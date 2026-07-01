@@ -88,8 +88,12 @@ export async function POST(_req: Request, { params }: Params) {
       if (diagramId) await tx.simulationStudyRoot.create({ data: { studyId: study.id, diagramId } });
     }
 
-    // Scenarios — config + overrides + interventions copied verbatim.
+    // Scenarios — config + overrides + interventions copied verbatim. Process
+    // variants (As-is vs To-be) remap their package keys → the new diagram ids.
     for (const sc of pkg.scenarios) {
+      const variantRootIds = (sc.variantRootKeys ?? [])
+        .map((k) => keyToDiagramId.get(k))
+        .filter((x): x is string => !!x);
       await tx.simulationScenario.create({
         data: {
           name: sc.name, studyId: study.id, isBaseline: !!sc.isBaseline,
@@ -97,6 +101,8 @@ export async function POST(_req: Request, { params }: Params) {
           runConfig: (sc.runConfig ?? {}) as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           overrides: (sc.overrides ?? {}) as any,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...(variantRootIds.length ? { variantRootIds: variantRootIds as any } : {}),
         },
       });
     }

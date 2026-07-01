@@ -1,0 +1,4376 @@
+{
+  "schemaVersion": "1.28",
+  "appVersion": "1.28.1375",
+  "exportedAt": "2026-07-01T01:55:51.451Z",
+  "project": {
+    "name": "Aardwolf Loan Processes",
+    "description": "",
+    "ownerName": "Paul Nash",
+    "colorConfig": {}
+  },
+  "diagrams": [
+    {
+      "originalId": "cmr0nmj2x000a01okojslk3os",
+      "name": "Loan Application Process (to-be)",
+      "type": "bpmn",
+      "data": {
+        "elements": [
+          {
+            "x": 50,
+            "y": 50,
+            "id": "pCust",
+            "type": "pool",
+            "label": "Customer",
+            "width": 3068.5,
+            "height": 97,
+            "properties": {
+              "isSystem": false,
+              "poolType": "black-box",
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "x": 50,
+            "y": 218,
+            "id": "p1",
+            "type": "pool",
+            "label": "Aardwolf Loans",
+            "width": 3068.5,
+            "height": 1376,
+            "properties": {
+              "poolType": "white-box"
+            }
+          },
+          {
+            "x": 86,
+            "y": 218,
+            "id": "lAI",
+            "type": "lane",
+            "label": "Loan Assessment AI Agent",
+            "width": 3032.5,
+            "height": 385,
+            "parentId": "p1",
+            "properties": {}
+          },
+          {
+            "x": 923.1428571428571,
+            "y": 498.00000000000006,
+            "id": "ds1",
+            "type": "data-store",
+            "label": "Lending Policy",
+            "width": 50,
+            "height": 40,
+            "parentId": "lAI",
+            "properties": {}
+          },
+          {
+            "x": 189.55555555555557,
+            "y": 300.94444444444446,
+            "id": "do_app",
+            "type": "data-object",
+            "label": "Loan Application Form",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAI",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 554,
+            "y": 322,
+            "id": "do_checklist",
+            "type": "data-object",
+            "label": "Loan Assessment Checklist",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAI",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 1072,
+            "y": 322,
+            "id": "do_credit",
+            "type": "data-object",
+            "label": "Credit Report",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAI",
+            "properties": {
+              "role": "output"
+            }
+          },
+          {
+            "x": 1097.5,
+            "y": 434,
+            "id": "t_assess",
+            "type": "task",
+            "label": "Assess Eligibility and Affordability",
+            "width": 107,
+            "height": 68,
+            "parentId": "lAI",
+            "taskType": "service",
+            "properties": {}
+          },
+          {
+            "x": 1234.5,
+            "y": 368,
+            "id": "do_summary",
+            "type": "data-object",
+            "label": "Assessment Summary",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAI",
+            "properties": {
+              "role": "output"
+            }
+          },
+          {
+            "x": 1260,
+            "y": 559.25,
+            "id": "gw_conf",
+            "type": "gateway",
+            "label": "Confidence Check",
+            "width": 40,
+            "height": 40,
+            "parentId": "lAI",
+            "properties": {
+              "labelWidth": 80,
+              "gatewayRole": "decision",
+              "gatewayType": "none",
+              "labelOffsetX": -70,
+              "labelOffsetY": -4
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 2514,
+            "y": 322,
+            "id": "do_decline",
+            "type": "data-object",
+            "label": "Decline Letter",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAI",
+            "properties": {
+              "role": "output"
+            }
+          },
+          {
+            "x": 2542,
+            "y": 435.5,
+            "id": "end_declined",
+            "type": "end-event",
+            "label": "Declined",
+            "width": 36,
+            "height": 36,
+            "parentId": "lAI",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            }
+          },
+          {
+            "x": 300,
+            "y": 402.5,
+            "id": "start1",
+            "type": "start-event",
+            "label": "Loan Application Submitted",
+            "width": 36,
+            "height": 36,
+            "parentId": "lAI",
+            "eventType": "message",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            }
+          },
+          {
+            "x": 406,
+            "y": 388,
+            "id": "t_register",
+            "type": "task",
+            "label": "Register Application",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAI",
+            "taskType": "service",
+            "properties": {}
+          },
+          {
+            "x": 620,
+            "y": 388,
+            "id": "t_complete",
+            "type": "task",
+            "label": "Check Application Completeness",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAI",
+            "taskType": "service",
+            "properties": {}
+          },
+          {
+            "x": 780,
+            "y": 388,
+            "id": "t_verify",
+            "type": "task",
+            "label": "Verify Identity and Documents",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAI",
+            "taskType": "service",
+            "properties": {}
+          },
+          {
+            "x": 940,
+            "y": 388,
+            "id": "t_credit",
+            "type": "task",
+            "label": "Obtain Credit Report",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAI",
+            "taskType": "service",
+            "properties": {}
+          },
+          {
+            "x": 2062,
+            "y": 559.25,
+            "id": "gw_conf_merge",
+            "type": "gateway",
+            "label": "Exception Handled",
+            "width": 40,
+            "height": 40,
+            "parentId": "lAI",
+            "properties": {
+              "labelWidth": 80,
+              "gatewayRole": "merge",
+              "gatewayType": "none",
+              "labelOffsetX": -40,
+              "labelOffsetY": -92
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 2192,
+            "y": 559.25,
+            "id": "gw_proceed",
+            "type": "gateway",
+            "label": "Proceed?",
+            "width": 40,
+            "height": 40,
+            "parentId": "lAI",
+            "properties": {
+              "labelWidth": 80,
+              "gatewayRole": "decision",
+              "gatewayType": "none",
+              "labelOffsetX": -53,
+              "labelOffsetY": -74
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 2382,
+            "y": 388,
+            "id": "t_decline",
+            "type": "task",
+            "label": "Send Decline Letter",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAI",
+            "taskType": "send",
+            "properties": {}
+          },
+          {
+            "x": 2382,
+            "y": 1194.6666666666667,
+            "id": "gw_type",
+            "type": "gateway",
+            "label": "Determine Loan Type",
+            "width": 40,
+            "height": 40,
+            "parentId": "lAI",
+            "properties": {
+              "labelWidth": 80,
+              "gatewayRole": "decision",
+              "gatewayType": "none",
+              "labelOffsetX": -40,
+              "labelOffsetY": -92
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 86,
+            "y": 603,
+            "id": "lSpec",
+            "type": "lane",
+            "label": "Loan Assessment Specialist",
+            "width": 3032.5,
+            "height": 280.00000000000006,
+            "parentId": "p1",
+            "properties": {}
+          },
+          {
+            "x": 1712,
+            "y": 639.5,
+            "id": "do_rfi",
+            "type": "data-object",
+            "label": "Request for Information",
+            "width": 36,
+            "height": 46,
+            "parentId": "lSpec",
+            "properties": {
+              "role": "output"
+            }
+          },
+          {
+            "x": 1740,
+            "y": 753,
+            "id": "t_response",
+            "type": "task",
+            "label": "Receive Response",
+            "width": 102,
+            "height": 65,
+            "parentId": "lSpec",
+            "taskType": "receive",
+            "properties": {}
+          },
+          {
+            "x": 1420,
+            "y": 705.5,
+            "id": "t_review",
+            "type": "task",
+            "label": "Review Exception",
+            "width": 102,
+            "height": 65,
+            "parentId": "lSpec",
+            "taskType": "user",
+            "properties": {}
+          },
+          {
+            "x": 1580,
+            "y": 705.5,
+            "id": "t_rfi",
+            "type": "task",
+            "label": "Request Further Information",
+            "width": 102,
+            "height": 65,
+            "parentId": "lSpec",
+            "taskType": "send",
+            "properties": {}
+          },
+          {
+            "x": 1944.2857142857142,
+            "y": 704.0714285714286,
+            "id": "t_resolve",
+            "type": "task",
+            "label": "Resolve Exception",
+            "width": 102,
+            "height": 65,
+            "parentId": "lSpec",
+            "taskType": "user",
+            "properties": {}
+          },
+          {
+            "x": 86,
+            "y": 883.0000000000001,
+            "id": "lPers",
+            "type": "lane",
+            "label": "Personal Loans Team",
+            "width": 3032.5,
+            "height": 259.99999999999994,
+            "parentId": "p1",
+            "properties": {}
+          },
+          {
+            "x": 2794,
+            "y": 909.5,
+            "id": "do_offer",
+            "type": "data-object",
+            "label": "Loan Offer",
+            "width": 36,
+            "height": 46,
+            "parentId": "lPers",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 2458.285714285714,
+            "y": 891.7142857142857,
+            "id": "do_tmpl_p",
+            "type": "data-object",
+            "label": "Personal Loan Agreement Template",
+            "width": 36,
+            "height": 46,
+            "parentId": "lPers",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 2542,
+            "y": 972,
+            "id": "sp_pers",
+            "type": "subprocess",
+            "label": "Draft and Approve Personal Loan",
+            "width": 108,
+            "height": 72,
+            "parentId": "lPers",
+            "properties": {}
+          },
+          {
+            "x": 2712.5,
+            "y": 1194.6666666666667,
+            "id": "gw_type_merge",
+            "type": "gateway",
+            "label": "Loan Type Processed",
+            "width": 40,
+            "height": 40,
+            "parentId": "lPers",
+            "properties": {
+              "labelWidth": 80,
+              "gatewayRole": "merge",
+              "gatewayType": "none",
+              "labelOffsetX": -40,
+              "labelOffsetY": -92
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 2872.5,
+            "y": 975.5,
+            "id": "t_send_outcome",
+            "type": "task",
+            "label": "Send Outcome to Customer",
+            "width": 102,
+            "height": 65,
+            "parentId": "lPers",
+            "taskType": "send",
+            "properties": {}
+          },
+          {
+            "x": 3032.5,
+            "y": 990,
+            "id": "end_closed",
+            "type": "end-event",
+            "label": "Application Closed",
+            "width": 36,
+            "height": 36,
+            "parentId": "lPers",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            }
+          },
+          {
+            "x": 86,
+            "y": 1143,
+            "id": "lHome",
+            "type": "lane",
+            "label": "Home Loans Team",
+            "width": 3032.5,
+            "height": 199.5,
+            "parentId": "p1",
+            "properties": {}
+          },
+          {
+            "x": 2502.571428571429,
+            "y": 1108.7142857142858,
+            "id": "do_tmpl_h",
+            "type": "data-object",
+            "label": "Home Loan Agreement Template",
+            "width": 36,
+            "height": 46,
+            "parentId": "lPers",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 2542,
+            "y": 1219,
+            "id": "sp_home",
+            "type": "subprocess",
+            "label": "Draft and Approve Home Loan",
+            "width": 108,
+            "height": 72,
+            "parentId": "lHome",
+            "properties": {}
+          },
+          {
+            "x": 86,
+            "y": 1342.5,
+            "id": "lComm",
+            "type": "lane",
+            "label": "Commercial Loans Team",
+            "width": 3032.5,
+            "height": 251.5,
+            "parentId": "p1",
+            "properties": {}
+          },
+          {
+            "x": 2471.5,
+            "y": 1352.5,
+            "id": "do_tmpl_c",
+            "type": "data-object",
+            "label": "Commercial Loan Agreement Template",
+            "width": 36,
+            "height": 46,
+            "parentId": "lComm",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 2540.928571428571,
+            "y": 1442.7857142857144,
+            "id": "sp_comm",
+            "type": "subprocess",
+            "label": "Draft and Approve Commercial Loan",
+            "width": 113,
+            "height": 76,
+            "parentId": "lComm",
+            "properties": {}
+          },
+          {
+            "x": 1776,
+            "y": 800,
+            "id": "bnd_timer",
+            "type": "intermediate-event",
+            "label": "10 Working Day Deadline",
+            "width": 36,
+            "height": 36,
+            "eventType": "timer",
+            "properties": {
+              "boundarySide": "bottom",
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            },
+            "boundaryHostId": "t_response"
+          }
+        ],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.6
+        },
+        "connectors": [
+          {
+            "id": "conn-pCust-start1",
+            "type": "messageBPMN",
+            "label": "Loan Application and Documents",
+            "sourceId": "pCust",
+            "targetId": "start1",
+            "waypoints": [
+              {
+                "x": 1584.25,
+                "y": 98.5
+              },
+              {
+                "x": 318,
+                "y": 147
+              },
+              {
+                "x": 318,
+                "y": 402.5
+              },
+              {
+                "x": 318,
+                "y": 420.5
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -106.25,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.08733909076095812,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-start1-t_register",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "start1",
+            "targetId": "t_register",
+            "waypoints": [
+              {
+                "x": 318,
+                "y": 420.5
+              },
+              {
+                "x": 336,
+                "y": 420.5
+              },
+              {
+                "x": 354,
+                "y": 420.5
+              },
+              {
+                "x": 382,
+                "y": 420.5
+              },
+              {
+                "x": 406,
+                "y": 420.5
+              },
+              {
+                "x": 457,
+                "y": 420.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-do_app-start1",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "do_app",
+            "targetId": "start1",
+            "waypoints": [
+              {
+                "x": 207.55555555555557,
+                "y": 323.94444444444446
+              },
+              {
+                "x": 225.55555555555557,
+                "y": 339.68086295551086
+              },
+              {
+                "x": 300,
+                "y": 404.7635814889336
+              },
+              {
+                "x": 318,
+                "y": 420.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.8420960545884001,
+            "targetOffsetAlong": 0.06287726358148878,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_register-t_complete",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t_register",
+            "targetId": "t_complete",
+            "waypoints": [
+              {
+                "x": 457,
+                "y": 420.5
+              },
+              {
+                "x": 508,
+                "y": 420.5
+              },
+              {
+                "x": 532,
+                "y": 420.5
+              },
+              {
+                "x": 596,
+                "y": 420.5
+              },
+              {
+                "x": 620,
+                "y": 420.5
+              },
+              {
+                "x": 671,
+                "y": 420.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-do_checklist-t_complete",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "do_checklist",
+            "targetId": "t_complete",
+            "waypoints": [
+              {
+                "x": 572,
+                "y": 345
+              },
+              {
+                "x": 590,
+                "y": 358.72727272727275
+              },
+              {
+                "x": 628.384105960265,
+                "y": 388
+              },
+              {
+                "x": 671,
+                "y": 420.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_complete-t_verify",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t_complete",
+            "targetId": "t_verify",
+            "waypoints": [
+              {
+                "x": 671,
+                "y": 420.5
+              },
+              {
+                "x": 722,
+                "y": 420.5
+              },
+              {
+                "x": 746,
+                "y": 420.5
+              },
+              {
+                "x": 756,
+                "y": 420.5
+              },
+              {
+                "x": 780,
+                "y": 420.5
+              },
+              {
+                "x": 831,
+                "y": 420.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-ds1-t_verify",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "ds1",
+            "targetId": "t_verify",
+            "waypoints": [
+              {
+                "x": 948.1428571428571,
+                "y": 518
+              },
+              {
+                "x": 924.113553113553,
+                "y": 498
+              },
+              {
+                "x": 870.047619047619,
+                "y": 453
+              },
+              {
+                "x": 831,
+                "y": 420.5
+              }
+            ],
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.01941391941391885,
+            "targetOffsetAlong": 0.8828197945845003,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_verify-t_credit",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t_verify",
+            "targetId": "t_credit",
+            "waypoints": [
+              {
+                "x": 831,
+                "y": 420.5
+              },
+              {
+                "x": 882,
+                "y": 420.5
+              },
+              {
+                "x": 906,
+                "y": 420.5
+              },
+              {
+                "x": 916,
+                "y": 420.5
+              },
+              {
+                "x": 940,
+                "y": 420.5
+              },
+              {
+                "x": 991,
+                "y": 420.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_credit-do_credit",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "t_credit",
+            "targetId": "do_credit",
+            "waypoints": [
+              {
+                "x": 991,
+                "y": 420.5
+              },
+              {
+                "x": 1033.6158940397352,
+                "y": 388
+              },
+              {
+                "x": 1072,
+                "y": 358.72727272727275
+              },
+              {
+                "x": 1090,
+                "y": 345
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_credit-t_assess",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t_credit",
+            "targetId": "t_assess",
+            "waypoints": [
+              {
+                "x": 991,
+                "y": 420.5
+              },
+              {
+                "x": 1042,
+                "y": 420.5
+              },
+              {
+                "x": 1066,
+                "y": 420.5
+              },
+              {
+                "x": 1069.75,
+                "y": 420.5
+              },
+              {
+                "x": 1069.75,
+                "y": 468
+              },
+              {
+                "x": 1073.5,
+                "y": 468
+              },
+              {
+                "x": 1097.5,
+                "y": 468
+              },
+              {
+                "x": 1151,
+                "y": 468
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-ds1-t_assess",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "ds1",
+            "targetId": "t_assess",
+            "waypoints": [
+              {
+                "x": 948.1428571428571,
+                "y": 518
+              },
+              {
+                "x": 973.1428571428571,
+                "y": 511.8380281690141
+              },
+              {
+                "x": 1097.5,
+                "y": 481.1866197183099
+              },
+              {
+                "x": 1151,
+                "y": 468
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.34595070422535057,
+            "targetOffsetAlong": 0.6939208782104395,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_assess-do_summary",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "t_assess",
+            "targetId": "do_summary",
+            "waypoints": [
+              {
+                "x": 1151,
+                "y": 468
+              },
+              {
+                "x": 1195.8181818181818,
+                "y": 434
+              },
+              {
+                "x": 1234.5,
+                "y": 404.6551724137931
+              },
+              {
+                "x": 1252.5,
+                "y": 391
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_assess-gw_conf",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t_assess",
+            "targetId": "gw_conf",
+            "waypoints": [
+              {
+                "x": 1151,
+                "y": 468
+              },
+              {
+                "x": 1204.5,
+                "y": 468
+              },
+              {
+                "x": 1228.5,
+                "y": 468
+              },
+              {
+                "x": 1234.25,
+                "y": 468
+              },
+              {
+                "x": 1234.25,
+                "y": 579.25
+              },
+              {
+                "x": 1240,
+                "y": 579.25
+              },
+              {
+                "x": 1260,
+                "y": 579.25
+              },
+              {
+                "x": 1280,
+                "y": 579.25
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gw_conf-t_review",
+            "type": "sequence",
+            "label": "Exception",
+            "sourceId": "gw_conf",
+            "targetId": "t_review",
+            "waypoints": [
+              {
+                "x": 1280,
+                "y": 579.25
+              },
+              {
+                "x": 1280,
+                "y": 599.25
+              },
+              {
+                "x": 1280,
+                "y": 738
+              },
+              {
+                "x": 1420,
+                "y": 738
+              },
+              {
+                "x": 1471,
+                "y": 738
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 39,
+            "labelOffsetY": 10,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gw_conf-gw_conf_merge",
+            "type": "sequence",
+            "label": "Straightforward",
+            "sourceId": "gw_conf",
+            "targetId": "gw_conf_merge",
+            "waypoints": [
+              {
+                "x": 1280,
+                "y": 579.25
+              },
+              {
+                "x": 1280,
+                "y": 559.25
+              },
+              {
+                "x": 1280,
+                "y": 539.25
+              },
+              {
+                "x": 1280,
+                "y": 522.1071428571428
+              },
+              {
+                "x": 2082,
+                "y": 522.1071428571428
+              },
+              {
+                "x": 2082,
+                "y": 539.25
+              },
+              {
+                "x": 2082,
+                "y": 559.25
+              },
+              {
+                "x": 2082,
+                "y": 579.25
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "top",
+            "targetSide": "top",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 56.85714285714266,
+            "labelOffsetY": -18,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_review-t_rfi",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t_review",
+            "targetId": "t_rfi",
+            "waypoints": [
+              {
+                "x": 1471,
+                "y": 738
+              },
+              {
+                "x": 1522,
+                "y": 738
+              },
+              {
+                "x": 1546,
+                "y": 738
+              },
+              {
+                "x": 1556,
+                "y": 738
+              },
+              {
+                "x": 1580,
+                "y": 738
+              },
+              {
+                "x": 1631,
+                "y": 738
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_rfi-do_rfi",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "t_rfi",
+            "targetId": "do_rfi",
+            "waypoints": [
+              {
+                "x": 1631,
+                "y": 738
+              },
+              {
+                "x": 1673.6158940397352,
+                "y": 705.5
+              },
+              {
+                "x": 1712,
+                "y": 676.2272727272727
+              },
+              {
+                "x": 1730,
+                "y": 662.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_rfi-pCust",
+            "type": "messageBPMN",
+            "label": "Request for Information",
+            "sourceId": "t_rfi",
+            "targetId": "pCust",
+            "waypoints": [
+              {
+                "x": 1631,
+                "y": 738
+              },
+              {
+                "x": 1631,
+                "y": 705.5
+              },
+              {
+                "x": 1631,
+                "y": 147
+              },
+              {
+                "x": 1584.25,
+                "y": 98.5
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -243.75,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5152354570637119,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_rfi-t_response",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t_rfi",
+            "targetId": "t_response",
+            "waypoints": [
+              {
+                "x": 1631,
+                "y": 738
+              },
+              {
+                "x": 1682,
+                "y": 738
+              },
+              {
+                "x": 1706,
+                "y": 738
+              },
+              {
+                "x": 1711,
+                "y": 738
+              },
+              {
+                "x": 1711,
+                "y": 785.5
+              },
+              {
+                "x": 1716,
+                "y": 785.5
+              },
+              {
+                "x": 1740,
+                "y": 785.5
+              },
+              {
+                "x": 1791,
+                "y": 785.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-pCust-t_response",
+            "type": "messageBPMN",
+            "label": "Information Response",
+            "sourceId": "pCust",
+            "targetId": "t_response",
+            "waypoints": [
+              {
+                "x": 1584.25,
+                "y": 98.5
+              },
+              {
+                "x": 1791,
+                "y": 147
+              },
+              {
+                "x": 1791,
+                "y": 753
+              },
+              {
+                "x": 1791,
+                "y": 785.5
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -288.5,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5673781978165228,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_response-t_resolve",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t_response",
+            "targetId": "t_resolve",
+            "waypoints": [
+              {
+                "x": 1791,
+                "y": 785.5
+              },
+              {
+                "x": 1842,
+                "y": 785.5
+              },
+              {
+                "x": 1866,
+                "y": 785.5
+              },
+              {
+                "x": 1893.142857142857,
+                "y": 785.5
+              },
+              {
+                "x": 1893.142857142857,
+                "y": 725.7380952380952
+              },
+              {
+                "x": 1920.2857142857142,
+                "y": 725.7380952380952
+              },
+              {
+                "x": 1944.2857142857142,
+                "y": 725.7380952380952
+              },
+              {
+                "x": 1995.2857142857142,
+                "y": 736.5714285714286
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "targetOffsetAlong": 0.33333333333333337,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-bnd_timer-t_resolve",
+            "type": "sequence",
+            "label": "Deadline Passed",
+            "sourceId": "bnd_timer",
+            "targetId": "t_resolve",
+            "waypoints": [
+              {
+                "x": 1794,
+                "y": 818
+              },
+              {
+                "x": 1794,
+                "y": 836
+              },
+              {
+                "x": 1794,
+                "y": 854
+              },
+              {
+                "x": 1920.2857142857142,
+                "y": 854
+              },
+              {
+                "x": 1920.2857142857142,
+                "y": 747.4047619047619
+              },
+              {
+                "x": 1944.2857142857142,
+                "y": 747.4047619047619
+              },
+              {
+                "x": 1995.2857142857142,
+                "y": 736.5714285714286
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 124.28571428571445,
+            "labelOffsetY": 17.14285714285711,
+            "directionType": "directed",
+            "targetOffsetAlong": 0.6666666666666666,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_resolve-gw_conf_merge",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t_resolve",
+            "targetId": "gw_conf_merge",
+            "waypoints": [
+              {
+                "x": 1995.2857142857142,
+                "y": 736.5714285714286
+              },
+              {
+                "x": 2046.2857142857142,
+                "y": 736.5714285714286
+              },
+              {
+                "x": 2082,
+                "y": 736.5714285714286
+              },
+              {
+                "x": 2082,
+                "y": 599.25
+              },
+              {
+                "x": 2082,
+                "y": 579.25
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gw_conf_merge-gw_proceed",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "gw_conf_merge",
+            "targetId": "gw_proceed",
+            "waypoints": [
+              {
+                "x": 2082,
+                "y": 579.25
+              },
+              {
+                "x": 2102,
+                "y": 579.25
+              },
+              {
+                "x": 2122,
+                "y": 579.25
+              },
+              {
+                "x": 2172,
+                "y": 579.25
+              },
+              {
+                "x": 2192,
+                "y": 579.25
+              },
+              {
+                "x": 2212,
+                "y": 579.25
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gw_proceed-t_decline",
+            "type": "sequence",
+            "label": "Declined",
+            "sourceId": "gw_proceed",
+            "targetId": "t_decline",
+            "waypoints": [
+              {
+                "x": 2212,
+                "y": 579.25
+              },
+              {
+                "x": 2212,
+                "y": 559.25
+              },
+              {
+                "x": 2212,
+                "y": 420.5
+              },
+              {
+                "x": 2382,
+                "y": 420.5
+              },
+              {
+                "x": 2433,
+                "y": 420.5
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "top",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 36,
+            "labelOffsetY": -24,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_decline-do_decline",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "t_decline",
+            "targetId": "do_decline",
+            "waypoints": [
+              {
+                "x": 2433,
+                "y": 420.5
+              },
+              {
+                "x": 2475.615894039735,
+                "y": 388
+              },
+              {
+                "x": 2514,
+                "y": 358.72727272727275
+              },
+              {
+                "x": 2532,
+                "y": 345
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_decline-pCust",
+            "type": "messageBPMN",
+            "label": "Decline Letter",
+            "sourceId": "t_decline",
+            "targetId": "pCust",
+            "waypoints": [
+              {
+                "x": 2433,
+                "y": 420.5
+              },
+              {
+                "x": 2433,
+                "y": 388
+              },
+              {
+                "x": 2433,
+                "y": 147
+              },
+              {
+                "x": 1584.25,
+                "y": 98.5
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -99,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.7766009450871761,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_decline-end_declined",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t_decline",
+            "targetId": "end_declined",
+            "waypoints": [
+              {
+                "x": 2433,
+                "y": 420.5
+              },
+              {
+                "x": 2484,
+                "y": 420.5
+              },
+              {
+                "x": 2508,
+                "y": 420.5
+              },
+              {
+                "x": 2516,
+                "y": 420.5
+              },
+              {
+                "x": 2516,
+                "y": 453.5
+              },
+              {
+                "x": 2524,
+                "y": 453.5
+              },
+              {
+                "x": 2542,
+                "y": 453.5
+              },
+              {
+                "x": 2560,
+                "y": 453.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gw_proceed-gw_type",
+            "type": "sequence",
+            "label": "Qualifies",
+            "sourceId": "gw_proceed",
+            "targetId": "gw_type",
+            "waypoints": [
+              {
+                "x": 2212,
+                "y": 579.25
+              },
+              {
+                "x": 2212,
+                "y": 599.25
+              },
+              {
+                "x": 2212,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2382,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2402,
+                "y": 1214.6666666666667
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 39,
+            "labelOffsetY": 10,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gw_type-sp_pers",
+            "type": "sequence",
+            "label": "Personal",
+            "sourceId": "gw_type",
+            "targetId": "sp_pers",
+            "waypoints": [
+              {
+                "x": 2402,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2402,
+                "y": 1194.6666666666667
+              },
+              {
+                "x": 2402,
+                "y": 1008
+              },
+              {
+                "x": 2542,
+                "y": 1008
+              },
+              {
+                "x": 2596,
+                "y": 1008
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "top",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 36,
+            "labelOffsetY": -24,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gw_type-sp_home",
+            "type": "sequence",
+            "label": "Home",
+            "sourceId": "gw_type",
+            "targetId": "sp_home",
+            "waypoints": [
+              {
+                "x": 2402,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2422,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2442,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2480,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2480,
+                "y": 1255
+              },
+              {
+                "x": 2518,
+                "y": 1255
+              },
+              {
+                "x": 2542,
+                "y": 1255
+              },
+              {
+                "x": 2596,
+                "y": 1255
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 21,
+            "labelOffsetY": 2,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gw_type-sp_comm",
+            "type": "sequence",
+            "label": "Commercial",
+            "sourceId": "gw_type",
+            "targetId": "sp_comm",
+            "waypoints": [
+              {
+                "x": 2402,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2402,
+                "y": 1234.6666666666667
+              },
+              {
+                "x": 2402,
+                "y": 1480.7857142857144
+              },
+              {
+                "x": 2540.928571428571,
+                "y": 1480.7857142857144
+              },
+              {
+                "x": 2597.428571428571,
+                "y": 1480.7857142857144
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 42,
+            "labelOffsetY": 10,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-do_tmpl_p-sp_pers",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "do_tmpl_p",
+            "targetId": "sp_pers",
+            "waypoints": [
+              {
+                "x": 2476.285714285714,
+                "y": 914.7142857142857
+              },
+              {
+                "x": 2494.285714285714,
+                "y": 928.7405386975793
+              },
+              {
+                "x": 2549.8009188361407,
+                "y": 972
+              },
+              {
+                "x": 2596,
+                "y": 1008
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "top",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.8049185431150783,
+            "targetOffsetAlong": 0.07223072996426556,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-do_tmpl_h-sp_home",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "do_tmpl_h",
+            "targetId": "sp_home",
+            "waypoints": [
+              {
+                "x": 2520.571428571429,
+                "y": 1131.7142857142858
+              },
+              {
+                "x": 2534.643270981626,
+                "y": 1154.7142857142858
+              },
+              {
+                "x": 2573.9745075318656,
+                "y": 1219
+              },
+              {
+                "x": 2596,
+                "y": 1255
+              }
+            ],
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.8908845113943598,
+            "targetOffsetAlong": 0.29606025492468135,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-do_tmpl_c-sp_comm",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "do_tmpl_c",
+            "targetId": "sp_comm",
+            "waypoints": [
+              {
+                "x": 2489.5,
+                "y": 1375.5
+              },
+              {
+                "x": 2507.5,
+                "y": 1393.0592322964924
+              },
+              {
+                "x": 2558.4747044000774,
+                "y": 1442.7857142857144
+              },
+              {
+                "x": 2597.428571428571,
+                "y": 1480.7857142857144
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "top",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.8817224412280953,
+            "targetOffsetAlong": 0.15527551302217935,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-sp_pers-gw_type_merge",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "sp_pers",
+            "targetId": "gw_type_merge",
+            "waypoints": [
+              {
+                "x": 2596,
+                "y": 1008
+              },
+              {
+                "x": 2650,
+                "y": 1008
+              },
+              {
+                "x": 2732.5,
+                "y": 1008
+              },
+              {
+                "x": 2732.5,
+                "y": 1194.6666666666667
+              },
+              {
+                "x": 2732.5,
+                "y": 1214.6666666666667
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-sp_home-gw_type_merge",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "sp_home",
+            "targetId": "gw_type_merge",
+            "waypoints": [
+              {
+                "x": 2596,
+                "y": 1255
+              },
+              {
+                "x": 2650,
+                "y": 1255
+              },
+              {
+                "x": 2674,
+                "y": 1255
+              },
+              {
+                "x": 2683.25,
+                "y": 1255
+              },
+              {
+                "x": 2683.25,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2692.5,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2712.5,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2732.5,
+                "y": 1214.6666666666667
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-sp_comm-gw_type_merge",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "sp_comm",
+            "targetId": "gw_type_merge",
+            "waypoints": [
+              {
+                "x": 2597.428571428571,
+                "y": 1480.7857142857144
+              },
+              {
+                "x": 2653.928571428571,
+                "y": 1480.7857142857144
+              },
+              {
+                "x": 2732.5,
+                "y": 1480.7857142857144
+              },
+              {
+                "x": 2732.5,
+                "y": 1234.6666666666667
+              },
+              {
+                "x": 2732.5,
+                "y": 1214.6666666666667
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gw_type_merge-t_send_outcome",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "gw_type_merge",
+            "targetId": "t_send_outcome",
+            "waypoints": [
+              {
+                "x": 2732.5,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2752.5,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2772.5,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2810.5,
+                "y": 1214.6666666666667
+              },
+              {
+                "x": 2810.5,
+                "y": 1008
+              },
+              {
+                "x": 2848.5,
+                "y": 1008
+              },
+              {
+                "x": 2872.5,
+                "y": 1008
+              },
+              {
+                "x": 2923.5,
+                "y": 1008
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-do_offer-t_send_outcome",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "do_offer",
+            "targetId": "t_send_outcome",
+            "waypoints": [
+              {
+                "x": 2812,
+                "y": 932.5
+              },
+              {
+                "x": 2830,
+                "y": 944.6883408071749
+              },
+              {
+                "x": 2875.5033112582782,
+                "y": 975.5
+              },
+              {
+                "x": 2923.5,
+                "y": 1008
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_send_outcome-pCust",
+            "type": "messageBPMN",
+            "label": "Loan Offer or Decline Letter",
+            "sourceId": "t_send_outcome",
+            "targetId": "pCust",
+            "waypoints": [
+              {
+                "x": 2923.5,
+                "y": 1008
+              },
+              {
+                "x": 2923.5,
+                "y": 975.5
+              },
+              {
+                "x": 2923.5,
+                "y": 147
+              },
+              {
+                "x": 1584.25,
+                "y": 98.5
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -392.75,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.9364510347075118,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t_send_outcome-end_closed",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t_send_outcome",
+            "targetId": "end_closed",
+            "waypoints": [
+              {
+                "x": 2923.5,
+                "y": 1008
+              },
+              {
+                "x": 2974.5,
+                "y": 1008
+              },
+              {
+                "x": 2998.5,
+                "y": 1008
+              },
+              {
+                "x": 3014.5,
+                "y": 1008
+              },
+              {
+                "x": 3032.5,
+                "y": 1008
+              },
+              {
+                "x": 3050.5,
+                "y": 1008
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          }
+        ]
+      },
+      "colorConfig": {},
+      "displayMode": "normal"
+    },
+    {
+      "originalId": "cmr0njxb0000101okbjcqu2ml",
+      "name": "Loan Application Process (as-is)",
+      "type": "bpmn",
+      "data": {
+        "elements": [
+          {
+            "x": 50,
+            "y": 50,
+            "id": "pCust",
+            "type": "pool",
+            "label": "Customer",
+            "width": 2106.5,
+            "height": 78,
+            "properties": {
+              "isSystem": false,
+              "poolType": "black-box",
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "x": 50,
+            "y": 218,
+            "id": "p1",
+            "type": "pool",
+            "label": "Lender",
+            "width": 2106.5,
+            "height": 1322.5,
+            "properties": {
+              "poolType": "white-box"
+            }
+          },
+          {
+            "x": 86,
+            "y": 218,
+            "id": "lAssess",
+            "type": "lane",
+            "label": "Loan Assessment Team",
+            "width": 2070.5,
+            "height": 702,
+            "parentId": "p1",
+            "properties": {}
+          },
+          {
+            "x": 158,
+            "y": 479,
+            "id": "startMsg",
+            "type": "start-event",
+            "label": "Loan Application Submitted",
+            "width": 36,
+            "height": 36,
+            "parentId": "lAssess",
+            "eventType": "message",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            }
+          },
+          {
+            "x": 263.3333333333333,
+            "y": 413.8333333333333,
+            "id": "doForm",
+            "type": "data-object",
+            "label": "Loan Application Form",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAssess",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 423.3333333333333,
+            "y": 412.5,
+            "id": "doChecklist",
+            "type": "data-object",
+            "label": "Loan Assessment Checklist",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAssess",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 779.5238095238096,
+            "y": 801.1666666666667,
+            "id": "dsPolicy",
+            "type": "data-store",
+            "label": "Lending Policy",
+            "width": 50,
+            "height": 40,
+            "parentId": "lAssess",
+            "properties": {}
+          },
+          {
+            "x": 1772.6666666666667,
+            "y": 497.8333333333333,
+            "id": "doOffer",
+            "type": "data-object",
+            "label": "Loan Offer",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAssess",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 1896.6666666666665,
+            "y": 678.1666666666666,
+            "id": "doDecline2",
+            "type": "data-object",
+            "label": "Decline Letter",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAssess",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 264,
+            "y": 530.5,
+            "id": "tRegister",
+            "type": "task",
+            "label": "Register Application",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAssess",
+            "taskType": "user",
+            "properties": {}
+          },
+          {
+            "x": 460,
+            "y": 530.5,
+            "id": "tCheck",
+            "type": "task",
+            "label": "Check Application Completeness",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAssess",
+            "taskType": "user",
+            "properties": {}
+          },
+          {
+            "x": 620,
+            "y": 530.5,
+            "id": "tVerify",
+            "type": "task",
+            "label": "Verify Identity and Documents",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAssess",
+            "taskType": "user",
+            "properties": {}
+          },
+          {
+            "x": 780,
+            "y": 543,
+            "id": "gxComplete",
+            "type": "gateway",
+            "label": "Complete and Verified?",
+            "width": 40,
+            "height": 40,
+            "parentId": "lAssess",
+            "properties": {
+              "labelWidth": 80,
+              "gatewayRole": "decision",
+              "gatewayType": "none",
+              "labelOffsetX": -40,
+              "labelOffsetY": -92
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 940,
+            "y": 483,
+            "id": "tRequestInfo",
+            "type": "task",
+            "label": "Request Further Information",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAssess",
+            "taskType": "send",
+            "properties": {}
+          },
+          {
+            "x": 940,
+            "y": 578,
+            "id": "tCredit",
+            "type": "task",
+            "label": "Obtain Credit Report",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAssess",
+            "taskType": "user",
+            "properties": {}
+          },
+          {
+            "x": 1072,
+            "y": 379.66666666666663,
+            "id": "doRFI",
+            "type": "data-object",
+            "label": "Request for Information",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAssess",
+            "properties": {
+              "role": "output"
+            }
+          },
+          {
+            "x": 1100,
+            "y": 530.5,
+            "id": "tReceiveResponse",
+            "type": "task",
+            "label": "Receive Customer Response",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAssess",
+            "taskType": "receive",
+            "properties": {}
+          },
+          {
+            "x": 856.8888888888889,
+            "y": 692.7407407407408,
+            "id": "doCredit",
+            "type": "data-object",
+            "label": "Credit Report",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAssess",
+            "properties": {
+              "role": "output"
+            }
+          },
+          {
+            "x": 1097.5,
+            "y": 719,
+            "id": "tAssess",
+            "type": "task",
+            "label": "Assess Eligibility and Affordability",
+            "width": 107,
+            "height": 68,
+            "parentId": "lAssess",
+            "taskType": "user",
+            "properties": {}
+          },
+          {
+            "x": 1307.3333333333335,
+            "y": 521.8571428571429,
+            "id": "endLapse",
+            "type": "end-event",
+            "label": "Lapse Application",
+            "width": 36,
+            "height": 36,
+            "parentId": "lAssess",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            }
+          },
+          {
+            "x": 1234.5,
+            "y": 653,
+            "id": "doSummary",
+            "type": "data-object",
+            "label": "Assessment Summary",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAssess",
+            "properties": {
+              "role": "output"
+            }
+          },
+          {
+            "x": 1260,
+            "y": 836.5,
+            "id": "gxProceed",
+            "type": "gateway",
+            "label": "Proceed?",
+            "width": 40,
+            "height": 40,
+            "parentId": "lAssess",
+            "properties": {
+              "labelWidth": 80,
+              "gatewayRole": "decision",
+              "gatewayType": "none",
+              "labelOffsetX": -71,
+              "labelOffsetY": -15
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 1420,
+            "y": 673,
+            "id": "tDecline",
+            "type": "task",
+            "label": "Send Decline Letter",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAssess",
+            "taskType": "send",
+            "properties": {}
+          },
+          {
+            "x": 1420,
+            "y": 1162.5,
+            "id": "gxType",
+            "type": "gateway",
+            "label": "Determine Loan Type",
+            "width": 40,
+            "height": 40,
+            "parentId": "lAssess",
+            "properties": {
+              "labelWidth": 80,
+              "gatewayRole": "decision",
+              "gatewayType": "none",
+              "labelOffsetX": -40,
+              "labelOffsetY": -92
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 1640,
+            "y": 695,
+            "id": "doDecline1",
+            "type": "data-object",
+            "label": "Decline Letter",
+            "width": 36,
+            "height": 46,
+            "parentId": "lAssess",
+            "properties": {
+              "role": "output"
+            }
+          },
+          {
+            "x": 1580,
+            "y": 578,
+            "id": "endDeclined",
+            "type": "end-event",
+            "label": "Declined",
+            "width": 36,
+            "height": 36,
+            "parentId": "lAssess",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 46
+            }
+          },
+          {
+            "x": 1750.5,
+            "y": 1162.5,
+            "id": "gxTypeMerge",
+            "type": "gateway",
+            "label": "Loan Type Resolved",
+            "width": 40,
+            "height": 40,
+            "parentId": "lAssess",
+            "properties": {
+              "labelWidth": 80,
+              "gatewayRole": "merge",
+              "gatewayType": "none",
+              "labelOffsetX": -40,
+              "labelOffsetY": -92
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 1910.5,
+            "y": 530.5,
+            "id": "tSendOutcome",
+            "type": "task",
+            "label": "Send Loan Outcome",
+            "width": 102,
+            "height": 65,
+            "parentId": "lAssess",
+            "taskType": "send",
+            "properties": {}
+          },
+          {
+            "x": 2070.5,
+            "y": 545,
+            "id": "endClosed",
+            "type": "end-event",
+            "label": "Application Closed",
+            "width": 36,
+            "height": 36,
+            "parentId": "lAssess",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            }
+          },
+          {
+            "x": 86,
+            "y": 920,
+            "id": "lPersonal",
+            "type": "lane",
+            "label": "Personal Loans Team",
+            "width": 2070.5,
+            "height": 199.5,
+            "parentId": "p1",
+            "properties": {}
+          },
+          {
+            "x": 1580,
+            "y": 996,
+            "id": "spPersonal",
+            "type": "subprocess",
+            "label": "Draft and Approve Personal Loan",
+            "width": 108,
+            "height": 72,
+            "parentId": "lPersonal",
+            "properties": {}
+          },
+          {
+            "x": 1514,
+            "y": 930,
+            "id": "doTplPersonal",
+            "type": "data-object",
+            "label": "Personal Loan Agreement Template",
+            "width": 36,
+            "height": 46,
+            "parentId": "lPersonal",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 86,
+            "y": 1119.5,
+            "id": "lHome",
+            "type": "lane",
+            "label": "Home Loans Team",
+            "width": 2070.5,
+            "height": 199.5,
+            "parentId": "p1",
+            "properties": {}
+          },
+          {
+            "x": 1580,
+            "y": 1195.5,
+            "id": "spHome",
+            "type": "subprocess",
+            "label": "Draft and Approve Home Loan",
+            "width": 108,
+            "height": 72,
+            "parentId": "lHome",
+            "properties": {}
+          },
+          {
+            "x": 1525.4285714285716,
+            "y": 1089.5,
+            "id": "doTplHome",
+            "type": "data-object",
+            "label": "Home Loan Agreement Template",
+            "width": 36,
+            "height": 46,
+            "parentId": "lPersonal",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 86,
+            "y": 1319,
+            "id": "lCommercial",
+            "type": "lane",
+            "label": "Commercial Loans Team",
+            "width": 2070.5,
+            "height": 221.5,
+            "parentId": "p1",
+            "properties": {}
+          },
+          {
+            "x": 1577.5,
+            "y": 1395,
+            "id": "spCommercial",
+            "type": "subprocess",
+            "label": "Draft and Approve Commercial Loan",
+            "width": 113,
+            "height": 76,
+            "parentId": "lCommercial",
+            "properties": {}
+          },
+          {
+            "x": 1511.5,
+            "y": 1329,
+            "id": "doTplCommercial",
+            "type": "data-object",
+            "label": "Commercial Loan Agreement Template",
+            "width": 36,
+            "height": 46,
+            "parentId": "lCommercial",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 50,
+            "y": 1630.5,
+            "id": "pLR",
+            "type": "pool",
+            "label": "Loan Ranger",
+            "width": 2106.5,
+            "height": 100,
+            "properties": {
+              "isSystem": true,
+              "poolType": "black-box",
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "x": 1136,
+            "y": 577.5,
+            "id": "bTimer",
+            "type": "intermediate-event",
+            "label": "Ten Working Days",
+            "width": 36,
+            "height": 36,
+            "eventType": "timer",
+            "properties": {
+              "boundarySide": "bottom",
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            },
+            "boundaryHostId": "tReceiveResponse"
+          },
+          {
+            "x": 138.66666666666666,
+            "y": 734,
+            "id": "_ai_gen_annotation",
+            "type": "text-annotation",
+            "label": "AI Generated\nPersonal Loans Team, Home Loans Team and Commercial Loans Team — with the applicant as\na Black-Box \"",
+            "width": 160,
+            "height": 44,
+            "properties": {}
+          }
+        ],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.6
+        },
+        "connectors": [
+          {
+            "id": "conn-pCust-startMsg",
+            "type": "messageBPMN",
+            "label": "Loan Application and Documents",
+            "sourceId": "pCust",
+            "targetId": "startMsg",
+            "waypoints": [
+              {
+                "x": 1103.25,
+                "y": 89
+              },
+              {
+                "x": 176,
+                "y": 128
+              },
+              {
+                "x": 176,
+                "y": 479
+              },
+              {
+                "x": 176,
+                "y": 497
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "labelOffsetX": 17.333333333333314,
+            "labelOffsetY": -136.5,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.059814858770472344,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-doForm-tRegister",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "doForm",
+            "targetId": "tRegister",
+            "waypoints": [
+              {
+                "x": 281.3333333333333,
+                "y": 436.8333333333333
+              },
+              {
+                "x": 287.4707177454866,
+                "y": 459.8333333333333
+              },
+              {
+                "x": 306.327608982827,
+                "y": 530.5
+              },
+              {
+                "x": 315,
+                "y": 563
+              }
+            ],
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.6704829003375907,
+            "targetOffsetAlong": 0.4149765586551664,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-startMsg-tRegister",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "startMsg",
+            "targetId": "tRegister",
+            "waypoints": [
+              {
+                "x": 176,
+                "y": 497
+              },
+              {
+                "x": 194,
+                "y": 497
+              },
+              {
+                "x": 212,
+                "y": 497
+              },
+              {
+                "x": 226,
+                "y": 497
+              },
+              {
+                "x": 226,
+                "y": 563
+              },
+              {
+                "x": 240,
+                "y": 563
+              },
+              {
+                "x": 264,
+                "y": 563
+              },
+              {
+                "x": 315,
+                "y": 563
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tRegister-pLR",
+            "type": "messageBPMN",
+            "label": "New application record",
+            "sourceId": "tRegister",
+            "targetId": "pLR",
+            "waypoints": [
+              {
+                "x": 315,
+                "y": 563
+              },
+              {
+                "x": 315,
+                "y": 595.5
+              },
+              {
+                "x": 315,
+                "y": 1630.5
+              },
+              {
+                "x": 1103.25,
+                "y": 1680.5
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": 458.5,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.1258010918585331,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tRegister-tCheck",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "tRegister",
+            "targetId": "tCheck",
+            "waypoints": [
+              {
+                "x": 315,
+                "y": 563
+              },
+              {
+                "x": 366,
+                "y": 563
+              },
+              {
+                "x": 390,
+                "y": 563
+              },
+              {
+                "x": 436,
+                "y": 563
+              },
+              {
+                "x": 460,
+                "y": 563
+              },
+              {
+                "x": 511,
+                "y": 563
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-doChecklist-tCheck",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "doChecklist",
+            "targetId": "tCheck",
+            "waypoints": [
+              {
+                "x": 441.3333333333333,
+                "y": 435.5
+              },
+              {
+                "x": 453.9006535947712,
+                "y": 458.5
+              },
+              {
+                "x": 493.24183006535947,
+                "y": 530.5
+              },
+              {
+                "x": 511,
+                "y": 563
+              }
+            ],
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.8490922294843857,
+            "targetOffsetAlong": 0.32590029475842613,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tCheck-tVerify",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "tCheck",
+            "targetId": "tVerify",
+            "waypoints": [
+              {
+                "x": 511,
+                "y": 563
+              },
+              {
+                "x": 562,
+                "y": 563
+              },
+              {
+                "x": 586,
+                "y": 563
+              },
+              {
+                "x": 596,
+                "y": 563
+              },
+              {
+                "x": 620,
+                "y": 563
+              },
+              {
+                "x": 671,
+                "y": 563
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-dsPolicy-tVerify",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "dsPolicy",
+            "targetId": "tVerify",
+            "waypoints": [
+              {
+                "x": 804.5238095238096,
+                "y": 821.1666666666667
+              },
+              {
+                "x": 794.1798087860064,
+                "y": 801.1666666666667
+              },
+              {
+                "x": 687.8090011989302,
+                "y": 595.5
+              },
+              {
+                "x": 671,
+                "y": 563
+              }
+            ],
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.2931199852439363,
+            "targetOffsetAlong": 0.6647941294012767,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tVerify-gxComplete",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "tVerify",
+            "targetId": "gxComplete",
+            "waypoints": [
+              {
+                "x": 671,
+                "y": 563
+              },
+              {
+                "x": 722,
+                "y": 563
+              },
+              {
+                "x": 746,
+                "y": 563
+              },
+              {
+                "x": 760,
+                "y": 563
+              },
+              {
+                "x": 780,
+                "y": 563
+              },
+              {
+                "x": 800,
+                "y": 563
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gxComplete-tRequestInfo",
+            "type": "sequence",
+            "label": "No",
+            "sourceId": "gxComplete",
+            "targetId": "tRequestInfo",
+            "waypoints": [
+              {
+                "x": 800,
+                "y": 563
+              },
+              {
+                "x": 800,
+                "y": 543
+              },
+              {
+                "x": 800,
+                "y": 515.5
+              },
+              {
+                "x": 940,
+                "y": 515.5
+              },
+              {
+                "x": 991,
+                "y": 515.5
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "top",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 21,
+            "labelOffsetY": -24,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tRequestInfo-doRFI",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "tRequestInfo",
+            "targetId": "doRFI",
+            "waypoints": [
+              {
+                "x": 991,
+                "y": 515.5
+              },
+              {
+                "x": 1019.5155096011816,
+                "y": 483
+              },
+              {
+                "x": 1072,
+                "y": 423.18181818181813
+              },
+              {
+                "x": 1090,
+                "y": 402.66666666666663
+              }
+            ],
+            "sourceSide": "top",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.7795638196194278,
+            "targetOffsetAlong": 0.9459815546772066,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tRequestInfo-pCust",
+            "type": "messageBPMN",
+            "label": "Request for Information",
+            "sourceId": "tRequestInfo",
+            "targetId": "pCust",
+            "waypoints": [
+              {
+                "x": 991,
+                "y": 515.5
+              },
+              {
+                "x": 991,
+                "y": 483
+              },
+              {
+                "x": 991,
+                "y": 128
+              },
+              {
+                "x": 1103.25,
+                "y": 89
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -146.5,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.4467125563731308,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tRequestInfo-tReceiveResponse",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "tRequestInfo",
+            "targetId": "tReceiveResponse",
+            "waypoints": [
+              {
+                "x": 991,
+                "y": 515.5
+              },
+              {
+                "x": 1042,
+                "y": 515.5
+              },
+              {
+                "x": 1066,
+                "y": 515.5
+              },
+              {
+                "x": 1076,
+                "y": 515.5
+              },
+              {
+                "x": 1076,
+                "y": 563
+              },
+              {
+                "x": 1100,
+                "y": 563
+              },
+              {
+                "x": 1151,
+                "y": 563
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-pCust-tReceiveResponse",
+            "type": "messageBPMN",
+            "label": "Customer response",
+            "sourceId": "pCust",
+            "targetId": "tReceiveResponse",
+            "waypoints": [
+              {
+                "x": 1103.25,
+                "y": 89
+              },
+              {
+                "x": 1151,
+                "y": 128
+              },
+              {
+                "x": 1151,
+                "y": 530.5
+              },
+              {
+                "x": 1151,
+                "y": 563
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -156.25,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5226679325896036,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tReceiveResponse-tCheck",
+            "type": "sequence",
+            "label": "Re-check",
+            "sourceId": "tReceiveResponse",
+            "targetId": "tCheck",
+            "waypoints": [
+              {
+                "x": 1151,
+                "y": 563
+              },
+              {
+                "x": 1100,
+                "y": 563
+              },
+              {
+                "x": 1076,
+                "y": 563
+              },
+              {
+                "x": 1076,
+                "y": 653
+              },
+              {
+                "x": 586,
+                "y": 653
+              },
+              {
+                "x": 586,
+                "y": 563
+              },
+              {
+                "x": 562,
+                "y": 563
+              },
+              {
+                "x": 511,
+                "y": 563
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "left",
+            "targetSide": "right",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-bTimer-endLapse",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "bTimer",
+            "targetId": "endLapse",
+            "waypoints": [
+              {
+                "x": 1154,
+                "y": 595.5
+              },
+              {
+                "x": 1154,
+                "y": 613.5
+              },
+              {
+                "x": 1154,
+                "y": 631.5
+              },
+              {
+                "x": 1289.3333333333335,
+                "y": 631.5
+              },
+              {
+                "x": 1289.3333333333335,
+                "y": 539.8571428571429
+              },
+              {
+                "x": 1307.3333333333335,
+                "y": 539.8571428571429
+              },
+              {
+                "x": 1325.3333333333335,
+                "y": 539.8571428571429
+              }
+            ],
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gxComplete-tCredit",
+            "type": "sequence",
+            "label": "Yes",
+            "sourceId": "gxComplete",
+            "targetId": "tCredit",
+            "waypoints": [
+              {
+                "x": 800,
+                "y": 563
+              },
+              {
+                "x": 800,
+                "y": 583
+              },
+              {
+                "x": 800,
+                "y": 610.5
+              },
+              {
+                "x": 940,
+                "y": 610.5
+              },
+              {
+                "x": 991,
+                "y": 610.5
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 21,
+            "labelOffsetY": 10,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tCredit-doCredit",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "tCredit",
+            "targetId": "doCredit",
+            "waypoints": [
+              {
+                "x": 991,
+                "y": 610.5
+              },
+              {
+                "x": 955.1430582438853,
+                "y": 643
+              },
+              {
+                "x": 892.8888888888889,
+                "y": 699.4259082048555
+              },
+              {
+                "x": 874.8888888888889,
+                "y": 715.7407407407408
+              }
+            ],
+            "sourceSide": "bottom",
+            "targetSide": "right",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.14846135533220903,
+            "targetOffsetAlong": 0.14532972748075618,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tCredit-tAssess",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "tCredit",
+            "targetId": "tAssess",
+            "waypoints": [
+              {
+                "x": 991,
+                "y": 610.5
+              },
+              {
+                "x": 1042,
+                "y": 610.5
+              },
+              {
+                "x": 1066,
+                "y": 610.5
+              },
+              {
+                "x": 1066,
+                "y": 753
+              },
+              {
+                "x": 1073.5,
+                "y": 753
+              },
+              {
+                "x": 1097.5,
+                "y": 753
+              },
+              {
+                "x": 1151,
+                "y": 753
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-dsPolicy-tAssess",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "dsPolicy",
+            "targetId": "tAssess",
+            "waypoints": [
+              {
+                "x": 804.5238095238096,
+                "y": 821.1666666666667
+              },
+              {
+                "x": 829.5238095238096,
+                "y": 816.2480987722192
+              },
+              {
+                "x": 1097.5,
+                "y": 763.5257352941177
+              },
+              {
+                "x": 1151,
+                "y": 753
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.37703580263881237,
+            "targetOffsetAlong": 0.6547902249134953,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tAssess-doSummary",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "tAssess",
+            "targetId": "doSummary",
+            "waypoints": [
+              {
+                "x": 1151,
+                "y": 753
+              },
+              {
+                "x": 1195.8181818181818,
+                "y": 719
+              },
+              {
+                "x": 1234.5,
+                "y": 689.6551724137931
+              },
+              {
+                "x": 1252.5,
+                "y": 676
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tAssess-gxProceed",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "tAssess",
+            "targetId": "gxProceed",
+            "waypoints": [
+              {
+                "x": 1151,
+                "y": 753
+              },
+              {
+                "x": 1204.5,
+                "y": 753
+              },
+              {
+                "x": 1228.5,
+                "y": 753
+              },
+              {
+                "x": 1234.25,
+                "y": 753
+              },
+              {
+                "x": 1234.25,
+                "y": 856.5
+              },
+              {
+                "x": 1240,
+                "y": 856.5
+              },
+              {
+                "x": 1260,
+                "y": 856.5
+              },
+              {
+                "x": 1280,
+                "y": 856.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gxProceed-tDecline",
+            "type": "sequence",
+            "label": "Declined",
+            "sourceId": "gxProceed",
+            "targetId": "tDecline",
+            "waypoints": [
+              {
+                "x": 1280,
+                "y": 856.5
+              },
+              {
+                "x": 1280,
+                "y": 836.5
+              },
+              {
+                "x": 1280,
+                "y": 705.5
+              },
+              {
+                "x": 1420,
+                "y": 705.5
+              },
+              {
+                "x": 1471,
+                "y": 705.5
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "top",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 36,
+            "labelOffsetY": -24,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tDecline-doDecline1",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "tDecline",
+            "targetId": "doDecline1",
+            "waypoints": [
+              {
+                "x": 1471,
+                "y": 705.5
+              },
+              {
+                "x": 1522,
+                "y": 708.9090909090909
+              },
+              {
+                "x": 1640,
+                "y": 716.7967914438502
+              },
+              {
+                "x": 1658,
+                "y": 718
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.552447552447552,
+            "targetOffsetAlong": 0.47384329225761357,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tDecline-pCust",
+            "type": "messageBPMN",
+            "label": "Decline Letter",
+            "sourceId": "tDecline",
+            "targetId": "pCust",
+            "waypoints": [
+              {
+                "x": 1471,
+                "y": 705.5
+              },
+              {
+                "x": 1471,
+                "y": 673
+              },
+              {
+                "x": 1471,
+                "y": 128
+              },
+              {
+                "x": 1103.25,
+                "y": 89
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -241.5,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.6745786850225493,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tDecline-endDeclined",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "tDecline",
+            "targetId": "endDeclined",
+            "waypoints": [
+              {
+                "x": 1471,
+                "y": 705.5
+              },
+              {
+                "x": 1522,
+                "y": 705.5
+              },
+              {
+                "x": 1546,
+                "y": 705.5
+              },
+              {
+                "x": 1554,
+                "y": 705.5
+              },
+              {
+                "x": 1554,
+                "y": 596
+              },
+              {
+                "x": 1562,
+                "y": 596
+              },
+              {
+                "x": 1580,
+                "y": 596
+              },
+              {
+                "x": 1598,
+                "y": 596
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gxProceed-gxType",
+            "type": "sequence",
+            "label": "Proceed",
+            "sourceId": "gxProceed",
+            "targetId": "gxType",
+            "waypoints": [
+              {
+                "x": 1280,
+                "y": 856.5
+              },
+              {
+                "x": 1280,
+                "y": 876.5
+              },
+              {
+                "x": 1280,
+                "y": 1182.5
+              },
+              {
+                "x": 1420,
+                "y": 1182.5
+              },
+              {
+                "x": 1440,
+                "y": 1182.5
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 33,
+            "labelOffsetY": 10,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gxType-spPersonal",
+            "type": "sequence",
+            "label": "Personal",
+            "sourceId": "gxType",
+            "targetId": "spPersonal",
+            "waypoints": [
+              {
+                "x": 1440,
+                "y": 1182.5
+              },
+              {
+                "x": 1440,
+                "y": 1162.5
+              },
+              {
+                "x": 1440,
+                "y": 1032
+              },
+              {
+                "x": 1580,
+                "y": 1032
+              },
+              {
+                "x": 1634,
+                "y": 1032
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "top",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 36,
+            "labelOffsetY": -24,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gxType-spHome",
+            "type": "sequence",
+            "label": "Home",
+            "sourceId": "gxType",
+            "targetId": "spHome",
+            "waypoints": [
+              {
+                "x": 1440,
+                "y": 1182.5
+              },
+              {
+                "x": 1460,
+                "y": 1182.5
+              },
+              {
+                "x": 1480,
+                "y": 1182.5
+              },
+              {
+                "x": 1518,
+                "y": 1182.5
+              },
+              {
+                "x": 1518,
+                "y": 1231.5
+              },
+              {
+                "x": 1556,
+                "y": 1231.5
+              },
+              {
+                "x": 1580,
+                "y": 1231.5
+              },
+              {
+                "x": 1634,
+                "y": 1231.5
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 21,
+            "labelOffsetY": 2,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gxType-spCommercial",
+            "type": "sequence",
+            "label": "Commercial",
+            "sourceId": "gxType",
+            "targetId": "spCommercial",
+            "waypoints": [
+              {
+                "x": 1440,
+                "y": 1182.5
+              },
+              {
+                "x": 1440,
+                "y": 1202.5
+              },
+              {
+                "x": 1440,
+                "y": 1433
+              },
+              {
+                "x": 1577.5,
+                "y": 1433
+              },
+              {
+                "x": 1634,
+                "y": 1433
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 42,
+            "labelOffsetY": 10,
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-doTplPersonal-spPersonal",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "doTplPersonal",
+            "targetId": "spPersonal",
+            "waypoints": [
+              {
+                "x": 1532,
+                "y": 953
+              },
+              {
+                "x": 1550,
+                "y": 966.9411764705883
+              },
+              {
+                "x": 1587.5189873417721,
+                "y": 996
+              },
+              {
+                "x": 1634,
+                "y": 1032
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-doTplHome-spHome",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "doTplHome",
+            "targetId": "spHome",
+            "waypoints": [
+              {
+                "x": 1543.4285714285716,
+                "y": 1112.5
+              },
+              {
+                "x": 1560.933973589436,
+                "y": 1135.5
+              },
+              {
+                "x": 1606.6002400960385,
+                "y": 1195.5
+              },
+              {
+                "x": 1634,
+                "y": 1231.5
+              }
+            ],
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.9862611711351216,
+            "targetOffsetAlong": 0.2462985194077642,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-doTplCommercial-spCommercial",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "doTplCommercial",
+            "targetId": "spCommercial",
+            "waypoints": [
+              {
+                "x": 1529.5,
+                "y": 1352
+              },
+              {
+                "x": 1547.5,
+                "y": 1365.952153110048
+              },
+              {
+                "x": 1584.9753086419753,
+                "y": 1395
+              },
+              {
+                "x": 1634,
+                "y": 1433
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-spPersonal-gxTypeMerge",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "spPersonal",
+            "targetId": "gxTypeMerge",
+            "waypoints": [
+              {
+                "x": 1634,
+                "y": 1032
+              },
+              {
+                "x": 1688,
+                "y": 1032
+              },
+              {
+                "x": 1770.5,
+                "y": 1032
+              },
+              {
+                "x": 1770.5,
+                "y": 1162.5
+              },
+              {
+                "x": 1770.5,
+                "y": 1182.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-spHome-gxTypeMerge",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "spHome",
+            "targetId": "gxTypeMerge",
+            "waypoints": [
+              {
+                "x": 1634,
+                "y": 1231.5
+              },
+              {
+                "x": 1688,
+                "y": 1231.5
+              },
+              {
+                "x": 1712,
+                "y": 1231.5
+              },
+              {
+                "x": 1721.25,
+                "y": 1231.5
+              },
+              {
+                "x": 1721.25,
+                "y": 1182.5
+              },
+              {
+                "x": 1730.5,
+                "y": 1182.5
+              },
+              {
+                "x": 1750.5,
+                "y": 1182.5
+              },
+              {
+                "x": 1770.5,
+                "y": 1182.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-spCommercial-gxTypeMerge",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "spCommercial",
+            "targetId": "gxTypeMerge",
+            "waypoints": [
+              {
+                "x": 1634,
+                "y": 1433
+              },
+              {
+                "x": 1690.5,
+                "y": 1433
+              },
+              {
+                "x": 1770.5,
+                "y": 1433
+              },
+              {
+                "x": 1770.5,
+                "y": 1202.5
+              },
+              {
+                "x": 1770.5,
+                "y": 1182.5
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gxTypeMerge-tSendOutcome",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "gxTypeMerge",
+            "targetId": "tSendOutcome",
+            "waypoints": [
+              {
+                "x": 1770.5,
+                "y": 1182.5
+              },
+              {
+                "x": 1790.5,
+                "y": 1182.5
+              },
+              {
+                "x": 1810.5,
+                "y": 1182.5
+              },
+              {
+                "x": 1848.5,
+                "y": 1182.5
+              },
+              {
+                "x": 1848.5,
+                "y": 563
+              },
+              {
+                "x": 1886.5,
+                "y": 563
+              },
+              {
+                "x": 1910.5,
+                "y": 563
+              },
+              {
+                "x": 1961.5,
+                "y": 563
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-doOffer-tSendOutcome",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "doOffer",
+            "targetId": "tSendOutcome",
+            "waypoints": [
+              {
+                "x": 1790.6666666666667,
+                "y": 520.8333333333333
+              },
+              {
+                "x": 1808.6666666666667,
+                "y": 525.2762601626016
+              },
+              {
+                "x": 1910.5,
+                "y": 550.4117073170731
+              },
+              {
+                "x": 1961.5,
+                "y": 563
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.5965853658536584,
+            "targetOffsetAlong": 0.3063339587242021,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-doDecline2-tSendOutcome",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "doDecline2",
+            "targetId": "tSendOutcome",
+            "waypoints": [
+              {
+                "x": 1914.6666666666665,
+                "y": 701.1666666666666
+              },
+              {
+                "x": 1922.4628065942902,
+                "y": 678.1666666666666
+              },
+              {
+                "x": 1950.4837153196622,
+                "y": 595.5
+              },
+              {
+                "x": 1961.5,
+                "y": 563
+              }
+            ],
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.7165594424339916,
+            "targetOffsetAlong": 0.3919972090162963,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tSendOutcome-pCust",
+            "type": "messageBPMN",
+            "label": "Loan Offer or Decline Letter",
+            "sourceId": "tSendOutcome",
+            "targetId": "pCust",
+            "waypoints": [
+              {
+                "x": 1961.5,
+                "y": 563
+              },
+              {
+                "x": 1961.5,
+                "y": 530.5
+              },
+              {
+                "x": 1961.5,
+                "y": 128
+              },
+              {
+                "x": 1103.25,
+                "y": 89
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -170.25,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.9074293852361738,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-tSendOutcome-endClosed",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "tSendOutcome",
+            "targetId": "endClosed",
+            "waypoints": [
+              {
+                "x": 1961.5,
+                "y": 563
+              },
+              {
+                "x": 2012.5,
+                "y": 563
+              },
+              {
+                "x": 2036.5,
+                "y": 563
+              },
+              {
+                "x": 2052.5,
+                "y": 563
+              },
+              {
+                "x": 2070.5,
+                "y": 563
+              },
+              {
+                "x": 2088.5,
+                "y": 563
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-_ai_gen_annotation-startMsg",
+            "type": "associationBPMN",
+            "label": "",
+            "sourceId": "_ai_gen_annotation",
+            "targetId": "startMsg",
+            "waypoints": [
+              {
+                "x": 218.66666666666666,
+                "y": 756
+              },
+              {
+                "x": 215.04247104247102,
+                "y": 734
+              },
+              {
+                "x": 178.96525096525096,
+                "y": 515
+              },
+              {
+                "x": 176,
+                "y": 497
+              }
+            ],
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "direct",
+            "directionType": "non-directed",
+            "sourceOffsetAlong": 0.4773487773487773,
+            "targetOffsetAlong": 0.5823680823680822,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "flcm21a3",
+            "type": "messageBPMN",
+            "label": "Elibibility",
+            "sourceId": "pLR",
+            "targetId": "tAssess",
+            "waypoints": [
+              {
+                "x": 1103.25,
+                "y": 1680.5
+              },
+              {
+                "x": 1170.2827512184117,
+                "y": 1630.5
+              },
+              {
+                "x": 1170.2827512184117,
+                "y": 787
+              },
+              {
+                "x": 1151,
+                "y": 753
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "direct",
+            "labelOffsetX": 45,
+            "labelOffsetY": 364.75,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.531821861485123,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          }
+        ]
+      },
+      "colorConfig": {},
+      "displayMode": "normal"
+    }
+  ],
+  "folderTree": {
+    "folders": [],
+    "diagramFolderMap": {}
+  }
+}

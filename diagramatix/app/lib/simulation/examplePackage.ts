@@ -35,6 +35,11 @@ export interface ExampleScenario {
   isBaseline?: boolean;
   runConfig: ScenarioRunConfig;
   overrides?: OverrideSet;
+  /** Process-variant roots for As-is vs To-be comparison studies: the diagram
+   *  KEY(s) this scenario runs instead of the study's roots. Empty/absent = run
+   *  the study roots. Referenced by package key (not DB id) so adopt can remap
+   *  to the freshly-minted diagram ids. */
+  variantRootKeys?: string[];
 }
 
 export interface ExamplePackage {
@@ -83,6 +88,11 @@ export function validateExamplePackage(pkg: unknown): string[] {
 
   if (!Array.isArray(p.scenarios)) errs.push("`scenarios` must be an array");
   if ((p.scenarios ?? []).filter((s) => s?.isBaseline).length > 1) errs.push("At most one baseline scenario");
+  for (const s of p.scenarios ?? []) {
+    for (const vk of s?.variantRootKeys ?? []) {
+      if (!keys.has(vk)) errs.push(`Scenario "${s?.name ?? "?"}" variant root "${vk}" does not match any diagram key`);
+    }
+  }
 
   return errs;
 }

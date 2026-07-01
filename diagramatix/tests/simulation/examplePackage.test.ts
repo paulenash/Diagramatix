@@ -43,6 +43,24 @@ describe("validateExamplePackage", () => {
     expect(twoBase).toContain("At most one baseline scenario");
   });
 
+  it("T0543 — accepts a scenario variant root that matches a diagram key, rejects one that doesn't", () => {
+    const twoDiagrams: ExamplePackage = {
+      ...good,
+      diagrams: [good.diagrams[0], { ...good.diagrams[0], key: "d2", name: "To-be" }],
+      study: { name: "Compare", rootKeys: ["d1", "d2"] },
+      scenarios: [
+        { name: "As-is", isBaseline: true, runConfig: good.scenarios[0].runConfig, variantRootKeys: ["d1"] },
+        { name: "To-be", runConfig: good.scenarios[0].runConfig, variantRootKeys: ["d2"] },
+      ],
+    };
+    expect(validateExamplePackage(twoDiagrams)).toEqual([]);
+    const bad = validateExamplePackage({
+      ...twoDiagrams,
+      scenarios: [{ name: "As-is", runConfig: good.scenarios[0].runConfig, variantRootKeys: ["ghost"] }],
+    });
+    expect(bad.some((e) => e.includes('variant root "ghost"'))).toBe(true);
+  });
+
   it("emptyPackage is structurally sound except for the no-diagram rule", () => {
     expect(summarizePackage(emptyPackage())).toEqual({ diagrams: 0, teams: 0, scenarios: 0, roots: 0 });
     expect(summarizePackage({})).toEqual({ diagrams: 0, teams: 0, scenarios: 0, roots: 0 });

@@ -6,10 +6,20 @@
  */
 import { describe, it, expect } from "vitest";
 import { STARTER_EXAMPLES } from "@/app/lib/simulation/exampleSeeds";
-import { validateExamplePackage } from "@/app/lib/simulation/examplePackage";
+import { validateExamplePackage, type ExamplePackage, type ExampleScenario } from "@/app/lib/simulation/examplePackage";
 import { assemblePortfolio } from "@/app/lib/simulation/network";
 import { runMonteCarlo } from "@/app/lib/simulation/runner";
 import { applyOverrides, type OverrideSet } from "@/app/lib/simulation/overrides";
+
+/** The diagrams a scenario actually runs: its pinned process variant (As-is vs
+ *  To-be comparison) when set, otherwise the study's roots. Mirrors the run
+ *  route's variant logic so the tests exercise what a real run does. */
+function rootsFor(pkg: ExamplePackage, sc: ExampleScenario) {
+  const keys = sc.variantRootKeys?.length ? sc.variantRootKeys : pkg.study.rootKeys;
+  return keys.map((k) => pkg.diagrams.find((d) => d.key === k)!).filter(Boolean);
+}
+const maxUtil = (perTeam: Record<string, { utilization: { mean: number } }>) =>
+  Math.max(0, ...Object.values(perTeam).map((t) => t.utilization.mean));
 
 describe("starter examples are operational", () => {
   it("there is a non-trivial starter set with unique slugs", () => {
@@ -47,21 +57,26 @@ describe("starter examples are operational", () => {
         expect(validateExamplePackage(pkg)).toEqual([]);
       });
 
-      it("assembles its study portfolio with shared team pools", () => {
+      it("assembles each scenario's roots, and every referenced team is in the library", () => {
         const teamCaps = Object.fromEntries(pkg.teams.map((t) => [t.name, t.capacity]));
-        const roots = pkg.study.rootKeys.map((k) => pkg.diagrams.find((d) => d.key === k)!).filter(Boolean);
-        const net = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: teamCaps });
-        expect(net.nodes.length).toBeGreaterThan(0);
-        // Every distinct team becomes exactly one pool.
-        expect(net.teams.length).toBe(pkg.teams.length);
+        const libNames = new Set(pkg.teams.map((t) => t.name));
+        for (const sc of pkg.scenarios) {
+          const roots = rootsFor(pkg, sc);
+          const net = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: teamCaps });
+          expect(net.nodes.length, `${ex.title} / ${sc.name}`).toBeGreaterThan(0);
+          // Every team a task seizes must exist in the library (no dangling refs);
+          // the library may also hold teams for lanes not yet parameterized.
+          for (const t of net.teams) expect(libNames.has(t.id), `${ex.slug} team ${t.id} in library`).toBe(true);
+        }
       });
 
       it("every scenario runs and completes work", () => {
         const teamCaps = Object.fromEntries(pkg.teams.map((t) => [t.name, t.capacity]));
-        const roots = pkg.study.rootKeys.map((k) => pkg.diagrams.find((d) => d.key === k)!);
-        const baseline = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: teamCaps });
         for (const sc of pkg.scenarios) {
-          const net = applyOverrides(baseline, (sc.overrides ?? {}) as OverrideSet);
+          // Run the scenario against ITS diagrams (variant roots if pinned).
+          const roots = rootsFor(pkg, sc);
+          const base = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: teamCaps });
+          const net = applyOverrides(base, (sc.overrides ?? {}) as OverrideSet);
           const { stats } = runMonteCarlo(net, sc.runConfig, sc.runConfig.interventions);
           expect(stats.completed.mean, `${ex.title} / ${sc.name}`).toBeGreaterThan(0);
         }
@@ -69,8 +84,30 @@ describe("starter examples are operational", () => {
     });
   }
 
+  it("T0542 — as-is/to-be comparison examples show the to-be relieving the busiest team", () => {
+    const teamCaps = (pkg: ExamplePackage) => Object.fromEntries(pkg.teams.map((t) => [t.name, t.capacity]));
+    const runVariant = (pkg: ExamplePackage, sc: ExampleScenario) => {
+      const roots = rootsFor(pkg, sc);
+      const net = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: teamCaps(pkg) });
+      return runMonteCarlo(applyOverrides(net, (sc.overrides ?? {}) as OverrideSet), sc.runConfig);
+    };
+    const comparisons = STARTER_EXAMPLES.filter((e) => e.package.scenarios.some((s) => s.variantRootKeys?.length));
+    expect(comparisons.length).toBeGreaterThanOrEqual(1); // the Aardwolf pair
+    for (const ex of comparisons) {
+      const [asIs, toBe] = ex.package.scenarios;
+      const rAsIs = runVariant(ex.package, asIs);
+      const rToBe = runVariant(ex.package, toBe);
+      // The redesigned (To-be) process should load its busiest team less than the
+      // manual (As-is) one — the automation payoff the comparison exists to show.
+      expect(maxUtil(rToBe.stats.perTeam), `${ex.slug} to-be busiest vs as-is`).toBeLessThan(maxUtil(rAsIs.stats.perTeam));
+    }
+  });
+
   it("staffing up relieves the busiest pool (baseline vs add-staff)", () => {
     for (const ex of STARTER_EXAMPLES) {
+      // Comparison examples ([As-is, To-be] variants) aren't baseline/add-staff —
+      // covered by the dedicated to-be-relief test above.
+      if (ex.package.scenarios.some((s) => s.variantRootKeys?.length)) continue;
       const teamCaps = Object.fromEntries(ex.package.teams.map((t) => [t.name, t.capacity]));
       const roots = ex.package.study.rootKeys.map((k) => ex.package.diagrams.find((d) => d.key === k)!);
       const base = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: teamCaps });

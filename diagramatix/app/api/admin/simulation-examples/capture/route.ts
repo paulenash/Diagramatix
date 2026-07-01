@@ -47,10 +47,17 @@ export async function POST(req: Request) {
   });
   if (!study) return NextResponse.json({ error: "Study not found in project" }, { status: 404 });
 
-  // Capture the root diagrams (what the portfolio run assembles). The diagram
-  // id is the package-local key; adopt remaps it to a fresh id.
+  // Capture the root diagrams (what the portfolio run assembles) plus any
+  // process-variant diagrams the scenarios pin (As-is vs To-be), so the
+  // comparison pairing survives. The diagram id is the package-local key; adopt
+  // remaps it to a fresh id.
   const rootIds = study.roots.map((r) => r.diagramId);
-  const diagramRows = await prisma.diagram.findMany({ where: { id: { in: rootIds } }, select: { id: true, name: true, type: true, data: true } });
+  const scenarioVariantIds = (id: unknown): string[] =>
+    Array.isArray(id) ? (id as unknown[]).filter((x): x is string => typeof x === "string") : [];
+  const variantIds = study.scenarios.flatMap((s) => scenarioVariantIds(s.variantRootIds));
+  const captureIds = Array.from(new Set([...rootIds, ...variantIds]));
+  const diagramRows = await prisma.diagram.findMany({ where: { id: { in: captureIds } }, select: { id: true, name: true, type: true, data: true } });
+  const capturedKeys = new Set(diagramRows.map((d) => d.id));
   const diagrams: ExampleDiagram[] = diagramRows.map((d) => ({
     key: d.id, name: d.name, type: d.type || "bpmn", data: (d.data ?? {}) as unknown as DiagramData,
   }));
@@ -58,12 +65,16 @@ export async function POST(req: Request) {
   const teamRows = await prisma.simulationTeam.findMany({ where: { projectId }, select: { name: true, capacity: true, costPerHour: true, efficiency: true } });
   const teams = teamRows.map((t) => ({ name: t.name, capacity: t.capacity, costPerHour: t.costPerHour, efficiency: t.efficiency }));
 
-  const scenarios: ExampleScenario[] = study.scenarios.map((s) => ({
-    name: s.name,
-    isBaseline: s.isBaseline,
-    runConfig: (s.runConfig ?? {}) as unknown as ScenarioRunConfig,
-    overrides: (s.overrides ?? {}) as unknown as OverrideSet,
-  }));
+  const scenarios: ExampleScenario[] = study.scenarios.map((s) => {
+    const variantRootKeys = scenarioVariantIds(s.variantRootIds).filter((k) => capturedKeys.has(k));
+    return {
+      name: s.name,
+      isBaseline: s.isBaseline,
+      runConfig: (s.runConfig ?? {}) as unknown as ScenarioRunConfig,
+      overrides: (s.overrides ?? {}) as unknown as OverrideSet,
+      ...(variantRootKeys.length ? { variantRootKeys } : {}),
+    };
+  });
 
   const pkg: ExamplePackage = {
     version: 1,
