@@ -13,6 +13,8 @@ import { MatrixButton } from "./matrix/MatrixChrome";
 import type { ReadinessIssue } from "@/app/lib/simulation/readiness";
 import { ResultsReport } from "./results/ResultsReport";
 import { ScenarioCompare } from "./results/ScenarioCompare";
+import { RunHistory } from "./results/RunHistory";
+import { PromptDialog } from "@/app/components/PromptDialog";
 import {
   DEFAULT_RUN_CONFIG,
   type ScenarioRunConfig,
@@ -234,6 +236,8 @@ function ScenarioList({ projectId, detail, diagrams, onChanged }: { projectId: s
               <div className="px-2 pb-2 border-t border-green-500/20 pt-2">
                 <ScenarioEditor
                   scenario={s} runUrl={`${base}/${s.id}/run`} diagrams={diagrams}
+                  runItemUrl={(rid) => `${base}/${s.id}/runs/${rid}`}
+                  assessUrl={`/api/projects/${projectId}/simulation/studies/${detail.id}/assess`}
                   onSave={(cfg) => patchScenario(s.id, { runConfig: cfg })}
                   onSetVariant={(ids) => patchScenario(s.id, { variantRootIds: ids })}
                 />
@@ -281,7 +285,7 @@ function AsIsToBeSetup({ diagrams, onCreate }: { diagrams: DiagramLite[]; onCrea
   );
 }
 
-function ScenarioEditor({ scenario, runUrl, diagrams, onSave, onSetVariant }: { scenario: ScenarioRow; runUrl: string; diagrams: DiagramLite[]; onSave: (cfg: ScenarioRunConfig) => void; onSetVariant: (ids: string[]) => void }) {
+function ScenarioEditor({ scenario, runUrl, runItemUrl, assessUrl, diagrams, onSave, onSetVariant }: { scenario: ScenarioRow; runUrl: string; runItemUrl: (rid: string) => string; assessUrl: string; diagrams: DiagramLite[]; onSave: (cfg: ScenarioRunConfig) => void; onSetVariant: (ids: string[]) => void }) {
   const initial: ScenarioRunConfig = { ...DEFAULT_RUN_CONFIG, ...(scenario.runConfig ?? {}) };
   const variantId = scenario.variantRootIds?.[0] ?? "";
   const [cfg, setCfg] = useState<ScenarioRunConfig>(initial);
@@ -292,6 +296,9 @@ function ScenarioEditor({ scenario, runUrl, diagrams, onSave, onSetVariant }: { 
   const [showReport, setShowReport] = useState(false);
   const [ran, setRan] = useState(0); // bump to refetch the report after a run
   const [setup, setSetup] = useState<ReadinessIssue[] | null>(null); // pre-run readiness dialog
+  const [lastRunId, setLastRunId] = useState<string | null>(null); // the just-finished run, for "save to history"
+  const [naming, setNaming] = useState(false); // quick-name dialog for the last run
+  const [showHistory, setShowHistory] = useState(false);
 
   async function runScenario(force = false) {
     setRunning(true); setRunErr(null); setResult(null); setSetup(null);
@@ -304,6 +311,7 @@ function ScenarioEditor({ scenario, runUrl, diagrams, onSave, onSetVariant }: { 
       // of running; show them so the user can fix or Run anyway.
       if (json.needsSetup) { setSetup((json.issues ?? []) as ReadinessIssue[]); return; }
       if (!res.ok) { setRunErr(json.error ?? "Run failed"); return; }
+      setLastRunId(json.run?.id ?? null);
       const stats = json.run?.metrics?.stats;
       const bottlenecks: string[] = json.run?.metrics?.bottlenecks ?? [];
       const top = bottlenecks[0] ?? null;
@@ -428,15 +436,40 @@ function ScenarioEditor({ scenario, runUrl, diagrams, onSave, onSetVariant }: { 
               ? <span className="text-green-200">{result.topBottleneck} ({(result.topUtil * 100).toFixed(0)}% util)</span>
               : <span className="text-green-400/50">no resource pools</span>}
           </div>
-          <button onClick={() => setShowReport((v) => !v)} className="text-green-400/70 hover:text-green-300 self-start mt-0.5">
-            {showReport ? "▾ hide full results" : "▸ full results"}
-          </button>
+          <div className="flex items-center gap-3 mt-0.5">
+            <button onClick={() => setShowReport((v) => !v)} className="text-green-400/70 hover:text-green-300">
+              {showReport ? "▾ hide full results" : "▸ full results"}
+            </button>
+            {lastRunId && <button onClick={() => setNaming(true)} className="text-green-300/80 hover:text-green-200" title="keep this run in the history under a name">★ save to history…</button>}
+          </div>
         </div>
       )}
       {showReport && (
         <div className="border border-green-500/30 rounded p-2 mt-1">
           <ResultsReport key={ran} runUrl={runUrl} />
         </div>
+      )}
+
+      {/* Run History — named/pinned runs + compare two saved runs. */}
+      <div className="mt-1 border-t border-green-500/20 pt-1">
+        <button onClick={() => setShowHistory((v) => !v)} className="text-green-400/70 hover:text-green-300 text-[11px]">
+          {showHistory ? "▾ Run History" : "▸ Run History"}
+        </button>
+        {showHistory && <RunHistory historyUrl={runUrl} runItemUrl={runItemUrl} assessUrl={assessUrl} refreshKey={ran} />}
+      </div>
+
+      {naming && lastRunId && (
+        <PromptDialog
+          title="Save run to history" message="Give this run a name to keep it (e.g. a capacity or staffing variant)."
+          placeholder="e.g. Large Sales Team (25)" confirmLabel="Save"
+          onConfirm={async (v) => {
+            setNaming(false);
+            if (!v.trim()) return;
+            await fetch(runItemUrl(lastRunId), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: v.trim() }) });
+            setShowHistory(true); setRan((n) => n + 1);
+          }}
+          onCancel={() => setNaming(false)}
+        />
       )}
     </div>
   );

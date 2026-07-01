@@ -21,6 +21,8 @@ export interface RunMetrics {
 /** A run row as returned by GET .../run (history, newest first). */
 export interface RunRow {
   id: string;
+  name?: string | null;
+  pinned?: boolean;
   metrics: RunMetrics | null;
   error: string | null;
   startedAt: string;
