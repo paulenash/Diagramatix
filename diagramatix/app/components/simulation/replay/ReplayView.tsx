@@ -23,7 +23,24 @@ import { MatrixButton } from "../matrix/MatrixChrome";
 const SIM_TYPES = new Set(["start-event", "end-event", "task", "subprocess", "subprocess-expanded", "gateway", "intermediate-event"]);
 
 interface NodePos { id: string; cx: number; cy: number; x: number; y: number; w: number; h: number; label: string }
-interface Frame { t: number; nodeId: string }
+interface Frame { t: number; nodeId: string; edgeId?: string }
+
+/** Point at arc-length fraction f (0..1) along a polyline (the routed connector
+ *  waypoints), so a token glides along the actual sequence connector. */
+function pointAlongPolyline(pts: { x: number; y: number }[], f: number): { x: number; y: number } {
+  if (pts.length === 0) return { x: 0, y: 0 };
+  if (pts.length === 1) return pts[0];
+  const seg: number[] = [];
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); seg.push(d); total += d; }
+  if (total === 0) return pts[0];
+  let target = Math.max(0, Math.min(1, f)) * total;
+  for (let i = 0; i < seg.length; i++) {
+    if (target <= seg[i]) { const t = seg[i] ? target / seg[i] : 0; return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * t, y: pts[i].y + (pts[i + 1].y - pts[i].y) * t }; }
+    target -= seg[i];
+  }
+  return pts[pts.length - 1];
+}
 
 export function ReplayView({ data, config, teamCapacities, onClose }: { data: DiagramData; config: SimRunConfig; teamCapacities?: Record<string, number>; onClose?: () => void }) {
   const [replay, setReplay] = useState<ReplayData>(() => buildReplay(data, config, teamCapacities));
@@ -60,11 +77,19 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
       let k = m.get(ev.tokenId);
       if (!k) { k = { frames: [], endT: ev.t }; m.set(ev.tokenId, k); }
       if (ev.kind === "exit") k.endT = ev.t;
-      else if (ev.nodeId) k.frames.push({ t: ev.t, nodeId: ev.nodeId });
+      else if (ev.nodeId) k.frames.push({ t: ev.t, nodeId: ev.nodeId, edgeId: ev.edgeId });
       k.endT = Math.max(k.endT, ev.t);
     }
     return m;
   }, [replay.trace]);
+
+  // Connector id → its routed waypoints, so tokens can glide along the actual
+  // sequence connectors between nodes.
+  const connWaypoints = useMemo(() => {
+    const m = new Map<string, { x: number; y: number }[]>();
+    for (const c of data.connectors) if (Array.isArray(c.waypoints) && c.waypoints.length >= 2) m.set(c.id, c.waypoints);
+    return m;
+  }, [data.connectors]);
 
   // Node → team map (for the live stats), + the precomputed running-stats
   // timeline the LiveStatsTable reads at the current playback clock.
@@ -102,9 +127,14 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
     const a = k.frames[i], b = k.frames[i + 1];
     const pa = nodeById.get(a.nodeId);
     if (!pa) return null;
-    const pb = b ? nodeById.get(b.nodeId) : undefined;
-    if (!pb || b!.t <= a.t) return { x: pa.cx, y: pa.cy };
-    const f = Math.min(1, (simT - a.t) / (b!.t - a.t));
+    if (!b || b.t <= a.t) return { x: pa.cx, y: pa.cy };
+    const f = Math.min(1, Math.max(0, (simT - a.t) / (b.t - a.t)));
+    // Glide along the actual routed connector into b (the edge the token
+    // travelled), falling back to a straight centre-to-centre line.
+    const wp = b.edgeId ? connWaypoints.get(b.edgeId) : undefined;
+    if (wp) return pointAlongPolyline(wp, f);
+    const pb = nodeById.get(b.nodeId);
+    if (!pb) return { x: pa.cx, y: pa.cy };
     return { x: pa.cx + (pb.cx - pa.cx) * f, y: pa.cy + (pb.cy - pa.cy) * f };
   }
 
@@ -161,7 +191,7 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
           {/* The real diagram (read-only) as the backdrop. */}
           {backdrop}
           {liveTokens.map((tk) => (
-            <circle key={tk.id} cx={tk.x} cy={tk.y} r={4} fill="#86efac" stroke="#22FF22" strokeWidth={1} style={{ filter: "drop-shadow(0 0 4px #22FF22)" }} />
+            <circle key={tk.id} cx={tk.x} cy={tk.y} r={4} fill="#166534" stroke="#052e16" strokeWidth={1} style={{ filter: "drop-shadow(0 0 2px #052e16)" }} />
           ))}
         </svg>
         <div className="absolute top-3 right-3">
