@@ -157,9 +157,14 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
                 <StudyManager projectId={projectId} isAdmin={isAdmin} onRan={setLastRunCfg} />
               </MatrixPanel>
               <MatrixPanel title={`Simulation Data — see, edit, fill & clear${!isOpen ? ` · ${diagramList.find((d) => d.id === activeId)?.name ?? "variant"}` : ""}`} className="md:col-span-3">
-                {!isOpen && <p className="text-[10px] text-green-400/50 mb-1">Editing the <span className="text-green-300">{diagramList.find((d) => d.id === activeId)?.name ?? "selected"}</span> variant — changes save straight to that diagram.</p>}
+                {!isOpen && (
+                  <p className="text-[10px] text-green-400/50 mb-1">
+                    Editing <span className="text-green-300">{diagramList.find((d) => d.id === activeId)?.name ?? "selected"}</span> — changes save straight to that diagram.
+                    <button onClick={() => setActiveId(diagramId ?? diagramList[0]?.id ?? null)} className="ml-2 text-green-400/70 hover:text-green-200">‹ back</button>
+                  </p>
+                )}
                 {canEditActive
-                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} />
+                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} onOpenDiagram={setActiveId} />
                   : <p className="text-xs text-green-400/60">{loadingVariant ? "Loading variant…" : "Open this diagram from its editor to edit simulation data here."}</p>}
               </MatrixPanel>
               <MatrixPanel title="Engine status" className="md:col-span-3">

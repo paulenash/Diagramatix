@@ -60,10 +60,13 @@ function MatrixDist({ value, onChange }: { value?: SimDist; onChange: (d: SimDis
 
 const num = (v: string) => (v === "" ? undefined : Math.max(0, Number(v) || 0));
 
-export function SimDataPanel({ data, onApplyData, onFillMissing }: {
+export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram }: {
   data: DiagramData;
   onApplyData: (next: DiagramData) => void;
   onFillMissing?: () => number;
+  /** Switch the console to another diagram — used to edit a linked subprocess's
+   *  own tasks (its sim data lives in the child diagram). */
+  onOpenDiagram?: (diagramId: string) => void;
 }) {
   const [confirmClear, setConfirmClear] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -157,7 +160,11 @@ export function SimDataPanel({ data, onApplyData, onFillMissing }: {
                 <Cell w={W.name} truncate>{t.label || t.id}</Cell>
                 <Cell w={W.dist}><MatrixDist value={sim.cycleTime} onChange={(cycleTime) => patchEl(t.id, { cycleTime })} /></Cell>
                 <Cell w={W.dist}><MatrixDist value={sim.waitTime} onChange={(waitTime) => patchEl(t.id, { waitTime })} /></Cell>
-                <Cell w={W.team}><input type="text" value={sim.teamId ?? ""} placeholder="team" onChange={(e) => patchEl(t.id, { teamId: e.target.value || undefined })} className={`${inp} w-40`} /></Cell>
+                <Cell w={W.team}>
+                  {onOpenDiagram && typeof t.properties?.linkedDiagramId === "string"
+                    ? <button onClick={() => onOpenDiagram(t.properties!.linkedDiagramId as string)} className="text-green-300 hover:text-green-200 text-[10px]" title="Open the linked subprocess diagram to edit its tasks">⤢ edit child →</button>
+                    : <input type="text" value={sim.teamId ?? ""} placeholder="team" onChange={(e) => patchEl(t.id, { teamId: e.target.value || undefined })} className={`${inp} w-40`} />}
+                </Cell>
                 <Cell w={W.units}><input type="number" min={1} value={sim.resourceUnits ?? 1} onChange={(e) => patchEl(t.id, { resourceUnits: Math.max(1, parseInt(e.target.value, 10) || 1) })} className={`${inp} w-10`} /></Cell>
               </Row>
             );
