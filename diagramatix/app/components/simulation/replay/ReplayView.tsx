@@ -17,6 +17,7 @@ import { buildReplay, forkReplay, teamIdsInDiagram, type ReplayData } from "@/ap
 import { assembleFromDiagram } from "@/app/lib/simulation/assemble";
 import { buildStatTimeline } from "@/app/lib/simulation/runningStats";
 import { LiveStatsTable } from "./LiveStatsTable";
+import { ReplayDiagramBackdrop } from "./ReplayDiagramBackdrop";
 import { MatrixButton } from "../matrix/MatrixChrome";
 
 const SIM_TYPES = new Set(["start-event", "end-event", "task", "subprocess", "subprocess-expanded", "gateway", "intermediate-event"]);
@@ -44,14 +45,14 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
     [data.elements],
   );
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
-  const edges = useMemo(() => data.connectors.filter((c) => nodeById.has(c.sourceId) && nodeById.has(c.targetId)), [data.connectors, nodeById]);
   const vb = useMemo(() => {
-    if (nodes.length === 0) return { x: 0, y: 0, w: 100, h: 100 };
-    const minX = Math.min(...nodes.map((n) => n.x)), minY = Math.min(...nodes.map((n) => n.y));
-    const maxX = Math.max(...nodes.map((n) => n.x + n.w)), maxY = Math.max(...nodes.map((n) => n.y + n.h));
+    const els = data.elements;
+    if (els.length === 0) return { x: 0, y: 0, w: 100, h: 100 };
+    const minX = Math.min(...els.map((e) => e.x)), minY = Math.min(...els.map((e) => e.y));
+    const maxX = Math.max(...els.map((e) => e.x + e.width)), maxY = Math.max(...els.map((e) => e.y + e.height));
     const pad = 40;
     return { x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 };
-  }, [nodes]);
+  }, [data.elements]);
 
   const keyframes = useMemo(() => {
     const m = new Map<string, { frames: Frame[]; endT: number }>();
@@ -72,6 +73,9 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
     return new Map(net.nodes.filter((n) => n.teamId).map((n) => [n.id, n.teamId as string]));
   }, [data, teamCapacities]);
   const statTimeline = useMemo(() => buildStatTimeline(replay.trace, nodeTeam), [replay.trace, nodeTeam]);
+  // Stable element so the heavy read-only diagram isn't re-rendered every
+  // animation frame — only when `data` changes (never during a run).
+  const backdrop = useMemo(() => <ReplayDiagramBackdrop data={data} />, [data]);
 
   useEffect(() => {
     function loop(ts: number) {
@@ -154,15 +158,8 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
 
       <div className="relative flex-1 border border-green-500/30 rounded overflow-hidden bg-black min-h-[240px]">
         <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
-          {edges.map((c) => { const s = nodeById.get(c.sourceId)!, t = nodeById.get(c.targetId)!; return <line key={c.id} x1={s.cx} y1={s.cy} x2={t.cx} y2={t.cy} stroke="#14532d" strokeWidth={1.5} />; })}
-          {nodes.map((n) => (
-            <g key={n.id}>
-              <rect x={n.x} y={n.y} width={n.w} height={n.h} rx={4} fill="#031a05" stroke="#22c55e" strokeWidth={1} strokeOpacity={0.5} />
-              <text x={n.cx} y={n.cy} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="#4ade80" style={{ pointerEvents: "none" }}>
-                {n.label.length > 18 ? n.label.slice(0, 17) + "…" : n.label}
-              </text>
-            </g>
-          ))}
+          {/* The real diagram (read-only) as the backdrop. */}
+          {backdrop}
           {liveTokens.map((tk) => (
             <circle key={tk.id} cx={tk.x} cy={tk.y} r={4} fill="#86efac" stroke="#22FF22" strokeWidth={1} style={{ filter: "drop-shadow(0 0 4px #22FF22)" }} />
           ))}
