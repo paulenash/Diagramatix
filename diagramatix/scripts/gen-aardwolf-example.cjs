@@ -36,13 +36,17 @@ const TEAMS = [
 const AI = { "Register Application": 2, "Check Application Completeness": 2, "Verify Identity and Documents": 4, "Obtain Credit Report": 2, "Assess Eligibility and Affordability": 3, "Send Decline Letter": 1 };
 const HUMAN = { "Register Application": 15, "Check Application Completeness": 20, "Verify Identity and Documents": 30, "Request Further Information": 10, "Obtain Credit Report": 20, "Receive Customer Response": 15, "Assess Eligibility and Affordability": 45, "Send Decline Letter": 8, "Send Loan Outcome": 10 };
 const SPEC = { "Receive Response": 10, "Review Exception": 30, "Request Further Information": 12, "Resolve Exception": 35 };
+// The loan-drafting steps (in the Personal/Home/Commercial lanes) — done by their
+// own teams, so they carry real work + queue.
+const DRAFT = { "Draft and Approve Personal Loan": 40, "Draft and Approve Home Loan": 60, "Draft and Approve Commercial Loan": 90 };
 
 function cycleFor(lane, label) {
   let mean;
-  if (lane === "Loan Assessment AI Agent") mean = AI[label] ?? 3;
+  if (DRAFT[label]) mean = DRAFT[label];
+  else if (lane === "Loan Assessment AI Agent") mean = AI[label] ?? 3;
   else if (lane === "Loan Assessment Specialist") mean = SPEC[label] ?? 15;
   else if (lane === "Loan Assessment Team") mean = HUMAN[label] ?? 15;
-  else mean = 10; // Personal/Home/Commercial handling tasks
+  else mean = 10; // Personal/Home/Commercial handling tasks (e.g. Send Outcome)
   const sd = Math.max(0.5, Math.round(mean * 0.2 * 10) / 10);
   return { kind: "normal", mean, sd };
 }
@@ -79,6 +83,14 @@ function parameterize(data) {
     const p = el.parentId ? byId.get(el.parentId) : undefined;
     return !p || p.type === "pool" || p.type === "lane";
   };
+
+  // The "Draft and Approve X Loan" steps are drawn as empty (bodyless)
+  // subprocesses, which pass through instantly and seize no team — so the loan
+  // teams would idle and the readiness check would flag them as team-less. Make
+  // them real tasks so they carry work on their lane's team.
+  for (const el of els) {
+    if (/^Draft and Approve/.test(el.label || "") && el.type === "subprocess") el.type = "task";
+  }
 
   for (const el of els) {
     const sim = (el.properties = el.properties || {}).sim = el.properties.sim || {};

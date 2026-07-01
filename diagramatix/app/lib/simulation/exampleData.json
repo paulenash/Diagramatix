@@ -3864,13 +3864,21 @@
                   "x": 1580,
                   "y": 996,
                   "id": "spPersonal",
-                  "type": "subprocess",
+                  "type": "task",
                   "label": "Draft and Approve Personal Loan",
                   "width": 108,
                   "height": 72,
                   "parentId": "lPersonal",
                   "properties": {
-                    "sim": {}
+                    "sim": {
+                      "teamId": "Personal Loans Team",
+                      "cycleTime": {
+                        "kind": "normal",
+                        "mean": 40,
+                        "sd": 8
+                      },
+                      "resourceUnits": 1
+                    }
                   }
                 },
                 {
@@ -3904,13 +3912,21 @@
                   "x": 1580,
                   "y": 1195.5,
                   "id": "spHome",
-                  "type": "subprocess",
+                  "type": "task",
                   "label": "Draft and Approve Home Loan",
                   "width": 108,
                   "height": 72,
                   "parentId": "lHome",
                   "properties": {
-                    "sim": {}
+                    "sim": {
+                      "teamId": "Home Loans Team",
+                      "cycleTime": {
+                        "kind": "normal",
+                        "mean": 60,
+                        "sd": 12
+                      },
+                      "resourceUnits": 1
+                    }
                   }
                 },
                 {
@@ -3944,13 +3960,21 @@
                   "x": 1577.5,
                   "y": 1395,
                   "id": "spCommercial",
-                  "type": "subprocess",
+                  "type": "task",
                   "label": "Draft and Approve Commercial Loan",
                   "width": 113,
                   "height": 76,
                   "parentId": "lCommercial",
                   "properties": {
-                    "sim": {}
+                    "sim": {
+                      "teamId": "Commercial Loans Team",
+                      "cycleTime": {
+                        "kind": "normal",
+                        "mean": 90,
+                        "sd": 18
+                      },
+                      "resourceUnits": 1
+                    }
                   }
                 },
                 {
@@ -6200,13 +6224,21 @@
                   "x": 2542,
                   "y": 972,
                   "id": "sp_pers",
-                  "type": "subprocess",
+                  "type": "task",
                   "label": "Draft and Approve Personal Loan",
                   "width": 108,
                   "height": 72,
                   "parentId": "lPers",
                   "properties": {
-                    "sim": {}
+                    "sim": {
+                      "teamId": "Personal Loans Team",
+                      "cycleTime": {
+                        "kind": "normal",
+                        "mean": 40,
+                        "sd": 8
+                      },
+                      "resourceUnits": 1
+                    }
                   }
                 },
                 {
@@ -6296,13 +6328,21 @@
                   "x": 2542,
                   "y": 1219,
                   "id": "sp_home",
-                  "type": "subprocess",
+                  "type": "task",
                   "label": "Draft and Approve Home Loan",
                   "width": 108,
                   "height": 72,
                   "parentId": "lHome",
                   "properties": {
-                    "sim": {}
+                    "sim": {
+                      "teamId": "Home Loans Team",
+                      "cycleTime": {
+                        "kind": "normal",
+                        "mean": 60,
+                        "sd": 12
+                      },
+                      "resourceUnits": 1
+                    }
                   }
                 },
                 {
@@ -6336,13 +6376,21 @@
                   "x": 2540.928571428571,
                   "y": 1442.7857142857144,
                   "id": "sp_comm",
-                  "type": "subprocess",
+                  "type": "task",
                   "label": "Draft and Approve Commercial Loan",
                   "width": 113,
                   "height": 76,
                   "parentId": "lComm",
                   "properties": {
-                    "sim": {}
+                    "sim": {
+                      "teamId": "Commercial Loans Team",
+                      "cycleTime": {
+                        "kind": "normal",
+                        "mean": 90,
+                        "sd": 18
+                      },
+                      "resourceUnits": 1
+                    }
                   }
                 },
                 {
