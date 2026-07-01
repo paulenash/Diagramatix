@@ -14,6 +14,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import type { SimRunConfig } from "@/app/lib/simulation/types";
 import { buildReplay, forkReplay, teamIdsInDiagram, type ReplayData } from "@/app/lib/simulation/replaySource";
+import { assembleFromDiagram } from "@/app/lib/simulation/assemble";
+import { buildStatTimeline } from "@/app/lib/simulation/runningStats";
+import { LiveStatsTable } from "./LiveStatsTable";
 import { MatrixButton } from "../matrix/MatrixChrome";
 
 const SIM_TYPES = new Set(["start-event", "end-event", "task", "subprocess", "subprocess-expanded", "gateway", "intermediate-event"]);
@@ -61,6 +64,14 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
     }
     return m;
   }, [replay.trace]);
+
+  // Node → team map (for the live stats), + the precomputed running-stats
+  // timeline the LiveStatsTable reads at the current playback clock.
+  const nodeTeam = useMemo(() => {
+    const net = assembleFromDiagram(data, { teamCapacities });
+    return new Map(net.nodes.filter((n) => n.teamId).map((n) => [n.id, n.teamId as string]));
+  }, [data, teamCapacities]);
+  const statTimeline = useMemo(() => buildStatTimeline(replay.trace, nodeTeam), [replay.trace, nodeTeam]);
 
   useEffect(() => {
     function loop(ts: number) {
@@ -156,6 +167,9 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
             <circle key={tk.id} cx={tk.x} cy={tk.y} r={4} fill="#86efac" stroke="#22FF22" strokeWidth={1} style={{ filter: "drop-shadow(0 0 4px #22FF22)" }} />
           ))}
         </svg>
+        <div className="absolute top-3 right-3">
+          <LiveStatsTable timeline={statTimeline} simT={simT} teamCapacities={teamCapacities} unit={config.clockUnit} />
+        </div>
         <div className="absolute bottom-3 right-3 font-mono text-green-300 text-sm bg-black/70 border border-green-500/40 rounded px-3 py-1.5 tabular-nums">
           t = {simT.toFixed(1)} <span className="text-green-500/60 text-xs">/ {replay.durationSim.toFixed(0)}</span>
           <span className="ml-3 text-green-400/70 text-xs">● {liveTokens.length} in flight</span>

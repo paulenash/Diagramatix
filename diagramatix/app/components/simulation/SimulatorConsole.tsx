@@ -132,7 +132,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
               </MatrixPanel>
               <MatrixPanel title="Run / Replay">
                 <p className="text-xs text-green-400/60 mb-3">
-                  Watch tokens flow through the process; intervene live. Or see where the heat builds up.
+                  Watch tokens flow through the process with a <span className="text-green-300">live stats panel</span> (completed, queues, utilisation) climbing as it runs; intervene live. Or see where the heat builds up.
                   {lastRunCfg
                     ? <span className="text-green-300"> Replay uses your last scenario run ({lastRunCfg.horizon} {lastRunCfg.clockUnit}s).</span>
                     : <span className="text-green-400/40"> Run a scenario first for a full replay; otherwise a short sample runs.</span>}
