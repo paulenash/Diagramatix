@@ -75,29 +75,36 @@ export function TeamLibraryManager({
 
   return (
     <div className="flex flex-col gap-2 text-[11px]">
-      {teams.length === 0 && <p className="text-green-400/50">No teams yet — add one below.</p>}
-      {teams.map((t) => (
-        <div key={t.id} className="flex items-center gap-2">
-          <span className="flex-1 text-green-300 truncate">{t.name}</span>
-          <span className="text-green-400/50">cap</span>
-          <input
-            type="number" min={1} value={t.capacity}
-            onChange={(e) => setCapacity(t.id, Math.max(1, parseInt(e.target.value, 10) || 1))}
-            className="w-14 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]"
-          />
-          <button onClick={() => remove(t.id)} className="text-red-400/70 hover:text-red-300 px-1" title="Delete">✕</button>
-        </div>
-      ))}
+      <div className="flex flex-col gap-0.5">
+        {teams.length === 0 && <p className="text-green-400/50">No teams yet — add one below.</p>}
+        {teams.length > 0 && (
+          <div className="flex items-center gap-2 text-green-400/40 pb-0.5 border-b border-green-500/20 uppercase tracking-wide text-[10px]">
+            <span className="w-52 shrink-0 text-left">Team Name</span>
+            <span className="w-16 shrink-0 text-left">Capacity</span>
+          </div>
+        )}
+        {teams.map((t) => (
+          <div key={t.id} className="flex items-center gap-2 py-0.5">
+            <span className="w-52 shrink-0 text-green-300 truncate" title={t.name}>{t.name}</span>
+            <input
+              type="number" min={1} value={t.capacity}
+              onChange={(e) => setCapacity(t.id, Math.max(1, parseInt(e.target.value, 10) || 1))}
+              className="w-16 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]"
+            />
+            <button onClick={() => remove(t.id)} className="text-red-400/70 hover:text-red-300 px-1" title="Delete">✕</button>
+          </div>
+        ))}
+      </div>
       <div className="flex items-center gap-2 pt-1 border-t border-green-500/20">
         <input
           type="text" value={newName} placeholder="new team (e.g. analysts)"
           onChange={(e) => setNewName(e.target.value)}
-          className="flex-1 bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-200 [color-scheme:dark]"
+          className="w-52 shrink-0 bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-200 [color-scheme:dark]"
         />
         <input
           type="number" min={1} value={newCap}
           onChange={(e) => setNewCap(Math.max(1, parseInt(e.target.value, 10) || 1))}
-          className="w-14 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]"
+          className="w-16 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]"
         />
         <MatrixButton onClick={addTeam}>{busy ? "…" : "+ Add"}</MatrixButton>
       </div>

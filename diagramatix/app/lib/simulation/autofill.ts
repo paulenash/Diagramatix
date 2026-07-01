@@ -24,11 +24,9 @@ const SOURCE = new Set(["start-event"]);
 const TASK = new Set(["task", "subprocess", "subprocess-expanded"]);
 const DELAY = new Set(["intermediate-event"]);
 
-function slug(s: string): string {
-  return s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "team";
-}
-
-/** Walk parentId up to the nearest lane/pool and slugify its label → team id. */
+/** Walk parentId up to the nearest lane/pool and use its label as the team id —
+ *  the readable name the user sees on the lane, so the Teams library + the
+ *  Simulation Data "team" column read as the lane names, not an internal slug. */
 function laneTeamId(el: DiagramElement, byId: Map<string, DiagramElement>): string {
   let cur: DiagramElement | undefined = el;
   const seen = new Set<string>();
@@ -36,7 +34,7 @@ function laneTeamId(el: DiagramElement, byId: Map<string, DiagramElement>): stri
     seen.add(cur.id);
     const parent = byId.get(cur.parentId);
     if (!parent) break;
-    if (parent.type === "lane" || parent.type === "pool") return slug(parent.label || "team");
+    if (parent.type === "lane" || parent.type === "pool") return (parent.label || "").trim() || "team";
     cur = parent;
   }
   return "team";

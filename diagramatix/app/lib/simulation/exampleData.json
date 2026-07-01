@@ -3302,32 +3302,32 @@
         "version": 1,
         "teams": [
           {
-            "name": "loan-assessment-team",
+            "name": "Loan Assessment Team",
             "capacity": 3,
             "costPerHour": 45
           },
           {
-            "name": "loan-assessment-ai-agent",
+            "name": "Loan Assessment AI Agent",
             "capacity": 12,
             "costPerHour": 3
           },
           {
-            "name": "loan-assessment-specialist",
+            "name": "Loan Assessment Specialist",
             "capacity": 2,
             "costPerHour": 60
           },
           {
-            "name": "personal-loans-team",
+            "name": "Personal Loans Team",
             "capacity": 3,
             "costPerHour": 40
           },
           {
-            "name": "home-loans-team",
+            "name": "Home Loans Team",
             "capacity": 3,
             "costPerHour": 45
           },
           {
-            "name": "commercial-loans-team",
+            "name": "Commercial Loans Team",
             "capacity": 2,
             "costPerHour": 55
           }
@@ -3484,7 +3484,7 @@
                   "taskType": "user",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-team",
+                      "teamId": "Loan Assessment Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 15,
@@ -3506,7 +3506,7 @@
                   "taskType": "user",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-team",
+                      "teamId": "Loan Assessment Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 20,
@@ -3528,7 +3528,7 @@
                   "taskType": "user",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-team",
+                      "teamId": "Loan Assessment Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 30,
@@ -3569,7 +3569,7 @@
                   "taskType": "send",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-team",
+                      "teamId": "Loan Assessment Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 10,
@@ -3591,7 +3591,7 @@
                   "taskType": "user",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-team",
+                      "teamId": "Loan Assessment Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 20,
@@ -3627,7 +3627,7 @@
                   "taskType": "receive",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-team",
+                      "teamId": "Loan Assessment Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 15,
@@ -3663,7 +3663,7 @@
                   "taskType": "user",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-team",
+                      "teamId": "Loan Assessment Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 45,
@@ -3733,7 +3733,7 @@
                   "taskType": "send",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-team",
+                      "teamId": "Loan Assessment Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 8,
@@ -3822,7 +3822,7 @@
                   "taskType": "send",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-team",
+                      "teamId": "Loan Assessment Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 10,
@@ -3871,7 +3871,7 @@
                   "parentId": "lPersonal",
                   "properties": {
                     "sim": {
-                      "teamId": "personal-loans-team",
+                      "teamId": "Personal Loans Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 40,
@@ -3919,7 +3919,7 @@
                   "parentId": "lHome",
                   "properties": {
                     "sim": {
-                      "teamId": "home-loans-team",
+                      "teamId": "Home Loans Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 60,
@@ -3967,7 +3967,7 @@
                   "parentId": "lCommercial",
                   "properties": {
                     "sim": {
-                      "teamId": "commercial-loans-team",
+                      "teamId": "Commercial Loans Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 90,
@@ -5802,7 +5802,7 @@
                   "taskType": "service",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-ai-agent",
+                      "teamId": "Loan Assessment AI Agent",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 3,
@@ -5909,7 +5909,7 @@
                   "taskType": "service",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-ai-agent",
+                      "teamId": "Loan Assessment AI Agent",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 2,
@@ -5931,7 +5931,7 @@
                   "taskType": "service",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-ai-agent",
+                      "teamId": "Loan Assessment AI Agent",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 2,
@@ -5953,7 +5953,7 @@
                   "taskType": "service",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-ai-agent",
+                      "teamId": "Loan Assessment AI Agent",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 4,
@@ -5975,7 +5975,7 @@
                   "taskType": "service",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-ai-agent",
+                      "teamId": "Loan Assessment AI Agent",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 2,
@@ -6035,7 +6035,7 @@
                   "taskType": "send",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-ai-agent",
+                      "teamId": "Loan Assessment AI Agent",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 1,
@@ -6103,7 +6103,7 @@
                   "taskType": "receive",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-specialist",
+                      "teamId": "Loan Assessment Specialist",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 10,
@@ -6125,7 +6125,7 @@
                   "taskType": "user",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-specialist",
+                      "teamId": "Loan Assessment Specialist",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 30,
@@ -6147,7 +6147,7 @@
                   "taskType": "send",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-specialist",
+                      "teamId": "Loan Assessment Specialist",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 12,
@@ -6169,7 +6169,7 @@
                   "taskType": "user",
                   "properties": {
                     "sim": {
-                      "teamId": "loan-assessment-specialist",
+                      "teamId": "Loan Assessment Specialist",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 35,
@@ -6231,7 +6231,7 @@
                   "parentId": "lPers",
                   "properties": {
                     "sim": {
-                      "teamId": "personal-loans-team",
+                      "teamId": "Personal Loans Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 40,
@@ -6272,7 +6272,7 @@
                   "taskType": "send",
                   "properties": {
                     "sim": {
-                      "teamId": "personal-loans-team",
+                      "teamId": "Personal Loans Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 10,
@@ -6335,7 +6335,7 @@
                   "parentId": "lHome",
                   "properties": {
                     "sim": {
-                      "teamId": "home-loans-team",
+                      "teamId": "Home Loans Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 60,
@@ -6383,7 +6383,7 @@
                   "parentId": "lComm",
                   "properties": {
                     "sim": {
-                      "teamId": "commercial-loans-team",
+                      "teamId": "Commercial Loans Team",
                       "cycleTime": {
                         "kind": "normal",
                         "mean": 90,

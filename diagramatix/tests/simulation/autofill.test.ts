@@ -45,7 +45,7 @@ describe("autofillSimulation", () => {
   it("fills task cycle time + assigns the lane team, keeps units", () => {
     const a = getSimParams(byId.get("a")!);
     expect(a.cycleTime).toBeDefined();
-    expect(a.teamId).toBe("finance-team");
+    expect(a.teamId).toBe("Finance Team"); // the lane's readable label, not a slug
     expect(a.resourceUnits).toBe(1);
   });
 
