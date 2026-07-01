@@ -9,6 +9,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { type RunMetrics, type RunRow, fmtRange, fmtPct, fmtMoney } from "@/app/lib/simulation/results";
+import type { CaseDist, Stat } from "@/app/lib/simulation/statistics";
+import { FlowHistogram } from "./FlowHistogram";
+
+/** Monte-Carlo confidence half-width on a run-averaged mean (p5–p95 across runs,
+ *  halved) — how much the ESTIMATE wobbles run-to-run, distinct from case spread. */
+function runHalfWidth(s: Stat): number {
+  return Math.max(0, (s.p95 - s.p5) / 2);
+}
 
 export function ResultsReport({ runUrl, initial }: { runUrl: string; initial?: RunMetrics | null }) {
   const [metrics, setMetrics] = useState<RunMetrics | null>(initial ?? null);
@@ -47,7 +55,6 @@ export function ResultsReport({ runUrl, initial }: { runUrl: string; initial?: R
       <div className="flex flex-wrap gap-x-6 gap-y-1">
         <Metric label="Replications" value={String(stats.replications)} />
         <Metric label="Completed" value={fmtRange(stats.completed, 0)} />
-        <Metric label={`Flow time (${unit})`} value={`p50 ${stats.flowTime.p50.toFixed(1)} · p95 ${stats.flowTime.p95.toFixed(1)}`} />
         {(stats.totalCost?.mean ?? 0) > 0 && (
           <>
             <Metric label="Cost / case" value={fmtMoney(stats.costPerCase?.mean)} />
@@ -55,6 +62,11 @@ export function ResultsReport({ runUrl, initial }: { runUrl: string; initial?: R
           </>
         )}
       </div>
+
+      {/* Flow time — the per-case distribution (how long individual cases take),
+          not the run-average. p50 = typical case, p95 = near-worst; sd = spread;
+          plus the run-to-run confidence on the mean. */}
+      <FlowTimeSection caseFlow={stats.caseFlow} runFlow={stats.flowTime} runs={stats.replications} unit={unit} />
 
       {/* Teams / resource pools */}
       <div>
@@ -116,6 +128,43 @@ export function ResultsReport({ runUrl, initial }: { runUrl: string; initial?: R
 
 function Metric({ label, value }: { label: string; value: string }) {
   return <div><span className="text-green-400/50">{label}: </span><span className="text-green-200">{value}</span></div>;
+}
+
+/** Flow-time block: per-case percentiles + spread + a distribution histogram,
+ *  with the run-to-run confidence on the mean. Falls back to the run-averaged
+ *  p50/p95 for runs recorded before per-case samples were collected. */
+function FlowTimeSection({ caseFlow, runFlow, runs, unit }: {
+  caseFlow?: CaseDist; runFlow: Stat; runs: number; unit: string;
+}) {
+  const hw = runHalfWidth(runFlow);
+  const conf = `${runFlow.mean.toFixed(0)} ±${hw.toFixed(0)} over ${runs} runs`;
+  if (!caseFlow || caseFlow.count === 0) {
+    // Legacy run (no per-case samples) — show the run-average summary only.
+    return (
+      <div>
+        <Heading>Flow time ({unit})</Heading>
+        <div className="flex flex-wrap gap-x-6 gap-y-1">
+          <Metric label="Mean (per run)" value={conf} />
+          <Metric label="p50 · p95 (per run)" value={`${runFlow.p50.toFixed(0)} · ${runFlow.p95.toFixed(0)}`} />
+        </div>
+      </div>
+    );
+  }
+  const cf = caseFlow;
+  return (
+    <div>
+      <Heading>Flow time per case ({unit})</Heading>
+      <div className="flex flex-wrap gap-x-6 gap-y-1">
+        <Metric label="Typical (p50)" value={cf.p50.toFixed(0)} />
+        <Metric label="Near worst (p95)" value={cf.p95.toFixed(0)} />
+        <Metric label="Spread (sd)" value={`±${cf.sd.toFixed(0)}`} />
+        <Metric label="Range" value={`${cf.min.toFixed(0)}–${cf.max.toFixed(0)}`} />
+        <Metric label="Mean" value={conf} />
+      </div>
+      <FlowHistogram dist={cf} unit={unit} />
+      <p className="text-green-400/40 mt-0.5">Each bar = share of the {cf.count.toLocaleString()} cases finishing in that time band. ✦ p50 · ▸ p95.</p>
+    </div>
+  );
 }
 function Heading({ children }: { children: React.ReactNode }) {
   return <p className="text-green-400/70 uppercase tracking-widest text-[10px] mb-1">{children}</p>;

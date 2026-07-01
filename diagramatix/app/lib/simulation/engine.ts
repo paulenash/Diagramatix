@@ -67,7 +67,7 @@ export interface SimState {
   // Applied-intervention state (so an Operator fork preserves timed changes).
   arrivalMult?: Record<string, number>;
   edgeProb?: Record<string, number>;
-  acc: { arrived: number; completed: number; flowSum: number; flowCount: number; perNode: Record<string, NodeAcc> };
+  acc: { arrived: number; completed: number; flowSum: number; flowCount: number; flowSamples?: number[]; perNode: Record<string, NodeAcc> };
 }
 
 export class Engine {
@@ -98,6 +98,11 @@ export class Engine {
   private completed = 0;
   private flowSum = 0;
   private flowCount = 0;
+  /** Per-case flow times (individual completed tokens) — retained so the report
+   *  can show the true case-level distribution + percentiles, not just the mean.
+   *  Transient (pooled into a compact CaseDist at aggregate time); never persisted
+   *  on the run except via a snapshot for Operator fork/resume. */
+  private flowSamples: number[] = [];
   private perNode = new Map<string, NodeAcc>();
   // indices
   private nodeById = new Map<string, SimNode>();
@@ -177,6 +182,7 @@ export class Engine {
 
   private resetStats(now: number): void {
     this.arrived = 0; this.completed = 0; this.flowSum = 0; this.flowCount = 0;
+    this.flowSamples = [];
     this.perNode.clear();
     for (const p of this.pools.values()) p.resetStats(now);
   }
@@ -492,7 +498,7 @@ export class Engine {
 
   private completeToken(token: Token): void {
     this.emit("exit", token.id);
-    if (this.warmedUp && !token.internal) { this.completed++; this.flowSum += this.clock - token.enteredAt; this.flowCount++; }
+    if (this.warmedUp && !token.internal) { const flow = this.clock - token.enteredAt; this.completed++; this.flowSum += flow; this.flowCount++; this.flowSamples.push(flow); }
     this.tokens.delete(token.id);
   }
 
@@ -533,6 +539,7 @@ export class Engine {
       arrived: this.arrived,
       completed: this.completed,
       avgFlowTime: this.flowCount ? this.flowSum / this.flowCount : 0,
+      flowSamples: this.flowSamples,
       perNode, perTeam,
     };
   }
@@ -561,7 +568,7 @@ export class Engine {
       arrivalsByNode: Object.fromEntries(this.arrivalsByNode),
       arrivalMult: Object.fromEntries(this.arrivalMult),
       edgeProb: Object.fromEntries(this.edgeProb),
-      acc: { arrived: this.arrived, completed: this.completed, flowSum: this.flowSum, flowCount: this.flowCount, perNode },
+      acc: { arrived: this.arrived, completed: this.completed, flowSum: this.flowSum, flowCount: this.flowCount, flowSamples: [...this.flowSamples], perNode },
     };
   }
 
@@ -583,7 +590,7 @@ export class Engine {
     e.arrivalMult = new Map(Object.entries(snap.arrivalMult ?? {}));
     e.edgeProb = new Map(Object.entries(snap.edgeProb ?? {}));
     e.arrived = snap.acc.arrived; e.completed = snap.acc.completed;
-    e.flowSum = snap.acc.flowSum; e.flowCount = snap.acc.flowCount;
+    e.flowSum = snap.acc.flowSum; e.flowCount = snap.acc.flowCount; e.flowSamples = [...(snap.acc.flowSamples ?? [])];
     e.perNode = new Map(Object.entries(snap.acc.perNode).map(([id, a]) => [id, { ...a }]));
     return e;
   }

@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { type RunMetrics, type RunRow, fmtDelta, fmtMoney } from "@/app/lib/simulation/results";
+import { FlowHistogram } from "./FlowHistogram";
 
 interface ScenarioLite { id: string; name: string; isBaseline: boolean }
 
@@ -72,8 +73,10 @@ export function ScenarioCompare({ scenarios, runUrlFor }: { scenarios: ScenarioL
 
   const rows: { label: string; get: (m: RunMetrics | null) => number | undefined; digits: number; pct?: boolean; money?: boolean }[] = [
     { label: "Completed", get: (m) => m?.stats.completed.mean, digits: 0 },
-    { label: "Flow p50", get: (m) => m?.stats.flowTime.p50, digits: 1 },
-    { label: "Flow p95", get: (m) => m?.stats.flowTime.p95, digits: 1 },
+    // True per-case percentiles (fall back to the run-average for legacy runs).
+    { label: "Typical (p50)", get: (m) => m?.stats.caseFlow?.p50 ?? m?.stats.flowTime.p50, digits: 0 },
+    { label: "Near worst (p95)", get: (m) => m?.stats.caseFlow?.p95 ?? m?.stats.flowTime.p95, digits: 0 },
+    { label: "Spread (sd)", get: (m) => m?.stats.caseFlow?.sd, digits: 0 },
     { label: "Top util", get: topUtil, digits: 2, pct: true },
     { label: "Cost / case", get: (m) => m?.stats.costPerCase?.mean, digits: 0, money: true },
     { label: "Total cost", get: (m) => m?.stats.totalCost?.mean, digits: 0, money: true },
@@ -133,9 +136,23 @@ export function ScenarioCompare({ scenarios, runUrlFor }: { scenarios: ScenarioL
             </tr>
           );
         })}
+        {/* Per-case flow-time distribution shape, side by side. */}
+        <tr className="border-b border-green-500/10">
+          <td className="py-1 text-left text-green-400/60 align-middle">flow shape</td>
+          {scenarios.map((s) => {
+            const cf = byId[s.id]?.stats.caseFlow;
+            return (
+              <td key={s.id} className="py-1 text-right align-middle">
+                {cf && cf.count > 0
+                  ? <div className="inline-block w-[120px]"><FlowHistogram dist={cf} compact width={120} height={28} /></div>
+                  : <span className="text-green-400/30">—</span>}
+              </td>
+            );
+          })}
+        </tr>
       </tbody>
       <tfoot>
-        <tr><td colSpan={scenarios.length + 1} className="pt-1 text-green-400/40">◆ baseline · deltas are vs baseline.</td></tr>
+        <tr><td colSpan={scenarios.length + 1} className="pt-1 text-green-400/40">◆ baseline · deltas are vs baseline · ✦ p50 ▸ p95 on the flow-shape bars.</td></tr>
       </tfoot>
     </table>
     </>
