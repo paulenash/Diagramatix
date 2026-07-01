@@ -15,6 +15,7 @@ import * as htmlToImage from "html-to-image";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { screenNameFromPath } from "@/app/lib/help/screenName";
 import { getCurrentDiagramName } from "@/app/lib/help/currentDiagram";
+import { useDraggable } from "./useDraggable";
 
 type Rect = { x: number; y: number; w: number; h: number };
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -35,6 +36,7 @@ export function ScreenCapture() {
   const pathname = usePathname();
   const email = session?.user?.email;
   const isSuper = !!email && SUPERUSER_EMAILS.has(email);
+  const { pos, handlers, didDrag } = useDraggable("diagramatix.camera.btnPos", () => ({ left: 64, top: window.innerHeight - 56 }));
 
   const [frozen, setFrozen] = useState<string | null>(null);
   const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
@@ -185,10 +187,13 @@ export function ScreenCapture() {
   return (
     <div data-no-capture>
       <button
-        onPointerDown={(e) => { e.preventDefault(); void capture(); }}
-        title="Capture this screen for the User Guide (open a menu first to include it). Alt+Shift+C"
+        onPointerDown={(e) => { e.preventDefault(); handlers.onPointerDown(e); }}
+        onPointerMove={handlers.onPointerMove}
+        onPointerUp={(e) => { handlers.onPointerUp(e); if (!didDrag()) void capture(); }}
+        title="Capture this screen for the User Guide (open a menu first to include it). Click to capture · drag to move · Alt+Shift+C"
         aria-label="Capture screen for User Guide"
-        className="fixed bottom-4 left-16 z-[70] w-10 h-10 flex items-center justify-center rounded-full border-2 border-gray-300 bg-white text-gray-600 hover:border-orange-400 hover:text-orange-600 hover:scale-110 transition-all"
+        style={pos ? { left: pos.left, top: pos.top, touchAction: "none" } : { touchAction: "none" }}
+        className={`fixed ${pos ? "" : "bottom-4 left-16"} z-[70] w-10 h-10 flex items-center justify-center rounded-full border-2 border-gray-300 bg-white text-gray-600 hover:border-orange-400 hover:text-orange-600 hover:scale-110 transition-all cursor-grab active:cursor-grabbing`}
       >
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />

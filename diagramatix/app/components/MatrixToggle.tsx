@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useDraggable } from "./useDraggable";
 
 /**
  * Global Matrix-rain screensaver. The little green "M" pinned to the
@@ -33,6 +34,7 @@ function readIdleSeconds(): number {
 export function MatrixToggle() {
   const [armed, setArmedState] = useState(false);
   const [running, setRunning] = useState(false);
+  const { pos, handlers, didDrag } = useDraggable("diagramatix.matrix.btnPos", () => ({ left: 16, top: window.innerHeight - 56 }));
   const [idleSeconds, setIdleSeconds] = useState(DEFAULT_IDLE_SECONDS);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -174,16 +176,18 @@ export function MatrixToggle() {
       {running && <canvas ref={canvasRef} className="fixed inset-0 z-[60] bg-black" />}
       <button
         data-no-capture
-        onClick={() => setArmed(!armed)}
-        className={`fixed bottom-4 left-4 z-[70] w-10 h-10 flex items-center justify-center rounded-full border-2 font-mono font-bold text-lg transition-all bg-black ${
+        {...handlers}
+        onClick={() => { if (didDrag()) return; setArmed(!armed); }}
+        style={pos ? { left: pos.left, top: pos.top, touchAction: "none" } : { touchAction: "none" }}
+        className={`fixed ${pos ? "" : "bottom-4 left-4"} z-[70] w-10 h-10 flex items-center justify-center rounded-full border-2 font-mono font-bold text-lg transition-all bg-black cursor-grab active:cursor-grabbing ${
           armed
             ? "border-green-400 text-green-400 shadow-[0_0_15px_rgba(74,222,128,0.7)] hover:scale-110"
             : "border-green-700/60 text-green-700/60 hover:border-green-400 hover:text-green-400 hover:scale-110"
         }`}
         title={
           armed
-            ? `Matrix screensaver ON — fires after ${idleSeconds}s idle. Click to disable.`
-            : "Matrix screensaver OFF. Click to enable."
+            ? `Matrix screensaver ON — fires after ${idleSeconds}s idle. Click to disable · drag to move.`
+            : "Matrix screensaver OFF. Click to enable · drag to move."
         }
         aria-label="Toggle Matrix screensaver"
         aria-pressed={armed}
