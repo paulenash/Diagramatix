@@ -10,6 +10,7 @@ import { spliceLinkedSubprocesses } from "@/app/lib/simulation/spliceLinks";
 import { applyOverrides, type OverrideSet } from "@/app/lib/simulation/overrides";
 import { runMonteCarlo } from "@/app/lib/simulation/runner";
 import { checkSimReadiness } from "@/app/lib/simulation/readiness";
+import { runIdsToPrune } from "@/app/lib/simulation/runHistory";
 import { DEFAULT_RUN_CONFIG, type ScenarioRunConfig } from "@/app/lib/simulation/types";
 
 type Params = { params: Promise<{ id: string; studyId: string; scenarioId: string }> };
@@ -39,7 +40,7 @@ export async function GET(_req: Request, { params }: Params) {
   const runs = await prisma.simulationRun.findMany({
     where: { scenarioId },
     orderBy: { startedAt: "desc" },
-    select: { id: true, metrics: true, error: true, startedAt: true, finishedAt: true },
+    select: { id: true, name: true, pinned: true, metrics: true, error: true, startedAt: true, finishedAt: true },
   });
   return NextResponse.json({ runs });
 }
@@ -128,6 +129,12 @@ export async function POST(req: Request, { params }: Params) {
     },
   });
   await prisma.simulationScenario.update({ where: { id: scenarioId }, data: { status: "RUNNING" } });
+
+  // Prune the scenario's transient (unpinned) run history, keeping the most
+  // recent few — named/pinned runs in the Run History are always kept.
+  const allRuns = await prisma.simulationRun.findMany({ where: { scenarioId }, select: { id: true, pinned: true, startedAt: true } });
+  const stale = runIdsToPrune(allRuns, 5).filter((rid) => rid !== run.id);
+  if (stale.length) await prisma.simulationRun.deleteMany({ where: { id: { in: stale } } });
 
   try {
     const { stats } = runMonteCarlo(net, cfg, cfg.interventions, teamCosts);

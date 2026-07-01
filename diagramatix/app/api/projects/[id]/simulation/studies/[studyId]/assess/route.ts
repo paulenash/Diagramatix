@@ -14,8 +14,10 @@ import { buildComparisonFacts, generateSimAssessment } from "@/app/lib/simulatio
 
 type Params = { params: Promise<{ id: string; studyId: string }> };
 
+type Loaded = { name: string; metrics: RunMetrics };
+
 /** Latest run WITH metrics for a scenario that belongs to this study+project. */
-async function latestMetrics(scenarioId: string, studyId: string, projectId: string): Promise<{ name: string; isBaseline: boolean; metrics: RunMetrics } | null> {
+async function latestMetrics(scenarioId: string, studyId: string, projectId: string): Promise<Loaded | null> {
   const sc = await prisma.simulationScenario.findUnique({
     where: { id: scenarioId },
     include: { study: { select: { id: true, projectId: true } } },
@@ -27,7 +29,19 @@ async function latestMetrics(scenarioId: string, studyId: string, projectId: str
     select: { metrics: true },
   });
   if (!run?.metrics) return null;
-  return { name: sc.name, isBaseline: sc.isBaseline, metrics: run.metrics as unknown as RunMetrics };
+  return { name: sc.name, metrics: run.metrics as unknown as RunMetrics };
+}
+
+/** A specific saved run (for comparing two Run History entries directly). Its
+ *  label is the run's own name, falling back to the scenario name. */
+async function runMetrics(runId: string, studyId: string, projectId: string): Promise<Loaded | null> {
+  const run = await prisma.simulationRun.findUnique({
+    where: { id: runId },
+    include: { scenario: { include: { study: { select: { id: true, projectId: true } } } } },
+  });
+  if (!run || run.error || !run.metrics) return null;
+  if (run.scenario.studyId !== studyId || run.scenario.study.projectId !== projectId) return null;
+  return { name: run.name || run.scenario.name, metrics: run.metrics as unknown as RunMetrics };
 }
 
 export async function POST(req: Request, { params }: Params) {
@@ -44,13 +58,21 @@ export async function POST(req: Request, { params }: Params) {
   if (!apiKey) return NextResponse.json({ error: "AI service not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 501 });
 
   const body = await req.json().catch(() => ({}));
-  const baselineScenarioId = typeof body.baselineScenarioId === "string" ? body.baselineScenarioId : "";
-  const compareScenarioId = typeof body.compareScenarioId === "string" ? body.compareScenarioId : "";
-  if (!baselineScenarioId || !compareScenarioId) return NextResponse.json({ error: "baselineScenarioId + compareScenarioId required" }, { status: 400 });
-
-  const base = await latestMetrics(baselineScenarioId, studyId, id);
-  const tobe = await latestMetrics(compareScenarioId, studyId, id);
-  if (!base || !tobe) return NextResponse.json({ error: "Both scenarios need a completed run before they can be assessed." }, { status: 400 });
+  // Two modes: compare two SAVED runs (baselineRunId/compareRunId), or two
+  // scenarios' latest runs (baselineScenarioId/compareScenarioId).
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const baselineRunId = str(body.baselineRunId), compareRunId = str(body.compareRunId);
+  let base: Loaded | null, tobe: Loaded | null;
+  if (baselineRunId && compareRunId) {
+    base = await runMetrics(baselineRunId, studyId, id);
+    tobe = await runMetrics(compareRunId, studyId, id);
+  } else {
+    const baselineScenarioId = str(body.baselineScenarioId), compareScenarioId = str(body.compareScenarioId);
+    if (!baselineScenarioId || !compareScenarioId) return NextResponse.json({ error: "Provide two run ids or two scenario ids" }, { status: 400 });
+    base = await latestMetrics(baselineScenarioId, studyId, id);
+    tobe = await latestMetrics(compareScenarioId, studyId, id);
+  }
+  if (!base || !tobe) return NextResponse.json({ error: "Both sides need a completed run before they can be assessed." }, { status: 400 });
 
   const unit = base.metrics.clockUnit || tobe.metrics.clockUnit || "";
   const facts = buildComparisonFacts(base.metrics, tobe.metrics, base.name, tobe.name, unit);

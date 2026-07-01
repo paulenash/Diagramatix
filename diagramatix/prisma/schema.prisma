@@ -1040,6 +1040,11 @@ model SimulationRun {
   networkSnapshot Json               @default("{}")
   metrics         Json               @default("{}")
   error           String?
+  // Run History: a user-given name (e.g. "Large Sales Team (25)") pins the run
+  // into the browsable history; unnamed/unpinned runs are pruned to the last few
+  // per scenario. `pinned` is set true whenever a run is named.
+  name            String?
+  pinned          Boolean            @default(false)
   startedAt       DateTime           @default(now())
   finishedAt      DateTime?
 
