@@ -157,6 +157,13 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
   const [openId, setOpenId] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
   const [pairing, setPairing] = useState(false);
+  // Scenarios that have a completed run — DONE from a prior session (persisted
+  // status) plus any run in this session — so "compare scenarios" only enables
+  // once there's something to compare.
+  const [ranIds, setRanIds] = useState<Set<string>>(new Set());
+  const hasRun = (s: ScenarioRow) => s.status === "DONE" || ranIds.has(s.id);
+  const ranCount = detail.scenarios.filter(hasRun).length;
+  const canCompare = ranCount >= 2;
 
   const base = `/api/projects/${projectId}/simulation/studies/${detail.id}/scenarios`;
 
@@ -197,20 +204,23 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center gap-3 mb-1 flex-wrap">
         <p className="text-green-400/70 uppercase tracking-widest text-[10px]">Scenarios</p>
-        <div className="flex items-center gap-3">
-          {diagrams.length >= 2 && (
-            <button onClick={() => setPairing((v) => !v)} className="text-green-400/70 hover:text-green-300 text-[10px]">
-              {pairing ? "▾ hide" : "⇄ set up As-is vs To-be"}
-            </button>
-          )}
-          {detail.scenarios.length >= 2 && (
-            <button onClick={() => setComparing((v) => !v)} className="text-green-400/70 hover:text-green-300 text-[10px]">
-              {comparing ? "▾ hide compare" : "⇄ compare scenarios"}
-            </button>
-          )}
-        </div>
+        {diagrams.length >= 2 && (
+          <button onClick={() => setPairing((v) => !v)} className="text-green-400/70 hover:text-green-300 text-[10px]">
+            {pairing ? "▾ hide" : "⇄ set up As-is vs To-be"}
+          </button>
+        )}
+        {detail.scenarios.length >= 2 && (
+          <button
+            onClick={() => { if (canCompare) setComparing((v) => !v); }}
+            disabled={!canCompare}
+            title={canCompare ? "Compare the scenarios' latest runs" : "Run both scenarios first, then compare"}
+            className={`text-[10px] ${canCompare ? "text-green-400/70 hover:text-green-300" : "text-green-400/25 cursor-not-allowed"}`}
+          >
+            {comparing ? "▾ hide compare" : "⇄ compare scenarios"}
+          </button>
+        )}
       </div>
       {pairing && <AsIsToBeSetup diagrams={diagrams} onCreate={createAsIsToBe} />}
       {comparing && detail.scenarios.length >= 2 && (
@@ -221,11 +231,12 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
       {detail.scenarios.length === 0 && <p className="text-green-400/40">No scenarios — add one below.</p>}
       <div className="flex flex-col gap-1">
         {detail.scenarios.map((s) => (
-          <div key={s.id} className="border border-green-500/20 rounded">
+          <div key={s.id} className={`border rounded ${openId === s.id ? "border-green-400 bg-green-400/5" : "border-green-500/20"}`}>
             <div className="flex items-center gap-2 px-2 py-1">
-              <button onClick={() => setOpenId(openId === s.id ? null : s.id)} className="flex-1 text-left text-green-300 hover:text-green-200 truncate">
+              <button onClick={() => setOpenId(openId === s.id ? null : s.id)} className={`flex-1 text-left hover:text-green-200 truncate ${openId === s.id ? "text-green-200" : "text-green-300"}`}>
                 {openId === s.id ? "▾" : "▸"} {s.name}
               </button>
+              {hasRun(s) && <span className="text-green-400 text-[10px]" title="has a completed run">✓ ran</span>}
               {s.isBaseline
                 ? <span className="text-green-300/80 text-[9px] border border-green-500/40 rounded px-1">BASELINE</span>
                 : <button onClick={() => patchScenario(s.id, { isBaseline: true })} className="text-green-400/50 hover:text-green-300 text-[9px]">set baseline</button>}
@@ -240,7 +251,7 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
                   assessUrl={`/api/projects/${projectId}/simulation/studies/${detail.id}/assess`}
                   onSave={(cfg) => patchScenario(s.id, { runConfig: cfg })}
                   onSetVariant={(ids) => patchScenario(s.id, { variantRootIds: ids })}
-                  onRan={onRan}
+                  onRan={(cfg) => { setRanIds((prev) => new Set(prev).add(s.id)); onRan?.(cfg); }}
                 />
               </div>
             )}
