@@ -144,30 +144,61 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
     return () => cancelAnimationFrame(raf.current);
   }, [playing, speed, replay.durationSim]);
 
-  function tokenPos(tokenId: string): { x: number; y: number } | null {
+  // Each token is either DWELLING at a node (queue + service — it sits stacked at
+  // the node's entry boundary) or in TRANSIT along the outgoing connector (the
+  // last slice of the gap between two nodes). Phase C = the queue backs up at the
+  // door.
+  type Phase =
+    | { kind: "transit"; edgeId?: string; nodeA: string; nodeB: string; f: number }
+    | { kind: "dwell"; nodeId: string; entryEdgeId?: string; tEnter: number };
+  function tokenPhase(tokenId: string): Phase | null {
     const k = keyframes.get(tokenId);
     if (!k || k.frames.length === 0) return null;
     if (simT < k.frames[0].t || simT > k.endT + 0.001) return null;
     let i = k.frames.length - 1;
     while (i > 0 && k.frames[i].t > simT) i--;
     const a = k.frames[i], b = k.frames[i + 1];
-    const pa = nodeById.get(a.nodeId);
+    if (!b || b.t <= a.t) return { kind: "dwell", nodeId: a.nodeId, entryEdgeId: a.edgeId, tEnter: a.t };
+    const dur = b.t - a.t;
+    const transitDur = dur * 0.25; // dwell for the first 75%, hop across in the last 25%
+    if (simT < b.t - transitDur) return { kind: "dwell", nodeId: a.nodeId, entryEdgeId: a.edgeId, tEnter: a.t };
+    const f = transitDur > 0 ? Math.min(1, Math.max(0, (simT - (b.t - transitDur)) / transitDur)) : 1;
+    return { kind: "transit", edgeId: b.edgeId, nodeA: a.nodeId, nodeB: b.nodeId, f };
+  }
+  function transitPos(ph: Extract<Phase, { kind: "transit" }>): { x: number; y: number } | null {
+    const wp = ph.edgeId ? connWaypoints.get(ph.edgeId) : undefined;
+    if (wp) return pointAlongPolyline(wp, ph.f);
+    const pa = nodeById.get(ph.nodeA), pb = nodeById.get(ph.nodeB);
     if (!pa) return null;
-    if (!b || b.t <= a.t) return { x: pa.cx, y: pa.cy };
-    const f = Math.min(1, Math.max(0, (simT - a.t) / (b.t - a.t)));
-    // Glide along the actual routed connector into b (the edge the token
-    // travelled), falling back to a straight centre-to-centre line.
-    const wp = b.edgeId ? connWaypoints.get(b.edgeId) : undefined;
-    if (wp) return pointAlongPolyline(wp, f);
-    const pb = nodeById.get(b.nodeId);
     if (!pb) return { x: pa.cx, y: pa.cy };
-    return { x: pa.cx + (pb.cx - pa.cx) * f, y: pa.cy + (pb.cy - pa.cy) * f };
+    return { x: pa.cx + (pb.cx - pa.cx) * ph.f, y: pa.cy + (pb.cy - pa.cy) * ph.f };
+  }
+  // Stack a waiting token at the node's entry boundary, backing up along the
+  // incoming connector (index k = position in the queue).
+  function boundaryStackPos(node: NodePos, entryEdgeId: string | undefined, k: number): { x: number; y: number } {
+    const gap = 9;
+    const wp = entryEdgeId ? connWaypoints.get(entryEdgeId) : undefined;
+    if (wp && wp.length >= 2) {
+      const last = wp[wp.length - 1], prev = wp[wp.length - 2];
+      const dx = last.x - prev.x, dy = last.y - prev.y, len = Math.hypot(dx, dy) || 1;
+      return { x: last.x - (dx / len) * gap * k, y: last.y - (dy / len) * gap * k };
+    }
+    return { x: node.x - 3 - gap * k, y: node.cy };
   }
 
   const liveTokens: { id: string; x: number; y: number }[] = [];
+  const dwellByNode = new Map<string, { id: string; tEnter: number; entryEdgeId?: string }[]>();
   for (const id of keyframes.keys()) {
-    const p = tokenPos(id);
-    if (p) { const j = hash(id); liveTokens.push({ id, x: p.x + ((j % 7) - 3) * 3, y: p.y + (((j >> 3) % 7) - 3) * 3 }); }
+    const ph = tokenPhase(id);
+    if (!ph) continue;
+    if (ph.kind === "transit") { const p = transitPos(ph); if (p) liveTokens.push({ id, x: p.x, y: p.y }); }
+    else { const arr = dwellByNode.get(ph.nodeId) ?? []; arr.push({ id, tEnter: ph.tEnter, entryEdgeId: ph.entryEdgeId }); dwellByNode.set(ph.nodeId, arr); }
+  }
+  for (const [nodeId, arr] of dwellByNode) {
+    const node = nodeById.get(nodeId);
+    if (!node) continue;
+    arr.sort((x, y) => x.tEnter - y.tEnter || (x.id < y.id ? -1 : 1)); // FIFO order
+    arr.forEach((tk, k) => { const p = boundaryStackPos(node, tk.entryEdgeId, Math.min(k, 18)); liveTokens.push({ id: tk.id, x: p.x, y: p.y }); });
   }
 
   function forkCapacity() {
@@ -237,10 +268,4 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
       </div>
     </div>
   );
-}
-
-function hash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
 }
