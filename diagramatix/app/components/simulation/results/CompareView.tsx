@@ -83,7 +83,7 @@ export function CompareView({ entries, assessFn }: {
   }
 
   return (
-    <>
+    <div className="max-w-lg mx-auto">
       {verdicts.length > 0 && (
         <div className="mb-2 border border-green-500/40 rounded bg-green-400/5 px-2 py-1.5">
           <div className="text-green-400/60 uppercase tracking-widest text-[9px] mb-0.5">verdict vs {baseline.name}</div>
@@ -164,6 +164,6 @@ export function CompareView({ entries, assessFn }: {
           <tr><td colSpan={entries.length + 1} className="pt-1 text-green-400/40">◆ baseline · deltas vs baseline · ✦ p50 ▸ p95 on the flow-shape bars.</td></tr>
         </tfoot>
       </table>
-    </>
+    </div>
   );
 }

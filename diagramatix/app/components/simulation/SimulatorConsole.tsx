@@ -77,7 +77,7 @@ export function SimulatorConsole({ data, diagramId, projectId, isAdmin, diagramN
 
   return (
     <div className="fixed inset-0 z-[60] bg-black text-green-400 font-mono overflow-hidden">
-      <div className="absolute inset-0 opacity-15 pointer-events-none">
+      <div className="absolute inset-0 opacity-30 pointer-events-none">
         <MatrixRain fontSize={18} />
       </div>
       <div className="relative z-10 flex flex-col h-full">

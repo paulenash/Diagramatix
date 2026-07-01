@@ -80,8 +80,9 @@ export function SimulationHeatmap({ data, teamCapacities, onClose }: { data: Dia
   const fillFor = (h: Heat | undefined): { fill: string; opacity: number; glow: boolean } => {
     const wait = h?.wait ?? 0;
     const w = maxWait > 0 ? wait / maxWait : 0;
-    const fill = w < 0.34 ? "#22c55e" : w < 0.67 ? "#f59e0b" : "#ef4444"; // green · amber · red
-    return { fill, opacity: 0.14 + 0.66 * w, glow: w >= 0.67 };
+    // green · amber · red · purple(=the very worst)
+    const fill = w < 0.34 ? "#22c55e" : w < 0.6 ? "#f59e0b" : w < 0.85 ? "#ef4444" : "#a855f7";
+    return { fill, opacity: 0.16 + 0.64 * w, glow: w >= 0.6 };
   };
 
   return (
@@ -122,7 +123,7 @@ export function SimulationHeatmap({ data, teamCapacities, onClose }: { data: Dia
           })}
         </svg>
         <div className="absolute bottom-3 left-3 font-mono text-[10px] text-green-400/70 bg-black/70 border border-green-500/40 rounded px-2 py-1">
-          avg wait: <span className="text-green-400">green</span> good · <span className="text-amber-400">orange</span> poor · <span className="text-red-400">red</span> bad · ⧗ = avg wait · worst node ringed
+          avg wait: <span className="text-green-400">green</span> good · <span className="text-amber-400">orange</span> poor · <span className="text-red-400">red</span> bad · <span className="text-purple-400">purple</span> worst · ⧗ = avg wait · worst node ringed
         </div>
       </div>
     </div>
