@@ -4471,9 +4471,15 @@ export const CHAPTERS: HelpChapter[] = [
               are the bottlenecks?&rdquo;
             </p>
             <p className="mt-2">
-              Open it from the editor toolbar with the{" "}
-              <strong>◈ Simulator</strong> button (available on BPMN diagrams).
-              A short Matrix-style intro leads into the Simulator console.
+              There are two ways in. From a <strong>diagram</strong>, the editor
+              toolbar&rsquo;s <strong>◈ Simulator</strong> button (on BPMN
+              diagrams) opens a <strong>single-process</strong> analysis of that
+              diagram. From the <strong>dashboard</strong>, right-click a project
+              tile → <strong>◈ Simulator</strong> to open the project in{" "}
+              <strong>comparison mode</strong>: the header shows the project name
+              and a <strong>process</strong> selector across all its diagrams, so
+              you can set up As-is/To-be pairs, run them and keep the results side
+              by side. A short Matrix-style intro leads into the console.
             </p>
           </>
         ),
@@ -4522,9 +4528,21 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <>
             <p>
-              In the replay, use <strong>Play / Pause</strong>, the{" "}
-              <strong>speed</strong> slider (the slowed-down clock) and the{" "}
-              <strong>scrub bar</strong> to move through time.
+              <strong>Launch replay</strong> animates your <strong>last
+              scenario run</strong> (its full horizon, so you see the real volume
+              of work). A <strong>live stats panel</strong> in the top-right
+              climbs as it plays — <strong>completed</strong> and{" "}
+              <strong>in-flight</strong> counts, and a per-team table of the
+              current <strong>queue</strong>, <strong>busy / capacity</strong> and{" "}
+              <strong>utilisation</strong>, with the emerging{" "}
+              <strong>bottleneck</strong> ringed and turning red as work piles on.
+              (It&rsquo;s one representative run to watch; <strong>▶ Run</strong>{" "}
+              still gives the rigorous multi-replication numbers.)
+            </p>
+            <p className="mt-2">
+              Use <strong>Play / Pause</strong>, the <strong>speed</strong> slider
+              (the slowed-down clock) and the <strong>scrub bar</strong> to move
+              through time.
             </p>
             <p className="mt-2">
               As the <strong>Operator</strong> you can <strong>reach in and
