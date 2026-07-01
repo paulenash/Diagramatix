@@ -22,7 +22,10 @@ function depthOf(el: DiagramElement, byId: Map<string, DiagramElement>): number 
   return d;
 }
 
-const CONTAINER = new Set(["pool", "lane"]);
+// Containers render as the background layer (behind the connectors) so the
+// sequence flows INSIDE them stay visible. Expanded subprocesses are containers
+// too — otherwise their box paints over the connectors drawn within.
+const CONTAINER = new Set(["pool", "lane", "subprocess-expanded"]);
 
 export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data }: { data: DiagramData }) {
   const byId = new Map(data.elements.map((e) => [e.id, e]));
