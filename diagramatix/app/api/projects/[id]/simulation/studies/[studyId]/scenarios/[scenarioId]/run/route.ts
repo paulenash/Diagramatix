@@ -9,6 +9,7 @@ import { assemblePortfolio, portfolioClosure } from "@/app/lib/simulation/networ
 import { spliceLinkedSubprocesses } from "@/app/lib/simulation/spliceLinks";
 import { applyOverrides, type OverrideSet } from "@/app/lib/simulation/overrides";
 import { runMonteCarlo } from "@/app/lib/simulation/runner";
+import { checkSimReadiness } from "@/app/lib/simulation/readiness";
 import { DEFAULT_RUN_CONFIG, type ScenarioRunConfig } from "@/app/lib/simulation/types";
 
 type Params = { params: Promise<{ id: string; studyId: string; scenarioId: string }> };
@@ -47,7 +48,7 @@ export async function GET(_req: Request, { params }: Params) {
  *  scenario's sparse overrides, schedule its planned interventions, run the
  *  Monte-Carlo, and persist a SimulationRun. Synchronous for now (small
  *  portfolios); large ones become a queued + polled job later. */
-export async function POST(_req: Request, { params }: Params) {
+export async function POST(req: Request, { params }: Params) {
   const session = await auth();
   if (isReadOnlyImpersonation(session, await cookies())) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
@@ -101,6 +102,17 @@ export async function POST(_req: Request, { params }: Params) {
 
   const cfg: ScenarioRunConfig = { ...DEFAULT_RUN_CONFIG, ...((scenario.runConfig ?? {}) as unknown as ScenarioRunConfig) };
   const overrides = (scenario.overrides ?? {}) as unknown as OverrideSet;
+
+  // ── Pre-run readiness check ────────────────────────────────────────────
+  // Surface un-set parameters (missing teams, gateway probabilities, arrival
+  // rates, un-initialised properties) so the user can complete the setup before
+  // running with silent defaults. `?force=true` runs anyway (the "Run anyway"
+  // path from the dialog).
+  const force = new URL(req.url).searchParams.get("force") === "true";
+  if (!force) {
+    const issues = checkSimReadiness(rootDiagrams.map((r) => r.data), teams);
+    if (issues.length > 0) return NextResponse.json({ needsSetup: true, issues });
+  }
 
   // ── Assemble + run ─────────────────────────────────────────────────────
   const baseline = assemblePortfolio(rootDiagrams, { teamCapacities });

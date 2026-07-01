@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { MatrixButton } from "./matrix/MatrixChrome";
+import type { ReadinessIssue } from "@/app/lib/simulation/readiness";
 import { ResultsReport } from "./results/ResultsReport";
 import { ScenarioCompare } from "./results/ScenarioCompare";
 import {
@@ -290,14 +291,18 @@ function ScenarioEditor({ scenario, runUrl, diagrams, onSave, onSetVariant }: { 
   const [runErr, setRunErr] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [ran, setRan] = useState(0); // bump to refetch the report after a run
+  const [setup, setSetup] = useState<ReadinessIssue[] | null>(null); // pre-run readiness dialog
 
-  async function runScenario() {
-    setRunning(true); setRunErr(null); setResult(null);
+  async function runScenario(force = false) {
+    setRunning(true); setRunErr(null); setResult(null); setSetup(null);
     try {
       // Persist the latest config first so the run uses what's on screen.
       onSave(cfg); setDirty(false);
-      const res = await fetch(runUrl, { method: "POST" });
+      const res = await fetch(runUrl + (force ? "?force=true" : ""), { method: "POST" });
       const json = await res.json().catch(() => ({}));
+      // Pre-run readiness gate: the server returns the un-set parameters instead
+      // of running; show them so the user can fix or Run anyway.
+      if (json.needsSetup) { setSetup((json.issues ?? []) as ReadinessIssue[]); return; }
       if (!res.ok) { setRunErr(json.error ?? "Run failed"); return; }
       const stats = json.run?.metrics?.stats;
       const bottlenecks: string[] = json.run?.metrics?.bottlenecks ?? [];
@@ -385,9 +390,33 @@ function ScenarioEditor({ scenario, runUrl, diagrams, onSave, onSetVariant }: { 
 
       <div className="flex items-center gap-3 pt-1">
         <MatrixButton onClick={() => { onSave(cfg); setDirty(false); }}>{dirty ? "Save config" : "Saved"}</MatrixButton>
-        <MatrixButton onClick={runScenario}>{running ? "◴ running…" : "▶ Run"}</MatrixButton>
+        <MatrixButton onClick={() => runScenario()}>{running ? "◴ running…" : "▶ Run"}</MatrixButton>
       </div>
       {runErr && <p className="text-red-400 text-[10px]">{runErr}</p>}
+      {setup && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" onClick={() => setSetup(null)}>
+          <div className="bg-black border border-green-500/50 rounded-lg max-w-md w-full max-h-[80vh] overflow-auto p-4" onClick={(e) => e.stopPropagation()}>
+            <p className="text-green-400 uppercase tracking-widest text-[11px] mb-1">Complete the simulation setup</p>
+            <p className="text-[11px] text-green-300/70 mb-2">
+              {setup.some((i) => i.severity === "error")
+                ? "Some parameters still need setting for the results to be meaningful:"
+                : "These will use defaults — set them for accurate numbers, or run anyway:"}
+            </p>
+            <ul className="flex flex-col gap-1 text-[11px] mb-3">
+              {setup.map((i, n) => (
+                <li key={n} className="flex gap-1.5">
+                  <span className={i.severity === "error" ? "text-red-400" : "text-yellow-400/80"}>{i.severity === "error" ? "✕" : "!"}</span>
+                  <span className="text-green-200/90">{i.message}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center gap-2">
+              <MatrixButton onClick={() => { setSetup(null); runScenario(true); }}>Run anyway</MatrixButton>
+              <button onClick={() => setSetup(null)} className="text-green-400/60 hover:text-green-300 text-[11px]">Cancel &amp; fix</button>
+            </div>
+          </div>
+        </div>
+      )}
       {result && (
         <div className="border border-green-500/30 rounded p-2 mt-1 text-[10px] text-green-300/90 flex flex-col gap-0.5">
           <div className="text-green-400/60 uppercase tracking-widest">Latest run · {cfg.replications} rep(s)</div>
