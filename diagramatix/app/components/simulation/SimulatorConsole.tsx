@@ -40,32 +40,40 @@ export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClos
         </header>
 
         {mode === "home" ? (
-          <main className="flex-1 overflow-auto p-6 grid gap-4 md:grid-cols-3 content-start">
-            <MatrixPanel title="Teams" className="md:col-span-2">
-              <TeamLibraryManager projectId={projectId} onCapacities={setTeamCapacities} />
-            </MatrixPanel>
-            <MatrixPanel title="Studies & Scenarios" className="md:col-span-3">
-              <StudyManager projectId={projectId} isAdmin={isAdmin} />
-            </MatrixPanel>
-            <MatrixPanel title="Run / Replay">
-              <p className="text-xs text-green-400/60 mb-3">Watch tokens flow through the process; intervene live. Or see where the heat builds up.</p>
-              <div className="flex flex-col gap-2">
-                <MatrixButton onClick={() => setMode("replay")}>▶ Launch replay</MatrixButton>
-                <MatrixButton onClick={() => setMode("heatmap")}>▦ Heatmap</MatrixButton>
-              </div>
-            </MatrixPanel>
-            <MatrixPanel title="Simulation Data — see, edit, fill & clear" className="md:col-span-3">
-              {onApplyData
-                ? <SimDataPanel data={data} onApplyData={onApplyData} onFillMissing={onFillTestData} />
-                : <p className="text-xs text-green-400/60">Open this diagram from its editor to edit simulation data here.</p>}
-            </MatrixPanel>
-            <MatrixPanel title="Engine status" className="md:col-span-3">
-              <p className="text-xs text-green-400/70 leading-relaxed">
-                Discrete-event core <span className="text-green-300">ONLINE</span> · resumable · M/M/1-verified ·
-                BPSim-aligned. Annotate elements via <span className="text-green-300">Properties → ◈ Simulation</span>,
-                then launch the replay to watch the flow and fork the timeline.
-              </p>
-            </MatrixPanel>
+          <main className="flex-1 overflow-auto p-4">
+            {/* Centred, compact column of panels — the ambient Matrix rain shows
+                in the margins on either side rather than the panels filling the
+                whole width. */}
+            <div className="max-w-5xl mx-auto grid gap-3 md:grid-cols-3 content-start">
+              <MatrixPanel title="Teams" className="md:col-span-2">
+                <TeamLibraryManager projectId={projectId} onCapacities={setTeamCapacities} />
+              </MatrixPanel>
+              <MatrixPanel title="Run / Replay">
+                <p className="text-xs text-green-400/60 mb-3">Watch tokens flow through the process; intervene live. Or see where the heat builds up.</p>
+                <div className="flex flex-col gap-2">
+                  <MatrixButton onClick={() => setMode("replay")}>▶ Launch replay</MatrixButton>
+                  <MatrixButton onClick={() => setMode("heatmap")}>▦ Heatmap</MatrixButton>
+                </div>
+              </MatrixPanel>
+              <MatrixPanel title="Studies & Scenarios" className="md:col-span-3">
+                <StudyManager projectId={projectId} isAdmin={isAdmin} />
+              </MatrixPanel>
+              <MatrixPanel title="Simulation Data — see, edit, fill & clear" className="md:col-span-3">
+                {onApplyData
+                  ? <SimDataPanel data={data} onApplyData={onApplyData} onFillMissing={onFillTestData} />
+                  : <p className="text-xs text-green-400/60">Open this diagram from its editor to edit simulation data here.</p>}
+              </MatrixPanel>
+              <MatrixPanel title="Engine status" className="md:col-span-3">
+                <p className="text-xs text-green-400/70 leading-relaxed">
+                  Discrete-event core <span className="text-green-300">ONLINE</span> · resumable · M/M/1-verified ·
+                  BPSim-aligned. Edit every parameter right here in the{" "}
+                  <span className="text-green-300">Simulation Data</span> panel above —{" "}
+                  <span className="text-green-300">no need to exit</span> (the per-element{" "}
+                  <span className="text-green-300">Properties → ◈ Simulation</span> editor back in the canvas is an
+                  alternative). Then Run a scenario, or launch the replay to watch the flow and fork the timeline.
+                </p>
+              </MatrixPanel>
+            </div>
           </main>
         ) : mode === "replay" ? (
           <main className="flex-1 overflow-hidden p-4">

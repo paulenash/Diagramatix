@@ -70,10 +70,18 @@ export function SimulationHeatmap({ data, teamCapacities, onClose }: { data: Dia
     return () => window.clearTimeout(id);
   }, [data, teamCapacities, reps, nonce]);
 
-  // Heat → fill: dark green (cool) → bright phosphor (hot). Util drives it.
+  // Heat → fill by WAIT TIME, relative to the worst wait in the diagram:
+  // green = good (little/no wait) · orange = poor · red = bad; the worst nodes
+  // glow full red. Wait time is what the user actually feels, so it drives the
+  // colour (utilisation still shown as the bottleneck readout).
+  const maxWait = useMemo(() => {
+    let m = 0; for (const h of heat.byNode.values()) if (h.wait > m) m = h.wait; return m;
+  }, [heat]);
   const fillFor = (h: Heat | undefined): { fill: string; opacity: number; glow: boolean } => {
-    const u = h?.util ?? 0;
-    return { fill: "#22c55e", opacity: 0.06 + 0.72 * u, glow: u > 0.8 };
+    const wait = h?.wait ?? 0;
+    const w = maxWait > 0 ? wait / maxWait : 0;
+    const fill = w < 0.34 ? "#22c55e" : w < 0.67 ? "#f59e0b" : "#ef4444"; // green · amber · red
+    return { fill, opacity: 0.14 + 0.66 * w, glow: w >= 0.67 };
   };
 
   return (
@@ -98,14 +106,14 @@ export function SimulationHeatmap({ data, teamCapacities, onClose }: { data: Dia
             const f = fillFor(h);
             const isTop = n.id === heat.topNode && (h?.wait ?? 0) > 0.01;
             return (
-              <g key={n.id} style={f.glow ? { filter: "drop-shadow(0 0 6px #22FF22)" } : undefined}>
+              <g key={n.id} style={f.glow ? { filter: `drop-shadow(0 0 7px ${f.fill})` } : undefined}>
                 <rect x={n.x} y={n.y} width={n.w} height={n.h} rx={4} fill={f.fill} fillOpacity={f.opacity}
-                  stroke={isTop ? "#fde047" : "#22c55e"} strokeWidth={isTop ? 2 : 1} strokeOpacity={isTop ? 0.9 : 0.5} />
-                <text x={n.cx} y={n.cy} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="#bbf7d0" style={{ pointerEvents: "none" }}>
+                  stroke={isTop ? "#fecaca" : f.fill} strokeWidth={isTop ? 2.5 : 1} strokeOpacity={isTop ? 1 : 0.5} />
+                <text x={n.cx} y={n.cy} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="#e5faec" style={{ pointerEvents: "none" }}>
                   {n.label.length > 18 ? n.label.slice(0, 17) + "…" : n.label}
                 </text>
                 {h && h.wait > 0.05 && (
-                  <text x={n.x + n.w - 2} y={n.y + 9} textAnchor="end" fontSize={8} fill="#22FF22" style={{ pointerEvents: "none" }}>
+                  <text x={n.x + n.w - 2} y={n.y + 9} textAnchor="end" fontSize={8} fill="#ffffff" style={{ pointerEvents: "none" }}>
                     ⧗{h.wait.toFixed(1)}
                   </text>
                 )}
@@ -114,7 +122,7 @@ export function SimulationHeatmap({ data, teamCapacities, onClose }: { data: Dia
           })}
         </svg>
         <div className="absolute bottom-3 left-3 font-mono text-[10px] text-green-400/70 bg-black/70 border border-green-500/40 rounded px-2 py-1">
-          brightness = pool utilisation · ⧗ = avg wait · <span className="text-yellow-300">yellow</span> = worst wait
+          avg wait: <span className="text-green-400">green</span> good · <span className="text-amber-400">orange</span> poor · <span className="text-red-400">red</span> bad · ⧗ = avg wait · worst node ringed
         </div>
       </div>
     </div>
