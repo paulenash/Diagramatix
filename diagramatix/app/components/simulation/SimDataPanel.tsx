@@ -108,7 +108,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing }: {
   const flag = (bad: boolean) => <span className={bad ? "text-red-400" : "text-green-500/40"}>●</span>;
 
   return (
-    <div className="flex flex-col gap-3 text-[10px]">
+    <div className="flex flex-col gap-3 text-[10px] overflow-x-auto">
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
         {onFillMissing && <MatrixButton onClick={doFill}>⚙ Fill missing</MatrixButton>}
@@ -157,8 +157,8 @@ export function SimDataPanel({ data, onApplyData, onFillMissing }: {
                 <Cell w={W.name} truncate>{t.label || t.id}</Cell>
                 <Cell w={W.dist}><MatrixDist value={sim.cycleTime} onChange={(cycleTime) => patchEl(t.id, { cycleTime })} /></Cell>
                 <Cell w={W.dist}><MatrixDist value={sim.waitTime} onChange={(waitTime) => patchEl(t.id, { waitTime })} /></Cell>
-                <Cell w={W.team}><input type="text" value={sim.teamId ?? ""} placeholder="team" onChange={(e) => patchEl(t.id, { teamId: e.target.value || undefined })} className={`${inp} w-52`} /></Cell>
-                <Cell w={W.units}><input type="number" min={1} value={sim.resourceUnits ?? 1} onChange={(e) => patchEl(t.id, { resourceUnits: Math.max(1, parseInt(e.target.value, 10) || 1) })} className={`${inp} w-12`} /></Cell>
+                <Cell w={W.team}><input type="text" value={sim.teamId ?? ""} placeholder="team" onChange={(e) => patchEl(t.id, { teamId: e.target.value || undefined })} className={`${inp} w-40`} /></Cell>
+                <Cell w={W.units}><input type="number" min={1} value={sim.resourceUnits ?? 1} onChange={(e) => patchEl(t.id, { resourceUnits: Math.max(1, parseInt(e.target.value, 10) || 1) })} className={`${inp} w-10`} /></Cell>
               </Row>
             );
           })}
@@ -228,12 +228,12 @@ const inp = "bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-
  *  lane name. */
 const W = {
   flag: "w-4 shrink-0",
-  name: "w-44 shrink-0",
-  dist: "w-64 shrink-0",
-  team: "w-56 shrink-0",
-  units: "w-14 shrink-0",
+  name: "w-40 shrink-0",
+  dist: "w-60 shrink-0",
+  team: "w-44 shrink-0",
+  units: "w-12 shrink-0",
   maxArr: "w-24 shrink-0",
-  target: "w-56 shrink-0",
+  target: "w-52 shrink-0",
   pct: "w-16 shrink-0",
   def: "w-14 shrink-0",
   cond: "w-40 shrink-0",
