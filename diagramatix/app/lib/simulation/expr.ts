@@ -174,8 +174,14 @@ class Parser {
 const FUNCS: Record<string, (args: Value[], ctx: EvalContext) => Value> = {
   getproperty: (a, ctx) => {
     const name = String(a[0]);
-    if (!(name in ctx.props)) throw new Error(`Unknown property '${name}'`);
-    return ctx.props[name];
+    // Forgiving: a property that was never assigned reads as 0 rather than
+    // throwing. An un-initialised per-token counter (e.g. a fresh event-
+    // subprocess handler token that didn't inherit the parent's counter) then
+    // behaves sensibly — arithmetic is 0-based, comparisons like `> 0` are
+    // false — instead of crashing the whole run. The pre-run readiness check
+    // (checkSimReadiness) surfaces properties that are USED but never
+    // initialised so the user can set them up before running.
+    return name in ctx.props ? ctx.props[name] : 0;
   },
   min: (a) => Math.min(...a.map(Number)),
   max: (a) => Math.max(...a.map(Number)),

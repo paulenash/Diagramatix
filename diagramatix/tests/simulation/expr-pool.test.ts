@@ -33,11 +33,19 @@ describe("expr — BPSim conditions & property assignments", () => {
     expect(compileExpr("max(2, 7, 3)").evalNumber({ props: {} })).toBe(7);
   });
 
-  it("is safe — no host access, errors on unknowns", () => {
+  it("is safe — no host access; unknown functions/globals/syntax throw", () => {
     expect(() => compileExpr("foo(1)").eval({ props: {} })).toThrow(); // unknown function
     expect(() => compileExpr("process").eval({ props: {} })).toThrow(); // no globals
-    expect(() => compileExpr("getProperty('missing')").eval({ props: {} })).toThrow();
     expect(() => compileExpr("'unterminated").eval({ props: {} })).toThrow();
+  });
+
+  it("an unset property reads as 0 (forgiving — no crash mid-run)", () => {
+    // Deliberately NON-throwing: a fresh event-subprocess handler token may read
+    // a counter it never inherited. It reads 0 (comparisons false, arithmetic
+    // 0-based) rather than crashing the whole run; the pre-run readiness check
+    // surfaces used-but-uninitialised properties so the user can set them up.
+    expect(compileExpr("getProperty('missing')").evalNumber({ props: {} })).toBe(0);
+    expect(compileExpr("getProperty('missing') > 0").evalBool({ props: {} })).toBe(false);
   });
 });
 
