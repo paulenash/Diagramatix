@@ -329,6 +329,17 @@
     Layout, validation and editor-interaction only — the diagram data structure
     and this XSD are UNCHANGED; the version attribute advances with the release
     window (same convention as v1.27).
+
+  v1.29 — Simulation results & comparison: a true per-case flow-time distribution
+    (Typical p50 / Near-worst p95 / Spread + a distribution histogram) in place of
+    run-average percentiles; a grounded AI assessment of an As-is/To-be comparison
+    (deltas computed deterministically, then written up by the model); a browsable
+    Run History (name/pin runs, prune the unpinned, compare any two saved runs);
+    and As-is/To-be comparison carried through the example catalogue (variant
+    scenarios survive capture/adopt) with a seeded Aardwolf Loans comparison.
+    Simulation runtime, results and example-catalogue only — the diagram data
+    structure and this XSD are UNCHANGED; the version attribute advances with the
+    release window (same convention as v1.27 / v1.28).
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

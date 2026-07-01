@@ -4599,18 +4599,70 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <>
             <p>
-              On a scenario, press <strong>▶ Run</strong>. The engine runs the
-              Monte-Carlo replications and shows a compact summary —{" "}
-              <strong>throughput</strong>, <strong>flow-time</strong> p50/p95, and
-              the <strong>top bottleneck</strong> team with its utilisation.
+              On a scenario, press <strong>▶ Run</strong>. Before it runs, a quick{" "}
+              <strong>readiness check</strong> flags any parameters still unset
+              (a task with no team, a decision with no branch percentages, a
+              source with no arrival rate) so you can fix them or{" "}
+              <strong>Run anyway</strong>. The engine then runs the Monte-Carlo
+              replications and shows a compact summary — <strong>throughput</strong>,
+              a <strong>flow-time</strong> snapshot and the{" "}
+              <strong>top bottleneck</strong> team with its utilisation.
             </p>
             <p className="mt-2">
-              Open <strong>▸ full results</strong> for the report: per-team
-              utilisation &amp; queue (ranked by bottleneck), flow-time ranges,
-              and the busiest tasks by wait. With two or more scenarios, use{" "}
-              <strong>⇄ compare scenarios</strong> to see them side by side with{" "}
-              <strong>deltas vs the baseline</strong> — the quickest way to show
-              &ldquo;hiring two more clears the backlog&rdquo;.
+              Open <strong>▸ full results</strong> for the report. The{" "}
+              <strong>Flow time per case</strong> block shows the real spread of
+              individual case times, not a single average:{" "}
+              <strong>Typical (p50)</strong> — a middle-of-the-road case;{" "}
+              <strong>Near worst (p95)</strong> — all but the unluckiest few (the
+              number to quote in a customer promise); and <strong>Spread</strong>{" "}
+              — how variable it is. A small <strong>distribution histogram</strong>{" "}
+              draws the whole shape, with the p50 and p95 marked. Below that:
+              per-team utilisation &amp; queue (ranked by bottleneck) and the
+              busiest tasks by wait.
+            </p>
+            <p className="mt-2">
+              <em>Why p50 and p95, not just an average?</em> A single mean hides
+              how consistent the process is — the gap between Typical and
+              Near-worst is the tail, i.e. how bad the slow cases get. The{" "}
+              <strong>± confidence</strong> shown on the mean is a different
+              thing again: it&rsquo;s how much the <em>estimate</em> wobbles
+              between the Monte-Carlo runs, so you know the numbers are solid.
+            </p>
+            <p className="mt-2">
+              With two or more scenarios, use <strong>⇄ compare scenarios</strong>{" "}
+              to see them side by side with <strong>deltas vs the baseline</strong>{" "}
+              and a flow-shape histogram per column. Press{" "}
+              <strong>✨ Explain these results</strong> for an{" "}
+              <strong>AI assessment</strong> — a plain-English read of what
+              changed and <em>why</em> (e.g. &ldquo;faster and more predictable
+              because work stops queueing&rdquo;). It is written only from the
+              figures on screen, so it never invents a number.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Run History — keep & compare runs",
+        body: (
+          <>
+            <p>
+              Every run is saved. To keep one, give it a{" "}
+              <strong>name</strong> — press <strong>★ save to history…</strong>{" "}
+              after a run, or ✎ in the <strong>Run History</strong> panel (e.g.{" "}
+              <em>&ldquo;Large Sales Team (25)&rdquo;</em>,{" "}
+              <em>&ldquo;Small Sales Team (3)&rdquo;</em>). Naming a run{" "}
+              <strong>pins</strong> it so it&rsquo;s kept; unnamed runs are the
+              recent few and are trimmed automatically.
+            </p>
+            <p className="mt-2">
+              In <strong>▸ Run History</strong> you can view any saved run&rsquo;s
+              full results, rename, pin/unpin, or delete it — and{" "}
+              <strong>tick any two</strong> then{" "}
+              <strong>⇄ compare selected</strong> to put them head to head, with
+              the same per-case metrics, histograms and{" "}
+              <strong>✨ AI assessment</strong>. This is how you compare the{" "}
+              <em>same</em> process run with different parameters (staffing,
+              capacity, demand) — not just two different scenarios.
             </p>
           </>
         ),
@@ -4636,10 +4688,12 @@ export const CHAPTERS: HelpChapter[] = [
           <>
             <p>
               New to simulation? From the Dashboard&rsquo;s <strong>System</strong>{" "}
-              menu open <strong>Simulator Examples</strong> and pick one (single
-              bottleneck, a shared team across two processes, a surge
-              intervention). <strong>Load &amp; open</strong> copies it into a new
-              project of your own and drops you on its diagram — open the{" "}
+              menu open <strong>Simulator Examples</strong> and pick one — a loan
+              origination process, a car-repair rework loop, or an{" "}
+              <strong>As-is vs To-be</strong> loan comparison (two process
+              variants in one study, ready to run and compare).{" "}
+              <strong>Load &amp; open</strong> copies it into a new project of your
+              own and drops you on its diagram — open the{" "}
               <strong>◈ Simulator</strong> and Run, Replay or compare scenarios
               straight away. They&rsquo;re a safe place to explore, and a fast way
               to <strong>demo</strong>.

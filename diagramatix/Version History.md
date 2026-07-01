@@ -6,7 +6,7 @@ Extracted from the canonical history block in [`public/diagramatix-export.xsd`](
 - **`schemaVersion`** (major.minor) — the export *data-structure* version. Bumped only when fields are added, removed, or renamed. *Major* = breaking change; *minor* = additive (new optional fields). Carried on the `<xs:schema version="…">` attribute.
 - **`appVersion`** (major.minor.build) — the Diagramatix *application* version. The build number is the git commit count, so it changes every commit. Injected at runtime via `/api/schema`.
 
-**Current version:** `1.28`. The XSD's own history block starts at **v1.10**; the earlier **v1.2–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`app/lib/diagram/types.ts`](app/lib/diagram/types.ts). **Schema versioning began at v1.2** (the initial XSD release) — **v1.0–v1.1** predate the export schema (early MVP "boxes + arrows", before a formal/versioned export existed).
+**Current version:** `1.29`. The XSD's own history block starts at **v1.10**; the earlier **v1.2–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`app/lib/diagram/types.ts`](app/lib/diagram/types.ts). **Schema versioning began at v1.2** (the initial XSD release) — **v1.0–v1.1** predate the export schema (early MVP "boxes + arrows", before a formal/versioned export existed).
 
 > **Maintenance:** keep this file in sync with the schema. On every `SCHEMA_VERSION` bump, update **all three together** — `app/lib/diagram/types.ts` (the constant + its history comment), `public/diagramatix-export.xsd` (its history block + any actual shape change), and **this file** (add a summary-table row *and* a detail section).
 
@@ -18,6 +18,7 @@ Extracted from the canonical history block in [`public/diagramatix-export.xsd`](
 
 | Version | Title | Schema shape change? |
 |---|---|---|
+| **1.29** | Simulation results & comparison — per-case distribution + histogram, grounded AI assessment, Run History, As-is/To-be example pipeline | No |
 | **1.28** | BPMN layout-geometry rules + scanner checks B33/B34/B35 + lane-tiling & EP-resize fixes | No |
 | **1.27** | DB-backed User Guide, image library, dictation, backup/restore | No |
 | **1.26** | AI clarification (`aiFeedback`) — JSON metadata only | No |
@@ -50,6 +51,9 @@ Extracted from the canonical history block in [`public/diagramatix-export.xsd`](
 ---
 
 ## Details (newest first)
+
+### v1.29 — Simulation results & comparison
+No schema shape change — simulation runtime, results and example-catalogue only; the version advances with the release window. **Per-case distribution:** the engine now retains individual case flow times (not just each replication's average), so the report shows true per-case **Typical (p50)**, **Near worst (p95)** and **Spread (sd)** plus a **distribution histogram** — the old p50/p95 were run-averages that badly understated the tail (e.g. an As-is near-worst of ~310 min was showing as ~192); the run-to-run figure is kept as a **± confidence** on the mean. **Grounded AI assessment:** an "✨ Explain these results" button on a comparison writes a plain-English verdict — the deltas are computed deterministically and Claude (Opus 4.8) writes the prose from *only* those figures, so it can't misstate a number. **Run History:** runs can be **named** (which pins them) and browsed; unnamed runs prune to the last few per scenario; **any two saved runs** can be compared side by side (e.g. "Large Sales Team (25)" vs "Small Sales Team (3)"), with histograms + assessment. **As-is/To-be example pipeline:** variant-pinned scenarios now survive capture → seed → adopt, and a worked **Aardwolf Loans — As-is vs To-be** comparison ships in the example catalogue. Pinned by unit tests T0542–T0550.
 
 ### v1.28 — BPMN layout-geometry rules + scanner checks + lane-tiling & EP-resize fixes
 No schema shape change — layout / validation / editor-interaction only; the version advances with the release window. **Rules** (code-enforced, Group 8 "Auto-Layout Placement"): **R8.14** the process Start Event clears its innermost Pool/Lane/Sub-lane inner boundary by ≥ 1 event width (was anchored to the pool header, ignoring the lane's own 36px header); **R8.15** the first connector ≤ 70% of a task width (the first element comes to the start — in the pool just the first element + its data objects, inside an EP the whole inner flow slides left); **R8.16** event labels (esp. edge-mounted) nudged clear of other elements and other event labels; **R8.17** no element placed on top of another (a de-overlap pass separates near-coincident "Cause-A" siblings); **R8.18** the End event hugs its last element within the same ≤ 70% gap. **Scanner checks (`diagramChecks` RULES):** **B33** event-label overlap, **B34** element overlap, **B35** lane tiling (lanes must tile contiguously). **Fixes:** lanes re-tile after late Expanded-Subprocess growth — fixes overlapping lanes that scrambled the on-screen lane order and made a lane boundary un-draggable; and a selected Expanded Subprocess's edge resize no longer drifts the whole element (the selection overlay's edge zone now owns the drag). All pinned by unit tests (T0514–T0530) plus a live-drag Playwright harness.

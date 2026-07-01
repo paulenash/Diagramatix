@@ -733,5 +733,17 @@ export interface TemplateData {
  *             re-stack fix and an EP boundary-resize drift fix. Layout / validation
  *             / editor-interaction only — NO diagram export or BPMN-XSD shape
  *             change; the version advances with the release window (as v1.27).
+ *
+ *  v1.29 (2026-07-01): Simulation results & comparison — true per-case flow-time
+ *             distribution (Typical p50 / Near-worst p95 / Spread sd + a
+ *             distribution histogram) replacing run-average percentiles; a
+ *             grounded AI assessment of an As-is/To-be comparison (deterministic
+ *             deltas → Claude prose); a browsable Run History (name/pin runs,
+ *             prune unpinned, compare any two saved runs); and As-is/To-be
+ *             comparison support carried through the example pipeline (variant
+ *             scenarios in captured/adopted examples) with a seeded Aardwolf Loans
+ *             comparison. Simulation runtime / results / example-catalog only — NO
+ *             diagram export or BPMN-XSD shape change; the version advances with
+ *             the release window (as v1.27 / v1.28).
  */
-export const SCHEMA_VERSION = "1.28";
+export const SCHEMA_VERSION = "1.29";
