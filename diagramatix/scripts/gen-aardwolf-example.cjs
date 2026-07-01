@@ -21,15 +21,21 @@ const OUT = path.join(__dirname, "..", "app", "lib", "simulation", "exampleData.
 const SLUG = "aardwolf-loan-comparison";
 
 // ── Parameter tables ───────────────────────────────────────────────────────
+// Team ids are slugs of the lane labels — the SAME convention the "Fill missing
+// simulation data" autofill uses (slug of the swim-lane) and the other seeded
+// examples follow (e.g. "loan-officer"). Keeping the library keyed by these slugs
+// means a task's team always resolves, even if the user runs autofill.
+const slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "team";
+
 // Team library (capacity). The to-be's AI Agent lane is high-throughput + fast;
 // the as-is Loan Assessment Team is the human bottleneck it replaces.
 const TEAMS = [
-  { name: "Loan Assessment Team", capacity: 3, costPerHour: 45 },       // as-is human bottleneck
-  { name: "Loan Assessment AI Agent", capacity: 12, costPerHour: 3 },   // to-be automated
-  { name: "Loan Assessment Specialist", capacity: 2, costPerHour: 60 }, // to-be exceptions only
-  { name: "Personal Loans Team", capacity: 3, costPerHour: 40 },
-  { name: "Home Loans Team", capacity: 3, costPerHour: 45 },
-  { name: "Commercial Loans Team", capacity: 2, costPerHour: 55 },
+  { name: "loan-assessment-team", capacity: 3, costPerHour: 45 },        // as-is human bottleneck
+  { name: "loan-assessment-ai-agent", capacity: 12, costPerHour: 3 },    // to-be automated
+  { name: "loan-assessment-specialist", capacity: 2, costPerHour: 60 },  // to-be exceptions only
+  { name: "personal-loans-team", capacity: 3, costPerHour: 40 },
+  { name: "home-loans-team", capacity: 3, costPerHour: 45 },
+  { name: "commercial-loans-team", capacity: 2, costPerHour: 55 },
 ];
 
 // Task cycle times (minutes) keyed by the lane that owns the task, then label.
@@ -96,7 +102,7 @@ function parameterize(data) {
     const sim = (el.properties = el.properties || {}).sim = el.properties.sim || {};
     if (el.type === "task") {
       const lane = laneOf(el);
-      if (lane) sim.teamId = lane;
+      if (lane) sim.teamId = slug(lane); // slug id — matches the team library + autofill
       sim.cycleTime = cycleFor(lane, el.label);
       sim.resourceUnits = 1;
     } else if (isProcessSource(el)) {
