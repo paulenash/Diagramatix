@@ -24,6 +24,8 @@ export function TeamLibraryManager({
   const [newCap, setNewCap] = useState(1);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [matching, setMatching] = useState(false);
+  const [matchMsg, setMatchMsg] = useState<string | null>(null);
 
   const publish = useCallback((list: Team[]) => {
     // Keyed by NAME: tasks reference a team by the name typed in sim.teamId.
@@ -71,6 +73,22 @@ export function TeamLibraryManager({
     await load();
   }
 
+  // Repair slug team names ("loan-assessment-team") to the exact lane names
+  // ("Loan Assessment Team") — renames the library teams AND the task references
+  // together across the project's diagrams.
+  async function matchLanes() {
+    if (!projectId) return;
+    setMatching(true); setMatchMsg(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/simulation-teams/match-lanes`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setMatchMsg(json.error || "Failed"); return; }
+      const n = json.renamed?.length ?? 0;
+      setMatchMsg(n ? `Renamed ${n} team(s) to lane names${json.diagramsUpdated ? ` · updated ${json.diagramsUpdated} diagram(s)` : ""}. Reopen the process to see task teams.` : "All team names already match the lanes.");
+      await load();
+    } finally { setMatching(false); }
+  }
+
   if (!projectId) return <p className="text-xs text-green-400/50">Open this diagram from a project to manage teams.</p>;
 
   return (
@@ -109,6 +127,17 @@ export function TeamLibraryManager({
         <MatrixButton onClick={addTeam}>{busy ? "…" : "+ Add"}</MatrixButton>
       </div>
       {err && <p className="text-red-400">{err}</p>}
+      {teams.length > 0 && (
+        <button
+          onClick={matchLanes}
+          disabled={matching}
+          className="self-start text-[10px] text-green-400/60 hover:text-green-300 disabled:opacity-50"
+          title="Rename teams to the exact swim-lane names, and update the tasks that reference them"
+        >
+          {matching ? "matching…" : "⇄ Match names to lanes"}
+        </button>
+      )}
+      {matchMsg && <p className="text-green-300 text-[10px]">{matchMsg}</p>}
       <p className="text-green-400/40 text-[10px]">Tasks reference a team by name in Properties → ◈ Simulation (or inherit their lane&rsquo;s team).</p>
     </div>
   );
