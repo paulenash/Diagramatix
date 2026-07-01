@@ -61,25 +61,37 @@ export function ReplayView({ data, config, teamCapacities, diagramId, diagramsBy
   const [zoomBox, setZoomBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomedRef = useRef(false);
+  const clickTimer = useRef<number | null>(null);
   const raf = useRef(0);
   const last = useRef(0);
 
-  // ── Geometry ──
+  // ── Drill-down: which linked subprocess instance we're looking inside. Each
+  // entry adds a "<subId>~" segment to the token-id prefix; the view swaps to
+  // that subprocess's child diagram. Empty = the top-level diagram. ──
+  const [drillStack, setDrillStack] = useState<{ subId: string; diagramId: string; label: string }[]>([]);
+  useEffect(() => { setDrillStack([]); setZoomBox(null); }, [data]);
+  const viewData = useMemo(() => {
+    if (!drillStack.length) return data;
+    return diagramsById?.get(drillStack[drillStack.length - 1].diagramId) ?? data;
+  }, [drillStack, data, diagramsById]);
+  const prefix = drillStack.length ? drillStack.map((d) => d.subId).join("~") + "~" : "";
+
+  // ── Geometry (of the current view) ──
   const nodes = useMemo<NodePos[]>(
-    () => data.elements.filter((e) => SIM_TYPES.has(e.type)).map((e) => ({
+    () => viewData.elements.filter((e) => SIM_TYPES.has(e.type)).map((e) => ({
       id: e.id, x: e.x, y: e.y, w: e.width, h: e.height, cx: e.x + e.width / 2, cy: e.y + e.height / 2, label: e.label,
     })),
-    [data.elements],
+    [viewData],
   );
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const vb = useMemo(() => {
-    const els = data.elements;
+    const els = viewData.elements;
     if (els.length === 0) return { x: 0, y: 0, w: 100, h: 100 };
     const minX = Math.min(...els.map((e) => e.x)), minY = Math.min(...els.map((e) => e.y));
     const maxX = Math.max(...els.map((e) => e.x + e.width)), maxY = Math.max(...els.map((e) => e.y + e.height));
     const pad = 40;
     return { x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 };
-  }, [data.elements]);
+  }, [viewData]);
 
   const keyframes = useMemo(() => {
     const m = new Map<string, { frames: Frame[]; endT: number }>();
@@ -97,9 +109,9 @@ export function ReplayView({ data, config, teamCapacities, diagramId, diagramsBy
   // sequence connectors between nodes.
   const connWaypoints = useMemo(() => {
     const m = new Map<string, { x: number; y: number }[]>();
-    for (const c of data.connectors) if (Array.isArray(c.waypoints) && c.waypoints.length >= 2) m.set(c.id, c.waypoints);
+    for (const c of viewData.connectors) if (Array.isArray(c.waypoints) && c.waypoints.length >= 2) m.set(c.id, c.waypoints);
     return m;
-  }, [data.connectors]);
+  }, [viewData]);
 
   // Running-stats timeline the LiveStatsTable reads at the current playback clock
   // (nodeTeam comes from the assembled — possibly spliced — network).
@@ -111,29 +123,56 @@ export function ReplayView({ data, config, teamCapacities, diagramId, diagramsBy
   }, [replayOpts]);
   // Stable element so the heavy read-only diagram isn't re-rendered every
   // animation frame — only when `data` changes (never during a run).
-  const backdrop = useMemo(() => <ReplayDiagramBackdrop data={data} />, [data]);
+  const backdrop = useMemo(() => <ReplayDiagramBackdrop data={viewData} />, [viewData]);
 
-  // Click-to-zoom: each click zooms further into the clicked point; Esc resets.
+  // Single click = zoom into the point (deferred so a double-click can cancel
+  // it); double click = drill into a linked subprocess. Esc steps back: unzoom,
+  // else pop one drill level.
   const view = zoomBox ?? vb;
+  const drilledRef = useRef(false);
   useEffect(() => { zoomedRef.current = !!zoomBox; }, [zoomBox]);
+  useEffect(() => { drilledRef.current = drillStack.length > 0; }, [drillStack]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && zoomedRef.current) { e.stopPropagation(); e.preventDefault(); setZoomBox(null); }
+      if (e.key !== "Escape") return;
+      if (zoomedRef.current) { e.stopPropagation(); e.preventDefault(); setZoomBox(null); }
+      else if (drilledRef.current) { e.stopPropagation(); e.preventDefault(); setDrillStack((s) => s.slice(0, -1)); }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
-  function zoomInAt(e: React.MouseEvent) {
-    const svg = svgRef.current; if (!svg) return;
-    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
-    const ctm = svg.getScreenCTM(); if (!ctm) return;
-    const w = pt.matrixTransform(ctm.inverse());
+  function clientToWorld(clientX: number, clientY: number): { x: number; y: number } | null {
+    const svg = svgRef.current; if (!svg) return null;
+    const pt = svg.createSVGPoint(); pt.x = clientX; pt.y = clientY;
+    const ctm = svg.getScreenCTM(); if (!ctm) return null;
+    return pt.matrixTransform(ctm.inverse());
+  }
+  function zoomInAt(clientX: number, clientY: number) {
+    const w = clientToWorld(clientX, clientY); if (!w) return;
     setZoomBox((prev) => {
       const cur = prev ?? vb;
       const nw = Math.max(vb.w * 0.06, cur.w * 0.6);
       const nh = Math.max(vb.h * 0.06, cur.h * 0.6);
       return { x: w.x - nw / 2, y: w.y - nh / 2, w: nw, h: nh };
     });
+  }
+  function drillAt(clientX: number, clientY: number) {
+    const w = clientToWorld(clientX, clientY); if (!w) return;
+    const hit = viewData.elements
+      .filter((el) => (el.type === "subprocess" || el.type === "subprocess-expanded")
+        && !!el.properties?.linkedDiagramId && !!diagramsById?.has(el.properties.linkedDiagramId as string)
+        && w.x >= el.x && w.x <= el.x + el.width && w.y >= el.y && w.y <= el.y + el.height)
+      .sort((a, b) => a.width * a.height - b.width * b.height)[0];
+    if (hit) setDrillStack((s) => [...s, { subId: hit.id, diagramId: hit.properties!.linkedDiagramId as string, label: hit.label || "subprocess" }]);
+  }
+  function onSvgClick(e: React.MouseEvent) {
+    const { clientX, clientY } = e;
+    if (clickTimer.current) window.clearTimeout(clickTimer.current);
+    clickTimer.current = window.setTimeout(() => { zoomInAt(clientX, clientY); clickTimer.current = null; }, 220);
+  }
+  function onSvgDoubleClick(e: React.MouseEvent) {
+    if (clickTimer.current) { window.clearTimeout(clickTimer.current); clickTimer.current = null; }
+    drillAt(e.clientX, e.clientY);
   }
 
   useEffect(() => {
@@ -166,12 +205,15 @@ export function ReplayView({ data, config, teamCapacities, diagramId, diagramsBy
     let i = k.frames.length - 1;
     while (i > 0 && k.frames[i].t > simT) i--;
     const a = k.frames[i], b = k.frames[i + 1];
-    if (!b || b.t <= a.t) return { kind: "dwell", nodeId: displayNodeId(a.nodeId), entryEdgeId: a.edgeId, tEnter: a.t };
+    if (prefix && !a.nodeId.startsWith(prefix)) return null; // token isn't inside the drilled subprocess right now
+    const loc = (id?: string) => (id && prefix && id.startsWith(prefix) ? id.slice(prefix.length) : id);
+    const aNode = displayNodeId(loc(a.nodeId) ?? a.nodeId);
+    if (!b || b.t <= a.t) return { kind: "dwell", nodeId: aNode, entryEdgeId: loc(a.edgeId), tEnter: a.t };
     const dur = b.t - a.t;
     const transitDur = dur * 0.25; // dwell for the first 75%, hop across in the last 25%
-    if (simT < b.t - transitDur) return { kind: "dwell", nodeId: displayNodeId(a.nodeId), entryEdgeId: a.edgeId, tEnter: a.t };
+    if (simT < b.t - transitDur) return { kind: "dwell", nodeId: aNode, entryEdgeId: loc(a.edgeId), tEnter: a.t };
     const f = transitDur > 0 ? Math.min(1, Math.max(0, (simT - (b.t - transitDur)) / transitDur)) : 1;
-    return { kind: "transit", edgeId: b.edgeId, nodeA: displayNodeId(a.nodeId), nodeB: displayNodeId(b.nodeId), f };
+    return { kind: "transit", edgeId: loc(b.edgeId), nodeA: aNode, nodeB: displayNodeId(loc(b.nodeId) ?? b.nodeId), f };
   }
   function transitPos(ph: Extract<Phase, { kind: "transit" }>): { x: number; y: number } | null {
     const wp = ph.edgeId ? connWaypoints.get(ph.edgeId) : undefined;
@@ -252,7 +294,7 @@ export function ReplayView({ data, config, teamCapacities, diagramId, diagramsBy
       </div>
 
       <div className="relative flex-1 border border-green-500/30 rounded overflow-hidden bg-black min-h-[240px]">
-        <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} className="w-full h-full cursor-zoom-in" preserveAspectRatio="xMidYMid meet" onClick={zoomInAt}>
+        <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} className="w-full h-full cursor-zoom-in" preserveAspectRatio="xMidYMid meet" onClick={onSvgClick} onDoubleClick={onSvgDoubleClick}>
           {/* Transparent hit layer so clicks anywhere (incl. empty space) zoom. */}
           <rect x={vb.x} y={vb.y} width={vb.w} height={vb.h} fill="transparent" />
           {/* The real diagram (read-only) as the backdrop. */}
@@ -264,10 +306,23 @@ export function ReplayView({ data, config, teamCapacities, diagramId, diagramsBy
         <div className="absolute top-3 right-3">
           <LiveStatsTable timeline={statTimeline} simT={simT} teamCapacities={teamCapacities} unit={config.clockUnit} />
         </div>
-        <div className="absolute top-3 left-3 font-mono text-[10px] text-green-400/60 bg-black/70 border border-green-500/40 rounded px-2 py-1 flex items-center gap-2">
-          {zoomBox ? (
-            <>🔍 zoomed<button onClick={(e) => { e.stopPropagation(); setZoomBox(null); }} className="text-green-300 hover:text-green-200">reset · Esc</button></>
-          ) : <span>click to zoom in</span>}
+        <div className="absolute top-3 left-3 font-mono text-[10px] text-green-400/60 bg-black/70 border border-green-500/40 rounded px-2 py-1 flex flex-col gap-1">
+          {drillStack.length > 0 && (
+            <div className="flex items-center gap-1 flex-wrap">
+              <button onClick={() => setDrillStack([])} className="text-green-400/70 hover:text-green-200">◆ top</button>
+              {drillStack.map((d, i) => (
+                <span key={i} className="flex items-center gap-1">
+                  <span className="text-green-500/50">›</span>
+                  <button onClick={() => setDrillStack((s) => s.slice(0, i + 1))} className={i === drillStack.length - 1 ? "text-green-200" : "text-green-400/70 hover:text-green-200"}>{d.label || "sub"}</button>
+                </span>
+              ))}
+              <button onClick={() => setDrillStack((s) => s.slice(0, -1))} className="ml-1 text-green-300 hover:text-green-200">‹ back</button>
+            </div>
+          )}
+          <div>
+            {zoomBox && <>🔍 zoomed · <button onClick={(e) => { e.stopPropagation(); setZoomBox(null); }} className="text-green-300 hover:text-green-200">Esc reset</button> · </>}
+            <span className="text-green-400/45">click zoom · dbl-click drills into a linked subprocess</span>
+          </div>
         </div>
         <div className="absolute bottom-3 right-3 font-mono text-green-300 text-sm bg-black/70 border border-green-500/40 rounded px-3 py-1.5 tabular-nums">
           t = {simT.toFixed(1)} <span className="text-green-500/60 text-xs">/ {replay.durationSim.toFixed(0)}</span>
