@@ -47,6 +47,17 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
   const [activeId, setActiveId] = useState<string | null>(diagramId ?? null);
   const [variantData, setVariantData] = useState<DiagramData | null>(null);
   const [loadingVariant, setLoadingVariant] = useState(false);
+  // Full data of every project BPMN diagram, so the replay can splice linked
+  // (collapsed) subprocesses in (their child diagrams live in this map).
+  const [diagramsById, setDiagramsById] = useState<Map<string, DiagramData>>(new Map());
+  useEffect(() => {
+    if (!diagramList.length) return;
+    let cancelled = false;
+    Promise.all(diagramList.map((d) =>
+      fetch(`/api/diagrams/${d.id}`).then((r) => (r.ok ? r.json() : null)).then((j) => [d.id, j?.data ?? null] as const).catch(() => [d.id, null] as const),
+    )).then((entries) => { if (!cancelled) setDiagramsById(new Map(entries.filter((e): e is [string, DiagramData] => !!e[1]))); });
+    return () => { cancelled = true; };
+  }, [diagramList]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -165,7 +176,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
           </main>
         ) : mode === "replay" ? (
           <main className="flex-1 overflow-hidden p-4">
-            <ReplayView data={activeData} config={replayCfg} teamCapacities={teamCapacities} onClose={() => setMode("home")} />
+            <ReplayView data={activeData} config={replayCfg} teamCapacities={teamCapacities} diagramId={activeId ?? diagramId} diagramsById={diagramsById} onClose={() => setMode("home")} />
           </main>
         ) : (
           <main className="flex-1 overflow-hidden p-4">

@@ -14,7 +14,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import type { SimRunConfig } from "@/app/lib/simulation/types";
 import { buildReplay, forkReplay, teamIdsInDiagram, type ReplayData } from "@/app/lib/simulation/replaySource";
-import { assembleFromDiagram } from "@/app/lib/simulation/assemble";
 import { buildStatTimeline } from "@/app/lib/simulation/runningStats";
 import { LiveStatsTable } from "./LiveStatsTable";
 import { ReplayDiagramBackdrop } from "./ReplayDiagramBackdrop";
@@ -42,8 +41,16 @@ function pointAlongPolyline(pts: { x: number; y: number }[], f: number): { x: nu
   return pts[pts.length - 1];
 }
 
-export function ReplayView({ data, config, teamCapacities, onClose }: { data: DiagramData; config: SimRunConfig; teamCapacities?: Record<string, number>; onClose?: () => void }) {
-  const [replay, setReplay] = useState<ReplayData>(() => buildReplay(data, config, teamCapacities));
+/** Where to DISPLAY a token: nodes inside a spliced linked/expanded subprocess
+ *  have ids "<subId>~<childId>" (recursive) — show the token at the top-level
+ *  subprocess box in the parent diagram (drill-down comes in Phase 2). */
+function displayNodeId(id: string): string { const i = id.indexOf("~"); return i === -1 ? id : id.slice(0, i); }
+
+export function ReplayView({ data, config, teamCapacities, diagramId, diagramsById, onClose }: { data: DiagramData; config: SimRunConfig; teamCapacities?: Record<string, number>; diagramId?: string; diagramsById?: Map<string, DiagramData>; onClose?: () => void }) {
+  // Flatten linked (collapsed) subprocesses into the run, exactly as ▶ Run does,
+  // so their timing/teams are honest instead of a pass-through.
+  const replayOpts = useMemo(() => ({ rootId: diagramId, byId: diagramsById }), [diagramId, diagramsById]);
+  const [replay, setReplay] = useState<ReplayData>(() => buildReplay(data, config, teamCapacities, replayOpts));
   const [simT, setSimT] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(20);
@@ -94,13 +101,14 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
     return m;
   }, [data.connectors]);
 
-  // Node → team map (for the live stats), + the precomputed running-stats
-  // timeline the LiveStatsTable reads at the current playback clock.
-  const nodeTeam = useMemo(() => {
-    const net = assembleFromDiagram(data, { teamCapacities });
-    return new Map(net.nodes.filter((n) => n.teamId).map((n) => [n.id, n.teamId as string]));
-  }, [data, teamCapacities]);
-  const statTimeline = useMemo(() => buildStatTimeline(replay.trace, nodeTeam), [replay.trace, nodeTeam]);
+  // Running-stats timeline the LiveStatsTable reads at the current playback clock
+  // (nodeTeam comes from the assembled — possibly spliced — network).
+  const statTimeline = useMemo(() => buildStatTimeline(replay.trace, replay.nodeTeam), [replay.trace, replay.nodeTeam]);
+  // Rebuild once the project diagrams load, so linked subprocesses splice in.
+  useEffect(() => {
+    if (diagramsById && diagramsById.size > 0) { setReplay(buildReplay(data, config, teamCapacities, replayOpts)); setSimT(0); setPlaying(true); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replayOpts]);
   // Stable element so the heavy read-only diagram isn't re-rendered every
   // animation frame — only when `data` changes (never during a run).
   const backdrop = useMemo(() => <ReplayDiagramBackdrop data={data} />, [data]);
@@ -158,12 +166,12 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
     let i = k.frames.length - 1;
     while (i > 0 && k.frames[i].t > simT) i--;
     const a = k.frames[i], b = k.frames[i + 1];
-    if (!b || b.t <= a.t) return { kind: "dwell", nodeId: a.nodeId, entryEdgeId: a.edgeId, tEnter: a.t };
+    if (!b || b.t <= a.t) return { kind: "dwell", nodeId: displayNodeId(a.nodeId), entryEdgeId: a.edgeId, tEnter: a.t };
     const dur = b.t - a.t;
     const transitDur = dur * 0.25; // dwell for the first 75%, hop across in the last 25%
-    if (simT < b.t - transitDur) return { kind: "dwell", nodeId: a.nodeId, entryEdgeId: a.edgeId, tEnter: a.t };
+    if (simT < b.t - transitDur) return { kind: "dwell", nodeId: displayNodeId(a.nodeId), entryEdgeId: a.edgeId, tEnter: a.t };
     const f = transitDur > 0 ? Math.min(1, Math.max(0, (simT - (b.t - transitDur)) / transitDur)) : 1;
-    return { kind: "transit", edgeId: b.edgeId, nodeA: a.nodeId, nodeB: b.nodeId, f };
+    return { kind: "transit", edgeId: b.edgeId, nodeA: displayNodeId(a.nodeId), nodeB: displayNodeId(b.nodeId), f };
   }
   function transitPos(ph: Extract<Phase, { kind: "transit" }>): { x: number; y: number } | null {
     const wp = ph.edgeId ? connWaypoints.get(ph.edgeId) : undefined;
@@ -203,16 +211,16 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
 
   function forkCapacity() {
     if (!forkTeam) return;
-    setReplay(forkReplay(data, config, simT, { kind: "capacity", teamId: forkTeam, capacity: forkCap }, teamCapacities));
+    setReplay(forkReplay(data, config, simT, { kind: "capacity", teamId: forkTeam, capacity: forkCap }, teamCapacities, replayOpts));
     setForked(true); setPlaying(true);
   }
   function forkInject() {
     const src = data.elements.find((e) => e.type === "start-event");
     if (!src) return;
-    setReplay(forkReplay(data, config, simT, { kind: "inject", nodeId: src.id, count: 10 }, teamCapacities));
+    setReplay(forkReplay(data, config, simT, { kind: "inject", nodeId: src.id, count: 10 }, teamCapacities, replayOpts));
     setForked(true); setPlaying(true);
   }
-  function resetRun() { setReplay(buildReplay(data, config, teamCapacities)); setSimT(0); setForked(false); setPlaying(true); }
+  function resetRun() { setReplay(buildReplay(data, config, teamCapacities, replayOpts)); setSimT(0); setForked(false); setPlaying(true); }
 
   return (
     <div className="flex flex-col h-full gap-2">
