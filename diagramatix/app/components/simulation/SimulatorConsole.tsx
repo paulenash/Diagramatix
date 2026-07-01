@@ -20,9 +20,15 @@ import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import type { ScenarioRunConfig } from "@/app/lib/simulation/types";
 
-export function SimulatorConsole({ data, diagramId, projectId, isAdmin, diagramName, onClose, onFillTestData, onApplyData }: {
-  data: DiagramData; diagramId?: string; projectId: string | null; isAdmin?: boolean; diagramName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
+const EMPTY_DIAGRAM: DiagramData = { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } };
+
+export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, isAdmin, diagramName, projectName, onClose, onFillTestData, onApplyData }: {
+  data?: DiagramData; diagramId?: string; projectId: string | null; isAdmin?: boolean; diagramName?: string; projectName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
 }) {
+  // Project mode = entered from a Project (no single open diagram): show the
+  // project name + a variant selector across all its processes for comparison.
+  // Diagram mode = entered from one diagram: single-process, just that name.
+  const projectMode = !diagramId;
   const [mode, setMode] = useState<"home" | "replay" | "heatmap">("home");
   const [teamCapacities, setTeamCapacities] = useState<Record<string, number>>({});
   // Config of the LAST scenario that ran (from Studies & Scenarios), so "Launch
@@ -49,6 +55,12 @@ export function SimulatorConsole({ data, diagramId, projectId, isAdmin, diagramN
       .then((j) => { if (j?.diagrams) setDiagramList(j.diagrams); })
       .catch(() => {});
   }, [projectId]);
+
+  // Project mode has no open diagram — default the panels to the first process
+  // once the list loads, so they aren't empty.
+  useEffect(() => {
+    if (projectMode && !activeId && diagramList.length) setActiveId(diagramList[0].id);
+  }, [projectMode, activeId, diagramList]);
 
   const isOpen = !activeId || activeId === diagramId;
   useEffect(() => {
@@ -84,18 +96,23 @@ export function SimulatorConsole({ data, diagramId, projectId, isAdmin, diagramN
         <header className="flex items-center justify-between px-5 py-3 border-b border-green-500/40">
           <div className="flex items-center gap-3">
             <span className="text-green-300 tracking-[0.3em] text-sm">◈ DIAGRAMATIX SIMULATOR</span>
-            {diagramList.length > 1 ? (
-              <label className="flex items-center gap-1 text-green-400/60 text-xs" title="Which diagram the panels below act on (As-is / To-be)">
-                variant
-                <select
-                  value={activeId ?? ""}
-                  onChange={(e) => setActiveId(e.target.value)}
-                  className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-xs [color-scheme:dark]"
-                >
-                  {diagramList.map((d) => <option key={d.id} value={d.id}>{d.name}{d.id === diagramId ? " (open)" : ""}</option>)}
-                </select>
-                {loadingVariant && <span className="text-green-400/40">loading…</span>}
-              </label>
+            {projectMode ? (
+              <>
+                {projectName && <span className="text-green-300 text-xs">/ {projectName}</span>}
+                {diagramList.length > 0 && (
+                  <label className="flex items-center gap-1 text-green-400/60 text-xs" title="Which process the panels below act on">
+                    process
+                    <select
+                      value={activeId ?? ""}
+                      onChange={(e) => setActiveId(e.target.value)}
+                      className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-xs [color-scheme:dark]"
+                    >
+                      {diagramList.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                    {loadingVariant && <span className="text-green-400/40">loading…</span>}
+                  </label>
+                )}
+              </>
             ) : diagramName ? (
               <span className="text-green-400/50 text-xs">/ {diagramName}</span>
             ) : null}

@@ -20,6 +20,7 @@ import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { BackupProgressModal } from "@/app/components/BackupProgressModal";
+import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 
 interface DiagramSummary {
   id: string;
@@ -278,6 +279,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   // tile that owns the open menu; `x/y` are viewport pixel positions
   // for absolute placement.
   const [tileContextMenu, setTileContextMenu] = useState<{ projectId: string; x: number; y: number } | null>(null);
+  // Project-level Simulator (comparison entry) — opened from a project's menu.
+  const [simProject, setSimProject] = useState<{ id: string; name: string } | null>(null);
   useEffect(() => {
     if (!tileContextMenu) return;
     const close = () => setTileContextMenu(null);
@@ -2949,6 +2952,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               Open
             </button>
             <button
+              onClick={() => { close(); setSimProject({ id: p.id, name: p.name }); }}
+              className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
+              title="Simulate + compare the processes in this project (As-is / To-be)"
+            >
+              ◈ Simulator
+            </button>
+            <button
               onClick={(e) => { close(); handleCloneProject(p.id, e); }}
               className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
             >
@@ -2990,6 +3000,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           </div>
         );
       })()}
+
+      {simProject && (
+        <SimulatorOverlay
+          projectId={simProject.id}
+          projectName={simProject.name}
+          isAdmin={!!isSu}
+          onClose={() => setSimProject(null)}
+        />
+      )}
 
       {showUsagePopover && usageSnapshot && (
         <UsagePopover
