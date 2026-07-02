@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The dramatic entry: types "Entering the Diagramatix Simulator…" then plays a
+ * The dramatic entry: types "Entering the DiagramMATRIX Simulator…" then plays a
  * short Matrix digital-rain burst, then hands off to the console. Skippable by
  * click / any key. The rain component itself handles reduced-motion.
  */
@@ -31,7 +31,7 @@ export function SimulatorIntro({ onEnter }: { onEnter: () => void }) {
       <div className="relative z-10 text-center px-6 pointer-events-none">
         {phase === "typing" ? (
           <MatrixTypewriter
-            text="Entering the Diagramatix Simulator…"
+            text="Entering the DiagramMATRIX Simulator…"
             speedMs={45}
             onDone={() => setPhase("rain")}
             className="text-lg sm:text-2xl drop-shadow-[0_0_10px_rgba(74,222,128,0.6)]"

@@ -116,7 +116,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
       <div className="relative z-10 flex flex-col h-full">
         <header className="flex items-center justify-between px-5 py-3 border-b border-green-500/40">
           <div className="flex items-center gap-3">
-            <span className="text-green-300 tracking-[0.3em] text-sm">◈ DIAGRAMATIX SIMULATOR</span>
+            <span className="text-green-300 tracking-[0.3em] text-sm">◈ DiagramMATRIX SIMULATOR</span>
             {projectMode ? (
               <>
                 {projectName && <span className="text-green-300 text-xs">{projectName}</span>}
