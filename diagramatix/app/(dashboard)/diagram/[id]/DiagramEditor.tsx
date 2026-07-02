@@ -3751,7 +3751,7 @@ export function DiagramEditor({
             <DiagramatixThrobber size={120} auraRadius={110} tone={aiBusy === "compare" ? "red" : "blue"} />
             <p className={`mt-3 text-sm font-medium ${aiBusy === "compare" ? "text-red-800" : "text-blue-800"} bg-white/85 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md`}>
               {aiBusy === "compare"
-                ? "Comparing models — Opus 4.8, Sonnet 4.6 and Haiku 4.5. This takes 1-2 minutes…"
+                ? "Comparing models — Fable 5, Opus 4.8, Sonnet 5 and Haiku 4.5. This takes 2-3 minutes…"
                 : audioPhase === "transcribing"
                 ? "Transcribing your recording — this can take a little while…"
                 : audioPhase === "reading"

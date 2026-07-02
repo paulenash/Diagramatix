@@ -23,8 +23,8 @@ export interface AiComparison {
 
 /**
  * SuperAdmin "AI Comparison Results" — the matrix from a multi-model BPMN
- * generation (Opus 4.8 / Sonnet 4.6 / Haiku 4.5). The current diagram was filled
- * with the Opus 4.8 output; this shows per-model conformance + a link to each
+ * generation (Fable 5 / Opus 4.8 / Sonnet 5 / Haiku 4.5). The current diagram was
+ * filled with the Opus 4.8 output; this shows per-model conformance + a link to each
  * saved model diagram (with ?from= so the editor's back nav returns here).
  */
 export function AiComparisonModal({

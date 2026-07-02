@@ -15,14 +15,16 @@ import {
  *
  * Generates the diagram with each model, lays it out, runs the conformance net,
  * and saves a diagram per model named `<current name> · <model>`. The CURRENT
- * diagram is filled with the OPUS 4.8 output (the strongest model we can reach —
- * Fable 5 is access-gated; no "best" scoring). The comparison matrix is persisted
+ * diagram is filled with the OPUS 4.8 output — Fable 5 is the most capable model
+ * but is access-gated (a key without Fable access simply shows an error row), so
+ * Opus 4.8 stays the safe default to fill with. The comparison matrix is persisted
  * on the current diagram's `aiComparison` column so the "AI Comparison Results"
  * button can show it. SuperAdmin-only; makes real model calls.
  */
 const MODELS = [
+  { id: "claude-fable-5", label: "Fable 5" },
   { id: "claude-opus-4-8", label: "Opus 4.8" },
-  { id: "claude-sonnet-4-6", label: "Sonnet 4.6" },
+  { id: "claude-sonnet-5", label: "Sonnet 5" },
   { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
 ];
 const CHOSEN_ID = "claude-opus-4-8"; // fills the current diagram
