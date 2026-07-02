@@ -32,6 +32,10 @@ export interface ElementSimParams {
   // source events (BPSim ControlParameters: InterTriggerTimer / TriggerCount)
   arrival?: SimDist;
   maxArrivals?: number;
+  /** Working/operating hours: id of a project calendar (SimulationCalendar). On a
+   *  source it gates arrivals to open windows; teams take their calendar from the
+   *  Team library instead. Resolved to a WorkCalendar at assembly time. */
+  calendarId?: string;
   // task (BPSim TimeParameters + ResourceParameters)
   cycleTime?: SimDist;
   setupTime?: SimDist;

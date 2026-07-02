@@ -60,13 +60,15 @@ function MatrixDist({ value, onChange }: { value?: SimDist; onChange: (d: SimDis
 
 const num = (v: string) => (v === "" ? undefined : Math.max(0, Number(v) || 0));
 
-export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram }: {
+export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, calendars = [] }: {
   data: DiagramData;
   onApplyData: (next: DiagramData) => void;
   onFillMissing?: () => number;
   /** Switch the console to another diagram — used to edit a linked subprocess's
    *  own tasks (its sim data lives in the child diagram). */
   onOpenDiagram?: (diagramId: string) => void;
+  /** Working calendars, for the per-source operating-hours picker. */
+  calendars?: { id: string; name: string }[];
 }) {
   const [confirmClear, setConfirmClear] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -134,7 +136,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram }
 
       {/* Sources */}
       {sources.length > 0 && (
-        <Section title="Arrivals (start / intermediate events)" cols={[{ label: "", w: W.flag }, { label: "element", w: W.name }, { label: "inter-arrival", w: W.dist }, { label: "max arrivals", w: W.maxArr }]}>
+        <Section title="Arrivals (start / intermediate events)" cols={[{ label: "", w: W.flag }, { label: "element", w: W.name }, { label: "inter-arrival", w: W.dist }, { label: "max arrivals", w: W.maxArr }, { label: "calendar", w: W.cal }]}>
           {sources.map((s) => {
             const sim = getSimParams(s);
             return (
@@ -143,6 +145,12 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram }
                 <Cell w={W.name} truncate>{s.label || s.id}</Cell>
                 <Cell w={W.dist}><MatrixDist value={sim.arrival} onChange={(arrival) => patchEl(s.id, { arrival })} /></Cell>
                 <Cell w={W.maxArr}><input type="number" value={sim.maxArrivals ?? ""} placeholder="∞" onChange={(e) => patchEl(s.id, { maxArrivals: num(e.target.value) })} className={`${inp} w-20`} /></Cell>
+                <Cell w={W.cal}>
+                  <select value={sim.calendarId ?? ""} onChange={(e) => patchEl(s.id, { calendarId: e.target.value || undefined })} title="Operating hours: only generate arrivals when this calendar is open" className={`${inp} w-28`}>
+                    <option value="">24/7</option>
+                    {calendars.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </Cell>
               </Row>
             );
           })}
@@ -240,6 +248,7 @@ const W = {
   team: "w-44 shrink-0",
   units: "w-12 shrink-0",
   maxArr: "w-24 shrink-0",
+  cal: "w-32 shrink-0",
   target: "w-52 shrink-0",
   pct: "w-16 shrink-0",
   def: "w-14 shrink-0",

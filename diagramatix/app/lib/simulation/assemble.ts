@@ -23,7 +23,14 @@
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { getSimParams, type LoopParams } from "@/app/lib/diagram/simParams";
 import type { SimNetwork, SimNode, SimEdge, SimTeam, NodeKind, Assignment, LoopSpec, EventSub } from "./model";
-import type { SimDist } from "./types";
+import type { SimDist, WorkCalendar } from "./types";
+
+/** Resolvers for working calendars: team calendars keyed by team name (like
+ *  teamCapacities), and a lookup from a source's calendarId → its WorkCalendar. */
+export interface CalendarOpts {
+  teamCalendars?: Record<string, WorkCalendar>;
+  calendarsById?: Record<string, WorkCalendar>;
+}
 
 const DEFAULT_ARRIVAL: SimDist = { kind: "exponential", mean: 10 };
 const DEFAULT_CYCLE: SimDist = { kind: "fixed", value: 1 };
@@ -63,7 +70,7 @@ function loopOf(el: DiagramElement): LoopSpec | undefined {
 
 export function assembleFromDiagram(
   data: DiagramData,
-  opts?: { teamCapacities?: Record<string, number> },
+  opts?: { teamCapacities?: Record<string, number> } & CalendarOpts,
 ): SimNetwork {
   const byId = new Map(data.elements.map((e) => [e.id, e]));
   const childrenOf = new Map<string, DiagramElement[]>();
@@ -130,7 +137,12 @@ export function assembleFromDiagram(
 
     if (kind === "source") {
       if (scope !== undefined) { node.kind = "delay"; node.delay = { kind: "fixed", value: 0 }; kind = "delay"; } // EP body entry → pass-through
-      else { node.arrival = sim.arrival ?? DEFAULT_ARRIVAL; node.maxArrivals = sim.maxArrivals; }
+      else {
+        node.arrival = sim.arrival ?? DEFAULT_ARRIVAL;
+        node.maxArrivals = sim.maxArrivals;
+        const cal = sim.calendarId ? opts?.calendarsById?.[sim.calendarId] : undefined;
+        if (cal) node.calendar = cal; // operating hours for this arrival source
+      }
     } else if (kind === "task") {
       node.cycleTime = sim.cycleTime ?? DEFAULT_CYCLE;
       node.setupTime = sim.setupTime;
@@ -176,7 +188,11 @@ export function assembleFromDiagram(
       isDefault: c.isDefaultFlow,
     }));
 
-  const teams: SimTeam[] = [...teamIds].map((id) => ({ id, capacity: opts?.teamCapacities?.[id] ?? 1 }));
+  const teams: SimTeam[] = [...teamIds].map((id) => ({
+    id,
+    capacity: opts?.teamCapacities?.[id] ?? 1,
+    ...(opts?.teamCalendars?.[id] ? { calendar: opts.teamCalendars[id] } : {}),
+  }));
 
   return { nodes, edges, teams };
 }

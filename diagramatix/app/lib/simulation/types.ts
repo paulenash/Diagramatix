@@ -29,6 +29,26 @@ export const SECONDS_PER_UNIT: Record<ClockUnit, number> = {
   day: 86400,
 };
 
+/** One open window in a weekly working calendar. `day` is 0=Monday … 6=Sunday;
+ *  `start`/`end` are "HH:MM" (end exclusive, "24:00" = end of day). `rate` is an
+ *  arrival-rate multiplier applied to sources during this window (default 1);
+ *  it is ignored for teams (a team is simply staffed at full capacity when open).
+ *  Everything not covered by an interval is CLOSED. */
+export interface CalendarInterval {
+  day: number;
+  start: string;
+  end: string;
+  rate?: number;
+}
+
+/** A reusable weekly working calendar (the "working hours" of a team or the
+ *  operating hours of an arrival source). The pattern repeats every 7 days with
+ *  sim-clock t=0 anchored to Monday 00:00. An empty `intervals` list means
+ *  "always open" (the safe engine fallback for an unconfigured calendar). */
+export interface WorkCalendar {
+  intervals: CalendarInterval[];
+}
+
 /** Run configuration for one scenario (≙ BPSim ScenarioParameters). */
 export interface SimRunConfig {
   /** Base time unit; every SimDist time value is interpreted in this unit. */

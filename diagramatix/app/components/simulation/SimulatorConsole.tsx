@@ -14,11 +14,12 @@ import { MatrixButton, MatrixPanel } from "./matrix/MatrixChrome";
 import { ReplayView } from "./replay/ReplayView";
 import { SimulationHeatmap } from "./results/SimulationHeatmap";
 import { TeamLibraryManager } from "./TeamLibraryManager";
+import { CalendarLibraryManager, type CalendarRow } from "./CalendarLibraryManager";
 import { StudyManager } from "./StudyManager";
 import { SimDataPanel } from "./SimDataPanel";
 import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
-import type { ScenarioRunConfig } from "@/app/lib/simulation/types";
+import type { ScenarioRunConfig, WorkCalendar } from "@/app/lib/simulation/types";
 
 const EMPTY_DIAGRAM: DiagramData = { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } };
 
@@ -31,6 +32,15 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
   const projectMode = !diagramId;
   const [mode, setMode] = useState<"home" | "replay" | "heatmap">("home");
   const [teamCapacities, setTeamCapacities] = useState<Record<string, number>>({});
+  // Working calendars: the library (from the Calendars panel) + the team→calendar
+  // assignment (from the Teams panel). Resolved into the maps the assembler wants
+  // so replay/heatmap honour working hours, exactly like the authoritative run.
+  const [calendars, setCalendars] = useState<CalendarRow[]>([]);
+  const [teamCalMap, setTeamCalMap] = useState<Record<string, string>>({}); // team name → calendarId
+  const calendarsById: Record<string, WorkCalendar> = Object.fromEntries(calendars.map((c) => [c.id, c.pattern]));
+  const teamCalendars: Record<string, WorkCalendar> = Object.fromEntries(
+    Object.entries(teamCalMap).filter(([, calId]) => calId && calendarsById[calId]).map(([name, calId]) => [name, calendarsById[calId]]),
+  );
   // Config of the LAST scenario that ran (from Studies & Scenarios), so "Launch
   // replay" animates that run — its full horizon → the real volume of tokens —
   // rather than a short default window. One replication + no warm-up so every
@@ -139,7 +149,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
                 whole width. */}
             <div className="max-w-5xl mx-auto grid gap-3 md:grid-cols-3 content-start">
               <MatrixPanel title="Teams" className="md:col-span-2">
-                <TeamLibraryManager projectId={projectId} onCapacities={setTeamCapacities} />
+                <TeamLibraryManager projectId={projectId} onCapacities={setTeamCapacities} calendars={calendars} onTeamCalendars={setTeamCalMap} />
               </MatrixPanel>
               <MatrixPanel title="Run / Replay">
                 <p className="text-xs text-green-400/60 mb-3">
@@ -153,6 +163,9 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
                   <MatrixButton onClick={() => setMode("heatmap")}>▦ Heatmap</MatrixButton>
                 </div>
               </MatrixPanel>
+              <MatrixPanel title="Calendars — working hours" className="md:col-span-3">
+                <CalendarLibraryManager projectId={projectId} onCalendars={setCalendars} />
+              </MatrixPanel>
               <MatrixPanel title="Studies & Scenarios" className="md:col-span-3">
                 <StudyManager projectId={projectId} isAdmin={isAdmin} onRan={setLastRunCfg} />
               </MatrixPanel>
@@ -164,7 +177,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
                   </p>
                 )}
                 {canEditActive
-                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} onOpenDiagram={setActiveId} />
+                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} onOpenDiagram={setActiveId} calendars={calendars} />
                   : <p className="text-xs text-green-400/60">{loadingVariant ? "Loading variant…" : "Open this diagram from its editor to edit simulation data here."}</p>}
               </MatrixPanel>
               <MatrixPanel title="Engine status" className="md:col-span-3">
@@ -181,11 +194,11 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
           </main>
         ) : mode === "replay" ? (
           <main className="flex-1 overflow-hidden p-4">
-            <ReplayView data={activeData} config={replayCfg} teamCapacities={teamCapacities} diagramId={activeId ?? diagramId} diagramsById={diagramsById} onClose={() => setMode("home")} />
+            <ReplayView data={activeData} config={replayCfg} teamCapacities={teamCapacities} teamCalendars={teamCalendars} calendarsById={calendarsById} diagramId={activeId ?? diagramId} diagramsById={diagramsById} onClose={() => setMode("home")} />
           </main>
         ) : (
           <main className="flex-1 overflow-hidden p-4">
-            <SimulationHeatmap data={activeData} teamCapacities={teamCapacities} onClose={() => setMode("home")} />
+            <SimulationHeatmap data={activeData} teamCapacities={teamCapacities} teamCalendars={teamCalendars} calendarsById={calendarsById} onClose={() => setMode("home")} />
           </main>
         )}
       </div>

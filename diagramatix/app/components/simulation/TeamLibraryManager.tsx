@@ -9,15 +9,22 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { MatrixButton } from "./matrix/MatrixChrome";
+import type { CalendarRow } from "./CalendarLibraryManager";
 
-interface Team { id: string; name: string; capacity: number; costPerHour: number | null; efficiency: number }
+interface Team { id: string; name: string; capacity: number; costPerHour: number | null; efficiency: number; calendarId: string | null }
 
 export function TeamLibraryManager({
   projectId,
   onCapacities,
+  calendars = [],
+  onTeamCalendars,
 }: {
   projectId: string | null;
   onCapacities?: (caps: Record<string, number>) => void;
+  /** Available working calendars (for the per-team picker). */
+  calendars?: CalendarRow[];
+  /** Publishes team name → assigned calendarId so the console can resolve hours. */
+  onTeamCalendars?: (map: Record<string, string>) => void;
 }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [newName, setNewName] = useState("");
@@ -30,7 +37,8 @@ export function TeamLibraryManager({
   const publish = useCallback((list: Team[]) => {
     // Keyed by NAME: tasks reference a team by the name typed in sim.teamId.
     onCapacities?.(Object.fromEntries(list.map((t) => [t.name, t.capacity])));
-  }, [onCapacities]);
+    onTeamCalendars?.(Object.fromEntries(list.filter((t) => t.calendarId).map((t) => [t.name, t.calendarId as string])));
+  }, [onCapacities, onTeamCalendars]);
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -67,6 +75,14 @@ export function TeamLibraryManager({
     });
   }
 
+  async function setCalendar(id: string, calendarId: string | null) {
+    setTeams((ts) => { const next = ts.map((t) => t.id === id ? { ...t, calendarId } : t); publish(next); return next; });
+    if (!projectId) return;
+    await fetch(`/api/projects/${projectId}/simulation-teams/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ calendarId }),
+    });
+  }
+
   async function remove(id: string) {
     if (!projectId) return;
     await fetch(`/api/projects/${projectId}/simulation-teams/${id}`, { method: "DELETE" });
@@ -99,6 +115,7 @@ export function TeamLibraryManager({
           <div className="flex items-center gap-2 text-green-400/40 pb-0.5 border-b border-green-500/20 uppercase tracking-wide text-[10px]">
             <span className="w-52 shrink-0 text-left">Team Name</span>
             <span className="w-16 shrink-0 text-left">Capacity</span>
+            <span className="w-32 shrink-0 text-left">Calendar</span>
           </div>
         )}
         {teams.map((t) => (
@@ -109,6 +126,15 @@ export function TeamLibraryManager({
               onChange={(e) => setCapacity(t.id, Math.max(1, parseInt(e.target.value, 10) || 1))}
               className="w-16 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]"
             />
+            <select
+              value={t.calendarId ?? ""}
+              onChange={(e) => setCalendar(t.id, e.target.value || null)}
+              title="Working hours for this team (from the Calendars panel)"
+              className="w-32 shrink-0 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-[10px] [color-scheme:dark]"
+            >
+              <option value="">24/7</option>
+              {calendars.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
             <button onClick={() => remove(t.id)} className="text-red-400/70 hover:text-red-300 px-1" title="Delete">✕</button>
           </div>
         ))}

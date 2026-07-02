@@ -19,14 +19,15 @@ import { sample } from "./distributions";
 import { compileExpr, type CompiledExpr, type Value } from "./expr";
 import type { SimNetwork, SimNode, SimEdge, EventSub } from "./model";
 import { SECONDS_PER_UNIT, type SimRunConfig, type PlannedIntervention } from "./types";
+import { isOpenAt, nextOpenAt, rateAt, boundariesIn } from "./calendar";
 import type { RepStats, NodeStat } from "./statistics";
 
-type EventType = "GENERATE" | "SERVICE_END" | "RESUME" | "EVENT_TRIGGER" | "INTERVENTION";
+type EventType = "GENERATE" | "SERVICE_END" | "RESUME" | "EVENT_TRIGGER" | "INTERVENTION" | "CALENDAR_CAP";
 /** Runtime form of a planned intervention carried on an INTERVENTION event.
  *  A revert event (scheduled after a `duration`) is the same shape with the
  *  captured prior value and no duration. */
 interface IvPayload { kind: PlannedIntervention["kind"]; target: string; value: number; duration?: number }
-interface Ev { type: EventType; nodeId: string; tokenId?: string; scopeInst?: string; esubId?: string; iv?: IvPayload }
+interface Ev { type: EventType; nodeId: string; tokenId?: string; scopeInst?: string; esubId?: string; iv?: IvPayload; cap?: number }
 
 interface Pending { tokenId: string; nodeId: string; units: number; requestedAt: number }
 /** A subprocess scope instance a token is currently inside. `remaining` =
@@ -142,9 +143,26 @@ export class Engine {
   reset(): void {
     this.arrivalMult.clear();
     this.edgeProb.clear();
+    const unit = this.config.clockUnit;
     for (const n of this.network.nodes) {
       if (n.kind === "source" && n.arrival) {
-        this.calendar.schedule(this.clock + sample(n.arrival, this.rng), { type: "GENERATE", nodeId: n.id });
+        // Working-hours sources only arrive during open windows: sample the
+        // first inter-arrival, then defer it to the next open time if it lands
+        // in a closed period. Subsequent arrivals are gated in onGenerate.
+        let ta = this.clock + sample(n.arrival, this.rng);
+        if (n.calendar) ta = nextOpenAt(ta, n.calendar, unit);
+        this.calendar.schedule(ta, { type: "GENERATE", nodeId: n.id });
+      }
+    }
+    // Working calendars: staff each team at full capacity during open windows and
+    // 0 when closed (in-service tasks finish; new seizes wait for the next shift).
+    for (const t of this.network.teams) {
+      if (!t.calendar) continue;
+      const pool = this.pools.get(t.id);
+      if (!pool) continue;
+      if (!isOpenAt(this.clock, t.calendar, unit)) pool.setCapacity(this.clock, 0); // closed at t=0
+      for (const b of boundariesIn(t.calendar, unit, this.config.horizon)) {
+        this.calendar.schedule(b.t, { type: "CALENDAR_CAP", nodeId: t.id, cap: b.open ? t.capacity : 0 });
       }
     }
     for (const iv of this.planned) {
@@ -190,6 +208,7 @@ export class Engine {
   // ── Event handlers ──────────────────────────────────────────────────────
   private handle(ev: Ev): void {
     if (ev.type === "GENERATE") return this.onGenerate(ev.nodeId);
+    if (ev.type === "CALENDAR_CAP") return this.applyCalendarCap(ev.nodeId, ev.cap ?? 0);
     if (ev.type === "INTERVENTION") return this.applyPlanned(ev.iv!);
     if (ev.type === "EVENT_TRIGGER") return this.onEventTrigger(ev.scopeInst!, ev.esubId!);
     if (ev.tokenId && this.cancelledTokens.has(ev.tokenId)) return; // token was interrupted
@@ -221,8 +240,31 @@ export class Engine {
     const next = (this.arrivalsByNode.get(nodeId) ?? 0);
     if ((node.maxArrivals === undefined || next < node.maxArrivals) && node.arrival) {
       const mult = this.arrivalMult.get(nodeId) ?? 1;
-      const delay = sample(node.arrival, this.rng) / (mult > 0 ? mult : 1);
-      this.calendar.schedule(this.clock + delay, { type: "GENERATE", nodeId });
+      let delay = sample(node.arrival, this.rng) / (mult > 0 ? mult : 1);
+      if (node.calendar) {
+        // We only generate during open windows, so the current window's rate
+        // multiplier applies — a rate:2 window arrives twice as fast. If the
+        // scaled arrival crosses into a closed period, defer to the next shift.
+        const r = rateAt(this.clock, node.calendar, this.config.clockUnit);
+        if (r > 0) delay /= r;
+        const ta = nextOpenAt(this.clock + delay, node.calendar, this.config.clockUnit);
+        this.calendar.schedule(ta, { type: "GENERATE", nodeId });
+      } else {
+        this.calendar.schedule(this.clock + delay, { type: "GENERATE", nodeId });
+      }
+    }
+  }
+
+  /** A working-calendar staffing change fired off the calendar: set the team's
+   *  capacity (full at shift open, 0 at close) and start any tokens the change
+   *  now admits. Reuses the same pool.setCapacity path as Operator levers, so
+   *  in-service tasks finish and queued tokens drain FIFO when the shift opens. */
+  private applyCalendarCap(teamId: string, capacity: number): void {
+    const pool = this.pools.get(teamId);
+    if (!pool) return;
+    for (const p of pool.setCapacity(this.clock, Math.max(0, Math.round(capacity)))) {
+      const t = this.tokens.get(p.tokenId), n = this.nodeById.get(p.nodeId);
+      if (t && n) this.startService(t, n, this.clock - p.requestedAt);
     }
   }
 

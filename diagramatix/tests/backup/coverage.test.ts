@@ -35,7 +35,7 @@ const SCOPED_COVERED = new Set<string>([
 // Single-sourced here and PINNED by the "deliberately omits the Simulator
 // tables" test below, so the omission is an asserted decision, not a comment.
 const SIMULATOR_TABLES = [
-  "SimulationTeam", "SimulationStudy", "SimulationStudyRoot",
+  "SimulationTeam", "SimulationCalendar", "SimulationStudy", "SimulationStudyRoot",
   "SimulationScenario", "SimulationRun", "SimulationExample",
 ] as const;
 

@@ -340,6 +340,17 @@
     Simulation runtime, results and example-catalogue only — the diagram data
     structure and this XSD are UNCHANGED; the version attribute advances with the
     release window (same convention as v1.27 / v1.28).
+
+  v1.30 — Simulator resource calendars / working hours: a project-level Calendar
+    library (reusable weekly shift patterns — open windows per weekday with an
+    optional per-window arrival-rate multiplier for time-varying demand). Teams are
+    staffed only during their calendar's open windows; arrival sources only generate
+    when open. A source event may carry an OPTIONAL string `calendarId` inside
+    element.properties.sim (referencing a project calendar) — the open PropertiesType
+    already permits it, so this XSD's structure is UNCHANGED (as with the v1.24 sim
+    params). New runtime DB tables (SimulationCalendar, SimulationTeam.calendarId)
+    are not part of the diagram export. The version attribute advances with the
+    release window.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

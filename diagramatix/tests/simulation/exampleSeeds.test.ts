@@ -12,6 +12,7 @@ import { assembleFromDiagram } from "@/app/lib/simulation/assemble";
 import { spliceLinkedSubprocesses } from "@/app/lib/simulation/spliceLinks";
 import { runMonteCarlo } from "@/app/lib/simulation/runner";
 import { applyOverrides, type OverrideSet } from "@/app/lib/simulation/overrides";
+import { calendarWarnings } from "@/app/lib/simulation/calendar";
 
 /** The diagrams a scenario actually runs: its pinned process variant (As-is vs
  *  To-be comparison) when set, otherwise the study's roots. Mirrors the run
@@ -102,6 +103,22 @@ describe("starter examples are operational", () => {
       // The redesigned (To-be) process should load its busiest team less than the
       // manual (As-is) one — the automation payoff the comparison exists to show.
       expect(maxUtil(rToBe.stats.perTeam), `${ex.slug} to-be busiest vs as-is`).toBeLessThan(maxUtil(rAsIs.stats.perTeam));
+    }
+  });
+
+  it("T0571 — every example carries a working calendar its human teams follow (AI teams stay 24/7)", () => {
+    const IS_AUTOMATION = (name: string) => /\b(ai|agent|bot|automat|robot|system)\b/i.test(name);
+    for (const ex of STARTER_EXAMPLES) {
+      const cals = ex.package.calendars ?? [];
+      expect(cals.length, `${ex.slug} has a calendar`).toBeGreaterThan(0);
+      const calNames = new Set(cals.map((c) => c.name));
+      // Every referenced calendar exists + has no overlap warnings.
+      for (const c of cals) expect(calendarWarnings(c.pattern), `${ex.slug}/${c.name}`).toEqual([]);
+      // Human teams are linked to a calendar; automation teams are not.
+      for (const t of ex.package.teams) {
+        if (IS_AUTOMATION(t.name)) continue;
+        expect(t.calendarName && calNames.has(t.calendarName), `${ex.slug}/${t.name} linked to a real calendar`).toBe(true);
+      }
     }
   });
 

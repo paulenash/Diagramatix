@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
-import { prisma } from "@/app/lib/db";
+import { prisma, pgPool } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { sanitizePattern } from "./sanitize";
 
 type Params = { params: Promise<{ id: string }> };
 
-/** GET /api/projects/[id]/simulation-teams — the project's simulation teams
- *  (resource pools). Gated at "view" so any editor/viewer can load them when
- *  running a simulation. */
+/** GET /api/projects/[id]/simulation-calendars — the project's working calendars
+ *  (reusable weekly shift patterns). Gated at "view" so any editor/viewer can
+ *  load them when running a simulation. */
 export async function GET(_req: Request, { params }: Params) {
   const session = await auth();
   const { id } = await params;
@@ -19,14 +20,14 @@ export async function GET(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  const teams = await prisma.simulationTeam.findMany({
+  const calendars = await prisma.simulationCalendar.findMany({
     where: { projectId: id },
     orderBy: { name: "asc" },
   });
-  return NextResponse.json({ teams });
+  return NextResponse.json({ calendars });
 }
 
-/** POST /api/projects/[id]/simulation-teams { name, capacity?, costPerHour?, efficiency? } */
+/** POST /api/projects/[id]/simulation-calendars { name, pattern? } */
 export async function POST(req: Request, { params }: Params) {
   const session = await auth();
   if (isReadOnlyImpersonation(session, await cookies())) {
@@ -42,20 +43,12 @@ export async function POST(req: Request, { params }: Params) {
   const body = await req.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
-  const team = await prisma.simulationTeam.create({
-    data: {
-      name,
-      projectId: id,
-      capacity: clampInt(body.capacity, 1),
-      costPerHour: typeof body.costPerHour === "number" ? body.costPerHour : null,
-      efficiency: typeof body.efficiency === "number" && body.efficiency > 0 ? body.efficiency : 1,
-      calendarId: typeof body.calendarId === "string" && body.calendarId ? body.calendarId : null,
-    },
-  });
-  return NextResponse.json({ team }, { status: 201 });
-}
-
-function clampInt(v: unknown, min: number): number {
-  const n = typeof v === "number" ? Math.round(v) : parseInt(String(v), 10);
-  return Number.isFinite(n) ? Math.max(min, n) : min;
+  // Create the row (pattern defaults to {"intervals":[]}); if a pattern was
+  // supplied, write it via raw SQL — Prisma 7 omits JSON fields from write inputs.
+  const created = await prisma.simulationCalendar.create({ data: { name, projectId: id } });
+  if (body.pattern !== undefined) {
+    await pgPool.query('UPDATE "SimulationCalendar" SET pattern = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(sanitizePattern(body.pattern)), created.id]);
+  }
+  const calendar = await prisma.simulationCalendar.findUnique({ where: { id: created.id } });
+  return NextResponse.json({ calendar }, { status: 201 });
 }

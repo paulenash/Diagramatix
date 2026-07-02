@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { assembleFromDiagram } from "@/app/lib/simulation/assemble";
 import { runMonteCarlo } from "@/app/lib/simulation/runner";
-import { DEFAULT_RUN_CONFIG } from "@/app/lib/simulation/types";
+import { DEFAULT_RUN_CONFIG, type WorkCalendar } from "@/app/lib/simulation/types";
 import { MatrixButton } from "../matrix/MatrixChrome";
 
 const SIM_TYPES = new Set(["start-event", "end-event", "task", "subprocess", "subprocess-expanded", "gateway", "intermediate-event"]);
@@ -20,7 +20,7 @@ interface NodePos { id: string; cx: number; cy: number; x: number; y: number; w:
 
 interface Heat { util: number; wait: number; teamId?: string }
 
-export function SimulationHeatmap({ data, teamCapacities, onClose }: { data: DiagramData; teamCapacities?: Record<string, number>; onClose?: () => void }) {
+export function SimulationHeatmap({ data, teamCapacities, teamCalendars, calendarsById, onClose }: { data: DiagramData; teamCapacities?: Record<string, number>; teamCalendars?: Record<string, WorkCalendar>; calendarsById?: Record<string, WorkCalendar>; onClose?: () => void }) {
   const [reps, setReps] = useState(12);
   const [nonce, setNonce] = useState(0);
   const [computing, setComputing] = useState(false);
@@ -50,7 +50,7 @@ export function SimulationHeatmap({ data, teamCapacities, onClose }: { data: Dia
     setComputing(true);
     // Defer so the "computing" state paints before the (synchronous) run.
     const id = window.setTimeout(() => {
-      const net = assembleFromDiagram(data, { teamCapacities });
+      const net = assembleFromDiagram(data, { teamCapacities, teamCalendars, calendarsById });
       const teamOf = new Map(net.nodes.map((n) => [n.id, n.teamId]));
       const { stats } = runMonteCarlo(net, { ...DEFAULT_RUN_CONFIG, horizon: 2000, warmUp: 200, replications: Math.max(1, reps), seed: 1, collectQueues: true });
 
@@ -68,7 +68,7 @@ export function SimulationHeatmap({ data, teamCapacities, onClose }: { data: Dia
       setComputing(false);
     }, 0);
     return () => window.clearTimeout(id);
-  }, [data, teamCapacities, reps, nonce]);
+  }, [data, teamCapacities, teamCalendars, calendarsById, reps, nonce]);
 
   // Heat → fill by WAIT TIME, relative to the worst wait in the diagram:
   // green = good (little/no wait) · orange = poor · red = bad; the worst nodes

@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-02  ·  **Document version:** 2.1  ·  **Suite:** 91 test files · 676 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-07-02  ·  **Document version:** 2.2  ·  **Suite:** 93 test files · 694 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0513`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0571`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -1007,9 +1007,9 @@ Pins the deterministic connector-quality checks behind the AI-connector complain
 
 ---
 
-## Layer 10 — BPMN geometry rules + Simulator results, run history & subprocess drill-through
+## Layer 10 — BPMN geometry rules + Simulator results, run history, subprocess drill-through & working calendars
 
-*(Added T0514–T0553 across the BPMN layout-rule window and the Simulator results/history/subprocess work.)*
+*(Added T0514–T0571 across the BPMN layout-rule window, the Simulator results/history/subprocess work, and the resource-calendars / working-hours feature.)*
 
 ### `tests/conformance/overlap-checks.test.ts` — element / label / lane / data-artifact overlap scanners (B33–B37)
 
@@ -1105,6 +1105,38 @@ Pins the deterministic connector-quality checks behind the AI-connector complain
 | T0543 | accepts a scenario variant root that matches a diagram key, rejects one that doesn't | A comparison example with a dangling As-is/To-be variant | If `validateExamplePackage` stopped checking `variantRootKeys` |
 | T0542 | as-is/to-be comparison examples show the to-be relieving the busiest team | A seeded comparison that doesn't actually improve | If the Aardwolf to-be stopped beating the as-is |
 | T0553 | the subprocess drill-through sample flattens its linked children (they carry work) | Linked subprocesses running as empty pass-throughs | If splice or the subtree body-start lookup regressed (child teams idle) |
+| T0571 | every example carries a working calendar its human teams follow (AI teams stay 24/7) | The back-filled Business-hours calendar going missing or mis-linked | If the example calendar seed regressed or a human team lost its calendar link |
+
+### `tests/simulation/calendar.test.ts` (added) — working-calendar maths (t=0 ≙ Monday 00:00, weekly repeat)
+
+Pure helpers that convert a weekly `WorkCalendar` into sim-clock times — the correctness-critical core of the resource-calendars (working-hours) feature.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0554 | week length matches the clock unit (minute/hour/second/day) | Wrong week wrap when the scenario's clock unit changes | If the unit→clock conversion regressed |
+| T0555 | `isOpenAt` reflects a 9–5 window (end exclusive) | Off-by-one open/closed at shift edges | If a window boundary was mis-evaluated |
+| T0556 | weekend + 7-day wrap are closed / reopen next Monday | A calendar not repeating weekly | If the modulo-week logic broke |
+| T0557 | hour units resolve the same windows | Calendars only working in minutes | If unit scaling regressed |
+| T0558 | a lunch gap reads as closed between two windows | Breaks not modelled | If multi-window days broke |
+| T0559 | `nextOpenAt` returns t when open, else the next boundary (incl. weekend + lunch) | Arrivals/queued work not resuming at the right time | If the next-open search regressed |
+| T0560 | an empty calendar is always open (safe fallback) | A mis-set/deleted calendar silently starving the model | If empty stopped meaning always-open |
+| T0561 | `rateAt` gives the window multiplier when open, 0 when closed | Wrong time-varying arrival rates | If per-window rate lookup regressed |
+| T0562 | `boundariesIn` emits open/close transitions within the horizon | Team capacity toggles scheduled at wrong times | If boundary enumeration regressed |
+| T0563 | touching windows collapse to one non-race boundary | A capacity flicker (close+open at the same instant) | If adjacent windows stopped collapsing |
+| T0570 | `calendarWarnings` flags overlapping windows, not clean/empty ones | Silent data-entry mistakes in a calendar | If the overlap check regressed |
+
+### `tests/simulation/calendarEngine.test.ts` (added) — working-hours behaviour in the engine
+
+The simulation *effect* of a calendar: teams only work in-hours, in-service tasks finish at close, queued work resumes at open, utilisation is against staffed time, sources gate + rate-vary arrivals.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0564 | a team on a 9–5 calendar only starts service during open hours | Work happening outside working hours | If capacity toggles stopped gating new seizes |
+| T0565 | a token arriving overnight queues and starts at 09:00 | Queued work not resuming at shift open | If the open-boundary drain regressed |
+| T0566 | a calendar throttles throughput vs the same model run 24/7 | Calendars having no real effect on results | If staffing toggles stopped reducing capacity |
+| T0567 | utilisation is measured against staffed time, not wall-clock | Misleadingly low utilisation for part-time teams | If the pool's time-weighted denominator regressed |
+| T0568 | a per-window rate multiplier makes arrivals time-varying (≈2×) | Peak/off-peak demand not modelled | If the arrival rate multiplier stopped applying |
+| T0569 | an empty calendar is a no-op (always-open regression guard) | Adding calendars changing no-calendar behaviour | If the calendar code path perturbed the default run |
 
 ---
 

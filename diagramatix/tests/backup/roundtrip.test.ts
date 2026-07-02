@@ -51,6 +51,8 @@ describe("full backup round-trip", () => {
     // Simulator tables (Phase 4–6): a team, a study with a root + scenario, and
     // a GLOBAL example. The catalog-driven full backup must carry them all.
     await prisma.simulationTeam.create({ data: { name: "Analysts", projectId: project.id, capacity: 3 } });
+    // A working calendar (Tier-1 feature) — the catalog-driven backup must carry it.
+    await prisma.simulationCalendar.create({ data: { name: "Business hours", projectId: project.id } });
     const study = await prisma.simulationStudy.create({ data: { name: "RT Study", projectId: project.id } });
     await prisma.simulationStudyRoot.create({ data: { studyId: study.id, diagramId: diagram.id } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,6 +69,7 @@ describe("full backup round-trip", () => {
       list: await prisma.entityList.count(),
       node: await prisma.entityNode.count(),
       team: await prisma.simulationTeam.count(),
+      calendar: await prisma.simulationCalendar.count(),
       study: await prisma.simulationStudy.count(),
       studyRoot: await prisma.simulationStudyRoot.count(),
       scenario: await prisma.simulationScenario.count(),
@@ -91,6 +94,7 @@ describe("full backup round-trip", () => {
     expect(await prisma.entityList.count()).toBe(before.list);
     expect(await prisma.entityNode.count()).toBe(before.node);
     expect(await prisma.simulationTeam.count()).toBe(before.team);
+    expect(await prisma.simulationCalendar.count()).toBe(before.calendar);
     expect(await prisma.simulationStudy.count()).toBe(before.study);
     expect(await prisma.simulationStudyRoot.count()).toBe(before.studyRoot);
     expect(await prisma.simulationScenario.count()).toBe(before.scenario);

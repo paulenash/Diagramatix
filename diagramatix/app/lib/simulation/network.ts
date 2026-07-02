@@ -23,7 +23,7 @@
 
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { extractForwardLinks } from "@/app/lib/diagram/linkClosure";
-import { assembleFromDiagram } from "./assemble";
+import { assembleFromDiagram, type CalendarOpts } from "./assemble";
 import type { SimNetwork, SimNode, SimEdge, SimTeam } from "./model";
 
 export interface PortfolioDiagram {
@@ -71,7 +71,7 @@ function namespaceFragment(net: SimNetwork, diagramId: string): SimNetwork {
  */
 export function assemblePortfolio(
   diagrams: PortfolioDiagram[],
-  opts?: { teamCapacities?: Record<string, number> },
+  opts?: { teamCapacities?: Record<string, number> } & CalendarOpts,
 ): SimNetwork {
   const nodes: SimNode[] = [];
   const edges: SimEdge[] = [];
@@ -79,7 +79,7 @@ export function assemblePortfolio(
 
   for (const d of diagrams) {
     const frag = namespaceFragment(
-      assembleFromDiagram(d.data, { teamCapacities: opts?.teamCapacities }),
+      assembleFromDiagram(d.data, { teamCapacities: opts?.teamCapacities, teamCalendars: opts?.teamCalendars, calendarsById: opts?.calendarsById }),
       d.id,
     );
     nodes.push(...frag.nodes);
@@ -93,7 +93,13 @@ export function assemblePortfolio(
     }
   }
 
-  const teams: SimTeam[] = [...teamCap].map(([id, capacity]) => ({ id, capacity }));
+  // Re-attach each team's working calendar (by team name) — the per-team pools
+  // are rebuilt here, so the calendar resolved in the fragments would be lost.
+  const teams: SimTeam[] = [...teamCap].map(([id, capacity]) => ({
+    id,
+    capacity,
+    ...(opts?.teamCalendars?.[id] ? { calendar: opts.teamCalendars[id] } : {}),
+  }));
   return { nodes, edges, teams };
 }
 

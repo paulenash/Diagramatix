@@ -7,7 +7,7 @@
  * fixtures alike.
  */
 
-import type { SimDist } from "./types";
+import type { SimDist, WorkCalendar } from "./types";
 
 export type NodeKind = "source" | "task" | "gateway" | "delay" | "sink" | "subprocess";
 
@@ -51,6 +51,10 @@ export interface SimNode {
   // source
   arrival?: SimDist;
   maxArrivals?: number;
+  /** Operating hours for this source: arrivals are only generated during open
+   *  windows (deferred to the next open time otherwise), with per-window rate
+   *  multipliers for time-varying (peak/off-peak) arrivals. Absent → 24/7. */
+  calendar?: WorkCalendar;
   // task
   cycleTime?: SimDist;
   setupTime?: SimDist;   // BPSim SetupTime, added before processing
@@ -80,6 +84,9 @@ export interface SimEdge {
 export interface SimTeam {
   id: string;
   capacity: number;
+  /** Working hours: the team is staffed at `capacity` during open windows and
+   *  0 when closed (in-service tasks finish; new seizes wait). Absent → 24/7. */
+  calendar?: WorkCalendar;
 }
 
 export interface SimPropertyDef {

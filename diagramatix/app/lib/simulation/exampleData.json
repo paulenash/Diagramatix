@@ -11,15 +11,18 @@
         "teams": [
           {
             "name": "loan-officer",
-            "capacity": 1
+            "capacity": 1,
+            "calendarName": "Business hours"
           },
           {
             "name": "title-researcher",
-            "capacity": 1
+            "capacity": 1,
+            "calendarName": "Business hours"
           },
           {
             "name": "loan-underwriter",
-            "capacity": 1
+            "capacity": 1,
+            "calendarName": "Business hours"
           }
         ],
         "diagrams": [
@@ -1184,6 +1187,65 @@
               }
             }
           }
+        ],
+        "calendars": [
+          {
+            "name": "Business hours",
+            "pattern": {
+              "intervals": [
+                {
+                  "day": 0,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 0,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 1,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 1,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 2,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 2,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 3,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 3,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 4,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 4,
+                  "start": "13:00",
+                  "end": "17:00"
+                }
+              ]
+            }
+          }
         ]
       }
     },
@@ -1198,7 +1260,8 @@
         "teams": [
           {
             "name": "team",
-            "capacity": 1
+            "capacity": 1,
+            "calendarName": "Business hours"
           }
         ],
         "diagrams": [
@@ -3289,6 +3352,65 @@
               }
             }
           }
+        ],
+        "calendars": [
+          {
+            "name": "Business hours",
+            "pattern": {
+              "intervals": [
+                {
+                  "day": 0,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 0,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 1,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 1,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 2,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 2,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 3,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 3,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 4,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 4,
+                  "start": "13:00",
+                  "end": "17:00"
+                }
+              ]
+            }
+          }
         ]
       }
     },
@@ -3304,7 +3426,8 @@
           {
             "name": "Loan Assessment Team",
             "capacity": 3,
-            "costPerHour": 45
+            "costPerHour": 45,
+            "calendarName": "Business hours"
           },
           {
             "name": "Loan Assessment AI Agent",
@@ -3314,22 +3437,26 @@
           {
             "name": "Loan Assessment Specialist",
             "capacity": 2,
-            "costPerHour": 60
+            "costPerHour": 60,
+            "calendarName": "Business hours"
           },
           {
             "name": "Personal Loans Team",
             "capacity": 3,
-            "costPerHour": 40
+            "costPerHour": 40,
+            "calendarName": "Business hours"
           },
           {
             "name": "Home Loans Team",
             "capacity": 3,
-            "costPerHour": 45
+            "costPerHour": 45,
+            "calendarName": "Business hours"
           },
           {
             "name": "Commercial Loans Team",
             "capacity": 2,
-            "costPerHour": 55
+            "costPerHour": 55,
+            "calendarName": "Business hours"
           }
         ],
         "diagrams": [
@@ -8084,6 +8211,65 @@
               "aardwolf-tobe"
             ]
           }
+        ],
+        "calendars": [
+          {
+            "name": "Business hours",
+            "pattern": {
+              "intervals": [
+                {
+                  "day": 0,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 0,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 1,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 1,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 2,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 2,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 3,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 3,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 4,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 4,
+                  "start": "13:00",
+                  "end": "17:00"
+                }
+              ]
+            }
+          }
         ]
       }
     },
@@ -8099,17 +8285,20 @@
           {
             "name": "Enquiry Team",
             "capacity": 2,
-            "costPerHour": 45
+            "costPerHour": 45,
+            "calendarName": "Business hours"
           },
           {
             "name": "Sales Team",
             "capacity": 3,
-            "costPerHour": 55
+            "costPerHour": 55,
+            "calendarName": "Business hours"
           },
           {
             "name": "Marketing Team",
             "capacity": 2,
-            "costPerHour": 50
+            "costPerHour": 50,
+            "calendarName": "Business hours"
           }
         ],
         "diagrams": [
@@ -10714,6 +10903,65 @@
               "collectQueues": true
             },
             "overrides": {}
+          }
+        ],
+        "calendars": [
+          {
+            "name": "Business hours",
+            "pattern": {
+              "intervals": [
+                {
+                  "day": 0,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 0,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 1,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 1,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 2,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 2,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 3,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 3,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 4,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 4,
+                  "start": "13:00",
+                  "end": "17:00"
+                }
+              ]
+            }
           }
         ]
       }

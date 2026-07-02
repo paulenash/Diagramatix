@@ -745,5 +745,18 @@ export interface TemplateData {
  *             comparison. Simulation runtime / results / example-catalog only — NO
  *             diagram export or BPMN-XSD shape change; the version advances with
  *             the release window (as v1.27 / v1.28).
+ *
+ *  v1.30 (2026-07-02): Simulator resource calendars / working hours (Tier 1) —
+ *             a project-level Calendar library (reusable weekly shift patterns:
+ *             open windows per weekday with optional per-window arrival-rate
+ *             multipliers for time-varying demand). A team is staffed only during
+ *             its calendar's open windows (in-service tasks finish at shift end;
+ *             new work waits for the next shift); an arrival source only generates
+ *             during open windows. A source event may carry `sim.calendarId` in
+ *             element.properties.sim — the ONLY diagram-export change (the open
+ *             PropertiesType already permits it, as with v1.24). New DB tables
+ *             SimulationCalendar + SimulationTeam.calendarId (backup/restore
+ *             pick them up automatically). Starter examples back-filled with a
+ *             Business-hours (9–5 w/ lunch) calendar on their human teams.
  */
-export const SCHEMA_VERSION = "1.29";
+export const SCHEMA_VERSION = "1.30";

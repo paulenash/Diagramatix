@@ -87,6 +87,7 @@ model Org {
   collaborationGroups CollaborationGroup[]
   entityLists         EntityList[]
   simulationTeams     SimulationTeam[]
+  simulationCalendars SimulationCalendar[]
 }
 
 model OrgMember {
@@ -242,6 +243,7 @@ model Project {
   // project's own copy, adopted from an org master and edited independently.
   entityLists EntityList[]
   simulationTeams SimulationTeam[]
+  simulationCalendars SimulationCalendar[]
   simulationStudies SimulationStudy[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -938,8 +940,36 @@ model SimulationTeam {
   costPerHour  Float?
   efficiency   Float    @default(1.0)
   calendar     Json     @default("{}")
+  // Working hours: id of the SimulationCalendar this team follows (a plain id
+  // reference, not an FK, so a deleted calendar just falls back to always-open).
+  calendarId   String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([projectId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Simulation — a reusable weekly working calendar (a team's shift pattern or a
+// source's operating hours). Mirrors SimulationTeam's org-master → project-copy
+// shape. `pattern` holds a WorkCalendar (app/lib/simulation/types.ts): a set of
+// open windows { day, start "HH:MM", end "HH:MM", rate? }; anything uncovered is
+// closed. t=0 in the sim clock is anchored to Monday 00:00.
+// ────────────────────────────────────────────────────────────────────────────
+model SimulationCalendar {
+  id             String   @id @default(cuid())
+  name           String
+  orgId          String?
+  org            Org?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  projectId      String?
+  project        Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceCalendarId String?
+  sourceCalendar SimulationCalendar?  @relation("SimulationCalendarClone", fields: [sourceCalendarId], references: [id], onDelete: SetNull)
+  clones         SimulationCalendar[] @relation("SimulationCalendarClone")
+  pattern        Json     @default("{\"intervals\":[]}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([orgId])
   @@index([projectId])

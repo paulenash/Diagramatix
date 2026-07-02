@@ -12,7 +12,7 @@
  */
 
 import type { DiagramData } from "../diagram/types";
-import type { ScenarioRunConfig } from "./types";
+import type { ScenarioRunConfig, WorkCalendar } from "./types";
 import type { OverrideSet } from "./overrides";
 
 export interface ExampleDiagram {
@@ -28,6 +28,15 @@ export interface ExampleTeam {
   capacity: number;
   costPerHour?: number | null;
   efficiency?: number;
+  /** Working calendar this team follows, by package-local calendar name. */
+  calendarName?: string;
+}
+
+/** A reusable working calendar carried in the bundle (referenced by teams —
+ *  and, later, sources — by name; adopt mints a new id per calendar). */
+export interface ExampleCalendar {
+  name: string;
+  pattern: WorkCalendar;
 }
 
 export interface ExampleScenario {
@@ -45,6 +54,8 @@ export interface ExampleScenario {
 export interface ExamplePackage {
   version: 1;
   teams: ExampleTeam[];
+  /** Optional working-calendar library (team shift patterns / source hours). */
+  calendars?: ExampleCalendar[];
   diagrams: ExampleDiagram[];
   study: { name: string; rootKeys: string[] };
   scenarios: ExampleScenario[];
@@ -73,12 +84,21 @@ export function validateExamplePackage(pkg: unknown): string[] {
   }
   if ((p.diagrams ?? []).length === 0) errs.push("At least one diagram is required");
 
+  // Calendar library (optional): unique names.
+  const calendarNames = new Set<string>();
+  for (const c of p.calendars ?? []) {
+    if (!c || typeof c.name !== "string" || !c.name) errs.push("A calendar is missing a name");
+    else if (calendarNames.has(c.name)) errs.push(`Duplicate calendar name: ${c.name}`);
+    else calendarNames.add(c.name);
+  }
+
   if (!Array.isArray(p.teams)) errs.push("`teams` must be an array");
   const teamNames = new Set<string>();
   for (const t of p.teams ?? []) {
     if (!t || typeof t.name !== "string" || !t.name) errs.push("A team is missing a name");
     else if (teamNames.has(t.name)) errs.push(`Duplicate team name: ${t.name}`);
     else teamNames.add(t.name);
+    if (t?.calendarName && !calendarNames.has(t.calendarName)) errs.push(`Team "${t.name}" references calendar "${t.calendarName}", which is not in the package`);
   }
 
   if (!p.study || typeof p.study.name !== "string") errs.push("`study.name` is required");

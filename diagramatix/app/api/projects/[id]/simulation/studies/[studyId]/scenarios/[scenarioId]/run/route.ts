@@ -11,7 +11,7 @@ import { applyOverrides, type OverrideSet } from "@/app/lib/simulation/overrides
 import { runMonteCarlo } from "@/app/lib/simulation/runner";
 import { checkSimReadiness } from "@/app/lib/simulation/readiness";
 import { runIdsToPrune } from "@/app/lib/simulation/runHistory";
-import { DEFAULT_RUN_CONFIG, type ScenarioRunConfig } from "@/app/lib/simulation/types";
+import { DEFAULT_RUN_CONFIG, type ScenarioRunConfig, type WorkCalendar } from "@/app/lib/simulation/types";
 
 type Params = { params: Promise<{ id: string; studyId: string; scenarioId: string }> };
 
@@ -96,10 +96,19 @@ export async function POST(req: Request, { params }: Params) {
 
   // Real pool capacities from the project's team library (keyed by name —
   // tasks reference a team by the name stored in sim.teamId).
-  const teams = await prisma.simulationTeam.findMany({ where: { projectId: id }, select: { name: true, capacity: true, costPerHour: true } });
+  const teams = await prisma.simulationTeam.findMany({ where: { projectId: id }, select: { name: true, capacity: true, costPerHour: true, calendarId: true } });
   const teamCapacities = Object.fromEntries(teams.map((t) => [t.name, t.capacity]));
   // Cost per hour by team name → per-team + total cost in the results.
   const teamCosts = Object.fromEntries(teams.filter((t) => t.costPerHour != null).map((t) => [t.name, t.costPerHour as number]));
+
+  // Working calendars: a source gates arrivals by sim.calendarId; a team by its
+  // library calendarId. Resolve both to WorkCalendars keyed for the assembler.
+  const calendars = await prisma.simulationCalendar.findMany({ where: { projectId: id }, select: { id: true, pattern: true } });
+  const calendarsById = Object.fromEntries(calendars.map((c) => [c.id, (c.pattern ?? { intervals: [] }) as unknown as WorkCalendar]));
+  const teamCalendars: Record<string, WorkCalendar> = {};
+  for (const t of teams) {
+    if (t.calendarId && calendarsById[t.calendarId]) teamCalendars[t.name] = calendarsById[t.calendarId];
+  }
 
   const cfg: ScenarioRunConfig = { ...DEFAULT_RUN_CONFIG, ...((scenario.runConfig ?? {}) as unknown as ScenarioRunConfig) };
   const overrides = (scenario.overrides ?? {}) as unknown as OverrideSet;
@@ -116,7 +125,7 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   // ── Assemble + run ─────────────────────────────────────────────────────
-  const baseline = assemblePortfolio(rootDiagrams, { teamCapacities });
+  const baseline = assemblePortfolio(rootDiagrams, { teamCapacities, teamCalendars, calendarsById });
   const net = applyOverrides(baseline, overrides);
 
   const run = await prisma.simulationRun.create({

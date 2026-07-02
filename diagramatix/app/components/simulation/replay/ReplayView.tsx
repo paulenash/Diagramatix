@@ -12,7 +12,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
-import type { SimRunConfig } from "@/app/lib/simulation/types";
+import type { SimRunConfig, WorkCalendar } from "@/app/lib/simulation/types";
 import { buildReplay, forkReplay, teamIdsInDiagram, type ReplayData } from "@/app/lib/simulation/replaySource";
 import { buildStatTimeline } from "@/app/lib/simulation/runningStats";
 import { LiveStatsTable } from "./LiveStatsTable";
@@ -46,10 +46,11 @@ function pointAlongPolyline(pts: { x: number; y: number }[], f: number): { x: nu
  *  subprocess box in the parent diagram (drill-down comes in Phase 2). */
 function displayNodeId(id: string): string { const i = id.indexOf("~"); return i === -1 ? id : id.slice(0, i); }
 
-export function ReplayView({ data, config, teamCapacities, diagramId, diagramsById, onClose }: { data: DiagramData; config: SimRunConfig; teamCapacities?: Record<string, number>; diagramId?: string; diagramsById?: Map<string, DiagramData>; onClose?: () => void }) {
+export function ReplayView({ data, config, teamCapacities, teamCalendars, calendarsById, diagramId, diagramsById, onClose }: { data: DiagramData; config: SimRunConfig; teamCapacities?: Record<string, number>; teamCalendars?: Record<string, WorkCalendar>; calendarsById?: Record<string, WorkCalendar>; diagramId?: string; diagramsById?: Map<string, DiagramData>; onClose?: () => void }) {
   // Flatten linked (collapsed) subprocesses into the run, exactly as ▶ Run does,
-  // so their timing/teams are honest instead of a pass-through.
-  const replayOpts = useMemo(() => ({ rootId: diagramId, byId: diagramsById }), [diagramId, diagramsById]);
+  // so their timing/teams are honest instead of a pass-through. Working calendars
+  // make tokens queue outside hours, matching the authoritative run.
+  const replayOpts = useMemo(() => ({ rootId: diagramId, byId: diagramsById, teamCalendars, calendarsById }), [diagramId, diagramsById, teamCalendars, calendarsById]);
   const [replay, setReplay] = useState<ReplayData>(() => buildReplay(data, config, teamCapacities, replayOpts));
   const [simT, setSimT] = useState(0);
   const [playing, setPlaying] = useState(true);

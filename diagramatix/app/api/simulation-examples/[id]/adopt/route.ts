@@ -80,7 +80,16 @@ export async function POST(_req: Request, { params }: Params) {
       });
     }
 
-    // Team library.
+    // Working-calendar library (create first so teams can reference by id).
+    const calendarNameToId = new Map<string, string>();
+    for (const c of pkg.calendars ?? []) {
+      const cal = await tx.simulationCalendar.create({ data: { name: c.name, projectId: project.id } });
+      calendarNameToId.set(c.name, cal.id);
+      // pattern is a JSON field — Prisma 7 omits it from write inputs, so set it raw.
+      await tx.$executeRaw`UPDATE "SimulationCalendar" SET pattern = ${JSON.stringify(c.pattern ?? { intervals: [] })}::jsonb WHERE id = ${cal.id}`;
+    }
+
+    // Team library (link each team to its calendar by name → new id).
     for (const t of pkg.teams) {
       await tx.simulationTeam.create({
         data: {
@@ -88,6 +97,7 @@ export async function POST(_req: Request, { params }: Params) {
           capacity: Math.max(1, Math.round(t.capacity ?? 1)),
           costPerHour: t.costPerHour ?? null,
           efficiency: t.efficiency && t.efficiency > 0 ? t.efficiency : 1,
+          calendarId: t.calendarName ? calendarNameToId.get(t.calendarName) ?? null : null,
         },
       });
     }

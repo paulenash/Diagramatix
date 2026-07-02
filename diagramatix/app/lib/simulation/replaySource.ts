@@ -6,7 +6,7 @@
 
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { Engine, type TraceEvent, type Intervention } from "./engine";
-import { assembleFromDiagram } from "./assemble";
+import { assembleFromDiagram, type CalendarOpts } from "./assemble";
 import { spliceLinkedSubprocesses } from "./spliceLinks";
 import type { SimNetwork } from "./model";
 import { getSimParams } from "@/app/lib/diagram/simParams";
@@ -21,12 +21,14 @@ export interface ReplayData {
 }
 
 /** Optional project diagrams so linked (collapsed) subprocesses are flattened in
- *  — exactly as the real run does — instead of animating as a pass-through. */
-export interface ReplayOpts { rootId?: string; byId?: Map<string, DiagramData> }
+ *  — exactly as the real run does — instead of animating as a pass-through.
+ *  Working calendars (team + source) make the replay show tokens queuing outside
+ *  hours, matching the authoritative run. */
+export interface ReplayOpts extends CalendarOpts { rootId?: string; byId?: Map<string, DiagramData> }
 
 function assembleForReplay(data: DiagramData, teamCapacities: Record<string, number> | undefined, opts?: ReplayOpts): SimNetwork {
   const src = opts?.byId && opts.rootId ? spliceLinkedSubprocesses(data, opts.rootId, opts.byId) : data;
-  return assembleFromDiagram(src, { teamCapacities });
+  return assembleFromDiagram(src, { teamCapacities, teamCalendars: opts?.teamCalendars, calendarsById: opts?.calendarsById });
 }
 
 function nodeTeamOf(net: SimNetwork): Map<string, string> {

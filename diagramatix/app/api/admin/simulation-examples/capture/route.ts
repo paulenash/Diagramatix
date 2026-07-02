@@ -62,8 +62,16 @@ export async function POST(req: Request) {
     key: d.id, name: d.name, type: d.type || "bpmn", data: (d.data ?? {}) as unknown as DiagramData,
   }));
 
-  const teamRows = await prisma.simulationTeam.findMany({ where: { projectId }, select: { name: true, capacity: true, costPerHour: true, efficiency: true } });
-  const teams = teamRows.map((t) => ({ name: t.name, capacity: t.capacity, costPerHour: t.costPerHour, efficiency: t.efficiency }));
+  const teamRows = await prisma.simulationTeam.findMany({ where: { projectId }, select: { name: true, capacity: true, costPerHour: true, efficiency: true, calendarId: true } });
+  // Working calendars: carry the library + resolve each team's calendarId → name
+  // (the portable reference) so an adopt re-creates them.
+  const calendarRows = await prisma.simulationCalendar.findMany({ where: { projectId }, select: { id: true, name: true, pattern: true } });
+  const calendarIdToName = new Map(calendarRows.map((c) => [c.id, c.name]));
+  const calendars = calendarRows.map((c) => ({ name: c.name, pattern: (c.pattern ?? { intervals: [] }) as unknown as import("@/app/lib/simulation/types").WorkCalendar }));
+  const teams = teamRows.map((t) => ({
+    name: t.name, capacity: t.capacity, costPerHour: t.costPerHour, efficiency: t.efficiency,
+    ...(t.calendarId && calendarIdToName.has(t.calendarId) ? { calendarName: calendarIdToName.get(t.calendarId) } : {}),
+  }));
 
   const scenarios: ExampleScenario[] = study.scenarios.map((s) => {
     const variantRootKeys = scenarioVariantIds(s.variantRootIds).filter((k) => capturedKeys.has(k));
@@ -79,6 +87,7 @@ export async function POST(req: Request) {
   const pkg: ExamplePackage = {
     version: 1,
     teams,
+    ...(calendars.length ? { calendars } : {}),
     diagrams,
     study: { name: study.name, rootKeys: rootIds },
     scenarios,
