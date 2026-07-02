@@ -8,6 +8,8 @@ import { describe, it, expect } from "vitest";
 import { STARTER_EXAMPLES } from "@/app/lib/simulation/exampleSeeds";
 import { validateExamplePackage, type ExamplePackage, type ExampleScenario } from "@/app/lib/simulation/examplePackage";
 import { assemblePortfolio } from "@/app/lib/simulation/network";
+import { assembleFromDiagram } from "@/app/lib/simulation/assemble";
+import { spliceLinkedSubprocesses } from "@/app/lib/simulation/spliceLinks";
 import { runMonteCarlo } from "@/app/lib/simulation/runner";
 import { applyOverrides, type OverrideSet } from "@/app/lib/simulation/overrides";
 
@@ -103,11 +105,28 @@ describe("starter examples are operational", () => {
     }
   });
 
+  it("T0553 — the subprocess drill-through sample flattens its linked children (they carry work)", () => {
+    const ex = STARTER_EXAMPLES.find((e) => e.slug === "sales-marketing-drill-through");
+    if (!ex) return; // sample optional in some builds
+    const byId = new Map(ex.package.diagrams.map((d) => [d.key, d.data]));
+    const rootKey = ex.package.study.rootKeys[0];
+    const spliced = spliceLinkedSubprocesses(byId.get(rootKey)!, rootKey, byId);
+    // the linked children are flattened in (their node ids carry the "<subId>~" prefix)
+    expect(spliced.elements.some((e) => e.id.includes("~"))).toBe(true);
+    const caps = Object.fromEntries(ex.package.teams.map((t) => [t.name, t.capacity]));
+    const { stats } = runMonteCarlo(assembleFromDiagram(spliced, { teamCapacities: caps }), ex.package.scenarios[0].runConfig);
+    // teams that ONLY exist inside the subprocesses must be busy → tokens drilled through
+    expect(stats.perTeam["Sales Team"]?.utilization.mean).toBeGreaterThan(0);
+    expect(stats.perTeam["Marketing Team"]?.utilization.mean).toBeGreaterThan(0);
+  });
+
   it("staffing up relieves the busiest pool (baseline vs add-staff)", () => {
     for (const ex of STARTER_EXAMPLES) {
       // Comparison examples ([As-is, To-be] variants) aren't baseline/add-staff —
-      // covered by the dedicated to-be-relief test above.
+      // covered by the dedicated to-be-relief test above. Single-scenario examples
+      // (e.g. a drill-through demo) have no add-staff variant to compare.
       if (ex.package.scenarios.some((s) => s.variantRootKeys?.length)) continue;
+      if (ex.package.scenarios.length < 2) continue;
       const teamCaps = Object.fromEntries(ex.package.teams.map((t) => [t.name, t.capacity]));
       const roots = ex.package.study.rootKeys.map((k) => ex.package.diagrams.find((d) => d.key === k)!);
       const base = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: teamCaps });

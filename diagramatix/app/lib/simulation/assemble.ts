@@ -144,7 +144,12 @@ export function assembleFromDiagram(
     } else if (kind === "gateway") {
       node.gateway = el.gatewayType === "parallel" ? "parallel" : "decision";
     } else if (kind === "subprocess") {
-      const bodyStartEl = (childrenOf.get(el.id) ?? []).find((c) => c.type === "start-event" && !skip.has(c.id));
+      // Body start = a start-event whose owning subprocess IS this one. Search the
+      // whole subtree (not just direct children): a linked diagram spliced in
+      // keeps its pools/lanes, so its start-event is nested inside them rather
+      // than a direct child. scopeOf excludes start-events in NESTED subprocesses.
+      const bodyStartEl = data.elements.find((c) => c.type === "start-event" && !skip.has(c.id) && scopeOf(c) === el.id)
+        ?? (childrenOf.get(el.id) ?? []).find((c) => c.type === "start-event" && !skip.has(c.id));
       node.bodyStart = bodyStartEl?.id;
       node.loop = loopOf(el);
       node.eventSubs = eventSubsByParent.get(el.id);

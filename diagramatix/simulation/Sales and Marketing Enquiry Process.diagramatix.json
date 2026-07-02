@@ -1,0 +1,2604 @@
+{
+  "schemaVersion": "1.29",
+  "appVersion": "1.29.0",
+  "exportedAt": "2026-07-02T00:08:45.701Z",
+  "project": {
+    "name": "Sales and Marketing Enquiry Process",
+    "description": "",
+    "ownerName": "Paul Nash",
+    "colorConfig": {}
+  },
+  "diagrams": [
+    {
+      "originalId": "cmr2qbujo0046641k1xj8rko3",
+      "name": "P01.2 Marketing Process",
+      "type": "bpmn",
+      "data": {
+        "elements": [
+          {
+            "x": 50,
+            "y": 50,
+            "id": "pProspect",
+            "type": "pool",
+            "label": "Prospect",
+            "width": 1428,
+            "height": 78,
+            "properties": {
+              "isSystem": false,
+              "poolType": "black-box",
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "x": 50,
+            "y": 218,
+            "id": "p1",
+            "type": "pool",
+            "label": "My Company",
+            "width": 1428,
+            "height": 270,
+            "properties": {
+              "poolType": "white-box"
+            }
+          },
+          {
+            "x": 86,
+            "y": 218,
+            "id": "l1",
+            "type": "lane",
+            "label": "Marketing Team",
+            "width": 1392,
+            "height": 270,
+            "parentId": "p1",
+            "properties": {}
+          },
+          {
+            "x": 158,
+            "y": 320,
+            "id": "start",
+            "type": "start-event",
+            "label": "",
+            "width": 36,
+            "height": 36,
+            "parentId": "l1",
+            "properties": {
+              "sim": {
+                "arrival": {
+                  "kind": "exponential",
+                  "mean": 10
+                }
+              }
+            }
+          },
+          {
+            "x": 264,
+            "y": 305.5,
+            "id": "t1",
+            "type": "task",
+            "label": "Retrieve Customer Information",
+            "width": 102,
+            "height": 65,
+            "parentId": "l1",
+            "taskType": "user",
+            "properties": {
+              "sim": {
+                "teamId": "Marketing Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": 438.6666666666667,
+            "y": 305.5,
+            "id": "t2",
+            "type": "task",
+            "label": "Qualify Marketing Opportunity",
+            "width": 102,
+            "height": 65,
+            "parentId": "l1",
+            "taskType": "user",
+            "properties": {
+              "sim": {
+                "teamId": "Marketing Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": 617.5,
+            "y": 304,
+            "id": "t3",
+            "type": "task",
+            "label": "Present Appropriate Marketing Material",
+            "width": 107,
+            "height": 68,
+            "parentId": "l1",
+            "taskType": "send",
+            "properties": {
+              "sim": {
+                "teamId": "Marketing Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": 780,
+            "y": 305.5,
+            "id": "t4",
+            "type": "task",
+            "label": "Close Marketing Opportunity",
+            "width": 102,
+            "height": 65,
+            "parentId": "l1",
+            "taskType": "receive",
+            "properties": {
+              "sim": {
+                "teamId": "Marketing Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": 940,
+            "y": 318,
+            "id": "gw1",
+            "type": "gateway",
+            "label": "Marketing success?",
+            "width": 40,
+            "height": 40,
+            "parentId": "l1",
+            "properties": {
+              "labelWidth": 80,
+              "gatewayRole": "decision",
+              "gatewayType": "none",
+              "labelOffsetX": -40,
+              "labelOffsetY": -92
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 1100,
+            "y": 258,
+            "id": "t5",
+            "type": "task",
+            "label": "Record Marketing Opportunity",
+            "width": 102,
+            "height": 65,
+            "parentId": "l1",
+            "taskType": "user",
+            "properties": {
+              "sim": {
+                "teamId": "Marketing Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": 1262,
+            "y": 353,
+            "id": "gw2",
+            "type": "gateway",
+            "label": "",
+            "width": 40,
+            "height": 40,
+            "parentId": "l1",
+            "properties": {
+              "gatewayRole": "merge",
+              "gatewayType": "none"
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 1372,
+            "y": 355,
+            "id": "end",
+            "type": "end-event",
+            "label": "",
+            "width": 36,
+            "height": 36,
+            "parentId": "l1",
+            "properties": {}
+          },
+          {
+            "x": 50,
+            "y": 578,
+            "id": "pSF",
+            "type": "pool",
+            "label": "SalesForce",
+            "width": 1428,
+            "height": 92,
+            "properties": {
+              "isSystem": true,
+              "poolType": "black-box",
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "x": 569.3333333333333,
+            "y": 394.33333333333337,
+            "id": "cqvbl26i",
+            "type": "data-object",
+            "label": "Catalog",
+            "width": 36,
+            "height": 46,
+            "parentId": "l1",
+            "properties": {
+              "role": "input"
+            }
+          }
+        ],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.6
+        },
+        "connectors": [
+          {
+            "id": "conn-start-t1",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "start",
+            "targetId": "t1",
+            "waypoints": [
+              {
+                "x": 176,
+                "y": 338
+              },
+              {
+                "x": 194,
+                "y": 338
+              },
+              {
+                "x": 212,
+                "y": 338
+              },
+              {
+                "x": 240,
+                "y": 338
+              },
+              {
+                "x": 264,
+                "y": 338
+              },
+              {
+                "x": 315,
+                "y": 338
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t1-t2",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t1",
+            "targetId": "t2",
+            "waypoints": [
+              {
+                "x": 315,
+                "y": 338
+              },
+              {
+                "x": 366,
+                "y": 338
+              },
+              {
+                "x": 390,
+                "y": 338
+              },
+              {
+                "x": 414.6666666666667,
+                "y": 338
+              },
+              {
+                "x": 438.6666666666667,
+                "y": 338
+              },
+              {
+                "x": 489.6666666666667,
+                "y": 338
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t2-t3",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t2",
+            "targetId": "t3",
+            "waypoints": [
+              {
+                "x": 489.6666666666667,
+                "y": 338
+              },
+              {
+                "x": 540.6666666666667,
+                "y": 338
+              },
+              {
+                "x": 564.6666666666667,
+                "y": 338
+              },
+              {
+                "x": 593.5,
+                "y": 338
+              },
+              {
+                "x": 617.5,
+                "y": 338
+              },
+              {
+                "x": 671,
+                "y": 338
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t3-pProspect",
+            "type": "messageBPMN",
+            "label": "Marketing material",
+            "sourceId": "t3",
+            "targetId": "pProspect",
+            "waypoints": [
+              {
+                "x": 671,
+                "y": 338
+              },
+              {
+                "x": 671,
+                "y": 304
+              },
+              {
+                "x": 671,
+                "y": 128
+              },
+              {
+                "x": 764,
+                "y": 89
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "rectilinear",
+            "labelOffsetX": -84,
+            "labelOffsetY": -49,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.43487394957983194,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t3-t4",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t3",
+            "targetId": "t4",
+            "waypoints": [
+              {
+                "x": 671,
+                "y": 338
+              },
+              {
+                "x": 724.5,
+                "y": 338
+              },
+              {
+                "x": 748.5,
+                "y": 338
+              },
+              {
+                "x": 756,
+                "y": 338
+              },
+              {
+                "x": 780,
+                "y": 338
+              },
+              {
+                "x": 831,
+                "y": 338
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-pProspect-t4",
+            "type": "messageBPMN",
+            "label": "Marketing interest",
+            "sourceId": "pProspect",
+            "targetId": "t4",
+            "waypoints": [
+              {
+                "x": 764,
+                "y": 89
+              },
+              {
+                "x": 831.0000000000001,
+                "y": 128
+              },
+              {
+                "x": 831.0000000000001,
+                "y": 305.5
+              },
+              {
+                "x": 831,
+                "y": 338
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -57.75,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5469187675070029,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t4-gw1",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t4",
+            "targetId": "gw1",
+            "waypoints": [
+              {
+                "x": 831,
+                "y": 338
+              },
+              {
+                "x": 882,
+                "y": 338
+              },
+              {
+                "x": 906,
+                "y": 338
+              },
+              {
+                "x": 920,
+                "y": 338
+              },
+              {
+                "x": 940,
+                "y": 338
+              },
+              {
+                "x": 960,
+                "y": 338
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gw1-t5",
+            "type": "sequence",
+            "label": "Yes",
+            "sourceId": "gw1",
+            "targetId": "t5",
+            "waypoints": [
+              {
+                "x": 960,
+                "y": 338
+              },
+              {
+                "x": 960,
+                "y": 318
+              },
+              {
+                "x": 960,
+                "y": 290.5
+              },
+              {
+                "x": 1100,
+                "y": 290.5
+              },
+              {
+                "x": 1151,
+                "y": 290.5
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "top",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 21,
+            "labelOffsetY": -24,
+            "directionType": "directed",
+            "branchProbability": 85,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gw1-gw2",
+            "type": "sequence",
+            "label": "No",
+            "sourceId": "gw1",
+            "targetId": "gw2",
+            "waypoints": [
+              {
+                "x": 960,
+                "y": 338
+              },
+              {
+                "x": 960,
+                "y": 358
+              },
+              {
+                "x": 960,
+                "y": 378
+              },
+              {
+                "x": 960,
+                "y": 413
+              },
+              {
+                "x": 1282,
+                "y": 413
+              },
+              {
+                "x": 1282,
+                "y": 413
+              },
+              {
+                "x": 1282,
+                "y": 393
+              },
+              {
+                "x": 1282,
+                "y": 373
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "bottom",
+            "targetSide": "bottom",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 21,
+            "labelOffsetY": 10,
+            "directionType": "directed",
+            "branchProbability": 15,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t5-pSF",
+            "type": "messageBPMN",
+            "label": "Marketing details",
+            "sourceId": "t5",
+            "targetId": "pSF",
+            "waypoints": [
+              {
+                "x": 1151,
+                "y": 290.5
+              },
+              {
+                "x": 1151,
+                "y": 323
+              },
+              {
+                "x": 1151,
+                "y": 578
+              },
+              {
+                "x": 764,
+                "y": 624
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": 68.5,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.7710084033613446,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t5-gw2",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t5",
+            "targetId": "gw2",
+            "waypoints": [
+              {
+                "x": 1151,
+                "y": 290.5
+              },
+              {
+                "x": 1202,
+                "y": 290.5
+              },
+              {
+                "x": 1282,
+                "y": 290.5
+              },
+              {
+                "x": 1282,
+                "y": 353
+              },
+              {
+                "x": 1282,
+                "y": 373
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-gw2-end",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "gw2",
+            "targetId": "end",
+            "waypoints": [
+              {
+                "x": 1282,
+                "y": 373
+              },
+              {
+                "x": 1302,
+                "y": 373
+              },
+              {
+                "x": 1322,
+                "y": 373
+              },
+              {
+                "x": 1354,
+                "y": 373
+              },
+              {
+                "x": 1372,
+                "y": 373
+              },
+              {
+                "x": 1390,
+                "y": 373
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "zl5s2kdp",
+            "type": "messageBPMN",
+            "label": "Customer \ninformation",
+            "sourceId": "pSF",
+            "targetId": "t1",
+            "waypoints": [
+              {
+                "x": 764,
+                "y": 624
+              },
+              {
+                "x": 319.3333333333333,
+                "y": 578
+              },
+              {
+                "x": 319.3333333333333,
+                "y": 370.5
+              },
+              {
+                "x": 315,
+                "y": 338
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "direct",
+            "labelOffsetX": -32.333333333333314,
+            "labelOffsetY": 46.75,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.18860877684407096,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "07yhebmx",
+            "type": "associationBPMN",
+            "sourceId": "cqvbl26i",
+            "targetId": "t3",
+            "waypoints": [
+              {
+                "x": 587.3333333333333,
+                "y": 417.33333333333337
+              },
+              {
+                "x": 605.3333333333333,
+                "y": 400.26560424966806
+              },
+              {
+                "x": 635.1428571428571,
+                "y": 372
+              },
+              {
+                "x": 671,
+                "y": 338
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.12896241122466712,
+            "targetOffsetAlong": 0.16488651535380477,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          }
+        ]
+      },
+      "colorConfig": {},
+      "displayMode": "normal"
+    },
+    {
+      "originalId": "cmr2nnybo0005641k7hut2d8x",
+      "name": "P01 Sales Enquiry Process",
+      "type": "bpmn",
+      "data": {
+        "elements": [
+          {
+            "x": -331.33333333333326,
+            "y": 186.3333333333333,
+            "id": "sdnr01x7",
+            "type": "start-event",
+            "label": "Enquiry\narrives",
+            "width": 36,
+            "height": 36,
+            "flowType": "catching",
+            "parentId": "ouc3s11m",
+            "eventType": "message",
+            "properties": {
+              "sim": {
+                "arrival": {
+                  "kind": "exponential",
+                  "mean": 10
+                }
+              }
+            }
+          },
+          {
+            "x": -219.66666666666663,
+            "y": 173.16666666666666,
+            "id": "g6DmBCpGc5UTC6SeHwwhG",
+            "type": "task",
+            "label": "Check Enquiry",
+            "width": 102,
+            "height": 65,
+            "parentId": "ouc3s11m",
+            "taskType": "user",
+            "properties": {
+              "sim": {
+                "teamId": "Enquiry Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": -456,
+            "y": -25.166666666666664,
+            "id": "6xuw8cmf",
+            "type": "pool",
+            "label": "Prospect",
+            "width": 1154.6666666666667,
+            "height": 97,
+            "properties": {
+              "poolType": "black-box",
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "x": -456,
+            "y": 141.5,
+            "id": "5g597ub1",
+            "type": "pool",
+            "label": "My Company",
+            "width": 1154.6666666666667,
+            "height": 612.3333333333333,
+            "properties": {
+              "poolType": "white-box",
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "x": -420,
+            "y": 141.5,
+            "id": "ouc3s11m",
+            "type": "lane",
+            "label": "Enquiry Team",
+            "width": 1118.6666666666667,
+            "height": 249.66666666666677,
+            "parentId": "5g597ub1",
+            "properties": {}
+          },
+          {
+            "x": -420,
+            "y": 391.16666666666674,
+            "id": "boytybhk",
+            "type": "lane",
+            "label": "Sales Team",
+            "width": 1118.6666666666667,
+            "height": 189.33333333333323,
+            "parentId": "5g597ub1",
+            "properties": {}
+          },
+          {
+            "x": -420,
+            "y": 580.5,
+            "id": "pmy4pqvq",
+            "type": "lane",
+            "label": "Marketing Team",
+            "width": 1118.6666666666667,
+            "height": 173.33333333333326,
+            "parentId": "5g597ub1",
+            "properties": {}
+          },
+          {
+            "x": -48.266666666666424,
+            "y": 438.9222222222221,
+            "id": "gEhDloqNBqiZE91568aZq",
+            "type": "gateway",
+            "label": "Type?",
+            "width": 40,
+            "height": 40,
+            "parentId": "boytybhk",
+            "properties": {
+              "labelOffsetX": -38,
+              "labelOffsetY": -52.666666666666686
+            }
+          },
+          {
+            "x": 54.066666666666904,
+            "y": 242.42222222222216,
+            "id": "XWVURo_fT2823kbbyiXGL",
+            "type": "task",
+            "label": "Close Enquiry",
+            "width": 102,
+            "height": 65,
+            "parentId": "ouc3s11m",
+            "properties": {
+              "sim": {
+                "teamId": "Enquiry Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": 232.38692810457601,
+            "y": 252.47015250544638,
+            "id": "FiuT3Rb0D_eoGdu2pPogp",
+            "type": "end-event",
+            "label": "End",
+            "width": 36,
+            "height": 36,
+            "flowType": "throwing",
+            "parentId": "ouc3s11m",
+            "eventType": "message",
+            "properties": {}
+          },
+          {
+            "x": 85.72026143790933,
+            "y": 422.92222222222216,
+            "id": "FTsQlLcspA7knVLZmKEjk",
+            "type": "subprocess",
+            "label": "Sales\nProcess",
+            "width": 108,
+            "height": 72,
+            "parentId": "boytybhk",
+            "properties": {
+              "sim": {
+                "teamId": "Sales Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              },
+              "linkedDiagramId": "cmr2o5e2e002m641kkuvy9s7u"
+            }
+          },
+          {
+            "x": 48.386928104576015,
+            "y": 633.1368191721131,
+            "id": "Y9rW8m3x4xv1RIingkJ7G",
+            "type": "subprocess",
+            "label": "Marketing\nProcess",
+            "width": 108,
+            "height": 72,
+            "parentId": "pmy4pqvq",
+            "properties": {
+              "sim": {
+                "teamId": "Marketing Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              },
+              "linkedDiagramId": "cmr2qbujo0046641k1xj8rko3"
+            }
+          },
+          {
+            "x": 265.0535947712427,
+            "y": 530.4701525054464,
+            "id": "ioDgji8h4vYv27YuDxMdP",
+            "type": "gateway",
+            "label": "Decision?",
+            "width": 40,
+            "height": 40,
+            "parentId": "boytybhk",
+            "properties": {
+              "gatewayRole": "merge",
+              "labelOffsetX": -30,
+              "labelOffsetY": -54
+            }
+          },
+          {
+            "x": 571.0535947712427,
+            "y": 263.1368191721131,
+            "id": "XRtLmhcK5HeDZKU9ooGAJ",
+            "type": "end-event",
+            "label": "End\nProcess",
+            "width": 36,
+            "height": 36,
+            "flowType": "throwing",
+            "parentId": "ouc3s11m",
+            "eventType": "message",
+            "properties": {}
+          },
+          {
+            "x": -456,
+            "y": 828.9701525054464,
+            "id": "49qnx4ur",
+            "type": "pool",
+            "label": "SalesForce",
+            "width": 1154.6666666666667,
+            "height": 116,
+            "properties": {
+              "isSystem": true,
+              "poolType": "black-box",
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "x": -302.27973856209064,
+            "y": 279.4701525054464,
+            "id": "zwndyv7x",
+            "type": "data-object",
+            "label": "Enquiry\nProcess\nGuidance",
+            "width": 36,
+            "height": 46,
+            "parentId": "ouc3s11m",
+            "properties": {
+              "role": "input"
+            }
+          },
+          {
+            "x": 408.72026143790936,
+            "y": 248.63681917211306,
+            "id": "52qyzrod",
+            "type": "task",
+            "label": "Draft\nFollowup Email",
+            "width": 102,
+            "height": 65,
+            "parentId": "ouc3s11m",
+            "properties": {
+              "sim": {
+                "teamId": "Enquiry Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": 351.0535947712427,
+            "y": 170.13681917211306,
+            "id": "k6lt9zlr",
+            "type": "data-object",
+            "label": "Followup Email\nTemplate",
+            "width": 36,
+            "height": 46,
+            "parentId": "ouc3s11m",
+            "properties": {
+              "role": "input"
+            }
+          }
+        ],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 1
+        },
+        "connectors": [
+          {
+            "id": "ti1l2l5f",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "sdnr01x7",
+            "targetId": "g6DmBCpGc5UTC6SeHwwhG",
+            "waypoints": [
+              {
+                "x": -313.33333333333326,
+                "y": 204.3333333333333
+              },
+              {
+                "x": -295.33333333333326,
+                "y": 204.3333333333333
+              },
+              {
+                "x": -277.33333333333326,
+                "y": 204.3333333333333
+              },
+              {
+                "x": -260.49999999999994,
+                "y": 204.3333333333333
+              },
+              {
+                "x": -260.49999999999994,
+                "y": 205.66666666666666
+              },
+              {
+                "x": -243.66666666666663,
+                "y": 205.66666666666666
+              },
+              {
+                "x": -219.66666666666663,
+                "y": 205.66666666666666
+              },
+              {
+                "x": -168.66666666666663,
+                "y": 205.66666666666666
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "xuazletz",
+            "type": "messageBPMN",
+            "label": "Sales\nEnquiry",
+            "sourceId": "6xuw8cmf",
+            "targetId": "sdnr01x7",
+            "waypoints": [
+              {
+                "x": 121.33333333333337,
+                "y": 23.333333333333336
+              },
+              {
+                "x": -313.33333333333326,
+                "y": 71.83333333333334
+              },
+              {
+                "x": -313.33333333333326,
+                "y": 186.3333333333333
+              },
+              {
+                "x": -313.33333333333326,
+                "y": 204.3333333333333
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "direct",
+            "labelOffsetX": -38.66666666666674,
+            "labelOffsetY": -38.66666666666664,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.12355658198614325,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "4471rm7s",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "g6DmBCpGc5UTC6SeHwwhG",
+            "targetId": "gEhDloqNBqiZE91568aZq",
+            "waypoints": [
+              {
+                "x": -168.66666666666663,
+                "y": 205.66666666666666
+              },
+              {
+                "x": -168.66666666666663,
+                "y": 238.16666666666666
+              },
+              {
+                "x": -168.66666666666663,
+                "y": 461.5888888888888
+              },
+              {
+                "x": -45.59999999999974,
+                "y": 461.5888888888888
+              },
+              {
+                "x": -28.266666666666424,
+                "y": 458.9222222222221
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.43333333333333285,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "gy8uj28q",
+            "type": "sequence",
+            "label": "Spurios\nEnquiry",
+            "sourceId": "gEhDloqNBqiZE91568aZq",
+            "targetId": "XWVURo_fT2823kbbyiXGL",
+            "waypoints": [
+              {
+                "x": -28.266666666666424,
+                "y": 458.9222222222221
+              },
+              {
+                "x": -28.266666666666424,
+                "y": 438.9222222222221
+              },
+              {
+                "x": -28.266666666666424,
+                "y": 274.92222222222216
+              },
+              {
+                "x": 54.066666666666904,
+                "y": 274.92222222222216
+              },
+              {
+                "x": 105.0666666666669,
+                "y": 274.92222222222216
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "top",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 37,
+            "labelOffsetY": -37.866666666666646,
+            "directionType": "directed",
+            "branchProbability": 5,
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "j5ul042b",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "XWVURo_fT2823kbbyiXGL",
+            "targetId": "FiuT3Rb0D_eoGdu2pPogp",
+            "waypoints": [
+              {
+                "x": 105.0666666666669,
+                "y": 274.92222222222216
+              },
+              {
+                "x": 156.0666666666669,
+                "y": 271.80348583877975
+              },
+              {
+                "x": 180.0666666666669,
+                "y": 271.80348583877975
+              },
+              {
+                "x": 214.38692810457601,
+                "y": 271.80348583877975
+              },
+              {
+                "x": 232.38692810457601,
+                "y": 271.80348583877975
+              },
+              {
+                "x": 250.38692810457601,
+                "y": 270.4701525054464
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.4520194402547322,
+            "targetOffsetAlong": 0.5370370370370381,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "7me2zr2z",
+            "type": "sequence",
+            "label": "Immediate\nSale",
+            "sourceId": "gEhDloqNBqiZE91568aZq",
+            "targetId": "FTsQlLcspA7knVLZmKEjk",
+            "waypoints": [
+              {
+                "x": -28.266666666666424,
+                "y": 458.9222222222221
+              },
+              {
+                "x": -8.266666666666424,
+                "y": 458.9222222222221
+              },
+              {
+                "x": 11.733333333333576,
+                "y": 458.9222222222221
+              },
+              {
+                "x": 61.72026143790933,
+                "y": 458.92222222222216
+              },
+              {
+                "x": 85.72026143790933,
+                "y": 458.92222222222216
+              },
+              {
+                "x": 139.72026143790933,
+                "y": 458.92222222222216
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 8,
+            "labelOffsetY": 20,
+            "directionType": "directed",
+            "branchProbability": 70,
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "isim93zg",
+            "type": "sequence",
+            "label": "Marketing\nOpportunity",
+            "sourceId": "gEhDloqNBqiZE91568aZq",
+            "targetId": "Y9rW8m3x4xv1RIingkJ7G",
+            "waypoints": [
+              {
+                "x": -28.266666666666424,
+                "y": 458.9222222222221
+              },
+              {
+                "x": -28.266666666666424,
+                "y": 478.9222222222221
+              },
+              {
+                "x": -28.266666666666424,
+                "y": 669.1368191721131
+              },
+              {
+                "x": 48.386928104576015,
+                "y": 669.1368191721131
+              },
+              {
+                "x": 102.38692810457601,
+                "y": 669.1368191721131
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 53,
+            "labelOffsetY": 85.68583877995638,
+            "directionType": "directed",
+            "branchProbability": 25,
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "ym4sovad",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "FTsQlLcspA7knVLZmKEjk",
+            "targetId": "ioDgji8h4vYv27YuDxMdP",
+            "waypoints": [
+              {
+                "x": 139.72026143790933,
+                "y": 458.92222222222216
+              },
+              {
+                "x": 193.72026143790933,
+                "y": 458.92222222222216
+              },
+              {
+                "x": 285.0535947712427,
+                "y": 458.92222222222216
+              },
+              {
+                "x": 285.0535947712427,
+                "y": 530.4701525054464
+              },
+              {
+                "x": 285.0535947712427,
+                "y": 550.4701525054464
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "wd6l0hx6",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "Y9rW8m3x4xv1RIingkJ7G",
+            "targetId": "ioDgji8h4vYv27YuDxMdP",
+            "waypoints": [
+              {
+                "x": 102.38692810457601,
+                "y": 669.1368191721131
+              },
+              {
+                "x": 156.38692810457601,
+                "y": 669.1368191721131
+              },
+              {
+                "x": 285.0535947712427,
+                "y": 669.1368191721131
+              },
+              {
+                "x": 285.0535947712427,
+                "y": 570.4701525054464
+              },
+              {
+                "x": 285.0535947712427,
+                "y": 550.4701525054464
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "k35tjubb",
+            "type": "messageBPMN",
+            "label": "Enquiry\nClose Email",
+            "sourceId": "FiuT3Rb0D_eoGdu2pPogp",
+            "targetId": "6xuw8cmf",
+            "waypoints": [
+              {
+                "x": 250.38692810457601,
+                "y": 270.4701525054464
+              },
+              {
+                "x": 250.38692810457601,
+                "y": 252.47015250544638
+              },
+              {
+                "x": 250.38692810457601,
+                "y": 71.83333333333334
+              },
+              {
+                "x": 121.33333333333337,
+                "y": 23.333333333333336
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "direct",
+            "labelOffsetX": -52.333333333333314,
+            "labelOffsetY": -72.65174291938986,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.6851851851851849,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "wbxv54q5",
+            "type": "messageBPMN",
+            "label": "Enquiry\nFeedback Request\n Email",
+            "sourceId": "XRtLmhcK5HeDZKU9ooGAJ",
+            "targetId": "6xuw8cmf",
+            "waypoints": [
+              {
+                "x": 589.0535947712427,
+                "y": 281.1368191721131
+              },
+              {
+                "x": 589.0535947712427,
+                "y": 263.1368191721131
+              },
+              {
+                "x": 589.0535947712427,
+                "y": 71.83333333333334
+              },
+              {
+                "x": 121.33333333333337,
+                "y": 23.333333333333336
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "direct",
+            "labelOffsetX": -61.66666666666663,
+            "labelOffsetY": -85.98507625272322,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "5vegto4j",
+            "type": "messageBPMN",
+            "label": "Enquiry\nDetails",
+            "sourceId": "g6DmBCpGc5UTC6SeHwwhG",
+            "targetId": "49qnx4ur",
+            "waypoints": [
+              {
+                "x": -168.66666666666663,
+                "y": 205.66666666666666
+              },
+              {
+                "x": -196.27973856209064,
+                "y": 238.16666666666666
+              },
+              {
+                "x": -196.27973856209064,
+                "y": 828.9701525054464
+              },
+              {
+                "x": 121.33333333333337,
+                "y": 886.9701525054464
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "direct",
+            "labelOffsetX": -57.66666666666666,
+            "labelOffsetY": 258.4017429193899,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.22928360886839202,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "7y0c1mrc",
+            "type": "messageBPMN",
+            "label": "Sale Details",
+            "sourceId": "FTsQlLcspA7knVLZmKEjk",
+            "targetId": "49qnx4ur",
+            "waypoints": [
+              {
+                "x": 139.72026143790933,
+                "y": 458.92222222222216
+              },
+              {
+                "x": 170.38692810457601,
+                "y": 494.92222222222216
+              },
+              {
+                "x": 170.38692810457601,
+                "y": 828.9701525054464
+              },
+              {
+                "x": 121.33333333333337,
+                "y": 886.9701525054464
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "direct",
+            "labelOffsetX": 58.33333333333334,
+            "labelOffsetY": 127.35729847494542,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.7839506172839508,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "y9pn9sj9",
+            "type": "messageBPMN",
+            "label": "Marketing\nProfile",
+            "sourceId": "Y9rW8m3x4xv1RIingkJ7G",
+            "targetId": "49qnx4ur",
+            "waypoints": [
+              {
+                "x": 102.38692810457601,
+                "y": 669.1368191721131
+              },
+              {
+                "x": 73.05359477124269,
+                "y": 705.1368191721131
+              },
+              {
+                "x": 73.05359477124269,
+                "y": 828.9701525054464
+              },
+              {
+                "x": 121.33333333333337,
+                "y": 886.9701525054464
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "direct",
+            "labelOffsetX": -53.66666666666667,
+            "labelOffsetY": 20.91666666666663,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.2283950617283951,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "fznx6oad",
+            "type": "associationBPMN",
+            "sourceId": "zwndyv7x",
+            "targetId": "g6DmBCpGc5UTC6SeHwwhG",
+            "waypoints": [
+              {
+                "x": -284.27973856209064,
+                "y": 302.4701525054464
+              },
+              {
+                "x": -266.27973856209064,
+                "y": 287.3986496335726
+              },
+              {
+                "x": -207.48164118999156,
+                "y": 238.16666666666666
+              },
+              {
+                "x": -168.66666666666663,
+                "y": 205.66666666666666
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.1723586332201347,
+            "targetOffsetAlong": 0.11946103408504966,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "qijv7feh",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "ioDgji8h4vYv27YuDxMdP",
+            "targetId": "52qyzrod",
+            "waypoints": [
+              {
+                "x": 285.0535947712427,
+                "y": 550.4701525054464
+              },
+              {
+                "x": 305.0535947712427,
+                "y": 550.4701525054464
+              },
+              {
+                "x": 325.0535947712427,
+                "y": 550.4701525054464
+              },
+              {
+                "x": 354.886928104576,
+                "y": 550.4701525054464
+              },
+              {
+                "x": 354.886928104576,
+                "y": 281.13681917211306
+              },
+              {
+                "x": 384.72026143790936,
+                "y": 281.13681917211306
+              },
+              {
+                "x": 408.72026143790936,
+                "y": 281.13681917211306
+              },
+              {
+                "x": 459.72026143790936,
+                "y": 281.13681917211306
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 8,
+            "labelOffsetY": 20,
+            "directionType": "directed",
+            "branchProbability": 4,
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "6omoezch",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "52qyzrod",
+            "targetId": "XRtLmhcK5HeDZKU9ooGAJ",
+            "waypoints": [
+              {
+                "x": 459.72026143790936,
+                "y": 281.13681917211306
+              },
+              {
+                "x": 510.72026143790936,
+                "y": 281.13681917211306
+              },
+              {
+                "x": 534.7202614379094,
+                "y": 281.13681917211306
+              },
+              {
+                "x": 553.0535947712427,
+                "y": 281.1368191721131
+              },
+              {
+                "x": 571.0535947712427,
+                "y": 281.1368191721131
+              },
+              {
+                "x": 589.0535947712427,
+                "y": 281.1368191721131
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "04r9z8ax",
+            "type": "associationBPMN",
+            "sourceId": "k6lt9zlr",
+            "targetId": "52qyzrod",
+            "waypoints": [
+              {
+                "x": 369.0535947712427,
+                "y": 193.13681917211306
+              },
+              {
+                "x": 387.0535947712427,
+                "y": 210.60740740740718
+              },
+              {
+                "x": 426.23541295306086,
+                "y": 248.63681917211306
+              },
+              {
+                "x": 459.72026143790936,
+                "y": 281.13681917211306
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "top",
+            "routingType": "direct",
+            "directionType": "open-directed",
+            "sourceOffsetAlong": 0.8797953964194373,
+            "targetOffsetAlong": 0.17171717171717157,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          }
+        ]
+      },
+      "colorConfig": {},
+      "displayMode": "normal"
+    },
+    {
+      "originalId": "cmr2o5e2e002m641kkuvy9s7u",
+      "name": "P01.1 Sales Process",
+      "type": "bpmn",
+      "data": {
+        "elements": [
+          {
+            "x": 50,
+            "y": 50,
+            "id": "pP",
+            "type": "pool",
+            "label": "Prospect",
+            "width": 1408.6666666666667,
+            "height": 78,
+            "properties": {
+              "isSystem": false,
+              "poolType": "black-box",
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "x": 50,
+            "y": 218,
+            "id": "p1",
+            "type": "pool",
+            "label": "My Company",
+            "width": 1408.6666666666667,
+            "height": 340,
+            "properties": {
+              "poolType": "white-box"
+            }
+          },
+          {
+            "x": 86,
+            "y": 218,
+            "id": "l1",
+            "type": "lane",
+            "label": "Sales Team",
+            "width": 1372.6666666666667,
+            "height": 340,
+            "parentId": "p1",
+            "properties": {}
+          },
+          {
+            "x": 158,
+            "y": 355,
+            "id": "e1",
+            "type": "start-event",
+            "label": "",
+            "width": 36,
+            "height": 36,
+            "parentId": "l1",
+            "properties": {
+              "sim": {
+                "arrival": {
+                  "kind": "fixed",
+                  "value": 1
+                }
+              },
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            }
+          },
+          {
+            "x": 264,
+            "y": 340.5,
+            "id": "t1",
+            "type": "task",
+            "label": "Retrieve Customer Information",
+            "width": 102,
+            "height": 65,
+            "parentId": "l1",
+            "taskType": "user",
+            "properties": {
+              "sim": {
+                "teamId": "Sales Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": 416,
+            "y": 340.5,
+            "id": "t2",
+            "type": "task",
+            "label": "Qualify Sale",
+            "width": 102,
+            "height": 65,
+            "parentId": "l1",
+            "taskType": "user",
+            "properties": {
+              "sim": {
+                "teamId": "Sales Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": 569.3333333333333,
+            "y": 340.5,
+            "id": "t3",
+            "type": "task",
+            "label": "Present Appropriate Products",
+            "width": 102,
+            "height": 65,
+            "parentId": "l1",
+            "taskType": "send",
+            "properties": {
+              "sim": {
+                "teamId": "Sales Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": 729.3333333333334,
+            "y": 340.5,
+            "id": "t4",
+            "type": "task",
+            "label": "Close Sale",
+            "width": 102,
+            "height": 65,
+            "parentId": "l1",
+            "taskType": "receive",
+            "properties": {
+              "sim": {
+                "teamId": "Sales Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": 898.6666666666667,
+            "y": 352.66666666666663,
+            "id": "g1",
+            "type": "gateway",
+            "label": "Sale Closed?",
+            "width": 40,
+            "height": 40,
+            "parentId": "l1",
+            "properties": {
+              "labelWidth": 80,
+              "gatewayRole": "decision",
+              "gatewayType": "none",
+              "labelOffsetX": -53,
+              "labelOffsetY": -74
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 1009.3333333333335,
+            "y": 258.33333333333337,
+            "id": "t5",
+            "type": "task",
+            "label": "Record Sale in SalesForce",
+            "width": 102,
+            "height": 65,
+            "parentId": "l1",
+            "taskType": "user",
+            "properties": {
+              "sim": {
+                "teamId": "Sales Team",
+                "cycleTime": {
+                  "max": 8,
+                  "min": 3,
+                  "kind": "triangular",
+                  "mode": 5
+                },
+                "resourceUnits": 1
+              }
+            }
+          },
+          {
+            "x": 1255.3333333333333,
+            "y": 339.99999999999994,
+            "id": "g2",
+            "type": "gateway",
+            "label": "Decision?",
+            "width": 40,
+            "height": 40,
+            "parentId": "l1",
+            "properties": {
+              "gatewayRole": "merge"
+            },
+            "gatewayType": "none"
+          },
+          {
+            "x": 1369.3333333333335,
+            "y": 336,
+            "id": "e3",
+            "type": "end-event",
+            "label": "",
+            "width": 36,
+            "height": 36,
+            "parentId": "l1",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            }
+          },
+          {
+            "x": 50,
+            "y": 648,
+            "id": "pS",
+            "type": "pool",
+            "label": "SalesForce",
+            "width": 1408.6666666666667,
+            "height": 92,
+            "properties": {
+              "isSystem": true,
+              "poolType": "black-box",
+              "poolHeaderWidth": 36
+            }
+          }
+        ],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.6
+        },
+        "connectors": [
+          {
+            "id": "conn-e1-t1",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "e1",
+            "targetId": "t1",
+            "waypoints": [
+              {
+                "x": 176,
+                "y": 373
+              },
+              {
+                "x": 194,
+                "y": 373
+              },
+              {
+                "x": 212,
+                "y": 373
+              },
+              {
+                "x": 240,
+                "y": 373
+              },
+              {
+                "x": 264,
+                "y": 373
+              },
+              {
+                "x": 315,
+                "y": 373
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t1-t2",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t1",
+            "targetId": "t2",
+            "waypoints": [
+              {
+                "x": 315,
+                "y": 373
+              },
+              {
+                "x": 366,
+                "y": 373
+              },
+              {
+                "x": 389,
+                "y": 373
+              },
+              {
+                "x": 393,
+                "y": 373
+              },
+              {
+                "x": 416,
+                "y": 373
+              },
+              {
+                "x": 467,
+                "y": 373
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t2-t3",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t2",
+            "targetId": "t3",
+            "waypoints": [
+              {
+                "x": 467,
+                "y": 373
+              },
+              {
+                "x": 518,
+                "y": 373
+              },
+              {
+                "x": 541,
+                "y": 373
+              },
+              {
+                "x": 546.3333333333333,
+                "y": 373
+              },
+              {
+                "x": 569.3333333333333,
+                "y": 373
+              },
+              {
+                "x": 620.3333333333333,
+                "y": 373
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t3-pP",
+            "type": "messageBPMN",
+            "label": "Product proposal",
+            "sourceId": "t3",
+            "targetId": "pP",
+            "waypoints": [
+              {
+                "x": 620.3333333333333,
+                "y": 373
+              },
+              {
+                "x": 620.3333333333333,
+                "y": 340.5
+              },
+              {
+                "x": 620.3333333333333,
+                "y": 128
+              },
+              {
+                "x": 754.3333333333334,
+                "y": 89
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": -75.25,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.42592592592592593,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t3-t4",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t3",
+            "targetId": "t4",
+            "waypoints": [
+              {
+                "x": 620.3333333333333,
+                "y": 373
+              },
+              {
+                "x": 671.3333333333333,
+                "y": 373
+              },
+              {
+                "x": 695.3333333333333,
+                "y": 373
+              },
+              {
+                "x": 705.3333333333334,
+                "y": 373
+              },
+              {
+                "x": 729.3333333333334,
+                "y": 373
+              },
+              {
+                "x": 780.3333333333334,
+                "y": 373
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t4-g1",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t4",
+            "targetId": "g1",
+            "waypoints": [
+              {
+                "x": 780.3333333333334,
+                "y": 373
+              },
+              {
+                "x": 831.3333333333334,
+                "y": 373
+              },
+              {
+                "x": 855.3333333333334,
+                "y": 373
+              },
+              {
+                "x": 878.6666666666667,
+                "y": 372.66666666666663
+              },
+              {
+                "x": 898.6666666666667,
+                "y": 372.66666666666663
+              },
+              {
+                "x": 918.6666666666667,
+                "y": 372.66666666666663
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "left",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-g1-t5",
+            "type": "sequence",
+            "label": "Yes",
+            "sourceId": "g1",
+            "targetId": "t5",
+            "waypoints": [
+              {
+                "x": 918.6666666666667,
+                "y": 372.66666666666663
+              },
+              {
+                "x": 918.6666666666667,
+                "y": 352.66666666666663
+              },
+              {
+                "x": 918.6666666666667,
+                "y": 290.83333333333337
+              },
+              {
+                "x": 1009.3333333333335,
+                "y": 290.83333333333337
+              },
+              {
+                "x": 1060.3333333333335,
+                "y": 290.83333333333337
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "top",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 21,
+            "labelOffsetY": -24,
+            "directionType": "directed",
+            "branchProbability": 70,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t5-pS",
+            "type": "messageBPMN",
+            "label": "Sale details",
+            "sourceId": "t5",
+            "targetId": "pS",
+            "waypoints": [
+              {
+                "x": 1060.3333333333335,
+                "y": 290.83333333333337
+              },
+              {
+                "x": 1060.3333333333335,
+                "y": 323.33333333333337
+              },
+              {
+                "x": 1060.3333333333335,
+                "y": 648
+              },
+              {
+                "x": 754.3333333333334,
+                "y": 694
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "labelOffsetX": 0,
+            "labelOffsetY": 103.33333333333331,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.7551440329218106,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-t5-g2",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "t5",
+            "targetId": "g2",
+            "waypoints": [
+              {
+                "x": 1060.3333333333335,
+                "y": 290.83333333333337
+              },
+              {
+                "x": 1111.3333333333335,
+                "y": 290.83333333333337
+              },
+              {
+                "x": 1274.3333333333333,
+                "y": 290.83333333333337
+              },
+              {
+                "x": 1274.3333333333333,
+                "y": 340.99999999999994
+              },
+              {
+                "x": 1275.3333333333333,
+                "y": 359.99999999999994
+              }
+            ],
+            "sourceSide": "right",
+            "targetSide": "top",
+            "routingType": "rectilinear",
+            "directionType": "directed",
+            "targetOffsetAlong": 0.475,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "conn-g1-g2",
+            "type": "sequence",
+            "label": "No",
+            "sourceId": "g1",
+            "targetId": "g2",
+            "waypoints": [
+              {
+                "x": 918.6666666666667,
+                "y": 372.66666666666663
+              },
+              {
+                "x": 918.6666666666667,
+                "y": 392.66666666666663
+              },
+              {
+                "x": 918.6666666666667,
+                "y": 412.66666666666663
+              },
+              {
+                "x": 918.6666666666667,
+                "y": 412.66666666666663
+              },
+              {
+                "x": 1278.9999999999998,
+                "y": 412.66666666666663
+              },
+              {
+                "x": 1278.9999999999998,
+                "y": 396.3333333333334
+              },
+              {
+                "x": 1278.9999999999998,
+                "y": 376.3333333333334
+              },
+              {
+                "x": 1275.3333333333333,
+                "y": 359.99999999999994
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "bottom",
+            "targetSide": "bottom",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 21,
+            "labelOffsetY": 10,
+            "directionType": "directed",
+            "branchProbability": 30,
+            "targetOffsetAlong": 0.4083333333333371,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "9r919n8k",
+            "type": "sequence",
+            "label": "",
+            "sourceId": "g2",
+            "targetId": "e3",
+            "waypoints": [
+              {
+                "x": 1275.3333333333333,
+                "y": 359.99999999999994
+              },
+              {
+                "x": 1294.3333333333333,
+                "y": 359
+              },
+              {
+                "x": 1314.3333333333333,
+                "y": 359
+              },
+              {
+                "x": 1332.8333333333335,
+                "y": 359
+              },
+              {
+                "x": 1332.8333333333335,
+                "y": 357.6666666666667
+              },
+              {
+                "x": 1351.3333333333335,
+                "y": 357.6666666666667
+              },
+              {
+                "x": 1369.3333333333335,
+                "y": 357.6666666666667
+              },
+              {
+                "x": 1387.3333333333335,
+                "y": 354
+              }
+            ],
+            "labelWidth": 60,
+            "sourceSide": "right",
+            "targetSide": "left",
+            "labelAnchor": "source",
+            "routingType": "rectilinear",
+            "labelOffsetX": 8,
+            "labelOffsetY": 20,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.4750000000000014,
+            "targetOffsetAlong": 0.6018518518518524,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "3zntxc80",
+            "type": "messageBPMN",
+            "label": "Sale\nConfirmation",
+            "sourceId": "pP",
+            "targetId": "t4",
+            "waypoints": [
+              {
+                "x": 776.0000000000001,
+                "y": 89
+              },
+              {
+                "x": 776.0000000000001,
+                "y": 128
+              },
+              {
+                "x": 776.0000000000001,
+                "y": 340.5
+              },
+              {
+                "x": 776.0000000000001,
+                "y": 373
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "routingType": "direct",
+            "labelOffsetX": 58.33333333333326,
+            "labelOffsetY": -71.25,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.5153809749171794,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          },
+          {
+            "id": "w4fpjkxc",
+            "type": "messageBPMN",
+            "label": "Customer information",
+            "sourceId": "pS",
+            "targetId": "t1",
+            "waypoints": [
+              {
+                "x": 754.3333333333334,
+                "y": 694
+              },
+              {
+                "x": 321.6666666666667,
+                "y": 648
+              },
+              {
+                "x": 321.6666666666667,
+                "y": 405.5
+              },
+              {
+                "x": 315,
+                "y": 373
+              }
+            ],
+            "labelWidth": 80,
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "routingType": "direct",
+            "labelOffsetX": -51,
+            "labelOffsetY": 64.25,
+            "directionType": "directed",
+            "sourceOffsetAlong": 0.19285376242309513,
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true
+          }
+        ]
+      },
+      "colorConfig": {},
+      "displayMode": "normal"
+    }
+  ],
+  "folderTree": {
+    "folders": [],
+    "diagramFolderMap": {}
+  }
+}
