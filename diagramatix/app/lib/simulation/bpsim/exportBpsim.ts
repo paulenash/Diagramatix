@@ -11,6 +11,7 @@
 
 import type { SimDist, ClockUnit } from "../types";
 import { unitToIso } from "../duration";
+import { serializeWorkCalendar } from "../calendar";
 import type { BpsimScenario, BpsimElementParams } from "./types";
 
 const NS = "bpsim";
@@ -66,8 +67,9 @@ function elementXml(ref: string, p: BpsimElementParams, unit: ClockUnit, indent:
     L.push(`<${NS}:PropertyParameters>${props}</${NS}:PropertyParameters>`);
   }
 
-  if (L.length === 0) return `${indent}<${NS}:ElementParameters elementRef="${esc(ref)}"/>`;
-  return `${indent}<${NS}:ElementParameters elementRef="${esc(ref)}">${L.map((x) => `\n${indent}  ${x}`).join("")}\n${indent}</${NS}:ElementParameters>`;
+  const openAttrs = `elementRef="${esc(ref)}"${p.calendarRef ? ` calendarRef="${esc(p.calendarRef)}"` : ""}`;
+  if (L.length === 0) return `${indent}<${NS}:ElementParameters ${openAttrs}/>`;
+  return `${indent}<${NS}:ElementParameters ${openAttrs}>${L.map((x) => `\n${indent}  ${x}`).join("")}\n${indent}</${NS}:ElementParameters>`;
 }
 
 /** Serialise scenarios to a `<bpsim:BPSimData>` block. `unit` is the ClockUnit
@@ -88,6 +90,12 @@ export function buildBpsimData(scenarios: BpsimScenario[], unit: ClockUnit = "mi
       if (sc.horizon !== undefined) out.push(`      <${NS}:Duration><${NS}:DurationParameter value="${unitToIso(sc.horizon, unit)}"/></${NS}:Duration>`);
       if (sc.warmUp !== undefined) out.push(`      <${NS}:Warmup><${NS}:DurationParameter value="${unitToIso(sc.warmUp, unit)}"/></${NS}:Warmup>`);
       out.push(`    </${NS}:ScenarioParameters>`);
+    }
+
+    // Scenario-level working calendars (referenced by a source's calendarRef).
+    for (const c of sc.calendars ?? []) {
+      const nameAttr = c.name ? ` name="${esc(c.name)}"` : "";
+      out.push(`    <${NS}:Calendar id="${esc(c.id)}"${nameAttr}>${esc(serializeWorkCalendar(c.pattern))}</${NS}:Calendar>`);
     }
 
     for (const [ref, p] of Object.entries(sc.elements)) {

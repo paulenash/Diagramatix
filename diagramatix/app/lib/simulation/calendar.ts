@@ -13,7 +13,35 @@
  * correctness-critical core, so they carry the bulk of the calendar tests.
  */
 
-import { SECONDS_PER_UNIT, type ClockUnit, type WorkCalendar } from "./types";
+import { SECONDS_PER_UNIT, type ClockUnit, type WorkCalendar, type CalendarInterval } from "./types";
+
+/** Day-of-week codes for the compact calendar string (0=Mon … 6=Sun). */
+const DAY_CODES = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
+
+/** Serialise a WorkCalendar to a compact, human-readable string for the BPSim
+ *  <Calendar> element value: "MO 09:00-12:00; MO 13:00-17:00; TU 09:00-17:00@2"
+ *  (the @n suffix is the arrival-rate multiplier, omitted when 1). */
+export function serializeWorkCalendar(cal: WorkCalendar): string {
+  return (cal.intervals ?? [])
+    .filter((iv) => Number.isInteger(iv.day) && iv.day >= 0 && iv.day <= 6)
+    .map((iv) => `${DAY_CODES[iv.day]} ${iv.start}-${iv.end}${iv.rate && iv.rate > 0 && iv.rate !== 1 ? `@${iv.rate}` : ""}`)
+    .join("; ");
+}
+
+/** Parse the compact calendar string back into a WorkCalendar (inverse of
+ *  serializeWorkCalendar). Malformed segments are skipped. */
+export function parseWorkCalendar(s: string): WorkCalendar {
+  const intervals: CalendarInterval[] = [];
+  for (const part of (s ?? "").split(";")) {
+    const m = /^\s*(MO|TU|WE|TH|FR|SA|SU)\s+(\d{1,2}:\d{2})-(\d{1,2}:\d{2})(?:@([\d.]+))?\s*$/.exec(part);
+    if (!m) continue;
+    const iv: CalendarInterval = { day: DAY_CODES.indexOf(m[1]), start: m[2], end: m[3] };
+    const rate = m[4] ? Number(m[4]) : undefined;
+    if (rate !== undefined && rate > 0 && rate !== 1) iv.rate = rate;
+    intervals.push(iv);
+  }
+  return { intervals };
+}
 
 /** One open window resolved to clock-unit offsets within a single week. */
 interface WeekWindow {

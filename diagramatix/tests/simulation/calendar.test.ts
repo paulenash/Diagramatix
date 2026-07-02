@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isOpenAt, nextOpenAt, rateAt, boundariesIn, weekLengthClock, calendarWarnings, closedReason,
+  serializeWorkCalendar, parseWorkCalendar,
 } from "@/app/lib/simulation/calendar";
 import type { WorkCalendar } from "@/app/lib/simulation/types";
 
@@ -150,5 +151,20 @@ describe("calendar helpers", () => {
     expect(closedReason(MIN(1, 10, 0), WITH_LUNCH, "minute")).toBe("Off-hours"); // WITH_LUNCH is Monday-only
     // Always-open calendar is never closed.
     expect(closedReason(MIN(6, 3, 0), ALWAYS, "minute")).toBe(null);
+  });
+
+  it("T0580 — serialize/parse round-trips a calendar (for the BPSim <Calendar> value)", () => {
+    const rich: WorkCalendar = {
+      intervals: [
+        { day: 0, start: "09:00", end: "12:00" },
+        { day: 0, start: "13:00", end: "17:00", rate: 2 },
+        { day: 4, start: "09:00", end: "17:00" },
+      ],
+    };
+    const s = serializeWorkCalendar(rich);
+    expect(s).toBe("MO 09:00-12:00; MO 13:00-17:00@2; FR 09:00-17:00");
+    expect(parseWorkCalendar(s)).toEqual(rich);       // exact round-trip incl. the rate
+    expect(parseWorkCalendar(serializeWorkCalendar(ALWAYS))).toEqual({ intervals: [] });
+    expect(parseWorkCalendar("garbage; MO 09:00-17:00; nonsense")).toEqual({ intervals: [{ day: 0, start: "09:00", end: "17:00" }] });
   });
 });

@@ -8,7 +8,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseBpsimScenarios } from "@/app/lib/simulation/bpsim/importBpsim";
 import { buildBpsimData } from "@/app/lib/simulation/bpsim/exportBpsim";
+import { diagramToBpsimScenario, identityIdMap } from "@/app/lib/simulation/bpsim/diagramBpsim";
+import { applyBpsimToDiagram } from "@/app/lib/simulation/bpsim/applyBpsimToDiagram";
 import type { BpsimScenario } from "@/app/lib/simulation/bpsim/types";
+import { getSimParams } from "@/app/lib/diagram/simParams";
+import type { DiagramData } from "@/app/lib/diagram/types";
 import { isoToUnit } from "@/app/lib/simulation/duration";
 
 // Fixtures live in the tracked test tree — the source `new features/BPsim/Examples`
@@ -110,5 +114,56 @@ describe("BPSim export → re-import round-trip", () => {
     const xml = buildBpsimData([{ elements: {} }], "minute");
     expect(xml).toContain("<bpsim:BPSimData");
     expect(xml).toContain("</bpsim:BPSimData>");
+  });
+});
+
+describe("BPSim — working-calendar round-trip", () => {
+  it("T0581 — a scenario's <Calendar> defs + a source's calendarRef survive export→import", () => {
+    const scenario: BpsimScenario = {
+      name: "Hours",
+      calendars: [{ id: "cal1", name: "Business hours", pattern: { intervals: [
+        { day: 0, start: "09:00", end: "12:00" }, { day: 0, start: "13:00", end: "17:00", rate: 2 },
+      ] } }],
+      elements: { src: { interArrival: { kind: "exponential", mean: 10 }, calendarRef: "cal1" } },
+    };
+    const xml = buildBpsimData([scenario], "minute");
+    expect(xml).toContain('<bpsim:Calendar id="cal1" name="Business hours">');
+    expect(xml).toContain('calendarRef="cal1"');
+    const [back] = parseBpsimScenarios(xml, "minute");
+    expect(back.calendars).toEqual(scenario.calendars);
+    expect(back.elements.src.calendarRef).toBe("cal1");
+  });
+});
+
+describe("BPSim — diagram interchange round-trip", () => {
+  it("T0582 — diagram → BPSim XML → back to the diagram preserves sim params + source calendar", () => {
+    const data = {
+      elements: [
+        { id: "s1", type: "start-event", x: 0, y: 0, width: 36, height: 36, properties: { sim: { arrival: { kind: "exponential", mean: 8 }, calendarId: "cal1" } } },
+        { id: "t1", type: "task", x: 100, y: 0, width: 100, height: 60, properties: { sim: { cycleTime: { kind: "fixed", value: 5 }, teamId: "Analysts", resourceUnits: 2 } } },
+        { id: "e1", type: "end-event", x: 300, y: 0, width: 36, height: 36, properties: {} },
+      ],
+      connectors: [
+        { id: "c1", type: "sequence", sourceId: "s1", targetId: "t1", waypoints: [] },
+        { id: "c2", type: "sequence", sourceId: "t1", targetId: "e1", waypoints: [], branchProbability: 40 },
+      ],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any as DiagramData;
+    const cals = [{ id: "cal1", name: "Business hours", pattern: { intervals: [{ day: 0, start: "09:00", end: "17:00" }] } }];
+
+    const scenario = diagramToBpsimScenario(data, { name: "d", calendars: cals });
+    const xml = buildBpsimData([scenario], "minute");
+    const [back] = parseBpsimScenarios(xml, "minute");
+    const applied = applyBpsimToDiagram(data, identityIdMap(data), back);
+
+    const sim = (id: string) => getSimParams(applied.elements.find((e) => e.id === id)!);
+    expect(sim("s1").arrival).toEqual({ kind: "exponential", mean: 8 });
+    expect(sim("s1").calendarId).toBe("cal1");                 // source calendar survives
+    expect(sim("t1").cycleTime).toEqual({ kind: "fixed", value: 5 });
+    expect(sim("t1").teamId).toBe("Analysts");                 // team + units via Selection
+    expect(sim("t1").resourceUnits).toBe(2);
+    expect(applied.connectors.find((c) => c.id === "c2")?.branchProbability).toBe(40);
+    expect(back.calendars?.[0].pattern.intervals[0]).toEqual({ day: 0, start: "09:00", end: "17:00" });
   });
 });

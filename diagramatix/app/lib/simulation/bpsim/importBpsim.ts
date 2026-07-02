@@ -16,7 +16,8 @@
 
 import type { SimDist, ClockUnit } from "../types";
 import { isoToUnit } from "../duration";
-import type { BpsimScenario, BpsimElementParams, BpsimAssignment } from "./types";
+import { parseWorkCalendar } from "../calendar";
+import type { BpsimScenario, BpsimElementParams, BpsimAssignment, BpsimCalendar } from "./types";
 
 const px = "(?:\\w+:)?"; // optional namespace prefix
 
@@ -188,10 +189,21 @@ export function parseBpsimScenarios(xml: string, unit: ClockUnit = "minute"): Bp
       const warmVal = warmAttrs ? attr(warmAttrs, "value") : undefined;
       if (warmVal) { try { scenario.warmUp = isoToUnit(warmVal, unit); } catch { /* skip */ } }
     }
+    // Scenario-level working calendars (Diagramatix extension).
+    const cals: BpsimCalendar[] = [];
+    for (const c of blocks(sc.inner, "Calendar")) {
+      const id = attr(c.open, "id");
+      if (!id) continue;
+      cals.push({ id, name: attr(c.open, "name"), pattern: parseWorkCalendar(decode(c.inner)) });
+    }
+    if (cals.length) scenario.calendars = cals;
     for (const ep of blocks(sc.inner, "ElementParameters")) {
       const ref = attr(ep.open, "elementRef");
       if (!ref) continue;
-      scenario.elements[ref] = parseElementParams(ep.inner, unit);
+      const params = parseElementParams(ep.inner, unit);
+      const calRef = attr(ep.open, "calendarRef");
+      if (calRef) params.calendarRef = calRef;
+      scenario.elements[ref] = params;
     }
     out.push(scenario);
   }

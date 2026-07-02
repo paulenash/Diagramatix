@@ -15,6 +15,7 @@ import { ReplayView } from "./replay/ReplayView";
 import { SimulationHeatmap } from "./results/SimulationHeatmap";
 import { TeamLibraryManager } from "./TeamLibraryManager";
 import { CalendarLibraryManager, type CalendarRow } from "./CalendarLibraryManager";
+import { BpsimInterchange } from "./BpsimInterchange";
 import { StudyManager } from "./StudyManager";
 import { SimDataPanel } from "./SimDataPanel";
 import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
@@ -179,6 +180,15 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
                 {canEditActive
                   ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} onOpenDiagram={setActiveId} calendars={calendars} />
                   : <p className="text-xs text-green-400/60">{loadingVariant ? "Loading variant…" : "Open this diagram from its editor to edit simulation data here."}</p>}
+              </MatrixPanel>
+              <MatrixPanel title="Interchange — BPSim export / import" className="md:col-span-3">
+                <BpsimInterchange
+                  data={activeData}
+                  onApplyData={canEditActive ? applyActive : undefined}
+                  calendars={calendars}
+                  runCfg={lastRunCfg}
+                  diagramName={isOpen ? diagramName : diagramList.find((d) => d.id === activeId)?.name}
+                />
               </MatrixPanel>
               <MatrixPanel title="Engine status" className="md:col-span-3">
                 <p className="text-xs text-green-400/70 leading-relaxed">

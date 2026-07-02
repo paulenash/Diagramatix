@@ -9,7 +9,15 @@
  * plain numbers in the scenario's base unit, passed through verbatim.
  */
 
-import type { SimDist } from "../types";
+import type { SimDist, WorkCalendar } from "../types";
+
+/** A working calendar defined at scenario level (BPSim <Calendar>), referenced
+ *  by a source element's `calendarRef`. `pattern` is the weekly open-window set. */
+export interface BpsimCalendar {
+  id: string;
+  name?: string;
+  pattern: WorkCalendar;
+}
 
 /** A token-property entry: either an initial distribution (a Property def) or
  *  an expression assignment applied when the token passes the element. */
@@ -35,6 +43,9 @@ export interface BpsimElementParams {
   selection?: string;       // Selection / ExpressionParameter (getResource(...))
   // PropertyParameters
   assignments?: BpsimAssignment[];
+  // Diagramatix extension: operating-hours calendar for a source (references a
+  // scenario-level BpsimCalendar by id).
+  calendarRef?: string;
 }
 
 export interface BpsimScenario {
@@ -47,6 +58,8 @@ export interface BpsimScenario {
   horizon?: number;
   /** ScenarioParameters/Warmup → warm-up, in the chosen ClockUnit. */
   warmUp?: number;
+  /** Scenario-level working calendars (BPSim <Calendar>), referenced by sources. */
+  calendars?: BpsimCalendar[];
   /** elementRef → its parameters. */
   elements: Record<string, BpsimElementParams>;
 }

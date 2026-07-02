@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-02  ·  **Document version:** 2.5  ·  **Suite:** 95 test files · 702 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-07-02  ·  **Document version:** 2.6  ·  **Suite:** 95 test files · 705 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0579`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0582`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -935,6 +935,8 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0332 | (Technical Support) reads ProcessingTime distributions (TruncatedNormal + Duration) | Task processing-time distributions importing wrong | If ProcessingTime parsing or PT30S→0.5min conversion broke |
 | T0333 | (Technical Support) reads resource Quantity and a Selection expression | Resource quantities and selection expressions being missed | If Quantity or Selection parsing regressed |
 | T0334 | (round-trip) preserves every parameter category losslessly | Exporting then re-importing a scenario silently losing parameters | If `buildBpsimData`/`parseBpsimScenarios` dropped any parameter category |
+| T0581 | a scenario's `<Calendar>` defs + a source's `calendarRef` survive export→import | Working-hours calendars being dropped by BPSim export/import | If Calendar emission/parsing or the calendarRef attribute regressed |
+| T0582 | diagram → BPSim XML → back preserves sim params + source calendar | The Simulator's Export/Import BPSim losing element params on round-trip | If `diagramToBpsimScenario`/`applyBpsimToDiagram` (calendarRef, Selection) regressed |
 | T0335 | (round-trip) emits a valid BPSimData wrapper | Exported BPSim XML lacking the required wrapper element | If the export stopped emitting the `<bpsim:BPSimData>` envelope |
 
 ### `tests/simulation/examplePackage.test.ts` — Structural validation guarding against malformed example bundles
@@ -1146,6 +1148,7 @@ Pure helpers that convert a weekly `WorkCalendar` into sim-clock times — the c
 | T0563 | touching windows collapse to one non-race boundary | A capacity flicker (close+open at the same instant) | If adjacent windows stopped collapsing |
 | T0570 | `calendarWarnings` flags overlapping windows, not clean/empty ones | Silent data-entry mistakes in a calendar | If the overlap check regressed |
 | T0572 | `closedReason` classifies a closure (Lunch / Off-hours / Weekend) for the replay dim cue | The off-shift lane cue mislabelling why work stopped | If the closure classifier regressed |
+| T0580 | `serializeWorkCalendar`/`parseWorkCalendar` round-trip a calendar (BPSim `<Calendar>` value) | Working-hours calendars corrupting through BPSim export/import | If the compact calendar string encode/decode regressed |
 
 ### `tests/simulation/calendarEngine.test.ts` (added) — working-hours behaviour in the engine
 
