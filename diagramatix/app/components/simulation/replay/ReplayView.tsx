@@ -132,11 +132,18 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
   // "off-shift" dim cue. Resolved once per view; the open/closed state is
   // evaluated against the playback clock each render (cheap: a handful of lanes).
   const calendarLanes = useMemo(() => {
-    if (!teamCalendars) return [] as { el: DiagramData["elements"][number]; team: string }[];
+    const cals = teamCalendars ?? {};
     return viewData.elements
       .filter((e) => e.type === "lane" || e.type === "pool")
-      .map((e) => ({ el: e, team: getSimParams(e).teamId ?? "" }))
-      .filter((x) => x.team && teamCalendars[x.team]);
+      .map((e) => {
+        // A lane's team is its own sim.teamId when set, else its label — teams
+        // are named after their lane (the "Match names to lanes" convention), so
+        // most lanes carry the team by NAME rather than an explicit sim.teamId.
+        const tid = getSimParams(e).teamId;
+        const team = tid && cals[tid] ? tid : (e.label && cals[e.label] ? e.label : "");
+        return { el: e, team };
+      })
+      .filter((x) => x.team);
   }, [viewData, teamCalendars]);
   // At the current clock, which lanes are closed + why (Lunch / Off-hours /
   // Weekend) — so the user sees WHY throughput has stalled.
