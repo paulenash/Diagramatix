@@ -14,15 +14,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
-import type { DiagramData } from "@/app/lib/diagram/types";
-import {
-  validateExamplePackage,
-  type ExamplePackage,
-  type ExampleDiagram,
-  type ExampleScenario,
-} from "@/app/lib/simulation/examplePackage";
-import type { ScenarioRunConfig } from "@/app/lib/simulation/types";
-import type { OverrideSet } from "@/app/lib/simulation/overrides";
+import { captureProjectPackage } from "@/app/lib/simulation/captureProject";
 
 const DIFFICULTIES = new Set(["intro", "core", "advanced"]);
 
@@ -40,60 +32,13 @@ export async function POST(req: Request) {
   if (!projectId || !studyId) return NextResponse.json({ error: "projectId + studyId required" }, { status: 400 });
   if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
 
-  // Study must belong to the project; pull its roots + scenarios.
-  const study = await prisma.simulationStudy.findFirst({
-    where: { id: studyId, projectId },
-    include: { roots: true, scenarios: { orderBy: { createdAt: "asc" } } },
-  });
-  if (!study) return NextResponse.json({ error: "Study not found in project" }, { status: 404 });
-
-  // Capture the root diagrams (what the portfolio run assembles) plus any
-  // process-variant diagrams the scenarios pin (As-is vs To-be), so the
-  // comparison pairing survives. The diagram id is the package-local key; adopt
-  // remaps it to a fresh id.
-  const rootIds = study.roots.map((r) => r.diagramId);
-  const scenarioVariantIds = (id: unknown): string[] =>
-    Array.isArray(id) ? (id as unknown[]).filter((x): x is string => typeof x === "string") : [];
-  const variantIds = study.scenarios.flatMap((s) => scenarioVariantIds(s.variantRootIds));
-  const captureIds = Array.from(new Set([...rootIds, ...variantIds]));
-  const diagramRows = await prisma.diagram.findMany({ where: { id: { in: captureIds } }, select: { id: true, name: true, type: true, data: true } });
-  const capturedKeys = new Set(diagramRows.map((d) => d.id));
-  const diagrams: ExampleDiagram[] = diagramRows.map((d) => ({
-    key: d.id, name: d.name, type: d.type || "bpmn", data: (d.data ?? {}) as unknown as DiagramData,
-  }));
-
-  const teamRows = await prisma.simulationTeam.findMany({ where: { projectId }, select: { name: true, capacity: true, costPerHour: true, efficiency: true, calendarId: true } });
-  // Working calendars: carry the library + resolve each team's calendarId → name
-  // (the portable reference) so an adopt re-creates them.
-  const calendarRows = await prisma.simulationCalendar.findMany({ where: { projectId }, select: { id: true, name: true, pattern: true } });
-  const calendarIdToName = new Map(calendarRows.map((c) => [c.id, c.name]));
-  const calendars = calendarRows.map((c) => ({ name: c.name, pattern: (c.pattern ?? { intervals: [] }) as unknown as import("@/app/lib/simulation/types").WorkCalendar }));
-  const teams = teamRows.map((t) => ({
-    name: t.name, capacity: t.capacity, costPerHour: t.costPerHour, efficiency: t.efficiency,
-    ...(t.calendarId && calendarIdToName.has(t.calendarId) ? { calendarName: calendarIdToName.get(t.calendarId) } : {}),
-  }));
-
-  const scenarios: ExampleScenario[] = study.scenarios.map((s) => {
-    const variantRootKeys = scenarioVariantIds(s.variantRootIds).filter((k) => capturedKeys.has(k));
-    return {
-      name: s.name,
-      isBaseline: s.isBaseline,
-      runConfig: (s.runConfig ?? {}) as unknown as ScenarioRunConfig,
-      overrides: (s.overrides ?? {}) as unknown as OverrideSet,
-      ...(variantRootKeys.length ? { variantRootKeys } : {}),
-    };
-  });
-
-  const pkg: ExamplePackage = {
-    version: 1,
-    teams,
-    ...(calendars.length ? { calendars } : {}),
-    diagrams,
-    study: { name: study.name, rootKeys: rootIds },
-    scenarios,
-  };
-  const errs = validateExamplePackage(pkg);
-  if (errs.length) return NextResponse.json({ error: `Captured package invalid: ${errs.join("; ")}` }, { status: 400 });
+  let pkg;
+  try {
+    ({ pkg } = await captureProjectPackage(projectId, studyId));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Capture failed";
+    return NextResponse.json({ error: msg }, { status: msg.includes("not found") ? 404 : 400 });
+  }
 
   let slug = slugify(title);
   for (let i = 2; await prisma.simulationExample.findUnique({ where: { slug } }); i++) slug = `${slugify(title)}-${i}`;

@@ -1,27 +1,19 @@
 /**
- * Adopt a published example simulation into a fresh project owned by the
- * caller — the one-click "load a ready-made simulation to demo" path.
- *
- * Recreates the whole bundle: the annotated diagrams (element/connector ids
- * preserved, so sim params + interventions keyed by those ids stay valid), the
- * team library, the study + its roots (remapped package-key → new diagram id),
- * and the scenarios (run config + overrides + planned interventions copied
- * verbatim — team references are by name, which we preserve). Returns the new
- * project id + the diagram to open so the caller can jump straight in.
+ * Import a Diagramatix simulation bundle (from GET /projects/[id]/simulation/export)
+ * — validate it and adopt it into a NEW project owned by the caller, recreating
+ * the diagrams + team library + calendar library + study + scenarios. Returns the
+ * new project id + the diagram to open, so the caller can jump straight into the
+ * Simulator.
  */
-
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
-import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
 import { validateExamplePackage, type ExamplePackage } from "@/app/lib/simulation/examplePackage";
 import { adoptPackage } from "@/app/lib/simulation/adoptPackage";
 
-type Params = { params: Promise<{ id: string }> };
-
-export async function POST(_req: Request, { params }: Params) {
+export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
@@ -38,20 +30,21 @@ export async function POST(_req: Request, { params }: Params) {
     throw err;
   }
 
-  const { id } = await params;
-  const example = await prisma.simulationExample.findFirst({ where: { id, published: true } });
-  if (!example) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  const pkg = (example.package ?? {}) as unknown as ExamplePackage;
+  const body = await req.json().catch(() => ({}));
+  // Accept the wrapped bundle ({ format, package }) or a bare ExamplePackage.
+  const pkg = (body?.package ?? body) as ExamplePackage;
   const errs = validateExamplePackage(pkg);
-  if (errs.length) return NextResponse.json({ error: `Example package invalid: ${errs.join("; ")}` }, { status: 500 });
+  if (errs.length) return NextResponse.json({ error: `Not a valid simulation bundle: ${errs.join("; ")}` }, { status: 400 });
+
+  const name = typeof body?.name === "string" && body.name.trim()
+    ? body.name.trim()
+    : `${pkg.study?.name ?? "Imported"} (imported)`;
 
   const result = await adoptPackage(pkg, {
     userId: session.user.id,
     orgId,
     ownerName: session.user.name ?? session.user.email ?? "",
-    projectName: `${example.title} (example)`,
+    projectName: name,
   });
-
   return NextResponse.json(result, { status: 201 });
 }

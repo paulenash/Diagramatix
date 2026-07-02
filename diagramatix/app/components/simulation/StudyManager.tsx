@@ -8,7 +8,7 @@
  * Monte-Carlo + results land in Phase 5, so the Run button is staged off here.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MatrixButton } from "./matrix/MatrixChrome";
 import type { ReadinessIssue } from "@/app/lib/simulation/readiness";
 import { ResultsReport } from "./results/ResultsReport";
@@ -45,6 +45,25 @@ export function StudyManager({ projectId, isAdmin, onRan }: { projectId: string 
   const [detail, setDetail] = useState<StudyDetail | null>(null);
   const [newStudy, setNewStudy] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+
+  // Import a Diagramatix simulation bundle → a brand-new project, then jump into it.
+  async function importBundle(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true); setErr(null);
+    try {
+      const body = JSON.parse(await file.text());
+      const res = await fetch("/api/simulation/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(json.error ?? "Import failed"); return; }
+      if (json.openDiagramId) window.location.href = `/diagram/${json.openDiagramId}`;
+      else window.location.reload();
+    } catch { setErr("That file isn't a valid simulation bundle (JSON)."); }
+    finally { setImporting(false); }
+  }
 
   const loadStudies = useCallback(async () => {
     if (!projectId) return;
@@ -108,6 +127,8 @@ export function StudyManager({ projectId, isAdmin, onRan }: { projectId: string 
               {selectedId === s.id ? "▾" : "▸"} {s.name}
             </button>
             <span className="text-green-400/40">{s._count?.roots ?? 0}r · {s._count?.scenarios ?? 0}s</span>
+            <a href={`/api/projects/${projectId}/simulation/export?studyId=${s.id}`} download
+              className="text-green-400/60 hover:text-green-300 px-1" title="Export this study as a Diagramatix simulation bundle (.dgxsim.json)">⭳</a>
             <button onClick={() => deleteStudy(s.id)} className="text-red-400/70 hover:text-red-300 px-1" title="Delete study">✕</button>
           </div>
         ))}
@@ -120,7 +141,10 @@ export function StudyManager({ projectId, isAdmin, onRan }: { projectId: string 
           className="flex-1 bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-200 [color-scheme:dark]"
         />
         <MatrixButton onClick={createStudy}>+ Study</MatrixButton>
+        <MatrixButton onClick={() => importRef.current?.click()}>{importing ? "…" : "⭱ Import"}</MatrixButton>
+        <input ref={importRef} type="file" accept=".json,.dgxsim,application/json" onChange={importBundle} className="hidden" />
       </div>
+      <p className="text-green-400/40 text-[10px]">⭳ on a study exports the whole simulation (diagrams + teams + calendars + scenarios) as a portable bundle; ⭱ Import recreates one in a new project.</p>
       {err && <p className="text-red-400">{err}</p>}
 
       {/* Selected study detail */}

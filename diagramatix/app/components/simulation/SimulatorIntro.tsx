@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * The dramatic entry: types "Entering the DiagramMATRIX Simulator…" then plays a
- * short Matrix digital-rain burst, then hands off to the console. Skippable by
- * click / any key. The rain component itself handles reduced-motion.
+ * The dramatic entry: types "Entering the DiagramMATRIX Simulator…", holds it on
+ * screen for a 5s dramatic beat, then plays a short Matrix digital-rain burst and
+ * hands off to the console. Skippable by click / any key (which cancels the
+ * pause). The rain component itself handles reduced-motion.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -13,12 +14,20 @@ import { MatrixTypewriter } from "./matrix/MatrixChrome";
 export function SimulatorIntro({ onEnter }: { onEnter: () => void }) {
   const [phase, setPhase] = useState<"typing" | "rain">("typing");
   const done = useRef(false);
-  const enter = () => { if (!done.current) { done.current = true; onEnter(); } };
+  // Dramatic beat: hold the fully-typed message on screen before the rain.
+  const pauseTimer = useRef<number | null>(null);
+  const enter = () => {
+    if (pauseTimer.current) { window.clearTimeout(pauseTimer.current); pauseTimer.current = null; }
+    if (!done.current) { done.current = true; onEnter(); }
+  };
 
   useEffect(() => {
     const skip = () => enter();
     window.addEventListener("keydown", skip);
-    return () => window.removeEventListener("keydown", skip);
+    return () => {
+      window.removeEventListener("keydown", skip);
+      if (pauseTimer.current) window.clearTimeout(pauseTimer.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -33,7 +42,7 @@ export function SimulatorIntro({ onEnter }: { onEnter: () => void }) {
           <MatrixTypewriter
             text="Entering the DiagramMATRIX Simulator…"
             speedMs={45}
-            onDone={() => setPhase("rain")}
+            onDone={() => { pauseTimer.current = window.setTimeout(() => setPhase("rain"), 5000); }}
             className="text-lg sm:text-2xl drop-shadow-[0_0_10px_rgba(74,222,128,0.6)]"
           />
         ) : (

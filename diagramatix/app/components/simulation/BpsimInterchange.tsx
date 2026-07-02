@@ -53,7 +53,8 @@ export function BpsimInterchange({
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
     const n = Object.keys(scenario.elements).length;
-    setMsg(`Exported ${n} parameterised element${n === 1 ? "" : "s"}${scenario.calendars?.length ? ` + ${scenario.calendars.length} calendar(s)` : ""}.`);
+    const c = scenario.calendars?.length ?? 0;
+    setMsg(`Exported ${n} parameterised element${n === 1 ? "" : "s"}${c ? ` + ${c} source calendar${c === 1 ? "" : "s"}` : ""}. (Team calendars stay in the Team library — use the study ⭳ Export for the full simulation bundle.)`);
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {

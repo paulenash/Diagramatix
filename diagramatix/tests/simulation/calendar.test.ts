@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isOpenAt, nextOpenAt, rateAt, boundariesIn, weekLengthClock, calendarWarnings, closedReason,
-  serializeWorkCalendar, parseWorkCalendar,
+  serializeWorkCalendar, parseWorkCalendar, simClockLabel,
 } from "@/app/lib/simulation/calendar";
 import type { WorkCalendar } from "@/app/lib/simulation/types";
 
@@ -166,5 +166,13 @@ describe("calendar helpers", () => {
     expect(parseWorkCalendar(s)).toEqual(rich);       // exact round-trip incl. the rate
     expect(parseWorkCalendar(serializeWorkCalendar(ALWAYS))).toEqual({ intervals: [] });
     expect(parseWorkCalendar("garbage; MO 09:00-17:00; nonsense")).toEqual({ intervals: [{ day: 0, start: "09:00", end: "17:00" }] });
+  });
+
+  it("T0583 — simClockLabel shows the day + time of the working week (t=0 ≙ Mon 00:00)", () => {
+    expect(simClockLabel(0, "minute")).toBe("Mon 00:00");
+    expect(simClockLabel(MIN(0, 9, 30), "minute")).toBe("Mon 09:30");
+    expect(simClockLabel(MIN(5, 10, 0), "minute")).toBe("Sat 10:00");
+    expect(simClockLabel(24 + 14, "hour")).toBe("Tue 14:00");   // hour units
+    expect(simClockLabel(MIN(7, 8, 0), "minute")).toBe("Mon 08:00"); // week wrap
   });
 });

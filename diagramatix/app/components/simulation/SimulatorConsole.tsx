@@ -168,7 +168,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
                 <CalendarLibraryManager projectId={projectId} onCalendars={setCalendars} />
               </MatrixPanel>
               <MatrixPanel title="Studies & Scenarios" className="md:col-span-3">
-                <StudyManager projectId={projectId} isAdmin={isAdmin} onRan={setLastRunCfg} />
+                <StudyManager projectId={projectId} isAdmin={isAdmin} onRan={(cfg) => { setLastRunCfg(cfg); setMode("replay"); }} />
               </MatrixPanel>
               <MatrixPanel title={`Simulation Data — see, edit, fill & clear${!isOpen ? ` · ${diagramList.find((d) => d.id === activeId)?.name ?? "variant"}` : ""}`} className="md:col-span-3">
                 {!isOpen && (

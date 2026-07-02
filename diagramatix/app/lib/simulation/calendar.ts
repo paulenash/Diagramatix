@@ -17,6 +17,17 @@ import { SECONDS_PER_UNIT, type ClockUnit, type WorkCalendar, type CalendarInter
 
 /** Day-of-week codes for the compact calendar string (0=Mon … 6=Sun). */
 const DAY_CODES = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
+const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** Wall-clock label for a sim time (t=0 ≙ Monday 00:00), e.g. "Mon 14:30" — for
+ *  the replay so the user can see the day/time the working calendars act on. */
+export function simClockLabel(t: number, clockUnit: ClockUnit): string {
+  const weekSec = 7 * 86400;
+  let sec = ((t * SECONDS_PER_UNIT[clockUnit]) % weekSec + weekSec) % weekSec;
+  const day = Math.floor(sec / 86400); sec -= day * 86400;
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+  return `${DOW[day]} ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
 
 /** Serialise a WorkCalendar to a compact, human-readable string for the BPSim
  *  <Calendar> element value: "MO 09:00-12:00; MO 13:00-17:00; TU 09:00-17:00@2"

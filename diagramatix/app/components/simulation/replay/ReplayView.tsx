@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import type { SimRunConfig, WorkCalendar } from "@/app/lib/simulation/types";
 import { buildReplay, forkReplay, teamIdsInDiagram, type ReplayData } from "@/app/lib/simulation/replaySource";
-import { closedReason } from "@/app/lib/simulation/calendar";
+import { closedReason, simClockLabel } from "@/app/lib/simulation/calendar";
 import { getSimParams } from "@/app/lib/diagram/simParams";
 import { buildStatTimeline } from "@/app/lib/simulation/runningStats";
 import { LiveStatsTable } from "./LiveStatsTable";
@@ -133,23 +133,51 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
   // evaluated against the playback clock each render (cheap: a handful of lanes).
   const calendarLanes = useMemo(() => {
     const cals = teamCalendars ?? {};
-    return viewData.elements
-      .filter((e) => e.type === "lane" || e.type === "pool")
-      .map((e) => {
-        // A lane's team is its own sim.teamId when set, else its label — teams
-        // are named after their lane (the "Match names to lanes" convention), so
-        // most lanes carry the team by NAME rather than an explicit sim.teamId.
-        const tid = getSimParams(e).teamId;
-        const team = tid && cals[tid] ? tid : (e.label && cals[e.label] ? e.label : "");
-        return { el: e, team };
-      })
-      .filter((x) => x.team);
+    if (Object.keys(cals).length === 0) return [] as { el: DiagramData["elements"][number]; teams: string[] }[];
+    const byId = new Map(viewData.elements.map((e) => [e.id, e]));
+    // Nearest lane/pool ancestor of an element.
+    const laneOf = (el: DiagramData["elements"][number]): string | undefined => {
+      let cur = el.parentId ? byId.get(el.parentId) : undefined;
+      const seen = new Set<string>();
+      while (cur && !seen.has(cur.id)) {
+        seen.add(cur.id);
+        if (cur.type === "lane" || cur.type === "pool") return cur.id;
+        cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+      }
+      return undefined;
+    };
+    const lanes = viewData.elements.filter((e) => e.type === "lane" || e.type === "pool");
+    // Every team a lane is responsible for: its own sim.teamId, its label (teams
+    // are named after lanes), AND the teams of the tasks inside it — so a lane
+    // dims however its team is wired up.
+    const teamsByLane = new Map<string, Set<string>>();
+    for (const lane of lanes) {
+      const set = new Set<string>();
+      const tid = getSimParams(lane).teamId;
+      if (tid) set.add(tid);
+      if (lane.label) set.add(lane.label);
+      teamsByLane.set(lane.id, set);
+    }
+    for (const el of viewData.elements) {
+      if (el.type !== "task" && el.type !== "subprocess" && el.type !== "subprocess-expanded") continue;
+      const tid = getSimParams(el).teamId;
+      if (!tid) continue;
+      const la = laneOf(el);
+      if (la && teamsByLane.has(la)) teamsByLane.get(la)!.add(tid);
+    }
+    return lanes
+      .map((el) => ({ el, teams: [...(teamsByLane.get(el.id) ?? [])].filter((t) => cals[t]) }))
+      .filter((x) => x.teams.length > 0);
   }, [viewData, teamCalendars]);
   // At the current clock, which lanes are closed + why (Lunch / Off-hours /
-  // Weekend) — so the user sees WHY throughput has stalled.
-  const dimmedLanes = calendarLanes
-    .map(({ el, team }) => ({ el, team, reason: closedReason(simT, teamCalendars![team], config.clockUnit) }))
-    .filter((x) => x.reason !== null);
+  // Weekend) — the first off-shift team in the lane wins the label.
+  const dimmedLanes = calendarLanes.flatMap(({ el, teams }) => {
+    for (const team of teams) {
+      const reason = closedReason(simT, teamCalendars![team], config.clockUnit);
+      if (reason) return [{ el, team, reason }];
+    }
+    return [];
+  });
 
   // Single click = zoom into the point (deferred so a double-click can cancel
   // it); double click = drill into a linked subprocess. Esc steps back: unzoom,
@@ -302,7 +330,7 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
         </label>
         <input type="range" min={0} max={Math.max(1, replay.durationSim)} value={simT}
           onChange={(e) => { setSimT(parseFloat(e.target.value)); setPlaying(false); }} className="flex-1 min-w-[120px] accent-green-500" />
-        {onClose && <MatrixButton variant="danger" onClick={onClose}>✕ Close</MatrixButton>}
+        {onClose && <MatrixButton onClick={() => { setPlaying(false); onClose(); }}>✓ Complete &amp; Close</MatrixButton>}
       </div>
 
       {/* Operator console */}
@@ -364,6 +392,7 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
         </div>
         <div className="absolute bottom-3 right-3 font-mono text-green-300 text-sm bg-black/70 border border-green-500/40 rounded px-3 py-1.5 tabular-nums">
           t = {simT.toFixed(1)} <span className="text-green-500/60 text-xs">/ {replay.durationSim.toFixed(0)}</span>
+          <span className="ml-3 text-green-200 text-xs" title="Day + time of the working week (t=0 = Monday 00:00)">🕑 {simClockLabel(simT, config.clockUnit)}</span>
           <span className="ml-3 text-green-400/70 text-xs">● {liveTokens.length} in flight</span>
         </div>
       </div>
