@@ -14,6 +14,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import type { SimRunConfig, WorkCalendar } from "@/app/lib/simulation/types";
 import { buildReplay, forkReplay, teamIdsInDiagram, type ReplayData } from "@/app/lib/simulation/replaySource";
+import { closedReason } from "@/app/lib/simulation/calendar";
+import { getSimParams } from "@/app/lib/diagram/simParams";
 import { buildStatTimeline } from "@/app/lib/simulation/runningStats";
 import { LiveStatsTable } from "./LiveStatsTable";
 import { ReplayDiagramBackdrop } from "./ReplayDiagramBackdrop";
@@ -125,6 +127,22 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
   // Stable element so the heavy read-only diagram isn't re-rendered every
   // animation frame — only when `data` changes (never during a run).
   const backdrop = useMemo(() => <ReplayDiagramBackdrop data={viewData} />, [viewData]);
+
+  // Lanes/pools whose team follows a working calendar — candidates for the
+  // "off-shift" dim cue. Resolved once per view; the open/closed state is
+  // evaluated against the playback clock each render (cheap: a handful of lanes).
+  const calendarLanes = useMemo(() => {
+    if (!teamCalendars) return [] as { el: DiagramData["elements"][number]; team: string }[];
+    return viewData.elements
+      .filter((e) => e.type === "lane" || e.type === "pool")
+      .map((e) => ({ el: e, team: getSimParams(e).teamId ?? "" }))
+      .filter((x) => x.team && teamCalendars[x.team]);
+  }, [viewData, teamCalendars]);
+  // At the current clock, which lanes are closed + why (Lunch / Off-hours /
+  // Weekend) — so the user sees WHY throughput has stalled.
+  const dimmedLanes = calendarLanes
+    .map(({ el, team }) => ({ el, team, reason: closedReason(simT, teamCalendars![team], config.clockUnit) }))
+    .filter((x) => x.reason !== null);
 
   // Single click = zoom into the point (deferred so a double-click can cancel
   // it); double click = drill into a linked subprocess. Esc steps back: unzoom,
@@ -300,6 +318,18 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
           <rect x={vb.x} y={vb.y} width={vb.w} height={vb.h} fill="transparent" />
           {/* The real diagram (read-only) as the backdrop. */}
           {backdrop}
+          {/* Off-shift cue: dim a lane while its team's calendar is closed, so a
+              stalled queue reads as "the team's on lunch / off for the night /
+              weekend" rather than a bug. Drawn over the backdrop, under the tokens. */}
+          {dimmedLanes.map(({ el, team, reason }) => (
+            <g key={`dim-${el.id}`} style={{ pointerEvents: "none" }}>
+              <rect x={el.x} y={el.y} width={el.width} height={el.height} fill="#0b0f14" opacity={0.42} />
+              <text x={el.x + el.width / 2} y={el.y + el.height / 2} textAnchor="middle" dominantBaseline="middle"
+                fontFamily="monospace" fontSize={Math.max(10, Math.min(16, el.height * 0.12))} fill="#fca5a5" opacity={0.85}>
+                ☾ {team} — {reason}
+              </text>
+            </g>
+          ))}
           {liveTokens.map((tk) => (
             <circle key={tk.id} cx={tk.x} cy={tk.y} r={4} fill="#166534" stroke="#052e16" strokeWidth={1} style={{ filter: "drop-shadow(0 0 2px #052e16)" }} />
           ))}

@@ -129,6 +129,25 @@ export function boundariesIn(cal: WorkCalendar, clockUnit: ClockUnit, horizon: n
     .map((t) => ({ t, open: isOpenAt(t, cal, clockUnit) }));
 }
 
+/** Why a calendar is CLOSED at time `t` — for a human-readable replay cue.
+ *  Returns null when open (or always-open). "Lunch" = a gap between two windows
+ *  on the same working day; "Weekend" = Sat/Sun with no windows; "Off-hours" =
+ *  before/after the day's windows (night) or a non-working weekday. */
+export function closedReason(t: number, cal: WorkCalendar, clockUnit: ClockUnit): "Lunch" | "Off-hours" | "Weekend" | null {
+  const windows = intervalsToClock(cal, clockUnit);
+  if (windows.length === 0) return null; // always open
+  const weekLen = weekLengthClock(clockUnit);
+  const tow = timeOfWeek(t, weekLen);
+  if (windows.some((w) => tow >= w.s && tow < w.e)) return null; // open now
+  const dayLen = 86400 / SECONDS_PER_UNIT[clockUnit];
+  const day = Math.floor(tow / dayLen); // 0=Mon … 6=Sun
+  const dayStart = day * dayLen;
+  const today = windows.filter((w) => w.s >= dayStart && w.s < dayStart + dayLen);
+  if (today.length === 0) return day >= 5 ? "Weekend" : "Off-hours";
+  const gapBetween = today.some((w) => w.e <= tow) && today.some((w) => w.s > tow);
+  return gapBetween ? "Lunch" : "Off-hours"; // mid-day gap vs before-first / after-last
+}
+
 /** Human-readable readiness warnings for a calendar. Malformed windows (end ≤
  *  start, bad day) are already dropped on save, so the one thing worth flagging
  *  is OVERLAPPING windows on the same day — harmless to the engine (first match

@@ -19,11 +19,48 @@ export interface CalendarRow { id: string; name: string; pattern: WorkCalendar }
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 // Preset patterns (24/7 = empty intervals ≙ always open).
-const PRESETS: { label: string; make: () => WorkCalendar }[] = [
-  { label: "Mon–Fri 9–5", make: () => ({ intervals: [0, 1, 2, 3, 4].map((day) => ({ day, start: "09:00", end: "17:00" })) }) },
-  { label: "9–5 w/ lunch", make: () => ({ intervals: [0, 1, 2, 3, 4].flatMap((day) => [{ day, start: "09:00", end: "12:00" }, { day, start: "13:00", end: "17:00" }]) }) },
-  { label: "24/7", make: () => ({ intervals: [] }) },
+const PRESETS: { label: string; title: string; make: () => WorkCalendar }[] = [
+  { label: "Mon–Fri 9–5", title: "Staffing: office hours, weekends off", make: () => ({ intervals: [0, 1, 2, 3, 4].map((day) => ({ day, start: "09:00", end: "17:00" })) }) },
+  { label: "9–5 w/ lunch", title: "Staffing: office hours with an hour for lunch", make: () => ({ intervals: [0, 1, 2, 3, 4].flatMap((day) => [{ day, start: "09:00", end: "12:00" }, { day, start: "13:00", end: "17:00" }]) }) },
+  { label: "24/7", title: "Always open (no restriction)", make: () => ({ intervals: [] }) },
+  {
+    // For a SOURCE: demand never stops, it just rises and falls. Open 24/7 with
+    // day/evening/night rate bands (weekends quieter) — the × multiplier scales
+    // the arrival rate, so applications still land overnight, just fewer.
+    label: "Demand: peak/off-peak",
+    title: "For an arrival source: 24/7 demand that peaks in the day and dips at night / on weekends",
+    make: () => ({
+      intervals: [0, 1, 2, 3, 4, 5, 6].flatMap((day) => {
+        const wd = day < 5;
+        return [
+          { day, start: "00:00", end: "08:00", rate: wd ? 0.3 : 0.2 }, // night trickle
+          { day, start: "08:00", end: "18:00", rate: wd ? 1.5 : 0.6 }, // daytime peak
+          { day, start: "18:00", end: "24:00", rate: wd ? 0.8 : 0.5 }, // evening
+        ];
+      }),
+    }),
+  },
 ];
+
+/** End-of-window time input. `<input type="time">` can't express midnight-as-end,
+ *  so a window that runs to the end of the day is stored as "24:00" and shown as a
+ *  badge; ⤒ sets it, clicking the badge returns to a normal picker. */
+function EndTime({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  if (value === "24:00") {
+    return (
+      <button type="button" onClick={() => onChange("17:00")} title="Ends at midnight (end of day) — click to pick a time instead"
+        className="bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-200 tabular-nums">24:00</button>
+    );
+  }
+  return (
+    <span className="flex items-center gap-0.5">
+      <input type="time" value={value} onChange={(e) => onChange(e.target.value)}
+        className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]" />
+      <button type="button" onClick={() => onChange("24:00")} title="End at midnight (end of day)"
+        className="text-green-400/50 hover:text-green-200 text-[10px] leading-none">⤒</button>
+    </span>
+  );
+}
 
 /** A short human summary of a pattern for the list row. */
 function summarise(p: WorkCalendar): string {
@@ -146,7 +183,7 @@ export function CalendarLibraryManager({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-green-400/40 uppercase tracking-wide text-[10px]">Presets:</span>
             {PRESETS.map((p) => (
-              <button key={p.label} onClick={() => savePattern(current.id, p.make())} className="text-[10px] text-green-400/70 hover:text-green-200 border border-green-500/30 rounded px-1.5 py-0.5">{p.label}</button>
+              <button key={p.label} title={p.title} onClick={() => savePattern(current.id, p.make())} className="text-[10px] text-green-400/70 hover:text-green-200 border border-green-500/30 rounded px-1.5 py-0.5">{p.label}</button>
             ))}
           </div>
           {DAYS.map((label, day) => (
@@ -159,8 +196,7 @@ export function CalendarLibraryManager({
                     <input type="time" value={iv.start} onChange={(e) => setField(idx, { start: e.target.value })}
                       className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]" />
                     <span className="text-green-400/40">–</span>
-                    <input type="time" value={iv.end} onChange={(e) => setField(idx, { end: e.target.value })}
-                      className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]" />
+                    <EndTime value={iv.end} onChange={(v) => setField(idx, { end: v })} />
                     <label className="flex items-center gap-1 text-green-400/50 ml-1" title="Arrival-rate multiplier for a source using this calendar (1 = normal)">
                       ×<input type="number" min={0.1} step={0.1} value={iv.rate ?? 1}
                         onChange={(e) => setField(idx, { rate: Math.max(0.1, Number(e.target.value) || 1) })}
@@ -173,7 +209,9 @@ export function CalendarLibraryManager({
               <button onClick={() => addWindow(day)} className="text-green-400/60 hover:text-green-200 px-1 pt-0.5" title={`Add a window on ${label}`}>+ window</button>
             </div>
           ))}
-          <p className="text-green-400/40 text-[10px]">Teams follow their calendar (staffed only in open windows). A source only generates arrivals when open; the × multiplier makes those arrivals faster/slower (time-varying demand). Week starts Monday 00:00.</p>
+          <p className="text-green-400/40 text-[10px]">
+            <span className="text-green-300/70">Staffing vs demand are different calendars.</span> A <span className="text-green-300/70">team</span> works only in open windows (closed = stands down). A <span className="text-green-300/70">source</span> only generates arrivals when open — so for demand that never stops (e.g. online applications arriving overnight), keep it <span className="text-green-300/70">24/7</span> and use the × multiplier to make quiet hours slower rather than closing them (the “Demand: peak/off-peak” preset). Use ⤒ for a window that ends at midnight. Week starts Monday 00:00.
+          </p>
         </div>
       )}
 

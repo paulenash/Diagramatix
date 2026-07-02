@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-02  ·  **Document version:** 2.2  ·  **Suite:** 93 test files · 694 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-07-02  ·  **Document version:** 2.3  ·  **Suite:** 93 test files · 695 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0571`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0572`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -1124,6 +1124,7 @@ Pure helpers that convert a weekly `WorkCalendar` into sim-clock times — the c
 | T0562 | `boundariesIn` emits open/close transitions within the horizon | Team capacity toggles scheduled at wrong times | If boundary enumeration regressed |
 | T0563 | touching windows collapse to one non-race boundary | A capacity flicker (close+open at the same instant) | If adjacent windows stopped collapsing |
 | T0570 | `calendarWarnings` flags overlapping windows, not clean/empty ones | Silent data-entry mistakes in a calendar | If the overlap check regressed |
+| T0572 | `closedReason` classifies a closure (Lunch / Off-hours / Weekend) for the replay dim cue | The off-shift lane cue mislabelling why work stopped | If the closure classifier regressed |
 
 ### `tests/simulation/calendarEngine.test.ts` (added) — working-hours behaviour in the engine
 

@@ -24,6 +24,8 @@ const BODY = [
   "",
   "**Operating hours for arrivals.** In **Simulation Data → Arrivals**, a start/intermediate event can also take a calendar: it only generates arrivals while open. Give a window a **× multiplier** (e.g. ×2 on a busy morning) to model **time-varying demand** — arrivals come faster in that window.",
   "",
+  "**Demand and staffing are different calendars — don't cross them.** Work arriving isn't the same as staff being available. Online loan applications keep landing at 2am and on Sundays; they just *queue* until the team clocks on. So put the 9–5 calendar on the **team** (they queue overnight) and leave the **source** at **24/7**. If demand itself rises and falls but never stops, give the source a calendar that stays open 24/7 with per-window **× rate bands** (the **Demand: peak/off-peak** preset) — arrivals slow down at night and on weekends instead of stopping. Only give a source *closed* windows when demand genuinely can't occur then (a phone line or a walk-in branch that's shut).",
+  "",
   "**Reading the results.** Utilisation is measured against *staffed* time, so a team busy all through its shift shows ~100% even though it idles nights and weekends. In the **Replay**, tokens visibly bank up at a closed team's tasks and surge through when the shift opens. The week is anchored so simulation time t=0 is **Monday 00:00**.",
   "",
   "The starter examples ship with a *Business hours (9–5 with lunch)* calendar on their human teams so you can see the effect immediately after adopting one.",

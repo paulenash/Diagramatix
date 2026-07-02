@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  isOpenAt, nextOpenAt, rateAt, boundariesIn, weekLengthClock, calendarWarnings,
+  isOpenAt, nextOpenAt, rateAt, boundariesIn, weekLengthClock, calendarWarnings, closedReason,
 } from "@/app/lib/simulation/calendar";
 import type { WorkCalendar } from "@/app/lib/simulation/types";
 
@@ -133,5 +133,22 @@ describe("calendar helpers", () => {
       intervals: [{ day: 0, start: "09:00", end: "13:00" }, { day: 0, start: "12:00", end: "17:00" }],
     };
     expect(calendarWarnings(overlap)).toEqual(["Mon: overlapping working windows"]);
+  });
+
+  it("T0572 — closedReason classifies the closure (Lunch / Off-hours / Weekend) for the replay cue", () => {
+    // Open → null.
+    expect(closedReason(MIN(0, 10, 0), NINE_TO_FIVE, "minute")).toBe(null);
+    // Before open / after close on a working day → Off-hours (night).
+    expect(closedReason(MIN(0, 2, 0), NINE_TO_FIVE, "minute")).toBe("Off-hours");
+    expect(closedReason(MIN(0, 20, 0), NINE_TO_FIVE, "minute")).toBe("Off-hours");
+    // Saturday / Sunday → Weekend.
+    expect(closedReason(MIN(5, 10, 0), NINE_TO_FIVE, "minute")).toBe("Weekend");
+    expect(closedReason(MIN(6, 10, 0), NINE_TO_FIVE, "minute")).toBe("Weekend");
+    // Mid-day gap between two windows → Lunch.
+    expect(closedReason(MIN(0, 12, 30), WITH_LUNCH, "minute")).toBe("Lunch");
+    // A weekday with no windows at all → Off-hours, not Weekend.
+    expect(closedReason(MIN(1, 10, 0), WITH_LUNCH, "minute")).toBe("Off-hours"); // WITH_LUNCH is Monday-only
+    // Always-open calendar is never closed.
+    expect(closedReason(MIN(6, 3, 0), ALWAYS, "minute")).toBe(null);
   });
 });
