@@ -54,19 +54,30 @@ export async function POST(_req: Request, { params }: Params) {
       data: { name: `${example.title} (example)`, userId, orgId, ownerName },
     });
 
-    // Diagrams — preserve `data` (incl. internal element/connector ids).
+    // Diagrams — preserve `data` (incl. internal element/connector ids). Pre-assign
+    // the ids so a subprocess's `linkedDiagramId` (which references a diagram KEY
+    // in the package) can be rewritten to the new id before creating — otherwise
+    // the linked child can't be resolved (drill-down + simulation break).
     const keyToDiagramId = new Map<string, string>();
+    for (const d of pkg.diagrams) keyToDiagramId.set(d.key, crypto.randomUUID());
     for (const d of pkg.diagrams) {
-      const created = await tx.diagram.create({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = JSON.parse(JSON.stringify(d.data)) as any; // clone so the package isn't mutated
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const el of (data.elements ?? []) as any[]) {
+        const linked = el.properties?.linkedDiagramId as string | undefined;
+        if (linked && keyToDiagramId.has(linked)) el.properties.linkedDiagramId = keyToDiagramId.get(linked);
+      }
+      await tx.diagram.create({
         data: {
+          id: keyToDiagramId.get(d.key)!,
           name: d.name,
           type: d.type || "bpmn",
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          data: d.data as any,
+          data: data as any,
           userId, diagramOwnerId: userId, orgId, projectId: project.id,
         },
       });
-      keyToDiagramId.set(d.key, created.id);
     }
 
     // Team library.

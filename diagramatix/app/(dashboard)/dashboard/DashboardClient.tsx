@@ -1052,6 +1052,28 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         }
       }
 
+      // Rewrite subprocess links (original child id \u2192 new id) now that every
+      // diagram exists, so drill-down + simulation resolve the linked children
+      // (otherwise a linked subprocess is an empty pass-through and tokens skip it).
+      let relinked = 0;
+      for (const diag of diags) {
+        const newId = idMap.get(diag.originalId as string);
+        if (!newId) continue;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = diag.data as any;
+        let changed = false;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const el of (data?.elements ?? []) as any[]) {
+          const linked = el.properties?.linkedDiagramId as string | undefined;
+          if (linked && idMap.has(linked)) { el.properties.linkedDiagramId = idMap.get(linked); changed = true; }
+        }
+        if (changed) {
+          await fetch(`/api/diagrams/${newId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data }) });
+          relinked++;
+        }
+      }
+      if (relinked) log(`\u2714 Re-linked ${relinked} diagram(s)' subprocess references`);
+
       if (exportData.folderTree) {
         log("Importing folder structure...");
         const ft = exportData.folderTree as Record<string, unknown>;
