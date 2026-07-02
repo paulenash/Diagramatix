@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-06-30  ·  **Document version:** 2.0  ·  **Suite:** 80 test files · 601 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-07-02  ·  **Document version:** 2.1  ·  **Suite:** 91 test files · 676 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -1007,4 +1007,105 @@ Pins the deterministic connector-quality checks behind the AI-connector complain
 
 ---
 
-*Generated 2026-06-28, updated 2026-06-29. Regenerate this document whenever test files are added or their behaviour changes — it is a hand-maintained companion to the suite, not auto-generated.*
+## Layer 10 — BPMN geometry rules + Simulator results, run history & subprocess drill-through
+
+*(Added T0514–T0553 across the BPMN layout-rule window and the Simulator results/history/subprocess work.)*
+
+### `tests/conformance/overlap-checks.test.ts` — element / label / lane / data-artifact overlap scanners (B33–B37)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0514 | fires when two tasks occupy the same box (coincidence) | The "Cause-A" bug where AI-placed siblings land on the same pixel | If the element-overlap check (B34) stopped detecting coincident boxes |
+| T0515 | clean when elements are spaced apart | False overlap positives on a valid layout | If B34 flagged well-separated elements |
+| T0516 | exempts a boundary event mounted on its host | A boundary event (correctly on its host's edge) counted as an overlap | If the boundary-host exemption were removed |
+| T0517 | touching edges are not an overlap (no sub-pixel false positives) | Flaky overlap flags from adjacent elements just touching | If the check used `>=` instead of a strict-overlap test |
+| T0518 | fires when an event label overlaps a neighbouring element | Event/boundary labels sitting on top of other elements (B33) | If the event-label overlap check stopped firing |
+| T0519 | clean when the label sits in free space | False label-overlap positives | If B33 flagged labels in clear space |
+| T0520 | exempts the event's own container ancestor (label inside its EP/pool) | A label inside its own EP/pool being wrongly flagged | If the container-ancestor exemption were dropped |
+| T0528 | fires when two lanes in a pool overlap | Overlapping lanes that scramble order + block boundary drags (B35) | If the lane-tiling check stopped detecting overlaps |
+| T0529 | clean when lanes tile contiguously | False lane-tiling positives on a valid pool | If B35 flagged a correctly tiled pool |
+| T0533 | fires when a data object is far from its associated element | Data objects drifting away from their element (B36) | If the data-artifact-distance check stopped firing |
+| T0534 | clean when the data object is adjacent to its element | False distance positives | If B36 flagged an adjacent data object |
+| T0535 | fires when an input (outward-only) data object has no role | An input data object left without a role (B37) | If the data-object-role check stopped firing |
+| T0536 | clean when an output (inward-only) data object is tagged role=output | False role positives on a correctly tagged output | If B37 mis-classified a valid output |
+
+### `tests/bpmn/start-end-placement.test.ts` — Start/End placement + connector length (R8.14/15/18)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0521 | process start clears its lane inner boundary by ≥1 event width (R8.14) | A start event crammed against the lane header | If the start-clearance re-anchor regressed |
+| T0522 | first connector (start → first element) ≤ 70% of a task width (R8.15) | An over-long first connector from the start event | If the first-gap shortening stopped applying |
+| T0523 | End event hugs its last element ≤ 70% of a task width (R8.18) | An over-long gap before the End event | If the end-placement pass regressed |
+
+### `tests/bpmn/lane-tiling.test.ts` — lanes tile contiguously + cover the pool
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0524 | lanes within a pool tile contiguously (no gaps, no overlaps) | Gaps/overlaps between lanes | If the lane re-tile pass regressed |
+| T0525 | the lane stack exactly covers the pool height | Lanes not spanning the pool | If lane heights didn't sum to the pool |
+| T0526 | lanes stay contiguous when a lane grows to fit an EP | Overlaps after late EP growth | If `fitLanesToChildren`/re-stack regressed |
+| T0527 | the lane stack exactly covers the pool height (EP case) | Pool/lane mismatch after EP growth | If the EP-growth re-tile regressed |
+
+### `tests/bpmn/event-label-nudge.test.ts` — event labels laid out clear of neighbours (R8.16)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0530 | laid-out event labels stay clear of elements and each other | Event labels overlapping after layout | If the label-nudge pass regressed |
+
+### `tests/bpmn/data-object-assoc.test.ts` — data links placed + roled even when the AI emits them as sequence flows (R8.02/03)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0531 | data link emitted as a SEQUENCE flow (the AI's only option) gets role + placement | Data links the AI mis-types as sequence being left un-placed | If R8.02 matched only by connector type, not endpoints |
+| T0532 | data link with NO type — R8.02 fires (role + placement correct) | Untyped data links being ignored | If the endpoint-based match regressed |
+| T0537 | a Data Store linked by a sequence-typed association sits near its element (R8.03) | Data stores drifting from their element | If the data-store placement (R8.03) regressed |
+
+### `tests/simulation/readiness.test.ts` — pre-run readiness check (surfaces un-set parameters)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0538 | flags a task with no team (warn) and one using an undefined team (error) | Silent defaults / a team that isn't in the library | If `checkSimReadiness` stopped flagging team issues |
+| T0539 | flags a decision gateway whose branches have no probabilities/conditions | An unrouted decision silently splitting evenly | If the gateway-routing check regressed |
+| T0540 | flags a property read but never initialised (and not one that is) | A `getProperty('x')` that always reads 0 slipping by | If the used-but-uninitialised check regressed |
+| T0541 | clean when teams, arrival and routing are all set | False readiness warnings on a complete model | If the check flagged a fully-set process |
+
+### `tests/simulation/caseDist.test.ts` — per-case flow-time distribution (Typical/Near-worst/Spread + histogram)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0544 | empty samples → zeroed distribution (no NaN) | NaN/crash on a run with no completed cases | If `caseDistOf([])` returned NaN |
+| T0545 | 1..100: correct mean/sd/percentiles/range, histogram covers every case | Wrong percentiles/spread or a lossy histogram | If the percentile/sd/binning maths regressed |
+| T0546 | a single repeated value → degenerate one-bin dist, zero spread | Divide-by-zero on a zero-range distribution | If the single-value/zero-range guard were removed |
+
+### `tests/simulation/assessFacts.test.ts` — grounded facts for the AI comparison assessment
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0547 | computes case-level speed/cost/bottleneck deltas from the two runs | The AI assessment being fed wrong figures | If `buildComparisonFacts` mis-computed a delta |
+| T0548 | omits the cost block when neither run has a cost | A phantom $0 cost saving in the prose | If the no-cost guard were removed |
+
+### `tests/simulation/runHistory.test.ts` — Run History pruning policy
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0549 | keeps the newest N unpinned, prunes older unpinned, never touches pinned | Named/pinned runs being deleted, or unbounded growth | If `runIdsToPrune` pruned pinned runs or the wrong ones |
+| T0550 | nothing to prune when unpinned count is within the keep limit | Recent runs being deleted too eagerly | If the keep-limit were ignored |
+
+### `tests/simulation/runningStats.test.ts` — live replay stats timeline
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0551 | tracks completed / in-flight / queue / busy across the trace | Wrong live numbers as the replay plays | If the running-stats accumulator mis-counted |
+| T0552 | two tokens contend: one in service, one queued | Queue/busy counters not reflecting contention | If service/queue transitions were mis-tracked |
+
+### `tests/simulation/examplePackage.test.ts` (added) + `tests/simulation/exampleSeeds.test.ts` (added) — comparison + drill-through examples
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0543 | accepts a scenario variant root that matches a diagram key, rejects one that doesn't | A comparison example with a dangling As-is/To-be variant | If `validateExamplePackage` stopped checking `variantRootKeys` |
+| T0542 | as-is/to-be comparison examples show the to-be relieving the busiest team | A seeded comparison that doesn't actually improve | If the Aardwolf to-be stopped beating the as-is |
+| T0553 | the subprocess drill-through sample flattens its linked children (they carry work) | Linked subprocesses running as empty pass-throughs | If splice or the subtree body-start lookup regressed (child teams idle) |
+
+---
+
+*Generated 2026-06-28, updated 2026-07-02. Regenerate this document whenever test files are added or their behaviour changes — it is a hand-maintained companion to the suite, not auto-generated.*
