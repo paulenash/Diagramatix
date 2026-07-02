@@ -182,6 +182,20 @@ jobs:
         # not a project dep — fetch it pinned + non-interactive (`--yes`).
         run: npx --yes tsx@4 scripts/seed-simulation-examples.ts
 
+      - name: Seed simulator docs (User Guide + Features)
+        working-directory: ./diagramatix
+        # Non-blocking, idempotent: the DB-backed User Guide sections + Feature
+        # catalog rows for simulator features. Each script skips/updates in place,
+        # so re-running every deploy is safe. Features rows land as DRAFTS — a
+        # SuperAdmin still clicks "Publish All" once to make them public (we don't
+        # auto-publish marketing copy). Add future doc seeds to this list.
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+        run: |
+          npx --yes tsx@4 scripts/add-guide-simulation-calendars.ts
+          npx --yes tsx@4 scripts/add-features-simulation-calendars.ts
+
       - name: Update App Service container image
         # `az webapp config container set` rewrites the container
         # configuration to point at the new SHA tag. App Service detects
