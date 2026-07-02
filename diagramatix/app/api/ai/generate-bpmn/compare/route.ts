@@ -9,25 +9,24 @@ import {
   findConnectorConformance,
   summariseConformance,
 } from "@/app/lib/diagram/checks/connectorConformance";
+import { pickBestModel } from "@/app/lib/ai/pickBestModel";
+import { AI_MODELS } from "@/app/lib/ai/models";
 
 /**
  * SuperAdmin "Full model comparison" for a BPMN AI prompt.
  *
  * Generates the diagram with each model, lays it out, runs the conformance net,
  * and saves a diagram per model named `<current name> · <model>`. The CURRENT
- * diagram is filled with the OPUS 4.8 output — Fable 5 is the most capable model
- * but is access-gated (a key without Fable access simply shows an error row), so
- * Opus 4.8 stays the safe default to fill with. The comparison matrix is persisted
- * on the current diagram's `aiComparison` column so the "AI Comparison Results"
+ * diagram is filled with the BEST result — the fewest connector-conformance issues
+ * among the reasonably-complete diagrams (see pickBestModel), not a fixed model —
+ * so the comparison actually picks a winner. Ties prefer the richer diagram, then
+ * the MODELS order below (strongest first). The comparison matrix is persisted on
+ * the current diagram's `aiComparison` column so the "AI Comparison Results"
  * button can show it. SuperAdmin-only; makes real model calls.
  */
-const MODELS = [
-  { id: "claude-fable-5", label: "Fable 5" },
-  { id: "claude-opus-4-8", label: "Opus 4.8" },
-  { id: "claude-sonnet-5", label: "Sonnet 5" },
-  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
-];
-const CHOSEN_ID = "claude-opus-4-8"; // fills the current diagram
+// The models compared — the shared AI_MODELS list (also drives the AI-Generate
+// default picker), so adding/renaming a model updates both surfaces at once.
+const MODELS = AI_MODELS;
 
 type ModelResult = {
   model: string;
@@ -71,8 +70,9 @@ export async function POST(req: Request) {
   const { aiRules } = splitRulesByEnforcement(rules);
 
   const results: ModelResult[] = [];
+  // Keep each model's laid-out diagram so we can fill with whichever wins.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let chosenData: any = null;
+  const dataByModel = new Map<string, any>();
 
   for (const m of MODELS) {
     const t0 = Date.now();
@@ -100,21 +100,25 @@ export async function POST(req: Request) {
         elements: res.plan.elements.length, connections: res.plan.connections.length,
         issues: issues.length, summary: summariseConformance(issues), diagramId: saved.id,
       });
-      if (m.id === CHOSEN_ID) chosenData = data;
+      dataByModel.set(m.id, data);
     } catch (e) {
       results.push({ model: m.id, label: m.label, ok: false, ms: Date.now() - t0, error: e instanceof Error ? e.message : String(e) });
     }
   }
 
+  // The winner fills the current diagram (null if every model errored).
+  const best = pickBestModel(results, MODELS.map((m) => m.id));
+  const chosenData = best ? dataByModel.get(best.model) ?? null : null;
+
   const comparison = {
     generatedAt: new Date().toISOString(),
     prompt,
-    chosenModel: MODELS.find((m) => m.id === CHOSEN_ID)?.label ?? CHOSEN_ID,
-    chosenModelId: CHOSEN_ID,
+    chosenModel: best?.label ?? null,
+    chosenModelId: best?.model ?? null,
     models: results,
   };
 
-  // Fill the current diagram with the Opus 4.8 output (if it generated), and
+  // Fill the current diagram with the best output (if any model generated), and
   // persist the comparison matrix on the diagram either way.
   const filledData = chosenData ?? (current.data ?? {});
   await prisma.diagram.update({

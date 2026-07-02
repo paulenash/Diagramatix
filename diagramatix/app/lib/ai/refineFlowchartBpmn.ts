@@ -9,7 +9,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
 
-const DEFAULT_MODEL = "claude-opus-4-8";
+const DEFAULT_MODEL = "claude-haiku-4-5-20251001"; // AI Generate default (see app/lib/ai/models.ts)
 
 export interface RefineResult {
   elements: AiElement[];

@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-02  ·  **Document version:** 2.3  ·  **Suite:** 93 test files · 695 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-07-02  ·  **Document version:** 2.5  ·  **Suite:** 95 test files · 702 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0572`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0579`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -656,6 +656,27 @@ Pins the deterministic connector-quality checks behind the AI-connector complain
 ---
 
 ## Layer 6 — AI generation pipeline
+
+### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
+
+The SuperAdmin "Compare all models" fills the current diagram with the BEST result. This pins what "best" means so the choice can't silently drift.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0573 | picks the fewest conformance issues among complete diagrams | Filling with a worse layout than another model produced | If the primary sort (fewest issues) regressed |
+| T0574 | the completeness floor stops a near-empty 0-issue diagram winning | A sparse 2-box diagram "winning" because it has nothing to get wrong | If the size floor were dropped |
+| T0575 | ties break to the richer diagram, then model-preference order | Nondeterministic / arbitrary winner on ties | If either tie-break regressed |
+| T0576 | ignores failed/unsaved results; returns null when none qualify | Filling from a model that errored, or crashing when all failed | If the ok/diagramId filter or the empty case regressed |
+
+### `tests/ai/aiModel.test.ts` — the AI-Generate model list + default resolver
+
+The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank / removed setting never leaves generation pointing at a non-existent model.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0577 | the production default is Haiku 4.5 and is a known model | The default silently drifting or pointing at a bad id | If DEFAULT_AI_MODEL changed away from a real model |
+| T0578 | resolveAiModel keeps a known id, falls back to the default for unset/blank/removed | Generation calling a non-existent model after a bad/emptied setting | If the fallback/validation regressed |
+| T0579 | every model has an id + label; unknown ids are rejected | A malformed model list or an unknown id being accepted | If the list or isKnownAiModel regressed |
 
 ### `tests/ai/split-rules.test.ts` — Only GREEN rules reach the AI model
 

@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { planFlowchart } from "@/app/lib/ai/planFlowchart";
+import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
   console.log("[AI flowchart plan] full:", fullRules.length, "chars → green-only:", aiRules.length, "chars");
 
   try {
-    const result = await planFlowchart({ apiKey, prompt, attachment, rules: aiRules });
+    const result = await planFlowchart({ apiKey, prompt, attachment, rules: aiRules, model: await getAiGenerateModel() });
     if (!result.ok) {
       return NextResponse.json({ error: result.error, raw: result.raw }, { status: result.status });
     }

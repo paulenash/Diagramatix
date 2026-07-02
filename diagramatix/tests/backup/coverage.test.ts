@@ -54,6 +54,9 @@ const SCOPED_OMITTED = new Set<string>([
   // SuperAdmin full backup (catalog-driven) AND its own dedicated table-level
   // backup/restore (app/lib/help/guideBackup.ts + tests/help).
   "HelpChapter", "HelpSection", "HelpImage",
+  // Global key-value app settings (e.g. the AI-Generate model) are system
+  // config, not per-user/org data — carried by the SuperAdmin full backup only.
+  "AppSetting",
   ...SIMULATOR_TABLES,
 ]);
 

@@ -67,7 +67,7 @@ interface Props {
   /** Persist the AI feedback on the diagram. */
   onAiFeedback?: (feedback: AiFeedback | undefined) => void;
   /** Current diagram id — the SuperAdmin "Compare all models" action fills this
-   *  diagram with the Opus 4.8 output. */
+   *  diagram with the best output. */
   diagramId?: string;
   /** Notifies the parent when a model comparison was produced. */
   onComparison?: (comparison: unknown) => void;
@@ -112,7 +112,7 @@ export function PlanPanel({
   const [error, setError] = useState<string | null>(null);
 
   /** SuperAdmin: generate this prompt across Fable 5 / Opus 4.8 / Sonnet 5 / Haiku 4.5,
-   *  fill THIS diagram with the Opus 4.8 output, and save one diagram per model.
+   *  fill THIS diagram with the best output, and save one diagram per model.
    *  Four live calls — slow (2-3 min). */
   async function handleCompare() {
     const effPrompt = prompt.trim();
@@ -136,7 +136,9 @@ export function PlanPanel({
       const result = await res.json();
       if (result.diagramData?.elements) onApplyDiagram(result.diagramData);
       onComparison?.(result.comparison);
-      setCompareStatus(`Filled with ${result.comparison?.chosenModel ?? "Opus 4.8"}. All 3 model diagrams saved — open "AI Comparison Results" to compare.`);
+      setCompareStatus(result.comparison?.chosenModel
+        ? `Filled with the best result (${result.comparison.chosenModel}). All model diagrams saved — open "AI Comparison Results" to compare.`
+        : `No model produced a diagram. Open "AI Comparison Results" for the per-model errors.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
       setCompareStatus(null);
@@ -745,7 +747,7 @@ export function PlanPanel({
             <div className="mt-1 shrink-0">
               <button onClick={() => handleCompare()} disabled={comparing || !prompt.trim() || !diagramId}
                 className="w-full px-2 py-1 text-[11px] text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
-                title="SuperAdmin: generate with Fable 5, Opus 4.8, Sonnet 5 and Haiku 4.5, fill this diagram with the Opus 4.8 result, and save one diagram per model">
+                title="SuperAdmin: generate with Fable 5, Opus 4.8, Sonnet 5 and Haiku 4.5, fill this diagram with the best result, and save one diagram per model">
                 {comparing && (<svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>)}
                 {comparing ? "Comparing models…" : "Compare all models (SuperAdmin)"}
               </button>

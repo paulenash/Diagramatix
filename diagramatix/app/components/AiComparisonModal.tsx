@@ -24,8 +24,9 @@ export interface AiComparison {
 /**
  * SuperAdmin "AI Comparison Results" — the matrix from a multi-model BPMN
  * generation (Fable 5 / Opus 4.8 / Sonnet 5 / Haiku 4.5). The current diagram was
- * filled with the Opus 4.8 output; this shows per-model conformance + a link to each
- * saved model diagram (with ?from= so the editor's back nav returns here).
+ * filled with the BEST output (fewest layout issues), marked ★; this shows per-model
+ * conformance + a link to each saved model diagram (with ?from= so the editor's back
+ * nav returns here).
  */
 export function AiComparisonModal({
   comparison,
@@ -45,7 +46,9 @@ export function AiComparisonModal({
           <div>
             <h2 className="text-sm font-semibold text-gray-800">AI Comparison Results</h2>
             <p className="text-[11px] text-gray-500">
-              The current diagram is filled with the {comparison.chosenModel ?? "Opus 4.8"} output.
+              {comparison.chosenModel
+                ? <>The current diagram is filled with the <span className="font-medium text-gray-700">{comparison.chosenModel}</span> output — the best of this run (fewest layout issues).</>
+                : "No model produced a diagram to fill with."}
               {comparison.generatedAt ? ` Generated ${new Date(comparison.generatedAt).toLocaleString()}.` : ""}
             </p>
           </div>
@@ -68,11 +71,11 @@ export function AiComparisonModal({
           </thead>
           <tbody>
             {models.map((m) => (
-              <tr key={m.model} className="border-b border-gray-100">
+              <tr key={m.model} className={`border-b border-gray-100 ${m.model === comparison.chosenModelId ? "bg-green-50/70" : ""}`}>
                 <td className="py-1 pr-2 font-medium text-gray-800">
                   {m.label}
                   {m.model === comparison.chosenModelId && (
-                    <span className="ml-1 text-[9px] text-green-700 bg-green-50 border border-green-200 rounded px-1">filled current</span>
+                    <span className="ml-1 text-[9px] text-green-700 bg-green-50 border border-green-200 rounded px-1">★ best · filled</span>
                   )}
                 </td>
                 <td className="py-1 px-2 text-right">

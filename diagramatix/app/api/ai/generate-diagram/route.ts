@@ -5,6 +5,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import { buildGenericSystemPrompt } from "@/app/lib/ai/generateDiagramPrompt";
+import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 
 
 export async function POST(req: Request) {
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
     userContent.push({ type: "text", text: prompt.trim() });
 
     const message = await client.messages.create({
-      model: "claude-opus-4-8",
+      model: await getAiGenerateModel(),
       max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: "user", content: userContent }],

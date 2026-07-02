@@ -719,6 +719,7 @@ interface AdminTile {
 const ADMIN_TILES: AdminTile[] = [
   { id: "users", title: "Registered Users", description: "Every registered user — status, subscription, current diagram.", users: true },
   { id: "ai-rules", title: "AI Rules & Preferences", description: "Geometric + style rules that steer AI BPMN generation.", href: "/dashboard/rules" },
+  { id: "ai-model", title: "AI Generate Model", description: "Choose the Claude model AI diagram generation uses (default Haiku 4.5).", href: "/dashboard/admin/ai-model" },
   { id: "database", title: "Database Access", description: "Inspect the live database and run maintenance queries.", href: "/dashboard/admin/database" },
   { id: "ddl", title: "Generate Diagramatix DDL", description: "Download the schema as PostgreSQL / MySQL / SQL Server DDL.", ddl: true },
   { id: "archive", title: "System Archive", description: "Archived projects and diagrams across the system.", href: "/dashboard/admin/archive" },

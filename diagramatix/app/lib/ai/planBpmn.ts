@@ -38,7 +38,7 @@ export type PlanBpmnResult =
   | { ok: true; plan: { elements: AiElement[]; connections: AiConnection[] }; model: string }
   | { ok: false; status: number; error: string; raw?: string };
 
-const DEFAULT_MODEL = "claude-opus-4-8";
+const DEFAULT_MODEL = "claude-haiku-4-5-20251001"; // AI Generate default (see app/lib/ai/models.ts)
 
 /**
  * Build the system prompt instructing Sonnet to return normalised BPMN JSON.

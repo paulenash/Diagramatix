@@ -1137,3 +1137,14 @@ model HelpImage {
 
   @@index([createdAt])
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Global key-value application settings (SuperAdmin-tunable, single row per key).
+// First use: "ai.generate.model" = the Claude model AI Generate uses. Kept
+// generic so future one-off system settings don't each need a new table.
+// ────────────────────────────────────────────────────────────────────────────
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
