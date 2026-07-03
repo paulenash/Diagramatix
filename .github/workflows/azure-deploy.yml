@@ -209,6 +209,7 @@ jobs:
           npx --yes tsx@4 scripts/add-guide-process-mining.ts
           npx --yes tsx@4 scripts/add-features-process-mining.ts
           npx --yes tsx@4 scripts/add-features-mining-examples.ts
+          npx --yes tsx@4 scripts/add-guide-mining-state-machine.ts
           npx --yes tsx@4 scripts/add-guide-mining-sample.ts
 
       - name: Update App Service container image
