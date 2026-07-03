@@ -5,7 +5,7 @@
  * downstream (discovery, conformance, simulator calibration) trusts its output.
  */
 import { describe, it, expect } from "vitest";
-import { parseCsv, guessMapping, parseTimestamp, buildEventLog } from "@/app/lib/mining/parseEventLog";
+import { parseCsv, guessMapping, parseTimestamp, excelSerialToMs, buildEventLog } from "@/app/lib/mining/parseEventLog";
 import type { LogMapping } from "@/app/lib/mining/types";
 
 describe("event-log parsing", () => {
@@ -35,6 +35,14 @@ describe("event-log parsing", () => {
     expect(parseTimestamp("1700000000000")).toBe(1700000000000);     // epoch millis
     expect(parseTimestamp("not a date")).toBeNull();
     expect(parseTimestamp("")).toBeNull();
+  });
+
+  it("T0617 — Excel serial dates convert; the range guard rejects id-like numbers", () => {
+    expect(parseTimestamp("45658")).toBe(Date.UTC(2025, 0, 1));          // serial 45658 = 2025-01-01
+    expect(parseTimestamp("45658.375")).toBe(Date.UTC(2025, 0, 1, 9));   // .375 day = 09:00
+    expect(excelSerialToMs(32874)).toBe(Date.UTC(1990, 0, 1));           // lower bound of the accepted range
+    expect(excelSerialToMs(5)).toBeNull();                               // below range → not a date (avoids id false-positives)
+    expect(excelSerialToMs(100000)).toBeNull();                          // above range (~year 2143)
   });
 
   const MAP: LogMapping = { caseId: "case", activity: "activity", timestamp: "ts", state: "state", resource: "user" };

@@ -75,12 +75,29 @@ export function guessMapping(headers: string[]): Partial<LogMapping> {
   return out;
 }
 
-/** epoch (s or ms) or an ISO/parseable date string → epoch ms, else null. */
+// Excel (1900 date system) serial-date range we accept: ~1990-01-01 .. 2100-01-01.
+// Narrow enough that id-like numbers aren't mistaken for dates. Unix epoch = serial
+// 25569 (days from Excel's 1899-12-30 base to 1970-01-01, which absorbs the 1900
+// leap-year bug for modern dates).
+const EXCEL_SERIAL_MIN = 32874, EXCEL_SERIAL_MAX = 73051;
+
+/** An Excel serial date (integer days since 1899-12-30, optional time fraction) →
+ *  epoch ms, or null if outside the plausible modern range. */
+export function excelSerialToMs(n: number): number | null {
+  if (!Number.isFinite(n) || n < EXCEL_SERIAL_MIN || n > EXCEL_SERIAL_MAX) return null;
+  return Math.round((n - 25569) * 86_400_000);
+}
+
+/** epoch (s or ms), an Excel serial date, or an ISO/parseable date string → epoch
+ *  ms, else null. */
 export function parseTimestamp(v: string): number | null {
   const s = (v ?? "").trim();
   if (!s) return null;
   if (/^\d{13}$/.test(s)) return Number(s);
   if (/^\d{10}$/.test(s)) return Number(s) * 1000;
+  // Excel serial date — a CSV exported from Excel whose date cell wasn't formatted
+  // as text comes through as a bare number (e.g. 45658 or 45658.375).
+  if (/^\d+(\.\d+)?$/.test(s)) { const ms = excelSerialToMs(Number(s)); if (ms !== null) return ms; }
   const t = Date.parse(s);
   return Number.isNaN(t) ? null : t;
 }

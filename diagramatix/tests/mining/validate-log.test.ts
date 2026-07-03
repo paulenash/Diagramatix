@@ -68,4 +68,16 @@ describe("event-log mapping validation", () => {
     const ms = validateEventLogMapping(H, [["1", "Open", "1704102000000", "New"]], MAP);
     expect(ms.timestampFormat).toBe("epoch milliseconds");
   });
+
+  it("T0618 — Excel serial dates are recognised + usable (not dropped)", () => {
+    const rows = [
+      ["1", "Open", "45658", "New"], ["1", "Close", "45658.5", "Done"],
+      ["2", "Open", "45659", "New"], ["2", "Close", "45659.5", "Done"],
+    ];
+    const v = validateEventLogMapping(H, rows, MAP);
+    expect(v.timestampFormat).toBe("Excel serial date");
+    expect(v.usable).toBe(4);
+    expect(v.dropped).toBe(0);
+    expect(v.warnings).toEqual([]);   // parses cleanly → no discarded / unrecognised warnings
+  });
 });
