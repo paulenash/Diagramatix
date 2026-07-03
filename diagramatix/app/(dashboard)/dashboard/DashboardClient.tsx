@@ -3004,9 +3004,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             <button
               onClick={() => { close(); setMiningProject({ id: p.id, name: p.name }); }}
               className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
-              title="DiagramatixMINER — discover the real process from event logs + check conformance"
+              title="Process Mining — discover the real process from event logs + check conformance"
             >
-              ⛏ DiagramatixMINER
+              ⛏ Process Mining
             </button>
             <button
               onClick={(e) => { close(); handleCloneProject(p.id, e); }}

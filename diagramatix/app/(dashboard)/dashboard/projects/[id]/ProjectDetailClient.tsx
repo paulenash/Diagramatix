@@ -12,6 +12,8 @@ import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { ProjectStructureSection } from "@/app/components/entityLists/ProjectStructureSection";
+import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
+import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
@@ -382,6 +384,10 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [exporting, setExporting] = useState(false);
   const [exportLog, setExportLog] = useState<string[]>([]);
   const [exportResult, setExportResult] = useState<"success" | "failed" | null>(null);
+  // Project-level overlays — the Simulator and Process Mining consoles, opened
+  // from the toolbar (same as the dashboard project menu).
+  const [showSim, setShowSim] = useState(false);
+  const [showMining, setShowMining] = useState(false);
   // Renamed: this menu now also handles imports, so it's a generic File menu.
   const [showFileMenu, setShowFileMenu] = useState(false);
   // File menu navigation: chosen section (Export/Import) and destination
@@ -2332,6 +2338,20 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               >
                 + New Diagram
               </button>
+              <button
+                onClick={() => setShowSim(true)}
+                className="px-3 py-1 text-xs font-medium rounded-md border text-gray-700 border-gray-300 hover:bg-gray-50"
+                title="Simulate + compare the processes in this project (As-is / To-be)"
+              >
+                ◈ Simulator
+              </button>
+              <button
+                onClick={() => setShowMining(true)}
+                className="px-3 py-1 text-xs font-medium rounded-md border text-gray-700 border-gray-300 hover:bg-gray-50"
+                title="Process Mining — discover the real process from event logs + check conformance"
+              >
+                ⛏ Process Mining
+              </button>
             </>
           )}
           <a href="/help" className="text-xs text-blue-600 hover:underline ml-1" title="User Guide">User Guide</a>
@@ -2786,6 +2806,25 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             // looking at that diagram next.
             refreshProjectData();
           }}
+        />
+      )}
+
+      {/* Project-level Simulator + Process Mining consoles (full-screen overlays) */}
+      {showSim && (
+        <SimulatorOverlay
+          projectId={project.id}
+          projectName={project.name}
+          isAdmin={!!isAdmin}
+          onClose={() => setShowSim(false)}
+        />
+      )}
+      {showMining && (
+        <ProcessMiningOverlay
+          projectId={project.id}
+          projectName={project.name}
+          isAdmin={!!isAdmin}
+          onClose={() => setShowMining(false)}
+          onOpenSimulator={() => { setShowMining(false); setShowSim(true); }}
         />
       )}
 
