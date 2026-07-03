@@ -100,6 +100,16 @@ export function ProcessMiningConsole({ projectId, projectName, onClose }: { proj
     } finally { setDiscovering(false); }
   }
 
+  async function discoverSm(runId: string) {
+    setDiscovering(true); setErr(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/discover-sm`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(json.error ?? "State-machine discovery failed"); return; }
+      await load();
+    } finally { setDiscovering(false); }
+  }
+
   const selected = runs.find((r) => r.id === selectedId) ?? null;
   const inp = "bg-slate-800 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs";
 
@@ -206,6 +216,20 @@ export function ProcessMiningConsole({ projectId, projectName, onClose }: { proj
                 </button>
                 {selected.discoveredBpmnId && (
                   <a href={`/diagram/${selected.discoveredBpmnId}`} className="text-xs text-indigo-300 hover:text-indigo-200 underline">Open discovered diagram →</a>
+                )}
+              </div>
+            </div>
+
+            {/* Discover the entity state machine */}
+            <div className="mt-4 pt-3 border-t border-slate-700">
+              <h3 className="text-xs font-semibold text-indigo-200 mb-1">Discover the state machine</h3>
+              <p className="text-[11px] text-slate-400 mb-2">Infer the entity&rsquo;s lifecycle — its states and the events that move between them — a candidate you can edit and use as the conformance reference.</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button onClick={() => discoverSm(selected.id)} disabled={discovering} className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded px-3 py-1.5">
+                  {discovering ? "Working…" : "⚙ Discover state machine"}
+                </button>
+                {selected.discoveredSmId && (
+                  <a href={`/diagram/${selected.discoveredSmId}`} className="text-xs text-indigo-300 hover:text-indigo-200 underline">Open state machine →</a>
                 )}
               </div>
             </div>

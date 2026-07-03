@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-02  ·  **Document version:** 2.8  ·  **Suite:** 97 test files · 715 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-07-02  ·  **Document version:** 2.9  ·  **Suite:** 98 test files · 718 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0592`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0595`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -679,6 +679,16 @@ Variants → a directly-follows graph → a well-formed, simulatable BPMN plan.
 | T0590 | a branch → an exclusive split gateway; merges before End; refs resolve | Malformed/unroutable discovered BPMN | If gateway placement or referential integrity regressed |
 | T0591 | a loop stays well-formed (back-edge + gateways) | Cyclic logs breaking discovery | If loop handling regressed |
 | T0592 | edgeThreshold trims rare directly-follows edges | No way to tame spaghetti models | If frequency filtering regressed |
+
+### `tests/mining/discoverStateMachine.test.ts` — candidate state-machine discovery
+
+The log's state sequences → a UML state machine (states + event-labelled transitions + initial/final).
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0593 | extracts distinct states + event-labelled transitions with counts | Wrong state lifecycle / frequencies | If the state-transition extraction regressed |
+| T0594 | entry transition labelled with the creating event; terminals reach Final | A malformed state machine (no start/end) | If initial/final wiring regressed |
+| T0595 | discoverStateMachine lays out an editor-valid diagram with formal transitions | An unrenderable state machine / missing transition events | If layout or the transitionEvent tagging regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 
