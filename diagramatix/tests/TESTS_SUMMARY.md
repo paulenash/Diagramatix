@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-02  ·  **Document version:** 2.7  ·  **Suite:** 95 test files · 706 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-07-02  ·  **Document version:** 3.1  ·  **Suite:** 100 test files · 726 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0583`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0603`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -656,6 +656,61 @@ Pins the deterministic connector-quality checks behind the AI-connector complain
 ---
 
 ## Layer 6 — AI generation pipeline
+
+### `tests/mining/parseEventLog.test.ts` — Process Mining event-log ingestion
+
+The front door of Process Mining: CSV → normalised events → compressed variants. Everything downstream trusts this.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0584 | parseCsv handles quotes/embedded delimiters/CRLF/BOM + delimiter detection | Mangled logs (commas in fields, semicolon exports) | If the CSV scanner regressed |
+| T0585 | guessMapping picks sensible columns from headers | A poor default column mapping | If the header heuristics regressed |
+| T0586 | parseTimestamp accepts ISO + epoch s/ms, rejects junk | Events silently dropped or mis-timed | If timestamp parsing regressed |
+| T0587 | buildEventLog groups by case, sorts by time, drops unmapped rows | Out-of-order traces / bad rows corrupting the log | If grouping/sorting/validation regressed |
+| T0588 | identical traces compress to one variant with a frequency count | Variant explosion / wrong frequencies | If the variant keying/counting regressed |
+
+### `tests/mining/discoverProcess.test.ts` — Process discovery (DFG → BPMN)
+
+Variants → a directly-follows graph → a well-formed, simulatable BPMN plan.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0589 | buildDfg aggregates directly-follows counts, starts + ends | Wrong process frequencies | If the DFG aggregation regressed |
+| T0590 | a branch → an exclusive split gateway; merges before End; refs resolve | Malformed/unroutable discovered BPMN | If gateway placement or referential integrity regressed |
+| T0591 | a loop stays well-formed (back-edge + gateways) | Cyclic logs breaking discovery | If loop handling regressed |
+| T0592 | edgeThreshold trims rare directly-follows edges | No way to tame spaghetti models | If frequency filtering regressed |
+
+### `tests/mining/discoverStateMachine.test.ts` — candidate state-machine discovery
+
+The log's state sequences → a UML state machine (states + event-labelled transitions + initial/final).
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0593 | extracts distinct states + event-labelled transitions with counts | Wrong state lifecycle / frequencies | If the state-transition extraction regressed |
+| T0594 | entry transition labelled with the creating event; terminals reach Final | A malformed state machine (no start/end) | If initial/final wiring regressed |
+| T0595 | discoverStateMachine lays out an editor-valid diagram with formal transitions | An unrenderable state machine / missing transition events | If layout or the transitionEvent tagging regressed |
+
+### `tests/mining/transitionConformance.test.ts` — state-change conformance
+
+Replay mined variants over a reference state machine → fitness % + deviations. The governance heart of Process Mining.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0596 | fitness = frequency-weighted fraction of cleanly-replaying cases | A wrong conformance headline | If the replay/fitness maths regressed |
+| T0597 | flags undocumented transition + unknown state + unexpected exit | Real compliance breaches going unreported | If the deviation detectors regressed |
+| T0598 | a fully-conforming log scores 100% with no violations | False positives on a clean process | If clean cases were mis-flagged |
+| T0599 | a reference transition never seen is flagged as dead (w/ its connector id) | Dead/unused reference paths hidden + no overlay anchor | If dead-transition detection or the id passthrough regressed |
+
+### `tests/mining/calibrate.test.ts` — the digital twin (mine → simulate)
+
+Mined performance → a runnable simulation calibrated to reality.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0600 | sojourn durations, resource concurrency, clock unit + active hours | Wrong simulation inputs mined from the log | If the performance aggregation regressed |
+| T0601 | fitDuration/fitArrival pick sensible SimDists; active hours → a calendar | Bad fitted distributions / working hours | If distribution fitting or the calendar derivation regressed |
+| T0602 | calibrate writes cycle time, arrival, gateway branch probabilities + a team library | An uncalibrated / unusable twin | If the param-writing or branch-probability mapping regressed |
+| T0603 | the whole pipeline yields a twin that actually simulates (completes work) | The mine→simulate loop silently producing a dead model | If any stage (parse→discover→calibrate→assemble→run) broke |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 

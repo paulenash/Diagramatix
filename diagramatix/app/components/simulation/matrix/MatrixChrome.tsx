@@ -52,11 +52,14 @@ export function MatrixTypewriter({
   speedMs = 45,
   onDone,
   className = "",
+  colorClass = "text-green-400",
 }: {
   text: string;
   speedMs?: number;
   onDone?: () => void;
   className?: string;
+  /** Text colour utility (default Matrix green; the Miner passes amber). */
+  colorClass?: string;
 }) {
   const [n, setN] = useState(0);
   useEffect(() => {
@@ -66,7 +69,7 @@ export function MatrixTypewriter({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [n, text]);
   return (
-    <span className={`font-mono text-green-400 ${className}`}>
+    <span className={`font-mono ${colorClass} ${className}`}>
       {text.slice(0, n)}
       <span className="animate-pulse">▋</span>
     </span>

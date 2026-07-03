@@ -758,5 +758,16 @@ export interface TemplateData {
  *             SimulationCalendar + SimulationTeam.calendarId (backup/restore
  *             pick them up automatically). Starter examples back-filled with a
  *             Business-hours (9–5 w/ lunch) calendar on their human teams.
+ *
+ *  v1.31 (2026-07-03): DiagramatixMINER — Process Mining. Ingest event logs →
+ *             discover the implied BPMN + a candidate State-Machine, check state-
+ *             change conformance against a reference State-Machine, and calibrate
+ *             a simulation "digital twin" from the mined timing/resource data
+ *             (cycle times, arrivals, branch probabilities, teams, working hours)
+ *             that opens in the Simulator. New runtime table ProcessMiningRun
+ *             (compressed variants + stats + performance; backup picks it up
+ *             automatically). Discovered diagrams are ordinary bpmn/state-machine
+ *             diagrams. Runtime/analytics only — NO diagram-export or BPMN-XSD
+ *             shape change; the version advances with the release window.
  */
-export const SCHEMA_VERSION = "1.30";
+export const SCHEMA_VERSION = "1.31";

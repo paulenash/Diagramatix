@@ -15,11 +15,17 @@ export function MatrixRain({
   onDone,
   fontSize = 16,
   className = "",
+  color = "#22FF22",
+  headColor = "#D4FFD4",
 }: {
   durationMs?: number;
   onDone?: () => void;
   fontSize?: number;
   className?: string;
+  /** Trailing-char colour (default Matrix green). The Miner uses an amber/brown. */
+  color?: string;
+  /** Leading "head" char colour. */
+  headColor?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -63,7 +69,7 @@ export function MatrixRain({
       for (let i = 0; i < drops.length; i++) {
         const y = drops[i] * fontSize;
         if (y >= 0 && y < canvas.height + fontSize) {
-          ctx.fillStyle = drops[i] < 2 ? "#D4FFD4" : "#22FF22";
+          ctx.fillStyle = drops[i] < 2 ? headColor : color;
           ctx.fillText(CHARS[Math.floor(Math.random() * CHARS.length)], i * fontSize, y);
         }
         drops[i]++;
