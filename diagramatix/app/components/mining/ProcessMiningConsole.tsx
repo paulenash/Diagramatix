@@ -7,8 +7,9 @@
  * digital-twin simulator calibration lands in the final slice.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseCsv, guessMapping } from "@/app/lib/mining/parseEventLog";
+import { validateEventLogMapping } from "@/app/lib/mining/validateLog";
 import type { LogMapping, MiningStats } from "@/app/lib/mining/types";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -109,6 +110,12 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
 
   const setRole = (key: keyof LogMapping, col: string) => setMapping((m) => ({ ...m, [key]: col || undefined }));
   const canImport = mapping.caseId && mapping.activity && mapping.timestamp && mapping.state && rows.length > 0;
+  // Advisory pre-import validation off the already-parsed rows — confirm the
+  // mapping is right + see what would be discarded, before ingesting.
+  const validation = useMemo(
+    () => (headers.length > 0 && rows.length > 0 ? validateEventLogMapping(headers, rows, mapping) : null),
+    [headers, rows, mapping],
+  );
 
   async function doImport() {
     if (!canImport) return;
@@ -218,6 +225,34 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
               </div>
               <p className="text-[10px] text-stone-400">{rows.length.toLocaleString()} rows · previewing first 5</p>
 
+              {/* Advisory mapping verification — confirm the mapping + see what would be dropped */}
+              {validation && (
+                <div className="rounded border border-stone-700 bg-stone-900/60 p-2.5 flex flex-col gap-1.5 text-[10px]">
+                  <div className="text-stone-300">
+                    <span className="text-amber-200">{validation.usable.toLocaleString()}</span> usable
+                    {" · "}
+                    {validation.dropped > 0
+                      ? <span className="text-rose-300">{validation.dropped.toLocaleString()} dropped</span>
+                      : <span className="text-emerald-300">0 dropped</span>}
+                    {" · "}<span className="text-stone-200">{validation.distinctCases.toLocaleString()}</span> cases
+                    {mapping.activity ? <>{" · "}{validation.distinctActivities.toLocaleString()} activities</> : null}
+                    {mapping.state ? <>{" · "}{validation.distinctStates.toLocaleString()} states</> : null}
+                  </div>
+                  <div className="text-stone-400">
+                    timestamp: <span className={validation.timestampFormat === "unrecognised" ? "text-rose-300" : "text-stone-300"}>{validation.timestampFormat}</span>
+                    {validation.from && validation.to ? ` · ${new Date(validation.from).toISOString().slice(0, 10)} → ${new Date(validation.to).toISOString().slice(0, 10)}` : ""}
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    {ROLES.map((r) => (validation.samples[r.key]?.length ? (
+                      <div key={r.key} className="text-stone-400 truncate"><span className="text-stone-500">{r.label.replace(/ \(optional\)$/, "")}:</span> {validation.samples[r.key]!.join("  ·  ")}</div>
+                    ) : null))}
+                  </div>
+                  {validation.warnings.map((w, i) => (
+                    <div key={i} className="text-amber-300 leading-snug">⚠ {w.message}</div>
+                  ))}
+                </div>
+              )}
+
               <div className="flex items-center gap-2">
                 <input value={runName} onChange={(e) => setRunName(e.target.value)} placeholder="run name" className={`${inp} flex-1`} />
                 <button onClick={doImport} disabled={!canImport || busy} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
@@ -256,6 +291,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
               <Stat label="States" value={selected.stats?.states?.length} />
               <Stat label="Variants" value={selected.stats?.variants} />
               <Stat label="Span" value={selected.stats?.from && selected.stats?.to ? `${Math.round((selected.stats.to - selected.stats.from) / 86400000)}d` : "—"} />
+              {typeof selected.stats?.unmappedRows === "number" && selected.stats.unmappedRows > 0 && (
+                <Stat label="Dropped rows" value={selected.stats.unmappedRows} />
+              )}
             </div>
             {/* Discover the BPMN process */}
             <div className="mt-4 pt-3 border-t border-stone-700">
