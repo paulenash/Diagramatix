@@ -88,6 +88,7 @@ model Org {
   entityLists         EntityList[]
   simulationTeams     SimulationTeam[]
   simulationCalendars SimulationCalendar[]
+  processMiningRuns   ProcessMiningRun[]
 }
 
 model OrgMember {
@@ -245,6 +246,7 @@ model Project {
   simulationTeams SimulationTeam[]
   simulationCalendars SimulationCalendar[]
   simulationStudies SimulationStudy[]
+  processMiningRuns ProcessMiningRun[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -970,6 +972,37 @@ model SimulationCalendar {
   pattern        Json     @default("{\"intervals\":[]}")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([projectId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Process Mining — one ingested event log + its discovered artefacts. Mirrors
+// SimulationStudy's project/org scoping. The raw log isn't stored; `variants`
+// holds the compressed log (distinct entity behaviours + frequency) which is
+// enough to (re)run discovery/conformance/calibration. Discovered BPMN + state-
+// machine diagrams and the calibrated SimulationStudy are referenced by id.
+// ────────────────────────────────────────────────────────────────────────────
+model ProcessMiningRun {
+  id               String   @id @default(cuid())
+  name             String
+  orgId            String?
+  org              Org?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  projectId        String?
+  project          Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById      String?
+  mapping          Json     @default("{}")   // column → role
+  stats            Json     @default("{}")   // headline aggregates
+  variants         Json     @default("[]")   // compressed log
+  performance      Json     @default("{}")   // timing/resource aggregates (simulator feed)
+  discoveredBpmnId String?                    // Diagram id
+  discoveredSmId   String?                    // Diagram id
+  referenceSmId    String?                    // Diagram id (user-selected)
+  conformance      Json?                      // {fitness, violations[], transitionStats}
+  studyId          String?                    // SimulationStudy id (calibrated twin)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([orgId])
   @@index([projectId])

@@ -1,0 +1,143 @@
+/**
+ * Event-log ingestion: a dependency-free CSV parser + column-role mapping +
+ * normalisation into per-entity traces and compressed VARIANTS. Pure; unit-tested.
+ * (No CSV library exists in the repo, so this is net-new but deliberately small.)
+ */
+import type { LogMapping, LogEvent, CaseTrace, Variant, MiningStats, EventLog } from "./types";
+
+// ── CSV ────────────────────────────────────────────────────────────────────
+
+/** Guess the delimiter from the first line (comma / semicolon / tab). */
+function detectDelimiter(text: string): string {
+  const nl = text.indexOf("\n");
+  const first = nl >= 0 ? text.slice(0, nl) : text;
+  const counts: [string, number][] = [",", ";", "\t"].map((d) => [d, first.split(d).length - 1]);
+  counts.sort((a, b) => b[1] - a[1]);
+  return counts[0][1] > 0 ? counts[0][0] : ",";
+}
+
+/** Parse delimited text into rows of fields, honouring quotes (embedded
+ *  delimiters, escaped `""`, and newlines inside quotes) and CRLF/CR/LF. */
+function parseDelimited(text: string, delim: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+  let i = 0;
+  const endRow = () => { row.push(field); rows.push(row); row = []; field = ""; };
+  while (i < text.length) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    if (c === '"') { inQuotes = true; i++; continue; }
+    if (c === delim) { row.push(field); field = ""; i++; continue; }
+    if (c === "\n") { endRow(); i++; continue; }
+    if (c === "\r") { if (text[i + 1] === "\n") { i++; continue; } endRow(); i++; continue; }
+    field += c; i++;
+  }
+  if (field !== "" || row.length > 0) endRow();
+  return rows;
+}
+
+/** Parse CSV text → { headers, rows } (blank lines dropped, BOM stripped). */
+export function parseCsv(text: string): { headers: string[]; rows: string[][] } {
+  const clean = (text ?? "").replace(/^﻿/, "");
+  const records = parseDelimited(clean, detectDelimiter(clean));
+  if (records.length === 0) return { headers: [], rows: [] };
+  const headers = records[0].map((h) => h.trim());
+  const rows = records.slice(1).filter((r) => r.some((c) => c.trim() !== ""));
+  return { headers, rows };
+}
+
+// ── Mapping ──────────────────────────────────────────────────────────────────
+
+/** Auto-guess the column→role mapping from header names. */
+export function guessMapping(headers: string[]): Partial<LogMapping> {
+  const find = (pats: RegExp[]) => headers.find((h) => pats.some((p) => p.test(h.toLowerCase())));
+  const out: Partial<LogMapping> = {};
+  const caseId = find([/case/, /instance/, /^id$/, /_id$/, /\bid\b/, /invoice/, /employee/, /order/, /ticket/, /registrant/, /entity/]);
+  const activity = find([/activity/, /event/, /action/, /task/, /\bstep\b/]);
+  const timestamp = find([/timestamp/, /\btime\b/, /\bdate\b/, /datetime/, /when/, /occurred/]);
+  const state = find([/state/, /status/, /stage/, /phase/]);
+  const resource = find([/resource/, /\buser\b/, /agent/, /owner/, /perform/, /\bwho\b/, /assign/, /\bby\b/]);
+  const entityType = find([/entity.?type/, /object.?type/, /\btype\b/]);
+  if (caseId) out.caseId = caseId;
+  if (activity) out.activity = activity;
+  if (timestamp) out.timestamp = timestamp;
+  if (state) out.state = state;
+  if (resource) out.resource = resource;
+  if (entityType) out.entityType = entityType;
+  return out;
+}
+
+/** epoch (s or ms) or an ISO/parseable date string → epoch ms, else null. */
+export function parseTimestamp(v: string): number | null {
+  const s = (v ?? "").trim();
+  if (!s) return null;
+  if (/^\d{13}$/.test(s)) return Number(s);
+  if (/^\d{10}$/.test(s)) return Number(s) * 1000;
+  const t = Date.parse(s);
+  return Number.isNaN(t) ? null : t;
+}
+
+// ── Normalise → traces → variants ────────────────────────────────────────────
+
+/** Build the normalised + compressed event log from parsed rows + a mapping.
+ *  Rows missing a case id or a valid timestamp are dropped (counted in stats). */
+export function buildEventLog(headers: string[], rows: string[][], mapping: LogMapping): EventLog {
+  const idx = (col: string | undefined) => (col ? headers.indexOf(col) : -1);
+  const ci = idx(mapping.caseId), ai = idx(mapping.activity), ti = idx(mapping.timestamp), si = idx(mapping.state), ri = idx(mapping.resource);
+
+  const events: LogEvent[] = [];
+  let unmapped = 0;
+  for (const r of rows) {
+    const caseId = (r[ci] ?? "").trim();
+    const timestamp = parseTimestamp(r[ti] ?? "");
+    if (!caseId || timestamp === null) { unmapped++; continue; }
+    const resource = ri >= 0 ? (r[ri] ?? "").trim() : "";
+    events.push({
+      caseId,
+      activity: (r[ai] ?? "").trim(),
+      state: (r[si] ?? "").trim(),
+      timestamp,
+      ...(resource ? { resource } : {}),
+    });
+  }
+
+  const byCase = new Map<string, LogEvent[]>();
+  for (const e of events) (byCase.get(e.caseId) ?? byCase.set(e.caseId, []).get(e.caseId)!).push(e);
+  const traces: CaseTrace[] = [];
+  for (const [caseId, evs] of byCase) {
+    evs.sort((a, b) => a.timestamp - b.timestamp); // stable → ties keep input order
+    traces.push({ caseId, events: evs });
+  }
+
+  const variantMap = new Map<string, Variant>();
+  for (const t of traces) {
+    const states = t.events.map((e) => e.state);
+    const acts = t.events.map((e) => e.activity);
+    const key = JSON.stringify([states, acts]);
+    const v = variantMap.get(key);
+    if (v) v.count++; else variantMap.set(key, { states, events: acts, count: 1 });
+  }
+  const variants = [...variantMap.values()].sort((a, b) => b.count - a.count);
+
+  const times = events.map((e) => e.timestamp);
+  const stats: MiningStats = {
+    cases: traces.length,
+    events: events.length,
+    activities: [...new Set(events.map((e) => e.activity).filter(Boolean))].sort(),
+    states: [...new Set(events.map((e) => e.state).filter(Boolean))].sort(),
+    variants: variants.length,
+    from: times.length ? Math.min(...times) : undefined,
+    to: times.length ? Math.max(...times) : undefined,
+    ...(unmapped ? { unmappedRows: unmapped } : {}),
+  };
+
+  return { events, traces, variants, stats };
+}

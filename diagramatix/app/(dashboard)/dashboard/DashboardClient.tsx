@@ -21,6 +21,7 @@ import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { BackupProgressModal } from "@/app/components/BackupProgressModal";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
+import { ProcessMiningConsole } from "@/app/components/mining/ProcessMiningConsole";
 
 interface DiagramSummary {
   id: string;
@@ -281,6 +282,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [tileContextMenu, setTileContextMenu] = useState<{ projectId: string; x: number; y: number } | null>(null);
   // Project-level Simulator (comparison entry) — opened from a project's menu.
   const [simProject, setSimProject] = useState<{ id: string; name: string } | null>(null);
+  // Project-level Process Mining — opened from a project's menu.
+  const [miningProject, setMiningProject] = useState<{ id: string; name: string } | null>(null);
   useEffect(() => {
     if (!tileContextMenu) return;
     const close = () => setTileContextMenu(null);
@@ -2981,6 +2984,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               ◈ Simulator
             </button>
             <button
+              onClick={() => { close(); setMiningProject({ id: p.id, name: p.name }); }}
+              className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
+              title="Discover the real process from event logs + check conformance"
+            >
+              ◈ Process Mining
+            </button>
+            <button
               onClick={(e) => { close(); handleCloneProject(p.id, e); }}
               className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
             >
@@ -3029,6 +3039,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           projectName={simProject.name}
           isAdmin={!!isSu}
           onClose={() => setSimProject(null)}
+        />
+      )}
+
+      {miningProject && (
+        <ProcessMiningConsole
+          projectId={miningProject.id}
+          projectName={miningProject.name}
+          onClose={() => setMiningProject(null)}
         />
       )}
 
