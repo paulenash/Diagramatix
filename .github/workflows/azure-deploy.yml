@@ -208,6 +208,7 @@ jobs:
           npx --yes tsx@4 scripts/add-features-simulation-calendars.ts
           npx --yes tsx@4 scripts/add-guide-process-mining.ts
           npx --yes tsx@4 scripts/add-features-process-mining.ts
+          npx --yes tsx@4 scripts/add-features-mining-examples.ts
 
       - name: Update App Service container image
         # `az webapp config container set` rewrites the container
