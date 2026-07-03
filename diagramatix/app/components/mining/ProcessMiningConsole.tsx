@@ -55,9 +55,10 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     if (res.ok) setRuns((await res.json()).runs ?? []);
   }, [projectId]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    fetch(`/api/projects/${projectId}/mining/reference-sms`).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j?.diagrams) setReferenceSms(j.diagrams); }).catch(() => {});
+  const loadReferenceSms = useCallback(async () => {
+    try { const r = await fetch(`/api/projects/${projectId}/mining/reference-sms`); if (r.ok) { const j = await r.json(); if (j?.diagrams) setReferenceSms(j.diagrams); } } catch { /* ignore */ }
   }, [projectId]);
+  useEffect(() => { loadReferenceSms(); }, [loadReferenceSms]);
   // Sync the reference picker + last result to whichever run is selected.
   useEffect(() => {
     const s = runs.find((r) => r.id === selectedId);
@@ -142,14 +143,23 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     } finally { setDiscovering(false); }
   }
 
-  async function discoverSm(runId: string) {
+  async function discoverSm(runId: string): Promise<string | null> {
     setDiscovering(true); setErr(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/discover-sm`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(json.error ?? "State-machine discovery failed"); return; }
+      if (!res.ok) { setErr(json.error ?? "State-machine discovery failed"); return null; }
       await load();
+      await loadReferenceSms();       // so the new diagram appears in the conformance picker
+      return (json.diagramId as string) ?? null;
     } finally { setDiscovering(false); }
+  }
+
+  // No reference yet? Scaffold a draft state-machine from the mined lifecycle and
+  // select it — the user then prunes it into a governed reference (source of truth).
+  async function createDraftReference(runId: string) {
+    const id = await discoverSm(runId);
+    if (id) setRefSmId(id);
   }
 
   const selected = runs.find((r) => r.id === selectedId) ?? null;
@@ -288,8 +298,16 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 <button onClick={() => runConformance(selected.id)} disabled={!refSmId || runningConf} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
                   {runningConf ? "Checking…" : "✓ Check conformance"}
                 </button>
-                {referenceSms.length === 0 && <span className="text-[10px] text-stone-400">Draw or discover a State-Machine diagram to use as the reference.</span>}
+                {refSmId && <a href={`/diagram/${refSmId}`} className="text-[11px] text-amber-300 hover:text-amber-200 underline">edit reference →</a>}
               </div>
+              {referenceSms.length === 0 && (
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <button onClick={() => createDraftReference(selected.id)} disabled={discovering} className="text-xs bg-amber-800 hover:bg-amber-700 disabled:opacity-40 text-white rounded px-3 py-1.5">
+                    {discovering ? "Creating…" : "＋ Create draft reference"}
+                  </button>
+                  <span className="text-[10px] text-stone-400">No reference yet — scaffold one from the mined lifecycle, then <span className="text-stone-300">edit it into your rulebook</span> (prune the moves that shouldn&rsquo;t be allowed).</span>
+                </div>
+              )}
 
               {conformance && (
                 <div className="mt-3">
