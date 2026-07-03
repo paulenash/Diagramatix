@@ -1,20 +1,22 @@
 "use client";
 
 /**
- * Process Mining console — ingest an event log, then discover / conform / simulate.
- * Slice 1: upload a CSV, map its columns to roles, and persist a run (the
- * compressed variants). Discovery, conformance and the digital-twin calibration
- * panels light up in later slices.
+ * DiagramatixMINER console — ingest an event log, discover the implied BPMN + a
+ * candidate state machine, and check conformance against a reference state
+ * machine. Amber/brown "mining" skin, styled like the Simulator console. The
+ * digital-twin simulator calibration lands in the final slice.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { parseCsv, guessMapping } from "@/app/lib/mining/parseEventLog";
 import type { LogMapping, MiningStats } from "@/app/lib/mining/types";
+import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 interface RunRow {
   id: string; name: string; stats: MiningStats; mapping: Partial<LogMapping>;
   discoveredBpmnId: string | null; discoveredSmId: string | null; referenceSmId: string | null;
+  conformance: ConformanceResult | null;
   studyId: string | null; createdAt: string;
 }
 
@@ -42,12 +44,40 @@ export function ProcessMiningConsole({ projectId, projectName, onClose }: { proj
   const [err, setErr] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(0);
   const [discovering, setDiscovering] = useState(false);
+  // Conformance
+  const [referenceSms, setReferenceSms] = useState<{ id: string; name: string }[]>([]);
+  const [refSmId, setRefSmId] = useState("");
+  const [runningConf, setRunningConf] = useState(false);
+  const [conformance, setConformance] = useState<ConformanceResult | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/projects/${projectId}/mining/runs`);
     if (res.ok) setRuns((await res.json()).runs ?? []);
   }, [projectId]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}/mining/reference-sms`).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j?.diagrams) setReferenceSms(j.diagrams); }).catch(() => {});
+  }, [projectId]);
+  // Sync the reference picker + last result to whichever run is selected.
+  useEffect(() => {
+    const s = runs.find((r) => r.id === selectedId);
+    setRefSmId(s?.referenceSmId ?? s?.discoveredSmId ?? "");
+    setConformance(s?.conformance ?? null);
+  }, [selectedId, runs]);
+
+  async function runConformance(runId: string) {
+    if (!refSmId) return;
+    setRunningConf(true); setErr(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/conformance`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ referenceSmId: refSmId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(json.error ?? "Conformance failed"); return; }
+      setConformance(json.conformance ?? null);
+      await load();
+    } finally { setRunningConf(false); }
+  }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -111,24 +141,24 @@ export function ProcessMiningConsole({ projectId, projectName, onClose }: { proj
   }
 
   const selected = runs.find((r) => r.id === selectedId) ?? null;
-  const inp = "bg-slate-800 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs";
+  const inp = "bg-stone-800 border border-stone-600 rounded px-2 py-1 text-stone-100 text-xs";
 
   return (
-    <div className="fixed inset-0 z-[60] bg-slate-950 text-slate-200 overflow-auto">
-      <header className="flex items-center justify-between px-5 py-3 border-b border-slate-700 sticky top-0 bg-slate-950/95 backdrop-blur">
+    <div className="fixed inset-0 z-[60] bg-stone-950 text-stone-200 overflow-auto font-mono">
+      <header className="flex items-center justify-between px-5 py-3 border-b border-amber-900/50 sticky top-0 bg-stone-950/95 backdrop-blur">
         <div className="flex items-center gap-3">
-          <span className="text-indigo-300 tracking-[0.25em] text-sm">◈ PROCESS MINING</span>
-          {projectName && <span className="text-slate-400 text-xs">{projectName}</span>}
+          <span className="text-amber-300 tracking-[0.25em] text-sm">⛏ DiagramatixMINER</span>
+          {projectName && <span className="text-stone-400 text-xs">{projectName}</span>}
         </div>
-        <button onClick={onClose} className="px-3 py-1.5 text-xs text-white bg-slate-700 hover:bg-slate-600 rounded">✕ Exit</button>
+        <button onClick={onClose} className="px-3 py-1.5 text-xs text-white bg-stone-700 hover:bg-stone-600 rounded">✕ Exit</button>
       </header>
 
       <main className="max-w-5xl mx-auto p-4 grid gap-4 md:grid-cols-3">
         {/* Import */}
-        <section className="md:col-span-2 bg-slate-900 border border-slate-700 rounded-lg p-4">
-          <h2 className="text-sm font-semibold text-indigo-200 mb-1">Import an event log</h2>
-          <p className="text-xs text-slate-400 mb-3">Upload a CSV exported from your source system(s). Map its columns to roles, then import — the process is inferred from the logs.</p>
-          <label className="inline-block cursor-pointer text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded px-3 py-1.5">
+        <section className="md:col-span-2 bg-stone-900 border border-stone-700 rounded-lg p-4">
+          <h2 className="text-sm font-semibold text-amber-200 mb-1">Import an event log</h2>
+          <p className="text-xs text-stone-400 mb-3">Upload a CSV exported from your source system(s). Map its columns to roles, then import — the process is inferred from the logs.</p>
+          <label className="inline-block cursor-pointer text-xs bg-amber-700 hover:bg-amber-600 text-white rounded px-3 py-1.5">
             {fileName ? `↻ ${fileName}` : "⭱ Choose CSV…"}
             <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={onFile} className="hidden" />
           </label>
@@ -138,7 +168,7 @@ export function ProcessMiningConsole({ projectId, projectName, onClose }: { proj
               <div className="grid grid-cols-2 gap-2">
                 {ROLES.map((role) => (
                   <label key={role.key} className="flex flex-col gap-0.5" title={role.hint}>
-                    <span className="text-[10px] uppercase tracking-wide text-slate-400">{role.label}{role.required && <span className="text-rose-400"> *</span>}</span>
+                    <span className="text-[10px] uppercase tracking-wide text-stone-400">{role.label}{role.required && <span className="text-rose-400"> *</span>}</span>
                     <select value={(mapping[role.key] as string) ?? ""} onChange={(e) => setRole(role.key, e.target.value)} className={inp}>
                       <option value="">—</option>
                       {headers.map((h) => <option key={h} value={h}>{h}</option>)}
@@ -148,23 +178,23 @@ export function ProcessMiningConsole({ projectId, projectName, onClose }: { proj
               </div>
 
               {/* Preview */}
-              <div className="overflow-x-auto border border-slate-700 rounded">
+              <div className="overflow-x-auto border border-stone-700 rounded">
                 <table className="text-[10px] min-w-full">
-                  <thead className="bg-slate-800 text-slate-400">
+                  <thead className="bg-stone-800 text-stone-400">
                     <tr>{headers.map((h) => <th key={h} className="px-2 py-1 text-left font-medium whitespace-nowrap">{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {rows.slice(0, 5).map((r, i) => (
-                      <tr key={i} className="border-t border-slate-800">{headers.map((_, c) => <td key={c} className="px-2 py-1 whitespace-nowrap text-slate-300">{r[c]}</td>)}</tr>
+                      <tr key={i} className="border-t border-stone-800">{headers.map((_, c) => <td key={c} className="px-2 py-1 whitespace-nowrap text-stone-300">{r[c]}</td>)}</tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <p className="text-[10px] text-slate-500">{rows.length.toLocaleString()} rows · previewing first 5</p>
+              <p className="text-[10px] text-stone-400">{rows.length.toLocaleString()} rows · previewing first 5</p>
 
               <div className="flex items-center gap-2">
                 <input value={runName} onChange={(e) => setRunName(e.target.value)} placeholder="run name" className={`${inp} flex-1`} />
-                <button onClick={doImport} disabled={!canImport || busy} className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded px-3 py-1.5">
+                <button onClick={doImport} disabled={!canImport || busy} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
                   {busy ? "Importing…" : "Import log"}
                 </button>
               </div>
@@ -175,14 +205,14 @@ export function ProcessMiningConsole({ projectId, projectName, onClose }: { proj
         </section>
 
         {/* Runs */}
-        <section className="bg-slate-900 border border-slate-700 rounded-lg p-4">
-          <h2 className="text-sm font-semibold text-indigo-200 mb-2">Mining runs</h2>
-          {runs.length === 0 && <p className="text-xs text-slate-500">No runs yet — import a log.</p>}
+        <section className="bg-stone-900 border border-stone-700 rounded-lg p-4">
+          <h2 className="text-sm font-semibold text-amber-200 mb-2">Mining runs</h2>
+          {runs.length === 0 && <p className="text-xs text-stone-400">No runs yet — import a log.</p>}
           <div className="flex flex-col gap-1">
             {runs.map((r) => (
-              <div key={r.id} className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${selectedId === r.id ? "bg-indigo-500/15" : "hover:bg-slate-800"}`}>
-                <button onClick={() => setSelectedId(selectedId === r.id ? null : r.id)} className="flex-1 text-left truncate text-slate-200" title={r.name}>{r.name}</button>
-                <span className="text-slate-500">{r.stats?.cases ?? 0}c</span>
+              <div key={r.id} className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${selectedId === r.id ? "bg-amber-600/15" : "hover:bg-stone-800"}`}>
+                <button onClick={() => setSelectedId(selectedId === r.id ? null : r.id)} className="flex-1 text-left truncate text-stone-200" title={r.name}>{r.name}</button>
+                <span className="text-stone-400">{r.stats?.cases ?? 0}c</span>
                 <button onClick={() => setDeleting(r)} className="text-rose-400/70 hover:text-rose-300 px-1" title="Delete run">✕</button>
               </div>
             ))}
@@ -191,8 +221,8 @@ export function ProcessMiningConsole({ projectId, projectName, onClose }: { proj
 
         {/* Selected run summary */}
         {selected && (
-          <section className="md:col-span-3 bg-slate-900 border border-slate-700 rounded-lg p-4">
-            <h2 className="text-sm font-semibold text-indigo-200 mb-2">{selected.name}</h2>
+          <section className="md:col-span-3 bg-stone-900 border border-stone-700 rounded-lg p-4">
+            <h2 className="text-sm font-semibold text-amber-200 mb-2">{selected.name}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
               <Stat label="Cases" value={selected.stats?.cases} />
               <Stat label="Events" value={selected.stats?.events} />
@@ -202,38 +232,87 @@ export function ProcessMiningConsole({ projectId, projectName, onClose }: { proj
               <Stat label="Span" value={selected.stats?.from && selected.stats?.to ? `${Math.round((selected.stats.to - selected.stats.from) / 86400000)}d` : "—"} />
             </div>
             {/* Discover the BPMN process */}
-            <div className="mt-4 pt-3 border-t border-slate-700">
-              <h3 className="text-xs font-semibold text-indigo-200 mb-1">Discover the process</h3>
-              <p className="text-[11px] text-slate-400 mb-2">Infer the BPMN implied by the logs. Raise the filter to hide rare paths and reveal the mainstream flow.</p>
+            <div className="mt-4 pt-3 border-t border-stone-700">
+              <h3 className="text-xs font-semibold text-amber-200 mb-1">Discover the process</h3>
+              <p className="text-[11px] text-stone-400 mb-2">Infer the BPMN implied by the logs. Raise the filter to hide rare paths and reveal the mainstream flow.</p>
               <div className="flex items-center gap-3 flex-wrap">
-                <label className="flex items-center gap-2 text-[11px] text-slate-400">
+                <label className="flex items-center gap-2 text-[11px] text-stone-400">
                   detail
-                  <input type="range" min={0} max={90} value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} className="accent-indigo-500" />
-                  <span className="w-16 text-slate-300">{threshold === 0 ? "all paths" : `−${threshold}%`}</span>
+                  <input type="range" min={0} max={90} value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} className="accent-amber-600" />
+                  <span className="w-16 text-stone-300">{threshold === 0 ? "all paths" : `−${threshold}%`}</span>
                 </label>
-                <button onClick={() => discover(selected.id)} disabled={discovering} className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded px-3 py-1.5">
+                <button onClick={() => discover(selected.id)} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
                   {discovering ? "Discovering…" : "⚙ Discover process"}
                 </button>
                 {selected.discoveredBpmnId && (
-                  <a href={`/diagram/${selected.discoveredBpmnId}`} className="text-xs text-indigo-300 hover:text-indigo-200 underline">Open discovered diagram →</a>
+                  <a href={`/diagram/${selected.discoveredBpmnId}`} className="text-xs text-amber-300 hover:text-amber-200 underline">Open discovered diagram →</a>
                 )}
               </div>
             </div>
 
             {/* Discover the entity state machine */}
-            <div className="mt-4 pt-3 border-t border-slate-700">
-              <h3 className="text-xs font-semibold text-indigo-200 mb-1">Discover the state machine</h3>
-              <p className="text-[11px] text-slate-400 mb-2">Infer the entity&rsquo;s lifecycle — its states and the events that move between them — a candidate you can edit and use as the conformance reference.</p>
+            <div className="mt-4 pt-3 border-t border-stone-700">
+              <h3 className="text-xs font-semibold text-amber-200 mb-1">Discover the state machine</h3>
+              <p className="text-[11px] text-stone-400 mb-2">Infer the entity&rsquo;s lifecycle — its states and the events that move between them — a candidate you can edit and use as the conformance reference.</p>
               <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => discoverSm(selected.id)} disabled={discovering} className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded px-3 py-1.5">
+                <button onClick={() => discoverSm(selected.id)} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
                   {discovering ? "Working…" : "⚙ Discover state machine"}
                 </button>
                 {selected.discoveredSmId && (
-                  <a href={`/diagram/${selected.discoveredSmId}`} className="text-xs text-indigo-300 hover:text-indigo-200 underline">Open state machine →</a>
+                  <a href={`/diagram/${selected.discoveredSmId}`} className="text-xs text-amber-300 hover:text-amber-200 underline">Open state machine →</a>
                 )}
               </div>
             </div>
-            <p className="text-[11px] text-slate-500 mt-3">Next: <span className="text-indigo-300">state-machine conformance</span> and <span className="text-indigo-300">calibrate a simulation twin</span> (coming in the next slices).</p>
+
+            {/* Conformance vs a reference state machine */}
+            <div className="mt-4 pt-3 border-t border-stone-700">
+              <h3 className="text-xs font-semibold text-amber-200 mb-1">Conformance vs the reference</h3>
+              <p className="text-[11px] text-stone-400 mb-2">Replay the real state changes against your single source of truth and see where reality deviates.</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <select value={refSmId} onChange={(e) => setRefSmId(e.target.value)} className={`${inp} min-w-[12rem]`} title="The reference State-Machine diagram">
+                  <option value="">— pick a reference state machine —</option>
+                  {referenceSms.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+                <button onClick={() => runConformance(selected.id)} disabled={!refSmId || runningConf} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
+                  {runningConf ? "Checking…" : "✓ Check conformance"}
+                </button>
+                {referenceSms.length === 0 && <span className="text-[10px] text-stone-400">Draw or discover a State-Machine diagram to use as the reference.</span>}
+              </div>
+
+              {conformance && (
+                <div className="mt-3">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="text-2xl tabular-nums" style={{ color: conformance.fitness >= 0.9 ? "#86efac" : conformance.fitness >= 0.6 ? "#fcd34d" : "#fca5a5" }}>
+                      {(conformance.fitness * 100).toFixed(0)}%
+                    </div>
+                    <div className="text-[11px] text-stone-400">
+                      fitness — <span className="text-stone-200">{conformance.conformingCases.toLocaleString()}</span> of <span className="text-stone-200">{conformance.totalCases.toLocaleString()}</span> cases replay cleanly
+                    </div>
+                  </div>
+                  {conformance.violations.length === 0 ? (
+                    <p className="text-xs text-emerald-300">✓ Fully conformant — no deviations.</p>
+                  ) : (
+                    <div className="overflow-x-auto border border-stone-700 rounded">
+                      <table className="text-[11px] min-w-full">
+                        <thead className="bg-stone-800 text-stone-400">
+                          <tr><th className="px-2 py-1 text-left">Deviation</th><th className="px-2 py-1 text-left">Detail</th><th className="px-2 py-1 text-right">Cases</th></tr>
+                        </thead>
+                        <tbody>
+                          {conformance.violations.map((v, i) => (
+                            <tr key={i} className="border-t border-stone-800">
+                              <td className="px-2 py-1 whitespace-nowrap"><span className={v.severity === "error" ? "text-rose-300" : "text-amber-300"}>{v.severity === "error" ? "✕" : "!"} {v.rule.replace(/-/g, " ")}</span></td>
+                              <td className="px-2 py-1 text-stone-300">{v.message}</td>
+                              <td className="px-2 py-1 text-right text-stone-300 tabular-nums">{v.cases || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-stone-400 mt-3">Next: <span className="text-amber-300">calibrate a simulation twin</span> from this run (coming in the final slice).</p>
           </section>
         )}
       </main>
@@ -248,9 +327,9 @@ export function ProcessMiningConsole({ projectId, projectName, onClose }: { proj
 
 function Stat({ label, value }: { label: string; value: number | string | undefined }) {
   return (
-    <div className="bg-slate-800/60 rounded p-2">
-      <div className="text-[10px] uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="text-lg text-slate-100 tabular-nums">{value ?? "—"}</div>
+    <div className="bg-stone-800/60 rounded p-2">
+      <div className="text-[10px] uppercase tracking-wide text-stone-400">{label}</div>
+      <div className="text-lg text-stone-100 tabular-nums">{value ?? "—"}</div>
     </div>
   );
 }
