@@ -9,9 +9,9 @@ import { useState } from "react";
 import { DiagramatixMinerIntro } from "./DiagramatixMinerIntro";
 import { ProcessMiningConsole } from "./ProcessMiningConsole";
 
-export function ProcessMiningOverlay({ projectId, projectName, onClose, onOpenSimulator }: { projectId: string; projectName?: string; onClose: () => void; onOpenSimulator?: () => void }) {
+export function ProcessMiningOverlay({ projectId, projectName, isAdmin, onClose, onOpenSimulator }: { projectId: string; projectName?: string; isAdmin?: boolean; onClose: () => void; onOpenSimulator?: () => void }) {
   const [entered, setEntered] = useState(false);
   return entered
-    ? <ProcessMiningConsole projectId={projectId} projectName={projectName} onClose={onClose} onOpenSimulator={onOpenSimulator} />
+    ? <ProcessMiningConsole projectId={projectId} projectName={projectName} isAdmin={isAdmin} onClose={onClose} onOpenSimulator={onOpenSimulator} />
     : <DiagramatixMinerIntro onEnter={() => setEntered(true)} />;
 }

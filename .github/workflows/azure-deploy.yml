@@ -182,6 +182,17 @@ jobs:
         # not a project dep — fetch it pinned + non-interactive (`--yes`).
         run: npx --yes tsx@4 scripts/seed-simulation-examples.ts
 
+      - name: Seed mining example catalog
+        working-directory: ./diagramatix
+        # Non-blocking, idempotent (upsert by slug) — the DiagramatixMINER
+        # starter examples (event log + reference state machines) for the
+        # Process-Mining Examples gallery. Runs AFTER the schema push so the
+        # MiningExample table exists. Same rationale as the simulator catalog.
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+        run: npx --yes tsx@4 scripts/seed-mining-examples.ts
+
       - name: Seed simulator docs (User Guide + Features)
         working-directory: ./diagramatix
         # Non-blocking, idempotent: the DB-backed User Guide sections + Feature
@@ -197,6 +208,7 @@ jobs:
           npx --yes tsx@4 scripts/add-features-simulation-calendars.ts
           npx --yes tsx@4 scripts/add-guide-process-mining.ts
           npx --yes tsx@4 scripts/add-features-process-mining.ts
+          npx --yes tsx@4 scripts/add-features-mining-examples.ts
 
       - name: Update App Service container image
         # `az webapp config container set` rewrites the container
