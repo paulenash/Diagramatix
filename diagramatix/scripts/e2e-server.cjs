@@ -28,6 +28,8 @@ function step(label, command) {
 // registerUser's `subscriptionLevelId: "free"` references).
 step("applying schema to diagramatix_test", `npx prisma db push --accept-data-loss --url "${env.DATABASE_URL}"`);
 step("seeding subscription levels", "npx --yes tsx@4 scripts/seed-subscriptions.ts");
+// The DiagramatixMINER Examples gallery needs its catalog, like subscriptions.
+step("seeding mining example catalog", "npx --yes tsx@4 scripts/seed-mining-examples.ts");
 
 // Lift the Free-tier caps in the TEST DB ONLY so the e2e account (a Free user)
 // can create ArchiMate diagrams + many diagrams + AI attempts. Never touches prod.
