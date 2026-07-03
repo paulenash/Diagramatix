@@ -45,6 +45,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   const [threshold, setThreshold] = useState(0);
   const [discovering, setDiscovering] = useState(false);
   const [aiSm, setAiSm] = useState(false);   // AI state-machine generation in flight
+  const [aiBpmn, setAiBpmn] = useState(false); // AI process generation in flight
   // Conformance
   const [referenceSms, setReferenceSms] = useState<{ id: string; name: string }[]>([]);
   const [refSmId, setRefSmId] = useState("");
@@ -132,16 +133,16 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     await load();
   }
 
-  async function discover(runId: string) {
-    setDiscovering(true); setErr(null);
+  async function discover(runId: string, ai = false) {
+    setDiscovering(true); if (ai) setAiBpmn(true); setErr(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/discover`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ edgeThreshold: threshold / 100 }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ edgeThreshold: threshold / 100, ai }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Discovery failed"); return; }
       await load();
-    } finally { setDiscovering(false); }
+    } finally { setDiscovering(false); setAiBpmn(false); }
   }
 
   async function discoverSm(runId: string, ai = false): Promise<string | null> {
@@ -267,7 +268,10 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                   <span className="w-16 text-stone-300">{threshold === 0 ? "all paths" : `−${threshold}%`}</span>
                 </label>
                 <button onClick={() => discover(selected.id)} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
-                  {discovering ? "Discovering…" : "⚙ Discover process"}
+                  {discovering && !aiBpmn ? "Discovering…" : "⚙ Discover process"}
+                </button>
+                <button onClick={() => discover(selected.id, true)} disabled={discovering} className="text-xs bg-amber-800 hover:bg-amber-700 disabled:opacity-40 text-white rounded px-3 py-1.5" title="Use AI (rules + template + your configured model) to curate a clean, readable BPMN process from the mined paths">
+                  {aiBpmn ? "✨ Generating…" : "✨ AI process"}
                 </button>
                 {selected.discoveredBpmnId && (
                   <a href={`/diagram/${selected.discoveredBpmnId}`} className="text-xs text-amber-300 hover:text-amber-200 underline">Open discovered diagram →</a>
