@@ -62,3 +62,14 @@ export interface EventLog {
   variants: Variant[];
   stats: MiningStats;
 }
+
+/** Timing + resource aggregates mined from the log — the numbers that calibrate
+ *  a simulation "digital twin". All durations are already in `clockUnit`. */
+export interface Performance {
+  clockUnit: "second" | "minute" | "hour" | "day";
+  activityDurations: Record<string, number[]>;   // activity → sojourn-time samples (until next event)
+  interArrival: number[];                          // gaps between consecutive cases' first events
+  activityResource: Record<string, string>;        // activity → dominant resource (→ simulation team)
+  resourceConcurrency: Record<string, number>;     // resource → max simultaneous cases (→ team capacity)
+  activeHours: number[];                           // 168 buckets, index = day(0=Mon)*24 + hour, event count
+}

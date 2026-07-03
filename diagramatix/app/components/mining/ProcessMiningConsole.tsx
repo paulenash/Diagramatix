@@ -29,7 +29,7 @@ const ROLES: { key: keyof LogMapping; label: string; required: boolean; hint: st
   { key: "entityType", label: "Entity type (optional)", required: false, hint: "The entity kind (Invoice, Employee…)" },
 ];
 
-export function ProcessMiningConsole({ projectId, projectName, onClose }: { projectId: string; projectName?: string; onClose: () => void }) {
+export function ProcessMiningConsole({ projectId, projectName, onClose, onOpenSimulator }: { projectId: string; projectName?: string; onClose: () => void; onOpenSimulator?: () => void }) {
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<RunRow | null>(null);
@@ -64,6 +64,18 @@ export function ProcessMiningConsole({ projectId, projectName, onClose }: { proj
     setRefSmId(s?.referenceSmId ?? s?.discoveredSmId ?? "");
     setConformance(s?.conformance ?? null);
   }, [selectedId, runs]);
+
+  const [calibrating, setCalibrating] = useState(false);
+  async function calibrate(runId: string) {
+    setCalibrating(true); setErr(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/calibrate`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(json.error ?? "Calibration failed"); return; }
+      await load();
+      onOpenSimulator?.(); // hand off to the Simulator on the calibrated twin study
+    } finally { setCalibrating(false); }
+  }
 
   async function runConformance(runId: string) {
     if (!refSmId) return;
@@ -312,7 +324,18 @@ export function ProcessMiningConsole({ projectId, projectName, onClose }: { proj
                 </div>
               )}
             </div>
-            <p className="text-[11px] text-stone-400 mt-3">Next: <span className="text-amber-300">calibrate a simulation twin</span> from this run (coming in the final slice).</p>
+
+            {/* Calibrate a simulation digital twin */}
+            <div className="mt-4 pt-3 border-t border-stone-700">
+              <h3 className="text-xs font-semibold text-amber-200 mb-1">Simulate a digital twin</h3>
+              <p className="text-[11px] text-stone-400 mb-2">Calibrate a simulation from the mined data — cycle times, arrivals, branch splits, teams + working hours — then explore <em>to-be</em> improvements in the Simulator.</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button onClick={() => calibrate(selected.id)} disabled={calibrating} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
+                  {calibrating ? "Calibrating…" : "▶ Calibrate & simulate"}
+                </button>
+                {selected.studyId && <span className="text-[10px] text-emerald-300">✓ twin study ready — opens in the Simulator</span>}
+              </div>
+            </div>
           </section>
         )}
       </main>

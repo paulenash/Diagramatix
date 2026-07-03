@@ -351,6 +351,14 @@
     params). New runtime DB tables (SimulationCalendar, SimulationTeam.calendarId)
     are not part of the diagram export. The version attribute advances with the
     release window.
+
+  v1.31 — DiagramatixMINER (Process Mining): ingest event logs → discover the
+    implied BPMN + a candidate State-Machine, check state-change conformance vs a
+    reference State-Machine, and calibrate a simulation "digital twin" from the
+    mined data. Discovered artefacts are ordinary bpmn/state-machine diagrams; the
+    new ProcessMiningRun runtime table is not part of the diagram export. This
+    XSD's structure is UNCHANGED; the version attribute advances with the release
+    window.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

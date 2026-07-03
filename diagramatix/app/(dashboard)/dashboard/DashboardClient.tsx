@@ -3047,6 +3047,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           projectId={miningProject.id}
           projectName={miningProject.name}
           onClose={() => setMiningProject(null)}
+          onOpenSimulator={() => { const p = miningProject; setMiningProject(null); setSimProject(p); }}
         />
       )}
 
