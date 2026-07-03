@@ -284,6 +284,16 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [simProject, setSimProject] = useState<{ id: string; name: string } | null>(null);
   // Project-level Process Mining — opened from a project's menu.
   const [miningProject, setMiningProject] = useState<{ id: string; name: string } | null>(null);
+  // Deep-link: ?mining=<projectId>&mp=<name> auto-opens ⛏ DiagramatixMINER on a
+  // freshly-adopted example project (the Mining-Examples gallery lands here).
+  useEffect(() => {
+    const mid = searchParams.get("mining");
+    if (!mid) return;
+    setMiningProject({ id: mid, name: searchParams.get("mp") ?? "" });
+    router.replace("/dashboard");
+    // Run once on mount for the initial URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (!tileContextMenu) return;
     const close = () => setTileContextMenu(null);
@@ -1586,6 +1596,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       title="Load a ready-made example simulation to explore or demo"
                     >
                       Simulator Examples
+                    </a>
+                    <a
+                      href="/dashboard/mining-examples"
+                      onClick={() => setFileMenuOpen(false)}
+                      className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      title="Load a ready-made process-mining example (event log + reference lifecycle) to explore or demo"
+                    >
+                      DiagramatixMINER Examples
                     </a>
                     <div className="border-t border-gray-100" />
                     <button
@@ -3046,6 +3064,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         <ProcessMiningOverlay
           projectId={miningProject.id}
           projectName={miningProject.name}
+          isAdmin={!!isSu}
           onClose={() => setMiningProject(null)}
           onOpenSimulator={() => { const p = miningProject; setMiningProject(null); setSimProject(p); }}
         />

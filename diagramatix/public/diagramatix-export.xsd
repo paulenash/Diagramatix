@@ -359,6 +359,13 @@
     new ProcessMiningRun runtime table is not part of the diagram export. This
     XSD's structure is UNCHANGED; the version attribute advances with the release
     window.
+
+  v1.32 — DiagramatixMINER Examples: an adoptable process-mining sample catalog
+    (new MiningExample runtime table; one-click "Load & open" recreates a ready
+    ProcessMiningRun + reference State-Machine diagrams in a fresh project). The
+    reference diagrams are ordinary state-machine diagrams; the catalog table is
+    not part of the diagram export. This XSD's structure is UNCHANGED; the
+    version attribute advances with the release window.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

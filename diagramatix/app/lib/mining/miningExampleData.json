@@ -1,0 +1,2472 @@
+{
+  "examples": [
+    {
+      "slug": "accounts-payable-invoice-lifecycle",
+      "title": "Accounts Payable — Invoice Lifecycle",
+      "concept": "Mine a real invoice process from an event log, then check it against the reference lifecycle.",
+      "description": "A month of Accounts Payable activity — ~200 invoices flowing through **Received → In Progress → Approved → Ready to Pay → Paid**, with an On Hold rework loop and a Cancelled branch.\n\n**Discover** the implied BPMN and the entity lifecycle, run **Conformance** against the bundled **reference** state machine (~89% fitness — only in-flight invoices deviate), then switch to the **strict** reference (no rework) to watch it flag ~40 undocumented *On Hold → In Progress* cases. Finally hit **Calibrate & simulate** to turn the discovered process into a digital twin and watch invoices animate through it in the Simulator.",
+      "difficulty": "core",
+      "package": {
+        "version": 1,
+        "diagrams": [
+          {
+            "key": "ap-reference",
+            "name": "AP Invoice Lifecycle (Reference)",
+            "type": "state-machine",
+            "data": {
+              "elements": [
+                {
+                  "id": "__init",
+                  "type": "initial-state",
+                  "x": 100,
+                  "y": 100,
+                  "width": 30,
+                  "height": 30,
+                  "label": "",
+                  "properties": {}
+                },
+                {
+                  "id": "__final",
+                  "type": "final-state",
+                  "x": 190,
+                  "y": 100,
+                  "width": 30,
+                  "height": 30,
+                  "label": "",
+                  "properties": {}
+                },
+                {
+                  "id": "received",
+                  "type": "state",
+                  "x": 280,
+                  "y": 100,
+                  "width": 120,
+                  "height": 60,
+                  "label": "Received",
+                  "properties": {}
+                },
+                {
+                  "id": "in-progress",
+                  "type": "state",
+                  "x": 460,
+                  "y": 100,
+                  "width": 120,
+                  "height": 60,
+                  "label": "In Progress",
+                  "properties": {}
+                },
+                {
+                  "id": "on-hold",
+                  "type": "state",
+                  "x": 100,
+                  "y": 200,
+                  "width": 120,
+                  "height": 60,
+                  "label": "On Hold",
+                  "properties": {}
+                },
+                {
+                  "id": "approved",
+                  "type": "state",
+                  "x": 280,
+                  "y": 200,
+                  "width": 120,
+                  "height": 60,
+                  "label": "Approved",
+                  "properties": {}
+                },
+                {
+                  "id": "ready-to-pay",
+                  "type": "state",
+                  "x": 460,
+                  "y": 200,
+                  "width": 120,
+                  "height": 60,
+                  "label": "Ready to Pay",
+                  "properties": {}
+                },
+                {
+                  "id": "paid",
+                  "type": "state",
+                  "x": 640,
+                  "y": 200,
+                  "width": 120,
+                  "height": 60,
+                  "label": "Paid",
+                  "properties": {}
+                },
+                {
+                  "id": "cancelled",
+                  "type": "state",
+                  "x": 100,
+                  "y": 300,
+                  "width": 120,
+                  "height": 60,
+                  "label": "Cancelled",
+                  "properties": {}
+                }
+              ],
+              "connectors": [
+                {
+                  "id": "conn-__init-received",
+                  "sourceId": "__init",
+                  "targetId": "received",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 115,
+                      "y": 115
+                    },
+                    {
+                      "x": 130,
+                      "y": 115
+                    },
+                    {
+                      "x": 190,
+                      "y": 115
+                    },
+                    {
+                      "x": 220,
+                      "y": 130
+                    },
+                    {
+                      "x": 280,
+                      "y": 130
+                    },
+                    {
+                      "x": 340,
+                      "y": 130
+                    }
+                  ],
+                  "label": "Receive Invoice",
+                  "labelMode": "formal",
+                  "transitionEvent": "Receive Invoice"
+                },
+                {
+                  "id": "conn-received-in-progress",
+                  "sourceId": "received",
+                  "targetId": "in-progress",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 340,
+                      "y": 130
+                    },
+                    {
+                      "x": 400,
+                      "y": 130
+                    },
+                    {
+                      "x": 460,
+                      "y": 130
+                    },
+                    {
+                      "x": 400,
+                      "y": 130
+                    },
+                    {
+                      "x": 460,
+                      "y": 130
+                    },
+                    {
+                      "x": 520,
+                      "y": 130
+                    }
+                  ],
+                  "label": "Begin Review",
+                  "labelMode": "formal",
+                  "transitionEvent": "Begin Review"
+                },
+                {
+                  "id": "conn-in-progress-on-hold",
+                  "sourceId": "in-progress",
+                  "targetId": "on-hold",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 520,
+                      "y": 130
+                    },
+                    {
+                      "x": 580,
+                      "y": 130
+                    },
+                    {
+                      "x": 743.4353422950835,
+                      "y": 130
+                    },
+                    {
+                      "x": -63.4353422950835,
+                      "y": 230
+                    },
+                    {
+                      "x": 100,
+                      "y": 230
+                    },
+                    {
+                      "x": 160,
+                      "y": 230
+                    }
+                  ],
+                  "label": "Place On Hold",
+                  "labelMode": "formal",
+                  "transitionEvent": "Place On Hold"
+                },
+                {
+                  "id": "conn-on-hold-in-progress",
+                  "sourceId": "on-hold",
+                  "targetId": "in-progress",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 160,
+                      "y": 230
+                    },
+                    {
+                      "x": 220,
+                      "y": 230
+                    },
+                    {
+                      "x": 306.6666666666667,
+                      "y": 230
+                    },
+                    {
+                      "x": 373.3333333333333,
+                      "y": 130
+                    },
+                    {
+                      "x": 460,
+                      "y": 130
+                    },
+                    {
+                      "x": 520,
+                      "y": 130
+                    }
+                  ],
+                  "label": "Resume Review",
+                  "labelMode": "formal",
+                  "transitionEvent": "Resume Review"
+                },
+                {
+                  "id": "conn-in-progress-approved",
+                  "sourceId": "in-progress",
+                  "targetId": "approved",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 520,
+                      "y": 130
+                    },
+                    {
+                      "x": 580,
+                      "y": 130
+                    },
+                    {
+                      "x": 685.409255338946,
+                      "y": 130
+                    },
+                    {
+                      "x": 174.59074466105403,
+                      "y": 230
+                    },
+                    {
+                      "x": 280,
+                      "y": 230
+                    },
+                    {
+                      "x": 340,
+                      "y": 230
+                    }
+                  ],
+                  "label": "Approve Invoice",
+                  "labelMode": "formal",
+                  "transitionEvent": "Approve Invoice"
+                },
+                {
+                  "id": "conn-approved-ready-to-pay",
+                  "sourceId": "approved",
+                  "targetId": "ready-to-pay",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 340,
+                      "y": 230
+                    },
+                    {
+                      "x": 400,
+                      "y": 230
+                    },
+                    {
+                      "x": 460,
+                      "y": 230
+                    },
+                    {
+                      "x": 400,
+                      "y": 230
+                    },
+                    {
+                      "x": 460,
+                      "y": 230
+                    },
+                    {
+                      "x": 520,
+                      "y": 230
+                    }
+                  ],
+                  "label": "Schedule Payment",
+                  "labelMode": "formal",
+                  "transitionEvent": "Schedule Payment"
+                },
+                {
+                  "id": "conn-ready-to-pay-paid",
+                  "sourceId": "ready-to-pay",
+                  "targetId": "paid",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 520,
+                      "y": 230
+                    },
+                    {
+                      "x": 580,
+                      "y": 230
+                    },
+                    {
+                      "x": 640,
+                      "y": 230
+                    },
+                    {
+                      "x": 580,
+                      "y": 230
+                    },
+                    {
+                      "x": 640,
+                      "y": 230
+                    },
+                    {
+                      "x": 700,
+                      "y": 230
+                    }
+                  ],
+                  "label": "Pay Invoice",
+                  "labelMode": "formal",
+                  "transitionEvent": "Pay Invoice"
+                },
+                {
+                  "id": "conn-in-progress-cancelled",
+                  "sourceId": "in-progress",
+                  "targetId": "cancelled",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 520,
+                      "y": 130
+                    },
+                    {
+                      "x": 580,
+                      "y": 130
+                    },
+                    {
+                      "x": 753.3333333333334,
+                      "y": 130
+                    },
+                    {
+                      "x": -73.33333333333334,
+                      "y": 330
+                    },
+                    {
+                      "x": 100,
+                      "y": 330
+                    },
+                    {
+                      "x": 160,
+                      "y": 330
+                    }
+                  ],
+                  "label": "Cancel Invoice",
+                  "labelMode": "formal",
+                  "transitionEvent": "Cancel Invoice"
+                },
+                {
+                  "id": "conn-on-hold-cancelled",
+                  "sourceId": "on-hold",
+                  "targetId": "cancelled",
+                  "sourceSide": "bottom",
+                  "targetSide": "top",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 160,
+                      "y": 230
+                    },
+                    {
+                      "x": 160,
+                      "y": 260
+                    },
+                    {
+                      "x": 160,
+                      "y": 320
+                    },
+                    {
+                      "x": 160,
+                      "y": 240
+                    },
+                    {
+                      "x": 160,
+                      "y": 300
+                    },
+                    {
+                      "x": 160,
+                      "y": 330
+                    }
+                  ],
+                  "label": "Cancel Invoice",
+                  "labelMode": "formal",
+                  "transitionEvent": "Cancel Invoice"
+                },
+                {
+                  "id": "conn-paid-__final",
+                  "sourceId": "paid",
+                  "targetId": "__final",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 700,
+                      "y": 230
+                    },
+                    {
+                      "x": 760,
+                      "y": 230
+                    },
+                    {
+                      "x": 953.8283891602168,
+                      "y": 230
+                    },
+                    {
+                      "x": -3.828389160216801,
+                      "y": 115
+                    },
+                    {
+                      "x": 190,
+                      "y": 115
+                    },
+                    {
+                      "x": 205,
+                      "y": 115
+                    }
+                  ],
+                  "label": ""
+                },
+                {
+                  "id": "conn-cancelled-__final",
+                  "sourceId": "cancelled",
+                  "targetId": "__final",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 160,
+                      "y": 330
+                    },
+                    {
+                      "x": 160,
+                      "y": 300
+                    },
+                    {
+                      "x": 160,
+                      "y": 240
+                    },
+                    {
+                      "x": 205,
+                      "y": 190
+                    },
+                    {
+                      "x": 205,
+                      "y": 130
+                    },
+                    {
+                      "x": 205,
+                      "y": 115
+                    }
+                  ],
+                  "label": ""
+                }
+              ],
+              "viewport": {
+                "x": 0,
+                "y": 0,
+                "zoom": 0.7
+              },
+              "fontSize": 12,
+              "connectorFontSize": 10
+            }
+          },
+          {
+            "key": "ap-strict",
+            "name": "AP Invoice Lifecycle (Strict — no rework)",
+            "type": "state-machine",
+            "data": {
+              "elements": [
+                {
+                  "id": "__init",
+                  "type": "initial-state",
+                  "x": 100,
+                  "y": 100,
+                  "width": 30,
+                  "height": 30,
+                  "label": "",
+                  "properties": {}
+                },
+                {
+                  "id": "__final",
+                  "type": "final-state",
+                  "x": 190,
+                  "y": 100,
+                  "width": 30,
+                  "height": 30,
+                  "label": "",
+                  "properties": {}
+                },
+                {
+                  "id": "received",
+                  "type": "state",
+                  "x": 280,
+                  "y": 100,
+                  "width": 120,
+                  "height": 60,
+                  "label": "Received",
+                  "properties": {}
+                },
+                {
+                  "id": "in-progress",
+                  "type": "state",
+                  "x": 460,
+                  "y": 100,
+                  "width": 120,
+                  "height": 60,
+                  "label": "In Progress",
+                  "properties": {}
+                },
+                {
+                  "id": "on-hold",
+                  "type": "state",
+                  "x": 100,
+                  "y": 200,
+                  "width": 120,
+                  "height": 60,
+                  "label": "On Hold",
+                  "properties": {}
+                },
+                {
+                  "id": "approved",
+                  "type": "state",
+                  "x": 280,
+                  "y": 200,
+                  "width": 120,
+                  "height": 60,
+                  "label": "Approved",
+                  "properties": {}
+                },
+                {
+                  "id": "ready-to-pay",
+                  "type": "state",
+                  "x": 460,
+                  "y": 200,
+                  "width": 120,
+                  "height": 60,
+                  "label": "Ready to Pay",
+                  "properties": {}
+                },
+                {
+                  "id": "paid",
+                  "type": "state",
+                  "x": 640,
+                  "y": 200,
+                  "width": 120,
+                  "height": 60,
+                  "label": "Paid",
+                  "properties": {}
+                },
+                {
+                  "id": "cancelled",
+                  "type": "state",
+                  "x": 100,
+                  "y": 300,
+                  "width": 120,
+                  "height": 60,
+                  "label": "Cancelled",
+                  "properties": {}
+                }
+              ],
+              "connectors": [
+                {
+                  "id": "conn-__init-received",
+                  "sourceId": "__init",
+                  "targetId": "received",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 115,
+                      "y": 115
+                    },
+                    {
+                      "x": 130,
+                      "y": 115
+                    },
+                    {
+                      "x": 190,
+                      "y": 115
+                    },
+                    {
+                      "x": 220,
+                      "y": 130
+                    },
+                    {
+                      "x": 280,
+                      "y": 130
+                    },
+                    {
+                      "x": 340,
+                      "y": 130
+                    }
+                  ],
+                  "label": "Receive Invoice",
+                  "labelMode": "formal",
+                  "transitionEvent": "Receive Invoice"
+                },
+                {
+                  "id": "conn-received-in-progress",
+                  "sourceId": "received",
+                  "targetId": "in-progress",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 340,
+                      "y": 130
+                    },
+                    {
+                      "x": 400,
+                      "y": 130
+                    },
+                    {
+                      "x": 460,
+                      "y": 130
+                    },
+                    {
+                      "x": 400,
+                      "y": 130
+                    },
+                    {
+                      "x": 460,
+                      "y": 130
+                    },
+                    {
+                      "x": 520,
+                      "y": 130
+                    }
+                  ],
+                  "label": "Begin Review",
+                  "labelMode": "formal",
+                  "transitionEvent": "Begin Review"
+                },
+                {
+                  "id": "conn-in-progress-on-hold",
+                  "sourceId": "in-progress",
+                  "targetId": "on-hold",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 520,
+                      "y": 130
+                    },
+                    {
+                      "x": 580,
+                      "y": 130
+                    },
+                    {
+                      "x": 743.4353422950835,
+                      "y": 130
+                    },
+                    {
+                      "x": -63.4353422950835,
+                      "y": 230
+                    },
+                    {
+                      "x": 100,
+                      "y": 230
+                    },
+                    {
+                      "x": 160,
+                      "y": 230
+                    }
+                  ],
+                  "label": "Place On Hold",
+                  "labelMode": "formal",
+                  "transitionEvent": "Place On Hold"
+                },
+                {
+                  "id": "conn-in-progress-approved",
+                  "sourceId": "in-progress",
+                  "targetId": "approved",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 520,
+                      "y": 130
+                    },
+                    {
+                      "x": 580,
+                      "y": 130
+                    },
+                    {
+                      "x": 685.409255338946,
+                      "y": 130
+                    },
+                    {
+                      "x": 174.59074466105403,
+                      "y": 230
+                    },
+                    {
+                      "x": 280,
+                      "y": 230
+                    },
+                    {
+                      "x": 340,
+                      "y": 230
+                    }
+                  ],
+                  "label": "Approve Invoice",
+                  "labelMode": "formal",
+                  "transitionEvent": "Approve Invoice"
+                },
+                {
+                  "id": "conn-approved-ready-to-pay",
+                  "sourceId": "approved",
+                  "targetId": "ready-to-pay",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 340,
+                      "y": 230
+                    },
+                    {
+                      "x": 400,
+                      "y": 230
+                    },
+                    {
+                      "x": 460,
+                      "y": 230
+                    },
+                    {
+                      "x": 400,
+                      "y": 230
+                    },
+                    {
+                      "x": 460,
+                      "y": 230
+                    },
+                    {
+                      "x": 520,
+                      "y": 230
+                    }
+                  ],
+                  "label": "Schedule Payment",
+                  "labelMode": "formal",
+                  "transitionEvent": "Schedule Payment"
+                },
+                {
+                  "id": "conn-ready-to-pay-paid",
+                  "sourceId": "ready-to-pay",
+                  "targetId": "paid",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 520,
+                      "y": 230
+                    },
+                    {
+                      "x": 580,
+                      "y": 230
+                    },
+                    {
+                      "x": 640,
+                      "y": 230
+                    },
+                    {
+                      "x": 580,
+                      "y": 230
+                    },
+                    {
+                      "x": 640,
+                      "y": 230
+                    },
+                    {
+                      "x": 700,
+                      "y": 230
+                    }
+                  ],
+                  "label": "Pay Invoice",
+                  "labelMode": "formal",
+                  "transitionEvent": "Pay Invoice"
+                },
+                {
+                  "id": "conn-in-progress-cancelled",
+                  "sourceId": "in-progress",
+                  "targetId": "cancelled",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 520,
+                      "y": 130
+                    },
+                    {
+                      "x": 580,
+                      "y": 130
+                    },
+                    {
+                      "x": 753.3333333333334,
+                      "y": 130
+                    },
+                    {
+                      "x": -73.33333333333334,
+                      "y": 330
+                    },
+                    {
+                      "x": 100,
+                      "y": 330
+                    },
+                    {
+                      "x": 160,
+                      "y": 330
+                    }
+                  ],
+                  "label": "Cancel Invoice",
+                  "labelMode": "formal",
+                  "transitionEvent": "Cancel Invoice"
+                },
+                {
+                  "id": "conn-on-hold-cancelled",
+                  "sourceId": "on-hold",
+                  "targetId": "cancelled",
+                  "sourceSide": "bottom",
+                  "targetSide": "top",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 160,
+                      "y": 230
+                    },
+                    {
+                      "x": 160,
+                      "y": 260
+                    },
+                    {
+                      "x": 160,
+                      "y": 320
+                    },
+                    {
+                      "x": 160,
+                      "y": 240
+                    },
+                    {
+                      "x": 160,
+                      "y": 300
+                    },
+                    {
+                      "x": 160,
+                      "y": 330
+                    }
+                  ],
+                  "label": "Cancel Invoice",
+                  "labelMode": "formal",
+                  "transitionEvent": "Cancel Invoice"
+                },
+                {
+                  "id": "conn-paid-__final",
+                  "sourceId": "paid",
+                  "targetId": "__final",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 700,
+                      "y": 230
+                    },
+                    {
+                      "x": 760,
+                      "y": 230
+                    },
+                    {
+                      "x": 953.8283891602168,
+                      "y": 230
+                    },
+                    {
+                      "x": -3.828389160216801,
+                      "y": 115
+                    },
+                    {
+                      "x": 190,
+                      "y": 115
+                    },
+                    {
+                      "x": 205,
+                      "y": 115
+                    }
+                  ],
+                  "label": ""
+                },
+                {
+                  "id": "conn-cancelled-__final",
+                  "sourceId": "cancelled",
+                  "targetId": "__final",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "type": "transition",
+                  "directionType": "open-directed",
+                  "routingType": "curvilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 160,
+                      "y": 330
+                    },
+                    {
+                      "x": 160,
+                      "y": 300
+                    },
+                    {
+                      "x": 160,
+                      "y": 240
+                    },
+                    {
+                      "x": 205,
+                      "y": 190
+                    },
+                    {
+                      "x": 205,
+                      "y": 130
+                    },
+                    {
+                      "x": 205,
+                      "y": 115
+                    }
+                  ],
+                  "label": ""
+                }
+              ],
+              "viewport": {
+                "x": 0,
+                "y": 0,
+                "zoom": 0.7
+              },
+              "fontSize": 12,
+              "connectorFontSize": 10
+            }
+          }
+        ],
+        "run": {
+          "name": "Accounts Payable — January 2026",
+          "mapping": {
+            "caseId": "Invoice ID",
+            "activity": "Activity",
+            "timestamp": "Timestamp",
+            "state": "Invoice Status",
+            "resource": "Resource"
+          },
+          "stats": {
+            "cases": 200,
+            "events": 987,
+            "activities": [
+              "Approve Invoice",
+              "Begin Review",
+              "Cancel Invoice",
+              "Pay Invoice",
+              "Place On Hold",
+              "Receive Invoice",
+              "Resume Review",
+              "Schedule Payment"
+            ],
+            "states": [
+              "Approved",
+              "Cancelled",
+              "In Progress",
+              "On Hold",
+              "Paid",
+              "Ready to Pay",
+              "Received"
+            ],
+            "variants": 10,
+            "from": 1767257108000,
+            "to": 1769898390000
+          },
+          "variants": [
+            {
+              "states": [
+                "Received",
+                "In Progress",
+                "Approved",
+                "Ready to Pay",
+                "Paid"
+              ],
+              "events": [
+                "Receive Invoice",
+                "Begin Review",
+                "Approve Invoice",
+                "Schedule Payment",
+                "Pay Invoice"
+              ],
+              "count": 108
+            },
+            {
+              "states": [
+                "Received",
+                "In Progress",
+                "On Hold",
+                "In Progress",
+                "Approved",
+                "Ready to Pay",
+                "Paid"
+              ],
+              "events": [
+                "Receive Invoice",
+                "Begin Review",
+                "Place On Hold",
+                "Resume Review",
+                "Approve Invoice",
+                "Schedule Payment",
+                "Pay Invoice"
+              ],
+              "count": 37
+            },
+            {
+              "states": [
+                "Received",
+                "In Progress",
+                "Cancelled"
+              ],
+              "events": [
+                "Receive Invoice",
+                "Begin Review",
+                "Cancel Invoice"
+              ],
+              "count": 20
+            },
+            {
+              "states": [
+                "Received",
+                "In Progress",
+                "On Hold",
+                "Cancelled"
+              ],
+              "events": [
+                "Receive Invoice",
+                "Begin Review",
+                "Place On Hold",
+                "Cancel Invoice"
+              ],
+              "count": 16
+            },
+            {
+              "states": [
+                "Received",
+                "In Progress",
+                "Approved",
+                "Ready to Pay"
+              ],
+              "events": [
+                "Receive Invoice",
+                "Begin Review",
+                "Approve Invoice",
+                "Schedule Payment"
+              ],
+              "count": 8
+            },
+            {
+              "states": [
+                "Received",
+                "In Progress"
+              ],
+              "events": [
+                "Receive Invoice",
+                "Begin Review"
+              ],
+              "count": 6
+            },
+            {
+              "states": [
+                "Received",
+                "In Progress",
+                "On Hold"
+              ],
+              "events": [
+                "Receive Invoice",
+                "Begin Review",
+                "Place On Hold"
+              ],
+              "count": 2
+            },
+            {
+              "states": [
+                "Received",
+                "In Progress",
+                "On Hold",
+                "In Progress",
+                "Approved"
+              ],
+              "events": [
+                "Receive Invoice",
+                "Begin Review",
+                "Place On Hold",
+                "Resume Review",
+                "Approve Invoice"
+              ],
+              "count": 1
+            },
+            {
+              "states": [
+                "Received",
+                "In Progress",
+                "On Hold",
+                "In Progress",
+                "Approved",
+                "Ready to Pay"
+              ],
+              "events": [
+                "Receive Invoice",
+                "Begin Review",
+                "Place On Hold",
+                "Resume Review",
+                "Approve Invoice",
+                "Schedule Payment"
+              ],
+              "count": 1
+            },
+            {
+              "states": [
+                "Received",
+                "In Progress",
+                "Approved"
+              ],
+              "events": [
+                "Receive Invoice",
+                "Begin Review",
+                "Approve Invoice"
+              ],
+              "count": 1
+            }
+          ],
+          "performance": {
+            "clockUnit": "hour",
+            "activityDurations": {
+              "Receive Invoice": [
+                2.9166666666666665,
+                8.1,
+                27.733333333333334,
+                28.7,
+                28.75,
+                10.483333333333333,
+                29.166666666666668,
+                13.75,
+                16.833333333333332,
+                25.216666666666665,
+                8.083333333333334,
+                12.4,
+                24.633333333333333,
+                29.933333333333334,
+                17.516666666666666,
+                7.5,
+                15.033333333333333,
+                29.166666666666668,
+                5.583333333333333,
+                4.183333333333334,
+                22.883333333333333,
+                19.8,
+                26.133333333333333,
+                17.283333333333335,
+                3.033333333333333,
+                29.45,
+                29.1,
+                19.15,
+                25.15,
+                11.833333333333334,
+                13.266666666666667,
+                15.666666666666666,
+                29.25,
+                20.15,
+                2.466666666666667,
+                2.1166666666666667,
+                21.566666666666666,
+                12.75,
+                10.1,
+                20.616666666666667,
+                16.45,
+                1.9833333333333334,
+                6.466666666666667,
+                17.6,
+                14.3,
+                29.133333333333333,
+                26.216666666666665,
+                1.9833333333333334,
+                3.433333333333333,
+                2.3833333333333333,
+                16.6,
+                10.266666666666667,
+                20.6,
+                5.566666666666666,
+                5.516666666666667,
+                17.516666666666666,
+                20.85,
+                13.3,
+                24.133333333333333,
+                9.016666666666667,
+                16.483333333333334,
+                3.1333333333333333,
+                8.766666666666667,
+                20.983333333333334,
+                4.066666666666666,
+                23.4,
+                3.25,
+                10.3,
+                16.25,
+                4.283333333333333,
+                2.433333333333333,
+                15.666666666666666,
+                3.5833333333333335,
+                14.733333333333333,
+                21.4,
+                30.1,
+                11.366666666666667,
+                8.533333333333333,
+                21.783333333333335,
+                20.533333333333335,
+                10.633333333333333,
+                2.8,
+                21.533333333333335,
+                26.016666666666666,
+                3.066666666666667,
+                5.85,
+                17.65,
+                18.316666666666666,
+                18.566666666666666,
+                30.083333333333332,
+                24.733333333333334,
+                3.2666666666666666,
+                22.733333333333334,
+                4.866666666666666,
+                25.766666666666666,
+                18.5,
+                28.466666666666665,
+                22.75,
+                19.95,
+                17.866666666666667,
+                26.733333333333334,
+                26.15,
+                27.9,
+                9.133333333333333,
+                12.816666666666666,
+                15.083333333333334,
+                19.283333333333335,
+                23.35,
+                15.166666666666666,
+                22.216666666666665,
+                27.25,
+                18.95,
+                29.25,
+                28.916666666666668,
+                30.2,
+                25.483333333333334,
+                27.583333333333332,
+                15.4,
+                9.05,
+                6.466666666666667,
+                5.1,
+                14.466666666666667,
+                20.933333333333334,
+                9,
+                18.95,
+                30.85,
+                12.75,
+                5.6,
+                23.183333333333334,
+                10.45,
+                12.5,
+                5.116666666666666,
+                26.733333333333334,
+                25.633333333333333,
+                19.35,
+                14.25,
+                9.566666666666666,
+                21.133333333333333,
+                8.15,
+                1.95,
+                30.6,
+                29.75,
+                13.7,
+                28.966666666666665,
+                19.233333333333334,
+                24.95,
+                17.333333333333332,
+                5.65,
+                25.133333333333333,
+                17.35,
+                26.966666666666665,
+                1.1166666666666667,
+                30.35,
+                26.166666666666668,
+                28.25,
+                12.766666666666667,
+                12.25,
+                23.533333333333335,
+                12.616666666666667,
+                7.533333333333333,
+                24.8,
+                15.65,
+                19.433333333333334,
+                13.316666666666666,
+                4.1,
+                17.15,
+                7.483333333333333,
+                7.95,
+                13.6,
+                13.716666666666667,
+                25.766666666666666,
+                3.6666666666666665,
+                9.766666666666667,
+                7.833333333333333,
+                4.8,
+                2.683333333333333,
+                7.583333333333333,
+                15.5,
+                27.333333333333332,
+                12.85,
+                6.133333333333334,
+                19.616666666666667,
+                30.783333333333335,
+                7.283333333333333,
+                21.083333333333332,
+                18.483333333333334,
+                19.116666666666667,
+                23.25,
+                30.416666666666668,
+                29.033333333333335,
+                30.283333333333335,
+                15.633333333333333,
+                14.566666666666666,
+                19.95,
+                28.566666666666666,
+                22.7,
+                2.9,
+                14.7,
+                15.283333333333333,
+                26.116666666666667
+              ],
+              "Begin Review": [
+                14.8,
+                4.15,
+                15.766666666666667,
+                13.033333333333333,
+                22.116666666666667,
+                42.45,
+                26.183333333333334,
+                11.683333333333334,
+                19.083333333333332,
+                20.266666666666666,
+                24.616666666666667,
+                18.866666666666667,
+                37.53333333333333,
+                13.85,
+                2.25,
+                32.916666666666664,
+                16.566666666666666,
+                14.8,
+                17.9,
+                31.45,
+                37.68333333333333,
+                39.35,
+                27.05,
+                23.816666666666666,
+                35.78333333333333,
+                7.916666666666667,
+                40.43333333333333,
+                29.083333333333332,
+                12.366666666666667,
+                22.466666666666665,
+                44.666666666666664,
+                22.216666666666665,
+                14.333333333333334,
+                6.35,
+                35.86666666666667,
+                26.9,
+                3.966666666666667,
+                28.183333333333334,
+                29.533333333333335,
+                28.55,
+                31.733333333333334,
+                9.8,
+                23.9,
+                5,
+                4.55,
+                11.25,
+                22.016666666666666,
+                10.733333333333333,
+                13.566666666666666,
+                23.5,
+                39,
+                15.95,
+                12.3,
+                9.05,
+                15.45,
+                36.68333333333333,
+                5.3,
+                39.53333333333333,
+                24.916666666666668,
+                35.483333333333334,
+                20.133333333333333,
+                17.283333333333335,
+                14.75,
+                35.86666666666667,
+                12.783333333333333,
+                6.8,
+                28.083333333333332,
+                20.816666666666666,
+                25.216666666666665,
+                4.866666666666666,
+                33.9,
+                16.95,
+                6.35,
+                14.316666666666666,
+                30.483333333333334,
+                2,
+                17.633333333333333,
+                15.783333333333333,
+                21.266666666666666,
+                8.816666666666666,
+                1.7,
+                15.616666666666667,
+                2.9,
+                1.95,
+                45.93333333333333,
+                21.316666666666666,
+                7.733333333333333,
+                31.366666666666667,
+                19.25,
+                9.9,
+                21.3,
+                15.516666666666667,
+                24.35,
+                35.016666666666666,
+                10.3,
+                10.566666666666666,
+                23.35,
+                22.983333333333334,
+                21.183333333333334,
+                28.083333333333332,
+                10.95,
+                7.516666666666667,
+                16.066666666666666,
+                27.2,
+                34.733333333333334,
+                37.93333333333333,
+                23.833333333333332,
+                24.816666666666666,
+                15.233333333333333,
+                15.666666666666666,
+                5.7,
+                4.1,
+                29.216666666666665,
+                8.983333333333333,
+                30.533333333333335,
+                40.43333333333333,
+                3.5833333333333335,
+                12.7,
+                19.4,
+                11.9,
+                12,
+                17.483333333333334,
+                18.85,
+                29.1,
+                8.883333333333333,
+                11.65,
+                12.8,
+                27.2,
+                17.2,
+                28.35,
+                19.016666666666666,
+                5.55,
+                6.066666666666666,
+                33.016666666666666,
+                47.46666666666667,
+                16.916666666666668,
+                2.8666666666666667,
+                2.1666666666666665,
+                12.366666666666667,
+                5.083333333333333,
+                19.133333333333333,
+                23.783333333333335,
+                3.0833333333333335,
+                19.216666666666665,
+                20.433333333333334,
+                7.8,
+                21.283333333333335,
+                11.866666666666667,
+                8.216666666666667,
+                11.166666666666666,
+                13.25,
+                23.316666666666666,
+                20.15,
+                7.133333333333334,
+                36.1,
+                2.783333333333333,
+                22.6,
+                15.7,
+                15.5,
+                23.383333333333333,
+                9.716666666666667,
+                37.18333333333333,
+                4.633333333333334,
+                4.366666666666666,
+                19.3,
+                24.7,
+                33.4,
+                39.68333333333333,
+                3.9833333333333334,
+                13.383333333333333,
+                22.85,
+                11.683333333333334,
+                39.016666666666666,
+                17.616666666666667,
+                19.766666666666666,
+                24.6,
+                8.633333333333333,
+                32.1,
+                29.5,
+                23.883333333333333,
+                11.983333333333333,
+                18.35,
+                27.333333333333332,
+                2.8333333333333335,
+                32.96666666666667,
+                19.183333333333334,
+                40.8,
+                17.516666666666666,
+                4.533333333333333,
+                10.516666666666667,
+                5.366666666666666,
+                4.85,
+                6.233333333333333,
+                19.066666666666666
+              ],
+              "Approve Invoice": [
+                3.65,
+                6.933333333333334,
+                8.216666666666667,
+                3.6666666666666665,
+                7.2,
+                10.633333333333333,
+                9.35,
+                4.466666666666667,
+                9.866666666666667,
+                4.083333333333333,
+                6.666666666666667,
+                10.766666666666667,
+                4.466666666666667,
+                11.383333333333333,
+                6.2,
+                3,
+                11.85,
+                6.516666666666667,
+                8.45,
+                12.683333333333334,
+                3.55,
+                9.383333333333333,
+                2.9166666666666665,
+                2.433333333333333,
+                9.783333333333333,
+                3.216666666666667,
+                3.6333333333333333,
+                5.233333333333333,
+                10.133333333333333,
+                6.4,
+                10.683333333333334,
+                3.6666666666666665,
+                8.366666666666667,
+                7.583333333333333,
+                7.416666666666667,
+                1.8833333333333333,
+                9.633333333333333,
+                8.966666666666667,
+                7.666666666666667,
+                2.3,
+                9.866666666666667,
+                1.1,
+                5.983333333333333,
+                3.1666666666666665,
+                9.4,
+                11.55,
+                3.8,
+                4.366666666666666,
+                4.883333333333334,
+                2.2,
+                4.95,
+                2.65,
+                3.6166666666666667,
+                12.866666666666667,
+                9.783333333333333,
+                7.75,
+                5.6,
+                12.15,
+                3.8833333333333333,
+                7.4,
+                1.55,
+                5.033333333333333,
+                10.833333333333334,
+                1.7666666666666666,
+                9.433333333333334,
+                11.05,
+                9.783333333333333,
+                12.1,
+                8.55,
+                5.016666666666667,
+                7.983333333333333,
+                7.75,
+                10.766666666666667,
+                7.866666666666666,
+                12.216666666666667,
+                10.85,
+                10.016666666666667,
+                11.816666666666666,
+                11.916666666666666,
+                5.383333333333334,
+                12.6,
+                1.1666666666666667,
+                8.866666666666667,
+                12.35,
+                12.2,
+                10.166666666666666,
+                11.316666666666666,
+                9.4,
+                10.783333333333333,
+                12.65,
+                5.266666666666667,
+                3.4166666666666665,
+                6.033333333333333,
+                8.366666666666667,
+                3.8666666666666667,
+                9.933333333333334,
+                12.55,
+                1,
+                3.8333333333333335,
+                1.85,
+                12.466666666666667,
+                5.383333333333334,
+                2.7666666666666666,
+                6.85,
+                7.9,
+                1.2166666666666666,
+                1.6166666666666667,
+                9.083333333333334,
+                1.2333333333333334,
+                9.216666666666667,
+                3.15,
+                12.916666666666666,
+                7.05,
+                8.85,
+                12.783333333333333,
+                6.233333333333333,
+                4.033333333333333,
+                9,
+                8.5,
+                2.066666666666667,
+                7.1,
+                2.433333333333333,
+                1.75,
+                12.55,
+                5.033333333333333,
+                11.766666666666667,
+                10.166666666666666,
+                12.95,
+                8.816666666666666,
+                8.233333333333333,
+                9.683333333333334,
+                10.966666666666667,
+                9.8,
+                8.283333333333333,
+                3.2666666666666666,
+                3.466666666666667,
+                3.966666666666667,
+                7.45,
+                8.25,
+                10.75,
+                6.4,
+                12.933333333333334,
+                11.316666666666666,
+                7.5,
+                3.8333333333333335,
+                10.2,
+                9,
+                10.883333333333333,
+                7.683333333333334,
+                11.833333333333334,
+                6.666666666666667,
+                4.466666666666667,
+                6.516666666666667,
+                6.933333333333334
+              ],
+              "Schedule Payment": [
+                77.18333333333334,
+                94.23333333333333,
+                77.21666666666667,
+                63.733333333333334,
+                31.2,
+                89.6,
+                26.866666666666667,
+                69.88333333333334,
+                46.18333333333333,
+                93.08333333333333,
+                75.96666666666667,
+                12.05,
+                24.216666666666665,
+                89.16666666666667,
+                59.5,
+                29.9,
+                14.166666666666666,
+                81.05,
+                77.7,
+                63.016666666666666,
+                74.6,
+                44.833333333333336,
+                61.05,
+                15.866666666666667,
+                40.083333333333336,
+                25.15,
+                59.833333333333336,
+                86.36666666666666,
+                48.166666666666664,
+                63.733333333333334,
+                51.016666666666666,
+                25.583333333333332,
+                24.216666666666665,
+                79.06666666666666,
+                66.73333333333333,
+                31.433333333333334,
+                69.16666666666667,
+                26.766666666666666,
+                28.183333333333334,
+                44.55,
+                48.35,
+                76.06666666666666,
+                22.833333333333332,
+                77.76666666666667,
+                96.98333333333333,
+                27.383333333333333,
+                41.53333333333333,
+                14.666666666666666,
+                15.283333333333333,
+                96.26666666666667,
+                77.9,
+                39.31666666666667,
+                63.3,
+                84.55,
+                63.15,
+                25.116666666666667,
+                70.48333333333333,
+                71.15,
+                92.23333333333333,
+                31.733333333333334,
+                54.15,
+                12.05,
+                62.8,
+                78.41666666666667,
+                65.21666666666667,
+                16.2,
+                68,
+                70.86666666666666,
+                51.56666666666667,
+                17.716666666666665,
+                50.266666666666666,
+                30.616666666666667,
+                94.26666666666667,
+                60.38333333333333,
+                19.183333333333334,
+                96.88333333333334,
+                72.9,
+                85.33333333333333,
+                55.5,
+                61.95,
+                95.4,
+                69.7,
+                58.96666666666667,
+                92.56666666666666,
+                47.86666666666667,
+                38.083333333333336,
+                34.96666666666667,
+                90.35,
+                74.16666666666667,
+                90.11666666666666,
+                93.08333333333333,
+                51.78333333333333,
+                14.016666666666667,
+                29.45,
+                25.083333333333332,
+                31.333333333333332,
+                65.63333333333334,
+                18.25,
+                38.63333333333333,
+                78.11666666666666,
+                68.93333333333334,
+                39.63333333333333,
+                12.966666666666667,
+                15.566666666666666,
+                80.28333333333333,
+                67.31666666666666,
+                50.583333333333336,
+                25.6,
+                86.61666666666666,
+                67.11666666666666,
+                20.15,
+                67.41666666666667,
+                48.68333333333333,
+                38.46666666666667,
+                38.166666666666664,
+                40.36666666666667,
+                74.13333333333334,
+                24.566666666666666,
+                39.56666666666667,
+                34.1,
+                86.38333333333334,
+                49.46666666666667,
+                77,
+                86.18333333333334,
+                93.36666666666666,
+                43.516666666666666,
+                13.45,
+                16.95,
+                64.11666666666666,
+                65.28333333333333,
+                53.75,
+                46.96666666666667,
+                22.933333333333334,
+                71.38333333333334,
+                41.56666666666667,
+                21.466666666666665,
+                36.56666666666667,
+                78.43333333333334,
+                80.03333333333333,
+                85.76666666666667,
+                20.583333333333332,
+                25.35,
+                17.883333333333333,
+                23.183333333333334,
+                24.166666666666668
+              ],
+              "Place On Hold": [
+                11.633333333333333,
+                25.416666666666668,
+                13.366666666666667,
+                61.05,
+                45.266666666666666,
+                30.516666666666666,
+                41.1,
+                29.75,
+                58.8,
+                58.36666666666667,
+                56.7,
+                43.2,
+                70.86666666666666,
+                19.883333333333333,
+                32.96666666666667,
+                42.1,
+                29.433333333333334,
+                48.266666666666666,
+                55.7,
+                42.61666666666667,
+                19.016666666666666,
+                2.183333333333333,
+                43.88333333333333,
+                29.516666666666666,
+                29.25,
+                54.46666666666667,
+                32.88333333333333,
+                23.266666666666666,
+                33.06666666666667,
+                48.15,
+                65.88333333333334,
+                38.13333333333333,
+                58.483333333333334,
+                49.68333333333333,
+                23.433333333333334,
+                2.8,
+                21.583333333333332,
+                50.2,
+                44.03333333333333,
+                21.733333333333334,
+                33.43333333333333,
+                39.6,
+                32.166666666666664,
+                21.766666666666666,
+                9.35,
+                31.566666666666666,
+                34.81666666666667,
+                66.5,
+                66.71666666666667,
+                36.833333333333336,
+                56.03333333333333,
+                22.35,
+                52.35,
+                57.766666666666666,
+                12.3
+              ],
+              "Resume Review": [
+                31.583333333333332,
+                34.05,
+                2.85,
+                22.166666666666668,
+                8.45,
+                13.416666666666666,
+                28.416666666666668,
+                4.783333333333333,
+                40.56666666666667,
+                9.466666666666667,
+                18.966666666666665,
+                32.46666666666667,
+                17.2,
+                3.7666666666666666,
+                16.55,
+                22.333333333333332,
+                12.6,
+                21.683333333333334,
+                18.366666666666667,
+                26.983333333333334,
+                37.483333333333334,
+                37.666666666666664,
+                10.95,
+                13.716666666666667,
+                20.466666666666665,
+                11.066666666666666,
+                22.683333333333334,
+                8.65,
+                12.35,
+                20,
+                23.033333333333335,
+                19.016666666666666,
+                10.5,
+                14.083333333333334,
+                39.583333333333336,
+                22.466666666666665,
+                7.416666666666667,
+                15.95,
+                13.65
+              ]
+            },
+            "interArrival": [
+              0.8566666666666667,
+              1.1144444444444443,
+              3.026666666666667,
+              0.18416666666666667,
+              0.43444444444444447,
+              1.5127777777777778,
+              0.21888888888888888,
+              0.17194444444444446,
+              16.954444444444444,
+              2.783333333333333,
+              0.2725,
+              0.6086111111111111,
+              1.2416666666666667,
+              0.12333333333333334,
+              0.6333333333333333,
+              1.1897222222222221,
+              0.03361111111111111,
+              64.31305555555555,
+              0.5511111111111111,
+              0.09888888888888889,
+              0.7277777777777777,
+              0.13416666666666666,
+              0.14972222222222223,
+              0.42027777777777775,
+              0.49972222222222223,
+              0.5255555555555556,
+              2.371111111111111,
+              1.2283333333333333,
+              0.6972222222222222,
+              0.9669444444444445,
+              15.75361111111111,
+              2.1508333333333334,
+              0.16694444444444445,
+              1.3836111111111111,
+              0.8597222222222223,
+              0.0075,
+              0.6363888888888889,
+              0.3761111111111111,
+              0.6116666666666667,
+              0.6741666666666667,
+              0.6655555555555556,
+              0.08694444444444445,
+              16.263055555555557,
+              0.7652777777777777,
+              1.0058333333333334,
+              0.09916666666666667,
+              0.3338888888888889,
+              1.3244444444444445,
+              1.0783333333333334,
+              1.3008333333333333,
+              1.006388888888889,
+              0.6419444444444444,
+              0.16527777777777777,
+              16.031944444444445,
+              0.14,
+              1.9755555555555555,
+              0.9333333333333333,
+              0.21,
+              0.33555555555555555,
+              0.10138888888888889,
+              1.1683333333333332,
+              0.013055555555555556,
+              1.6922222222222223,
+              0.28194444444444444,
+              0.4686111111111111,
+              0.2625,
+              17.826666666666668,
+              0.034444444444444444,
+              1.365,
+              0.4713888888888889,
+              0.2452777777777778,
+              0.7880555555555555,
+              1.2730555555555556,
+              0.6655555555555556,
+              0.043333333333333335,
+              1.518888888888889,
+              64.03611111111111,
+              1.5627777777777778,
+              0.7266666666666667,
+              1.7127777777777777,
+              1.9047222222222222,
+              0.8066666666666666,
+              0.8166666666666667,
+              0.38055555555555554,
+              0.9322222222222222,
+              15.45,
+              1.3030555555555556,
+              1.528888888888889,
+              1.3155555555555556,
+              1.7869444444444444,
+              0.8638888888888889,
+              0.4736111111111111,
+              0.9727777777777777,
+              15.8425,
+              0.24388888888888888,
+              1.0244444444444445,
+              0.8036111111111112,
+              0.3983333333333333,
+              0.7880555555555555,
+              0.04694444444444444,
+              0.7558333333333334,
+              0.008333333333333333,
+              0.5961111111111111,
+              3.6641666666666666,
+              15.745555555555555,
+              2.1305555555555555,
+              0.15777777777777777,
+              0.32861111111111113,
+              0.48777777777777775,
+              0.07361111111111111,
+              0.3338888888888889,
+              0.1947222222222222,
+              0.22777777777777777,
+              0.2411111111111111,
+              1.0358333333333334,
+              1.0233333333333334,
+              0.024722222222222222,
+              0.4288888888888889,
+              0.2941666666666667,
+              1.2127777777777777,
+              16.400555555555556,
+              0.6952777777777778,
+              0.7633333333333333,
+              1.1602777777777777,
+              0.44305555555555554,
+              0.6772222222222222,
+              0.5363888888888889,
+              0.3536111111111111,
+              0.20972222222222223,
+              1.3633333333333333,
+              64.92972222222222,
+              1.728611111111111,
+              1.365,
+              0.7672222222222222,
+              1.2138888888888888,
+              0.01888888888888889,
+              2.2916666666666665,
+              0.7616666666666667,
+              16.128611111111113,
+              1.2016666666666667,
+              0.5305555555555556,
+              0.7747222222222222,
+              0.2313888888888889,
+              1.2547222222222223,
+              1.6155555555555556,
+              0.7325,
+              1.6383333333333334,
+              15.838333333333333,
+              1.16,
+              0.4436111111111111,
+              0.3416666666666667,
+              0.16777777777777778,
+              0.3186111111111111,
+              0.08583333333333333,
+              0.43666666666666665,
+              0.225,
+              1.0019444444444445,
+              1.015,
+              21.32638888888889,
+              1.5322222222222222,
+              1.2516666666666667,
+              0.045,
+              0.08972222222222222,
+              1.0330555555555556,
+              0.3030555555555556,
+              0.018055555555555554,
+              0.9336111111111111,
+              17.635833333333334,
+              0.3194444444444444,
+              0.6438888888888888,
+              1.8186111111111112,
+              4.183888888888889,
+              64.12722222222222,
+              3.1305555555555555,
+              3.8958333333333335,
+              16.774444444444445,
+              0.7186111111111111,
+              0.4913888888888889,
+              3.626388888888889,
+              0.06722222222222222,
+              18.61916666666667,
+              0.32666666666666666,
+              1.033611111111111,
+              5.629722222222222,
+              1.8527777777777779,
+              17.004166666666666,
+              0.21166666666666667,
+              0.9313888888888889,
+              1.7944444444444445,
+              0.6866666666666666,
+              1.1297222222222223,
+              17.901666666666667,
+              0.019444444444444445,
+              0.445,
+              0.4686111111111111,
+              0.9061111111111111,
+              0.13722222222222222,
+              1.8058333333333334,
+              3.1683333333333334
+            ],
+            "activityResource": {
+              "Receive Invoice": "Alice Chen",
+              "Begin Review": "Alice Chen",
+              "Approve Invoice": "Frank Muller",
+              "Schedule Payment": "Ben Okoro",
+              "Pay Invoice": "Payment Run",
+              "Cancel Invoice": "Alice Chen",
+              "Place On Hold": "Alice Chen",
+              "Resume Review": "Carla Reyes"
+            },
+            "resourceConcurrency": {
+              "Carla Reyes": 13,
+              "Frank Muller": 5,
+              "Payment Run": 1,
+              "Emma Watts": 4,
+              "Alice Chen": 17,
+              "David Singh": 11,
+              "Ben Okoro": 14
+            },
+            "activeHours": [
+              0,
+              1,
+              3,
+              2,
+              1,
+              5,
+              2,
+              2,
+              8,
+              7,
+              4,
+              8,
+              4,
+              7,
+              3,
+              9,
+              8,
+              5,
+              3,
+              2,
+              1,
+              2,
+              5,
+              0,
+              3,
+              3,
+              3,
+              5,
+              1,
+              3,
+              3,
+              6,
+              7,
+              8,
+              6,
+              5,
+              10,
+              7,
+              10,
+              8,
+              9,
+              6,
+              6,
+              8,
+              4,
+              3,
+              2,
+              1,
+              9,
+              6,
+              3,
+              6,
+              3,
+              4,
+              2,
+              6,
+              7,
+              9,
+              14,
+              7,
+              6,
+              6,
+              11,
+              10,
+              8,
+              2,
+              5,
+              3,
+              1,
+              5,
+              5,
+              5,
+              5,
+              6,
+              9,
+              4,
+              4,
+              7,
+              7,
+              3,
+              10,
+              7,
+              9,
+              17,
+              15,
+              16,
+              15,
+              17,
+              9,
+              8,
+              4,
+              5,
+              6,
+              4,
+              6,
+              3,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              6,
+              12,
+              18,
+              8,
+              10,
+              12,
+              10,
+              9,
+              7,
+              10,
+              13,
+              9,
+              4,
+              6,
+              5,
+              5,
+              9,
+              7,
+              5,
+              5,
+              7,
+              6,
+              4,
+              7,
+              9,
+              10,
+              4,
+              8,
+              5,
+              7,
+              6,
+              4,
+              7,
+              9,
+              7,
+              7,
+              6,
+              7,
+              4,
+              7,
+              5,
+              3,
+              5,
+              5,
+              8,
+              3,
+              3,
+              8,
+              5,
+              3,
+              4,
+              2,
+              4,
+              2,
+              3,
+              2,
+              0,
+              3,
+              2,
+              4,
+              3,
+              5,
+              5,
+              3,
+              3
+            ]
+          },
+          "referenceSmKey": "ap-reference"
+        }
+      }
+    }
+  ]
+}

@@ -37,7 +37,7 @@ const SCOPED_COVERED = new Set<string>([
 const SIMULATOR_TABLES = [
   "SimulationTeam", "SimulationCalendar", "SimulationStudy", "SimulationStudyRoot",
   "SimulationScenario", "SimulationRun", "SimulationExample",
-  "ProcessMiningRun",
+  "ProcessMiningRun", "MiningExample",
 ] as const;
 
 // Tables the scoped backups deliberately DON'T carry — publish lineage,

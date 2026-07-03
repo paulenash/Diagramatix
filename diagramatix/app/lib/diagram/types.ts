@@ -769,5 +769,14 @@ export interface TemplateData {
  *             automatically). Discovered diagrams are ordinary bpmn/state-machine
  *             diagrams. Runtime/analytics only — NO diagram-export or BPMN-XSD
  *             shape change; the version advances with the release window.
+ *
+ *  v1.32 (2026-07-03): DiagramatixMINER Examples — an adoptable process-mining
+ *             sample catalog (mirrors Simulator Examples). New runtime table
+ *             MiningExample (global catalog; `package` JSON carries a compressed
+ *             event log + reference State-Machine diagrams). One-click "Load &
+ *             open" adopts a ready ProcessMiningRun + the reference diagrams into
+ *             a fresh project; SuperAdmins author more by capturing a run. Ships
+ *             the Accounts Payable invoice-lifecycle starter. Runtime only — NO
+ *             diagram-export or BPMN-XSD shape change.
  */
-export const SCHEMA_VERSION = "1.31";
+export const SCHEMA_VERSION = "1.32";

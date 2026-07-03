@@ -220,6 +220,7 @@ model User {
   simulationStudiesCreated      SimulationStudy[]          @relation("SimulationStudyAuthor")
   // Simulator (Phase 6) — example catalog entries this user authored.
   simulationExamplesCreated     SimulationExample[]        @relation("SimulationExampleAuthor")
+  miningExamplesCreated         MiningExample[]            @relation("MiningExampleAuthor")
 }
 
 model Project {
@@ -1086,6 +1087,31 @@ model SimulationExample {
   package     Json     @default("{}")
   createdById String?
   createdBy   User?    @relation("SimulationExampleAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([published, sortOrder])
+}
+
+// An editable, extensible catalog entry for DiagramatixMINER: a worked process-
+// mining example a user can adopt into their own project. Mirrors
+// SimulationExample (global catalog, `published` gates visibility) — `package`
+// (JSON) holds the portable bundle: a compressed event log (mapping + variants
+// + performance + stats) plus reference state-machine diagrams. Adopt recreates
+// a ready ProcessMiningRun + the reference diagrams in a fresh project; the
+// seed populates the starter set; admins author more by capturing a run.
+model MiningExample {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  concept     String   @default("")     // one-line tagline (the lesson)
+  description String   @default("")      // markdown walkthrough
+  difficulty  String   @default("core")  // intro | core | advanced
+  sortOrder   Int      @default(0)
+  published   Boolean  @default(false)
+  package     Json     @default("{}")
+  createdById String?
+  createdBy   User?    @relation("MiningExampleAuthor", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

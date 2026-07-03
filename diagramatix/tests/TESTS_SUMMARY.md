@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-02  ·  **Document version:** 3.1  ·  **Suite:** 100 test files · 726 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-07-03  ·  **Document version:** 3.2  ·  **Suite:** 101 test files · 731 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0608
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0603`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0608`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -711,6 +711,18 @@ Mined performance → a runnable simulation calibrated to reality.
 | T0601 | fitDuration/fitArrival pick sensible SimDists; active hours → a calendar | Bad fitted distributions / working hours | If distribution fitting or the calendar derivation regressed |
 | T0602 | calibrate writes cycle time, arrival, gateway branch probabilities + a team library | An uncalibrated / unusable twin | If the param-writing or branch-probability mapping regressed |
 | T0603 | the whole pipeline yields a twin that actually simulates (completes work) | The mine→simulate loop silently producing a dead model | If any stage (parse→discover→calibrate→assemble→run) broke |
+
+### `tests/mining/example-package.test.ts` — DiagramatixMINER Examples catalog
+
+The adoptable process-mining sample (mirrors Simulator Examples): a portable package (compressed log + reference state machines) and the shipped Accounts Payable starter.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0604 | emptyMiningPackage is a version-1 scaffold (not yet adoptable) | A blank scaffold silently passing as a complete example | If the scaffold shape or validation floor changed |
+| T0605 | validate catches the real failure modes (bad mapping, empty variants, dangling referenceSmKey) | A malformed package half-creating a project on adopt | If package validation weakened |
+| T0606 | summarize counts references/cases/variants/states | Wrong catalog-card counts | If the summary shape drifted |
+| T0607 | the shipped AP starter is a valid, self-consistent bundle | A broken/unadoptable seeded example shipping | If the generator or baked JSON regressed |
+| T0608 | conformance oracle: permissive clean (181/200), strict flags 39 rework cases (144/200) | The sample's headline conformance story silently changing | If the baked log/references or the conformance engine changed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 
