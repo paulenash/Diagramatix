@@ -30,6 +30,8 @@ step("applying schema to diagramatix_test", `npx prisma db push --accept-data-lo
 step("seeding subscription levels", "npx --yes tsx@4 scripts/seed-subscriptions.ts");
 // The DiagramatixMINER Examples gallery needs its catalog, like subscriptions.
 step("seeding mining example catalog", "npx --yes tsx@4 scripts/seed-mining-examples.ts");
+// A known SuperAdmin account so the admin-surface specs can sign in (test DB only).
+step("seeding e2e superadmin (test DB only)", "npx --yes tsx@4 scripts/e2e-seed-superadmin.ts");
 
 // Lift the Free-tier caps in the TEST DB ONLY so the e2e account (a Free user)
 // can create ArchiMate diagrams + many diagrams + AI attempts. Never touches prod.
