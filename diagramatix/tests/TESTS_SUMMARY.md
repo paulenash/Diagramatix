@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-03  ·  **Document version:** 3.2  ·  **Suite:** 101 test files · 731 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0608
+**As at:** 2026-07-04  ·  **Document version:** 3.3  ·  **Suite:** 102 test files · 733 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0610
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0608`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0610`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -711,6 +711,15 @@ Mined performance → a runnable simulation calibrated to reality.
 | T0601 | fitDuration/fitArrival pick sensible SimDists; active hours → a calendar | Bad fitted distributions / working hours | If distribution fitting or the calendar derivation regressed |
 | T0602 | calibrate writes cycle time, arrival, gateway branch probabilities + a team library | An uncalibrated / unusable twin | If the param-writing or branch-probability mapping regressed |
 | T0603 | the whole pipeline yields a twin that actually simulates (completes work) | The mine→simulate loop silently producing a dead model | If any stage (parse→discover→calibrate→assemble→run) broke |
+
+### `tests/mining/ai-state-machine.test.ts` — AI-curated reference state machine
+
+The miner's "✨ AI state machine" reuses the app's AI Generate pipeline (rules + template + configured model) to curate a clean reference from the mined lifecycle. Only the prompt serialisation is pure (the model call needs a live key); this pins it.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0609 | the brief carries states, entry, weighted transitions + terminals | The AI being fed an incomplete/incorrect picture of the mined lifecycle | If the serialisation dropped states/transitions/frequencies |
+| T0610 | respects the stats state-list ordering when provided | Inconsistent state ordering in the prompt | If the stats override was ignored |
 
 ### `tests/mining/example-package.test.ts` — DiagramatixMINER Examples catalog
 
