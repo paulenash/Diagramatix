@@ -7,10 +7,10 @@
  * would otherwise do silently (drop rows with no case id / bad timestamp) plus a
  * few soft "does this mapping look right?" heuristics.
  */
-import { parseTimestamp } from "./parseEventLog";
+import { parseTimestamp, excelSerialToMs } from "./parseEventLog";
 import type { LogMapping } from "./types";
 
-export type TimestampFormat = "ISO / date" | "epoch seconds" | "epoch milliseconds" | "unrecognised" | "—";
+export type TimestampFormat = "ISO / date" | "epoch seconds" | "epoch milliseconds" | "Excel serial date" | "unrecognised" | "—";
 
 export interface LogValidation {
   total: number;             // data rows
@@ -35,6 +35,7 @@ function classifyTs(raw: string): TimestampFormat {
   if (!s) return "—";
   if (/^\d{13}$/.test(s)) return "epoch milliseconds";
   if (/^\d{10}$/.test(s)) return "epoch seconds";
+  if (/^\d+(\.\d+)?$/.test(s) && excelSerialToMs(Number(s)) !== null) return "Excel serial date";
   return parseTimestamp(s) !== null ? "ISO / date" : "unrecognised";
 }
 
