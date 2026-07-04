@@ -284,11 +284,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [simProject, setSimProject] = useState<{ id: string; name: string } | null>(null);
   // Project-level Process Mining — opened from a project's menu.
   const [miningProject, setMiningProject] = useState<{ id: string; name: string } | null>(null);
-  // Deep-link: ?mining=<projectId>&mp=<name> auto-opens ⛏ DiagramatixMINER on a
-  // freshly-adopted example project (the Mining-Examples gallery lands here).
+  // Skip the intro when RETURNING to the console (e.g. back from a discovered
+  // diagram, ?pmnoi=1) — the intro is only for a fresh entry.
+  const [skipMiningIntro, setSkipMiningIntro] = useState(false);
+  // Deep-link: ?mining=<projectId>&mp=<name> auto-opens Process Mining on a
+  // freshly-adopted example project, or on return from a discovered diagram.
   useEffect(() => {
     const mid = searchParams.get("mining");
     if (!mid) return;
+    if (searchParams.get("pmnoi")) setSkipMiningIntro(true);
     setMiningProject({ id: mid, name: searchParams.get("mp") ?? "" });
     router.replace("/dashboard");
     // Run once on mount for the initial URL.
@@ -3002,7 +3006,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               ◈ Simulator
             </button>
             <button
-              onClick={() => { close(); setMiningProject({ id: p.id, name: p.name }); }}
+              onClick={() => { close(); setSkipMiningIntro(false); setMiningProject({ id: p.id, name: p.name }); }}
               className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
               title="Process Mining — discover the real process from event logs + check conformance"
             >
@@ -3065,6 +3069,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           projectId={miningProject.id}
           projectName={miningProject.name}
           isAdmin={!!isSu}
+          skipIntro={skipMiningIntro}
           onClose={() => setMiningProject(null)}
           onOpenSimulator={() => { const p = miningProject; setMiningProject(null); setSimProject(p); }}
         />

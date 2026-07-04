@@ -192,6 +192,10 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
 
   const selected = runs.find((r) => r.id === selectedId) ?? null;
   const inp = "bg-stone-800 border border-stone-600 rounded px-2 py-1 text-stone-100 text-xs";
+  // Open a discovered diagram with a back-link that returns to the MINER console
+  // (via the ?mining deep-link) instead of the owning project.
+  const openDiagram = (id: string) =>
+    `/diagram/${id}?from=${encodeURIComponent(`/dashboard?mining=${projectId}&mp=${encodeURIComponent(projectName ?? "")}&pmnoi=1`)}`;
 
   return (
     <div className="fixed inset-0 z-[60] bg-stone-950 text-stone-200 overflow-auto font-mono">
@@ -321,7 +325,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                   {aiBpmn ? "✨ Generating…" : "✨ Discover process"}
                 </button>
                 {selected.discoveredBpmnId && (
-                  <a href={`/diagram/${selected.discoveredBpmnId}`} className="text-xs text-amber-300 hover:text-amber-200 underline">Open discovered diagram →</a>
+                  <a href={openDiagram(selected.discoveredBpmnId)} className="text-xs text-amber-300 hover:text-amber-200 underline">Open discovered diagram →</a>
                 )}
               </div>
             </div>
@@ -335,7 +339,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                   {aiSm ? "✨ Generating…" : "✨ Discover state machine"}
                 </button>
                 {selected.discoveredSmId && (
-                  <a href={`/diagram/${selected.discoveredSmId}`} className="text-xs text-amber-300 hover:text-amber-200 underline">Open state machine →</a>
+                  <a href={openDiagram(selected.discoveredSmId)} className="text-xs text-amber-300 hover:text-amber-200 underline">Open state machine →</a>
                 )}
               </div>
             </div>
@@ -352,7 +356,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 <button onClick={() => runConformance(selected.id)} disabled={!refSmId || runningConf} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
                   {runningConf ? "Checking…" : "✓ Check conformance"}
                 </button>
-                {refSmId && <a href={`/diagram/${refSmId}`} className="text-[11px] text-amber-300 hover:text-amber-200 underline">edit reference →</a>}
+                {refSmId && <a href={openDiagram(refSmId)} className="text-[11px] text-amber-300 hover:text-amber-200 underline">edit reference →</a>}
               </div>
               {referenceSms.length === 0 && (
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
