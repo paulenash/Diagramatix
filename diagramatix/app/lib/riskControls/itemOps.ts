@@ -2,7 +2,7 @@
  *  project routes) authorise first, then delegate the libraryId-scoped work
  *  here. Mirrors app/lib/entityLists/nodeOps.ts. */
 import { prisma } from "@/app/lib/db";
-import { RISK_CONTROL_KINDS, CONTROL_TYPES, type RiskControlKind, type ControlType } from "./types";
+import { RISK_CONTROL_KINDS, CONTROL_TYPES, CONTROL_AUTOMATIONS, type RiskControlKind, type ControlType, type ControlAutomation } from "./types";
 
 export class ItemOpError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
@@ -27,6 +27,8 @@ export async function createItem(
   if (!name) throw new ItemOpError("Name required", 400);
   const controlType = input.controlType ? (input.controlType as ControlType) : null;
   if (controlType && !CONTROL_TYPES.includes(controlType)) throw new ItemOpError("Invalid control type", 400);
+  const automation = input.automation ? (input.automation as ControlAutomation) : null;
+  if (automation && !CONTROL_AUTOMATIONS.includes(automation)) throw new ItemOpError("Invalid automation", 400);
 
   // Default sortOrder = end of the kind group; default code = kind prefix + n.
   const last = await prisma.riskControlItem.findFirst({
@@ -34,18 +36,25 @@ export async function createItem(
   });
   const sortOrder = (last?.sortOrder ?? -1) + 1;
   const code = asStr(input.code) || `${kind === "Risk" ? "R" : "C"}-${String(sortOrder + 1).padStart(2, "0")}`;
+  const isRisk = kind === "Risk", isControl = kind === "Control";
 
   return prisma.riskControlItem.create({
     data: {
       libraryId, kind, name, code, sortOrder,
       description: asStr(input.description) || null,
-      likelihood: kind === "Risk" ? asRating(input.likelihood) : null,
-      impact: kind === "Risk" ? asRating(input.impact) : null,
-      riskCategory: kind === "Risk" ? (asStr(input.riskCategory) || null) : null,
-      controlType: kind === "Control" ? controlType : null,
-      frequency: kind === "Control" ? (asStr(input.frequency) || null) : null,
-      owner: kind === "Control" ? (asStr(input.owner) || null) : null,
-      frameworkRef: kind === "Control" ? (asStr(input.frameworkRef) || null) : null,
+      likelihood: isRisk ? asRating(input.likelihood) : null,
+      impact: isRisk ? asRating(input.impact) : null,
+      riskCategory: isRisk ? (asStr(input.riskCategory) || null) : null,
+      residualLikelihood: isRisk ? asRating(input.residualLikelihood) : null,
+      residualImpact: isRisk ? asRating(input.residualImpact) : null,
+      controlType: isControl ? controlType : null,
+      automation: isControl ? automation : null,
+      frequency: isControl ? (asStr(input.frequency) || null) : null,
+      owner: isControl ? (asStr(input.owner) || null) : null,
+      frameworkRef: isControl ? (asStr(input.frameworkRef) || null) : null,
+      evidence: isControl ? (asStr(input.evidence) || null) : null,
+      testMethod: isControl ? (asStr(input.testMethod) || null) : null,
+      testFrequency: isControl ? (asStr(input.testFrequency) || null) : null,
     },
   });
 }
@@ -67,15 +76,25 @@ export async function updateItem(
     if (input.likelihood !== undefined) data.likelihood = asRating(input.likelihood);
     if (input.impact !== undefined) data.impact = asRating(input.impact);
     if (input.riskCategory !== undefined) data.riskCategory = asStr(input.riskCategory) || null;
+    if (input.residualLikelihood !== undefined) data.residualLikelihood = asRating(input.residualLikelihood);
+    if (input.residualImpact !== undefined) data.residualImpact = asRating(input.residualImpact);
   } else {
     if (input.controlType !== undefined) {
       const ct = input.controlType ? (input.controlType as ControlType) : null;
       if (ct && !CONTROL_TYPES.includes(ct)) throw new ItemOpError("Invalid control type", 400);
       data.controlType = ct;
     }
+    if (input.automation !== undefined) {
+      const a = input.automation ? (input.automation as ControlAutomation) : null;
+      if (a && !CONTROL_AUTOMATIONS.includes(a)) throw new ItemOpError("Invalid automation", 400);
+      data.automation = a;
+    }
     if (input.frequency !== undefined) data.frequency = asStr(input.frequency) || null;
     if (input.owner !== undefined) data.owner = asStr(input.owner) || null;
     if (input.frameworkRef !== undefined) data.frameworkRef = asStr(input.frameworkRef) || null;
+    if (input.evidence !== undefined) data.evidence = asStr(input.evidence) || null;
+    if (input.testMethod !== undefined) data.testMethod = asStr(input.testMethod) || null;
+    if (input.testFrequency !== undefined) data.testFrequency = asStr(input.testFrequency) || null;
   }
   return prisma.riskControlItem.update({ where: { id: itemId }, data });
 }

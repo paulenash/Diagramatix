@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-05  ·  **Document version:** 4.2  ·  **Suite:** 109 test files · 755 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0631  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-05  ·  **Document version:** 4.3  ·  **Suite:** 109 test files · 756 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0632  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0631`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0631 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export.)
+> **Highest ref allocated: `T0631`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0632 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -779,6 +779,7 @@ Attach Risks/Controls (from an org-master → project-copy catalog) to process s
 | T0629 | the `.xlsx` writer builds a valid multi-sheet workbook with inline strings + XML escaping | A corrupt Risk-Control Matrix export that Excel can't open | If the OOXML zip shape or escaping broke |
 | T0630 | adopt clones the org library into a SEPARATE project copy with items + links re-linked | The project copy sharing rows with the master, or dangling mitigation links | If `adoptLibrary`'s id-remap or isolation regressed |
 | T0631 | the RCM export reflects on-model attachments + coverage (Covered / GAP) | The matrix mis-reporting where controls are attached or which risks are uncovered | If `buildRcmXlsx` gathering/coverage logic regressed |
+| T0632 | the flat Audit Grid has one Activity×Risk×Control row carrying the audit/assurance columns (Automation, Evidence, Test method/frequency, Residual) | The auditor-standard flat RCM losing a mature column or mis-joining activity/risk/control | If the audit-grid builder or the audit-field wiring regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 

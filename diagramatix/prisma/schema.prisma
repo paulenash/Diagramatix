@@ -943,6 +943,12 @@ enum ControlType {
   Corrective
 }
 
+enum ControlAutomation {
+  Manual
+  Automated
+  ITDependent
+}
+
 model RiskControlLibrary {
   id             String              @id @default(cuid())
   name           String
@@ -974,14 +980,21 @@ model RiskControlItem {
   description  String?
   sortOrder    Int                @default(0)
   // Risk attributes (kind = Risk)
-  likelihood   Int?               // 1..5
-  impact       Int?               // 1..5
-  riskCategory String?
+  likelihood         Int?         // 1..5 (inherent)
+  impact             Int?         // 1..5 (inherent)
+  riskCategory       String?
+  residualLikelihood Int?         // 1..5 (after controls)
+  residualImpact     Int?         // 1..5 (after controls)
   // Control attributes (kind = Control)
   controlType  ControlType?
-  frequency    String?
+  automation   ControlAutomation? // Manual | Automated | IT-dependent
+  frequency    String?            // how often the control runs
   owner        String?
   frameworkRef String?            // e.g. "SOX 404", "ISO 27001 A.9"
+  // Audit / assurance
+  evidence     String?            // what evidence proves the control operated
+  testMethod   String?            // how internal audit tests it
+  testFrequency String?           // how often it is tested
   // Mitigation links where this item is the control / the risk.
   asControl    RiskControlLink[]  @relation("LinkControl")
   asRisk       RiskControlLink[]  @relation("LinkRisk")

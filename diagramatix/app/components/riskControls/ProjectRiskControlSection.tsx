@@ -72,7 +72,7 @@ export function ProjectRiskControlSection({
             <>
               <div className="flex items-center justify-between">
                 <p className="text-[11px] text-gray-600">Library: <span className="font-medium">{library.name}</span></p>
-                <a href={`${basePath}/export`} className="text-[11px] text-blue-600 hover:text-blue-800">⭳ Export Risk-Control Matrix (.xlsx)</a>
+                <a href={`${basePath}/export`} className="text-[11px] text-teal-700 hover:text-teal-900">⭳ Export Risk-Control Matrix (.xlsx)</a>
               </div>
               <RiskControlEditor library={library} basePath={basePath} canEdit={canEdit} onChange={refresh} />
             </>
@@ -87,10 +87,10 @@ export function ProjectRiskControlSection({
                         <option value="">Adopt from {orgName || "org"}…</option>
                         {masters.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.itemCount})</option>)}
                       </select>
-                      <button onClick={() => adopt(false)} disabled={busy || !chosen} className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-40">Adopt</button>
+                      <button onClick={() => adopt(false)} disabled={busy || !chosen} className="text-xs px-2 py-1 bg-teal-700 text-white rounded hover:bg-teal-700 disabled:opacity-40">Adopt</button>
                     </div>
                   )}
-                  <button onClick={createEmpty} className="text-[11px] text-blue-600 hover:text-blue-800">+ create empty library</button>
+                  <button onClick={createEmpty} className="text-[11px] text-teal-700 hover:text-teal-900">+ create empty library</button>
                 </div>
               )}
             </div>

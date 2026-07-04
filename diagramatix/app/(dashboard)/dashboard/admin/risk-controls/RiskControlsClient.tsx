@@ -41,7 +41,7 @@ export function RiskControlsClient({
         <div>
           <button onClick={() => router.push(backHref)} className="text-xs text-gray-500 hover:text-gray-800">← Back</button>
           <h1 className="text-xl font-semibold text-gray-900">Risk &amp; Control Catalog</h1>
-          <p className="text-sm text-gray-500">Master library for <span className="font-medium text-orange-700">{orgName}</span> — projects adopt a copy.</p>
+          <p className="text-sm text-gray-500">Master library for <span className="font-medium text-teal-700">{orgName}</span> — projects adopt a copy.</p>
         </div>
         {isSuperAdmin && orgs.length > 1 && (
           <select value={orgId} onChange={(e) => router.push(`/dashboard/admin/risk-controls?orgId=${e.target.value}`)}
@@ -53,7 +53,7 @@ export function RiskControlsClient({
 
       <div className="flex items-center gap-2 mb-5">
         <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New library name" className="text-sm border border-gray-300 rounded px-2 py-1 flex-1 max-w-xs" />
-        <button onClick={createLibrary} className="text-sm px-3 py-1 bg-orange-600 text-white rounded hover:bg-orange-700">+ New library</button>
+        <button onClick={createLibrary} className="text-sm px-3 py-1 bg-teal-600 text-white rounded hover:bg-teal-700">+ New library</button>
       </div>
 
       {loading ? <p className="text-sm text-gray-400">Loading…</p> : libraries.length === 0 ? (
@@ -61,7 +61,7 @@ export function RiskControlsClient({
       ) : (
         <div className="space-y-6">
           {libraries.map((lib) => (
-            <section key={lib.id} className="border border-orange-200 rounded-lg p-4">
+            <section key={lib.id} className="border border-teal-200 rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-base font-medium text-gray-800">{lib.name}</h2>
                 <button onClick={() => setConfirmDel({ id: lib.id, name: lib.name })} className="text-xs text-red-500 hover:text-red-700">Delete library</button>

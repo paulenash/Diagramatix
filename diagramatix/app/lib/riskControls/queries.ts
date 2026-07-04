@@ -15,8 +15,10 @@ export function serializeLibrary(lib: any): RiskControlLibraryDTO {
       id: it.id, libraryId: it.libraryId, kind: it.kind, code: it.code, name: it.name,
       description: it.description ?? null, sortOrder: it.sortOrder,
       likelihood: it.likelihood ?? null, impact: it.impact ?? null, riskCategory: it.riskCategory ?? null,
-      controlType: it.controlType ?? null, frequency: it.frequency ?? null,
+      residualLikelihood: it.residualLikelihood ?? null, residualImpact: it.residualImpact ?? null,
+      controlType: it.controlType ?? null, automation: it.automation ?? null, frequency: it.frequency ?? null,
       owner: it.owner ?? null, frameworkRef: it.frameworkRef ?? null,
+      evidence: it.evidence ?? null, testMethod: it.testMethod ?? null, testFrequency: it.testFrequency ?? null,
     })),
     links: (lib.links ?? []).map((ln: any) => ({ id: ln.id, controlId: ln.controlId, riskId: ln.riskId })),
   };
