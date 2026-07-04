@@ -287,6 +287,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   // Skip the intro when RETURNING to the console (e.g. back from a discovered
   // diagram, ?pmnoi=1) — the intro is only for a fresh entry.
   const [skipMiningIntro, setSkipMiningIntro] = useState(false);
+  // When the Simulator was opened FROM the MINER, exiting it returns here.
+  const [simFromMining, setSimFromMining] = useState<{ id: string; name: string } | null>(null);
   // Deep-link: ?mining=<projectId>&mp=<name> auto-opens Process Mining on a
   // freshly-adopted example project, or on return from a discovered diagram.
   useEffect(() => {
@@ -3060,7 +3062,12 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           projectId={simProject.id}
           projectName={simProject.name}
           isAdmin={!!isSu}
-          onClose={() => setSimProject(null)}
+          onClose={() => {
+            setSimProject(null);
+            // Invoked from the MINER → exiting the Simulator returns to the MINER
+            // console it came from (skip the intro; the console restores its screen).
+            if (simFromMining) { const p = simFromMining; setSimFromMining(null); setSkipMiningIntro(true); setMiningProject(p); }
+          }}
         />
       )}
 
@@ -3071,7 +3078,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           isAdmin={!!isSu}
           skipIntro={skipMiningIntro}
           onClose={() => setMiningProject(null)}
-          onOpenSimulator={() => { const p = miningProject; setMiningProject(null); setSimProject(p); }}
+          onOpenSimulator={() => { const p = miningProject; setMiningProject(null); setSimFromMining(p); setSimProject(p); }}
         />
       )}
 
