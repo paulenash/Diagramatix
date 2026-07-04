@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-04  ·  **Document version:** 3.7  ·  **Suite:** 104 test files · 742 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0619
+**As at:** 2026-07-04  ·  **Document version:** 3.8  ·  **Suite:** 105 test files · 746 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0623
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0619`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617 = parseEventLog Excel-serial conversion; T0618 = the validator labels serial dates; T0619 = the example's sampleLog rebuilds to the same run.)
+> **Highest ref allocated: `T0623`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -711,6 +711,17 @@ Mined performance → a runnable simulation calibrated to reality.
 | T0601 | fitDuration/fitArrival pick sensible SimDists; active hours → a calendar | Bad fitted distributions / working hours | If distribution fitting or the calendar derivation regressed |
 | T0602 | calibrate writes cycle time, arrival, gateway branch probabilities + a team library | An uncalibrated / unusable twin | If the param-writing or branch-probability mapping regressed |
 | T0603 | the whole pipeline yields a twin that actually simulates (completes work) | The mine→simulate loop silently producing a dead model | If any stage (parse→discover→calibrate→assemble→run) broke |
+
+### `tests/diagram/state-machine-layout.test.ts` — state-machine Layout red rules
+
+The dedicated `layoutStateMachine` (dispatched for flat state machines) enforces DiagramRules Group 3. These pin the geometry so a layout regression goes red.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0620 | S3.01/S3.02: initial top-left, finals bottom-right, left-to-right flow | The old grid's misplaced final + backward connectors returning | If placement stopped putting initial TL / finals BR or the LR layering broke |
+| T0621 | S3.04: connection points on a node side ≥10px apart | Overlapping/coincident transition endpoints | If the endpoint fan-out regressed |
+| T0622 | S3.05: reciprocal transitions (A↔B) don't cross | Crossing back-and-forth transitions | If reciprocal pairs stopped routing on different sides |
+| T0623 | S3.06: horizontally-overlapping labels ≥ ½ label height apart | Transition labels stacking on top of each other | If the label de-overlap pass regressed |
 
 ### `tests/mining/validate-log.test.ts` — pre-import mapping verification
 
