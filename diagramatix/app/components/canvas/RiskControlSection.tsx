@@ -3,9 +3,12 @@
 import { useState } from "react";
 import type { DiagramElement } from "@/app/lib/diagram/types";
 import { getRiskControl, riskControlPatch, type RiskControlRef } from "@/app/lib/diagram/riskControl";
+import type { RiskControlKind } from "@/app/lib/riskControls/types";
 
-/** Catalog items available to attach (from the project's Risk & Control library). */
-export interface RiskCatalogItem { id: string; code: string; name: string; kind: "Risk" | "Control"; }
+/** Catalog items available to attach (from the project's Risk & Control library).
+ *  Steps carry Risks + Controls (the RCM); governance objects link to those in
+ *  the catalog rather than attaching directly to a step. */
+export interface RiskCatalogItem { id: string; code: string; name: string; kind: RiskControlKind; }
 
 const ATTACHABLE = new Set(["task", "subprocess", "subprocess-expanded", "call-activity", "transaction", "gateway", "data-object", "data-store"]);
 

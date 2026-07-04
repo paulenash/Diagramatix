@@ -61,9 +61,9 @@ export async function adoptLibrary(
     }
     let linkCount = 0;
     for (const ln of master.links) {
-      const controlId = idMap.get(ln.controlId), riskId = idMap.get(ln.riskId);
-      if (!controlId || !riskId) continue;
-      await tx.riskControlLink.create({ data: { libraryId: copy.id, controlId, riskId } });
+      const sourceId = idMap.get(ln.sourceId), targetId = idMap.get(ln.targetId);
+      if (!sourceId || !targetId) continue;
+      await tx.riskControlLink.create({ data: { libraryId: copy.id, sourceId, targetId } });
       linkCount++;
     }
     return { copy, linkCount };

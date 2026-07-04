@@ -7,8 +7,40 @@
  * (RiskControlLink). An Org holds a master library; a Project adopts a COPY.
  */
 
-export type RiskControlKind = "Risk" | "Control";
-export const RISK_CONTROL_KINDS: RiskControlKind[] = ["Risk", "Control"];
+export type RiskControlKind = "Risk" | "Control" | "Policy" | "Regulation" | "AuditFinding" | "KRI" | "KPI";
+export const RISK_CONTROL_KINDS: RiskControlKind[] = ["Risk", "Control", "Policy", "Regulation", "AuditFinding", "KRI", "KPI"];
+
+export const KIND_LABEL: Record<RiskControlKind, string> = {
+  Risk: "Risk", Control: "Control", Policy: "Policy", Regulation: "Regulation",
+  AuditFinding: "Audit Finding", KRI: "KRI", KPI: "KPI",
+};
+export const KIND_LABEL_PLURAL: Record<RiskControlKind, string> = {
+  Risk: "Risks", Control: "Controls", Policy: "Policies", Regulation: "Regulations",
+  AuditFinding: "Audit Findings", KRI: "KRIs", KPI: "KPIs",
+};
+export const KIND_PREFIX: Record<RiskControlKind, string> = {
+  Risk: "R", Control: "C", Policy: "P", Regulation: "REG", AuditFinding: "AF", KRI: "KRI", KPI: "KPI",
+};
+
+/** The verb a directed link implies, inferred from the two kinds (source→target). */
+const REL_VERBS: Record<string, string> = {
+  "Control>Risk": "mitigates", "Policy>Control": "governs", "Policy>Risk": "addresses",
+  "Regulation>Policy": "requires", "Regulation>Control": "mandates", "Regulation>Risk": "drives",
+  "AuditFinding>Control": "raised against", "AuditFinding>Risk": "raised against",
+  "KRI>Risk": "monitors", "KRI>Control": "monitors", "KPI>Control": "measures", "KPI>Risk": "measures",
+};
+export function relationVerb(sourceKind: RiskControlKind, targetKind: RiskControlKind): string {
+  return REL_VERBS[`${sourceKind}>${targetKind}`] ?? "relates to";
+}
+
+/** Canonical orientation when linking two kinds: true if `a` should be the
+ *  SOURCE (e.g. Control→Risk, Policy→Control), so the graph reads consistently
+ *  regardless of which item the user linked from. */
+export function aIsSource(a: RiskControlKind, b: RiskControlKind): boolean {
+  if (REL_VERBS[`${a}>${b}`]) return true;
+  if (REL_VERBS[`${b}>${a}`]) return false;
+  return true;
+}
 
 export type ControlType = "Preventive" | "Detective" | "Corrective";
 export const CONTROL_TYPES: ControlType[] = ["Preventive", "Detective", "Corrective"];
@@ -59,8 +91,8 @@ export interface RiskControlItemDTO {
 
 export interface RiskControlLinkDTO {
   id: string;
-  controlId: string;
-  riskId: string;
+  sourceId: string;
+  targetId: string;
 }
 
 export interface RiskControlLibraryDTO {
