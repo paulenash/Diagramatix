@@ -388,6 +388,10 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   // from the toolbar (same as the dashboard project menu).
   const [showSim, setShowSim] = useState(false);
   const [showMining, setShowMining] = useState(false);
+  // When the Simulator was launched from the MINER, exiting it returns to the
+  // MINER (skipping its intro) rather than falling back to the project screen.
+  const [simFromMining, setSimFromMining] = useState(false);
+  const [miningSkipIntro, setMiningSkipIntro] = useState(false);
   // Renamed: this menu now also handles imports, so it's a generic File menu.
   const [showFileMenu, setShowFileMenu] = useState(false);
   // File menu navigation: chosen section (Export/Import) and destination
@@ -2815,7 +2819,11 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           projectId={project.id}
           projectName={project.name}
           isAdmin={!!isAdmin}
-          onClose={() => setShowSim(false)}
+          onClose={() => {
+            setShowSim(false);
+            // Came from the MINER? Return to it (skip the intro) instead of the project screen.
+            if (simFromMining) { setSimFromMining(false); setMiningSkipIntro(true); setShowMining(true); }
+          }}
         />
       )}
       {showMining && (
@@ -2823,8 +2831,9 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           projectId={project.id}
           projectName={project.name}
           isAdmin={!!isAdmin}
-          onClose={() => setShowMining(false)}
-          onOpenSimulator={() => { setShowMining(false); setShowSim(true); }}
+          skipIntro={miningSkipIntro}
+          onClose={() => { setShowMining(false); setMiningSkipIntro(false); }}
+          onOpenSimulator={() => { setShowMining(false); setSimFromMining(true); setShowSim(true); }}
         />
       )}
 
