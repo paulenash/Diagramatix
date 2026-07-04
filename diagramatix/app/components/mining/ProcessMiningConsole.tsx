@@ -62,6 +62,24 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     try { const r = await fetch(`/api/projects/${projectId}/mining/reference-sms`); if (r.ok) { const j = await r.json(); if (j?.diagrams) setReferenceSms(j.diagrams); } } catch { /* ignore */ }
   }, [projectId]);
   useEffect(() => { loadReferenceSms(); }, [loadReferenceSms]);
+  // Adopted-example hand-off: if the gallery stashed a raw sample log for this
+  // project, pre-load the Import panel with it (confirm the analysis, then import).
+  useEffect(() => {
+    try {
+      const key = `mining-sample:${projectId}`;
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return;
+      sessionStorage.removeItem(key);
+      const s = JSON.parse(raw) as { fileName?: string; runName?: string; headers: string[]; rows: string[][]; mapping?: Partial<LogMapping> };
+      if (Array.isArray(s.headers) && Array.isArray(s.rows) && s.headers.length && s.rows.length) {
+        setHeaders(s.headers); setRows(s.rows);
+        setMapping(s.mapping ?? guessMapping(s.headers));
+        setFileName(s.fileName ?? "sample.csv");
+        setRunName(s.runName ?? (s.fileName ?? "").replace(/\.[^.]+$/, ""));
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
   // Sync the reference picker + last result to whichever run is selected.
   useEffect(() => {
     const s = runs.find((r) => r.id === selectedId);

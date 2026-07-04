@@ -32,14 +32,14 @@ export function DiagramatixMinerIntro({ onEnter }: { onEnter: () => void }) {
 
   return (
     <div onClick={enter} className="fixed inset-0 z-[60] bg-[#140d07] overflow-hidden flex items-center justify-center cursor-pointer">
-      {phase === "rain" && <MatrixRain durationMs={1800} onDone={enter} color="#B45309" headColor="#FCD34D" />}
+      {phase === "rain" && <MatrixRain durationMs={5000} onDone={enter} color="#D97706" headColor="#FDE68A" />}
       <div className="relative z-10 text-center px-6 pointer-events-none">
         {phase === "typing" ? (
           <MatrixTypewriter
             text="Entering DiagramatixMINER…"
             speedMs={45}
             colorClass="text-amber-300"
-            onDone={() => { pauseTimer.current = window.setTimeout(() => setPhase("rain"), 4000); }}
+            onDone={() => { pauseTimer.current = window.setTimeout(() => setPhase("rain"), 2500); }}
             className="text-lg sm:text-2xl drop-shadow-[0_0_10px_rgba(217,119,6,0.6)]"
           />
         ) : (

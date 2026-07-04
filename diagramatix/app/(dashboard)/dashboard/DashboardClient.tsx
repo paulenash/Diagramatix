@@ -1603,7 +1603,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                       title="Load a ready-made process-mining example (event log + reference lifecycle) to explore or demo"
                     >
-                      DiagramatixMINER Examples
+                      Process Mining Examples
                     </a>
                     <div className="border-t border-gray-100" />
                     <button

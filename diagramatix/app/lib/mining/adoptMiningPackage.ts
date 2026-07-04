@@ -19,10 +19,21 @@ export interface AdoptMiningCtx {
   projectName: string;
 }
 
+export interface AdoptMiningResult {
+  projectId: string;
+  projectName: string;
+  openDiagramId: string | null;
+  /** Set when the run was pre-created (no sampleLog). */
+  runId?: string | null;
+  /** Set when the package ships a raw log — the console opens the Import panel
+   *  pre-loaded with this instead of a pre-built run. */
+  sampleLog?: MiningExamplePackage["sampleLog"];
+}
+
 export async function adoptMiningPackage(
   pkg: MiningExamplePackage,
   ctx: AdoptMiningCtx,
-): Promise<{ projectId: string; projectName: string; runId: string; openDiagramId: string | null }> {
+): Promise<AdoptMiningResult> {
   // One transaction so a partial failure never leaves a half-built project.
   return prisma.$transaction(async (tx) => {
     const project = await tx.project.create({
@@ -46,16 +57,23 @@ export async function adoptMiningPackage(
       });
     }
 
+    const referenceSmId = pkg.run.referenceSmKey ? keyToDiagramId.get(pkg.run.referenceSmKey) ?? null : null;
+    const openDiagramId = referenceSmId ?? keyToDiagramId.values().next().value ?? null;
+
+    // With a sampleLog, DON'T pre-create the run — the user imports it in the
+    // console (confirm-the-analysis flow). Otherwise recreate the run as usual.
+    if (pkg.sampleLog) {
+      return { projectId: project.id, projectName: project.name, openDiagramId, sampleLog: pkg.sampleLog };
+    }
+
     // The run — scalars via Prisma, the four JSON columns via raw SQL (Prisma 7
     // omits ProcessMiningRun JSON writes from model inputs; matches the import route).
     const r = pkg.run;
-    const referenceSmId = r.referenceSmKey ? keyToDiagramId.get(r.referenceSmKey) ?? null : null;
     const run = await tx.processMiningRun.create({
       data: { name: r.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId },
     });
     await tx.$executeRaw`UPDATE "ProcessMiningRun" SET mapping = ${JSON.stringify(r.mapping)}::jsonb, stats = ${JSON.stringify(r.stats)}::jsonb, variants = ${JSON.stringify(r.variants)}::jsonb, performance = ${JSON.stringify(r.performance)}::jsonb, "updatedAt" = NOW() WHERE id = ${run.id}`;
 
-    const openDiagramId = referenceSmId ?? keyToDiagramId.values().next().value ?? null;
     return { projectId: project.id, projectName: project.name, runId: run.id, openDiagramId };
   });
 }

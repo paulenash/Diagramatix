@@ -52,6 +52,11 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
       const res = await fetch(`/api/mining-examples/${id}/adopt`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Could not load example"); return; }
+      // Hand the raw sample log to the console (via sessionStorage) so it opens
+      // the Import panel pre-loaded — the user confirms the analysis, then imports.
+      if (json.projectId && json.sampleLog) {
+        try { sessionStorage.setItem(`mining-sample:${json.projectId}`, JSON.stringify(json.sampleLog)); } catch { /* quota — fall back to an empty console */ }
+      }
       // Land on the dashboard with the miner console auto-opened on the new project.
       if (json.projectId) router.push(`/dashboard?mining=${json.projectId}&mp=${encodeURIComponent(json.projectName ?? "")}`);
     } catch (e) {
@@ -62,8 +67,8 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="relative min-h-[calc(100vh-3.5rem)] bg-stone-950 text-amber-200 font-mono overflow-hidden">
       {/* Amber digital-rain backdrop */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
-        <MatrixRain fontSize={18} color="#B45309" headColor="#FCD34D" />
+      <div className="absolute inset-0 opacity-45 pointer-events-none">
+        <MatrixRain fontSize={18} color="#D97706" headColor="#FDE68A" />
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-8">
