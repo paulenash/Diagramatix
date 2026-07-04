@@ -219,6 +219,17 @@ const example = {
 const outFile = join(__dirname, "..", "app", "lib", "mining", "miningExampleData.json");
 writeFileSync(outFile, JSON.stringify({ examples: [example] }, null, 2) + "\n", "utf8");
 console.log(`Wrote ${outFile}`);
-for (const s of sampleLogs) console.log(`  scenario "${s.scenario}": ${s.rows.length} rows → ${s.fileName}`);
+
+// Also emit each scenario as a real .csv under the repo-root /mining folder, so
+// the raw files exist on disk (inspect / download / manual-upload) and stay in
+// sync with the baked example. Disk names drop the "(current)" suffix.
+const csvField = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+const toCsv = (headers: string[], rows: string[][]) => [headers, ...rows].map((r) => r.map(csvField).join(",")).join("\r\n") + "\r\n";
+const miningDir = join(__dirname, "..", "..", "mining");
+for (const s of sampleLogs) {
+  const diskName = s.fileName.replace(/-current\.csv$/, ".csv");
+  writeFileSync(join(miningDir, diskName), toCsv(s.headers, s.rows), "utf8");
+  console.log(`  scenario "${s.scenario}": ${s.rows.length} rows → mining/${diskName}`);
+}
 console.log(`  current run: ${log.stats.cases} cases, ${log.stats.events} events, ${log.stats.variants} variants; clockUnit=${performance.clockUnit}`);
 console.log(`  references: ${diagrams.map((d) => `${d.key} (${d.data.elements.length} el, ${d.data.connectors.length} conn)`).join(", ")}`);
