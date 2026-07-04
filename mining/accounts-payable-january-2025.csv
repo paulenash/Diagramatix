@@ -1,0 +1,860 @@
+Invoice ID,Vendor,Amount,Activity,Timestamp,Invoice Status,Resource
+INV-2025-0001,Northwind Traders,2536.05,Receive Invoice,2025-01-01T10:46:35Z,Received,Ben Okoro
+INV-2025-0002,Acme Office Supplies,3776.81,Receive Invoice,2025-01-01T13:13:49Z,Received,Alice Chen
+INV-2025-0003,Hooli Cloud,2369.22,Receive Invoice,2025-01-01T14:02:58Z,Received,Alice Chen
+INV-2025-0004,Wonka Ingredients,604.32,Receive Invoice,2025-01-01T15:04:31Z,Received,Carla Reyes
+INV-2025-0005,Umbrella Facilities,234.32,Receive Invoice,2025-01-01T15:16:15Z,Received,Alice Chen
+INV-2025-0006,Globex Logistics,4263.38,Receive Invoice,2025-01-01T15:49:34Z,Received,Carla Reyes
+INV-2025-0007,Wayne Utilities,4661.24,Receive Invoice,2025-01-01T16:09:13Z,Received,Carla Reyes
+INV-2025-0005,Umbrella Facilities,1465.42,Begin Review,2025-01-01T21:31:15Z,In Progress,Alice Chen
+INV-2025-0008,Stark Industrial,2932.45,Receive Invoice,2025-01-02T08:12:12Z,Received,Alice Chen
+INV-2025-0009,Vandelay Imports,4754.85,Receive Invoice,2025-01-02T08:21:40Z,Received,Carla Reyes
+INV-2025-0010,Soylent Catering,1933.99,Receive Invoice,2025-01-02T09:01:01Z,Received,Alice Chen
+INV-2025-0011,Umbrella Facilities,3533.70,Receive Invoice,2025-01-02T09:04:15Z,Received,Alice Chen
+INV-2025-0012,Cyberdyne Systems,2638.78,Receive Invoice,2025-01-02T09:44:31Z,Received,Ben Okoro
+INV-2025-0013,Cyberdyne Systems,4277.12,Receive Invoice,2025-01-02T12:10:08Z,Received,Ben Okoro
+INV-2025-0014,Initech Software,1857.00,Receive Invoice,2025-01-02T13:16:38Z,Received,Carla Reyes
+INV-2025-0015,Hooli Cloud,618.20,Receive Invoice,2025-01-02T14:10:39Z,Received,Alice Chen
+INV-2025-0016,Cyberdyne Systems,2871.42,Receive Invoice,2025-01-02T15:29:37Z,Received,Carla Reyes
+INV-2025-0017,Globex Logistics,3595.20,Receive Invoice,2025-01-02T15:38:47Z,Received,Alice Chen
+INV-2025-0003,Hooli Cloud,4111.14,Begin Review,2025-01-02T16:44:58Z,In Progress,Alice Chen
+INV-2025-0010,Soylent Catering,922.32,Begin Review,2025-01-02T19:35:01Z,In Progress,Alice Chen
+INV-2025-0001,Northwind Traders,3934.55,Begin Review,2025-01-02T21:54:35Z,In Progress,Ben Okoro
+INV-2025-0007,Wayne Utilities,439.50,Begin Review,2025-01-03T03:45:13Z,In Progress,Carla Reyes
+INV-2025-0006,Globex Logistics,885.38,Begin Review,2025-01-03T04:51:34Z,In Progress,Carla Reyes
+INV-2025-0013,Cyberdyne Systems,4351.60,Begin Review,2025-01-03T07:15:08Z,In Progress,Ben Okoro
+INV-2025-0018,Wonka Ingredients,4469.42,Receive Invoice,2025-01-03T09:28:15Z,Received,Alice Chen
+INV-2025-0010,Soylent Catering,4105.70,Schedule Payment,2025-01-03T09:48:01Z,Ready to Pay,Alice Chen
+INV-2025-0019,Wayne Utilities,2184.31,Receive Invoice,2025-01-03T10:14:15Z,Received,Ben Okoro
+INV-2025-0002,Acme Office Supplies,2406.03,Begin Review,2025-01-03T10:26:49Z,In Progress,Alice Chen
+INV-2025-0020,Hooli Cloud,3034.92,Receive Invoice,2025-01-03T11:20:47Z,Received,Alice Chen
+INV-2025-0021,Acme Office Supplies,1988.98,Receive Invoice,2025-01-03T11:21:30Z,Received,Alice Chen
+INV-2025-0022,Northwind Traders,3418.33,Receive Invoice,2025-01-03T12:16:39Z,Received,David Singh
+INV-2025-0019,Wayne Utilities,1073.16,Begin Review,2025-01-03T13:16:15Z,In Progress,Ben Okoro
+INV-2025-0004,Wonka Ingredients,2776.42,Begin Review,2025-01-03T13:20:31Z,In Progress,Carla Reyes
+INV-2025-0023,Vandelay Imports,1940.65,Receive Invoice,2025-01-03T14:17:28Z,Received,David Singh
+INV-2025-0024,Cyberdyne Systems,2119.01,Receive Invoice,2025-01-03T14:53:24Z,Received,David Singh
+INV-2025-0025,Vandelay Imports,4025.57,Receive Invoice,2025-01-03T15:00:44Z,Received,Carla Reyes
+INV-2025-0026,Hooli Cloud,1053.15,Receive Invoice,2025-01-03T15:08:56Z,Received,Carla Reyes
+INV-2025-0017,Globex Logistics,103.61,Begin Review,2025-01-03T15:41:47Z,In Progress,Alice Chen
+INV-2025-0016,Cyberdyne Systems,2328.09,Begin Review,2025-01-03T15:51:37Z,In Progress,Carla Reyes
+INV-2025-0027,Vandelay Imports,3710.09,Receive Invoice,2025-01-03T16:28:49Z,Received,Ben Okoro
+INV-2025-0019,Wayne Utilities,3966.55,Schedule Payment,2025-01-03T19:09:15Z,Ready to Pay,Ben Okoro
+INV-2025-0011,Umbrella Facilities,3647.93,Begin Review,2025-01-03T20:23:15Z,In Progress,Alice Chen
+INV-2025-0015,Hooli Cloud,3807.59,Begin Review,2025-01-03T20:35:39Z,In Progress,Alice Chen
+INV-2025-0014,Initech Software,3290.07,Begin Review,2025-01-03T21:58:38Z,In Progress,Carla Reyes
+INV-2025-0001,Northwind Traders,3145.04,Place On Hold,2025-01-04T00:35:35Z,On Hold,Ben Okoro
+INV-2025-0005,Umbrella Facilities,1564.99,Cancel Invoice,2025-01-04T00:55:15Z,Cancelled,Alice Chen
+INV-2025-0014,Initech Software,4209.42,Schedule Payment,2025-01-04T03:19:38Z,Ready to Pay,Carla Reyes
+INV-2025-0022,Northwind Traders,3948.19,Begin Review,2025-01-04T04:52:39Z,In Progress,David Singh
+INV-2025-0021,Acme Office Supplies,3010.27,Begin Review,2025-01-04T05:35:30Z,In Progress,Alice Chen
+INV-2025-0003,Hooli Cloud,4448.47,Approve Invoice,2025-01-04T06:45:58Z,Approved,Emma Watts
+INV-2025-0017,Globex Logistics,2489.22,Schedule Payment,2025-01-04T08:06:47Z,Ready to Pay,Alice Chen
+INV-2025-0009,Vandelay Imports,2734.83,Begin Review,2025-01-04T08:42:40Z,In Progress,Carla Reyes
+INV-2025-0008,Stark Industrial,1650.79,Begin Review,2025-01-04T08:52:12Z,In Progress,Alice Chen
+INV-2025-0012,Cyberdyne Systems,3190.53,Begin Review,2025-01-04T09:47:31Z,In Progress,Ben Okoro
+INV-2025-0013,Cyberdyne Systems,2397.39,Approve Invoice,2025-01-04T10:45:08Z,Approved,Frank Muller
+INV-2025-0011,Umbrella Facilities,2037.06,Schedule Payment,2025-01-04T10:48:15Z,Ready to Pay,Alice Chen
+INV-2025-0016,Cyberdyne Systems,4695.27,Raise Dispute,2025-01-04T10:48:37Z,Disputed,Carla Reyes
+INV-2025-0020,Hooli Cloud,2183.55,Begin Review,2025-01-04T11:35:47Z,In Progress,Alice Chen
+INV-2025-0024,Cyberdyne Systems,4085.50,Begin Review,2025-01-04T12:55:24Z,In Progress,David Singh
+INV-2025-0007,Wayne Utilities,4082.72,Approve Invoice,2025-01-04T15:39:13Z,Approved,Emma Watts
+INV-2025-0024,Cyberdyne Systems,523.80,Cancel Invoice,2025-01-04T16:52:24Z,Cancelled,David Singh
+INV-2025-0003,Hooli Cloud,4590.31,Schedule Payment,2025-01-04T17:21:58Z,Ready to Pay,Alice Chen
+INV-2025-0020,Hooli Cloud,3121.30,Schedule Payment,2025-01-04T17:27:47Z,Ready to Pay,Alice Chen
+INV-2025-0023,Vandelay Imports,3515.70,Begin Review,2025-01-04T18:10:28Z,In Progress,David Singh
+INV-2025-0027,Vandelay Imports,1301.57,Begin Review,2025-01-04T18:53:49Z,In Progress,Ben Okoro
+INV-2025-0023,Vandelay Imports,1821.74,Approve Invoice,2025-01-04T21:18:28Z,Approved,Frank Muller
+INV-2025-0018,Wonka Ingredients,1852.39,Begin Review,2025-01-04T21:19:15Z,In Progress,Alice Chen
+INV-2025-0022,Northwind Traders,2234.08,Schedule Payment,2025-01-04T23:06:39Z,Ready to Pay,David Singh
+INV-2025-0008,Stark Industrial,2127.33,Schedule Payment,2025-01-04T23:15:12Z,Ready to Pay,Alice Chen
+INV-2025-0015,Hooli Cloud,2495.59,Approve Invoice,2025-01-05T00:00:39Z,Approved,Emma Watts
+INV-2025-0013,Cyberdyne Systems,3952.78,Schedule Payment,2025-01-05T01:19:08Z,Ready to Pay,Ben Okoro
+INV-2025-0018,Wonka Ingredients,1881.17,Approve Invoice,2025-01-05T04:07:15Z,Approved,Emma Watts
+INV-2025-0025,Vandelay Imports,3951.68,Begin Review,2025-01-05T04:33:44Z,In Progress,Carla Reyes
+INV-2025-0018,Wonka Ingredients,2238.12,Schedule Payment,2025-01-05T06:15:15Z,Ready to Pay,Alice Chen
+INV-2025-0015,Hooli Cloud,3038.84,Schedule Payment,2025-01-05T08:17:39Z,Ready to Pay,Alice Chen
+INV-2025-0007,Wayne Utilities,2664.44,Schedule Payment,2025-01-05T10:21:13Z,Ready to Pay,Carla Reyes
+INV-2025-0027,Vandelay Imports,663.24,Schedule Payment,2025-01-05T11:07:49Z,Ready to Pay,Ben Okoro
+INV-2025-0011,Umbrella Facilities,1608.30,Pay Invoice,2025-01-05T11:12:15Z,Paid,Payment Run
+INV-2025-0004,Wonka Ingredients,1870.41,Approve Invoice,2025-01-05T12:03:31Z,Approved,Frank Muller
+INV-2025-0023,Vandelay Imports,1182.57,Schedule Payment,2025-01-05T13:25:28Z,Ready to Pay,David Singh
+INV-2025-0026,Hooli Cloud,2646.66,Begin Review,2025-01-05T15:58:56Z,In Progress,Carla Reyes
+INV-2025-0002,Acme Office Supplies,2114.21,Cancel Invoice,2025-01-05T20:31:49Z,Cancelled,Alice Chen
+INV-2025-0012,Cyberdyne Systems,4666.70,Approve Invoice,2025-01-06T01:59:31Z,Approved,Emma Watts
+INV-2025-0004,Wonka Ingredients,3138.13,Schedule Payment,2025-01-06T02:48:31Z,Ready to Pay,Carla Reyes
+INV-2025-0006,Globex Logistics,4447.08,Cancel Invoice,2025-01-06T07:06:34Z,Cancelled,Carla Reyes
+INV-2025-0028,Stark Industrial,2808.12,Receive Invoice,2025-01-06T08:48:02Z,Received,David Singh
+INV-2025-0021,Acme Office Supplies,874.56,Approve Invoice,2025-01-06T09:17:30Z,Approved,Emma Watts
+INV-2025-0029,Northwind Traders,1667.21,Receive Invoice,2025-01-06T10:51:48Z,Received,Ben Okoro
+INV-2025-0025,Vandelay Imports,2863.27,Approve Invoice,2025-01-06T10:55:44Z,Approved,Frank Muller
+INV-2025-0016,Cyberdyne Systems,1299.10,Resolve Dispute,2025-01-06T11:17:37Z,In Progress,Carla Reyes
+INV-2025-0030,Initech Software,2910.59,Receive Invoice,2025-01-06T11:41:55Z,Received,David Singh
+INV-2025-0031,Wayne Utilities,1241.49,Receive Invoice,2025-01-06T13:15:54Z,Received,Alice Chen
+INV-2025-0017,Globex Logistics,3439.12,Pay Invoice,2025-01-06T13:34:47Z,Paid,Payment Run
+INV-2025-0025,Vandelay Imports,3168.67,Schedule Payment,2025-01-06T14:17:44Z,Ready to Pay,Carla Reyes
+INV-2025-0021,Acme Office Supplies,1288.68,Schedule Payment,2025-01-06T14:25:30Z,Ready to Pay,Alice Chen
+INV-2025-0032,Wonka Ingredients,1217.87,Receive Invoice,2025-01-06T14:42:22Z,Received,Ben Okoro
+INV-2025-0031,Wayne Utilities,3530.30,Begin Review,2025-01-06T15:31:54Z,In Progress,Alice Chen
+INV-2025-0033,Wonka Ingredients,4504.77,Receive Invoice,2025-01-06T15:54:40Z,Received,David Singh
+INV-2025-0009,Vandelay Imports,1483.75,Cancel Invoice,2025-01-06T16:52:40Z,Cancelled,Carla Reyes
+INV-2025-0012,Cyberdyne Systems,2166.21,Schedule Payment,2025-01-06T20:05:31Z,Ready to Pay,Ben Okoro
+INV-2025-0010,Soylent Catering,515.25,Pay Invoice,2025-01-06T20:25:01Z,Paid,Payment Run
+INV-2025-0029,Northwind Traders,1128.66,Begin Review,2025-01-06T21:44:48Z,In Progress,Ben Okoro
+INV-2025-0019,Wayne Utilities,4746.95,Pay Invoice,2025-01-07T04:05:15Z,Paid,Payment Run
+INV-2025-0028,Stark Industrial,2377.66,Begin Review,2025-01-07T04:17:02Z,In Progress,David Singh
+INV-2025-0026,Hooli Cloud,3932.41,Approve Invoice,2025-01-07T05:20:56Z,Approved,Frank Muller
+INV-2025-0034,Globex Logistics,1486.47,Receive Invoice,2025-01-07T08:14:19Z,Received,David Singh
+INV-2025-0035,Umbrella Facilities,3055.14,Receive Invoice,2025-01-07T10:03:23Z,Received,Ben Okoro
+INV-2025-0036,Vandelay Imports,1878.07,Receive Invoice,2025-01-07T11:07:18Z,Received,Carla Reyes
+INV-2025-0037,Soylent Catering,3328.92,Receive Invoice,2025-01-07T11:53:15Z,Received,Carla Reyes
+INV-2025-0030,Initech Software,1745.84,Begin Review,2025-01-07T12:07:55Z,In Progress,David Singh
+INV-2025-0038,Globex Logistics,2065.70,Receive Invoice,2025-01-07T12:28:21Z,Received,Ben Okoro
+INV-2025-0031,Wayne Utilities,483.25,Approve Invoice,2025-01-07T13:40:54Z,Approved,Emma Watts
+INV-2025-0001,Northwind Traders,670.00,Resume Review,2025-01-07T14:02:35Z,In Progress,Ben Okoro
+INV-2025-0039,Cyberdyne Systems,940.42,Receive Invoice,2025-01-07T14:28:58Z,Received,David Singh
+INV-2025-0023,Vandelay Imports,4600.79,Pay Invoice,2025-01-07T17:19:28Z,Paid,Payment Run
+INV-2025-0028,Stark Industrial,2346.73,Cancel Invoice,2025-01-07T17:25:02Z,Cancelled,David Singh
+INV-2025-0032,Wonka Ingredients,3984.09,Begin Review,2025-01-07T17:34:22Z,In Progress,Ben Okoro
+INV-2025-0037,Soylent Catering,1598.85,Begin Review,2025-01-07T18:18:15Z,In Progress,Carla Reyes
+INV-2025-0030,Initech Software,4158.29,Schedule Payment,2025-01-07T20:07:55Z,Ready to Pay,David Singh
+INV-2025-0034,Globex Logistics,2566.92,Begin Review,2025-01-07T21:58:19Z,In Progress,David Singh
+INV-2025-0032,Wonka Ingredients,3883.32,Approve Invoice,2025-01-08T00:20:22Z,Approved,Frank Muller
+INV-2025-0035,Umbrella Facilities,339.45,Begin Review,2025-01-08T04:41:23Z,In Progress,Ben Okoro
+INV-2025-0037,Soylent Catering,933.18,Schedule Payment,2025-01-08T05:14:15Z,Ready to Pay,Carla Reyes
+INV-2025-0033,Wonka Ingredients,3831.74,Begin Review,2025-01-08T05:33:40Z,In Progress,David Singh
+INV-2025-0035,Umbrella Facilities,2998.92,Schedule Payment,2025-01-08T07:23:23Z,Ready to Pay,Ben Okoro
+INV-2025-0003,Hooli Cloud,1806.25,Pay Invoice,2025-01-08T07:42:58Z,Paid,Payment Run
+INV-2025-0040,Initech Software,482.36,Receive Invoice,2025-01-08T09:37:21Z,Received,Carla Reyes
+INV-2025-0038,Globex Logistics,2164.68,Begin Review,2025-01-08T10:29:21Z,In Progress,Ben Okoro
+INV-2025-0041,Stark Industrial,4782.07,Receive Invoice,2025-01-08T10:30:03Z,Received,Carla Reyes
+INV-2025-0036,Vandelay Imports,2266.80,Begin Review,2025-01-08T12:02:18Z,In Progress,Carla Reyes
+INV-2025-0042,Soylent Catering,3038.86,Receive Invoice,2025-01-08T12:47:35Z,Received,David Singh
+INV-2025-0043,Wonka Ingredients,2586.36,Receive Invoice,2025-01-08T13:15:51Z,Received,Carla Reyes
+INV-2025-0044,Stark Industrial,2172.86,Receive Invoice,2025-01-08T13:36:15Z,Received,Carla Reyes
+INV-2025-0029,Northwind Traders,2707.62,Approve Invoice,2025-01-08T14:19:48Z,Approved,Frank Muller
+INV-2025-0013,Cyberdyne Systems,4296.23,Pay Invoice,2025-01-08T19:19:08Z,Paid,Payment Run
+INV-2025-0040,Initech Software,496.85,Begin Review,2025-01-08T19:49:21Z,In Progress,Carla Reyes
+INV-2025-0016,Cyberdyne Systems,673.47,Approve Invoice,2025-01-08T19:58:37Z,Approved,Emma Watts
+INV-2025-0018,Wonka Ingredients,4790.68,Pay Invoice,2025-01-08T22:22:15Z,Paid,Payment Run
+INV-2025-0001,Northwind Traders,4651.87,Approve Invoice,2025-01-08T22:43:35Z,Approved,Emma Watts
+INV-2025-0001,Northwind Traders,2101.37,Schedule Payment,2025-01-09T02:07:35Z,Ready to Pay,Ben Okoro
+INV-2025-0043,Wonka Ingredients,4693.45,Begin Review,2025-01-09T05:52:51Z,In Progress,Carla Reyes
+INV-2025-0029,Northwind Traders,2715.30,Schedule Payment,2025-01-09T07:01:48Z,Ready to Pay,Ben Okoro
+INV-2025-0016,Cyberdyne Systems,2975.12,Schedule Payment,2025-01-09T07:30:37Z,Ready to Pay,Carla Reyes
+INV-2025-0045,Umbrella Facilities,1780.97,Receive Invoice,2025-01-09T08:01:39Z,Received,Carla Reyes
+INV-2025-0046,Soylent Catering,2377.84,Receive Invoice,2025-01-09T08:02:20Z,Received,Carla Reyes
+INV-2025-0034,Globex Logistics,568.44,Place On Hold,2025-01-09T09:01:19Z,On Hold,David Singh
+INV-2025-0044,Stark Industrial,4238.61,Begin Review,2025-01-09T09:12:15Z,In Progress,Carla Reyes
+INV-2025-0047,Stark Industrial,494.61,Receive Invoice,2025-01-09T09:46:08Z,Received,Alice Chen
+INV-2025-0046,Soylent Catering,1417.48,Begin Review,2025-01-09T10:35:20Z,In Progress,Carla Reyes
+INV-2025-0048,Wonka Ingredients,3907.17,Receive Invoice,2025-01-09T10:35:50Z,Received,Ben Okoro
+INV-2025-0021,Acme Office Supplies,3089.75,Pay Invoice,2025-01-09T11:31:30Z,Paid,Payment Run
+INV-2025-0020,Hooli Cloud,1703.19,Pay Invoice,2025-01-09T11:49:47Z,Paid,Payment Run
+INV-2025-0039,Cyberdyne Systems,1429.38,Begin Review,2025-01-09T12:07:58Z,In Progress,David Singh
+INV-2025-0008,Stark Industrial,2857.97,Pay Invoice,2025-01-09T13:38:12Z,Paid,Payment Run
+INV-2025-0049,Umbrella Facilities,2570.00,Receive Invoice,2025-01-09T14:42:48Z,Received,Alice Chen
+INV-2025-0050,Acme Office Supplies,1722.24,Receive Invoice,2025-01-09T15:19:35Z,Received,Carla Reyes
+INV-2025-0043,Wonka Ingredients,2212.59,Schedule Payment,2025-01-09T17:40:51Z,Ready to Pay,Carla Reyes
+INV-2025-0015,Hooli Cloud,1350.77,Pay Invoice,2025-01-09T18:42:39Z,Paid,Payment Run
+INV-2025-0040,Initech Software,281.46,Raise Dispute,2025-01-09T22:07:21Z,Disputed,Carla Reyes
+INV-2025-0050,Acme Office Supplies,1994.43,Begin Review,2025-01-09T22:08:35Z,In Progress,Carla Reyes
+INV-2025-0022,Northwind Traders,2997.22,Pay Invoice,2025-01-09T23:09:39Z,Paid,Payment Run
+INV-2025-0046,Soylent Catering,1183.23,Place On Hold,2025-01-10T04:42:20Z,On Hold,Carla Reyes
+INV-2025-0014,Initech Software,1936.27,Pay Invoice,2025-01-10T06:10:38Z,Paid,Payment Run
+INV-2025-0050,Acme Office Supplies,3431.77,Approve Invoice,2025-01-10T06:55:35Z,Approved,Frank Muller
+INV-2025-0039,Cyberdyne Systems,2687.35,Raise Dispute,2025-01-10T07:36:58Z,Disputed,David Singh
+INV-2025-0051,Wayne Utilities,2684.68,Receive Invoice,2025-01-10T08:19:09Z,Received,David Singh
+INV-2025-0052,Vandelay Imports,3362.37,Receive Invoice,2025-01-10T08:19:26Z,Received,Carla Reyes
+INV-2025-0048,Wonka Ingredients,3293.08,Begin Review,2025-01-10T08:30:50Z,In Progress,Ben Okoro
+INV-2025-0033,Wonka Ingredients,2753.05,Approve Invoice,2025-01-10T09:28:40Z,Approved,Frank Muller
+INV-2025-0053,Globex Logistics,2272.93,Receive Invoice,2025-01-10T10:22:48Z,Received,Ben Okoro
+INV-2025-0007,Wayne Utilities,4391.12,Pay Invoice,2025-01-10T10:34:13Z,Paid,Payment Run
+INV-2025-0038,Globex Logistics,530.82,Approve Invoice,2025-01-10T10:40:21Z,Approved,Emma Watts
+INV-2025-0054,Acme Office Supplies,1706.97,Receive Invoice,2025-01-10T10:45:46Z,Received,Alice Chen
+INV-2025-0055,Globex Logistics,2431.70,Receive Invoice,2025-01-10T10:48:55Z,Received,Alice Chen
+INV-2025-0041,Stark Industrial,835.38,Begin Review,2025-01-10T10:57:03Z,In Progress,Carla Reyes
+INV-2025-0056,Globex Logistics,4586.19,Receive Invoice,2025-01-10T11:09:18Z,Received,David Singh
+INV-2025-0057,Umbrella Facilities,631.37,Receive Invoice,2025-01-10T11:27:53Z,Received,Alice Chen
+INV-2025-0048,Wonka Ingredients,2586.41,Schedule Payment,2025-01-10T11:35:50Z,Ready to Pay,Ben Okoro
+INV-2025-0058,Wayne Utilities,4604.17,Receive Invoice,2025-01-10T12:34:48Z,Received,Alice Chen
+INV-2025-0053,Globex Logistics,2672.83,Begin Review,2025-01-10T13:25:48Z,In Progress,Ben Okoro
+INV-2025-0042,Soylent Catering,4067.95,Begin Review,2025-01-10T13:44:35Z,In Progress,David Singh
+INV-2025-0059,Globex Logistics,634.11,Receive Invoice,2025-01-10T13:50:17Z,Received,Carla Reyes
+INV-2025-0060,Northwind Traders,2600.62,Receive Invoice,2025-01-10T14:08:38Z,Received,Ben Okoro
+INV-2025-0036,Vandelay Imports,3036.96,Approve Invoice,2025-01-10T14:53:18Z,Approved,Emma Watts
+INV-2025-0034,Globex Logistics,3551.79,Resume Review,2025-01-10T14:59:19Z,In Progress,David Singh
+INV-2025-0061,Stark Industrial,2906.81,Receive Invoice,2025-01-10T15:02:40Z,Received,Alice Chen
+INV-2025-0044,Stark Industrial,2135.75,Approve Invoice,2025-01-10T15:15:15Z,Approved,Emma Watts
+INV-2025-0062,Northwind Traders,3047.34,Receive Invoice,2025-01-10T15:25:02Z,Received,David Singh
+INV-2025-0058,Wayne Utilities,2637.81,Begin Review,2025-01-10T15:34:48Z,In Progress,Alice Chen
+INV-2025-0063,Wayne Utilities,4508.16,Receive Invoice,2025-01-10T15:58:23Z,Received,Carla Reyes
+INV-2025-0060,Northwind Traders,524.92,Begin Review,2025-01-10T16:23:38Z,In Progress,Ben Okoro
+INV-2025-0064,Stark Industrial,2196.31,Receive Invoice,2025-01-10T16:49:16Z,Received,David Singh
+INV-2025-0057,Umbrella Facilities,4011.35,Begin Review,2025-01-10T17:48:53Z,In Progress,Alice Chen
+INV-2025-0037,Soylent Catering,4240.80,Pay Invoice,2025-01-10T18:49:15Z,Paid,Payment Run
+INV-2025-0057,Umbrella Facilities,1563.69,Raise Dispute,2025-01-10T23:46:53Z,Disputed,Alice Chen
+INV-2025-0047,Stark Industrial,3917.77,Begin Review,2025-01-10T23:55:08Z,In Progress,Alice Chen
+INV-2025-0061,Stark Industrial,1716.89,Begin Review,2025-01-10T23:59:40Z,In Progress,Alice Chen
+INV-2025-0056,Globex Logistics,4249.11,Begin Review,2025-01-11T01:58:18Z,In Progress,David Singh
+INV-2025-0055,Globex Logistics,3170.34,Begin Review,2025-01-11T03:12:55Z,In Progress,Alice Chen
+INV-2025-0045,Umbrella Facilities,2498.30,Begin Review,2025-01-11T06:03:39Z,In Progress,Carla Reyes
+INV-2025-0044,Stark Industrial,679.58,Schedule Payment,2025-01-11T07:50:15Z,Ready to Pay,Carla Reyes
+INV-2025-0042,Soylent Catering,4196.98,Raise Dispute,2025-01-11T09:19:35Z,Disputed,David Singh
+INV-2025-0027,Vandelay Imports,815.37,Pay Invoice,2025-01-11T09:29:49Z,Paid,Payment Run
+INV-2025-0036,Vandelay Imports,3893.67,Schedule Payment,2025-01-11T09:40:18Z,Ready to Pay,Carla Reyes
+INV-2025-0061,Stark Industrial,1035.76,Approve Invoice,2025-01-11T10:54:40Z,Approved,Frank Muller
+INV-2025-0049,Umbrella Facilities,4590.59,Begin Review,2025-01-11T12:45:48Z,In Progress,Alice Chen
+INV-2025-0033,Wonka Ingredients,3928.90,Pay Invoice,2025-01-11T14:50:40Z,Paid,Payment Run
+INV-2025-0026,Hooli Cloud,4789.95,Pay Invoice,2025-01-11T17:07:56Z,Paid,Payment Run
+INV-2025-0054,Acme Office Supplies,2842.11,Begin Review,2025-01-11T17:30:46Z,In Progress,Alice Chen
+INV-2025-0012,Cyberdyne Systems,1659.14,Pay Invoice,2025-01-11T18:51:31Z,Paid,Payment Run
+INV-2025-0064,Stark Industrial,866.97,Begin Review,2025-01-11T20:05:16Z,In Progress,David Singh
+INV-2025-0041,Stark Industrial,3857.16,Place On Hold,2025-01-11T21:53:03Z,On Hold,Carla Reyes
+INV-2025-0060,Northwind Traders,152.91,Place On Hold,2025-01-11T22:57:38Z,On Hold,Ben Okoro
+INV-2025-0046,Soylent Catering,3381.75,Cancel Invoice,2025-01-11T23:00:20Z,Cancelled,Carla Reyes
+INV-2025-0053,Globex Logistics,3494.23,Place On Hold,2025-01-11T23:56:48Z,On Hold,Ben Okoro
+INV-2025-0031,Wayne Utilities,1232.83,Pay Invoice,2025-01-12T00:06:54Z,Paid,Payment Run
+INV-2025-0059,Globex Logistics,509.77,Begin Review,2025-01-12T00:19:17Z,In Progress,Carla Reyes
+INV-2025-0004,Wonka Ingredients,1039.12,Pay Invoice,2025-01-12T01:11:31Z,Paid,Payment Run
+INV-2025-0025,Vandelay Imports,3886.93,Pay Invoice,2025-01-12T01:21:44Z,Paid,Payment Run
+INV-2025-0030,Initech Software,4168.33,Pay Invoice,2025-01-12T01:26:55Z,Paid,Payment Run
+INV-2025-0063,Wayne Utilities,2963.61,Begin Review,2025-01-12T03:47:23Z,In Progress,Carla Reyes
+INV-2025-0055,Globex Logistics,2439.26,Place On Hold,2025-01-12T04:04:55Z,On Hold,Alice Chen
+INV-2025-0058,Wayne Utilities,3483.88,Place On Hold,2025-01-12T04:38:48Z,On Hold,Alice Chen
+INV-2025-0054,Acme Office Supplies,386.02,Place On Hold,2025-01-12T05:02:46Z,On Hold,Alice Chen
+INV-2025-0032,Wonka Ingredients,2343.58,Pay Invoice,2025-01-12T05:25:22Z,Paid,Payment Run
+INV-2025-0052,Vandelay Imports,767.13,Begin Review,2025-01-12T05:42:26Z,In Progress,Carla Reyes
+INV-2025-0056,Globex Logistics,633.23,Approve Invoice,2025-01-12T05:57:18Z,Approved,Frank Muller
+INV-2025-0051,Wayne Utilities,4357.58,Begin Review,2025-01-12T06:20:09Z,In Progress,David Singh
+INV-2025-0064,Stark Industrial,1494.48,Approve Invoice,2025-01-12T09:09:16Z,Approved,Frank Muller
+INV-2025-0062,Northwind Traders,3978.86,Begin Review,2025-01-12T11:10:02Z,In Progress,David Singh
+INV-2025-0053,Globex Logistics,4075.62,Cancel Invoice,2025-01-12T11:17:48Z,Cancelled,Ben Okoro
+INV-2025-0045,Umbrella Facilities,3945.38,Place On Hold,2025-01-12T11:58:39Z,On Hold,Carla Reyes
+INV-2025-0029,Northwind Traders,1340.28,Pay Invoice,2025-01-12T15:18:48Z,Paid,Payment Run
+INV-2025-0052,Vandelay Imports,1613.30,Approve Invoice,2025-01-12T15:56:26Z,Approved,Emma Watts
+INV-2025-0047,Stark Industrial,2158.05,Approve Invoice,2025-01-12T19:30:08Z,Approved,Frank Muller
+INV-2025-0064,Stark Industrial,2929.59,Schedule Payment,2025-01-12T21:05:16Z,Ready to Pay,David Singh
+INV-2025-0056,Globex Logistics,2788.06,Schedule Payment,2025-01-12T22:18:18Z,Ready to Pay,David Singh
+INV-2025-0036,Vandelay Imports,2015.46,Pay Invoice,2025-01-12T22:46:18Z,Paid,Payment Run
+INV-2025-0049,Umbrella Facilities,3773.45,Raise Dispute,2025-01-12T23:03:48Z,Disputed,Alice Chen
+INV-2025-0015,Hooli Cloud,4703.55,Reopen Invoice,2025-01-13T00:33:39Z,In Progress,Alice Chen
+INV-2025-0034,Globex Logistics,2535.23,Approve Invoice,2025-01-13T01:34:19Z,Approved,Emma Watts
+INV-2025-0052,Vandelay Imports,206.78,Schedule Payment,2025-01-13T03:03:26Z,Ready to Pay,Carla Reyes
+INV-2025-0061,Stark Industrial,173.26,Pay Invoice,2025-01-13T06:37:40Z,Paid,Payment Run
+INV-2025-0065,Soylent Catering,216.58,Receive Invoice,2025-01-13T08:10:50Z,Received,Carla Reyes
+INV-2025-0066,Initech Software,2754.12,Receive Invoice,2025-01-13T08:43:11Z,Received,Ben Okoro
+INV-2025-0067,Wonka Ingredients,489.69,Receive Invoice,2025-01-13T09:05:12Z,Received,Alice Chen
+INV-2025-0047,Stark Industrial,2696.59,Schedule Payment,2025-01-13T09:19:08Z,Ready to Pay,Alice Chen
+INV-2025-0068,Wonka Ingredients,4499.89,Receive Invoice,2025-01-13T11:36:26Z,Received,Ben Okoro
+INV-2025-0040,Initech Software,1127.37,Resolve Dispute,2025-01-13T12:34:21Z,In Progress,Carla Reyes
+INV-2025-0069,Cyberdyne Systems,2010.59,Receive Invoice,2025-01-13T13:59:37Z,Received,Alice Chen
+INV-2025-0070,Stark Industrial,690.53,Receive Invoice,2025-01-13T14:09:29Z,Received,Alice Chen
+INV-2025-0071,Umbrella Facilities,3397.08,Receive Invoice,2025-01-13T14:59:30Z,Received,Ben Okoro
+INV-2025-0001,Northwind Traders,1886.75,Pay Invoice,2025-01-13T15:17:35Z,Paid,Payment Run
+INV-2025-0063,Wayne Utilities,3655.54,Place On Hold,2025-01-13T15:23:23Z,On Hold,Carla Reyes
+INV-2025-0072,Initech Software,4312.45,Receive Invoice,2025-01-13T16:27:54Z,Received,Ben Okoro
+INV-2025-0016,Cyberdyne Systems,684.50,Pay Invoice,2025-01-13T18:17:37Z,Paid,Payment Run
+INV-2025-0072,Initech Software,4208.99,Begin Review,2025-01-13T19:29:54Z,In Progress,Ben Okoro
+INV-2025-0067,Wonka Ingredients,694.81,Begin Review,2025-01-13T20:08:12Z,In Progress,Alice Chen
+INV-2025-0034,Globex Logistics,4318.37,Schedule Payment,2025-01-13T20:11:19Z,Ready to Pay,David Singh
+INV-2025-0051,Wayne Utilities,1706.92,Approve Invoice,2025-01-13T20:19:09Z,Approved,Frank Muller
+INV-2025-0067,Wonka Ingredients,2480.33,Place On Hold,2025-01-13T23:55:12Z,On Hold,Alice Chen
+INV-2025-0065,Soylent Catering,4791.05,Begin Review,2025-01-14T00:55:50Z,In Progress,Carla Reyes
+INV-2025-0035,Umbrella Facilities,1337.35,Pay Invoice,2025-01-14T02:45:23Z,Paid,Payment Run
+INV-2025-0057,Umbrella Facilities,4199.55,Resolve Dispute,2025-01-14T03:09:53Z,In Progress,Alice Chen
+INV-2025-0069,Cyberdyne Systems,3468.25,Begin Review,2025-01-14T03:29:37Z,In Progress,Alice Chen
+INV-2025-0065,Soylent Catering,1989.82,Schedule Payment,2025-01-14T06:03:50Z,Ready to Pay,Carla Reyes
+INV-2025-0044,Stark Industrial,1718.12,Pay Invoice,2025-01-14T08:46:15Z,Paid,Payment Run
+INV-2025-0042,Soylent Catering,4662.79,Resolve Dispute,2025-01-14T09:19:35Z,In Progress,David Singh
+INV-2025-0068,Wonka Ingredients,1800.94,Begin Review,2025-01-14T09:32:26Z,In Progress,Ben Okoro
+INV-2025-0071,Umbrella Facilities,355.50,Begin Review,2025-01-14T09:47:30Z,In Progress,Ben Okoro
+INV-2025-0045,Umbrella Facilities,2187.70,Cancel Invoice,2025-01-14T10:03:39Z,Cancelled,Carla Reyes
+INV-2025-0073,Cyberdyne Systems,2536.24,Receive Invoice,2025-01-14T10:09:42Z,Received,David Singh
+INV-2025-0059,Globex Logistics,795.29,Approve Invoice,2025-01-14T10:25:17Z,Approved,Emma Watts
+INV-2025-0074,Umbrella Facilities,580.26,Receive Invoice,2025-01-14T10:40:05Z,Received,Ben Okoro
+INV-2025-0075,Stark Industrial,2768.36,Receive Invoice,2025-01-14T10:58:25Z,Received,Alice Chen
+INV-2025-0062,Northwind Traders,3172.00,Approve Invoice,2025-01-14T11:53:02Z,Approved,Frank Muller
+INV-2025-0041,Stark Industrial,2824.12,Resume Review,2025-01-14T12:07:03Z,In Progress,Carla Reyes
+INV-2025-0069,Cyberdyne Systems,2040.18,Schedule Payment,2025-01-14T12:12:37Z,Ready to Pay,Alice Chen
+INV-2025-0076,Northwind Traders,4750.82,Receive Invoice,2025-01-14T12:46:42Z,Received,David Singh
+INV-2025-0070,Stark Industrial,1846.92,Begin Review,2025-01-14T13:04:29Z,In Progress,Alice Chen
+INV-2025-0077,Vandelay Imports,3890.19,Receive Invoice,2025-01-14T14:56:51Z,Received,Ben Okoro
+INV-2025-0078,Wayne Utilities,4759.46,Receive Invoice,2025-01-14T15:18:56Z,Received,David Singh
+INV-2025-0079,Northwind Traders,3314.25,Receive Invoice,2025-01-14T15:51:58Z,Received,David Singh
+INV-2025-0080,Vandelay Imports,266.59,Receive Invoice,2025-01-14T16:01:33Z,Received,Carla Reyes
+INV-2025-0050,Acme Office Supplies,3601.34,Pay Invoice,2025-01-14T17:00:35Z,Paid,Payment Run
+INV-2025-0039,Cyberdyne Systems,4334.25,Resolve Dispute,2025-01-14T18:19:58Z,In Progress,David Singh
+INV-2025-0066,Initech Software,1463.37,Begin Review,2025-01-14T18:52:11Z,In Progress,Ben Okoro
+INV-2025-0079,Northwind Traders,3680.49,Begin Review,2025-01-14T18:56:58Z,In Progress,David Singh
+INV-2025-0080,Vandelay Imports,463.08,Begin Review,2025-01-14T21:59:33Z,In Progress,Carla Reyes
+INV-2025-0064,Stark Industrial,4312.06,Pay Invoice,2025-01-14T23:11:16Z,Paid,Payment Run
+INV-2025-0042,Soylent Catering,2243.52,Approve Invoice,2025-01-14T23:15:35Z,Approved,Emma Watts
+INV-2025-0079,Northwind Traders,940.65,Schedule Payment,2025-01-15T01:03:58Z,Ready to Pay,David Singh
+INV-2025-0042,Soylent Catering,4187.84,Schedule Payment,2025-01-15T01:29:35Z,Ready to Pay,David Singh
+INV-2025-0043,Wonka Ingredients,2009.54,Pay Invoice,2025-01-15T02:05:51Z,Paid,Payment Run
+INV-2025-0059,Globex Logistics,3902.20,Schedule Payment,2025-01-15T02:42:17Z,Ready to Pay,Carla Reyes
+INV-2025-0055,Globex Logistics,4127.21,Resume Review,2025-01-15T04:27:55Z,In Progress,Alice Chen
+INV-2025-0062,Northwind Traders,2633.25,Schedule Payment,2025-01-15T06:17:02Z,Ready to Pay,David Singh
+INV-2025-0041,Stark Industrial,1708.49,Approve Invoice,2025-01-15T07:04:03Z,Approved,Frank Muller
+INV-2025-0081,Cyberdyne Systems,1356.85,Receive Invoice,2025-01-15T08:52:17Z,Received,Carla Reyes
+INV-2025-0072,Initech Software,2853.93,Place On Hold,2025-01-15T09:18:54Z,On Hold,Ben Okoro
+INV-2025-0077,Vandelay Imports,342.03,Begin Review,2025-01-15T09:29:51Z,In Progress,Ben Okoro
+INV-2025-0082,Hooli Cloud,3725.16,Receive Invoice,2025-01-15T09:41:25Z,Received,Carla Reyes
+INV-2025-0083,Wonka Ingredients,1357.10,Receive Invoice,2025-01-15T10:01:14Z,Received,Carla Reyes
+INV-2025-0071,Umbrella Facilities,3659.03,Place On Hold,2025-01-15T10:14:30Z,On Hold,Ben Okoro
+INV-2025-0084,Northwind Traders,2302.50,Receive Invoice,2025-01-15T10:17:41Z,Received,Carla Reyes
+INV-2025-0065,Soylent Catering,2418.62,Pay Invoice,2025-01-15T11:21:50Z,Paid,Payment Run
+INV-2025-0085,Northwind Traders,3412.30,Receive Invoice,2025-01-15T11:55:30Z,Received,Carla Reyes
+INV-2025-0068,Wonka Ingredients,4551.39,Place On Hold,2025-01-15T12:24:26Z,On Hold,Ben Okoro
+INV-2025-0086,Wayne Utilities,625.88,Receive Invoice,2025-01-15T12:31:11Z,Received,Carla Reyes
+INV-2025-0056,Globex Logistics,382.22,Pay Invoice,2025-01-15T12:32:18Z,Paid,Payment Run
+INV-2025-0087,Wayne Utilities,1043.92,Receive Invoice,2025-01-15T12:35:44Z,Received,David Singh
+INV-2025-0088,Acme Office Supplies,2394.05,Receive Invoice,2025-01-15T12:41:36Z,Received,David Singh
+INV-2025-0089,Hooli Cloud,3416.87,Receive Invoice,2025-01-15T12:42:24Z,Received,Carla Reyes
+INV-2025-0090,Vandelay Imports,3072.97,Receive Invoice,2025-01-15T14:28:57Z,Received,Carla Reyes
+INV-2025-0082,Hooli Cloud,2299.06,Begin Review,2025-01-15T14:52:25Z,In Progress,Carla Reyes
+INV-2025-0040,Initech Software,3135.00,Approve Invoice,2025-01-15T15:10:21Z,Approved,Frank Muller
+INV-2025-0074,Umbrella Facilities,2895.93,Begin Review,2025-01-15T17:09:05Z,In Progress,Ben Okoro
+INV-2025-0075,Stark Industrial,3296.88,Begin Review,2025-01-15T19:48:25Z,In Progress,Alice Chen
+INV-2025-0073,Cyberdyne Systems,1406.73,Begin Review,2025-01-15T20:28:42Z,In Progress,David Singh
+INV-2025-0040,Initech Software,2811.90,Schedule Payment,2025-01-15T20:42:21Z,Ready to Pay,Carla Reyes
+INV-2025-0076,Northwind Traders,3509.45,Begin Review,2025-01-15T21:20:42Z,In Progress,David Singh
+INV-2025-0083,Wonka Ingredients,3577.12,Begin Review,2025-01-15T21:44:14Z,In Progress,Carla Reyes
+INV-2025-0074,Umbrella Facilities,633.26,Place On Hold,2025-01-15T22:15:05Z,On Hold,Ben Okoro
+INV-2025-0058,Wayne Utilities,2053.10,Resume Review,2025-01-16T00:08:48Z,In Progress,Alice Chen
+INV-2025-0052,Vandelay Imports,1023.62,Pay Invoice,2025-01-16T00:16:26Z,Paid,Payment Run
+INV-2025-0041,Stark Industrial,2809.22,Schedule Payment,2025-01-16T02:31:03Z,Ready to Pay,Carla Reyes
+INV-2025-0067,Wonka Ingredients,2011.10,Resume Review,2025-01-16T03:24:12Z,In Progress,Alice Chen
+INV-2025-0081,Cyberdyne Systems,4658.70,Begin Review,2025-01-16T03:30:17Z,In Progress,Carla Reyes
+INV-2025-0038,Globex Logistics,2497.44,Pay Invoice,2025-01-16T05:32:21Z,Paid,Payment Run
+INV-2025-0078,Wayne Utilities,2400.60,Begin Review,2025-01-16T05:44:56Z,In Progress,David Singh
+INV-2025-0086,Wayne Utilities,2720.39,Begin Review,2025-01-16T06:31:11Z,In Progress,Carla Reyes
+INV-2025-0080,Vandelay Imports,2700.96,Place On Hold,2025-01-16T08:07:33Z,On Hold,Carla Reyes
+INV-2025-0091,Umbrella Facilities,2563.65,Receive Invoice,2025-01-16T08:35:33Z,Received,Carla Reyes
+INV-2025-0092,Cyberdyne Systems,77.46,Receive Invoice,2025-01-16T08:40:10Z,Received,David Singh
+INV-2025-0085,Northwind Traders,4140.90,Begin Review,2025-01-16T09:18:30Z,In Progress,Carla Reyes
+INV-2025-0093,Wonka Ingredients,1215.83,Receive Invoice,2025-01-16T09:23:15Z,Received,Carla Reyes
+INV-2025-0060,Northwind Traders,3823.63,Resume Review,2025-01-16T09:25:38Z,In Progress,Ben Okoro
+INV-2025-0067,Wonka Ingredients,4083.16,Approve Invoice,2025-01-16T10:06:12Z,Approved,Emma Watts
+INV-2025-0094,Wonka Ingredients,2303.63,Receive Invoice,2025-01-16T10:24:24Z,Received,Alice Chen
+INV-2025-0095,Wonka Ingredients,2988.56,Receive Invoice,2025-01-16T10:38:40Z,Received,Carla Reyes
+INV-2025-0096,Initech Software,4663.34,Receive Invoice,2025-01-16T12:14:35Z,Received,Ben Okoro
+INV-2025-0055,Globex Logistics,4761.91,Approve Invoice,2025-01-16T12:39:55Z,Approved,Emma Watts
+INV-2025-0075,Stark Industrial,4218.92,Raise Dispute,2025-01-16T12:46:25Z,Disputed,Alice Chen
+INV-2025-0097,Hooli Cloud,1392.54,Receive Invoice,2025-01-16T13:05:38Z,Received,Carla Reyes
+INV-2025-0077,Vandelay Imports,1671.48,Approve Invoice,2025-01-16T13:08:51Z,Approved,Emma Watts
+INV-2025-0094,Wonka Ingredients,4179.71,Begin Review,2025-01-16T13:14:24Z,In Progress,Alice Chen
+INV-2025-0098,Vandelay Imports,3063.00,Receive Invoice,2025-01-16T13:18:23Z,Received,Ben Okoro
+INV-2025-0058,Wayne Utilities,813.82,Approve Invoice,2025-01-16T13:26:48Z,Approved,Frank Muller
+INV-2025-0070,Stark Industrial,3462.46,Approve Invoice,2025-01-16T14:02:29Z,Approved,Emma Watts
+INV-2025-0099,Acme Office Supplies,3764.08,Receive Invoice,2025-01-16T14:07:43Z,Received,David Singh
+INV-2025-0057,Umbrella Facilities,212.02,Approve Invoice,2025-01-16T14:24:53Z,Approved,Frank Muller
+INV-2025-0034,Globex Logistics,690.26,Pay Invoice,2025-01-16T14:28:19Z,Paid,Payment Run
+INV-2025-0100,Soylent Catering,2232.78,Receive Invoice,2025-01-16T14:42:43Z,Received,Carla Reyes
+INV-2025-0101,Initech Software,3544.75,Receive Invoice,2025-01-16T15:20:38Z,Received,Carla Reyes
+INV-2025-0102,Acme Office Supplies,3240.52,Receive Invoice,2025-01-16T15:56:15Z,Received,David Singh
+INV-2025-0055,Globex Logistics,4794.25,Schedule Payment,2025-01-16T15:56:55Z,Ready to Pay,Alice Chen
+INV-2025-0057,Umbrella Facilities,2112.56,Schedule Payment,2025-01-16T16:36:53Z,Ready to Pay,Alice Chen
+INV-2025-0066,Initech Software,2895.99,Approve Invoice,2025-01-16T16:46:11Z,Approved,Frank Muller
+INV-2025-0094,Wonka Ingredients,606.92,Schedule Payment,2025-01-16T16:49:24Z,Ready to Pay,Alice Chen
+INV-2025-0054,Acme Office Supplies,4031.08,Resume Review,2025-01-16T16:49:46Z,In Progress,Alice Chen
+INV-2025-0049,Umbrella Facilities,2728.69,Resolve Dispute,2025-01-16T18:45:48Z,In Progress,Alice Chen
+INV-2025-0089,Hooli Cloud,940.19,Begin Review,2025-01-16T19:06:24Z,In Progress,Carla Reyes
+INV-2025-0088,Acme Office Supplies,768.41,Begin Review,2025-01-16T19:09:36Z,In Progress,David Singh
+INV-2025-0070,Stark Industrial,475.01,Schedule Payment,2025-01-16T20:49:29Z,Ready to Pay,Alice Chen
+INV-2025-0048,Wonka Ingredients,1701.02,Pay Invoice,2025-01-16T21:44:50Z,Paid,Payment Run
+INV-2025-0078,Wayne Utilities,58.96,Cancel Invoice,2025-01-16T21:59:56Z,Cancelled,David Singh
+INV-2025-0084,Northwind Traders,2725.07,Begin Review,2025-01-16T22:08:41Z,In Progress,Carla Reyes
+INV-2025-0066,Initech Software,1700.51,Schedule Payment,2025-01-16T23:10:11Z,Ready to Pay,Ben Okoro
+INV-2025-0087,Wayne Utilities,2064.11,Begin Review,2025-01-16T23:43:44Z,In Progress,David Singh
+INV-2025-0049,Umbrella Facilities,1014.57,Approve Invoice,2025-01-16T23:52:48Z,Approved,Frank Muller
+INV-2025-0039,Cyberdyne Systems,2884.68,Approve Invoice,2025-01-17T00:02:58Z,Approved,Frank Muller
+INV-2025-0077,Vandelay Imports,2167.76,Schedule Payment,2025-01-17T00:24:51Z,Ready to Pay,Ben Okoro
+INV-2025-0067,Wonka Ingredients,3168.64,Schedule Payment,2025-01-17T00:35:12Z,Ready to Pay,Alice Chen
+INV-2025-0074,Umbrella Facilities,1618.80,Resume Review,2025-01-17T00:56:05Z,In Progress,Ben Okoro
+INV-2025-0096,Initech Software,123.83,Begin Review,2025-01-17T02:34:35Z,In Progress,Ben Okoro
+INV-2025-0054,Acme Office Supplies,4563.19,Approve Invoice,2025-01-17T03:40:46Z,Approved,Emma Watts
+INV-2025-0102,Acme Office Supplies,2726.35,Begin Review,2025-01-17T03:47:15Z,In Progress,David Singh
+INV-2025-0096,Initech Software,1104.45,Schedule Payment,2025-01-17T04:37:35Z,Ready to Pay,Ben Okoro
+INV-2025-0100,Soylent Catering,4224.23,Begin Review,2025-01-17T04:54:43Z,In Progress,Carla Reyes
+INV-2025-0097,Hooli Cloud,3583.88,Begin Review,2025-01-17T05:29:38Z,In Progress,Carla Reyes
+INV-2025-0042,Soylent Catering,2765.01,Pay Invoice,2025-01-17T06:33:35Z,Paid,Payment Run
+INV-2025-0060,Northwind Traders,1771.02,Approve Invoice,2025-01-17T06:36:38Z,Approved,Frank Muller
+INV-2025-0092,Cyberdyne Systems,4355.93,Begin Review,2025-01-17T06:40:10Z,In Progress,David Singh
+INV-2025-0081,Cyberdyne Systems,1198.91,Approve Invoice,2025-01-17T06:54:17Z,Approved,Frank Muller
+INV-2025-0058,Wayne Utilities,4574.38,Schedule Payment,2025-01-17T08:23:48Z,Ready to Pay,Alice Chen
+INV-2025-0076,Northwind Traders,4048.57,Place On Hold,2025-01-17T08:36:42Z,On Hold,David Singh
+INV-2025-0103,Cyberdyne Systems,4178.03,Receive Invoice,2025-01-17T08:50:00Z,Received,Alice Chen
+INV-2025-0090,Vandelay Imports,3411.77,Begin Review,2025-01-17T08:53:57Z,In Progress,Carla Reyes
+INV-2025-0071,Umbrella Facilities,3212.35,Resume Review,2025-01-17T08:54:30Z,In Progress,Ben Okoro
+INV-2025-0104,Wayne Utilities,291.49,Receive Invoice,2025-01-17T10:24:47Z,Received,Carla Reyes
+INV-2025-0049,Umbrella Facilities,3047.11,Schedule Payment,2025-01-17T10:31:48Z,Ready to Pay,Alice Chen
+INV-2025-0082,Hooli Cloud,2630.62,Approve Invoice,2025-01-17T10:34:25Z,Approved,Frank Muller
+INV-2025-0105,Soylent Catering,4243.32,Receive Invoice,2025-01-17T10:38:16Z,Received,David Singh
+INV-2025-0063,Wayne Utilities,225.33,Resume Review,2025-01-17T10:54:23Z,In Progress,Carla Reyes
+INV-2025-0106,Umbrella Facilities,901.30,Receive Invoice,2025-01-17T11:06:09Z,Received,Alice Chen
+INV-2025-0088,Acme Office Supplies,3771.90,Raise Dispute,2025-01-17T11:37:36Z,Disputed,David Singh
+INV-2025-0054,Acme Office Supplies,2185.64,Schedule Payment,2025-01-17T12:26:46Z,Ready to Pay,Alice Chen
+INV-2025-0091,Umbrella Facilities,1495.87,Begin Review,2025-01-17T12:27:33Z,In Progress,Carla Reyes
+INV-2025-0047,Stark Industrial,1639.30,Pay Invoice,2025-01-17T12:28:08Z,Paid,Payment Run
+INV-2025-0107,Cyberdyne Systems,2422.33,Receive Invoice,2025-01-17T12:45:14Z,Received,Ben Okoro
+INV-2025-0108,Globex Logistics,2903.76,Receive Invoice,2025-01-17T13:21:06Z,Received,Carla Reyes
+INV-2025-0060,Northwind Traders,3416.19,Schedule Payment,2025-01-17T15:17:38Z,Ready to Pay,Ben Okoro
+INV-2025-0107,Cyberdyne Systems,2769.62,Begin Review,2025-01-17T16:24:14Z,In Progress,Ben Okoro
+INV-2025-0039,Cyberdyne Systems,993.87,Schedule Payment,2025-01-17T17:00:58Z,Ready to Pay,David Singh
+INV-2025-0074,Umbrella Facilities,85.51,Approve Invoice,2025-01-17T17:38:05Z,Approved,Frank Muller
+INV-2025-0083,Wonka Ingredients,3358.09,Approve Invoice,2025-01-17T19:24:14Z,Approved,Emma Watts
+INV-2025-0074,Umbrella Facilities,2672.76,Schedule Payment,2025-01-17T20:11:05Z,Ready to Pay,Ben Okoro
+INV-2025-0051,Wayne Utilities,2066.01,Pay Invoice,2025-01-17T20:39:09Z,Paid,Payment Run
+INV-2025-0106,Umbrella Facilities,1076.87,Begin Review,2025-01-17T21:23:09Z,In Progress,Alice Chen
+INV-2025-0093,Wonka Ingredients,2274.45,Begin Review,2025-01-17T22:44:15Z,In Progress,Carla Reyes
+INV-2025-0059,Globex Logistics,2979.13,Pay Invoice,2025-01-17T23:48:17Z,Paid,Payment Run
+INV-2025-0082,Hooli Cloud,4524.37,Schedule Payment,2025-01-18T00:43:25Z,Ready to Pay,Carla Reyes
+INV-2025-0095,Wonka Ingredients,908.98,Begin Review,2025-01-18T01:07:40Z,In Progress,Carla Reyes
+INV-2025-0091,Umbrella Facilities,55.15,Approve Invoice,2025-01-18T01:43:33Z,Approved,Emma Watts
+INV-2025-0085,Northwind Traders,3359.98,Approve Invoice,2025-01-18T01:49:30Z,Approved,Emma Watts
+INV-2025-0012,Cyberdyne Systems,684.01,Reopen Invoice,2025-01-18T01:50:31Z,In Progress,Ben Okoro
+INV-2025-0093,Wonka Ingredients,3525.55,Approve Invoice,2025-01-18T02:41:15Z,Approved,Emma Watts
+INV-2025-0106,Umbrella Facilities,3109.29,Place On Hold,2025-01-18T02:42:09Z,On Hold,Alice Chen
+INV-2025-0073,Cyberdyne Systems,2004.03,Approve Invoice,2025-01-18T03:16:42Z,Approved,Frank Muller
+INV-2025-0097,Hooli Cloud,2833.42,Place On Hold,2025-01-18T03:27:38Z,On Hold,Carla Reyes
+INV-2025-0099,Acme Office Supplies,861.55,Begin Review,2025-01-18T03:47:43Z,In Progress,David Singh
+INV-2025-0095,Wonka Ingredients,2089.05,Approve Invoice,2025-01-18T04:47:40Z,Approved,Emma Watts
+INV-2025-0068,Wonka Ingredients,1217.25,Resume Review,2025-01-18T04:51:26Z,In Progress,Ben Okoro
+INV-2025-0099,Acme Office Supplies,209.88,Schedule Payment,2025-01-18T06:07:43Z,Ready to Pay,David Singh
+INV-2025-0102,Acme Office Supplies,1783.54,Place On Hold,2025-01-18T06:26:15Z,On Hold,David Singh
+INV-2025-0089,Hooli Cloud,424.08,Place On Hold,2025-01-18T06:46:24Z,On Hold,Carla Reyes
+INV-2025-0090,Vandelay Imports,4225.97,Place On Hold,2025-01-18T06:49:57Z,On Hold,Carla Reyes
+INV-2025-0080,Vandelay Imports,2035.31,Resume Review,2025-01-18T08:51:33Z,In Progress,Carla Reyes
+INV-2025-0105,Soylent Catering,423.04,Begin Review,2025-01-18T09:09:16Z,In Progress,David Singh
+INV-2025-0103,Cyberdyne Systems,574.40,Begin Review,2025-01-18T09:20:00Z,In Progress,Alice Chen
+INV-2025-0086,Wayne Utilities,3562.56,Cancel Invoice,2025-01-18T10:03:11Z,Cancelled,Carla Reyes
+INV-2025-0085,Northwind Traders,2665.02,Schedule Payment,2025-01-18T10:10:30Z,Ready to Pay,Carla Reyes
+INV-2025-0060,Northwind Traders,4509.18,Pay Invoice,2025-01-18T12:23:38Z,Paid,Payment Run
+INV-2025-0062,Northwind Traders,2391.30,Pay Invoice,2025-01-18T12:44:02Z,Paid,Payment Run
+INV-2025-0101,Initech Software,1170.21,Begin Review,2025-01-18T12:46:38Z,In Progress,Carla Reyes
+INV-2025-0098,Vandelay Imports,402.10,Begin Review,2025-01-18T14:15:23Z,In Progress,Ben Okoro
+INV-2025-0107,Cyberdyne Systems,3199.80,Cancel Invoice,2025-01-18T14:22:14Z,Cancelled,Ben Okoro
+INV-2025-0100,Soylent Catering,1694.10,Approve Invoice,2025-01-18T15:48:43Z,Approved,Emma Watts
+INV-2025-0108,Globex Logistics,1918.41,Begin Review,2025-01-18T16:39:06Z,In Progress,Carla Reyes
+INV-2025-0106,Umbrella Facilities,3189.58,Cancel Invoice,2025-01-18T17:01:09Z,Cancelled,Alice Chen
+INV-2025-0073,Cyberdyne Systems,1194.92,Schedule Payment,2025-01-18T17:10:42Z,Ready to Pay,David Singh
+INV-2025-0083,Wonka Ingredients,560.44,Pay Invoice,2025-01-18T17:43:14Z,Paid,Payment Run
+INV-2025-0069,Cyberdyne Systems,4732.84,Pay Invoice,2025-01-18T18:01:37Z,Paid,Payment Run
+INV-2025-0092,Cyberdyne Systems,4019.14,Approve Invoice,2025-01-18T18:25:10Z,Approved,Emma Watts
+INV-2025-0098,Vandelay Imports,4010.32,Approve Invoice,2025-01-18T20:53:23Z,Approved,Frank Muller
+INV-2025-0066,Initech Software,2664.96,Pay Invoice,2025-01-18T22:05:11Z,Paid,Payment Run
+INV-2025-0095,Wonka Ingredients,3231.69,Schedule Payment,2025-01-18T23:52:40Z,Ready to Pay,Carla Reyes
+INV-2025-0105,Soylent Catering,3054.77,Place On Hold,2025-01-19T01:57:16Z,On Hold,David Singh
+INV-2025-0084,Northwind Traders,207.73,Approve Invoice,2025-01-19T04:22:41Z,Approved,Emma Watts
+INV-2025-0103,Cyberdyne Systems,2212.09,Approve Invoice,2025-01-19T04:33:00Z,Approved,Emma Watts
+INV-2025-0041,Stark Industrial,1709.22,Pay Invoice,2025-01-19T05:35:03Z,Paid,Payment Run
+INV-2025-0071,Umbrella Facilities,1040.61,Approve Invoice,2025-01-19T06:29:30Z,Approved,Emma Watts
+INV-2025-0072,Initech Software,230.29,Resume Review,2025-01-19T07:58:54Z,In Progress,Ben Okoro
+INV-2025-0101,Initech Software,472.38,Schedule Payment,2025-01-19T08:04:38Z,Ready to Pay,Carla Reyes
+INV-2025-0063,Wayne Utilities,1370.02,Approve Invoice,2025-01-19T08:28:23Z,Approved,Frank Muller
+INV-2025-0057,Umbrella Facilities,3522.56,Pay Invoice,2025-01-19T09:23:53Z,Paid,Payment Run
+INV-2025-0089,Hooli Cloud,3858.65,Resume Review,2025-01-19T10:26:24Z,In Progress,Carla Reyes
+INV-2025-0094,Wonka Ingredients,643.89,Pay Invoice,2025-01-19T10:49:24Z,Paid,Payment Run
+INV-2025-0064,Stark Industrial,937.23,Reopen Invoice,2025-01-19T11:10:16Z,In Progress,David Singh
+INV-2025-0104,Wayne Utilities,53.82,Begin Review,2025-01-19T11:16:47Z,In Progress,Carla Reyes
+INV-2025-0100,Soylent Catering,4750.46,Schedule Payment,2025-01-19T11:20:43Z,Ready to Pay,Carla Reyes
+INV-2025-0071,Umbrella Facilities,1389.15,Schedule Payment,2025-01-19T11:35:30Z,Ready to Pay,Ben Okoro
+INV-2025-0087,Wayne Utilities,308.93,Approve Invoice,2025-01-19T15:51:44Z,Approved,Frank Muller
+INV-2025-0103,Cyberdyne Systems,3638.75,Schedule Payment,2025-01-19T16:18:00Z,Ready to Pay,Alice Chen
+INV-2025-0104,Wayne Utilities,440.15,Approve Invoice,2025-01-19T16:50:47Z,Approved,Frank Muller
+INV-2025-0073,Cyberdyne Systems,3887.37,Pay Invoice,2025-01-19T17:33:42Z,Paid,Payment Run
+INV-2025-0079,Northwind Traders,3857.03,Pay Invoice,2025-01-19T20:56:58Z,Paid,Payment Run
+INV-2025-0104,Wayne Utilities,2936.02,Schedule Payment,2025-01-19T21:51:47Z,Ready to Pay,Carla Reyes
+INV-2025-0099,Acme Office Supplies,3456.48,Pay Invoice,2025-01-19T23:00:43Z,Paid,Payment Run
+INV-2025-0084,Northwind Traders,3113.01,Schedule Payment,2025-01-19T23:41:41Z,Ready to Pay,Carla Reyes
+INV-2025-0070,Stark Industrial,226.37,Pay Invoice,2025-01-19T23:56:29Z,Paid,Payment Run
+INV-2025-0063,Wayne Utilities,1179.24,Schedule Payment,2025-01-20T02:39:23Z,Ready to Pay,Carla Reyes
+INV-2025-0108,Globex Logistics,3806.46,Approve Invoice,2025-01-20T03:45:06Z,Approved,Frank Muller
+INV-2025-0091,Umbrella Facilities,1185.09,Pay Invoice,2025-01-20T05:22:33Z,Paid,Payment Run
+INV-2025-0093,Wonka Ingredients,921.82,Pay Invoice,2025-01-20T05:25:15Z,Paid,Payment Run
+INV-2025-0087,Wayne Utilities,3858.64,Schedule Payment,2025-01-20T06:16:44Z,Ready to Pay,David Singh
+INV-2025-0108,Globex Logistics,3418.45,Schedule Payment,2025-01-20T06:22:06Z,Ready to Pay,Carla Reyes
+INV-2025-0080,Vandelay Imports,2468.94,Approve Invoice,2025-01-20T06:56:33Z,Approved,Emma Watts
+INV-2025-0109,Soylent Catering,582.31,Receive Invoice,2025-01-20T08:17:25Z,Received,Carla Reyes
+INV-2025-0110,Cyberdyne Systems,3868.01,Receive Invoice,2025-01-20T08:29:29Z,Received,David Singh
+INV-2025-0111,Initech Software,2470.20,Receive Invoice,2025-01-20T09:18:22Z,Received,Ben Okoro
+INV-2025-0097,Hooli Cloud,3814.20,Resume Review,2025-01-20T09:47:38Z,In Progress,Carla Reyes
+INV-2025-0112,Acme Office Supplies,3681.39,Receive Invoice,2025-01-20T10:46:34Z,Received,Carla Reyes
+INV-2025-0113,Northwind Traders,1169.57,Receive Invoice,2025-01-20T10:56:57Z,Received,Carla Reyes
+INV-2025-0114,Umbrella Facilities,4052.07,Receive Invoice,2025-01-20T12:11:35Z,Received,Carla Reyes
+INV-2025-0115,Vandelay Imports,793.25,Receive Invoice,2025-01-20T12:44:20Z,Received,Ben Okoro
+INV-2025-0116,Globex Logistics,4519.88,Receive Invoice,2025-01-20T13:00:26Z,Received,Alice Chen
+INV-2025-0117,Umbrella Facilities,3310.89,Receive Invoice,2025-01-20T13:19:26Z,Received,Alice Chen
+INV-2025-0118,Wonka Ingredients,709.43,Receive Invoice,2025-01-20T13:51:55Z,Received,Ben Okoro
+INV-2025-0119,Wayne Utilities,310.92,Receive Invoice,2025-01-20T13:52:45Z,Received,Alice Chen
+INV-2025-0076,Northwind Traders,3762.31,Cancel Invoice,2025-01-20T14:32:42Z,Cancelled,David Singh
+INV-2025-0120,Umbrella Facilities,1517.61,Receive Invoice,2025-01-20T16:24:04Z,Received,Ben Okoro
+INV-2025-0121,Wonka Ingredients,339.33,Receive Invoice,2025-01-20T16:43:53Z,Received,Alice Chen
+INV-2025-0096,Initech Software,3418.94,Pay Invoice,2025-01-20T18:12:35Z,Paid,Payment Run
+INV-2025-0092,Cyberdyne Systems,2866.70,Pay Invoice,2025-01-20T19:07:10Z,Paid,Payment Run
+INV-2025-0095,Wonka Ingredients,4780.73,Pay Invoice,2025-01-20T19:25:40Z,Paid,Payment Run
+INV-2025-0068,Wonka Ingredients,3337.11,Approve Invoice,2025-01-20T19:26:26Z,Approved,Emma Watts
+INV-2025-0080,Vandelay Imports,4296.02,Schedule Payment,2025-01-20T21:40:33Z,Ready to Pay,Carla Reyes
+INV-2025-0074,Umbrella Facilities,4491.79,Pay Invoice,2025-01-20T22:43:05Z,Paid,Payment Run
+INV-2025-0089,Hooli Cloud,840.44,Approve Invoice,2025-01-21T00:18:24Z,Approved,Frank Muller
+INV-2025-0068,Wonka Ingredients,374.54,Schedule Payment,2025-01-21T01:13:26Z,Ready to Pay,Ben Okoro
+INV-2025-0081,Cyberdyne Systems,2142.27,Pay Invoice,2025-01-21T02:08:17Z,Paid,Payment Run
+INV-2025-0110,Cyberdyne Systems,2304.00,Begin Review,2025-01-21T03:15:29Z,In Progress,David Singh
+INV-2025-0039,Cyberdyne Systems,4336.31,Pay Invoice,2025-01-21T04:04:58Z,Paid,Payment Run
+INV-2025-0059,Globex Logistics,4312.47,Reopen Invoice,2025-01-21T06:20:17Z,In Progress,Carla Reyes
+INV-2025-0108,Globex Logistics,1185.82,Pay Invoice,2025-01-21T07:11:06Z,Paid,Payment Run
+INV-2025-0075,Stark Industrial,2897.56,Resolve Dispute,2025-01-21T07:26:25Z,In Progress,Alice Chen
+INV-2025-0055,Globex Logistics,3077.68,Pay Invoice,2025-01-21T07:59:55Z,Paid,Payment Run
+INV-2025-0113,Northwind Traders,3799.21,Begin Review,2025-01-21T08:38:57Z,In Progress,Carla Reyes
+INV-2025-0122,Stark Industrial,4282.95,Receive Invoice,2025-01-21T08:59:20Z,Received,Ben Okoro
+INV-2025-0067,Wonka Ingredients,4099.20,Pay Invoice,2025-01-21T11:02:12Z,Paid,Payment Run
+INV-2025-0040,Initech Software,1410.15,Pay Invoice,2025-01-21T11:33:21Z,Paid,Payment Run
+INV-2025-0110,Cyberdyne Systems,4649.58,Schedule Payment,2025-01-21T11:34:29Z,Ready to Pay,David Singh
+INV-2025-0122,Stark Industrial,3187.10,Begin Review,2025-01-21T12:21:20Z,In Progress,Ben Okoro
+INV-2025-0123,Globex Logistics,1175.39,Receive Invoice,2025-01-21T12:28:53Z,Received,David Singh
+INV-2025-0124,Globex Logistics,1825.54,Receive Invoice,2025-01-21T12:57:20Z,Received,David Singh
+INV-2025-0125,Wonka Ingredients,4481.07,Receive Invoice,2025-01-21T13:51:17Z,Received,Carla Reyes
+INV-2025-0101,Initech Software,4335.81,Pay Invoice,2025-01-21T14:19:38Z,Paid,Payment Run
+INV-2025-0063,Wayne Utilities,3763.98,Pay Invoice,2025-01-21T14:33:23Z,Paid,Payment Run
+INV-2025-0126,Initech Software,2224.93,Receive Invoice,2025-01-21T14:36:46Z,Received,David Singh
+INV-2025-0113,Northwind Traders,1728.26,Approve Invoice,2025-01-21T14:37:57Z,Approved,Emma Watts
+INV-2025-0071,Umbrella Facilities,1003.47,Pay Invoice,2025-01-21T15:18:30Z,Paid,Payment Run
+INV-2025-0127,Stark Industrial,653.00,Receive Invoice,2025-01-21T15:28:56Z,Received,David Singh
+INV-2025-0121,Wonka Ingredients,1246.81,Begin Review,2025-01-21T15:29:53Z,In Progress,Alice Chen
+INV-2025-0085,Northwind Traders,2199.60,Pay Invoice,2025-01-21T16:27:30Z,Paid,Payment Run
+INV-2025-0089,Hooli Cloud,1734.47,Schedule Payment,2025-01-21T16:53:24Z,Ready to Pay,Carla Reyes
+INV-2025-0088,Acme Office Supplies,2168.36,Resolve Dispute,2025-01-21T17:33:36Z,In Progress,David Singh
+INV-2025-0072,Initech Software,4282.35,Approve Invoice,2025-01-21T18:40:54Z,Approved,Frank Muller
+INV-2025-0127,Stark Industrial,2025.18,Begin Review,2025-01-21T21:35:56Z,In Progress,David Singh
+INV-2025-0111,Initech Software,2142.59,Begin Review,2025-01-21T22:27:22Z,In Progress,Ben Okoro
+INV-2025-0090,Vandelay Imports,4473.42,Resume Review,2025-01-21T23:45:57Z,In Progress,Carla Reyes
+INV-2025-0087,Wayne Utilities,683.63,Pay Invoice,2025-01-22T00:16:44Z,Paid,Payment Run
+INV-2025-0109,Soylent Catering,2873.53,Begin Review,2025-01-22T00:21:25Z,In Progress,Carla Reyes
+INV-2025-0120,Umbrella Facilities,2641.61,Begin Review,2025-01-22T00:44:04Z,In Progress,Ben Okoro
+INV-2025-0113,Northwind Traders,3385.09,Schedule Payment,2025-01-22T00:45:57Z,Ready to Pay,Carla Reyes
+INV-2025-0058,Wayne Utilities,2431.39,Pay Invoice,2025-01-22T01:08:48Z,Paid,Payment Run
+INV-2025-0112,Acme Office Supplies,1575.62,Begin Review,2025-01-22T03:37:34Z,In Progress,Carla Reyes
+INV-2025-0119,Wayne Utilities,2803.87,Begin Review,2025-01-22T03:37:45Z,In Progress,Alice Chen
+INV-2025-0125,Wonka Ingredients,2430.82,Begin Review,2025-01-22T03:41:17Z,In Progress,Carla Reyes
+INV-2025-0062,Northwind Traders,2918.10,Reopen Invoice,2025-01-22T05:42:02Z,In Progress,David Singh
+INV-2025-0114,Umbrella Facilities,4296.97,Begin Review,2025-01-22T06:56:35Z,In Progress,Carla Reyes
+INV-2025-0117,Umbrella Facilities,518.39,Begin Review,2025-01-22T08:05:26Z,In Progress,Alice Chen
+INV-2025-0066,Initech Software,4209.78,Reopen Invoice,2025-01-22T08:44:11Z,In Progress,Ben Okoro
+INV-2025-0128,Acme Office Supplies,3080.48,Receive Invoice,2025-01-22T09:17:44Z,Received,Carla Reyes
+INV-2025-0129,Soylent Catering,1219.73,Receive Invoice,2025-01-22T10:11:28Z,Received,Carla Reyes
+INV-2025-0115,Vandelay Imports,4114.91,Begin Review,2025-01-22T10:57:20Z,In Progress,Ben Okoro
+INV-2025-0116,Globex Logistics,3543.69,Begin Review,2025-01-22T11:30:26Z,In Progress,Alice Chen
+INV-2025-0102,Acme Office Supplies,3830.04,Resume Review,2025-01-22T12:09:15Z,In Progress,David Singh
+INV-2025-0122,Stark Industrial,1495.68,Raise Dispute,2025-01-22T12:32:20Z,Disputed,Ben Okoro
+INV-2025-0126,Initech Software,3980.17,Begin Review,2025-01-22T13:18:46Z,In Progress,David Singh
+INV-2025-0124,Globex Logistics,3304.49,Begin Review,2025-01-22T13:30:20Z,In Progress,David Singh
+INV-2025-0130,Soylent Catering,2674.45,Receive Invoice,2025-01-22T13:52:00Z,Received,David Singh
+INV-2025-0131,Vandelay Imports,1963.05,Receive Invoice,2025-01-22T13:57:07Z,Received,Alice Chen
+INV-2025-0132,Globex Logistics,4710.24,Receive Invoice,2025-01-22T14:05:59Z,Received,Carla Reyes
+INV-2025-0072,Initech Software,3034.83,Schedule Payment,2025-01-22T14:07:54Z,Ready to Pay,Ben Okoro
+INV-2025-0118,Wonka Ingredients,380.96,Begin Review,2025-01-22T14:16:55Z,In Progress,Ben Okoro
+INV-2025-0133,Vandelay Imports,558.38,Receive Invoice,2025-01-22T14:32:37Z,Received,David Singh
+INV-2025-0077,Vandelay Imports,3636.47,Pay Invoice,2025-01-22T15:12:51Z,Paid,Payment Run
+INV-2025-0126,Initech Software,3052.06,Place On Hold,2025-01-22T15:37:46Z,On Hold,David Singh
+INV-2025-0134,Globex Logistics,4248.76,Receive Invoice,2025-01-22T16:12:27Z,Received,Ben Okoro
+INV-2025-0116,Globex Logistics,4102.62,Schedule Payment,2025-01-22T17:42:26Z,Ready to Pay,Alice Chen
+INV-2025-0128,Acme Office Supplies,1846.67,Begin Review,2025-01-22T18:00:44Z,In Progress,Carla Reyes
+INV-2025-0119,Wayne Utilities,3211.95,Approve Invoice,2025-01-22T18:06:45Z,Approved,Emma Watts
+INV-2025-0123,Globex Logistics,1538.29,Begin Review,2025-01-22T19:04:53Z,In Progress,David Singh
+INV-2025-0124,Globex Logistics,95.07,Approve Invoice,2025-01-22T19:22:20Z,Approved,Frank Muller
+INV-2025-0097,Hooli Cloud,4177.50,Approve Invoice,2025-01-22T21:02:38Z,Approved,Frank Muller
+INV-2025-0049,Umbrella Facilities,869.45,Pay Invoice,2025-01-22T23:36:48Z,Paid,Payment Run
+INV-2025-0088,Acme Office Supplies,4133.09,Approve Invoice,2025-01-22T23:55:36Z,Approved,Emma Watts
+INV-2025-0075,Stark Industrial,826.31,Approve Invoice,2025-01-23T00:02:25Z,Approved,Frank Muller
+INV-2025-0120,Umbrella Facilities,2704.35,Approve Invoice,2025-01-23T01:08:04Z,Approved,Frank Muller
+INV-2025-0125,Wonka Ingredients,1174.96,Approve Invoice,2025-01-23T01:17:17Z,Approved,Emma Watts
+INV-2025-0088,Acme Office Supplies,3338.51,Schedule Payment,2025-01-23T02:29:36Z,Ready to Pay,David Singh
+INV-2025-0129,Soylent Catering,3160.75,Begin Review,2025-01-23T02:54:28Z,In Progress,Carla Reyes
+INV-2025-0097,Hooli Cloud,4603.92,Schedule Payment,2025-01-23T03:08:38Z,Ready to Pay,Carla Reyes
+INV-2025-0124,Globex Logistics,2012.48,Schedule Payment,2025-01-23T04:01:20Z,Ready to Pay,David Singh
+INV-2025-0100,Soylent Catering,3458.27,Pay Invoice,2025-01-23T04:19:43Z,Paid,Payment Run
+INV-2025-0120,Umbrella Facilities,3896.44,Schedule Payment,2025-01-23T04:47:04Z,Ready to Pay,Ben Okoro
+INV-2025-0090,Vandelay Imports,3920.21,Approve Invoice,2025-01-23T04:59:57Z,Approved,Frank Muller
+INV-2025-0132,Globex Logistics,2925.92,Begin Review,2025-01-23T05:03:59Z,In Progress,Carla Reyes
+INV-2025-0084,Northwind Traders,4118.03,Pay Invoice,2025-01-23T05:15:41Z,Paid,Payment Run
+INV-2025-0054,Acme Office Supplies,4050.18,Pay Invoice,2025-01-23T06:35:46Z,Paid,Payment Run
+INV-2025-0114,Umbrella Facilities,967.48,Approve Invoice,2025-01-23T07:00:35Z,Approved,Emma Watts
+INV-2025-0125,Wonka Ingredients,2648.32,Schedule Payment,2025-01-23T07:33:17Z,Ready to Pay,Carla Reyes
+INV-2025-0119,Wayne Utilities,2465.80,Schedule Payment,2025-01-23T08:02:45Z,Ready to Pay,Alice Chen
+INV-2025-0135,Wonka Ingredients,243.90,Receive Invoice,2025-01-23T08:03:28Z,Received,Alice Chen
+INV-2025-0133,Vandelay Imports,3401.09,Begin Review,2025-01-23T09:05:37Z,In Progress,David Singh
+INV-2025-0127,Stark Industrial,2953.35,Cancel Invoice,2025-01-23T09:24:56Z,Cancelled,David Singh
+INV-2025-0136,Vandelay Imports,1921.47,Receive Invoice,2025-01-23T09:30:57Z,Received,Ben Okoro
+INV-2025-0137,Globex Logistics,2250.28,Receive Invoice,2025-01-23T11:32:46Z,Received,David Singh
+INV-2025-0098,Vandelay Imports,975.83,Pay Invoice,2025-01-23T13:11:23Z,Paid,Payment Run
+INV-2025-0138,Cyberdyne Systems,3221.02,Receive Invoice,2025-01-23T13:42:09Z,Received,Ben Okoro
+INV-2025-0139,Wayne Utilities,1595.31,Receive Invoice,2025-01-23T13:51:28Z,Received,Carla Reyes
+INV-2025-0128,Acme Office Supplies,2793.90,Approve Invoice,2025-01-23T13:57:44Z,Approved,Frank Muller
+INV-2025-0140,Initech Software,3692.14,Receive Invoice,2025-01-23T14:16:45Z,Received,Alice Chen
+INV-2025-0131,Vandelay Imports,4487.78,Begin Review,2025-01-23T14:25:07Z,In Progress,Alice Chen
+INV-2025-0075,Stark Industrial,1997.15,Schedule Payment,2025-01-23T14:32:25Z,Ready to Pay,Alice Chen
+INV-2025-0141,Cyberdyne Systems,4407.09,Receive Invoice,2025-01-23T14:41:08Z,Received,Ben Okoro
+INV-2025-0112,Acme Office Supplies,1504.94,Place On Hold,2025-01-23T15:34:34Z,On Hold,Carla Reyes
+INV-2025-0117,Umbrella Facilities,3295.70,Raise Dispute,2025-01-23T16:08:26Z,Disputed,Alice Chen
+INV-2025-0068,Wonka Ingredients,526.92,Pay Invoice,2025-01-23T16:11:26Z,Paid,Payment Run
+INV-2025-0105,Soylent Catering,1324.03,Resume Review,2025-01-23T16:38:16Z,In Progress,David Singh
+INV-2025-0109,Soylent Catering,1910.12,Approve Invoice,2025-01-23T16:42:25Z,Approved,Frank Muller
+INV-2025-0130,Soylent Catering,981.88,Begin Review,2025-01-23T17:23:00Z,In Progress,David Singh
+INV-2025-0090,Vandelay Imports,3225.59,Schedule Payment,2025-01-23T19:05:57Z,Ready to Pay,Carla Reyes
+INV-2025-0131,Vandelay Imports,4722.63,Schedule Payment,2025-01-23T19:49:07Z,Ready to Pay,Alice Chen
+INV-2025-0111,Initech Software,4707.40,Approve Invoice,2025-01-23T20:29:22Z,Approved,Emma Watts
+INV-2025-0116,Globex Logistics,858.21,Pay Invoice,2025-01-23T20:46:26Z,Paid,Payment Run
+INV-2025-0132,Globex Logistics,1101.02,Schedule Payment,2025-01-23T21:31:59Z,Ready to Pay,Carla Reyes
+INV-2025-0114,Umbrella Facilities,1280.29,Schedule Payment,2025-01-23T21:52:35Z,Ready to Pay,Carla Reyes
+INV-2025-0138,Cyberdyne Systems,3185.56,Begin Review,2025-01-23T22:41:09Z,In Progress,Ben Okoro
+INV-2025-0140,Initech Software,3552.04,Begin Review,2025-01-23T22:57:45Z,In Progress,Alice Chen
+INV-2025-0103,Cyberdyne Systems,3109.38,Pay Invoice,2025-01-23T22:58:00Z,Paid,Payment Run
+INV-2025-0104,Wayne Utilities,3062.12,Pay Invoice,2025-01-24T00:06:47Z,Paid,Payment Run
+INV-2025-0134,Globex Logistics,4573.07,Begin Review,2025-01-24T01:06:27Z,In Progress,Ben Okoro
+INV-2025-0089,Hooli Cloud,3225.29,Pay Invoice,2025-01-24T03:02:24Z,Paid,Payment Run
+INV-2025-0118,Wonka Ingredients,3156.02,Approve Invoice,2025-01-24T03:26:55Z,Approved,Frank Muller
+INV-2025-0141,Cyberdyne Systems,147.10,Begin Review,2025-01-24T04:45:08Z,In Progress,Ben Okoro
+INV-2025-0123,Globex Logistics,256.43,Approve Invoice,2025-01-24T05:18:53Z,Approved,Emma Watts
+INV-2025-0121,Wonka Ingredients,1952.83,Approve Invoice,2025-01-24T06:01:53Z,Approved,Frank Muller
+INV-2025-0139,Wayne Utilities,1038.97,Begin Review,2025-01-24T06:42:28Z,In Progress,Carla Reyes
+INV-2025-0082,Hooli Cloud,3822.27,Pay Invoice,2025-01-24T06:58:25Z,Paid,Payment Run
+INV-2025-0133,Vandelay Imports,71.99,Place On Hold,2025-01-24T07:24:37Z,On Hold,David Singh
+INV-2025-0109,Soylent Catering,774.43,Schedule Payment,2025-01-24T07:28:25Z,Ready to Pay,Carla Reyes
+INV-2025-0142,Globex Logistics,4218.99,Receive Invoice,2025-01-24T08:21:08Z,Received,Carla Reyes
+INV-2025-0128,Acme Office Supplies,1908.88,Schedule Payment,2025-01-24T09:12:44Z,Ready to Pay,Carla Reyes
+INV-2025-0143,Wayne Utilities,4223.26,Receive Invoice,2025-01-24T09:48:26Z,Received,Ben Okoro
+INV-2025-0141,Cyberdyne Systems,2445.06,Raise Dispute,2025-01-24T10:11:08Z,Disputed,Ben Okoro
+INV-2025-0144,Wonka Ingredients,2032.33,Receive Invoice,2025-01-24T11:19:45Z,Received,Ben Okoro
+INV-2025-0135,Wonka Ingredients,4550.37,Begin Review,2025-01-24T11:23:28Z,In Progress,Alice Chen
+INV-2025-0140,Initech Software,3608.10,Approve Invoice,2025-01-24T13:28:45Z,Approved,Emma Watts
+INV-2025-0110,Cyberdyne Systems,2101.00,Pay Invoice,2025-01-24T13:44:29Z,Paid,Payment Run
+INV-2025-0135,Wonka Ingredients,1548.30,Schedule Payment,2025-01-24T14:15:28Z,Ready to Pay,Alice Chen
+INV-2025-0145,Wonka Ingredients,211.81,Receive Invoice,2025-01-24T14:16:58Z,Received,Alice Chen
+INV-2025-0134,Globex Logistics,1629.98,Schedule Payment,2025-01-24T14:53:27Z,Ready to Pay,Ben Okoro
+INV-2025-0146,Umbrella Facilities,3623.48,Receive Invoice,2025-01-24T14:54:36Z,Received,Alice Chen
+INV-2025-0147,Wonka Ingredients,2294.63,Receive Invoice,2025-01-24T16:12:49Z,Received,Ben Okoro
+INV-2025-0148,Wonka Ingredients,1657.63,Receive Invoice,2025-01-24T16:14:15Z,Received,Alice Chen
+INV-2025-0111,Initech Software,1057.83,Schedule Payment,2025-01-24T16:23:22Z,Ready to Pay,Ben Okoro
+INV-2025-0115,Vandelay Imports,2578.15,Approve Invoice,2025-01-24T16:31:20Z,Approved,Frank Muller
+INV-2025-0149,Umbrella Facilities,4385.11,Receive Invoice,2025-01-24T16:51:15Z,Received,Alice Chen
+INV-2025-0144,Wonka Ingredients,3522.07,Begin Review,2025-01-24T17:53:45Z,In Progress,Ben Okoro
+INV-2025-0136,Vandelay Imports,625.19,Begin Review,2025-01-24T19:44:57Z,In Progress,Ben Okoro
+INV-2025-0138,Cyberdyne Systems,2742.92,Approve Invoice,2025-01-24T19:52:09Z,Approved,Emma Watts
+INV-2025-0112,Acme Office Supplies,3218.36,Resume Review,2025-01-24T21:48:34Z,In Progress,Carla Reyes
+INV-2025-0126,Initech Software,4081.22,Resume Review,2025-01-24T22:32:46Z,In Progress,David Singh
+INV-2025-0118,Wonka Ingredients,3750.96,Schedule Payment,2025-01-24T22:43:55Z,Ready to Pay,Ben Okoro
+INV-2025-0138,Cyberdyne Systems,1803.02,Schedule Payment,2025-01-25T01:07:09Z,Ready to Pay,Ben Okoro
+INV-2025-0136,Vandelay Imports,378.42,Approve Invoice,2025-01-25T01:49:57Z,Approved,Emma Watts
+INV-2025-0102,Acme Office Supplies,4777.19,Approve Invoice,2025-01-25T02:54:15Z,Approved,Frank Muller
+INV-2025-0115,Vandelay Imports,3896.70,Schedule Payment,2025-01-25T03:22:20Z,Ready to Pay,Ben Okoro
+INV-2025-0137,Globex Logistics,4115.31,Begin Review,2025-01-25T04:27:46Z,In Progress,David Singh
+INV-2025-0145,Wonka Ingredients,2462.44,Begin Review,2025-01-25T05:13:58Z,In Progress,Alice Chen
+INV-2025-0148,Wonka Ingredients,3730.65,Begin Review,2025-01-25T06:44:15Z,In Progress,Alice Chen
+INV-2025-0146,Umbrella Facilities,4030.94,Begin Review,2025-01-25T07:42:36Z,In Progress,Alice Chen
+INV-2025-0102,Acme Office Supplies,1127.02,Schedule Payment,2025-01-25T08:18:15Z,Ready to Pay,David Singh
+INV-2025-0129,Soylent Catering,1186.38,Approve Invoice,2025-01-25T09:24:28Z,Approved,Emma Watts
+INV-2025-0114,Umbrella Facilities,2575.64,Pay Invoice,2025-01-25T11:12:35Z,Paid,Payment Run
+INV-2025-0149,Umbrella Facilities,3846.94,Begin Review,2025-01-25T11:31:15Z,In Progress,Alice Chen
+INV-2025-0097,Hooli Cloud,3908.69,Pay Invoice,2025-01-25T11:52:38Z,Paid,Payment Run
+INV-2025-0111,Initech Software,2127.09,Pay Invoice,2025-01-25T13:37:22Z,Paid,Payment Run
+INV-2025-0109,Soylent Catering,2284.18,Pay Invoice,2025-01-25T17:39:25Z,Paid,Payment Run
+INV-2025-0133,Vandelay Imports,4585.91,Cancel Invoice,2025-01-25T17:54:37Z,Cancelled,David Singh
+INV-2025-0105,Soylent Catering,1029.04,Approve Invoice,2025-01-25T19:49:16Z,Approved,Frank Muller
+INV-2025-0136,Vandelay Imports,4472.02,Schedule Payment,2025-01-25T19:50:57Z,Ready to Pay,Ben Okoro
+INV-2025-0144,Wonka Ingredients,3725.75,Raise Dispute,2025-01-25T20:51:45Z,Disputed,Ben Okoro
+INV-2025-0130,Soylent Catering,1297.38,Approve Invoice,2025-01-25T21:10:00Z,Approved,Emma Watts
+INV-2025-0143,Wayne Utilities,192.46,Begin Review,2025-01-25T23:30:26Z,In Progress,Ben Okoro
+INV-2025-0129,Soylent Catering,4762.07,Schedule Payment,2025-01-25T23:42:28Z,Ready to Pay,Carla Reyes
+INV-2025-0072,Initech Software,3827.19,Pay Invoice,2025-01-26T00:23:54Z,Paid,Payment Run
+INV-2025-0148,Wonka Ingredients,146.97,Approve Invoice,2025-01-26T01:28:15Z,Approved,Emma Watts
+INV-2025-0105,Soylent Catering,4051.87,Schedule Payment,2025-01-26T02:11:16Z,Ready to Pay,David Singh
+INV-2025-0142,Globex Logistics,4035.59,Begin Review,2025-01-26T03:40:08Z,In Progress,Carla Reyes
+INV-2025-0124,Globex Logistics,1649.54,Pay Invoice,2025-01-26T06:25:20Z,Paid,Payment Run
+INV-2025-0115,Vandelay Imports,3088.23,Pay Invoice,2025-01-26T07:15:20Z,Paid,Payment Run
+INV-2025-0146,Umbrella Facilities,1830.55,Cancel Invoice,2025-01-26T10:31:36Z,Cancelled,Alice Chen
+INV-2025-0112,Acme Office Supplies,1840.89,Approve Invoice,2025-01-26T12:00:34Z,Approved,Frank Muller
+INV-2025-0148,Wonka Ingredients,4184.11,Schedule Payment,2025-01-26T13:04:15Z,Ready to Pay,Alice Chen
+INV-2025-0125,Wonka Ingredients,852.22,Pay Invoice,2025-01-26T13:36:17Z,Paid,Payment Run
+INV-2025-0113,Northwind Traders,123.47,Pay Invoice,2025-01-26T14:30:57Z,Paid,Payment Run
+INV-2025-0147,Wonka Ingredients,1997.20,Begin Review,2025-01-26T14:50:49Z,In Progress,Ben Okoro
+INV-2025-0149,Umbrella Facilities,3719.83,Place On Hold,2025-01-26T15:24:15Z,On Hold,Alice Chen
+INV-2025-0145,Wonka Ingredients,3434.76,Cancel Invoice,2025-01-26T21:13:58Z,Cancelled,Alice Chen
+INV-2025-0141,Cyberdyne Systems,3411.35,Resolve Dispute,2025-01-26T21:34:08Z,In Progress,Ben Okoro
+INV-2025-0137,Globex Logistics,1345.43,Approve Invoice,2025-01-26T22:46:46Z,Approved,Emma Watts
+INV-2025-0075,Stark Industrial,1519.83,Pay Invoice,2025-01-26T23:11:25Z,Paid,Payment Run
+INV-2025-0142,Globex Logistics,3150.07,Approve Invoice,2025-01-27T00:42:08Z,Approved,Emma Watts
+INV-2025-0122,Stark Industrial,368.51,Resolve Dispute,2025-01-27T01:37:20Z,In Progress,Ben Okoro
+INV-2025-0137,Globex Logistics,1336.08,Schedule Payment,2025-01-27T03:47:46Z,Ready to Pay,David Singh
+INV-2025-0142,Globex Logistics,2784.54,Schedule Payment,2025-01-27T03:54:08Z,Ready to Pay,Carla Reyes
+INV-2025-0126,Initech Software,3131.21,Approve Invoice,2025-01-27T05:21:46Z,Approved,Frank Muller
+INV-2025-0080,Vandelay Imports,3031.49,Pay Invoice,2025-01-27T06:31:33Z,Paid,Payment Run
+INV-2025-0120,Umbrella Facilities,2499.29,Pay Invoice,2025-01-27T07:01:04Z,Paid,Payment Run
+INV-2025-0112,Acme Office Supplies,3262.83,Schedule Payment,2025-01-27T07:54:34Z,Ready to Pay,Carla Reyes
+INV-2025-0150,Hooli Cloud,2885.03,Receive Invoice,2025-01-27T08:30:29Z,Received,Alice Chen
+INV-2025-0151,Initech Software,2752.33,Receive Invoice,2025-01-27T09:21:04Z,Received,Ben Okoro
+INV-2025-0152,Wayne Utilities,4194.30,Receive Invoice,2025-01-27T09:57:18Z,Received,Carla Reyes
+INV-2025-0126,Initech Software,3498.70,Schedule Payment,2025-01-27T10:53:46Z,Ready to Pay,David Singh
+INV-2025-0153,Acme Office Supplies,1593.25,Receive Invoice,2025-01-27T11:32:46Z,Received,Carla Reyes
+INV-2025-0154,Initech Software,4508.46,Receive Invoice,2025-01-27T11:40:07Z,Received,Carla Reyes
+INV-2025-0123,Globex Logistics,956.75,Pay Invoice,2025-01-27T11:51:53Z,Paid,Payment Run
+INV-2025-0139,Wayne Utilities,3600.41,Cancel Invoice,2025-01-27T12:15:28Z,Cancelled,Carla Reyes
+INV-2025-0155,Acme Office Supplies,1038.62,Receive Invoice,2025-01-27T12:30:45Z,Received,David Singh
+INV-2025-0156,Hooli Cloud,4697.67,Receive Invoice,2025-01-27T12:59:27Z,Received,Alice Chen
+INV-2025-0119,Wayne Utilities,122.38,Pay Invoice,2025-01-27T13:05:45Z,Paid,Payment Run
+INV-2025-0157,Cyberdyne Systems,1891.64,Receive Invoice,2025-01-27T13:17:06Z,Received,Alice Chen
+INV-2025-0158,Wonka Ingredients,1011.37,Receive Invoice,2025-01-27T14:22:58Z,Received,Alice Chen
+INV-2025-0159,Wonka Ingredients,3138.38,Receive Invoice,2025-01-27T16:39:17Z,Received,Alice Chen
+INV-2025-0134,Globex Logistics,3466.65,Pay Invoice,2025-01-27T17:03:27Z,Paid,Payment Run
+INV-2025-0141,Cyberdyne Systems,2281.07,Approve Invoice,2025-01-27T20:19:08Z,Approved,Frank Muller
+INV-2025-0088,Acme Office Supplies,2236.24,Pay Invoice,2025-01-27T21:42:36Z,Paid,Payment Run
+INV-2025-0147,Wonka Ingredients,827.20,Approve Invoice,2025-01-27T21:46:49Z,Approved,Frank Muller
+INV-2025-0121,Wonka Ingredients,4556.30,Pay Invoice,2025-01-27T22:23:53Z,Paid,Payment Run
+INV-2025-0105,Soylent Catering,4257.81,Pay Invoice,2025-01-27T23:59:16Z,Paid,Payment Run
+INV-2025-0151,Initech Software,4113.67,Begin Review,2025-01-28T02:10:04Z,In Progress,Ben Okoro
+INV-2025-0112,Acme Office Supplies,251.34,Pay Invoice,2025-01-28T05:42:34Z,Paid,Payment Run
+INV-2025-0126,Initech Software,1349.52,Pay Invoice,2025-01-28T06:03:46Z,Paid,Payment Run
+INV-2025-0117,Umbrella Facilities,1657.69,Resolve Dispute,2025-01-28T06:31:26Z,In Progress,Alice Chen
+INV-2025-0128,Acme Office Supplies,843.00,Pay Invoice,2025-01-28T06:35:44Z,Paid,Payment Run
+INV-2025-0160,Hooli Cloud,4493.74,Receive Invoice,2025-01-28T08:58:44Z,Received,Carla Reyes
+INV-2025-0159,Wonka Ingredients,3972.85,Begin Review,2025-01-28T09:06:17Z,In Progress,Alice Chen
+INV-2025-0161,Vandelay Imports,2618.79,Receive Invoice,2025-01-28T09:20:24Z,Received,Alice Chen
+INV-2025-0118,Wonka Ingredients,2038.98,Pay Invoice,2025-01-28T09:25:55Z,Paid,Payment Run
+INV-2025-0155,Acme Office Supplies,632.67,Begin Review,2025-01-28T10:21:45Z,In Progress,David Singh
+INV-2025-0162,Soylent Catering,1512.90,Receive Invoice,2025-01-28T10:59:20Z,Received,Alice Chen
+INV-2025-0154,Initech Software,4283.19,Begin Review,2025-01-28T11:55:07Z,In Progress,Carla Reyes
+INV-2025-0163,Acme Office Supplies,1974.89,Receive Invoice,2025-01-28T12:00:17Z,Received,Carla Reyes
+INV-2025-0152,Wayne Utilities,2416.35,Begin Review,2025-01-28T12:09:18Z,In Progress,Carla Reyes
+INV-2025-0164,Wayne Utilities,3264.26,Receive Invoice,2025-01-28T12:27:01Z,Received,David Singh
+INV-2025-0129,Soylent Catering,211.39,Pay Invoice,2025-01-28T12:43:28Z,Paid,Payment Run
+INV-2025-0141,Cyberdyne Systems,1043.64,Schedule Payment,2025-01-28T12:46:08Z,Ready to Pay,Ben Okoro
+INV-2025-0165,Soylent Catering,543.66,Receive Invoice,2025-01-28T12:53:57Z,Received,Ben Okoro
+INV-2025-0142,Globex Logistics,4010.67,Pay Invoice,2025-01-28T15:07:08Z,Paid,Payment Run
+INV-2025-0165,Soylent Catering,580.52,Begin Review,2025-01-28T15:54:57Z,In Progress,Ben Okoro
+INV-2025-0166,Globex Logistics,3940.32,Receive Invoice,2025-01-28T15:57:30Z,Received,David Singh
+INV-2025-0167,Globex Logistics,3916.45,Receive Invoice,2025-01-28T16:22:37Z,Received,Alice Chen
+INV-2025-0117,Umbrella Facilities,3854.50,Approve Invoice,2025-01-28T16:42:26Z,Approved,Frank Muller
+INV-2025-0143,Wayne Utilities,2131.45,Cancel Invoice,2025-01-28T19:19:26Z,Cancelled,Ben Okoro
+INV-2025-0151,Initech Software,3305.86,Approve Invoice,2025-01-28T20:36:04Z,Approved,Emma Watts
+INV-2025-0154,Initech Software,2570.58,Approve Invoice,2025-01-28T20:37:07Z,Approved,Frank Muller
+INV-2025-0138,Cyberdyne Systems,3278.07,Pay Invoice,2025-01-28T20:52:09Z,Paid,Payment Run
+INV-2025-0166,Globex Logistics,2322.41,Begin Review,2025-01-29T03:23:30Z,In Progress,David Singh
+INV-2025-0117,Umbrella Facilities,2475.25,Schedule Payment,2025-01-29T03:37:26Z,Ready to Pay,Alice Chen
+INV-2025-0156,Hooli Cloud,2086.63,Begin Review,2025-01-29T03:37:27Z,In Progress,Alice Chen
+INV-2025-0151,Initech Software,4358.97,Schedule Payment,2025-01-29T05:20:04Z,Ready to Pay,Ben Okoro
+INV-2025-0090,Vandelay Imports,199.53,Pay Invoice,2025-01-29T06:37:57Z,Paid,Payment Run
+INV-2025-0163,Acme Office Supplies,3055.85,Begin Review,2025-01-29T07:53:17Z,In Progress,Carla Reyes
+INV-2025-0157,Cyberdyne Systems,4153.60,Begin Review,2025-01-29T08:09:06Z,In Progress,Alice Chen
+INV-2025-0156,Hooli Cloud,4582.46,Place On Hold,2025-01-29T08:57:27Z,On Hold,Alice Chen
+INV-2025-0150,Hooli Cloud,3039.92,Begin Review,2025-01-29T09:10:29Z,In Progress,Alice Chen
+INV-2025-0168,Umbrella Facilities,2393.52,Receive Invoice,2025-01-29T09:35:41Z,Received,Alice Chen
+INV-2025-0169,Stark Industrial,62.28,Receive Invoice,2025-01-29T10:35:12Z,Received,Alice Chen
+INV-2025-0132,Globex Logistics,1619.80,Pay Invoice,2025-01-29T10:47:59Z,Paid,Payment Run
+INV-2025-0163,Acme Office Supplies,1308.32,Approve Invoice,2025-01-29T11:06:17Z,Approved,Frank Muller
+INV-2025-0161,Vandelay Imports,3699.29,Begin Review,2025-01-29T11:32:24Z,In Progress,Alice Chen
+INV-2025-0167,Globex Logistics,3050.96,Begin Review,2025-01-29T11:48:37Z,In Progress,Alice Chen
+INV-2025-0170,Globex Logistics,508.92,Receive Invoice,2025-01-29T11:53:55Z,Received,Ben Okoro
+INV-2025-0158,Wonka Ingredients,3698.64,Begin Review,2025-01-29T12:14:58Z,In Progress,Alice Chen
+INV-2025-0153,Acme Office Supplies,1319.22,Begin Review,2025-01-29T12:18:46Z,In Progress,Carla Reyes
+INV-2025-0152,Wayne Utilities,328.59,Approve Invoice,2025-01-29T12:44:18Z,Approved,Emma Watts
+INV-2025-0157,Cyberdyne Systems,1496.37,Schedule Payment,2025-01-29T13:39:06Z,Ready to Pay,Alice Chen
+INV-2025-0165,Soylent Catering,4160.29,Cancel Invoice,2025-01-29T13:43:57Z,Cancelled,Ben Okoro
+INV-2025-0171,Umbrella Facilities,1982.51,Receive Invoice,2025-01-29T14:15:02Z,Received,David Singh
+INV-2025-0172,Umbrella Facilities,2015.41,Receive Invoice,2025-01-29T14:37:20Z,Received,Carla Reyes
+INV-2025-0173,Globex Logistics,1475.92,Receive Invoice,2025-01-29T14:50:40Z,Received,Ben Okoro
+INV-2025-0170,Globex Logistics,614.98,Begin Review,2025-01-29T14:56:55Z,In Progress,Ben Okoro
+INV-2025-0174,Hooli Cloud,3124.42,Receive Invoice,2025-01-29T15:21:22Z,Received,Ben Okoro
+INV-2025-0175,Soylent Catering,1249.46,Receive Invoice,2025-01-29T15:41:41Z,Received,Alice Chen
+INV-2025-0176,Umbrella Facilities,68.84,Receive Invoice,2025-01-29T15:47:52Z,Received,Ben Okoro
+INV-2025-0169,Stark Industrial,3060.87,Begin Review,2025-01-29T16:04:12Z,In Progress,Alice Chen
+INV-2025-0177,Wayne Utilities,1560.49,Receive Invoice,2025-01-29T16:34:19Z,Received,David Singh
+INV-2025-0140,Initech Software,2347.46,Pay Invoice,2025-01-29T16:53:45Z,Paid,Payment Run
+INV-2025-0178,Initech Software,344.10,Receive Invoice,2025-01-29T16:58:09Z,Received,Alice Chen
+INV-2025-0159,Wonka Ingredients,524.34,Raise Dispute,2025-01-29T17:14:17Z,Disputed,Alice Chen
+INV-2025-0166,Globex Logistics,4131.02,Schedule Payment,2025-01-29T17:17:30Z,Ready to Pay,David Singh
+INV-2025-0172,Umbrella Facilities,1470.50,Begin Review,2025-01-29T17:57:20Z,In Progress,Carla Reyes
+INV-2025-0122,Stark Industrial,805.90,Approve Invoice,2025-01-29T18:34:20Z,Approved,Frank Muller
+INV-2025-0162,Soylent Catering,2360.68,Begin Review,2025-01-29T19:04:20Z,In Progress,Alice Chen
+INV-2025-0131,Vandelay Imports,3608.09,Pay Invoice,2025-01-29T20:14:07Z,Paid,Payment Run
+INV-2025-0164,Wayne Utilities,4431.50,Begin Review,2025-01-29T20:52:01Z,In Progress,David Singh
+INV-2025-0122,Stark Industrial,4165.46,Schedule Payment,2025-01-29T21:03:20Z,Ready to Pay,Ben Okoro
+INV-2025-0155,Acme Office Supplies,1557.03,Place On Hold,2025-01-29T21:11:45Z,On Hold,David Singh
+INV-2025-0150,Hooli Cloud,2615.43,Schedule Payment,2025-01-29T22:50:29Z,Ready to Pay,Alice Chen
+INV-2025-0160,Hooli Cloud,3446.64,Begin Review,2025-01-29T23:37:44Z,In Progress,Carla Reyes
+INV-2025-0164,Wayne Utilities,1945.94,Schedule Payment,2025-01-30T00:10:01Z,Ready to Pay,David Singh
+INV-2025-0161,Vandelay Imports,1608.70,Schedule Payment,2025-01-30T03:47:24Z,Ready to Pay,Alice Chen
+INV-2025-0149,Umbrella Facilities,3468.64,Resume Review,2025-01-30T04:38:15Z,In Progress,Alice Chen
+INV-2025-0153,Acme Office Supplies,1407.27,Approve Invoice,2025-01-30T05:02:46Z,Approved,Frank Muller
+INV-2025-0152,Wayne Utilities,4086.47,Schedule Payment,2025-01-30T05:20:18Z,Ready to Pay,Carla Reyes
+INV-2025-0102,Acme Office Supplies,2659.04,Pay Invoice,2025-01-30T05:30:15Z,Paid,Payment Run
+INV-2025-0176,Umbrella Facilities,573.63,Begin Review,2025-01-30T05:44:52Z,In Progress,Ben Okoro
+INV-2025-0178,Initech Software,1115.95,Begin Review,2025-01-30T06:03:09Z,In Progress,Alice Chen
+INV-2025-0177,Wayne Utilities,3882.43,Begin Review,2025-01-30T06:18:19Z,In Progress,David Singh
+INV-2025-0168,Umbrella Facilities,437.14,Begin Review,2025-01-30T06:58:41Z,In Progress,Alice Chen
+INV-2025-0156,Hooli Cloud,1344.10,Cancel Invoice,2025-01-30T07:41:27Z,Cancelled,Alice Chen
+INV-2025-0179,Hooli Cloud,3259.52,Receive Invoice,2025-01-30T08:02:22Z,Received,Ben Okoro
+INV-2025-0160,Hooli Cloud,169.56,Approve Invoice,2025-01-30T08:32:44Z,Approved,Emma Watts
+INV-2025-0144,Wonka Ingredients,4276.30,Resolve Dispute,2025-01-30T08:34:45Z,In Progress,Ben Okoro
+INV-2025-0180,Cyberdyne Systems,1960.37,Receive Invoice,2025-01-30T08:42:56Z,Received,Alice Chen
+INV-2025-0147,Wonka Ingredients,1038.84,Pay Invoice,2025-01-30T09:04:49Z,Paid,Payment Run
+INV-2025-0181,Vandelay Imports,4165.49,Receive Invoice,2025-01-30T09:15:41Z,Received,David Singh
+INV-2025-0176,Umbrella Facilities,3478.88,Approve Invoice,2025-01-30T09:36:52Z,Approved,Emma Watts
+INV-2025-0168,Umbrella Facilities,3716.64,Approve Invoice,2025-01-30T09:59:41Z,Approved,Emma Watts
+INV-2025-0182,Wayne Utilities,4250.19,Receive Invoice,2025-01-30T11:16:12Z,Received,David Singh
+INV-2025-0176,Umbrella Facilities,3850.03,Schedule Payment,2025-01-30T11:54:52Z,Ready to Pay,Ben Okoro
+INV-2025-0183,Wayne Utilities,4355.48,Receive Invoice,2025-01-30T12:28:34Z,Received,Carla Reyes
+INV-2025-0174,Hooli Cloud,4170.26,Begin Review,2025-01-30T13:07:22Z,In Progress,Ben Okoro
+INV-2025-0159,Wonka Ingredients,1809.60,Resolve Dispute,2025-01-30T13:09:17Z,In Progress,Alice Chen
+INV-2025-0184,Umbrella Facilities,4756.81,Receive Invoice,2025-01-30T14:05:46Z,Received,Ben Okoro
+INV-2025-0185,Hooli Cloud,3535.23,Receive Invoice,2025-01-30T15:21:53Z,Received,Ben Okoro
+INV-2025-0141,Cyberdyne Systems,1146.95,Pay Invoice,2025-01-30T16:36:08Z,Paid,Payment Run
+INV-2025-0186,Hooli Cloud,907.97,Receive Invoice,2025-01-30T16:36:11Z,Received,Alice Chen
+INV-2025-0171,Umbrella Facilities,3274.77,Begin Review,2025-01-30T17:16:02Z,In Progress,David Singh
+INV-2025-0173,Globex Logistics,1865.07,Begin Review,2025-01-30T17:46:40Z,In Progress,Ben Okoro
+INV-2025-0153,Acme Office Supplies,806.16,Schedule Payment,2025-01-30T18:28:46Z,Ready to Pay,Carla Reyes
+INV-2025-0175,Soylent Catering,936.24,Begin Review,2025-01-30T18:29:41Z,In Progress,Alice Chen
+INV-2025-0168,Umbrella Facilities,1234.04,Schedule Payment,2025-01-30T18:47:41Z,Ready to Pay,Alice Chen
+INV-2025-0148,Wonka Ingredients,2757.11,Pay Invoice,2025-01-30T21:43:15Z,Paid,Payment Run
+INV-2025-0178,Initech Software,3399.20,Schedule Payment,2025-01-30T22:05:09Z,Ready to Pay,Alice Chen
+INV-2025-0135,Wonka Ingredients,3883.30,Pay Invoice,2025-01-30T22:46:28Z,Paid,Payment Run
+INV-2025-0170,Globex Logistics,3881.56,Approve Invoice,2025-01-30T23:02:55Z,Approved,Frank Muller
+INV-2025-0158,Wonka Ingredients,4378.85,Raise Dispute,2025-01-30T23:08:58Z,Disputed,Alice Chen
+INV-2025-0160,Hooli Cloud,3317.38,Schedule Payment,2025-01-30T23:24:44Z,Ready to Pay,Carla Reyes
+INV-2025-0177,Wayne Utilities,2380.96,Raise Dispute,2025-01-31T00:44:19Z,Disputed,David Singh
+INV-2025-0122,Stark Industrial,1979.97,Pay Invoice,2025-01-31T02:54:20Z,Paid,Payment Run
+INV-2025-0164,Wayne Utilities,4291.61,Pay Invoice,2025-01-31T03:57:01Z,Paid,Payment Run
+INV-2025-0169,Stark Industrial,2850.03,Raise Dispute,2025-01-31T05:21:12Z,Disputed,Alice Chen
+INV-2025-0130,Soylent Catering,1175.23,Pay Invoice,2025-01-31T06:03:00Z,Paid,Payment Run
+INV-2025-0136,Vandelay Imports,1849.08,Pay Invoice,2025-01-31T06:35:57Z,Paid,Payment Run
+INV-2025-0187,Soylent Catering,3533.39,Receive Invoice,2025-01-31T08:53:28Z,Received,Alice Chen
+INV-2025-0188,Stark Industrial,451.66,Receive Invoice,2025-01-31T08:56:48Z,Received,David Singh
+INV-2025-0167,Globex Logistics,4518.21,Approve Invoice,2025-01-31T10:41:37Z,Approved,Emma Watts
+INV-2025-0189,Wayne Utilities,2688.86,Receive Invoice,2025-01-31T10:50:30Z,Received,Carla Reyes
+INV-2025-0144,Wonka Ingredients,4637.33,Approve Invoice,2025-01-31T11:21:45Z,Approved,Frank Muller
+INV-2025-0155,Acme Office Supplies,2971.15,Cancel Invoice,2025-01-31T11:24:45Z,Cancelled,David Singh
+INV-2025-0190,Hooli Cloud,4427.84,Receive Invoice,2025-01-31T11:39:25Z,Received,Ben Okoro
+INV-2025-0191,Wonka Ingredients,2175.53,Receive Invoice,2025-01-31T12:14:17Z,Received,David Singh
+INV-2025-0172,Umbrella Facilities,4566.32,Approve Invoice,2025-01-31T12:16:20Z,Approved,Frank Muller
+INV-2025-0181,Vandelay Imports,2847.07,Begin Review,2025-01-31T12:48:41Z,In Progress,David Singh
+INV-2025-0192,Globex Logistics,1325.68,Receive Invoice,2025-01-31T13:02:05Z,Received,Ben Okoro
+INV-2025-0193,Cyberdyne Systems,2097.48,Receive Invoice,2025-01-31T13:25:03Z,Received,Carla Reyes
+INV-2025-0194,Wonka Ingredients,1062.39,Receive Invoice,2025-01-31T13:26:13Z,Received,Ben Okoro
+INV-2025-0195,Hooli Cloud,1267.20,Receive Invoice,2025-01-31T13:49:43Z,Received,Alice Chen
+INV-2025-0196,Hooli Cloud,1017.32,Receive Invoice,2025-01-31T13:54:01Z,Received,Carla Reyes
+INV-2025-0197,Vandelay Imports,3998.36,Receive Invoice,2025-01-31T13:59:50Z,Received,Ben Okoro
+INV-2025-0167,Globex Logistics,3552.70,Schedule Payment,2025-01-31T14:19:37Z,Ready to Pay,Alice Chen
+INV-2025-0198,Globex Logistics,3313.86,Receive Invoice,2025-01-31T15:07:04Z,Received,Ben Okoro
+INV-2025-0199,Acme Office Supplies,2459.75,Receive Invoice,2025-01-31T15:23:38Z,Received,Alice Chen
+INV-2025-0200,Cyberdyne Systems,4169.94,Receive Invoice,2025-01-31T16:55:24Z,Received,Alice Chen
+INV-2025-0172,Umbrella Facilities,3801.79,Schedule Payment,2025-01-31T18:32:20Z,Ready to Pay,Carla Reyes
+INV-2025-0159,Wonka Ingredients,4590.27,Approve Invoice,2025-01-31T19:46:17Z,Approved,Emma Watts
+INV-2025-0197,Vandelay Imports,3241.73,Begin Review,2025-01-31T20:55:50Z,In Progress,Ben Okoro
+INV-2025-0175,Soylent Catering,1244.20,Cancel Invoice,2025-01-31T21:22:41Z,Cancelled,Alice Chen
+INV-2025-0185,Hooli Cloud,3132.21,Begin Review,2025-01-31T21:44:53Z,In Progress,Ben Okoro
+INV-2025-0163,Acme Office Supplies,2419.98,Pay Invoice,2025-01-31T22:10:17Z,Paid,Payment Run
+INV-2025-0182,Wayne Utilities,4709.85,Begin Review,2025-01-31T22:36:12Z,In Progress,David Singh
+INV-2025-0180,Cyberdyne Systems,1055.55,Begin Review,2025-01-31T22:44:56Z,In Progress,Alice Chen
+INV-2025-0159,Wonka Ingredients,512.43,Schedule Payment,2025-01-31T22:47:17Z,Ready to Pay,Alice Chen
+INV-2025-0173,Globex Logistics,2392.76,Place On Hold,2025-01-31T23:01:40Z,On Hold,Ben Okoro
+INV-2025-0153,Acme Office Supplies,3009.84,Pay Invoice,2025-01-31T23:37:46Z,Paid,Payment Run
