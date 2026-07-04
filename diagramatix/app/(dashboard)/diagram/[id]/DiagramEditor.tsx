@@ -694,13 +694,15 @@ export function DiagramEditor({
   // sections returns to the dashboard rather than to the project it lives
   // in. Otherwise: project if the diagram has one, else dashboard.
   const backHref = backFromHref ?? (projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
-  const backLabel = backHref.startsWith("/notifications") || backHref.includes("notifications=1")
-    ? "Notifications"
-    : backHref.startsWith("/dashboard/projects")
-      ? "Project"
-      : backHref.startsWith("/dashboard")
-        ? "Dashboard"
-        : "Back";
+  const backLabel = backHref.includes("mining=")
+    ? "MINER"                                              // returned from a Process Mining console
+    : backHref.startsWith("/notifications") || backHref.includes("notifications=1")
+      ? "Notifications"
+      : backHref.startsWith("/dashboard/projects")
+        ? "Project"
+        : backHref.startsWith("/dashboard")
+          ? "Dashboard"
+          : "Back";
 
   const handleBackToProject = useCallback(async () => {
     if ((await confirmSaveBeforeLeave()) === "cancel") return;

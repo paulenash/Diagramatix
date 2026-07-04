@@ -29,15 +29,16 @@ export function DiagramatixThrobber({
   /** @deprecated The throbbing blue aura was removed; this prop is kept
    *  only so existing call sites keep compiling. It has no effect. */
   auraRadius: _auraRadius,
-  /** Icon colour. "red" is used for the SuperAdmin model-comparison overlay. */
+  /** Icon colour. "red" = SuperAdmin model-comparison overlay; "amber" = the
+   *  Process Mining (DiagramatixMINER) brown skin. */
   tone = "blue",
 }: {
   size?: number;
   auraRadius?: number;
-  tone?: "blue" | "red";
+  tone?: "blue" | "red" | "amber";
 }) {
-  const strokeColor = tone === "red" ? "#DC2626" : "#2E5BD6";
-  const dotColor = tone === "red" ? "#991B1B" : "#1B3A95";
+  const strokeColor = tone === "red" ? "#DC2626" : tone === "amber" ? "#B45309" : "#2E5BD6";
+  const dotColor = tone === "red" ? "#991B1B" : tone === "amber" ? "#78350F" : "#1B3A95";
   // No aura — the icon fills its native 0 0 100 100 viewBox so it
   // renders at the requested `size`. Only the triangle rotates; there
   // is no throbbing blue circle behind it any more.

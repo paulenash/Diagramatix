@@ -79,6 +79,9 @@ test.describe("DiagramatixMINER Examples — user", () => {
   });
 
   test("＋ Create draft reference scaffolds a reference for a run that has none", async ({ page }) => {
+    // Discovery is AI-only now — this button calls Claude, so it needs a key.
+    // Skip in environments without one (e.g. CI e2e) rather than 503.
+    test.skip(!process.env.ANTHROPIC_API_KEY, "Create draft reference uses AI — needs ANTHROPIC_API_KEY");
     // A project + a small imported log → a run with NO reference state machine.
     const projectId = (await (await page.request.post("/api/projects", { data: { name: `Draft Ref ${Date.now()}` } })).json()).id;
     const imp = await page.request.post(`/api/projects/${projectId}/mining/import`, {

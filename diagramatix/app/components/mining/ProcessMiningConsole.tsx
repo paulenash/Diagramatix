@@ -13,6 +13,7 @@ import { validateEventLogMapping } from "@/app/lib/mining/validateLog";
 import type { LogMapping, MiningStats } from "@/app/lib/mining/types";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 
 interface RunRow {
   id: string; name: string; stats: MiningStats; mapping: Partial<LogMapping>;
@@ -61,6 +62,14 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     try { const r = await fetch(`/api/projects/${projectId}/mining/reference-sms`); if (r.ok) { const j = await r.json(); if (j?.diagrams) setReferenceSms(j.diagrams); } } catch { /* ignore */ }
   }, [projectId]);
   useEffect(() => { loadReferenceSms(); }, [loadReferenceSms]);
+  // Restore the run that was open before viewing a diagram (return-to-exact-screen).
+  useEffect(() => {
+    try {
+      const rid = sessionStorage.getItem(`mining-return:${projectId}`);
+      if (rid) { sessionStorage.removeItem(`mining-return:${projectId}`); setSelectedId(rid); }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
   // Adopted-example hand-off: if the gallery stashed a raw sample log for this
   // project, pre-load the Import panel with it (confirm the analysis, then import).
   useEffect(() => {
@@ -196,6 +205,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   // (via the ?mining deep-link) instead of the owning project.
   const openDiagram = (id: string) =>
     `/diagram/${id}?from=${encodeURIComponent(`/dashboard?mining=${projectId}&mp=${encodeURIComponent(projectName ?? "")}&pmnoi=1`)}`;
+  // Remember which run was open so returning from a diagram restores the exact
+  // screen (the selected-run panel) instead of the top of the console.
+  const stashReturn = () => { try { if (selectedId) sessionStorage.setItem(`mining-return:${projectId}`, selectedId); } catch { /* ignore */ } };
 
   return (
     <div className="fixed inset-0 z-[60] bg-stone-950 text-stone-200 overflow-auto font-mono">
@@ -324,8 +336,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 <button onClick={() => discover(selected.id, true)} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
                   {aiBpmn ? "✨ Generating…" : "✨ Discover process"}
                 </button>
+                {aiBpmn && <DiagramatixThrobber size={20} tone="amber" />}
                 {selected.discoveredBpmnId && (
-                  <a href={openDiagram(selected.discoveredBpmnId)} className="text-xs text-amber-300 hover:text-amber-200 underline">Open discovered diagram →</a>
+                  <a href={openDiagram(selected.discoveredBpmnId)} onClick={stashReturn} className="text-xs text-amber-300 hover:text-amber-200 underline">Open discovered diagram →</a>
                 )}
               </div>
             </div>
@@ -338,8 +351,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 <button onClick={() => discoverSm(selected.id, true)} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5" title="Use AI (rules + template + your configured model) to curate a clean reference state machine from the mined lifecycle">
                   {aiSm ? "✨ Generating…" : "✨ Discover state machine"}
                 </button>
+                {aiSm && <DiagramatixThrobber size={20} tone="amber" />}
                 {selected.discoveredSmId && (
-                  <a href={openDiagram(selected.discoveredSmId)} className="text-xs text-amber-300 hover:text-amber-200 underline">Open state machine →</a>
+                  <a href={openDiagram(selected.discoveredSmId)} onClick={stashReturn} className="text-xs text-amber-300 hover:text-amber-200 underline">Open state machine →</a>
                 )}
               </div>
             </div>
@@ -356,7 +370,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 <button onClick={() => runConformance(selected.id)} disabled={!refSmId || runningConf} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
                   {runningConf ? "Checking…" : "✓ Check conformance"}
                 </button>
-                {refSmId && <a href={openDiagram(refSmId)} className="text-[11px] text-amber-300 hover:text-amber-200 underline">edit reference →</a>}
+                {refSmId && <a href={openDiagram(refSmId)} onClick={stashReturn} className="text-[11px] text-amber-300 hover:text-amber-200 underline">edit reference →</a>}
               </div>
               {referenceSms.length === 0 && (
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
