@@ -43,7 +43,6 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   const [runName, setRunName] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [threshold, setThreshold] = useState(0);
   const [discovering, setDiscovering] = useState(false);
   const [aiSm, setAiSm] = useState(false);   // AI state-machine generation in flight
   const [aiBpmn, setAiBpmn] = useState(false); // AI process generation in flight
@@ -162,7 +161,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     setDiscovering(true); if (ai) setAiBpmn(true); setErr(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/discover`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ edgeThreshold: threshold / 100, ai }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ai }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Discovery failed"); return; }
@@ -187,7 +186,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   // No reference yet? Scaffold a draft state-machine from the mined lifecycle and
   // select it — the user then prunes it into a governed reference (source of truth).
   async function createDraftReference(runId: string) {
-    const id = await discoverSm(runId);
+    const id = await discoverSm(runId, true);
     if (id) setRefSmId(id);
   }
 
@@ -316,18 +315,10 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
             {/* Discover the BPMN process */}
             <div className="mt-4 pt-3 border-t border-stone-700">
               <h3 className="text-xs font-semibold text-amber-200 mb-1">Discover the process</h3>
-              <p className="text-[11px] text-stone-400 mb-2">Infer the BPMN implied by the logs. Raise the filter to hide rare paths and reveal the mainstream flow.</p>
+              <p className="text-[11px] text-stone-400 mb-2">Turn the mined paths into a clean, readable BPMN process — AI-curated (rules + template + your configured model): gateways at real branches, rework loops, tidy labels, noise dropped.</p>
               <div className="flex items-center gap-3 flex-wrap">
-                <label className="flex items-center gap-2 text-[11px] text-stone-400">
-                  detail
-                  <input type="range" min={0} max={90} value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} className="accent-amber-600" />
-                  <span className="w-16 text-stone-300">{threshold === 0 ? "all paths" : `−${threshold}%`}</span>
-                </label>
-                <button onClick={() => discover(selected.id)} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
-                  {discovering && !aiBpmn ? "Discovering…" : "⚙ Discover process"}
-                </button>
-                <button onClick={() => discover(selected.id, true)} disabled={discovering} className="text-xs bg-amber-800 hover:bg-amber-700 disabled:opacity-40 text-white rounded px-3 py-1.5" title="Use AI (rules + template + your configured model) to curate a clean, readable BPMN process from the mined paths">
-                  {aiBpmn ? "✨ Generating…" : "✨ AI process"}
+                <button onClick={() => discover(selected.id, true)} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
+                  {aiBpmn ? "✨ Generating…" : "✨ Discover process"}
                 </button>
                 {selected.discoveredBpmnId && (
                   <a href={`/diagram/${selected.discoveredBpmnId}`} className="text-xs text-amber-300 hover:text-amber-200 underline">Open discovered diagram →</a>
@@ -338,13 +329,10 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
             {/* Discover the entity state machine */}
             <div className="mt-4 pt-3 border-t border-stone-700">
               <h3 className="text-xs font-semibold text-amber-200 mb-1">Discover the state machine</h3>
-              <p className="text-[11px] text-stone-400 mb-2">Infer the entity&rsquo;s lifecycle — its states and the events that move between them — a candidate you can edit and use as the conformance reference. <span className="text-stone-300">⚙ Discover</span> mirrors the log exactly; <span className="text-amber-300">✨ AI</span> curates a clean, governable reference (tidy labels, merged states, noise dropped).</p>
+              <p className="text-[11px] text-stone-400 mb-2">Infer the entity&rsquo;s lifecycle — the states and the events that move between them — AI-curated into a clean, governable reference (tidy labels, merged states, noise dropped) that you can edit and use for conformance.</p>
               <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => discoverSm(selected.id)} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
-                  {discovering && !aiSm ? "Working…" : "⚙ Discover state machine"}
-                </button>
-                <button onClick={() => discoverSm(selected.id, true)} disabled={discovering} className="text-xs bg-amber-800 hover:bg-amber-700 disabled:opacity-40 text-white rounded px-3 py-1.5" title="Use AI (rules + template + your configured model) to curate a clean reference state machine from the mined lifecycle">
-                  {aiSm ? "✨ Generating…" : "✨ AI state machine"}
+                <button onClick={() => discoverSm(selected.id, true)} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5" title="Use AI (rules + template + your configured model) to curate a clean reference state machine from the mined lifecycle">
+                  {aiSm ? "✨ Generating…" : "✨ Discover state machine"}
                 </button>
                 {selected.discoveredSmId && (
                   <a href={`/diagram/${selected.discoveredSmId}`} className="text-xs text-amber-300 hover:text-amber-200 underline">Open state machine →</a>
