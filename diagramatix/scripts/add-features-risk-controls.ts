@@ -20,13 +20,13 @@ const FEATURES: Array<{ name: string; summary: string; details: string; sortOrde
     name: "Risk & Control — Risk-Control Matrix",
     sortOrder: 340,
     summary:
-      "Attach Risks and Controls to process steps, check control coverage on the model, and export a Risk-Control Matrix — turning your process maps into audit-ready risk documentation.",
+      "Attach Risks, Controls and the wider governance model (Policies, Regulations, Audit Findings, KRIs, KPIs) to process steps, check control coverage, and export an audit-ready Risk-Control Matrix with full traceability.",
     details: [
-      "- Maintain an Organisation master library of Risks (likelihood/impact/category) and Controls (preventive/detective/corrective, owner, framework reference); each Project adopts its own editable copy",
-      "- Link Controls to the Risks they mitigate, then attach either to any task, gateway or data object on the canvas",
+      "- Maintain an Organisation master GRC library — Risks (likelihood/impact + residual), Controls (preventive/detective/corrective, manual/automated/IT-dependent, owner, framework, evidence, test method + frequency), plus Policies, Regulations, Audit Findings, KRIs and KPIs; each Project adopts its own editable copy",
+      "- Build the traceability graph: Controls mitigate Risks, Policies govern Controls, Regulations require Policies, Audit Findings raise against Controls, KRIs monitor Risks — then attach Risks/Controls to any task, gateway or data object on the canvas",
       "- The Diagram scan flags coverage gaps (a Risk with no mitigating Control) and segregation-of-duties breaches (one lane that both raises and approves the same work)",
-      "- Export the Risk-Control Matrix to Excel — every Risk, its mitigating Controls, coverage status and where each is attached on the process models",
-      "- Reuses your existing model: no separate GRC tool, and controls sit right on the process they govern",
+      "- Export a multi-sheet Excel Risk-Control Matrix: a flat Activity × Risk × Control audit grid (with control type, automation, owner, evidence, test method, residual risk, policy/regulation), a Risk-Control Matrix, Control + GRC registers, a Traceability sheet, and a coverage summary",
+      "- Reuses your existing model: no separate GRC tool, and controls sit right on the process they govern — end-to-end traceability from a BPMN activity to the controls and regulations that govern it",
     ].join("\n"),
   },
 ];

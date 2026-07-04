@@ -9,7 +9,7 @@ import JSZip from "jszip";
 import { prisma } from "@/app/lib/db";
 import { truncateAll } from "../_setup/db";
 import { createUserWithOrg, createProject } from "../_setup/factories";
-import { createItem, updateItem, linkMitigation } from "@/app/lib/riskControls/itemOps";
+import { createItem, updateItem, linkItems } from "@/app/lib/riskControls/itemOps";
 import { adoptLibrary } from "@/app/lib/riskControls/adoptLibrary";
 import { buildRcmXlsx } from "@/app/lib/riskControls/exportRcm";
 
@@ -19,7 +19,7 @@ async function seed() {
   const master = await prisma.riskControlLibrary.create({ data: { name: "SOX Controls", orgId: org.id } });
   const risk = await createItem(master.id, { kind: "Risk", name: "Duplicate payment", likelihood: 3, impact: 5, riskCategory: "Financial" });
   const control = await createItem(master.id, { kind: "Control", name: "Two-person approval", controlType: "Preventive", owner: "Finance", frameworkRef: "SOX 404" });
-  await linkMitigation(master.id, control.id, risk.id);
+  await linkItems(master.id, control.id, risk.id);   // Control → Risk = mitigation
   return { user, org, project, master, risk, control };
 }
 type World = Awaited<ReturnType<typeof seed>>;
@@ -49,8 +49,8 @@ describe("risk & control — adopt + RCM export", () => {
 
     // The mitigation link points at the COPY's item ids (re-linked, not dangling).
     expect(copy!.links).toHaveLength(1);
-    expect(copy!.links[0].controlId).toBe(copyControl.id);
-    expect(copy!.links[0].riskId).toBe(copyRisk.id);
+    expect(copy!.links[0].sourceId).toBe(copyControl.id);   // Control = source
+    expect(copy!.links[0].targetId).toBe(copyRisk.id);      // Risk = target
 
     // Editing the master afterwards does not touch the copy.
     await prisma.riskControlItem.update({ where: { id: w.risk.id }, data: { name: "CHANGED" } });
@@ -125,5 +125,48 @@ describe("risk & control — adopt + RCM export", () => {
     expect(grid).toContain(control.code);                            // the mitigating control on this activity
     expect(grid).toContain("Covered");
     expect(grid).toContain("<v>2</v>");                              // residual score = 1 × 2 (numeric cell)
+  });
+
+  it("T0633 — GRC objects (Policy/Regulation) + the traceability graph flow into the export", async () => {
+    // Extend the master with a Policy governing the Control and a Regulation
+    // requiring the Policy, then adopt so the whole graph clones.
+    const policy = await createItem(w.master.id, { kind: "Policy", name: "Payments Policy", owner: "CFO", frameworkRef: "FIN-01" });
+    const reg = await createItem(w.master.id, { kind: "Regulation", name: "SOX", frameworkRef: "SOX 404" });
+    await linkItems(w.master.id, policy.id, w.control.id);   // Policy governs Control
+    await linkItems(w.master.id, reg.id, policy.id);         // Regulation requires Policy
+
+    await adoptLibrary(w.project.id, w.org.id, w.master.id);
+    const lib = await prisma.riskControlLibrary.findFirst({ where: { projectId: w.project.id }, include: { items: true, links: true } });
+    // The full graph cloned: 4 items (risk, control, policy, regulation) + 3 links.
+    expect(lib!.items).toHaveLength(4);
+    expect(lib!.links).toHaveLength(3);
+
+    // Attach the risk+control to an activity so the audit grid shows the chain.
+    const cRisk = lib!.items.find((i) => i.kind === "Risk")!;
+    const cControl = lib!.items.find((i) => i.kind === "Control")!;
+    await prisma.diagram.create({
+      data: {
+        name: "Payments", type: "bpmn", userId: w.user.id, diagramOwnerId: w.user.id, orgId: w.org.id, projectId: w.project.id,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: { elements: [{ id: "t1", type: "task", x: 0, y: 0, width: 100, height: 60, label: "Pay",
+          properties: { risk: { riskRefs: [{ itemId: cRisk.id, code: cRisk.code, label: cRisk.name }], controlRefs: [{ itemId: cControl.id, code: cControl.code, label: cControl.name }] } } }], connectors: [] } as any,
+      },
+    });
+
+    const z = await JSZip.loadAsync((await buildRcmXlsx(w.project.id))!.buffer);
+    // Traceability sheet (sheet5) carries the edges with their inferred verbs.
+    const trace = await z.file("xl/worksheets/sheet5.xml")!.async("string");
+    expect(trace).toContain("governs");     // Policy → Control
+    expect(trace).toContain("requires");    // Regulation → Policy
+    expect(trace).toContain("mitigates");   // Control → Risk
+    expect(trace).toContain("Payments Policy");
+    // GRC Register (sheet4) lists the Policy + Regulation.
+    const reg4 = await z.file("xl/worksheets/sheet4.xml")!.async("string");
+    expect(reg4).toContain("Payments Policy");
+    expect(reg4).toContain("SOX");
+    // Audit grid governance column ties the control to its Policy/Regulation.
+    const grid = await z.file("xl/worksheets/sheet1.xml")!.async("string");
+    const policyCopy = lib!.items.find((i) => i.kind === "Policy")!;
+    expect(grid).toContain(policyCopy.code);
   });
 });

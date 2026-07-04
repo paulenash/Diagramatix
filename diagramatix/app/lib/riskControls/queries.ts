@@ -20,7 +20,7 @@ export function serializeLibrary(lib: any): RiskControlLibraryDTO {
       owner: it.owner ?? null, frameworkRef: it.frameworkRef ?? null,
       evidence: it.evidence ?? null, testMethod: it.testMethod ?? null, testFrequency: it.testFrequency ?? null,
     })),
-    links: (lib.links ?? []).map((ln: any) => ({ id: ln.id, controlId: ln.controlId, riskId: ln.riskId })),
+    links: (lib.links ?? []).map((ln: any) => ({ id: ln.id, sourceId: ln.sourceId, targetId: ln.targetId })),
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */

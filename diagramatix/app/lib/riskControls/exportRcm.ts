@@ -8,7 +8,7 @@
 import { prisma } from "@/app/lib/db";
 import { loadProjectLibrary } from "./queries";
 import { buildXlsx, type Sheet } from "./xlsx";
-import { riskScore, residualScore, CONTROL_TYPE_LABELS, CONTROL_AUTOMATION_LABELS } from "./types";
+import { riskScore, residualScore, CONTROL_TYPE_LABELS, CONTROL_AUTOMATION_LABELS, KIND_LABEL, relationVerb } from "./types";
 import { getRiskControl } from "@/app/lib/diagram/riskControl";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
@@ -22,13 +22,21 @@ export async function buildRcmXlsx(projectId: string): Promise<{ filename: strin
   const risks = library.items.filter((i) => i.kind === "Risk");
   const controls = library.items.filter((i) => i.kind === "Control");
   const byId = new Map(library.items.map((i) => [i.id, i]));
+  const kindOf = (id: string) => byId.get(id)?.kind;
+  const push = (m: Map<string, string[]>, k: string, v: string) => (m.get(k) ?? m.set(k, []).get(k)!).push(v);
 
-  // Control → the Risks it mitigates, and Risk → its Controls.
-  const controlsForRisk = new Map<string, string[]>();
-  const risksForControl = new Map<string, string[]>();
+  // Generalised traceability edges (source → target); mitigation is Control→Risk.
+  const controlsForRisk = new Map<string, string[]>();      // risk → mitigating controls
+  const risksForControl = new Map<string, string[]>();      // control → risks it mitigates
+  const linkedTo = new Map<string, string[]>();             // any item → items linked FROM it (source→target)
+  const linkedFrom = new Map<string, string[]>();           // any item → items linked TO it (target←source)
   for (const ln of library.links) {
-    (controlsForRisk.get(ln.riskId) ?? controlsForRisk.set(ln.riskId, []).get(ln.riskId)!).push(ln.controlId);
-    (risksForControl.get(ln.controlId) ?? risksForControl.set(ln.controlId, []).get(ln.controlId)!).push(ln.riskId);
+    push(linkedTo, ln.sourceId, ln.targetId);
+    push(linkedFrom, ln.targetId, ln.sourceId);
+    if (kindOf(ln.sourceId) === "Control" && kindOf(ln.targetId) === "Risk") {
+      push(controlsForRisk, ln.targetId, ln.sourceId);
+      push(risksForControl, ln.sourceId, ln.targetId);
+    }
   }
 
   // Scan the project's diagrams for on-model attachments (element.properties.risk).
@@ -49,10 +57,19 @@ export async function buildRcmXlsx(projectId: string): Promise<{ filename: strin
   const attachments = (id: string) => (attachOf.get(id) ?? []).join("; ");
   const codeName = (id: string) => { const it = byId.get(id); return it ? `${it.code} ${it.name}` : id; };
   const autoLabel = (a: string | null) => (a ? CONTROL_AUTOMATION_LABELS[a as keyof typeof CONTROL_AUTOMATION_LABELS] ?? a : "");
+  const ofKind = (ids: string[] | undefined, kind: string) => (ids ?? []).filter((id) => kindOf(id) === kind);
+  // The governance chain a control sits under: Policies governing it + the
+  // Regulations requiring those policies.
+  const governanceFor = (controlId: string): string => {
+    const policies = ofKind(linkedFrom.get(controlId), "Policy");
+    const regs = new Set<string>();
+    for (const p of policies) for (const r of ofKind(linkedFrom.get(p), "Regulation")) regs.add(r);
+    return [...policies.map(codeName), ...[...regs].map(codeName)].join("; ");
+  };
 
   // ── Sheet 1: Audit Grid — one row per Activity × Risk × Control (the flat,
   //    auditor-standard RCM). A risk with no control emits a single GAP row. ──
-  const gridHeader = ["Process", "Activity", "Risk", "Risk score", "Residual", "Control", "Control type", "Automation", "Frequency", "Owner", "Framework", "Evidence", "Test method", "Test frequency", "Coverage"];
+  const gridHeader = ["Process", "Activity", "Risk", "Risk score", "Residual", "Control", "Control type", "Automation", "Frequency", "Owner", "Framework", "Policy / Regulation", "Evidence", "Test method", "Test frequency", "Coverage"];
   const gridRows: (string | number)[][] = [];
   for (const ar of activityRisks) {
     const r = byId.get(ar.riskId); if (!r) continue;
@@ -66,13 +83,13 @@ export async function buildRcmXlsx(projectId: string): Promise<{ filename: strin
         gridRows.push([...base,
           c ? `${c.code} ${c.name}` : cid,
           c?.controlType ? CONTROL_TYPE_LABELS[c.controlType] : "", autoLabel(c?.automation ?? null),
-          c?.frequency ?? "", c?.owner ?? "", c?.frameworkRef ?? "",
+          c?.frequency ?? "", c?.owner ?? "", c?.frameworkRef ?? "", governanceFor(cid),
           c?.evidence ?? "", c?.testMethod ?? "", c?.testFrequency ?? "", "Covered",
         ]);
       }
     }
   }
-  if (gridRows.length === 0) gridRows.push(["—", "No risks attached to any process step yet", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
+  if (gridRows.length === 0) gridRows.push(["—", "No risks attached to any process step yet", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
 
   // ── Sheet 2: Risk-Control Matrix (one row per Risk) ──
   const rcmHeader = ["Risk", "Risk description", "Likelihood", "Impact", "Score", "Residual", "Category", "Mitigating controls", "Coverage", "Attached on"];
@@ -96,15 +113,42 @@ export async function buildRcmXlsx(projectId: string): Promise<{ filename: strin
     attachments(c.id),
   ]);
 
-  // ── Sheet 4: Coverage summary ──
+  // ── Sheet 4: GRC Register — every governance object (Policies, Regulations,
+  //    Audit Findings, KRIs, KPIs) with owner + framework + what it links to. ──
+  const otherKinds = ["Policy", "Regulation", "AuditFinding", "KRI", "KPI"] as const;
+  const regHeader = ["Kind", "Code", "Name", "Description", "Owner", "Framework ref", "Links to", "Attached on"];
+  const regRows: string[][] = [];
+  for (const kind of otherKinds) {
+    for (const it of library.items.filter((i) => i.kind === kind)) {
+      const links = [...(linkedTo.get(it.id) ?? []), ...(linkedFrom.get(it.id) ?? [])].map(codeName).join("; ");
+      regRows.push([KIND_LABEL[kind], it.code, it.name, it.description ?? "", it.owner ?? "", it.frameworkRef ?? "", links, attachments(it.id)]);
+    }
+  }
+  if (regRows.length === 0) regRows.push(["—", "", "No policies / regulations / findings / KRIs / KPIs yet", "", "", "", "", ""]);
+
+  // ── Sheet 5: Traceability — every directed edge as "A verb B". ──
+  const traceHeader = ["Source", "Source kind", "Relationship", "Target", "Target kind"];
+  const traceRows = library.links.map((ln) => {
+    const s = byId.get(ln.sourceId), t = byId.get(ln.targetId);
+    return [
+      s ? `${s.code} ${s.name}` : ln.sourceId, s ? KIND_LABEL[s.kind] : "",
+      s && t ? relationVerb(s.kind, t.kind) : "relates to",
+      t ? `${t.code} ${t.name}` : ln.targetId, t ? KIND_LABEL[t.kind] : "",
+    ];
+  });
+  if (traceRows.length === 0) traceRows.push(["—", "", "no links yet", "", ""]);
+
+  // ── Sheet 6: Coverage summary ──
   const uncovered = risks.filter((r) => !(controlsForRisk.get(r.id)?.length));
+  const count = (k: string) => library.items.filter((i) => i.kind === k).length;
   const summaryRows: (string | number)[][] = [
     ["Risk-Control Matrix — coverage summary"],
     [],
     ["Library", library.name],
-    ["Risks", risks.length],
-    ["Controls", controls.length],
-    ["Mitigation links", library.links.length],
+    ["Risks", risks.length], ["Controls", controls.length],
+    ["Policies", count("Policy")], ["Regulations", count("Regulation")],
+    ["Audit Findings", count("AuditFinding")], ["KRIs", count("KRI")], ["KPIs", count("KPI")],
+    ["Traceability links", library.links.length],
     ["Activity × Risk × Control rows", gridRows.length],
     ["Risks with no control (coverage gaps)", uncovered.length],
     [],
@@ -116,6 +160,8 @@ export async function buildRcmXlsx(projectId: string): Promise<{ filename: strin
     { name: "Audit Grid", rows: [gridHeader, ...gridRows] },
     { name: "Risk-Control Matrix", rows: [rcmHeader, ...rcmRows] },
     { name: "Control Register", rows: [ctlHeader, ...ctlRows] },
+    { name: "GRC Register", rows: [regHeader, ...regRows] },
+    { name: "Traceability", rows: [traceHeader, ...traceRows] },
     { name: "Coverage Summary", rows: summaryRows },
   ];
   const buffer = await buildXlsx(sheets);

@@ -501,7 +501,7 @@ export function DiagramEditor({
     if (!projectId) return;
     fetch(`/api/projects/${projectId}/risk-controls`)
       .then((r) => (r.ok ? r.json() : { library: null }))
-      .then((j) => setRiskCatalog((j.library?.items ?? []).map((it: { id: string; code: string; name: string; kind: "Risk" | "Control" }) => ({ id: it.id, code: it.code, name: it.name, kind: it.kind }))))
+      .then((j) => setRiskCatalog((j.library?.items ?? []).map((it: RiskCatalogItem) => ({ id: it.id, code: it.code, name: it.name, kind: it.kind }))))
       .catch(() => {});
   }, [projectId]);
 

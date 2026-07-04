@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
 import { ownedLibrary } from "./routeAuth";
-import { createItem, updateItem, deleteItem, linkMitigation, unlinkMitigation, ItemOpError } from "./itemOps";
+import { createItem, updateItem, deleteItem, linkItems, unlinkItems, ItemOpError } from "./itemOps";
 
 type Scope = { orgId?: string; projectId?: string };
 
@@ -46,20 +46,20 @@ export async function hDeleteItem(libraryId: string, itemId: string, scope: Scop
   catch (err) { return opErr(err); }
 }
 
-export async function hLink(libraryId: string, scope: Scope, body: { controlId?: unknown; riskId?: unknown }) {
+export async function hLink(libraryId: string, scope: Scope, body: { sourceId?: unknown; targetId?: unknown }) {
   const notOwned = await ownedLibrary({ id: libraryId, ...scope }); if (notOwned) return notOwned;
-  const controlId = typeof body.controlId === "string" ? body.controlId : "";
-  const riskId = typeof body.riskId === "string" ? body.riskId : "";
-  if (!controlId || !riskId) return NextResponse.json({ error: "controlId and riskId required" }, { status: 400 });
-  try { const link = await linkMitigation(libraryId, controlId, riskId); return NextResponse.json({ link }, { status: 201 }); }
+  const sourceId = typeof body.sourceId === "string" ? body.sourceId : "";
+  const targetId = typeof body.targetId === "string" ? body.targetId : "";
+  if (!sourceId || !targetId) return NextResponse.json({ error: "sourceId and targetId required" }, { status: 400 });
+  try { const link = await linkItems(libraryId, sourceId, targetId); return NextResponse.json({ link }, { status: 201 }); }
   catch (err) { return opErr(err); }
 }
 
-export async function hUnlink(libraryId: string, scope: Scope, body: { controlId?: unknown; riskId?: unknown }) {
+export async function hUnlink(libraryId: string, scope: Scope, body: { sourceId?: unknown; targetId?: unknown }) {
   const notOwned = await ownedLibrary({ id: libraryId, ...scope }); if (notOwned) return notOwned;
-  const controlId = typeof body.controlId === "string" ? body.controlId : "";
-  const riskId = typeof body.riskId === "string" ? body.riskId : "";
-  if (!controlId || !riskId) return NextResponse.json({ error: "controlId and riskId required" }, { status: 400 });
-  await unlinkMitigation(libraryId, controlId, riskId);
+  const sourceId = typeof body.sourceId === "string" ? body.sourceId : "";
+  const targetId = typeof body.targetId === "string" ? body.targetId : "";
+  if (!sourceId || !targetId) return NextResponse.json({ error: "sourceId and targetId required" }, { status: 400 });
+  await unlinkItems(libraryId, sourceId, targetId);
   return NextResponse.json({ ok: true });
 }

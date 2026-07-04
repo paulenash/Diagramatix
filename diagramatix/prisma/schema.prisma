@@ -932,9 +932,17 @@ model EntityNode {
 // An Org holds a master library; a Project adopts a COPY it edits independently
 // (mirrors Entity Lists). Controls MITIGATE Risks via RiskControlLink.
 // ────────────────────────────────────────────────────────────────────────────
+// A GRC library item kind. Risk + Control are the RCM core; the rest form the
+// wider governance/traceability graph (a step ↔ risk ↔ control ↔ policy ↔
+// regulation ↔ audit finding, with KRIs/KPIs as indicators).
 enum RiskControlKind {
   Risk
   Control
+  Policy
+  Regulation
+  AuditFinding
+  KRI
+  KPI
 }
 
 enum ControlType {
@@ -995,9 +1003,11 @@ model RiskControlItem {
   evidence     String?            // what evidence proves the control operated
   testMethod   String?            // how internal audit tests it
   testFrequency String?           // how often it is tested
-  // Mitigation links where this item is the control / the risk.
-  asControl    RiskControlLink[]  @relation("LinkControl")
-  asRisk       RiskControlLink[]  @relation("LinkRisk")
+  // Directed traceability edges where this item is the source / the target.
+  // (Control→Risk = mitigates; Policy→Control = governs; Regulation→Policy =
+  //  requires; AuditFinding→Control = addresses; KRI→Risk = monitors; …)
+  linksOut     RiskControlLink[]  @relation("LinkSource")
+  linksIn      RiskControlLink[]  @relation("LinkTarget")
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
@@ -1008,13 +1018,13 @@ model RiskControlLink {
   id         String             @id @default(cuid())
   libraryId  String
   library    RiskControlLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
-  controlId  String
-  control    RiskControlItem    @relation("LinkControl", fields: [controlId], references: [id], onDelete: Cascade)
-  riskId     String
-  risk       RiskControlItem    @relation("LinkRisk", fields: [riskId], references: [id], onDelete: Cascade)
+  sourceId   String
+  source     RiskControlItem    @relation("LinkSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId   String
+  target     RiskControlItem    @relation("LinkTarget", fields: [targetId], references: [id], onDelete: Cascade)
   createdAt  DateTime           @default(now())
 
-  @@unique([controlId, riskId])
+  @@unique([sourceId, targetId])
   @@index([libraryId])
 }
 

@@ -2,7 +2,7 @@
  *  project routes) authorise first, then delegate the libraryId-scoped work
  *  here. Mirrors app/lib/entityLists/nodeOps.ts. */
 import { prisma } from "@/app/lib/db";
-import { RISK_CONTROL_KINDS, CONTROL_TYPES, CONTROL_AUTOMATIONS, type RiskControlKind, type ControlType, type ControlAutomation } from "./types";
+import { RISK_CONTROL_KINDS, CONTROL_TYPES, CONTROL_AUTOMATIONS, KIND_PREFIX, type RiskControlKind, type ControlType, type ControlAutomation } from "./types";
 
 export class ItemOpError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
@@ -35,8 +35,9 @@ export async function createItem(
     where: { libraryId, kind }, orderBy: { sortOrder: "desc" }, select: { sortOrder: true },
   });
   const sortOrder = (last?.sortOrder ?? -1) + 1;
-  const code = asStr(input.code) || `${kind === "Risk" ? "R" : "C"}-${String(sortOrder + 1).padStart(2, "0")}`;
+  const code = asStr(input.code) || `${KIND_PREFIX[kind]}-${String(sortOrder + 1).padStart(2, "0")}`;
   const isRisk = kind === "Risk", isControl = kind === "Control";
+  const generic = !isRisk;   // owner + frameworkRef apply to controls + governance objects
 
   return prisma.riskControlItem.create({
     data: {
@@ -50,8 +51,8 @@ export async function createItem(
       controlType: isControl ? controlType : null,
       automation: isControl ? automation : null,
       frequency: isControl ? (asStr(input.frequency) || null) : null,
-      owner: isControl ? (asStr(input.owner) || null) : null,
-      frameworkRef: isControl ? (asStr(input.frameworkRef) || null) : null,
+      owner: generic ? (asStr(input.owner) || null) : null,
+      frameworkRef: generic ? (asStr(input.frameworkRef) || null) : null,
       evidence: isControl ? (asStr(input.evidence) || null) : null,
       testMethod: isControl ? (asStr(input.testMethod) || null) : null,
       testFrequency: isControl ? (asStr(input.testFrequency) || null) : null,
@@ -90,11 +91,13 @@ export async function updateItem(
       data.automation = a;
     }
     if (input.frequency !== undefined) data.frequency = asStr(input.frequency) || null;
-    if (input.owner !== undefined) data.owner = asStr(input.owner) || null;
-    if (input.frameworkRef !== undefined) data.frameworkRef = asStr(input.frameworkRef) || null;
     if (input.evidence !== undefined) data.evidence = asStr(input.evidence) || null;
     if (input.testMethod !== undefined) data.testMethod = asStr(input.testMethod) || null;
     if (input.testFrequency !== undefined) data.testFrequency = asStr(input.testFrequency) || null;
+  }
+  if (item.kind !== "Risk") {
+    if (input.owner !== undefined) data.owner = asStr(input.owner) || null;
+    if (input.frameworkRef !== undefined) data.frameworkRef = asStr(input.frameworkRef) || null;
   }
   return prisma.riskControlItem.update({ where: { id: itemId }, data });
 }
@@ -106,22 +109,26 @@ export async function deleteItem(libraryId: string, itemId: string) {
   await prisma.riskControlItem.delete({ where: { id: itemId } });
 }
 
-/** Link a Control to a Risk (mitigation). Idempotent on the (control,risk) pair. */
-export async function linkMitigation(libraryId: string, controlId: string, riskId: string) {
-  const [control, risk] = await Promise.all([
-    prisma.riskControlItem.findFirst({ where: { id: controlId, libraryId, kind: "Control" }, select: { id: true } }),
-    prisma.riskControlItem.findFirst({ where: { id: riskId, libraryId, kind: "Risk" }, select: { id: true } }),
+/** Link one item to another (a directed traceability edge, source → target).
+ *  Any two distinct items in the same library may be linked; the relationship
+ *  semantics are inferred from the two kinds. Idempotent on (source, target).
+ *  A Control→Risk edge is the RCM mitigation. */
+export async function linkItems(libraryId: string, sourceId: string, targetId: string) {
+  if (sourceId === targetId) throw new ItemOpError("An item can't link to itself", 400);
+  const [source, target] = await Promise.all([
+    prisma.riskControlItem.findFirst({ where: { id: sourceId, libraryId }, select: { id: true } }),
+    prisma.riskControlItem.findFirst({ where: { id: targetId, libraryId }, select: { id: true } }),
   ]);
-  if (!control) throw new ItemOpError("Control not in this library", 400);
-  if (!risk) throw new ItemOpError("Risk not in this library", 400);
+  if (!source) throw new ItemOpError("Source item not in this library", 400);
+  if (!target) throw new ItemOpError("Target item not in this library", 400);
   return prisma.riskControlLink.upsert({
-    where: { controlId_riskId: { controlId, riskId } },
-    create: { libraryId, controlId, riskId },
+    where: { sourceId_targetId: { sourceId, targetId } },
+    create: { libraryId, sourceId, targetId },
     update: {},
   });
 }
 
-/** Remove a mitigation link. */
-export async function unlinkMitigation(libraryId: string, controlId: string, riskId: string) {
-  await prisma.riskControlLink.deleteMany({ where: { libraryId, controlId, riskId } });
+/** Remove a traceability link. */
+export async function unlinkItems(libraryId: string, sourceId: string, targetId: string) {
+  await prisma.riskControlLink.deleteMany({ where: { libraryId, sourceId, targetId } });
 }
