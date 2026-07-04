@@ -27,6 +27,7 @@ import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
+import type { RiskCatalogItem } from "@/app/components/canvas/RiskControlSection";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
@@ -493,6 +494,16 @@ export function DiagramEditor({
     } catch { /* ignore */ }
   }, [projectId]);
   useEffect(() => { loadEntityStructure(); }, [loadEntityStructure]);
+
+  // Project Risk & Control catalog — items available to attach to a step.
+  const [riskCatalog, setRiskCatalog] = useState<RiskCatalogItem[]>([]);
+  useEffect(() => {
+    if (!projectId) return;
+    fetch(`/api/projects/${projectId}/risk-controls`)
+      .then((r) => (r.ok ? r.json() : { library: null }))
+      .then((j) => setRiskCatalog((j.library?.items ?? []).map((it: { id: string; code: string; name: string; kind: "Risk" | "Control" }) => ({ id: it.id, code: it.code, name: it.name, kind: it.kind }))))
+      .catch(() => {});
+  }, [projectId]);
 
   // Persist a brand-new pool/lane name into the project structure, then
   // refresh local suggestions. Returns true on success.
@@ -3459,6 +3470,7 @@ export function DiagramEditor({
             multiSelectionCount={selectedElementIds.size}
             onUpdateLabel={updateLabel}
             onUpdateProperties={updateProperties}
+            riskCatalog={riskCatalog}
             onLinkSharePointFile={(id) => setSpLinkElId(id)}
             onPreviewSharePointFile={(link) => setSpPreview(link)}
             onSetEventBoundary={(id, hostId) => {

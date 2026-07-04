@@ -731,6 +731,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "ai-plan", title: "AI Plan Formats", description: "Saved AI two-phase plan format templates.", href: "/dashboard/admin/ai-plan-format" },
   { id: "org-settings", title: "Org Settings", description: "Manage Orgs, OrgAdmins, and cross-Org sharing.", href: "/dashboard/admin/org-settings" },
   { id: "entity-lists", title: "Entity Lists", description: "Org structures, external participants and IT systems for BPMN pool/lane naming.", href: "/dashboard/admin/entity-lists" },
+  { id: "risk-controls", title: "Risk & Control Catalog", description: "Master library of Risks and Controls; projects adopt a copy, attach them to steps and export a Risk-Control Matrix.", href: "/dashboard/admin/risk-controls" },
   { id: "sharing", title: "Project Sharing", description: "Every shared project plus its editors / viewers.", href: "/dashboard/admin/sharing" },
   { id: "scanner-rules", title: "BPMN Scanner Rules", description: "Rules used by the diagram issue scanner.", href: "/dashboard/admin/scanner-rules" },
   { id: "bubble-help", title: "Bubble Help", description: "The contextual help-cloud topics shown in the editor.", href: "/dashboard/admin/bubble-help" },

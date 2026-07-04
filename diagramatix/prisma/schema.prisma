@@ -86,6 +86,7 @@ model Org {
   diagramRules        DiagramRules[]
   collaborationGroups CollaborationGroup[]
   entityLists         EntityList[]
+  riskControlLibraries RiskControlLibrary[]
   simulationTeams     SimulationTeam[]
   simulationCalendars SimulationCalendar[]
   processMiningRuns   ProcessMiningRun[]
@@ -244,6 +245,8 @@ model Project {
   // Entity Lists (External Participants, Org Structure, IT Systems) — a
   // project's own copy, adopted from an org master and edited independently.
   entityLists EntityList[]
+  // Risk & Control catalog — project's own copy, adopted from an org master.
+  riskControlLibraries RiskControlLibrary[]
   simulationTeams SimulationTeam[]
   simulationCalendars SimulationCalendar[]
   simulationStudies SimulationStudy[]
@@ -921,6 +924,85 @@ model EntityNode {
   updatedAt DateTime        @updatedAt
 
   @@index([listId, parentId, sortOrder])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Risk & Control catalog — a governed library of Risks and Controls attached to
+// process steps to produce a Risk-Control Matrix (RCM) + coverage checks.
+// An Org holds a master library; a Project adopts a COPY it edits independently
+// (mirrors Entity Lists). Controls MITIGATE Risks via RiskControlLink.
+// ────────────────────────────────────────────────────────────────────────────
+enum RiskControlKind {
+  Risk
+  Control
+}
+
+enum ControlType {
+  Preventive
+  Detective
+  Corrective
+}
+
+model RiskControlLibrary {
+  id             String              @id @default(cuid())
+  name           String
+  // Exactly one of orgId / projectId is set.
+  orgId          String?
+  org            Org?                @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  projectId      String?
+  project        Project?            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // The org master this project copy was cloned from (provenance only).
+  sourceLibraryId String?
+  sourceLibrary  RiskControlLibrary? @relation("RiskControlLibraryClone", fields: [sourceLibraryId], references: [id], onDelete: SetNull)
+  clones         RiskControlLibrary[] @relation("RiskControlLibraryClone")
+  items          RiskControlItem[]
+  links          RiskControlLink[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([orgId])
+  @@index([projectId])
+}
+
+model RiskControlItem {
+  id           String             @id @default(cuid())
+  libraryId    String
+  library      RiskControlLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  kind         RiskControlKind
+  code         String             // short handle, e.g. "R-01" / "C-01"
+  name         String
+  description  String?
+  sortOrder    Int                @default(0)
+  // Risk attributes (kind = Risk)
+  likelihood   Int?               // 1..5
+  impact       Int?               // 1..5
+  riskCategory String?
+  // Control attributes (kind = Control)
+  controlType  ControlType?
+  frequency    String?
+  owner        String?
+  frameworkRef String?            // e.g. "SOX 404", "ISO 27001 A.9"
+  // Mitigation links where this item is the control / the risk.
+  asControl    RiskControlLink[]  @relation("LinkControl")
+  asRisk       RiskControlLink[]  @relation("LinkRisk")
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([libraryId, kind, sortOrder])
+}
+
+model RiskControlLink {
+  id         String             @id @default(cuid())
+  libraryId  String
+  library    RiskControlLibrary @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  controlId  String
+  control    RiskControlItem    @relation("LinkControl", fields: [controlId], references: [id], onDelete: Cascade)
+  riskId     String
+  risk       RiskControlItem    @relation("LinkRisk", fields: [riskId], references: [id], onDelete: Cascade)
+  createdAt  DateTime           @default(now())
+
+  @@unique([controlId, riskId])
+  @@index([libraryId])
 }
 
 // ────────────────────────────────────────────────────────────────────────────

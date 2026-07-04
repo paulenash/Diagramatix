@@ -40,6 +40,12 @@ const SIMULATOR_TABLES = [
   "ProcessMiningRun", "MiningExample",
 ] as const;
 
+// Risk & Control catalog (org master + project copy). Carried by the full
+// SuperAdmin backup (catalog-driven); wiring them into the SCOPED org/user
+// backups is a deliberate follow-up, single-sourced + pinned here like the
+// Simulator tables so the omission is an asserted decision, not a comment.
+const RISK_CONTROL_TABLES = ["RiskControlLibrary", "RiskControlItem", "RiskControlLink"] as const;
+
 // Tables the scoped backups deliberately DON'T carry — publish lineage,
 // review workflow, cross-tenant config, notifications, and (for now) the
 // Simulator. Only the SuperAdmin full backup carries these. A new table lands
@@ -59,6 +65,7 @@ const SCOPED_OMITTED = new Set<string>([
   // config, not per-user/org data — carried by the SuperAdmin full backup only.
   "AppSetting",
   ...SIMULATOR_TABLES,
+  ...RISK_CONTROL_TABLES,
 ]);
 
 describe("backup coverage", () => {
@@ -107,6 +114,18 @@ describe("backup coverage", () => {
       expect(
         SCOPED_COVERED.has(t),
         `${t} is now scoped-covered — remove it from SIMULATOR_TABLES and add round-trip coverage`,
+      ).toBe(false);
+    }
+  });
+
+  it("deliberately omits the Risk & Control tables from scoped backups (asserted, not just commented)", async () => {
+    const schema = await getBackupSchema();
+    for (const t of RISK_CONTROL_TABLES) {
+      expect(schema.tables, `${t} is no longer a catalog table — update RISK_CONTROL_TABLES`).toContain(t);
+      expect(SCOPED_OMITTED.has(t), `${t} must be a conscious scoped-backup omission`).toBe(true);
+      expect(
+        SCOPED_COVERED.has(t),
+        `${t} is now scoped-covered — remove it from RISK_CONTROL_TABLES and add round-trip coverage`,
       ).toBe(false);
     }
   });

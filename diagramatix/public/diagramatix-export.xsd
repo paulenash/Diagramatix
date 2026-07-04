@@ -366,6 +366,15 @@
     reference diagrams are ordinary state-machine diagrams; the catalog table is
     not part of the diagram export. This XSD's structure is UNCHANGED; the
     version attribute advances with the release window.
+
+  v1.33 — Risk & Control: a step may carry an OPTIONAL `risk` object inside
+    element.properties ({ riskRefs[], controlRefs[] } — each a catalog item id +
+    cached code/label), the ONLY diagram-export change — the open PropertiesType
+    already permits it, so this XSD's structure is UNCHANGED (as with the v1.24
+    sim params and v1.30 calendarId). New runtime DB tables (RiskControlLibrary,
+    RiskControlItem, RiskControlLink — an org master adopted into a project copy)
+    are not part of the diagram export. The version attribute advances with the
+    release window.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

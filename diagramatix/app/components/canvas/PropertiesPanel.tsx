@@ -18,6 +18,7 @@ import type {
 } from "@/app/lib/diagram/types";
 import { RichTextEditor } from "./RichTextEditor";
 import { SimulationSection } from "./SimulationSection";
+import { RiskControlSection, type RiskCatalogItem } from "./RiskControlSection";
 import { getCachedCatalogue, findShapeByKey, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
 
 // ArchiMate relationship metadata — maps the archi-* connector type to its
@@ -44,6 +45,8 @@ interface Props {
   diagramType?: DiagramType;
   onUpdateLabel: (id: string, label: string) => void;
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
+  /** Project Risk & Control catalog items available to attach to a step. */
+  riskCatalog?: RiskCatalogItem[];
   /** Open the SharePoint picker to link a file to this Data Object / Store. */
   onLinkSharePointFile?: (elementId: string) => void;
   /** Open the embedded preview for an already-linked SharePoint file. */
@@ -691,6 +694,7 @@ export function PropertiesPanel({
   diagramOwnerError,
   onSetDiagramOwner,
   isAdmin: _isAdmin,
+  riskCatalog,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
   // Auto-grow textarea ref for task/subprocess Name editing — height
@@ -2919,6 +2923,7 @@ export function PropertiesPanel({
       </div>
     )}
       <SimulationSection element={element} onUpdateProperties={onUpdateProperties} />
+      <RiskControlSection element={element} catalog={riskCatalog ?? []} onUpdateProperties={onUpdateProperties} />
     </div>
   );
 }
