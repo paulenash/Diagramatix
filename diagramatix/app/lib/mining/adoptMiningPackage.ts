@@ -28,6 +28,9 @@ export interface AdoptMiningResult {
   /** Set when the package ships a raw log — the console opens the Import panel
    *  pre-loaded with this instead of a pre-built run. */
   sampleLog?: MiningExamplePackage["sampleLog"];
+  /** Set when the package ships several choosable scenarios — the console shows
+   *  a scenario picker and pre-loads the default (last) one. */
+  sampleLogs?: MiningExamplePackage["sampleLogs"];
 }
 
 export async function adoptMiningPackage(
@@ -62,8 +65,8 @@ export async function adoptMiningPackage(
 
     // With a sampleLog, DON'T pre-create the run — the user imports it in the
     // console (confirm-the-analysis flow). Otherwise recreate the run as usual.
-    if (pkg.sampleLog) {
-      return { projectId: project.id, projectName: project.name, openDiagramId, sampleLog: pkg.sampleLog };
+    if (pkg.sampleLog || pkg.sampleLogs?.length) {
+      return { projectId: project.id, projectName: project.name, openDiagramId, sampleLog: pkg.sampleLog, sampleLogs: pkg.sampleLogs };
     }
 
     // The run — scalars via Prisma, the four JSON columns via raw SQL (Prisma 7

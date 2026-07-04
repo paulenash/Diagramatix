@@ -40,9 +40,20 @@ test.describe("DiagramatixMINER Examples — user", () => {
     // the user confirms the analysis, then imports.
     const importBtn = page.getByRole("button", { name: /Import log/ });
     await expect(importBtn).toBeVisible({ timeout: 25_000 });
+
+    // Three choosable period scenarios are offered; the current month is the default.
+    await expect(page.getByText("Choose a scenario to explore")).toBeVisible();
+    await expect(page.getByRole("button", { name: "January 2025" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "July 2025" })).toBeVisible();
+    const runNameInput = page.getByPlaceholder("run name");
+    await expect(runNameInput).toHaveValue(/January 2026/);
+    // Pick the oldest period → the staged run name switches to it.
+    await page.getByRole("button", { name: "January 2025" }).click();
+    await expect(runNameInput).toHaveValue(/January 2025/);
+
     await importBtn.click();
     // After import the run appears (in the runs list + the auto-selected panel).
-    await expect(page.getByText("Accounts Payable — January 2026").first()).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByText("Accounts Payable — January 2025").first()).toBeVisible({ timeout: 25_000 });
   });
 
   test("every mining route works over an authenticated session (import → calibrate)", async ({ page }) => {

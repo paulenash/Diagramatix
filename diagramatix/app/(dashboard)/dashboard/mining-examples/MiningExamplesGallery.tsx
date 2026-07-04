@@ -52,10 +52,13 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
       const res = await fetch(`/api/mining-examples/${id}/adopt`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Could not load example"); return; }
-      // Hand the raw sample log to the console (via sessionStorage) so it opens
+      // Hand the raw sample log(s) to the console (via sessionStorage) so it opens
       // the Import panel pre-loaded — the user confirms the analysis, then imports.
-      if (json.projectId && json.sampleLog) {
-        try { sessionStorage.setItem(`mining-sample:${json.projectId}`, JSON.stringify(json.sampleLog)); } catch { /* quota — fall back to an empty console */ }
+      // Several scenarios → stash the set (console shows a picker); otherwise the
+      // single log. Either way the console pre-loads a default to confirm.
+      if (json.projectId && (json.sampleLogs?.length || json.sampleLog)) {
+        const payload = json.sampleLogs?.length ? { scenarios: json.sampleLogs } : json.sampleLog;
+        try { sessionStorage.setItem(`mining-sample:${json.projectId}`, JSON.stringify(payload)); } catch { /* quota — fall back to an empty console */ }
       }
       // Land on the dashboard with the miner console auto-opened on the new project.
       if (json.projectId) router.push(`/dashboard?mining=${json.projectId}&mp=${encodeURIComponent(json.projectName ?? "")}`);

@@ -22,6 +22,13 @@ interface RunRow {
   studyId: string | null; createdAt: string;
 }
 
+/** A choosable raw sample log handed over from an adopted example. */
+interface SampleScenario {
+  scenario?: string; note?: string;
+  fileName?: string; runName?: string;
+  headers: string[]; rows: string[][]; mapping?: Partial<LogMapping>;
+}
+
 const ROLES: { key: keyof LogMapping; label: string; required: boolean; hint: string }[] = [
   { key: "caseId", label: "Case / entity id", required: true, hint: "The entity instance (e.g. Invoice #123) — the process case" },
   { key: "activity", label: "Activity / event", required: true, hint: "The business event that occurred" },
@@ -42,6 +49,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   const [rows, setRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<Partial<LogMapping>>({});
   const [runName, setRunName] = useState("");
+  // Choosable scenarios (an example may ship several period logs to pick between).
+  const [scenarios, setScenarios] = useState<SampleScenario[] | null>(null);
+  const [scenarioIdx, setScenarioIdx] = useState(-1);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [discovering, setDiscovering] = useState(false);
@@ -75,18 +85,22 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   }, [projectId]);
   // Adopted-example hand-off: if the gallery stashed a raw sample log for this
   // project, pre-load the Import panel with it (confirm the analysis, then import).
+  // Several scenarios → keep the set for the picker + pre-load the default (last).
   useEffect(() => {
     try {
       const key = `mining-sample:${projectId}`;
       const raw = sessionStorage.getItem(key);
       if (!raw) return;
       sessionStorage.removeItem(key);
-      const s = JSON.parse(raw) as { fileName?: string; runName?: string; headers: string[]; rows: string[][]; mapping?: Partial<LogMapping> };
-      if (Array.isArray(s.headers) && Array.isArray(s.rows) && s.headers.length && s.rows.length) {
-        setHeaders(s.headers); setRows(s.rows);
-        setMapping(s.mapping ?? guessMapping(s.headers));
-        setFileName(s.fileName ?? "sample.csv");
-        setRunName(s.runName ?? (s.fileName ?? "").replace(/\.[^.]+$/, ""));
+      const parsed = JSON.parse(raw) as SampleScenario | { scenarios: SampleScenario[] };
+      const set = "scenarios" in parsed ? parsed.scenarios : null;
+      if (set && Array.isArray(set) && set.length) {
+        setScenarios(set);
+        const def = set.length - 1;             // last = recommended/current
+        setScenarioIdx(def);
+        loadStaging(set[def]);
+      } else {
+        loadStaging(parsed as SampleScenario);
       }
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -148,7 +162,20 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     setFileName(file.name); setHeaders(h); setRows(r);
     setMapping(guessMapping(h));
     setRunName(file.name.replace(/\.[^.]+$/, ""));
+    // A hand-picked file replaces any scenario choice.
+    setScenarios(null); setScenarioIdx(-1);
   }
+
+  // Load a scenario/sample log into the Import staging (confirm-the-analysis flow).
+  function loadStaging(s: SampleScenario) {
+    if (!Array.isArray(s?.headers) || !Array.isArray(s?.rows) || !s.headers.length || !s.rows.length) return;
+    setErr(null);
+    setHeaders(s.headers); setRows(s.rows);
+    setMapping(s.mapping ?? guessMapping(s.headers));
+    setFileName(s.fileName ?? "sample.csv");
+    setRunName(s.runName ?? (s.fileName ?? "").replace(/\.[^.]+$/, ""));
+  }
+  const chooseScenario = (i: number) => { if (!scenarios?.[i]) return; setScenarioIdx(i); loadStaging(scenarios[i]); };
 
   const setRole = (key: keyof LogMapping, col: string) => setMapping((m) => ({ ...m, [key]: col || undefined }));
   const canImport = mapping.caseId && mapping.activity && mapping.timestamp && mapping.state && rows.length > 0;
@@ -242,6 +269,33 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
         <section className="md:col-span-2 bg-stone-900 border border-stone-700 rounded-lg p-4">
           <h2 className="text-sm font-semibold text-amber-200 mb-1">Import an event log</h2>
           <p className="text-xs text-stone-400 mb-3">Upload a CSV exported from your source system(s). Map its columns to roles, then import — the process is inferred from the logs.</p>
+
+          {/* Choosable scenarios (adopted example) — pick a period, confirm, import. */}
+          {scenarios && scenarios.length > 0 && (
+            <div className="mb-3 rounded-md border border-amber-800/60 bg-amber-950/30 p-3 flex flex-col gap-2">
+              <p className="text-[11px] text-amber-200 font-medium">Choose a scenario to explore</p>
+              <div className="flex flex-wrap gap-1.5">
+                {scenarios.map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => chooseScenario(i)}
+                    className={`text-[11px] rounded px-2.5 py-1 border transition ${
+                      i === scenarioIdx
+                        ? "bg-amber-700 border-amber-500 text-white shadow-[0_0_10px_rgba(217,119,6,0.45)]"
+                        : "bg-stone-800 border-stone-600 text-stone-300 hover:border-amber-600 hover:text-amber-200"
+                    }`}
+                  >
+                    {s.scenario ?? s.runName ?? `Scenario ${i + 1}`}
+                  </button>
+                ))}
+              </div>
+              {scenarios[scenarioIdx]?.note && (
+                <p className="text-[10px] text-amber-100/70 leading-snug">{scenarios[scenarioIdx].note}</p>
+              )}
+              <p className="text-[10px] text-stone-400 leading-snug">Same process across different past periods — compliance declines the further back you go. Confirm the analysis below, then import.</p>
+            </div>
+          )}
+
           <label className="inline-block cursor-pointer text-xs bg-amber-700 hover:bg-amber-600 text-white rounded px-3 py-1.5">
             {fileName ? `↻ ${fileName}` : "⭱ Choose CSV…"}
             <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={onFile} className="hidden" />
