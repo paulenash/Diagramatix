@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-04  ·  **Document version:** 3.8  ·  **Suite:** 105 test files · 746 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0623
+**As at:** 2026-07-04  ·  **Document version:** 3.9  ·  **Suite:** 105 test files · 746 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0623  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -1273,4 +1273,57 @@ The simulation *effect* of a calendar: teams only work in-hours, in-service task
 
 ---
 
-*Generated 2026-06-28, updated 2026-07-02. Regenerate this document whenever test files are added or their behaviour changes — it is a hand-maintained companion to the suite, not auto-generated.*
+## Layer 11 — End-to-end (Playwright) browser tests
+
+Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG canvas, full navigation, cross-page flows. **Separate from the Vitest suite above** (different runner, different CI job) and **separate from deployment**.
+
+### How the e2e layer works
+
+- **Runner:** Playwright (`@playwright/test`), **Chromium only**, **serial** (`workers: 1`, `fullyParallel: false`), 1 retry in CI. Config: `playwright.config.ts`. Run locally: `npm run e2e` (headless) · `npm run e2e:headed` · `npm run e2e:ui`.
+- **It is NOT part of the deploy.** It runs in the **`e2e` job of `.github/workflows/ci.yml`** (next to the `test` job, which runs the Vitest suite). The deploy workflow (`azure-deploy.yml`) builds + ships the container image and does **not** run e2e. The two workflows fire **in parallel** on every push to `main`, and the deploy does **not** wait on CI — so a red e2e does not block a deploy (a branch-protection gate is a noted follow-up).
+- **Whole suite, every run — not scoped to the diff.** `playwright test` runs **every** spec in `e2e/` on every push, with no awareness of what changed. A change in one area is checked against every journey.
+- **Its own app server + database.** `scripts/e2e-server.cjs` builds the app (non-standalone) and serves it on **:3001** against the **`diagramatix_test`** DB (a Postgres **service container** in CI; the local Postgres in dev). On startup it applies the schema (`prisma db push`) and seeds the reference data the journeys need: subscription levels, the Free-tier cap lift, the **mining example catalog**, and a known **SuperAdmin** account.
+- **Authenticated by default.** The `setup` project (`auth.setup.ts`) registers the e2e account via the real `/api/register` and logs in once, saving the session to `e2e/.auth/user.json`; every spec reuses it. `auth-smoke` clears the session to test auth itself; the admin mining tests sign in fresh as the seeded SuperAdmin.
+- **Asserts on PERSISTED data, not the DOM.** Most journeys drive a real pointer/drag, then read the **saved diagram via the API** (`_helpers.ts` → `diagramData`) — more robust than SVG-DOM assertions, and it proves autosave actually persisted the change. Elements expose `data-element-id`, resize hit-zones `data-resize-handle`, palette items `data-testid`, so tests target real rendered boxes (the editor re-fits the view after a drop, so fixed coordinates can't be assumed).
+- **AI-dependent steps skip without a key.** Mining discovery is AI-only, so the "Create draft reference" journey needs a live model — it **skips** when `ANTHROPIC_API_KEY` is absent (e.g. CI) instead of failing.
+
+### The e2e tests (each spec, each case)
+
+**`e2e/auth.setup.ts` — session bootstrap** (runs first; a dependency of every spec)
+- *authenticate* — registers the e2e account (201, or 409 if it exists) + logs in through the real form → `/dashboard`; saves the session for reuse.
+
+**`e2e/auth-smoke.spec.ts` — auth itself** (runs UNauthenticated)
+- *a seeded user can log in and reach the dashboard* — the login form lands on `/dashboard`.
+- *an unauthenticated visitor is kept out of the dashboard* — `/dashboard` redirects to `/login`.
+
+**`e2e/editor.spec.ts` — the create → edit → persist backbone**
+- *the editor renders a created diagram's canvas* — a created BPMN diagram opens with the SVG canvas on `/diagram/{id}`.
+- *a created diagram reopens (persists) on reload* — reload the editor; same diagram, canvas still renders (it was saved).
+
+**`e2e/canvas.spec.ts` — SVG pointer interactions** (asserted on persisted data)
+- *drag a Task from the palette onto the canvas → it persists* — a palette drag creates a task that autosaves.
+- *move an element with the pointer → the new position persists* — drag a task down 160px; its saved Y increases.
+- *drag-create a connector between two tasks → it persists* — drag from one task's connection point to another; a connector is created + saved.
+
+**`e2e/reroute.spec.ts` — move-and-reroute** (parametrized: BPMN, Flowchart, ArchiMate)
+- *move-and-reroute: {BPMN sequence | Flowchart flowline | ArchiMate serving} connector follows the moved element* — seed two connected elements, drag one down; a waypoint lands inside the moved element's new box (the connector re-routed to follow it).
+
+**`e2e/routing-avoid.spec.ts` — obstacle avoidance** (parametrized: task, gateway, intermediate-event, data-object)
+- *obstacle avoidance: A→B routes around a {…} between the endpoints* — seed A→B with a third element C in the channel, nudge an endpoint to force a re-route, assert the connector does NOT cross C's box. (Browser-level probe of the known obstacle-avoidance gap.)
+
+**`e2e/ep-boundary.spec.ts` — expanded-subprocess edge-resize drift** (2 diagrams × top/left/right = 6)
+- *{synthetic EP + nested | reported diagram}: {top|left|right}-edge live drag — only that edge moves* — grab a real edge resize hit-zone and drag it; assert (1) mid-drag the other three edges hold their screen position and (2) after release the dragged edge moved while the other three stayed put (no whole-element drift).
+
+**`e2e/mining-examples.spec.ts` — Process Mining sample-catalog journeys**
+- *gallery renders + Load & open pre-loads the sample CSV; import creates the run* — the gallery card → Load & open → the console opens with the Import panel pre-filled → Import log creates the run.
+- *every mining route works over an authenticated session (import → calibrate)* — adopt → import the sample → discover → discover-SM → conformance (181/200) → calibrate, all over authenticated HTTP.
+- *＋ Create draft reference scaffolds a reference for a run that has none* — the empty-state button scaffolds an (AI) reference and selects it. **Skips without `ANTHROPIC_API_KEY`.**
+- *admin catalog routes are refused for a non-superuser (403)* — the admin API rejects a normal user.
+- *(admin) catalog manager loads for a superuser and CRUD works* — the manager page + create / publish / duplicate / delete.
+- *(admin) Save run as example: capture route works + the button renders in the console* — capture a run into a draft example; the admin capture button renders.
+
+> **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
+
+---
+
+*Generated 2026-06-28, updated 2026-07-04. Regenerate this document whenever test files (Vitest OR the Playwright e2e specs) are added or their behaviour changes — it is a hand-maintained companion to the suite, not auto-generated.*
