@@ -9,7 +9,7 @@ import JSZip from "jszip";
 import { prisma } from "@/app/lib/db";
 import { truncateAll } from "../_setup/db";
 import { createUserWithOrg, createProject } from "../_setup/factories";
-import { createItem, linkMitigation } from "@/app/lib/riskControls/itemOps";
+import { createItem, updateItem, linkMitigation } from "@/app/lib/riskControls/itemOps";
 import { adoptLibrary } from "@/app/lib/riskControls/adoptLibrary";
 import { buildRcmXlsx } from "@/app/lib/riskControls/exportRcm";
 
@@ -82,13 +82,48 @@ describe("risk & control — adopt + RCM export", () => {
     const rcm = await buildRcmXlsx(w.project.id);
     expect(rcm).toBeTruthy();
     const z = await JSZip.loadAsync(rcm!.buffer);
-    const matrix = await z.file("xl/worksheets/sheet1.xml")!.async("string");
-    // Covered risk row shows its control + "Covered" + where it's attached.
+    // Sheet 2 = the risk-centric Risk-Control Matrix.
+    const matrix = await z.file("xl/worksheets/sheet2.xml")!.async("string");
     expect(matrix).toContain(covControl.code);
     expect(matrix).toContain("Covered");
-    expect(matrix).toContain("Payments — Pay invoice");
-    // The un-mitigated risk shows a coverage GAP.
+    expect(matrix).toContain("Payments — Pay invoice");   // "Attached on" column
     expect(matrix).toContain(gapRisk.name);
     expect(matrix).toContain("GAP — no control");
+  });
+
+  it("T0632 — the flat Audit Grid has one Activity×Risk×Control row carrying the audit/assurance columns", async () => {
+    await adoptLibrary(w.project.id, w.org.id, w.master.id);
+    const lib = await prisma.riskControlLibrary.findFirst({ where: { projectId: w.project.id }, include: { items: true } });
+    const risk = lib!.items.find((i) => i.kind === "Risk")!;
+    const control = lib!.items.find((i) => i.kind === "Control")!;
+    // Fill the audit/assurance + residual fields.
+    await updateItem(lib!.id, control.id, { automation: "Automated", evidence: "ERP approval log", testMethod: "Sample 25 approvals", testFrequency: "Quarterly" });
+    await updateItem(lib!.id, risk.id, { residualLikelihood: 1, residualImpact: 2 });
+
+    await prisma.diagram.create({
+      data: {
+        name: "Payments", type: "bpmn", userId: w.user.id, diagramOwnerId: w.user.id, orgId: w.org.id, projectId: w.project.id,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: {
+          elements: [{ id: "t1", type: "task", x: 0, y: 0, width: 100, height: 60, label: "Approve invoice",
+            properties: { risk: { riskRefs: [{ itemId: risk.id, code: risk.code, label: risk.name }] } } }],
+          connectors: [],
+        } as any,
+      },
+    });
+
+    const rcm = await buildRcmXlsx(w.project.id);
+    const z = await JSZip.loadAsync(rcm!.buffer);
+    const grid = await z.file("xl/worksheets/sheet1.xml")!.async("string");  // Audit Grid
+    // The mature audit columns + the row's data.
+    for (const s of ["Process", "Activity", "Test method", "Automation", "Residual"]) expect(grid).toContain(`>${s}</t>`);
+    expect(grid).toContain("Approve invoice");                       // Activity (own column)
+    expect(grid).toContain("Automated");
+    expect(grid).toContain("ERP approval log");                      // evidence
+    expect(grid).toContain("Sample 25 approvals");                   // test method
+    expect(grid).toContain("Quarterly");                             // test frequency
+    expect(grid).toContain(control.code);                            // the mitigating control on this activity
+    expect(grid).toContain("Covered");
+    expect(grid).toContain("<v>2</v>");                              // residual score = 1 × 2 (numeric cell)
   });
 });

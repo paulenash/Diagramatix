@@ -44,7 +44,7 @@ export function RiskControlSection({
   const gap = hasRisk && !rc.controlRefs?.length;
 
   const chip = (kind: "risk" | "control", r: RiskControlRef) => (
-    <span key={r.itemId} className={`text-[10px] rounded px-1.5 py-0.5 flex items-center gap-1 ${kind === "risk" ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}>
+    <span key={r.itemId} className={`text-[10px] rounded px-1.5 py-0.5 flex items-center gap-1 ${kind === "risk" ? "bg-red-50 text-red-700" : "bg-teal-50 text-teal-700"}`}>
       {r.code} {r.label}
       <button onClick={() => detach(kind, r.itemId)} className="opacity-60 hover:opacity-100">×</button>
     </span>

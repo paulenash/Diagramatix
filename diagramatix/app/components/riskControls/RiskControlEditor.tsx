@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import {
-  CONTROL_TYPES, CONTROL_TYPE_LABELS, RATING_SCALE, riskScore, riskBand,
-  type RiskControlLibraryDTO, type RiskControlItemDTO,
+  CONTROL_TYPES, CONTROL_TYPE_LABELS, CONTROL_AUTOMATIONS, CONTROL_AUTOMATION_LABELS,
+  RATING_SCALE, riskScore, riskBand,
+  type RiskControlLibraryDTO,
 } from "@/app/lib/riskControls/types";
 
 /**
@@ -62,7 +63,7 @@ export function RiskControlEditor({
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Risks ({risks.length})</h4>
-            {canEdit && <button onClick={() => addItem("Risk")} disabled={busy} className="text-[11px] text-blue-600 hover:text-blue-800">+ Add risk</button>}
+            {canEdit && <button onClick={() => addItem("Risk")} disabled={busy} className="text-[11px] text-teal-700 hover:text-teal-900">+ Add risk</button>}
           </div>
           {risks.length === 0 && <p className="text-xs text-gray-400 italic">No risks yet.</p>}
           {risks.map((r) => {
@@ -89,13 +90,22 @@ export function RiskControlEditor({
                         <option value="">—</option>{RATING_SCALE.map((n) => <option key={n} value={n}>{n}</option>)}
                       </select></label>
                     <input defaultValue={r.riskCategory ?? ""} placeholder="category" onBlur={(e) => patchItem(r.id, { riskCategory: e.target.value })} className={`${inp} w-24`} />
+                    <span className="text-gray-400">residual</span>
+                    <label className="flex items-center gap-1">L
+                      <select defaultValue={r.residualLikelihood ?? ""} onChange={(e) => patchItem(r.id, { residualLikelihood: e.target.value })} className={inp}>
+                        <option value="">—</option>{RATING_SCALE.map((n) => <option key={n} value={n}>{n}</option>)}
+                      </select></label>
+                    <label className="flex items-center gap-1">I
+                      <select defaultValue={r.residualImpact ?? ""} onChange={(e) => patchItem(r.id, { residualImpact: e.target.value })} className={inp}>
+                        <option value="">—</option>{RATING_SCALE.map((n) => <option key={n} value={n}>{n}</option>)}
+                      </select></label>
                   </div>
                 )}
                 {/* mitigating controls */}
                 <div className="flex flex-wrap gap-1 items-center">
                   {controlsForRisk(r.id).map((cid) => {
                     const c = controls.find((x) => x.id === cid);
-                    return <span key={cid} className="text-[10px] bg-blue-50 text-blue-700 rounded px-1.5 py-0.5 flex items-center gap-1">{c?.code ?? "?"}{canEdit && <button onClick={() => unlink(cid, r.id)} className="text-blue-400 hover:text-blue-700">×</button>}</span>;
+                    return <span key={cid} className="text-[10px] bg-teal-50 text-teal-700 rounded px-1.5 py-0.5 flex items-center gap-1">{c?.code ?? "?"}{canEdit && <button onClick={() => unlink(cid, r.id)} className="text-teal-500 hover:text-teal-700">×</button>}</span>;
                   })}
                   {controlsForRisk(r.id).length === 0 && <span className="text-[10px] text-red-500">no control — coverage gap</span>}
                   {canEdit && controls.length > 0 && (
@@ -114,7 +124,7 @@ export function RiskControlEditor({
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Controls ({controls.length})</h4>
-            {canEdit && <button onClick={() => addItem("Control")} disabled={busy} className="text-[11px] text-blue-600 hover:text-blue-800">+ Add control</button>}
+            {canEdit && <button onClick={() => addItem("Control")} disabled={busy} className="text-[11px] text-teal-700 hover:text-teal-900">+ Add control</button>}
           </div>
           {controls.length === 0 && <p className="text-xs text-gray-400 italic">No controls yet.</p>}
           {controls.map((c) => (
@@ -132,9 +142,15 @@ export function RiskControlEditor({
                   <select defaultValue={c.controlType ?? ""} onChange={(e) => patchItem(c.id, { controlType: e.target.value })} className={inp}>
                     <option value="">type…</option>{CONTROL_TYPES.map((t) => <option key={t} value={t}>{CONTROL_TYPE_LABELS[t]}</option>)}
                   </select>
+                  <select defaultValue={c.automation ?? ""} onChange={(e) => patchItem(c.id, { automation: e.target.value })} className={inp}>
+                    <option value="">automation…</option>{CONTROL_AUTOMATIONS.map((a) => <option key={a} value={a}>{CONTROL_AUTOMATION_LABELS[a]}</option>)}
+                  </select>
                   <input defaultValue={c.frequency ?? ""} placeholder="frequency" onBlur={(e) => patchItem(c.id, { frequency: e.target.value })} className={`${inp} w-20`} />
                   <input defaultValue={c.owner ?? ""} placeholder="owner" onBlur={(e) => patchItem(c.id, { owner: e.target.value })} className={`${inp} w-20`} />
                   <input defaultValue={c.frameworkRef ?? ""} placeholder="framework (SOX…)" onBlur={(e) => patchItem(c.id, { frameworkRef: e.target.value })} className={`${inp} w-28`} />
+                  <input defaultValue={c.evidence ?? ""} placeholder="evidence" onBlur={(e) => patchItem(c.id, { evidence: e.target.value })} className={`${inp} w-32`} />
+                  <input defaultValue={c.testMethod ?? ""} placeholder="test method" onBlur={(e) => patchItem(c.id, { testMethod: e.target.value })} className={`${inp} w-28`} />
+                  <input defaultValue={c.testFrequency ?? ""} placeholder="test freq" onBlur={(e) => patchItem(c.id, { testFrequency: e.target.value })} className={`${inp} w-20`} />
                 </div>
               )}
               {(c.controlType || c.owner) && (
