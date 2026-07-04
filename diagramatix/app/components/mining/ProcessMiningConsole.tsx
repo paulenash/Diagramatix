@@ -504,8 +504,26 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
               <h3 className={`text-xs font-semibold mb-1 ${allStepsDone ? "text-amber-200" : "text-stone-500"}`}>Explain results</h3>
               <p className="text-[11px] text-stone-400 mb-2">
                 An AI summary of what the mining revealed — the real process, the conformance findings, timing, and the twin.
-                {!allStepsDone && <span className="text-stone-500"> Discover the process + state machine and check conformance to enable.</span>}
               </p>
+              {/* Prerequisites — the button lights up when every step is done. */}
+              <ul className="text-[11px] mb-2.5 flex flex-col gap-0.5">
+                {[
+                  { done: !!selected.discoveredBpmnId, label: "Discover the process", hint: "the ✨ Discover process step" },
+                  { done: !!selected.discoveredSmId, label: "Discover the state machine", hint: "the ✨ Discover state machine step" },
+                  { done: !!selected.conformance, label: "Check conformance against a reference", hint: "pick a reference state machine + run conformance" },
+                ].map((s, i) => (
+                  <li key={i} className="flex items-baseline gap-1.5">
+                    <span className={s.done ? "text-emerald-400" : "text-stone-500"}>{s.done ? "✓" : "○"}</span>
+                    <span className={s.done ? "text-stone-300" : "text-stone-400"}>
+                      {s.label}
+                      {!s.done && <span className="text-stone-500"> — {s.hint}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {allStepsDone
+                ? <p className="text-[11px] text-amber-300/80 mb-2">All steps complete — ready to explain.</p>
+                : <p className="text-[11px] text-stone-500 mb-2">Complete the steps above to enable the summary.</p>}
               <div className="flex items-center gap-3 flex-wrap">
                 <button onClick={() => explain(selected.id)} disabled={!allStepsDone || explaining}
                   className={`text-xs rounded px-3 py-1.5 text-white disabled:cursor-not-allowed ${allStepsDone ? "bg-amber-600 hover:bg-amber-500 shadow-[0_0_16px_rgba(217,119,6,0.5)]" : "bg-stone-700/60 !text-stone-400"}`}
