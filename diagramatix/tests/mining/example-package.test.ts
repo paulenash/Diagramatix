@@ -97,4 +97,29 @@ describe("the shipped Accounts Payable starter example", () => {
     expect(rebuilt.stats.states).toEqual(p.run.stats.states);
     expect(rebuilt.variants.length).toBe(p.run.variants.length);
   });
+
+  it("T0625 — ships three choosable period scenarios with DECLINING compliance back in time", () => {
+    const p = ex.package;
+    const logs = p.sampleLogs!;
+    expect(logs, "example ships several choosable scenarios").toBeTruthy();
+    expect(logs).toHaveLength(3);
+    // Chronological worst → current; the last is the recommended default (== sampleLog).
+    expect(logs.map((s) => s.scenario)).toEqual(["January 2025", "July 2025", "January 2026 (current)"]);
+    expect(logs[logs.length - 1].rows).toEqual(p.sampleLog!.rows);
+    for (const s of logs) { expect(s.rows.length).toBeGreaterThan(0); expect(s.note).toBeTruthy(); }
+
+    // Fitness against the permissive reference must strictly INCREASE toward the present.
+    const permissive = toRef(Object.fromEntries(p.diagrams.map((d) => [d.key, d]))["ap-reference"]);
+    const fitness = logs.map((s) => checkTransitionConformance(buildEventLog(s.headers, s.rows, s.mapping).variants, permissive).fitness);
+    expect(fitness[0]).toBeLessThan(fitness[1]);
+    expect(fitness[1]).toBeLessThan(fitness[2]);
+    expect(fitness[2]).toBeGreaterThan(0.85);   // current month is highly conforming
+    expect(fitness[0]).toBeLessThan(0.6);        // oldest month is far off-book
+
+    // The older months carry the deviations the current month doesn't: an unknown
+    // "Disputed" state + undocumented transitions.
+    const oldest = checkTransitionConformance(buildEventLog(logs[0].headers, logs[0].rows, logs[0].mapping).variants, permissive);
+    expect(oldest.violations.some((v) => v.rule === "unknown-state")).toBe(true);
+    expect(oldest.violations.some((v) => v.rule === "undocumented-transition")).toBe(true);
+  });
 });

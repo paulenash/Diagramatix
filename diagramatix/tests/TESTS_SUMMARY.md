@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-04  ·  **Document version:** 4.0  ·  **Suite:** 106 test files · 747 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0624  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-04  ·  **Document version:** 4.1  ·  **Suite:** 106 test files · 748 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0625  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0624`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06.)
+> **Highest ref allocated: `T0625`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -763,6 +763,9 @@ The adoptable process-mining sample (mirrors Simulator Examples): a portable pac
 | T0606 | summarize counts references/cases/variants/states | Wrong catalog-card counts | If the summary shape drifted |
 | T0607 | the shipped AP starter is a valid, self-consistent bundle | A broken/unadoptable seeded example shipping | If the generator or baked JSON regressed |
 | T0608 | conformance oracle: permissive clean (181/200), strict flags 39 rework cases (144/200) | The sample's headline conformance story silently changing | If the baked log/references or the conformance engine changed |
+| T0619 | ships a raw sampleLog that rebuilds to the same run (import-first flow) | The confirm-the-analysis import producing a different run than the baked one | If the sample log or the parser drifted |
+| T0624 | the AI Explain-results brief carries the run's stats, top paths, conformance + artefacts (`explain-results.test.ts`) | The "Explain results" summary being fed wrong/empty numbers | If `buildExplainPrompt` stopped serialising a section |
+| T0625 | ships three choosable period scenarios (Jan 2025 / Jul 2025 / Jan 2026) with compliance DECLINING back in time (fitness strictly increasing toward the present; older months carry the unknown "Disputed" state + undocumented transitions) | The multi-scenario story silently flattening or reversing | If a period's mix/seed or the ordering changed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 
@@ -1315,7 +1318,7 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 - *{synthetic EP + nested | reported diagram}: {top|left|right}-edge live drag — only that edge moves* — grab a real edge resize hit-zone and drag it; assert (1) mid-drag the other three edges hold their screen position and (2) after release the dragged edge moved while the other three stayed put (no whole-element drift).
 
 **`e2e/mining-examples.spec.ts` — Process Mining sample-catalog journeys**
-- *gallery renders + Load & open pre-loads the sample CSV; import creates the run* — the gallery card → Load & open → the console opens with the Import panel pre-filled → Import log creates the run.
+- *gallery renders + Load & open pre-loads the sample CSV; import creates the run* — the gallery card → Load & open → the console opens with the Import panel pre-filled, offering the **three choosable period scenarios** (current month = default); switching to *January 2025* re-stages that log → Import log creates the run.
 - *every mining route works over an authenticated session (import → calibrate)* — adopt → import the sample → discover → discover-SM → conformance (181/200) → calibrate, all over authenticated HTTP.
 - *＋ Create draft reference scaffolds a reference for a run that has none* — the empty-state button scaffolds an (AI) reference and selects it. **Skips without `ANTHROPIC_API_KEY`.**
 - *admin catalog routes are refused for a non-superuser (403)* — the admin API rejects a normal user.

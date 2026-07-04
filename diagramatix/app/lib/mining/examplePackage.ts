@@ -47,6 +47,10 @@ export interface MiningExampleSampleLog {
   headers: string[];
   rows: string[][];
   mapping: LogMapping;
+  /** Short chooser label when the bundle ships several scenarios (e.g. "July 2025"). */
+  scenario?: string;
+  /** One-line description of what's distinctive about this scenario. */
+  note?: string;
 }
 
 export interface MiningExamplePackage {
@@ -54,8 +58,14 @@ export interface MiningExamplePackage {
   /** Reference state-machine diagrams (the single source of truth for states). */
   diagrams: MiningExampleDiagram[];
   run: MiningExampleRun;
-  /** Optional raw log for the "confirm the CSV analysis, then import" flow. */
+  /** Optional raw log for the "confirm the CSV analysis, then import" flow.
+   *  When several scenarios ship, this is the recommended/default one (also the
+   *  last entry of `sampleLogs`). */
   sampleLog?: MiningExampleSampleLog;
+  /** Optional set of alternative raw logs the learner can CHOOSE between on
+   *  entry — e.g. the same process across different past periods with varying
+   *  compliance. When present the console shows a scenario picker. */
+  sampleLogs?: MiningExampleSampleLog[];
 }
 
 export function emptyMiningPackage(): MiningExamplePackage {
@@ -100,13 +110,17 @@ export function validateMiningExamplePackage(pkg: unknown): string[] {
   if (!r.performance || typeof r.performance.clockUnit !== "string") errs.push("`run.performance` is required (with a clockUnit)");
   if (r.referenceSmKey && !keys.has(r.referenceSmKey)) errs.push(`run.referenceSmKey "${r.referenceSmKey}" does not match any diagram key`);
 
-  const sl = p.sampleLog;
-  if (sl !== undefined) {
-    if (!Array.isArray(sl.headers) || sl.headers.length === 0) errs.push("`sampleLog.headers` must be a non-empty array");
-    if (!Array.isArray(sl.rows) || sl.rows.length === 0) errs.push("`sampleLog.rows` must be a non-empty array");
+  const validateLog = (sl: MiningExampleSampleLog, label: string) => {
+    if (!Array.isArray(sl.headers) || sl.headers.length === 0) errs.push(`\`${label}.headers\` must be a non-empty array`);
+    if (!Array.isArray(sl.rows) || sl.rows.length === 0) errs.push(`\`${label}.rows\` must be a non-empty array`);
     if (!sl.mapping || !sl.mapping.caseId || !sl.mapping.activity || !sl.mapping.timestamp || !sl.mapping.state) {
-      errs.push("`sampleLog.mapping` must map caseId, activity, timestamp and state");
+      errs.push(`\`${label}.mapping\` must map caseId, activity, timestamp and state`);
     }
+  };
+  if (p.sampleLog !== undefined) validateLog(p.sampleLog, "sampleLog");
+  if (p.sampleLogs !== undefined) {
+    if (!Array.isArray(p.sampleLogs) || p.sampleLogs.length === 0) errs.push("`sampleLogs` must be a non-empty array when present");
+    else p.sampleLogs.forEach((sl, i) => validateLog(sl, `sampleLogs[${i}]`));
   }
 
   return errs;
