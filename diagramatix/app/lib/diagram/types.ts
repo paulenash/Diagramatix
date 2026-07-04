@@ -778,5 +778,14 @@ export interface TemplateData {
  *             a fresh project; SuperAdmins author more by capturing a run. Ships
  *             the Accounts Payable invoice-lifecycle starter. Runtime only — NO
  *             diagram-export or BPMN-XSD shape change.
+ *
+ *  v1.33 (2026-07-05): Risk & Control. A step may carry risk/control references
+ *             in element.properties.risk ({ riskRefs[], controlRefs[] } — catalog
+ *             item id + cached code/label), the ONLY diagram-export change (the
+ *             open PropertiesType already permits it, as with v1.24/v1.30). New DB
+ *             tables RiskControlLibrary + RiskControlItem + RiskControlLink (an
+ *             org master adopted into a project copy, like Entity Lists; scoped
+ *             backup carries them). Two structure rules (B38 control-coverage,
+ *             B39 segregation-of-duties) + a Risk-Control Matrix .xlsx export.
  */
-export const SCHEMA_VERSION = "1.32";
+export const SCHEMA_VERSION = "1.33";

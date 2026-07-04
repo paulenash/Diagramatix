@@ -22,6 +22,7 @@
  */
 import type { DiagramElement, Connector } from "../types";
 import { wrapText } from "../textMetrics";
+import { getRiskControl } from "../riskControl";
 
 export interface DiagramLike {
   elements: DiagramElement[];
@@ -985,6 +986,25 @@ function poolKind(p: DiagramElement | undefined): PoolKind {
   const isSystem = (p.properties?.isSystem as boolean | undefined) ?? false;
   return isSystem ? "system" : "external";
 }
+
+/** Walk an element's parentId chain to its enclosing lane/sublane (or undefined).
+ *  The nearest lane ancestor is the one whose duties the element belongs to. */
+function laneAncestor(
+  byId: Map<string, DiagramElement>,
+  e: DiagramElement | undefined,
+): DiagramElement | undefined {
+  let cur = e?.parentId ? byId.get(e.parentId) : undefined;
+  for (let i = 0; i < 32 && cur; i++) {
+    if (cur.type === "lane" || cur.type === "sublane") return cur;
+    cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+  }
+  return undefined;
+}
+
+/** Verbs that originate/prepare work vs. verbs that authorise/approve it
+ *  (segregation-of-duties classification). ACTIVITY_TYPES is defined above. */
+const CREATE_RE = /\b(create|creates?|raise|raises?|initiate|initiates?|submit|submits?|prepare|prepares?|request|requests?|originate|record|records?|enter|draft|drafts?|lodge|log)\b/i;
+const APPROVE_RE = /\b(approve|approves?|authoris|authoriz|sign[-\s]?off|signoff|release|releases?|verify|verifies|validate|validates?|confirm|confirms?|certify|reconcile)\b/i;
 
 /** B14 — consolidated task-trigger-vs-message-flow matrix.
  *
@@ -1965,7 +1985,82 @@ export const RULES: Rule[] = [
     category: "bpmn-structure",
     check: checkDataObjectRole,
   },
+  {
+    code: "B38",
+    id: "control-coverage",
+    title: "Risk without a mitigating control",
+    description: "A step carries a Risk from the Risk & Control catalog but no Control is attached to mitigate it — a coverage gap in the Risk-Control Matrix. Attach a Control (or link one to the Risk in the catalog).",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkControlCoverage,
+  },
+  {
+    code: "B39",
+    id: "segregation-of-duties",
+    title: "Segregation of duties breached in a lane",
+    description: "A single lane holds both an originating activity (create/raise/submit…) and an authorising activity (approve/authorise/release…), so one team can both raise and approve the same work. Move one duty to a different lane.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkSegregationOfDuties,
+  },
 ];
+
+/** B38 — a step carries a Risk but no mitigating Control (Risk-Control coverage
+ *  gap). Uses only element.properties.risk, so it works offline; the RCM export
+ *  resolves the full attributes from the catalog. */
+export function checkControlCoverage(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  for (const e of d.elements) {
+    if (!ACTIVITY_TYPES.has(e.type)) continue;
+    const rc = getRiskControl(e);
+    if (rc.riskRefs?.length && !rc.controlRefs?.length) {
+      const codes = rc.riskRefs.map((r) => r.code).filter(Boolean).join(", ");
+      out.push({
+        rule: "control-coverage",
+        severity: "warning",
+        ids: [e.id],
+        message: `"${e.label || e.type}" has a risk${codes ? ` (${codes})` : ""} with no mitigating control attached`,
+        data: { risks: rc.riskRefs.map((r) => r.code) },
+      });
+    }
+  }
+  return out;
+}
+
+/** B39 — segregation of duties: a single lane holds both an originating ("create")
+ *  and an authorising ("approve") activity, so one team can both raise and approve
+ *  the same work. Classifies by activity label verbs; groups by enclosing lane. */
+export function checkSegregationOfDuties(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const perLane = new Map<string, { creates: string[]; approves: string[] }>();
+  for (const e of d.elements) {
+    if (!ACTIVITY_TYPES.has(e.type)) continue;
+    const lane = laneAncestor(byId, e);
+    if (!lane) continue;
+    const label = e.label ?? "";
+    const isCreate = CREATE_RE.test(label);
+    const isApprove = APPROVE_RE.test(label);
+    if (!isCreate && !isApprove) continue;
+    const bucket = perLane.get(lane.id) ?? { creates: [], approves: [] };
+    if (isApprove) bucket.approves.push(e.id);      // an approve verb wins if both match
+    else if (isCreate) bucket.creates.push(e.id);
+    perLane.set(lane.id, bucket);
+  }
+  const out: Violation[] = [];
+  for (const [laneId, { creates, approves }] of perLane) {
+    if (creates.length && approves.length) {
+      const lane = byId.get(laneId);
+      out.push({
+        rule: "segregation-of-duties",
+        severity: "warning",
+        ids: [laneId, ...creates, ...approves],
+        message: `Lane "${lane?.label || laneId}" both originates and approves work — segregation of duties may be breached`,
+        data: { laneId, creates, approves },
+      });
+    }
+  }
+  return out;
+}
 
 /** Run every rule and return the combined violation list. */
 export function checkDiagram(d: DiagramLike): Violation[] {

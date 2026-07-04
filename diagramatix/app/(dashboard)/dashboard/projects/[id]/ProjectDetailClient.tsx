@@ -12,6 +12,7 @@ import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { ProjectStructureSection } from "@/app/components/entityLists/ProjectStructureSection";
+import { ProjectRiskControlSection } from "@/app/components/riskControls/ProjectRiskControlSection";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
@@ -2398,6 +2399,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             </select>
           </div>
           <ProjectStructureSection projectId={project.id} canEdit={!readOnly} />
+          <ProjectRiskControlSection projectId={project.id} canEdit={!readOnly} />
           <div className="overflow-y-auto p-2 flex-1">
             {renderFolder(ROOT_ID, 0)}
           </div>

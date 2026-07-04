@@ -6,7 +6,7 @@ Extracted from the canonical history block in [`public/diagramatix-export.xsd`](
 - **`schemaVersion`** (major.minor) — the export *data-structure* version. Bumped only when fields are added, removed, or renamed. *Major* = breaking change; *minor* = additive (new optional fields). Carried on the `<xs:schema version="…">` attribute.
 - **`appVersion`** (major.minor.build) — the Diagramatix *application* version. The build number is the git commit count, so it changes every commit. Injected at runtime via `/api/schema`.
 
-**Current version:** `1.29`. The XSD's own history block starts at **v1.10**; the earlier **v1.2–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`app/lib/diagram/types.ts`](app/lib/diagram/types.ts). **Schema versioning began at v1.2** (the initial XSD release) — **v1.0–v1.1** predate the export schema (early MVP "boxes + arrows", before a formal/versioned export existed).
+**Current version:** `1.33`. The XSD's own history block starts at **v1.10**; the earlier **v1.2–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`app/lib/diagram/types.ts`](app/lib/diagram/types.ts). **Schema versioning began at v1.2** (the initial XSD release) — **v1.0–v1.1** predate the export schema (early MVP "boxes + arrows", before a formal/versioned export existed).
 
 > **Maintenance:** keep this file in sync with the schema. On every `SCHEMA_VERSION` bump, update **all three together** — `app/lib/diagram/types.ts` (the constant + its history comment), `public/diagramatix-export.xsd` (its history block + any actual shape change), and **this file** (add a summary-table row *and* a detail section).
 
@@ -18,6 +18,7 @@ Extracted from the canonical history block in [`public/diagramatix-export.xsd`](
 
 | Version | Title | Schema shape change? |
 |---|---|---|
+| **1.33** | Risk & Control — attach Risks/Controls to steps (`element.properties.risk`), coverage + segregation-of-duties checks (B38/B39), Risk-Control Matrix .xlsx export; org-master → project-copy catalog | No (open PropertiesType) |
 | **1.29** | Simulation results & comparison — per-case distribution + histogram, grounded AI assessment, Run History, As-is/To-be example pipeline | No |
 | **1.28** | BPMN layout-geometry rules + scanner checks B33/B34/B35 + lane-tiling & EP-resize fixes | No |
 | **1.27** | DB-backed User Guide, image library, dictation, backup/restore | No |

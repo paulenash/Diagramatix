@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-04  ·  **Document version:** 4.1  ·  **Suite:** 106 test files · 748 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0625  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-05  ·  **Document version:** 4.2  ·  **Suite:** 109 test files · 755 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0631  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0625`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance.)
+> **Highest ref allocated: `T0631`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0631 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -766,6 +766,19 @@ The adoptable process-mining sample (mirrors Simulator Examples): a portable pac
 | T0619 | ships a raw sampleLog that rebuilds to the same run (import-first flow) | The confirm-the-analysis import producing a different run than the baked one | If the sample log or the parser drifted |
 | T0624 | the AI Explain-results brief carries the run's stats, top paths, conformance + artefacts (`explain-results.test.ts`) | The "Explain results" summary being fed wrong/empty numbers | If `buildExplainPrompt` stopped serialising a section |
 | T0625 | ships three choosable period scenarios (Jan 2025 / Jul 2025 / Jan 2026) with compliance DECLINING back in time (fitness strictly increasing toward the present; older months carry the unknown "Disputed" state + undocumented transitions) | The multi-scenario story silently flattening or reversing | If a period's mix/seed or the ordering changed |
+
+### `tests/riskControls/` — Risk & Control (catalog + attach + RCM + checks)
+
+Attach Risks/Controls (from an org-master → project-copy catalog) to process steps, scan for coverage/segregation-of-duties gaps, and export a Risk-Control Matrix. Pure helpers + checks, the hand-built `.xlsx` writer, and a DB round-trip for adopt + export.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0626 | `riskControlPatch` merges over the current annotation (shallow-merge safe) | Adding a control silently dropping the element's existing risks | If the patch stopped spreading the prior value (the reducer merges `properties` shallowly) |
+| T0627 | B38 control-coverage flags a risk with no control; clean when covered | A Risk-Control Matrix coverage gap going unreported | If `checkControlCoverage` regressed |
+| T0628 | B39 segregation-of-duties flags one lane that raises + approves; clean when split | A SoD breach (one team both raises and approves) going unflagged | If the lane-grouping / verb classification regressed |
+| T0629 | the `.xlsx` writer builds a valid multi-sheet workbook with inline strings + XML escaping | A corrupt Risk-Control Matrix export that Excel can't open | If the OOXML zip shape or escaping broke |
+| T0630 | adopt clones the org library into a SEPARATE project copy with items + links re-linked | The project copy sharing rows with the master, or dangling mitigation links | If `adoptLibrary`'s id-remap or isolation regressed |
+| T0631 | the RCM export reflects on-model attachments + coverage (Covered / GAP) | The matrix mis-reporting where controls are attached or which risks are uncovered | If `buildRcmXlsx` gathering/coverage logic regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 
