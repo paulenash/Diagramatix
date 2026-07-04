@@ -52,6 +52,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   const [refSmId, setRefSmId] = useState("");
   const [runningConf, setRunningConf] = useState(false);
   const [conformance, setConformance] = useState<ConformanceResult | null>(null);
+  // AI "Explain results"
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [explaining, setExplaining] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/projects/${projectId}/mining/runs`);
@@ -93,6 +96,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     const s = runs.find((r) => r.id === selectedId);
     setRefSmId(s?.referenceSmId ?? s?.discoveredSmId ?? "");
     setConformance(s?.conformance ?? null);
+    setExplanation(null);
   }, [selectedId, runs]);
 
   const [calibrating, setCalibrating] = useState(false);
@@ -103,6 +107,8 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Calibration failed"); return; }
       await load();
+      // Remember the open run so exiting the Simulator returns to this exact screen.
+      try { if (selectedId) sessionStorage.setItem(`mining-return:${projectId}`, selectedId); } catch { /* ignore */ }
       onOpenSimulator?.(); // hand off to the Simulator on the calibrated twin study
     } finally { setCalibrating(false); }
   }
@@ -119,6 +125,16 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       setConformance(json.conformance ?? null);
       await load();
     } finally { setRunningConf(false); }
+  }
+
+  async function explain(runId: string) {
+    setExplaining(true); setErr(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/explain`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(json.error ?? "Explain failed"); return; }
+      setExplanation(json.explanation ?? "");
+    } finally { setExplaining(false); }
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -200,6 +216,8 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   }
 
   const selected = runs.find((r) => r.id === selectedId) ?? null;
+  // "Explain results" lights up once the run is fully mined (process + lifecycle + conformance).
+  const allStepsDone = !!(selected?.discoveredBpmnId && selected?.discoveredSmId && selected?.conformance);
   const inp = "bg-stone-800 border border-stone-600 rounded px-2 py-1 text-stone-100 text-xs";
   // Open a discovered diagram with a back-link that returns to the MINER console
   // (via the ?mining deep-link) instead of the owning project.
@@ -425,6 +443,26 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 </button>
                 {selected.studyId && <span className="text-[10px] text-emerald-300">✓ twin study ready — opens in the Simulator</span>}
               </div>
+            </div>
+
+            {/* AI: explain what the mining revealed — lights up once fully mined */}
+            <div className={`mt-4 pt-3 border-t transition-colors ${allStepsDone ? "border-amber-500/60" : "border-stone-700"}`}>
+              <h3 className={`text-xs font-semibold mb-1 ${allStepsDone ? "text-amber-200" : "text-stone-500"}`}>Explain results</h3>
+              <p className="text-[11px] text-stone-400 mb-2">
+                An AI summary of what the mining revealed — the real process, the conformance findings, timing, and the twin.
+                {!allStepsDone && <span className="text-stone-500"> Discover the process + state machine and check conformance to enable.</span>}
+              </p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button onClick={() => explain(selected.id)} disabled={!allStepsDone || explaining}
+                  className={`text-xs rounded px-3 py-1.5 text-white disabled:cursor-not-allowed ${allStepsDone ? "bg-amber-600 hover:bg-amber-500 shadow-[0_0_16px_rgba(217,119,6,0.5)]" : "bg-stone-700/60 !text-stone-400"}`}
+                  title={allStepsDone ? "Summarise what the mining discovered" : "Complete discovery + conformance first"}>
+                  {explaining ? "Analysing…" : "✨ Explain results"}
+                </button>
+                {explaining && <DiagramatixThrobber size={20} tone="amber" />}
+              </div>
+              {explanation && (
+                <div className="mt-3 rounded border border-amber-500/40 bg-stone-900/70 p-3 text-[11px] text-stone-200 leading-relaxed whitespace-pre-wrap">{explanation}</div>
+              )}
             </div>
 
             {/* Admin: capture this run into the Mining-Example catalog */}
