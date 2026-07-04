@@ -29,22 +29,35 @@ async function apExampleId(request: { get: (u: string) => Promise<{ ok(): boolea
 
 // ── As a normal (non-admin) user — reuses the saved E2E_USER session ──────────
 test.describe("DiagramatixMINER Examples — user", () => {
-  test("gallery renders and Load & open opens the console on the mined run", async ({ page }) => {
+  test("gallery renders + Load & open pre-loads the sample CSV; import creates the run", async ({ page }) => {
     await page.goto("/dashboard/mining-examples");
     await expect(page.getByRole("heading", { name: /DiagramatixMINER Examples/ })).toBeVisible();
     await expect(page.getByText("Accounts Payable — Invoice Lifecycle")).toBeVisible();
 
     await page.getByRole("button", { name: /Load & open/ }).first().click();
     await page.keyboard.press("Enter").catch(() => {}); // skip the amber intro (also auto-advances)
-    await expect(page.getByText("Accounts Payable — January 2026")).toBeVisible({ timeout: 25_000 });
+    // The console opens with the Import panel pre-loaded from the sample CSV —
+    // the user confirms the analysis, then imports.
+    const importBtn = page.getByRole("button", { name: /Import log/ });
+    await expect(importBtn).toBeVisible({ timeout: 25_000 });
+    await importBtn.click();
+    // After import the run appears (in the runs list + the auto-selected panel).
+    await expect(page.getByText("Accounts Payable — January 2026").first()).toBeVisible({ timeout: 25_000 });
   });
 
-  test("every mining route works over an authenticated session (adopt → calibrate)", async ({ page }) => {
+  test("every mining route works over an authenticated session (import → calibrate)", async ({ page }) => {
     const id = await apExampleId(page.request);
     const adoptRes = await page.request.post(`/api/mining-examples/${id}/adopt`);
     expect(adoptRes.ok(), `adopt -> ${adoptRes.status()} ${await adoptRes.text()}`).toBeTruthy();
-    const { projectId, runId } = await adoptRes.json();
-    expect(projectId && runId).toBeTruthy();
+    const { projectId, sampleLog } = await adoptRes.json();
+    expect(projectId && sampleLog?.rows?.length).toBeTruthy();
+
+    // Import the sample log to create the run (what the console does on confirm).
+    const impRes = await page.request.post(`/api/projects/${projectId}/mining/import`, {
+      data: { name: sampleLog.runName ?? "Sample", mapping: sampleLog.mapping, headers: sampleLog.headers, rows: sampleLog.rows },
+    });
+    expect(impRes.ok(), `import -> ${impRes.status()} ${await impRes.text()}`).toBeTruthy();
+    const runId = (await impRes.json()).run.id;
 
     const runsRes = await page.request.get(`/api/projects/${projectId}/mining/runs`);
     const run = (await runsRes.json()).runs.find((r: { id: string }) => r.id === runId);
@@ -129,8 +142,15 @@ test.describe("DiagramatixMINER Examples — admin", () => {
     const exId = await apExampleId(page.request);
     const adopt = await (await page.request.post(`/api/mining-examples/${exId}/adopt`)).json();
 
-    // capture the adopted run into a new draft catalog entry
-    const cap = await page.request.post("/api/admin/mining-examples/capture", { data: { projectId: adopt.projectId, runId: adopt.runId, title: `E2E Captured ${Date.now()}` } });
+    // The example ships a sample log — import it to create a run to capture.
+    const impRes = await page.request.post(`/api/projects/${adopt.projectId}/mining/import`, {
+      data: { name: adopt.sampleLog.runName ?? "Sample", mapping: adopt.sampleLog.mapping, headers: adopt.sampleLog.headers, rows: adopt.sampleLog.rows },
+    });
+    expect(impRes.ok(), `import -> ${impRes.status()}`).toBeTruthy();
+    const runId = (await impRes.json()).run.id;
+
+    // capture the run into a new draft catalog entry
+    const cap = await page.request.post("/api/admin/mining-examples/capture", { data: { projectId: adopt.projectId, runId, title: `E2E Captured ${Date.now()}` } });
     expect(cap.ok(), `capture -> ${cap.status()} ${await cap.text()}`).toBeTruthy();
     const capId = (await cap.json()).example.id;
 

@@ -38,11 +38,24 @@ export interface MiningExampleRun {
   referenceSmKey?: string;
 }
 
+/** The raw sample event log carried in the bundle. When present, adopt does NOT
+ *  pre-create the run — it hands this to the console so the user lands on the
+ *  Import panel pre-loaded (confirm the analysis, then Import). */
+export interface MiningExampleSampleLog {
+  fileName?: string;
+  runName?: string;
+  headers: string[];
+  rows: string[][];
+  mapping: LogMapping;
+}
+
 export interface MiningExamplePackage {
   version: 1;
   /** Reference state-machine diagrams (the single source of truth for states). */
   diagrams: MiningExampleDiagram[];
   run: MiningExampleRun;
+  /** Optional raw log for the "confirm the CSV analysis, then import" flow. */
+  sampleLog?: MiningExampleSampleLog;
 }
 
 export function emptyMiningPackage(): MiningExamplePackage {
@@ -86,6 +99,15 @@ export function validateMiningExamplePackage(pkg: unknown): string[] {
   if (!Array.isArray(r.variants) || r.variants.length === 0) errs.push("`run.variants` must be a non-empty array");
   if (!r.performance || typeof r.performance.clockUnit !== "string") errs.push("`run.performance` is required (with a clockUnit)");
   if (r.referenceSmKey && !keys.has(r.referenceSmKey)) errs.push(`run.referenceSmKey "${r.referenceSmKey}" does not match any diagram key`);
+
+  const sl = p.sampleLog;
+  if (sl !== undefined) {
+    if (!Array.isArray(sl.headers) || sl.headers.length === 0) errs.push("`sampleLog.headers` must be a non-empty array");
+    if (!Array.isArray(sl.rows) || sl.rows.length === 0) errs.push("`sampleLog.rows` must be a non-empty array");
+    if (!sl.mapping || !sl.mapping.caseId || !sl.mapping.activity || !sl.mapping.timestamp || !sl.mapping.state) {
+      errs.push("`sampleLog.mapping` must map caseId, activity, timestamp and state");
+    }
+  }
 
   return errs;
 }

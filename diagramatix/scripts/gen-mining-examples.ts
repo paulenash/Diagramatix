@@ -136,6 +136,15 @@ const pkg: MiningExamplePackage = {
     performance,
     referenceSmKey: "ap-reference",
   },
+  // Raw log so adopt lands the user on the Import panel pre-loaded — they confirm
+  // the column analysis, then import (which rebuilds the run above).
+  sampleLog: {
+    fileName: "accounts-payable-january-2026.csv",
+    runName: "Accounts Payable — January 2026",
+    headers: HEADERS,
+    rows,
+    mapping: MAP,
+  },
 };
 
 const example = {

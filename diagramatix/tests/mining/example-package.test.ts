@@ -14,6 +14,7 @@ import {
 } from "@/app/lib/mining/examplePackage";
 import { STARTER_MINING_EXAMPLES } from "@/app/lib/mining/exampleSeeds";
 import { checkTransitionConformance, type ReferenceSm } from "@/app/lib/mining/transitionConformance";
+import { buildEventLog } from "@/app/lib/mining/parseEventLog";
 
 const toRef = (d: MiningExamplePackage["diagrams"][number]): ReferenceSm =>
   ({ elements: d.data.elements as ReferenceSm["elements"], connectors: d.data.connectors as ReferenceSm["connectors"] });
@@ -82,5 +83,18 @@ describe("the shipped Accounts Payable starter example", () => {
     expect(undoc?.cases).toBe(39);
     // Strict is strictly less conforming than permissive.
     expect(strict.conformingCases).toBeLessThan(permissive.conformingCases);
+  });
+
+  it("T0619 — ships a raw sampleLog that rebuilds to the same run (import-first flow)", () => {
+    const p = ex.package;
+    expect(p.sampleLog, "example ships a raw sample log for the confirm-and-import flow").toBeTruthy();
+    const sl = p.sampleLog!;
+    expect(sl.rows.length).toBeGreaterThan(0);
+    // Importing the sample log reproduces the pre-computed run exactly.
+    const rebuilt = buildEventLog(sl.headers, sl.rows, sl.mapping);
+    expect(rebuilt.stats.cases).toBe(p.run.stats.cases);
+    expect(rebuilt.stats.variants).toBe(p.run.stats.variants);
+    expect(rebuilt.stats.states).toEqual(p.run.stats.states);
+    expect(rebuilt.variants.length).toBe(p.run.variants.length);
   });
 });
