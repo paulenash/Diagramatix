@@ -7,6 +7,7 @@ import type { DiagramData, DiagramElement, Connector, Point, Side } from "./type
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
 import { CHEVRON_THEMES } from "./chevronThemes";
+import { layoutStateMachine } from "./stateMachineLayout";
 
 // Value chain AI rule: when a Value Chain contains collapsed
 // processes, pick a random Colour Theme from the catalogue and apply
@@ -193,6 +194,14 @@ export function layoutGenericDiagram(
   // ArchiMate: layered-band layout
   if (diagramType === "archimate") {
     return layoutArchimateDiagram(aiElements, aiConnections);
+  }
+
+  // State machine: dedicated layered layout enforcing the S3.xx Layout rules.
+  // Only for FLAT machines — composite/nested ones keep the generic grid so the
+  // container + parent/child handling below still applies.
+  if (diagramType === "state-machine"
+      && !aiElements.some(e => e.type === "composite-state" || e.type === "submachine" || e.group || e.parent)) {
+    return layoutStateMachine(aiElements, aiConnections);
   }
 
   const elements: DiagramElement[] = [];
