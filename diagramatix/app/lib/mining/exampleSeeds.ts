@@ -20,7 +20,7 @@ export interface StarterMiningExample {
 }
 
 export const STARTER_MINING_EXAMPLES: StarterMiningExample[] =
-  (data as { examples: StarterMiningExample[] }).examples;
+  (data as unknown as { examples: StarterMiningExample[] }).examples;
 
 /** Slugs the seed should retire (none yet). */
 export const RETIRED_MINING_EXAMPLE_SLUGS: string[] = [];

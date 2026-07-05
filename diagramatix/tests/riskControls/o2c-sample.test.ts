@@ -6,6 +6,10 @@
 import { describe, it, expect } from "vitest";
 import { O2C_SAMPLE } from "@/app/lib/riskControls/o2cSample";
 import { RISK_CONTROL_KINDS } from "@/app/lib/riskControls/types";
+import { buildEventLog } from "@/app/lib/mining/parseEventLog";
+import { checkTransitionConformance, type ReferenceSm } from "@/app/lib/mining/transitionConformance";
+import { deviationSignature } from "@/app/lib/riskControls/controlEffectiveness";
+import { STARTER_MINING_EXAMPLES } from "@/app/lib/mining/exampleSeeds";
 
 const CONFORMANCE_RULES = new Set(["undocumented-transition", "unknown-state", "unexpected-entry", "unexpected-exit", "dead-transition"]);
 
@@ -52,6 +56,25 @@ describe("Order-to-Cash sample GRC library", () => {
       const [rule, ...rest] = c.monitorSignature!.split("|");
       expect(CONFORMANCE_RULES.has(rule), `${c.code} rule "${rule}" valid`).toBe(true);
       expect(rest.length === 1 || rest.length === 2, `${c.code} signature shape`).toBe(true);
+    }
+  });
+
+  it("T0637 — the O2C mining example's deviations match the library's control monitor signatures (self-contained demo)", () => {
+    const ex = STARTER_MINING_EXAMPLES.find((e) => e.slug === "order-to-cash-lifecycle");
+    expect(ex, "O2C mining example is shipped").toBeTruthy();
+    const ref = ex!.package.diagrams[0].data;
+    const sl = ex!.package.sampleLog!;
+    const log = buildEventLog(sl.headers, sl.rows, sl.mapping);
+    const conf = checkTransitionConformance(log.variants, { elements: ref.elements, connectors: ref.connectors } as unknown as ReferenceSm);
+    expect(conf.totalCases).toBe(200);
+
+    // Every control that monitors a deviation actually finds it in the mined log
+    // (cases > 0), so operating-effectiveness is meaningful out of the box.
+    const observed = new Map(conf.violations.map((v) => [deviationSignature(v), v.cases]));
+    const monitored = O2C_SAMPLE.items.filter((i) => i.monitorSignature);
+    expect(monitored.length).toBeGreaterThanOrEqual(4);
+    for (const c of monitored) {
+      expect(observed.get(c.monitorSignature!) ?? 0, `${c.code} ${c.monitorSignature} observed`).toBeGreaterThan(0);
     }
   });
 });
