@@ -87,6 +87,8 @@ export interface RiskControlItemDTO {
   evidence: string | null;
   testMethod: string | null;
   testFrequency: string | null;
+  // Operating effectiveness: the mining-conformance deviation this control guards.
+  monitorSignature: string | null;
 }
 
 export interface RiskControlLinkDTO {

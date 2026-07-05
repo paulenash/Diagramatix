@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { RiskControlEditor } from "./RiskControlEditor";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import type { RiskControlLibraryDTO } from "@/app/lib/riskControls/types";
+import type { ObservedDeviation, ControlEffectiveness } from "@/app/lib/riskControls/controlEffectiveness";
 
 /**
  * Project-level Risk & Control library: adopt an org master (a COPY the project
@@ -26,12 +27,22 @@ export function ProjectRiskControlSection({
   const [err, setErr] = useState<string | null>(null);
   const [confirmReplace, setConfirmReplace] = useState(false);
   const [open, setOpen] = useState(false);
+  const [deviations, setDeviations] = useState<ObservedDeviation[] | undefined>(undefined);
+  const [effectiveness, setEffectiveness] = useState<Record<string, ControlEffectiveness>>({});
+  const [runName, setRunName] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const res = await fetch(basePath);
     const j = await res.json().catch(() => ({ library: null }));
     setLibrary(j.library ?? null);
     setLoading(false);
+    // Operating effectiveness from the project's latest mining conformance.
+    fetch(`${basePath}/effectiveness`).then((r) => (r.ok ? r.json() : null)).then((e) => {
+      if (!e) return;
+      setDeviations(e.run ? (e.deviations ?? []) : undefined);
+      setEffectiveness(e.effectiveness ?? {});
+      setRunName(e.run?.name ?? null);
+    }).catch(() => {});
   }, [basePath]);
 
   useEffect(() => {
@@ -71,10 +82,12 @@ export function ProjectRiskControlSection({
           {loading ? <p className="text-xs text-gray-400">Loading…</p> : library ? (
             <>
               <div className="flex items-center justify-between">
-                <p className="text-[11px] text-gray-600">Library: <span className="font-medium">{library.name}</span></p>
+                <p className="text-[11px] text-gray-600">Library: <span className="font-medium">{library.name}</span>
+                  {runName && <span className="text-gray-400"> · effectiveness from mining run “{runName}”</span>}
+                </p>
                 <a href={`${basePath}/export`} className="text-[11px] text-teal-700 hover:text-teal-900">⭳ Export Risk-Control Matrix (.xlsx)</a>
               </div>
-              <RiskControlEditor library={library} basePath={basePath} canEdit={canEdit} onChange={refresh} />
+              <RiskControlEditor library={library} basePath={basePath} canEdit={canEdit} onChange={refresh} deviations={deviations} effectiveness={effectiveness} />
             </>
           ) : (
             <div className="space-y-2">

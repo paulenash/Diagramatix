@@ -2,6 +2,7 @@
  *  the org + project route trees. Maps Prisma rows to client-safe DTOs. */
 import { prisma } from "@/app/lib/db";
 import type { RiskControlLibraryDTO } from "./types";
+import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function serializeLibrary(lib: any): RiskControlLibraryDTO {
@@ -19,6 +20,7 @@ export function serializeLibrary(lib: any): RiskControlLibraryDTO {
       controlType: it.controlType ?? null, automation: it.automation ?? null, frequency: it.frequency ?? null,
       owner: it.owner ?? null, frameworkRef: it.frameworkRef ?? null,
       evidence: it.evidence ?? null, testMethod: it.testMethod ?? null, testFrequency: it.testFrequency ?? null,
+      monitorSignature: it.monitorSignature ?? null,
     })),
     links: (lib.links ?? []).map((ln: any) => ({ id: ln.id, sourceId: ln.sourceId, targetId: ln.targetId })),
   };
@@ -46,4 +48,17 @@ export async function loadOrgLibraries(orgId: string): Promise<RiskControlLibrar
 export async function loadProjectLibrary(projectId: string): Promise<RiskControlLibraryDTO | null> {
   const lib = await prisma.riskControlLibrary.findFirst({ where: { projectId }, include: includeAll as any }); // eslint-disable-line @typescript-eslint/no-explicit-any
   return lib ? serializeLibrary(lib) : null;
+}
+
+/** The most recent mining run in the project that has a conformance result —
+ *  the source of control operating-effectiveness. Null if none has been run. */
+export async function loadLatestConformance(projectId: string): Promise<{ runId: string; runName: string; conformance: ConformanceResult } | null> {
+  const runs = await prisma.processMiningRun.findMany({
+    where: { projectId }, orderBy: { updatedAt: "desc" }, select: { id: true, name: true, conformance: true },
+  });
+  for (const r of runs) {
+    const c = r.conformance as unknown as ConformanceResult | null;
+    if (c && typeof c === "object" && Array.isArray(c.violations)) return { runId: r.id, runName: r.name, conformance: c };
+  }
+  return null;
 }
