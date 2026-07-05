@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-05  ·  **Document version:** 4.4  ·  **Suite:** 109 test files · 757 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0633  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-05  ·  **Document version:** 4.5  ·  **Suite:** 110 test files · 759 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0635  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0631`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0633 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph.)
+> **Highest ref allocated: `T0631`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -769,7 +769,7 @@ The adoptable process-mining sample (mirrors Simulator Examples): a portable pac
 
 ### `tests/riskControls/` — Risk & Control (catalog + attach + RCM + checks)
 
-Attach Risks/Controls (from an org-master → project-copy GRC catalog — Risks, Controls, Policies, Regulations, Audit Findings, KRIs, KPIs, joined by a directed traceability graph) to process steps, scan for coverage/segregation-of-duties gaps, and export a multi-sheet Risk-Control Matrix (flat audit grid + registers + traceability). Pure helpers + checks, the hand-built `.xlsx` writer, and a DB round-trip for adopt + export.
+Attach Risks/Controls (from an org-master → project-copy GRC catalog — Risks, Controls, Policies, Regulations, Audit Findings, KRIs, KPIs, joined by a directed traceability graph) to process steps, scan for coverage/segregation-of-duties gaps, and export a multi-sheet Risk-Control Matrix (flat audit grid + registers + traceability), and prove **operating effectiveness** by tying each Control to the DiagramatixMINER conformance deviation it guards ("bypassed in N of M cases"). Pure helpers + checks, the hand-built `.xlsx` writer, and DB round-trips for adopt + export + effectiveness.
 
 | Ref | Test | Protects you against | How it would break (go red) |
 |------|------|----------------------|------------------------------|
@@ -781,6 +781,8 @@ Attach Risks/Controls (from an org-master → project-copy GRC catalog — Risks
 | T0631 | the RCM export reflects on-model attachments + coverage (Covered / GAP) | The matrix mis-reporting where controls are attached or which risks are uncovered | If `buildRcmXlsx` gathering/coverage logic regressed |
 | T0632 | the flat Audit Grid has one Activity×Risk×Control row carrying the audit/assurance columns (Automation, Evidence, Test method/frequency, Residual) | The auditor-standard flat RCM losing a mature column or mis-joining activity/risk/control | If the audit-grid builder or the audit-field wiring regressed |
 | T0633 | GRC objects (Policy/Regulation) + the traceability graph clone on adopt and flow into the export (Traceability sheet verbs, GRC Register, audit-grid governance column) | The wider governance graph (policy↔control↔regulation) not persisting or not reaching the RCM | If the generalized `sourceId/targetId` links or the traceability/register export regressed |
+| T0634 | control effectiveness: deviation-signature matching + bypassed/effectiveness maths (39/200 → 80.5%, unobserved → 100%, none → null) | Mis-computing "is the control operating" from mining conformance | If `deviationSignature`/`controlEffectiveness` regressed |
+| T0635 | control operating-effectiveness from a real mining run's conformance flows into the export (bypassed cases + % in the Control Register; run named in the summary) | The RCM not reflecting whether controls actually operate on real data | If `loadLatestConformance` or the effectiveness export columns regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 

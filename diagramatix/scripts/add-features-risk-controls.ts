@@ -25,8 +25,9 @@ const FEATURES: Array<{ name: string; summary: string; details: string; sortOrde
       "- Maintain an Organisation master GRC library — Risks (likelihood/impact + residual), Controls (preventive/detective/corrective, manual/automated/IT-dependent, owner, framework, evidence, test method + frequency), plus Policies, Regulations, Audit Findings, KRIs and KPIs; each Project adopts its own editable copy",
       "- Build the traceability graph: Controls mitigate Risks, Policies govern Controls, Regulations require Policies, Audit Findings raise against Controls, KRIs monitor Risks — then attach Risks/Controls to any task, gateway or data object on the canvas",
       "- The Diagram scan flags coverage gaps (a Risk with no mitigating Control) and segregation-of-duties breaches (one lane that both raises and approves the same work)",
-      "- Export a multi-sheet Excel Risk-Control Matrix: a flat Activity × Risk × Control audit grid (with control type, automation, owner, evidence, test method, residual risk, policy/regulation), a Risk-Control Matrix, Control + GRC registers, a Traceability sheet, and a coverage summary",
-      "- Reuses your existing model: no separate GRC tool, and controls sit right on the process they govern — end-to-end traceability from a BPMN activity to the controls and regulations that govern it",
+      "- Prove operating effectiveness from real data: tie a Control to the DiagramatixMINER conformance deviation a bypass would produce, and the matrix shows it was \"bypassed in N of M cases\" with an effectiveness % — evidence the control is actually operating, not just that it exists",
+      "- Export a multi-sheet Excel Risk-Control Matrix: a flat Activity × Risk × Control audit grid (with control type, automation, owner, evidence, test method, residual risk, policy/regulation, bypassed cases + effectiveness), a Risk-Control Matrix, Control + GRC registers, a Traceability sheet, and a coverage summary",
+      "- Reuses your existing model: no separate GRC tool, and controls sit right on the process they govern — end-to-end traceability from a BPMN activity to the controls, regulations and real-world effectiveness that govern it",
     ].join("\n"),
   },
 ];

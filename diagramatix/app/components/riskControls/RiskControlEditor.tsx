@@ -8,6 +8,7 @@ import {
   RATING_SCALE, riskScore, riskBand, relationVerb, aIsSource,
   type RiskControlLibraryDTO, type RiskControlItemDTO, type RiskControlKind,
 } from "@/app/lib/riskControls/types";
+import type { ObservedDeviation, ControlEffectiveness } from "@/app/lib/riskControls/controlEffectiveness";
 
 /**
  * Reusable editor for ONE GRC library. A section per item kind (Risks, Controls,
@@ -21,12 +22,16 @@ const BAND_COLOR: Record<string, string> = {
 };
 
 export function RiskControlEditor({
-  library, basePath, canEdit, onChange,
+  library, basePath, canEdit, onChange, deviations, effectiveness,
 }: {
   library: RiskControlLibraryDTO;
   basePath: string;
   canEdit: boolean;
   onChange: () => void;
+  /** Observed mining deviations to map controls against (project context only). */
+  deviations?: ObservedDeviation[];
+  /** Per-control operating effectiveness from the latest conformance run. */
+  effectiveness?: Record<string, ControlEffectiveness>;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -105,6 +110,15 @@ export function RiskControlEditor({
         <input defaultValue={it.evidence ?? ""} placeholder="evidence" onBlur={(e) => patchItem(it.id, { evidence: e.target.value })} className={`${inp} w-32`} />
         <input defaultValue={it.testMethod ?? ""} placeholder="test method" onBlur={(e) => patchItem(it.id, { testMethod: e.target.value })} className={`${inp} w-28`} />
         <input defaultValue={it.testFrequency ?? ""} placeholder="test freq" onBlur={(e) => patchItem(it.id, { testFrequency: e.target.value })} className={`${inp} w-20`} />
+        {deviations !== undefined && (
+          <select defaultValue={it.monitorSignature ?? ""} onChange={(e) => patchItem(it.id, { monitorSignature: e.target.value })} className={inp} title="Which mining deviation a bypass of this control produces">
+            <option value="">monitors deviation… (mining)</option>
+            {[...(deviations ?? []),
+              ...(it.monitorSignature && !(deviations ?? []).some((d) => d.signature === it.monitorSignature)
+                ? [{ signature: it.monitorSignature, label: it.monitorSignature, rule: "", cases: 0 }] : [])]
+              .map((d) => <option key={d.signature} value={d.signature}>{d.label}{d.cases ? ` (${d.cases})` : ""}</option>)}
+          </select>
+        )}
       </div>
     );
     // Policy / Regulation / Audit Finding / KRI / KPI — generic governance fields.
@@ -139,6 +153,11 @@ export function RiskControlEditor({
                       <input defaultValue={it.name} onBlur={(e) => e.target.value.trim() !== it.name && patchItem(it.id, { name: e.target.value })} className={`${inp} flex-1`} />
                     ) : <span className="text-xs flex-1">{it.name}</span>}
                     {kind === "Risk" && <span className={`text-[10px] px-1.5 py-0.5 rounded ${BAND_COLOR[riskBand(score)]}`}>{score ?? "—"}</span>}
+                    {kind === "Control" && effectiveness?.[it.id] && (() => {
+                      const e = effectiveness[it.id]; const pct = e.effectivenessPct;
+                      const cls = pct == null ? "bg-gray-100 text-gray-500" : pct >= 95 ? "bg-emerald-100 text-emerald-700" : pct >= 80 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700";
+                      return <span className={`text-[10px] px-1.5 py-0.5 rounded ${cls}`} title={`Bypassed in ${e.bypassedCases} of ${e.totalCases} cases (from mining conformance)`}>{pct == null ? "—" : `${pct}%`}{e.bypassedCases ? ` · ${e.bypassedCases} bypassed` : ""}</span>;
+                    })()}
                     {canEdit && <button onClick={() => setEditId(editId === it.id ? null : it.id)} className="text-[11px] text-gray-500 hover:text-gray-800">{editId === it.id ? "▾" : "▸"}</button>}
                     {canEdit && <button onClick={() => setConfirm({ id: it.id, name: it.name })} className="text-[11px] text-red-500 hover:text-red-700">✕</button>}
                   </div>

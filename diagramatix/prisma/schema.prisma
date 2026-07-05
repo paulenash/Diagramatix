@@ -1003,6 +1003,11 @@ model RiskControlItem {
   evidence     String?            // what evidence proves the control operated
   testMethod   String?            // how internal audit tests it
   testFrequency String?           // how often it is tested
+  // Operating effectiveness from mining: the conformance-deviation signature this
+  // control guards against (e.g. "undocumented-transition|In Progress|Ready to Pay").
+  // When that deviation appears in the project's mining conformance, the control
+  // was "bypassed" in that many cases.
+  monitorSignature String?
   // Directed traceability edges where this item is the source / the target.
   // (Control→Risk = mitigates; Policy→Control = governs; Regulation→Policy =
   //  requires; AuditFinding→Control = addresses; KRI→Risk = monitors; …)

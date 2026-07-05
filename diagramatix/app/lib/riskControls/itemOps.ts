@@ -56,6 +56,7 @@ export async function createItem(
       evidence: isControl ? (asStr(input.evidence) || null) : null,
       testMethod: isControl ? (asStr(input.testMethod) || null) : null,
       testFrequency: isControl ? (asStr(input.testFrequency) || null) : null,
+      monitorSignature: isControl ? (asStr(input.monitorSignature) || null) : null,
     },
   });
 }
@@ -94,6 +95,7 @@ export async function updateItem(
     if (input.evidence !== undefined) data.evidence = asStr(input.evidence) || null;
     if (input.testMethod !== undefined) data.testMethod = asStr(input.testMethod) || null;
     if (input.testFrequency !== undefined) data.testFrequency = asStr(input.testFrequency) || null;
+    if (input.monitorSignature !== undefined) data.monitorSignature = asStr(input.monitorSignature) || null;
   }
   if (item.kind !== "Risk") {
     if (input.owner !== undefined) data.owner = asStr(input.owner) || null;

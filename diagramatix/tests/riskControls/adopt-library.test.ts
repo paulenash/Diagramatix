@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import JSZip from "jszip";
-import { prisma } from "@/app/lib/db";
+import { prisma, pgPool } from "@/app/lib/db";
 import { truncateAll } from "../_setup/db";
 import { createUserWithOrg, createProject } from "../_setup/factories";
 import { createItem, updateItem, linkItems } from "@/app/lib/riskControls/itemOps";
@@ -168,5 +168,32 @@ describe("risk & control — adopt + RCM export", () => {
     const grid = await z.file("xl/worksheets/sheet1.xml")!.async("string");
     const policyCopy = lib!.items.find((i) => i.kind === "Policy")!;
     expect(grid).toContain(policyCopy.code);
+  });
+
+  it("T0635 — control operating-effectiveness from mining conformance flows into the export", async () => {
+    await adoptLibrary(w.project.id, w.org.id, w.master.id);
+    const lib = await prisma.riskControlLibrary.findFirst({ where: { projectId: w.project.id }, include: { items: true } });
+    const control = lib!.items.find((i) => i.kind === "Control")!;
+    // The control guards the skip-approval transition.
+    const sig = "undocumented-transition|In Progress|Ready to Pay";
+    await updateItem(lib!.id, control.id, { monitorSignature: sig });
+
+    // A mining run whose conformance shows that deviation in 40 of 200 cases.
+    const run = await prisma.processMiningRun.create({ data: { name: "AP Jan", projectId: w.project.id, orgId: w.org.id } });
+    const conf = {
+      fitness: 0.8, totalCases: 200, conformingCases: 160,
+      violations: [{ rule: "undocumented-transition", severity: "error", message: "Undocumented transition: In Progress → Ready to Pay", cases: 40, data: { from: "In Progress", to: "Ready to Pay" } }],
+      transitionStats: [],
+    };
+    await pgPool.query('UPDATE "ProcessMiningRun" SET conformance = $1::jsonb WHERE id = $2', [JSON.stringify(conf), run.id]);
+
+    const z = await JSZip.loadAsync((await buildRcmXlsx(w.project.id))!.buffer);
+    // Control Register (sheet3) shows the bypass count + effectiveness %.
+    const register = await z.file("xl/worksheets/sheet3.xml")!.async("string");
+    expect(register).toContain("<v>40</v>");     // bypassed in 40 cases
+    expect(register).toContain("80%");           // (1 - 40/200) = 80% effective
+    // Coverage summary names the effectiveness source run.
+    const summary = await z.file("xl/worksheets/sheet6.xml")!.async("string");
+    expect(summary).toContain("AP Jan");
   });
 });

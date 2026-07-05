@@ -6,7 +6,8 @@
  * writer (app/lib/riskControls/xlsx.ts).
  */
 import { prisma } from "@/app/lib/db";
-import { loadProjectLibrary } from "./queries";
+import { loadProjectLibrary, loadLatestConformance } from "./queries";
+import { controlEffectiveness, type ControlEffectiveness } from "./controlEffectiveness";
 import { buildXlsx, type Sheet } from "./xlsx";
 import { riskScore, residualScore, CONTROL_TYPE_LABELS, CONTROL_AUTOMATION_LABELS, KIND_LABEL, relationVerb } from "./types";
 import { getRiskControl } from "@/app/lib/diagram/riskControl";
@@ -21,6 +22,19 @@ export async function buildRcmXlsx(projectId: string): Promise<{ filename: strin
 
   const risks = library.items.filter((i) => i.kind === "Risk");
   const controls = library.items.filter((i) => i.kind === "Control");
+
+  // Operating effectiveness from the project's latest mining conformance.
+  const latest = await loadLatestConformance(projectId);
+  const effOf = new Map<string, ControlEffectiveness>();
+  if (latest) for (const c of controls) {
+    const e = controlEffectiveness(c.monitorSignature, latest.conformance);
+    if (e) effOf.set(c.id, e);
+  }
+  const effCells = (controlId: string): (string | number)[] => {
+    const e = effOf.get(controlId);
+    if (!e) return ["", ""];
+    return [e.bypassedCases, e.effectivenessPct == null ? "" : `${e.effectivenessPct}%`];
+  };
   const byId = new Map(library.items.map((i) => [i.id, i]));
   const kindOf = (id: string) => byId.get(id)?.kind;
   const push = (m: Map<string, string[]>, k: string, v: string) => (m.get(k) ?? m.set(k, []).get(k)!).push(v);
@@ -69,14 +83,14 @@ export async function buildRcmXlsx(projectId: string): Promise<{ filename: strin
 
   // ── Sheet 1: Audit Grid — one row per Activity × Risk × Control (the flat,
   //    auditor-standard RCM). A risk with no control emits a single GAP row. ──
-  const gridHeader = ["Process", "Activity", "Risk", "Risk score", "Residual", "Control", "Control type", "Automation", "Frequency", "Owner", "Framework", "Policy / Regulation", "Evidence", "Test method", "Test frequency", "Coverage"];
+  const gridHeader = ["Process", "Activity", "Risk", "Risk score", "Residual", "Control", "Control type", "Automation", "Frequency", "Owner", "Framework", "Policy / Regulation", "Evidence", "Test method", "Test frequency", "Bypassed (cases)", "Operating effectiveness", "Coverage"];
   const gridRows: (string | number)[][] = [];
   for (const ar of activityRisks) {
     const r = byId.get(ar.riskId); if (!r) continue;
     const ctrlIds = controlsForRisk.get(ar.riskId) ?? [];
     const base = [ar.process, ar.activity, `${r.code} ${r.name}`, riskScore(r) ?? "", residualScore(r) ?? ""];
     if (ctrlIds.length === 0) {
-      gridRows.push([...base, "", "", "", "", "", "", "", "", "", "GAP — no control"]);
+      gridRows.push([...base, "", "", "", "", "", "", "", "", "", "", "", "GAP — no control"]);
     } else {
       for (const cid of ctrlIds) {
         const c = byId.get(cid);
@@ -84,12 +98,13 @@ export async function buildRcmXlsx(projectId: string): Promise<{ filename: strin
           c ? `${c.code} ${c.name}` : cid,
           c?.controlType ? CONTROL_TYPE_LABELS[c.controlType] : "", autoLabel(c?.automation ?? null),
           c?.frequency ?? "", c?.owner ?? "", c?.frameworkRef ?? "", governanceFor(cid),
-          c?.evidence ?? "", c?.testMethod ?? "", c?.testFrequency ?? "", "Covered",
+          c?.evidence ?? "", c?.testMethod ?? "", c?.testFrequency ?? "", ...effCells(cid), "Covered",
         ]);
       }
     }
   }
-  if (gridRows.length === 0) gridRows.push(["—", "No risks attached to any process step yet", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
+  const gridWidth = gridHeader.length;
+  if (gridRows.length === 0) gridRows.push(["—", "No risks attached to any process step yet", ...Array(gridWidth - 2).fill("")]);
 
   // ── Sheet 2: Risk-Control Matrix (one row per Risk) ──
   const rcmHeader = ["Risk", "Risk description", "Likelihood", "Impact", "Score", "Residual", "Category", "Mitigating controls", "Coverage", "Attached on"];
@@ -104,11 +119,11 @@ export async function buildRcmXlsx(projectId: string): Promise<{ filename: strin
   });
 
   // ── Sheet 3: Control register (with audit / assurance columns) ──
-  const ctlHeader = ["Control", "Description", "Type", "Automation", "Frequency", "Owner", "Framework ref", "Evidence", "Test method", "Test frequency", "Mitigates risks", "Attached on"];
+  const ctlHeader = ["Control", "Description", "Type", "Automation", "Frequency", "Owner", "Framework ref", "Evidence", "Test method", "Test frequency", "Bypassed (cases)", "Operating effectiveness", "Mitigates risks", "Attached on"];
   const ctlRows = controls.map((c) => [
     `${c.code} ${c.name}`, c.description ?? "",
     c.controlType ? CONTROL_TYPE_LABELS[c.controlType] : "", autoLabel(c.automation), c.frequency ?? "", c.owner ?? "", c.frameworkRef ?? "",
-    c.evidence ?? "", c.testMethod ?? "", c.testFrequency ?? "",
+    c.evidence ?? "", c.testMethod ?? "", c.testFrequency ?? "", ...effCells(c.id),
     (risksForControl.get(c.id) ?? []).map(codeName).join("; "),
     attachments(c.id),
   ]);
@@ -151,6 +166,8 @@ export async function buildRcmXlsx(projectId: string): Promise<{ filename: strin
     ["Traceability links", library.links.length],
     ["Activity × Risk × Control rows", gridRows.length],
     ["Risks with no control (coverage gaps)", uncovered.length],
+    ["Operating effectiveness source", latest ? `${latest.runName} (fitness ${(latest.conformance.fitness * 100).toFixed(1)}%)` : "no mining conformance run yet"],
+    ["Controls monitored for bypass", effOf.size],
     [],
     ["Coverage gaps:"],
     ...(uncovered.length ? uncovered.map((r) => [`${r.code} ${r.name}`]) : [["None — every risk has at least one control"]]),
