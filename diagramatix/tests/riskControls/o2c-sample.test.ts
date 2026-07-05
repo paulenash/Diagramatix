@@ -4,8 +4,9 @@
  * items, every kind present, and monitor signatures are well-formed.
  */
 import { describe, it, expect } from "vitest";
-import { O2C_SAMPLE } from "@/app/lib/riskControls/o2cSample";
+import { O2C_SAMPLE, O2C_ATTACH } from "@/app/lib/riskControls/o2cSample";
 import { RISK_CONTROL_KINDS } from "@/app/lib/riskControls/types";
+import { validateRiskControlExamplePackage, summarizeRiskControlPackage, type RiskControlExamplePackage } from "@/app/lib/riskControls/examplePackage";
 import { buildEventLog } from "@/app/lib/mining/parseEventLog";
 import { checkTransitionConformance, type ReferenceSm } from "@/app/lib/mining/transitionConformance";
 import { deviationSignature } from "@/app/lib/riskControls/controlEffectiveness";
@@ -76,5 +77,35 @@ describe("Order-to-Cash sample GRC library", () => {
     for (const c of monitored) {
       expect(observed.get(c.monitorSignature!) ?? 0, `${c.code} ${c.monitorSignature} observed`).toBeGreaterThan(0);
     }
+  });
+
+  it("T0638 — O2C_ATTACH references only real library codes + the example package validates/summarizes", () => {
+    // Every code in the step-attachment map exists in the library, so adopt resolves them.
+    const codes = new Set(O2C_SAMPLE.items.map((i) => i.code));
+    for (const [label, m] of Object.entries(O2C_ATTACH)) {
+      for (const c of [...(m.risks ?? []), ...(m.controls ?? [])]) {
+        expect(codes.has(c), `${label} → ${c} exists`).toBe(true);
+      }
+    }
+
+    // The example-package validator catches the real failure modes…
+    expect(validateRiskControlExamplePackage(null).length).toBeGreaterThan(0);
+    expect(validateRiskControlExamplePackage({ version: 2 })).toContain("Unsupported or missing package version");
+    const bad = { version: 1, diagrams: [{ name: "d", type: "bpmn", data: { elements: [], connectors: [] } }], library: { name: "L", items: [{ code: "R-01", kind: "Risk", name: "x" }], links: [{ source: "R-01", target: "NOPE" }] }, attach: {} };
+    expect(validateRiskControlExamplePackage(bad).some((e) => e.includes("R-01→NOPE"))).toBe(true);
+
+    // …and accepts a minimal valid package built from the sample.
+    const good: RiskControlExamplePackage = {
+      version: 1,
+      diagrams: [{ name: "Value Chain", type: "value-chain", data: { elements: [], connectors: [] } as never }],
+      library: { name: O2C_SAMPLE.name, items: O2C_SAMPLE.items, links: O2C_SAMPLE.links },
+      attach: O2C_ATTACH,
+    };
+    expect(validateRiskControlExamplePackage(good)).toEqual([]);
+    const s = summarizeRiskControlPackage(good);
+    expect(s.diagrams).toBe(1);
+    expect(s.risks).toBe(10);
+    expect(s.controls).toBe(11);
+    expect(s.hasMining).toBe(false);
   });
 });

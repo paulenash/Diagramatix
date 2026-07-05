@@ -2360,7 +2360,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               </button>
               <button
                 onClick={() => setShowRcm(true)}
-                className="px-3 py-1 text-xs font-medium rounded-md border text-teal-700 border-teal-300 hover:bg-teal-50"
+                className="px-3 py-1 text-xs font-medium rounded-md border text-gray-700 border-gray-300 hover:bg-gray-50"
                 title="Risk & Controls — maintain the risk/control catalog + Risk-Control Matrix"
               >
                 ◆ Risk &amp; Controls
@@ -2408,9 +2408,9 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           </div>
           <ProjectStructureSection projectId={project.id} canEdit={!readOnly} />
           <button onClick={() => setShowRcm(true)}
-            className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-medium text-teal-800 hover:bg-teal-50 border-b border-gray-100">
+            className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-medium text-blue-800 hover:bg-blue-50 border-b border-gray-100">
             <span>◆ Risk &amp; Controls <span className="text-gray-400 ml-1">— catalog + Risk-Control Matrix</span></span>
-            <span className="text-teal-500">open ⤢</span>
+            <span className="text-blue-500">open ⤢</span>
           </button>
           <div className="overflow-y-auto p-2 flex-1">
             {renderFolder(ROOT_ID, 0)}

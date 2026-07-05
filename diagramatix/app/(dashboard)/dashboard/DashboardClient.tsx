@@ -1611,6 +1611,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       Process Mining Examples
                     </a>
+                    <a
+                      href="/dashboard/risk-control-examples"
+                      onClick={() => setFileMenuOpen(false)}
+                      className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      title="Load a ready-made Risk & Control (GRC) example — process + risks/controls + mining effectiveness"
+                    >
+                      Risk &amp; Control Examples
+                    </a>
                     <div className="border-t border-gray-100" />
                     <button
                       onClick={() => { setFileMenuOpen(false); handleBackupDownload(); }}
