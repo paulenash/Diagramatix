@@ -1,0 +1,378 @@
+<title>Diagramatix — Competitive Briefing (2026)</title>
+<style>
+  :root {
+    --ground: #FBFBF9;
+    --panel: #FFFFFF;
+    --ink: #1A1F2B;
+    --muted: #5A6273;
+    --faint: #8A8F9C;
+    --hair: #E6E6E1;
+    --hair-strong: #D6D7D0;
+    --accent: #0F766E;      /* teal — brand thread */
+    --accent-soft: #E3F0EE;
+    --amber: #B45309;       /* MINER thread + Partial */
+    --amber-soft: #F6ECDD;
+    --strong: #0F7A4D;
+    --strong-soft: #E2F1E8;
+    --none: #8A8F9C;
+    --none-soft: #EEEEEA;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+
+  .wrap {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    padding: clamp(1.25rem, 4vw, 4rem) clamp(1rem, 5vw, 2rem) 4rem;
+  }
+  .sheet { max-width: 940px; margin: 0 auto; }
+
+  /* ---- typography ---- */
+  h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; margin: 0; }
+  p { margin: 0; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--accent); font-weight: 600;
+  }
+  .prose { max-width: 65ch; }
+  .lede { font-size: clamp(1.05rem, 1.6vw, 1.2rem); color: #333846; }
+
+  /* ---- masthead ---- */
+  .mast { padding-bottom: 1.6rem; border-bottom: 2px solid var(--ink); }
+  .mast h1 { font-size: clamp(2rem, 5.2vw, 3.1rem); line-height: 1.04; margin: 0.7rem 0 0; }
+  .mast .sub { font-family: var(--serif); font-style: italic; font-size: clamp(1.05rem, 2vw, 1.35rem); color: var(--muted); margin-top: 0.5rem; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.6rem; margin-top: 1.3rem;
+    font-family: var(--mono); font-size: 0.72rem; color: var(--muted); letter-spacing: 0.02em;
+  }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  section { margin-top: clamp(2.4rem, 5vw, 3.6rem); }
+  .sec-head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 1.3rem; }
+  .sec-head h2 { font-size: clamp(1.4rem, 3vw, 1.9rem); }
+  .sec-num { font-family: var(--mono); font-size: 0.72rem; color: var(--faint); letter-spacing: 0.12em; padding-top: 0.35rem; }
+
+  /* ---- thesis band: the loop ---- */
+  .thesis {
+    background: var(--ink); color: #EDEEF0; border-radius: 14px;
+    padding: clamp(1.5rem, 3.5vw, 2.4rem); margin-top: 2rem;
+  }
+  .thesis .eyebrow { color: #F0C48A; }
+  .thesis h2 { color: #fff; font-size: clamp(1.3rem, 2.8vw, 1.7rem); margin: 0.55rem 0 0.4rem; }
+  .thesis p { color: #C3C7D0; max-width: 62ch; }
+  .loop { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.5rem; margin-top: 1.5rem; }
+  .step {
+    flex: 1 1 120px; min-width: 108px; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 9px; padding: 0.7rem 0.8rem;
+    display: flex; flex-direction: column; gap: 0.15rem;
+  }
+  .step .n { font-family: var(--mono); font-size: 0.64rem; color: #7E8595; letter-spacing: 0.1em; }
+  .step .t { font-weight: 600; font-size: 0.95rem; color: #fff; }
+  .step.new { background: rgba(240,150,60,0.14); border-color: rgba(240,150,60,0.4); }
+  .step.new .t { color: #FBD9AF; }
+  .step.new .n { color: #E8A868; }
+
+  /* ---- exec summary ---- */
+  .claims { list-style: none; padding: 0; margin: 1.5rem 0 0; display: flex; flex-direction: column; gap: 1rem; }
+  .claims li { display: grid; grid-template-columns: auto 1fr; gap: 0.9rem; align-items: start; }
+  .claims .mark {
+    font-family: var(--serif); font-weight: 700; color: var(--accent);
+    background: var(--accent-soft); border-radius: 7px; width: 2rem; height: 2rem;
+    display: grid; place-items: center; font-size: 1rem;
+  }
+  .claims b { font-weight: 600; }
+  .claims .body { color: #3a4050; max-width: 62ch; }
+
+  .players { margin-top: 2rem; display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--hair); }
+  .player { display: grid; grid-template-columns: 170px 1fr; gap: 1.4rem; padding: 1.15rem 0; border-bottom: 1px solid var(--hair); }
+  .player .name { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+  .player .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--none); flex: none; }
+  .player.us .name { color: var(--accent); }
+  .player.us .dot { background: var(--accent); }
+  .player .read { color: #3a4050; max-width: 60ch; }
+
+  .bottomline {
+    margin-top: 2rem; background: var(--accent-soft); border-left: 4px solid var(--accent);
+    border-radius: 0 12px 12px 0; padding: 1.2rem 1.4rem;
+  }
+  .bottomline .eyebrow { color: var(--accent); }
+  .bottomline p { margin-top: 0.45rem; color: #23423e; font-size: 1.02rem; }
+
+  /* ---- tables ---- */
+  .scroll { overflow-x: auto; border: 1px solid var(--hair); border-radius: 12px; background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+  thead th {
+    text-align: left; font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); font-weight: 600;
+    padding: 0.85rem 0.9rem; border-bottom: 1px solid var(--hair-strong); white-space: nowrap; background: #FAFAF7;
+  }
+  tbody td { padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: #FAFAF7; }
+  .cap { font-weight: 500; color: var(--ink); min-width: 240px; }
+  .pos-fit { color: #3a4050; }
+  .pos-weak { color: var(--muted); font-size: 0.95em; }
+
+  .grouprow td {
+    font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); background: #F4F7F6; padding: 0.5rem 0.9rem; font-weight: 600;
+  }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.66rem; font-weight: 600;
+    letter-spacing: 0.03em; padding: 0.2rem 0.5rem; border-radius: 999px; white-space: nowrap; }
+  .pill.strong { color: var(--strong); background: var(--strong-soft); }
+  .pill.partial { color: var(--amber); background: var(--amber-soft); }
+  .pill.none { color: var(--none); background: var(--none-soft); }
+  .col-us { background: rgba(15,118,110,0.035); }
+
+  /* ---- leads / trails ---- */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .card { background: var(--panel); border: 1px solid var(--hair); border-radius: 12px; padding: 1.3rem 1.4rem; }
+  .card.lead { border-top: 3px solid var(--strong); }
+  .card.trail { border-top: 3px solid var(--amber); }
+  .card h3 { font-size: 1.1rem; margin-bottom: 0.9rem; }
+  .card ol { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.6rem; color: #3a4050; font-size: 0.92rem; }
+  .card b { font-weight: 600; color: var(--ink); }
+
+  /* ---- one-liners ---- */
+  .liners { display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1.4rem; }
+  .liner { display: grid; grid-template-columns: 160px 1fr; gap: 1.2rem; align-items: baseline; padding: 0.85rem 0; border-bottom: 1px solid var(--hair); }
+  .liner .vs { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+  .liner q { font-family: var(--serif); font-size: 1.05rem; color: var(--ink); quotes: "“" "”"; }
+
+  footer { margin-top: 3.2rem; padding-top: 1.3rem; border-top: 1px solid var(--hair); color: var(--faint); font-size: 0.78rem; max-width: 70ch; }
+
+  @media (max-width: 720px) {
+    .player, .liner { grid-template-columns: 1fr; gap: 0.35rem; }
+    .split { grid-template-columns: 1fr; }
+    .claims li { grid-template-columns: 1fr; }
+    .claims .mark { display: none; }
+  }
+
+  .fade { opacity: 0; transform: translateY(8px); animation: rise 0.6s ease forwards; }
+  .fade:nth-child(2) { animation-delay: 0.05s; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .fade { animation: none; opacity: 1; transform: none; } }
+</style>
+
+<div class="wrap">
+  <div class="sheet">
+
+    <header class="mast fade">
+      <span class="eyebrow">Competitive Briefing</span>
+      <h1>Diagramatix vs Signavio, ARIS &amp; PRIME BPM</h1>
+      <p class="sub">From a diagramming workspace to a full-loop process platform.</p>
+      <div class="meta">
+        <span><b>Prepared</b> 5 July 2026 (rev 2)</span>
+        <span><b>Supersedes</b> 4 July 2026 refresh</span>
+        <span><b>Basis</b> current feature catalogue (incl. Risk &amp; Control) vs public product material</span>
+      </div>
+    </header>
+
+    <!-- THESIS -->
+    <div class="thesis fade">
+      <span class="eyebrow">What changed since June</span>
+      <h2>The two "enterprise-only" pillars — mining and GRC — are now both here, and integrated.</h2>
+      <p>June flagged process mining as the clear gap; that closed with <b style="color:#FBD9AF">DiagramatixMINER</b>. Now Risk &amp; Control has shipped too — Risks/Controls on the real steps, a Risk-Control Matrix, and, uniquely, <b style="color:#FBD9AF">control effectiveness proven from the mined conformance</b> (“bypassed in N of M cases”). Enterprise suites keep mining and GRC in separate products; Diagramatix does both on one model.</p>
+      <div class="loop">
+        <div class="step"><span class="n">01</span><span class="t">Model</span></div>
+        <div class="step"><span class="n">02</span><span class="t">Publish</span></div>
+        <div class="step"><span class="n">03</span><span class="t">Mine</span></div>
+        <div class="step"><span class="n">04</span><span class="t">Conform</span></div>
+        <div class="step"><span class="n">05</span><span class="t">Simulate (twin)</span></div>
+        <div class="step new"><span class="n">06 · new</span><span class="t">Govern (GRC)</span></div>
+        <div class="step"><span class="n">07</span><span class="t">Improve</span></div>
+      </div>
+    </div>
+
+    <!-- EXEC SUMMARY -->
+    <section>
+      <div class="sec-head"><span class="sec-num">01</span><h2>Executive summary</h2></div>
+      <p class="lede prose">Diagramatix has moved from “modern AI-assisted diagramming workspace” to a <b>full-loop process <em>and governance</em> platform for the SMB and mid-market</b>: author in any notation, publish, mine the real process, check conformance, calibrate a digital twin, simulate the redesign — and govern it with risks, controls and a Risk-Control Matrix — without leaving the tool.</p>
+
+      <ul class="claims">
+        <li>
+          <span class="mark">◆</span>
+          <span class="body"><b>A closed mine → conform → simulate → improve loop in one product.</b> Most tools do <em>either</em> mining (Celonis, Signavio PI, ARIS Mining) <em>or</em> modelling + simulation (Signavio Modeler, ARIS, PRIME). Diagramatix does both, and wires mining output straight into a calibrated twin — a workflow the enterprise suites keep in separate modules.</span>
+        </li>
+        <li>
+          <span class="mark">◆</span>
+          <span class="body"><b>Governance on the process, proven by data.</b> Attach Risks &amp; Controls to the real steps, export a Risk-Control Matrix, and — uniquely at this tier — see each control's <em>operating effectiveness</em> (“bypassed in N of M cases”) computed from the <em>mined conformance</em>. Enterprise GRC suites keep risk/control and mining in separate products; Diagramatix does both on one model.</span>
+        </li>
+        <li>
+          <span class="mark">◆</span>
+          <span class="body"><b>Entity-lifecycle mining + state-machine conformance.</b> Beyond directly-follows BPMN discovery, it mines the business entity's real state machine and replays it against a reference lifecycle — conformance framed as <em>legal states and transitions</em>, unusually precise for this tier.</span>
+        </li>
+        <li>
+          <span class="mark">◆</span>
+          <span class="body"><b>Text-, image- and voice-to-diagram across every notation</b>, plus Microsoft Visio round-trip (export <em>and</em> re-import), diagram health checking, and automatic sub-process linking — a self-service experience the enterprise suites don't emphasise.</span>
+        </li>
+      </ul>
+
+      <div class="players">
+        <div class="player us">
+          <div class="name"><span class="dot"></span>Diagramatix</div>
+          <p class="read">Now uniquely complete for teams that want to model, publish, mine, govern and simulate as one workflow — no enterprise budget, no multi-tool stack — with control effectiveness proven from mined data.</p>
+        </div>
+        <div class="player">
+          <div class="name"><span class="dot"></span>SAP Signavio</div>
+          <p class="read">Strongest for enterprise, SAP-aligned transformation: repository, Collaboration Hub, Process Intelligence with live connectors, governance. Heavier, costlier; not a multi-notation + Visio editor.</p>
+        </div>
+        <div class="player">
+          <div class="name"><span class="dot"></span>ARIS</div>
+          <p class="read">The deepest enterprise-architecture platform: scale, repository governance, mining, simulation, risk/compliance. Diagramatix leads on self-service, AI/image/voice generation, Visio round-trip and the mining-to-twin loop.</p>
+        </div>
+        <div class="player">
+          <div class="name"><span class="dot"></span>PRIME BPM</div>
+          <p class="read">Closest in the business-user improvement segment (BPMN mapping, APQC, RACI, approvals). Diagramatix now clearly leads on mining, conformance, digital-twin simulation, notation breadth and Visio round-trip.</p>
+        </div>
+      </div>
+
+      <div class="bottomline">
+        <span class="eyebrow">Bottom line</span>
+        <p>For an organisation that wants to model, publish, mine, govern and simulate its processes as one workflow, Diagramatix is now uniquely complete — and mining-driven control effectiveness is something even Signavio / ARIS don't offer on a single model. The honest remaining gaps versus Signavio / ARIS / Celonis are enterprise-scale mining connectors and org-wide analytics dashboards, and deep repository governance.</p>
+      </div>
+    </section>
+
+    <!-- POSITIONING -->
+    <section>
+      <div class="sec-head"><span class="sec-num">02</span><h2>High-level positioning</h2></div>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>Product</th><th>Strongest fit</th><th>Relative weakness vs Diagramatix</th></tr>
+          </thead>
+          <tbody>
+            <tr class="col-us">
+              <td class="cap">Diagramatix</td>
+              <td class="pos-fit">Full-loop SMB/mid-market: multi-notation + AI/image/voice generation, Visio round-trip, publish/review, process mining + conformance + digital-twin simulation, health checking</td>
+              <td class="pos-weak">Enterprise-scale mining connectors &amp; org-wide dashboards, deep repository governance, formal risk/compliance</td>
+            </tr>
+            <tr>
+              <td class="cap">SAP Signavio</td>
+              <td class="pos-fit">Enterprise BPM &amp; SAP-aligned transformation, repository, Collaboration Hub, Process Intelligence, governance, simulation</td>
+              <td class="pos-weak">Not a self-service multi-notation + Visio editor; no image/voice-to-diagram; heavier &amp; costlier</td>
+            </tr>
+            <tr>
+              <td class="cap">ARIS</td>
+              <td class="pos-fit">Enterprise process architecture, governance, process mining/intelligence, simulation, risk/compliance</td>
+              <td class="pos-weak">Less lightweight/self-service; image/voice + Visio round-trip less clear; higher barrier to entry</td>
+            </tr>
+            <tr>
+              <td class="cap">PRIME BPM</td>
+              <td class="pos-fit">Business-user BPM improvement, BPMN mapping, APQC library, RACI, analysis, approvals</td>
+              <td class="pos-weak">No comparable mining/conformance or digital-twin simulation; narrower notation range; no Visio round-trip</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CAPABILITY MATRIX -->
+    <section>
+      <div class="sec-head"><span class="sec-num">03</span><h2>Capability matrix</h2></div>
+      <p class="prose" style="color:var(--muted); font-size:0.9rem; margin-bottom:1rem;">
+        <span class="pill strong">Strong</span> clear public evidence &nbsp;·&nbsp;
+        <span class="pill partial">Partial</span> adjacent capability &nbsp;·&nbsp;
+        <span class="pill none">Not found</span> no confirmed public evidence (not proven absence)
+      </p>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>Capability</th><th>Diagramatix</th><th>Signavio</th><th>ARIS</th><th>PRIME BPM</th></tr>
+          </thead>
+          <tbody>
+            <tr class="grouprow"><td colspan="5">Authoring &amp; input</td></tr>
+            <tr><td class="cap">Multi-notation modelling (BPMN, ArchiMate, UML, Value Chain, State Machine…)</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td></tr>
+            <tr><td class="cap">AI text-to-diagram — all notations</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill partial">Partial</span></td></tr>
+            <tr><td class="cap">Image-to-diagram (sketch/screenshot → editable)</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill none">Not found</span></td><td><span class="pill none">Not found</span></td><td><span class="pill partial">Partial</span></td></tr>
+            <tr><td class="cap">Voice dictation → AI Generate</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill none">Not found</span></td><td><span class="pill none">Not found</span></td><td><span class="pill none">Not found</span></td></tr>
+            <tr><td class="cap">Smart connector routing / BPMN-aware auto-connect</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill partial">Partial</span></td></tr>
+
+            <tr class="grouprow"><td colspan="5">Interchange &amp; structure</td></tr>
+            <tr><td class="cap">Microsoft Visio round-trip (VSDX export <em>and</em> re-import)</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill none">Not found</span></td></tr>
+            <tr><td class="cap">BPMN 2.0 XML import / Flowchart → BPMN translation</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td></tr>
+            <tr><td class="cap">Cross-functional pools / lanes / sub-lanes</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td></tr>
+            <tr><td class="cap">Diagram health check &amp; connector scan</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill none">Not found</span></td></tr>
+            <tr><td class="cap">Automatic sub-process linking / drill-down</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td></tr>
+
+            <tr class="grouprow"><td colspan="5">Collaboration &amp; governance</td></tr>
+            <tr><td class="cap">Publishing &amp; review lifecycle (versioned, re-review reminders)</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td></tr>
+            <tr><td class="cap">Collaboration, comments &amp; sign-off</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td></tr>
+            <tr><td class="cap">Governed naming from org / entity lists</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td></tr>
+            <tr><td class="cap">Repository governance at enterprise scale</td><td class="col-us"><span class="pill partial">Partial</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td></tr>
+
+            <tr class="grouprow"><td colspan="5">Risk &amp; Control (GRC)</td></tr>
+            <tr><td class="cap">Risk &amp; Control on the process model (attach to steps)</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td></tr>
+            <tr><td class="cap">Risk-Control Matrix export + coverage / segregation-of-duties checks</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td></tr>
+            <tr><td class="cap">GRC traceability graph (risk ↔ control ↔ policy ↔ regulation ↔ KRI/KPI)</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill none">Not found</span></td></tr>
+            <tr><td class="cap">Control operating-effectiveness from mined conformance (on the model)</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill none">Not found</span></td></tr>
+
+            <tr class="grouprow"><td colspan="5">Process mining &amp; simulation</td></tr>
+            <tr><td class="cap">Process discovery from event logs (→ BPMN)</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill none">Not found</span></td></tr>
+            <tr><td class="cap">Entity state-machine lifecycle mining</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill none">Not found</span></td></tr>
+            <tr><td class="cap">Conformance checking (token replay, fitness %)</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill none">Not found</span></td></tr>
+            <tr><td class="cap">Digital-twin calibration from the log</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill none">Not found</span></td></tr>
+            <tr><td class="cap">Discrete-event / BPSim simulation, scenarios, Monte Carlo</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td></tr>
+            <tr><td class="cap">Working-hours calendars in simulation</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill none">Not found</span></td></tr>
+            <tr><td class="cap">Enterprise-scale mining connectors (live extraction)</td><td class="col-us"><span class="pill partial">Partial</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill none">Not found</span></td></tr>
+            <tr><td class="cap">Org-wide process-intelligence dashboards / KPIs</td><td class="col-us"><span class="pill partial">Partial</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td></tr>
+
+            <tr class="grouprow"><td colspan="5">Platform</td></tr>
+            <tr><td class="cap">SharePoint / OneDrive integration</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill none">Not found</span></td></tr>
+            <tr><td class="cap">Backup / restore / portable account snapshot</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill partial">Partial</span></td><td><span class="pill partial">Partial</span></td></tr>
+            <tr><td class="cap">Self-serve tiered subscriptions</td><td class="col-us"><span class="pill strong">Strong</span></td><td><span class="pill none">Not found</span></td><td><span class="pill none">Not found</span></td><td><span class="pill partial">Partial</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- LEADS / TRAILS -->
+    <section>
+      <div class="sec-head"><span class="sec-num">04</span><h2>Where we stand</h2></div>
+      <div class="split">
+        <div class="card lead">
+          <h3>Where Diagramatix leads</h3>
+          <ol>
+            <li><b>Mining-proven control effectiveness on one model.</b> Risks/controls sit on the same process the miner analyses, so the RCM shows whether each control actually operates — the suites keep GRC and mining in separate products.</li>
+            <li><b>The integrated loop.</b> Mining feeds a calibrated twin in one click; discovery, conformance and simulation aren't separate modules.</li>
+            <li><b>Entity-lifecycle conformance.</b> State-machine replay against a reference lifecycle — more precise than DFG-only, rare at this tier.</li>
+            <li><b>Input breadth + self-service.</b> Text, image and voice to diagram across every notation; Visio round-trip both directions; free tier + self-serve upgrade.</li>
+          </ol>
+        </div>
+        <div class="card trail">
+          <h3>Where we still trail (honest gaps)</h3>
+          <ol>
+            <li><b>Enterprise mining at scale.</b> We mine uploaded logs; Celonis / Signavio PI / ARIS extract live from source systems with pre-built connectors.</li>
+            <li><b>Repository governance.</b> ARIS/Signavio offer deeper repository objects, glossaries and lifecycle governance.</li>
+            <li><b>Org-wide analytics surface.</b> No org-wide KPI / process-intelligence dashboarding layer yet.</li>
+            <li><span style="opacity:.7"><b>Risk / compliance — no longer a gap</b> (see the GRC rows above; effectiveness from mining is a lead).</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- ONE-LINERS -->
+    <section>
+      <div class="sec-head"><span class="sec-num">05</span><h2>Positioning statements</h2></div>
+      <div class="liners">
+        <div class="liner"><span class="vs">vs Signavio / ARIS</span><q>The full model-to-mine-to-govern-to-simulate loop, self-service — with control effectiveness proven from your own event data, on one model.</q></div>
+        <div class="liner"><span class="vs">vs Celonis</span><q>Bring your event log; get discovery, conformance, a runnable twin <em>and</em> a Risk-Control Matrix showing which controls were bypassed — not just a dashboard.</q></div>
+        <div class="liner"><span class="vs">vs PRIME BPM</span><q>Everything PRIME does for BPMN improvement, plus real process mining, conformance, digital-twin simulation and a data-proven Risk-Control Matrix.</q></div>
+      </div>
+    </section>
+
+    <footer>
+      Assessments reflect public product material as of July 2026 and the current Diagramatix feature catalogue. “Not found” indicates no confirmed public evidence, not proven absence — the competitor cells warrant a human verification pass before external use.
+    </footer>
+
+  </div>
+</div>
