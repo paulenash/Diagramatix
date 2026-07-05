@@ -8,14 +8,23 @@
  * Pure data — no DB, no React.
  */
 
-/** Which column of the uploaded log plays each role. Values are column headers. */
+/** Which column of the uploaded log plays each role. Values are column headers,
+ *  EXCEPT `activityState` which is a config map (not a column). */
 export interface LogMapping {
   caseId: string;        // entity instance id (e.g. Invoice #123) — the process "case"
   activity: string;      // the business event / activity name
   timestamp: string;     // when it happened
-  state: string;         // the entity's resulting state after the event
+  state?: string;        // optional: the entity's resulting state after the event
   entityType?: string;   // optional: the entity kind (Invoice, Employee…)
   resource?: string;     // optional: who/what performed it (→ simulation team)
+  // Governance (optional) — carry GRC identifiers straight from the source system.
+  controlId?: string;    // optional: the Control (RCM) id exercised by the event
+  riskId?: string;       // optional: the Risk id the event relates to
+  policyId?: string;     // optional: the Policy id the event relates to
+  /** When no `state` column is mapped, this activity→state table supplies the
+   *  state each activity produces (defaults to the activity's own name). It
+   *  completes the lifecycle the rest of the miner + the State Machine need. */
+  activityState?: Record<string, string>;
 }
 
 /** One normalised event row. `timestamp` is epoch milliseconds. */
@@ -25,6 +34,9 @@ export interface LogEvent {
   timestamp: number;
   state: string;
   resource?: string;
+  controlId?: string;
+  riskId?: string;
+  policyId?: string;
 }
 
 /** All events of one entity instance, ordered by timestamp. */
@@ -61,6 +73,26 @@ export interface EventLog {
   traces: CaseTrace[];
   variants: Variant[];
   stats: MiningStats;
+}
+
+/** Per-control operating-effectiveness mined DIRECTLY from Control IDs carried on
+ *  events. `expected` = cases in which the control's governed activities occurred;
+ *  `applied` = cases in which the control id was actually recorded; the shortfall
+ *  is a bypass. */
+export interface ControlObservation {
+  applied: number;                 // distinct cases carrying this control id
+  expected: number;                // distinct cases where a governed activity occurred
+  bypassed: number;                // expected - applied
+  effectivenessPct: number | null; // applied/expected (null when expected = 0)
+  activities: string[];            // activities observed carrying this control id
+}
+
+/** Governance aggregates mined from Control/Risk/Policy IDs on events — the stored
+ *  summary that closes the loop with the Risk & Control (GRC) feature. */
+export interface GovernanceStats {
+  controls: Record<string, ControlObservation>;   // control id → effectiveness
+  risks: Record<string, { cases: number }>;        // risk id → distinct cases
+  policies: Record<string, { cases: number }>;     // policy id → distinct cases
 }
 
 /** Timing + resource aggregates mined from the log — the numbers that calibrate

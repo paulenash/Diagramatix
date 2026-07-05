@@ -14,7 +14,7 @@ import {
   type MiningExamplePackage,
   type MiningExampleDiagram,
 } from "./examplePackage";
-import type { LogMapping, MiningStats, Variant, Performance } from "./types";
+import type { LogMapping, MiningStats, Variant, Performance, GovernanceStats } from "./types";
 
 export interface CaptureMiningResult { pkg: MiningExamplePackage; runName: string }
 
@@ -28,6 +28,7 @@ export async function captureMiningPackage(projectId: string, runId: string): Pr
   if (!Array.isArray(variants) || variants.length === 0) throw new Error("Run has no variants to capture");
   const performance = (run.performance ?? null) as unknown as Performance | null;
   if (!performance?.clockUnit) throw new Error("Run has no performance data — re-import the log");
+  const governance = (run.governance ?? null) as unknown as GovernanceStats | null;
 
   // Carry the reference SM diagram (id = package key) when one is set.
   const diagrams: MiningExampleDiagram[] = [];
@@ -49,6 +50,7 @@ export async function captureMiningPackage(projectId: string, runId: string): Pr
       stats: (run.stats ?? {}) as unknown as MiningStats,
       variants,
       performance,
+      ...(governance && Object.keys(governance.controls ?? {}).length ? { governance } : {}),
       ...(referenceSmKey ? { referenceSmKey } : {}),
     },
   };

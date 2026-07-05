@@ -1,0 +1,1082 @@
+Order ID,Customer,Amount,Activity,Timestamp,Order Status,Resource
+SO-2026-0001,Soylent Foods,34035.97,Receive Order,2026-02-02T08:23:45Z,Received,Priya Nair
+SO-2026-0002,Wonka Brands,21340.44,Receive Order,2026-02-02T08:38:36Z,Received,Nadia Rahman
+SO-2026-0001,Soylent Foods,17927.05,Approve Order,2026-02-02T09:43:45Z,Approved,Order Desk
+SO-2026-0003,Globex Stores,35797.95,Receive Order,2026-02-02T11:33:27Z,Received,Tom Becker
+SO-2026-0004,Stark Traders,8443.18,Receive Order,2026-02-02T11:44:00Z,Received,Priya Nair
+SO-2026-0005,Initech Ltd,9141.44,Receive Order,2026-02-02T11:52:04Z,Received,Luis Ortega
+SO-2026-0006,Acme Retail,8631.58,Receive Order,2026-02-02T11:57:28Z,Received,Priya Nair
+SO-2026-0006,Acme Retail,29473.64,Run Credit Check,2026-02-02T13:02:28Z,Credit Check,Credit Desk
+SO-2026-0004,Stark Traders,14984.60,Run Credit Check,2026-02-02T13:59:00Z,Credit Check,Credit Desk
+SO-2026-0007,Wonka Brands,2470.87,Receive Order,2026-02-02T14:04:05Z,Received,Priya Nair
+SO-2026-0008,Initech Ltd,12278.78,Receive Order,2026-02-02T14:40:13Z,Received,Priya Nair
+SO-2026-0009,Hooli Inc,20079.20,Receive Order,2026-02-02T14:40:44Z,Received,Tom Becker
+SO-2026-0010,Globex Stores,23967.04,Receive Order,2026-02-02T14:49:07Z,Received,Tom Becker
+SO-2026-0011,Acme Retail,18356.69,Receive Order,2026-02-02T14:50:18Z,Received,Nadia Rahman
+SO-2026-0005,Initech Ltd,29714.36,Run Credit Check,2026-02-02T15:14:04Z,Credit Check,Credit Desk
+SO-2026-0002,Wonka Brands,5467.66,Run Credit Check,2026-02-02T16:09:36Z,Credit Check,Credit Desk
+SO-2026-0009,Hooli Inc,13311.15,Run Credit Check,2026-02-02T17:07:44Z,Credit Check,Credit Desk
+SO-2026-0011,Acme Retail,16219.81,Run Credit Check,2026-02-02T17:15:18Z,Credit Check,Credit Desk
+SO-2026-0003,Globex Stores,20512.91,Run Credit Check,2026-02-02T18:05:27Z,Credit Check,Credit Desk
+SO-2026-0010,Globex Stores,14505.68,Run Credit Check,2026-02-02T18:51:07Z,Credit Check,Credit Desk
+SO-2026-0008,Initech Ltd,41498.71,Run Credit Check,2026-02-02T19:24:13Z,Credit Check,Credit Desk
+SO-2026-0003,Globex Stores,27948.76,Place On Credit Hold,2026-02-02T19:26:27Z,On Credit Hold,Credit Desk
+SO-2026-0009,Hooli Inc,29209.07,Place On Credit Hold,2026-02-02T20:08:44Z,On Credit Hold,Credit Desk
+SO-2026-0007,Wonka Brands,36397.69,Run Credit Check,2026-02-02T21:11:05Z,Credit Check,Credit Desk
+SO-2026-0006,Acme Retail,17218.41,Approve Order,2026-02-02T21:43:28Z,Approved,Order Desk
+SO-2026-0011,Acme Retail,10832.09,Approve Order,2026-02-02T21:51:18Z,Approved,Order Desk
+SO-2026-0003,Globex Stores,18777.48,Release Credit Hold,2026-02-03T00:02:27Z,Approved,Credit Desk
+SO-2026-0007,Wonka Brands,15352.21,Approve Order,2026-02-03T00:31:05Z,Approved,Order Desk
+SO-2026-0009,Hooli Inc,13880.43,Release Credit Hold,2026-02-03T02:02:44Z,Approved,Credit Desk
+SO-2026-0010,Globex Stores,25240.44,Approve Order,2026-02-03T02:06:07Z,Approved,Order Desk
+SO-2026-0004,Stark Traders,39743.10,Approve Order,2026-02-03T02:19:00Z,Approved,Order Desk
+SO-2026-0005,Initech Ltd,8289.52,Approve Order,2026-02-03T04:10:04Z,Approved,Order Desk
+SO-2026-0008,Initech Ltd,12852.92,Approve Order,2026-02-03T04:28:13Z,Approved,Order Desk
+SO-2026-0002,Wonka Brands,13745.31,Approve Order,2026-02-03T04:52:36Z,Approved,Order Desk
+SO-2026-0012,Wayne Enterprises,15043.98,Receive Order,2026-02-03T08:13:53Z,Received,Luis Ortega
+SO-2026-0003,Globex Stores,36464.83,Fulfil Order,2026-02-03T09:06:27Z,Fulfilled,Fulfilment Centre
+SO-2026-0013,Wayne Enterprises,31426.95,Receive Order,2026-02-03T11:05:14Z,Received,Tom Becker
+SO-2026-0014,Initech Ltd,3584.45,Receive Order,2026-02-03T11:13:27Z,Received,Tom Becker
+SO-2026-0015,Initech Ltd,25886.36,Receive Order,2026-02-03T12:01:46Z,Received,Luis Ortega
+SO-2026-0016,Umbrella Group,43758.84,Receive Order,2026-02-03T12:04:32Z,Received,Tom Becker
+SO-2026-0012,Wayne Enterprises,20227.21,Run Credit Check,2026-02-03T13:22:53Z,Credit Check,Credit Desk
+SO-2026-0017,Globex Stores,20404.63,Receive Order,2026-02-03T13:25:32Z,Received,Luis Ortega
+SO-2026-0018,Umbrella Group,39142.76,Receive Order,2026-02-03T13:36:15Z,Received,Priya Nair
+SO-2026-0016,Umbrella Group,16975.30,Run Credit Check,2026-02-03T14:07:32Z,Credit Check,Credit Desk
+SO-2026-0019,Soylent Foods,22040.41,Receive Order,2026-02-03T14:11:11Z,Received,Priya Nair
+SO-2026-0020,Initech Ltd,40934.00,Receive Order,2026-02-03T14:16:21Z,Received,Tom Becker
+SO-2026-0004,Stark Traders,19558.17,Fulfil Order,2026-02-03T14:47:00Z,Fulfilled,Fulfilment Centre
+SO-2026-0021,Acme Retail,2993.42,Receive Order,2026-02-03T15:15:05Z,Received,Tom Becker
+SO-2026-0003,Globex Stores,13556.03,Invoice Customer,2026-02-03T16:02:27Z,Invoiced,Billing System
+SO-2026-0014,Initech Ltd,45398.75,Run Credit Check,2026-02-03T16:27:27Z,Credit Check,Credit Desk
+SO-2026-0022,Wonka Brands,19321.40,Receive Order,2026-02-03T16:47:27Z,Received,Priya Nair
+SO-2026-0017,Globex Stores,13565.87,Run Credit Check,2026-02-03T17:10:32Z,Credit Check,Credit Desk
+SO-2026-0020,Initech Ltd,7030.26,Run Credit Check,2026-02-03T17:35:21Z,Credit Check,Credit Desk
+SO-2026-0013,Wayne Enterprises,7867.11,Run Credit Check,2026-02-03T18:34:14Z,Credit Check,Credit Desk
+SO-2026-0012,Wayne Enterprises,32415.00,Place On Credit Hold,2026-02-03T19:02:53Z,On Credit Hold,Credit Desk
+SO-2026-0015,Initech Ltd,19710.56,Run Credit Check,2026-02-03T19:05:46Z,Credit Check,Credit Desk
+SO-2026-0011,Acme Retail,35883.39,Fulfil Order,2026-02-03T19:59:18Z,Fulfilled,Fulfilment Centre
+SO-2026-0014,Initech Ltd,20681.21,Approve Order,2026-02-03T20:46:27Z,Approved,Order Desk
+SO-2026-0005,Initech Ltd,8218.34,Fulfil Order,2026-02-03T20:54:04Z,Fulfilled,Fulfilment Centre
+SO-2026-0018,Umbrella Group,15988.24,Run Credit Check,2026-02-03T22:17:15Z,Credit Check,Credit Desk
+SO-2026-0019,Soylent Foods,11730.82,Run Credit Check,2026-02-03T22:44:11Z,Credit Check,Credit Desk
+SO-2026-0021,Acme Retail,41126.46,Run Credit Check,2026-02-03T23:20:05Z,Credit Check,Credit Desk
+SO-2026-0001,Soylent Foods,13313.57,Fulfil Order,2026-02-03T23:37:45Z,Fulfilled,Fulfilment Centre
+SO-2026-0022,Wonka Brands,6873.49,Run Credit Check,2026-02-03T23:54:27Z,Credit Check,Credit Desk
+SO-2026-0012,Wayne Enterprises,9697.12,Release Credit Hold,2026-02-04T00:11:53Z,Approved,Credit Desk
+SO-2026-0019,Soylent Foods,22133.37,Place On Credit Hold,2026-02-04T00:40:11Z,On Credit Hold,Credit Desk
+SO-2026-0005,Initech Ltd,12038.70,Invoice Customer,2026-02-04T02:04:04Z,Invoiced,Billing System
+SO-2026-0016,Umbrella Group,15175.20,Approve Order,2026-02-04T02:06:32Z,Approved,Order Desk
+SO-2026-0006,Acme Retail,30049.39,Fulfil Order,2026-02-04T02:44:28Z,Fulfilled,Fulfilment Centre
+SO-2026-0015,Initech Ltd,37073.51,Approve Order,2026-02-04T02:45:46Z,Approved,Order Desk
+SO-2026-0017,Globex Stores,30199.10,Approve Order,2026-02-04T04:10:32Z,Approved,Order Desk
+SO-2026-0009,Hooli Inc,26680.86,Fulfil Order,2026-02-04T05:10:44Z,Fulfilled,Fulfilment Centre
+SO-2026-0002,Wonka Brands,25567.91,Fulfil Order,2026-02-04T05:13:36Z,Fulfilled,Fulfilment Centre
+SO-2026-0020,Initech Ltd,17109.37,Place On Credit Hold,2026-02-04T05:24:21Z,On Credit Hold,Credit Desk
+SO-2026-0008,Initech Ltd,9381.83,Fulfil Order,2026-02-04T05:30:13Z,Fulfilled,Fulfilment Centre
+SO-2026-0021,Acme Retail,27204.28,Approve Order,2026-02-04T06:06:05Z,Approved,Order Desk
+SO-2026-0012,Wayne Enterprises,37800.17,Fulfil Order,2026-02-04T07:53:53Z,Fulfilled,Fulfilment Centre
+SO-2026-0023,Initech Ltd,45368.44,Receive Order,2026-02-04T08:20:02Z,Received,Nadia Rahman
+SO-2026-0018,Umbrella Group,10931.84,Approve Order,2026-02-04T08:42:15Z,Approved,Order Desk
+SO-2026-0024,Umbrella Group,22436.69,Receive Order,2026-02-04T08:45:17Z,Received,Luis Ortega
+SO-2026-0025,Globex Stores,35002.06,Receive Order,2026-02-04T09:11:23Z,Received,Nadia Rahman
+SO-2026-0026,Hooli Inc,11825.47,Receive Order,2026-02-04T09:15:57Z,Received,Luis Ortega
+SO-2026-0027,Wayne Enterprises,3086.92,Receive Order,2026-02-04T09:26:35Z,Received,Priya Nair
+SO-2026-0027,Wayne Enterprises,36233.20,Run Credit Check,2026-02-04T10:41:35Z,Credit Check,Credit Desk
+SO-2026-0002,Wonka Brands,37683.25,Invoice Customer,2026-02-04T11:16:36Z,Invoiced,Billing System
+SO-2026-0028,Initech Ltd,11305.52,Receive Order,2026-02-04T12:02:35Z,Received,Tom Becker
+SO-2026-0006,Acme Retail,26208.45,Invoice Customer,2026-02-04T12:24:28Z,Invoiced,Billing System
+SO-2026-0007,Wonka Brands,22830.50,Fulfil Order,2026-02-04T12:35:05Z,Fulfilled,Fulfilment Centre
+SO-2026-0022,Wonka Brands,17661.69,Place On Credit Hold,2026-02-04T12:40:27Z,On Credit Hold,Credit Desk
+SO-2026-0029,Soylent Foods,28984.15,Receive Order,2026-02-04T12:43:01Z,Received,Nadia Rahman
+SO-2026-0026,Hooli Inc,1609.12,Run Credit Check,2026-02-04T12:45:57Z,Credit Check,Credit Desk
+SO-2026-0027,Wayne Enterprises,6383.07,Approve Order,2026-02-04T12:46:35Z,Approved,Order Desk
+SO-2026-0019,Soylent Foods,26446.92,Release Credit Hold,2026-02-04T13:18:11Z,Approved,Credit Desk
+SO-2026-0030,Wayne Enterprises,1715.41,Receive Order,2026-02-04T13:30:33Z,Received,Priya Nair
+SO-2026-0007,Wonka Brands,5196.81,Invoice Customer,2026-02-04T13:49:05Z,Invoiced,Billing System
+SO-2026-0031,Soylent Foods,780.25,Receive Order,2026-02-04T14:22:19Z,Received,Nadia Rahman
+SO-2026-0004,Stark Traders,3376.86,Invoice Customer,2026-02-04T14:23:00Z,Invoiced,Billing System
+SO-2026-0028,Initech Ltd,6596.78,Run Credit Check,2026-02-04T14:26:35Z,Credit Check,Credit Desk
+SO-2026-0013,Wayne Enterprises,21438.30,Cancel Order,2026-02-04T14:28:14Z,Cancelled,Tom Becker
+SO-2026-0010,Globex Stores,8046.36,Fulfil Order,2026-02-04T14:33:07Z,Fulfilled,Fulfilment Centre
+SO-2026-0024,Umbrella Group,33658.12,Run Credit Check,2026-02-04T14:34:17Z,Credit Check,Credit Desk
+SO-2026-0032,Initech Ltd,42706.89,Receive Order,2026-02-04T14:39:12Z,Received,Tom Becker
+SO-2026-0029,Soylent Foods,27284.61,Run Credit Check,2026-02-04T14:47:01Z,Credit Check,Credit Desk
+SO-2026-0025,Globex Stores,5948.26,Run Credit Check,2026-02-04T15:44:23Z,Credit Check,Credit Desk
+SO-2026-0001,Soylent Foods,31784.95,Invoice Customer,2026-02-04T15:59:45Z,Invoiced,Billing System
+SO-2026-0033,Soylent Foods,23364.88,Receive Order,2026-02-04T16:01:33Z,Received,Luis Ortega
+SO-2026-0021,Acme Retail,7748.79,Fulfil Order,2026-02-04T16:08:05Z,Fulfilled,Fulfilment Centre
+SO-2026-0034,Hooli Inc,21046.85,Receive Order,2026-02-04T16:14:07Z,Received,Priya Nair
+SO-2026-0023,Initech Ltd,18125.35,Run Credit Check,2026-02-04T16:20:02Z,Credit Check,Credit Desk
+SO-2026-0035,Initech Ltd,37506.90,Receive Order,2026-02-04T16:31:33Z,Received,Nadia Rahman
+SO-2026-0011,Acme Retail,38533.95,Invoice Customer,2026-02-04T17:23:18Z,Invoiced,Billing System
+SO-2026-0020,Initech Ltd,13777.77,Ship Goods,2026-02-04T18:15:21Z,Fulfilled,Fulfilment Centre
+SO-2026-0025,Globex Stores,25055.64,Approve Order,2026-02-04T18:21:23Z,Approved,Order Desk
+SO-2026-0009,Hooli Inc,30244.99,Invoice Customer,2026-02-04T18:24:44Z,Invoiced,Billing System
+SO-2026-0031,Soylent Foods,23414.66,Run Credit Check,2026-02-04T18:30:19Z,Credit Check,Credit Desk
+SO-2026-0030,Wayne Enterprises,44027.31,Ship Goods,2026-02-04T18:56:33Z,Fulfilled,Fulfilment Centre
+SO-2026-0008,Initech Ltd,6090.40,Invoice Customer,2026-02-04T19:42:13Z,Invoiced,Billing System
+SO-2026-0033,Soylent Foods,5910.96,Run Credit Check,2026-02-04T19:50:33Z,Credit Check,Credit Desk
+SO-2026-0031,Soylent Foods,19442.88,Place On Credit Hold,2026-02-04T20:28:19Z,On Credit Hold,Credit Desk
+SO-2026-0028,Initech Ltd,1998.51,Place On Credit Hold,2026-02-04T20:42:35Z,On Credit Hold,Credit Desk
+SO-2026-0035,Initech Ltd,41959.32,Run Credit Check,2026-02-04T21:11:33Z,Credit Check,Credit Desk
+SO-2026-0032,Initech Ltd,14085.16,Run Credit Check,2026-02-04T21:14:12Z,Credit Check,Credit Desk
+SO-2026-0024,Umbrella Group,3829.93,Approve Order,2026-02-04T21:35:17Z,Approved,Order Desk
+SO-2026-0023,Initech Ltd,1285.26,Approve Order,2026-02-04T22:15:02Z,Approved,Order Desk
+SO-2026-0016,Umbrella Group,29595.03,Fulfil Order,2026-02-04T22:27:32Z,Fulfilled,Fulfilment Centre
+SO-2026-0026,Hooli Inc,21032.27,Cancel Order,2026-02-04T23:47:57Z,Cancelled,Luis Ortega
+SO-2026-0033,Soylent Foods,31749.93,Place On Credit Hold,2026-02-04T23:50:33Z,On Credit Hold,Credit Desk
+SO-2026-0021,Acme Retail,40586.87,Invoice Customer,2026-02-05T00:28:05Z,Invoiced,Billing System
+SO-2026-0034,Hooli Inc,8759.74,Run Credit Check,2026-02-05T01:01:07Z,Credit Check,Credit Desk
+SO-2026-0030,Wayne Enterprises,1959.07,Invoice Customer,2026-02-05T01:03:33Z,Invoiced,Billing System
+SO-2026-0029,Soylent Foods,26324.74,Place On Credit Hold,2026-02-05T01:24:01Z,On Credit Hold,Credit Desk
+SO-2026-0032,Initech Ltd,45616.77,Place On Credit Hold,2026-02-05T02:04:12Z,On Credit Hold,Credit Desk
+SO-2026-0035,Initech Ltd,4869.79,Place On Credit Hold,2026-02-05T03:13:33Z,On Credit Hold,Credit Desk
+SO-2026-0012,Wayne Enterprises,21264.40,Invoice Customer,2026-02-05T04:45:53Z,Invoiced,Billing System
+SO-2026-0036,Hooli Inc,29303.55,Receive Order,2026-02-05T08:21:34Z,Received,Priya Nair
+SO-2026-0037,Hooli Inc,27034.08,Receive Order,2026-02-05T08:40:14Z,Received,Nadia Rahman
+SO-2026-0038,Wonka Brands,20722.31,Receive Order,2026-02-05T08:59:27Z,Received,Nadia Rahman
+SO-2026-0017,Globex Stores,16394.19,Fulfil Order,2026-02-05T09:03:32Z,Fulfilled,Fulfilment Centre
+SO-2026-0039,Vandelay Co,15379.46,Receive Order,2026-02-05T09:07:49Z,Received,Luis Ortega
+SO-2026-0010,Globex Stores,42140.47,Invoice Customer,2026-02-05T09:09:07Z,Invoiced,Billing System
+SO-2026-0018,Umbrella Group,31217.32,Fulfil Order,2026-02-05T10:46:15Z,Fulfilled,Fulfilment Centre
+SO-2026-0040,Hooli Inc,19748.16,Receive Order,2026-02-05T11:06:56Z,Received,Priya Nair
+SO-2026-0020,Initech Ltd,1155.94,Invoice Customer,2026-02-05T11:08:21Z,Invoiced,Billing System
+SO-2026-0037,Hooli Inc,28987.25,Run Credit Check,2026-02-05T11:10:14Z,Credit Check,Credit Desk
+SO-2026-0041,Globex Stores,6740.24,Receive Order,2026-02-05T11:50:25Z,Received,Luis Ortega
+SO-2026-0042,Globex Stores,32508.26,Receive Order,2026-02-05T12:33:44Z,Received,Nadia Rahman
+SO-2026-0043,Globex Stores,15601.08,Receive Order,2026-02-05T13:27:16Z,Received,Priya Nair
+SO-2026-0038,Wonka Brands,27364.55,Run Credit Check,2026-02-05T13:52:27Z,Credit Check,Credit Desk
+SO-2026-0016,Umbrella Group,44160.57,Invoice Customer,2026-02-05T14:00:32Z,Invoiced,Billing System
+SO-2026-0041,Globex Stores,17032.27,Run Credit Check,2026-02-05T14:04:25Z,Credit Check,Credit Desk
+SO-2026-0040,Hooli Inc,44948.39,Run Credit Check,2026-02-05T14:18:56Z,Credit Check,Credit Desk
+SO-2026-0036,Hooli Inc,5443.84,Run Credit Check,2026-02-05T14:24:34Z,Credit Check,Credit Desk
+SO-2026-0039,Vandelay Co,21399.49,Approve Order,2026-02-05T15:03:49Z,Approved,Order Desk
+SO-2026-0044,Acme Retail,41391.59,Receive Order,2026-02-05T15:14:43Z,Received,Nadia Rahman
+SO-2026-0017,Globex Stores,40871.20,Invoice Customer,2026-02-05T15:21:32Z,Invoiced,Billing System
+SO-2026-0043,Globex Stores,13020.94,Run Credit Check,2026-02-05T16:59:16Z,Credit Check,Credit Desk
+SO-2026-0042,Globex Stores,9412.94,Run Credit Check,2026-02-05T17:36:44Z,Credit Check,Credit Desk
+SO-2026-0040,Hooli Inc,38731.83,Approve Order,2026-02-05T17:41:56Z,Approved,Order Desk
+SO-2026-0037,Hooli Inc,14947.24,Approve Order,2026-02-05T18:12:14Z,Approved,Order Desk
+SO-2026-0041,Globex Stores,22345.47,Place On Credit Hold,2026-02-05T18:44:25Z,On Credit Hold,Credit Desk
+SO-2026-0025,Globex Stores,11440.94,Fulfil Order,2026-02-05T19:09:23Z,Fulfilled,Fulfilment Centre
+SO-2026-0007,Wonka Brands,11715.43,Raise Dispute,2026-02-05T20:20:05Z,Disputed,Priya Nair
+SO-2026-0027,Wayne Enterprises,36227.41,Fulfil Order,2026-02-05T20:22:35Z,Fulfilled,Fulfilment Centre
+SO-2026-0044,Acme Retail,3346.63,Run Credit Check,2026-02-05T20:23:43Z,Credit Check,Credit Desk
+SO-2026-0014,Initech Ltd,12951.56,Fulfil Order,2026-02-05T20:52:27Z,Fulfilled,Fulfilment Centre
+SO-2026-0015,Initech Ltd,25650.05,Fulfil Order,2026-02-05T21:46:46Z,Fulfilled,Fulfilment Centre
+SO-2026-0023,Initech Ltd,10218.01,Fulfil Order,2026-02-05T22:14:02Z,Fulfilled,Fulfilment Centre
+SO-2026-0036,Hooli Inc,29509.14,Approve Order,2026-02-05T22:18:34Z,Approved,Order Desk
+SO-2026-0038,Wonka Brands,26372.01,Approve Order,2026-02-05T23:18:27Z,Approved,Order Desk
+SO-2026-0018,Umbrella Group,18546.73,Invoice Customer,2026-02-05T23:52:15Z,Invoiced,Billing System
+SO-2026-0034,Hooli Inc,18628.86,Cancel Order,2026-02-06T00:29:07Z,Cancelled,Priya Nair
+SO-2026-0039,Vandelay Co,43689.63,Fulfil Order,2026-02-06T01:56:49Z,Fulfilled,Fulfilment Centre
+SO-2026-0023,Initech Ltd,28307.96,Invoice Customer,2026-02-06T02:31:02Z,Invoiced,Billing System
+SO-2026-0043,Globex Stores,32786.46,Approve Order,2026-02-06T03:01:16Z,Approved,Order Desk
+SO-2026-0028,Initech Ltd,37420.48,Release Credit Hold,2026-02-06T03:42:35Z,Approved,Credit Desk
+SO-2026-0044,Acme Retail,46042.18,Approve Order,2026-02-06T04:18:43Z,Approved,Order Desk
+SO-2026-0042,Globex Stores,44162.87,Approve Order,2026-02-06T04:27:44Z,Approved,Order Desk
+SO-2026-0014,Initech Ltd,13809.19,Invoice Customer,2026-02-06T07:46:27Z,Invoiced,Billing System
+SO-2026-0019,Soylent Foods,23328.84,Fulfil Order,2026-02-06T08:30:11Z,Fulfilled,Fulfilment Centre
+SO-2026-0027,Wayne Enterprises,26130.50,Invoice Customer,2026-02-06T08:30:35Z,Invoiced,Billing System
+SO-2026-0025,Globex Stores,30077.36,Invoice Customer,2026-02-06T08:52:23Z,Invoiced,Billing System
+SO-2026-0045,Initech Ltd,33236.27,Receive Order,2026-02-06T08:55:25Z,Received,Priya Nair
+SO-2026-0046,Wonka Brands,39090.65,Receive Order,2026-02-06T10:10:33Z,Received,Tom Becker
+SO-2026-0047,Acme Retail,43425.23,Receive Order,2026-02-06T11:08:39Z,Received,Nadia Rahman
+SO-2026-0036,Hooli Inc,27912.73,Fulfil Order,2026-02-06T11:24:34Z,Fulfilled,Fulfilment Centre
+SO-2026-0031,Soylent Foods,25185.88,Ship Goods,2026-02-06T11:35:19Z,Fulfilled,Fulfilment Centre
+SO-2026-0015,Initech Ltd,41595.39,Invoice Customer,2026-02-06T12:10:46Z,Invoiced,Billing System
+SO-2026-0004,Stark Traders,9761.44,Receive Payment,2026-02-06T12:13:00Z,Paid,Billing System
+SO-2026-0022,Wonka Brands,21507.28,Release Credit Hold,2026-02-06T12:42:27Z,Approved,Credit Desk
+SO-2026-0029,Soylent Foods,19959.87,Release Credit Hold,2026-02-06T12:51:01Z,Approved,Credit Desk
+SO-2026-0048,Stark Traders,15936.14,Receive Order,2026-02-06T12:52:44Z,Received,Priya Nair
+SO-2026-0049,Hooli Inc,5720.35,Receive Order,2026-02-06T13:05:35Z,Received,Tom Becker
+SO-2026-0042,Globex Stores,30699.36,Fulfil Order,2026-02-06T15:07:44Z,Fulfilled,Fulfilment Centre
+SO-2026-0050,Vandelay Co,47001.53,Receive Order,2026-02-06T15:30:10Z,Received,Nadia Rahman
+SO-2026-0051,Acme Retail,10950.13,Receive Order,2026-02-06T15:43:38Z,Received,Luis Ortega
+SO-2026-0052,Initech Ltd,13574.18,Receive Order,2026-02-06T16:02:31Z,Received,Tom Becker
+SO-2026-0045,Initech Ltd,44493.98,Run Credit Check,2026-02-06T16:04:25Z,Credit Check,Credit Desk
+SO-2026-0049,Hooli Inc,23391.37,Run Credit Check,2026-02-06T16:23:35Z,Credit Check,Credit Desk
+SO-2026-0019,Soylent Foods,42022.89,Invoice Customer,2026-02-06T17:01:11Z,Invoiced,Billing System
+SO-2026-0039,Vandelay Co,44027.75,Invoice Customer,2026-02-06T17:23:49Z,Invoiced,Billing System
+SO-2026-0036,Hooli Inc,27002.34,Invoice Customer,2026-02-06T17:28:34Z,Invoiced,Billing System
+SO-2026-0047,Acme Retail,36015.12,Run Credit Check,2026-02-06T17:32:39Z,Credit Check,Credit Desk
+SO-2026-0024,Umbrella Group,37148.65,Fulfil Order,2026-02-06T17:37:17Z,Fulfilled,Fulfilment Centre
+SO-2026-0032,Initech Ltd,1741.99,Release Credit Hold,2026-02-06T18:07:12Z,Approved,Credit Desk
+SO-2026-0046,Wonka Brands,47940.90,Run Credit Check,2026-02-06T18:26:33Z,Credit Check,Credit Desk
+SO-2026-0035,Initech Ltd,5640.01,Release Credit Hold,2026-02-06T19:18:33Z,Approved,Credit Desk
+SO-2026-0048,Stark Traders,39674.54,Run Credit Check,2026-02-06T19:43:44Z,Credit Check,Credit Desk
+SO-2026-0051,Acme Retail,41998.62,Run Credit Check,2026-02-06T20:50:38Z,Credit Check,Credit Desk
+SO-2026-0042,Globex Stores,31473.20,Invoice Customer,2026-02-06T21:12:44Z,Invoiced,Billing System
+SO-2026-0038,Wonka Brands,886.63,Fulfil Order,2026-02-06T21:53:27Z,Fulfilled,Fulfilment Centre
+SO-2026-0049,Hooli Inc,39782.45,Approve Order,2026-02-06T22:05:35Z,Approved,Order Desk
+SO-2026-0048,Stark Traders,38456.60,Place On Credit Hold,2026-02-06T22:05:44Z,On Credit Hold,Credit Desk
+SO-2026-0024,Umbrella Group,28328.35,Invoice Customer,2026-02-06T22:32:17Z,Invoiced,Billing System
+SO-2026-0022,Wonka Brands,2984.28,Fulfil Order,2026-02-06T22:39:27Z,Fulfilled,Fulfilment Centre
+SO-2026-0033,Soylent Foods,6749.05,Release Credit Hold,2026-02-06T23:28:33Z,Approved,Credit Desk
+SO-2026-0045,Initech Ltd,31447.76,Approve Order,2026-02-06T23:37:25Z,Approved,Order Desk
+SO-2026-0052,Initech Ltd,7547.18,Run Credit Check,2026-02-06T23:49:31Z,Credit Check,Credit Desk
+SO-2026-0052,Initech Ltd,40472.84,Approve Order,2026-02-07T01:37:31Z,Approved,Order Desk
+SO-2026-0051,Acme Retail,22218.77,Approve Order,2026-02-07T01:40:38Z,Approved,Order Desk
+SO-2026-0046,Wonka Brands,36107.55,Approve Order,2026-02-07T02:59:33Z,Approved,Order Desk
+SO-2026-0043,Globex Stores,38830.70,Fulfil Order,2026-02-07T03:15:16Z,Fulfilled,Fulfilment Centre
+SO-2026-0032,Initech Ltd,4362.02,Fulfil Order,2026-02-07T04:06:12Z,Fulfilled,Fulfilment Centre
+SO-2026-0035,Initech Ltd,46577.74,Fulfil Order,2026-02-07T04:22:33Z,Fulfilled,Fulfilment Centre
+SO-2026-0050,Vandelay Co,46081.37,Approve Order,2026-02-07T04:28:10Z,Approved,Order Desk
+SO-2026-0041,Globex Stores,7875.57,Ship Goods,2026-02-07T05:24:25Z,Fulfilled,Fulfilment Centre
+SO-2026-0047,Acme Retail,1890.34,Approve Order,2026-02-07T05:40:39Z,Approved,Order Desk
+SO-2026-0022,Wonka Brands,40461.44,Invoice Customer,2026-02-07T05:54:27Z,Invoiced,Billing System
+SO-2026-0052,Initech Ltd,39534.54,Fulfil Order,2026-02-07T06:27:31Z,Fulfilled,Fulfilment Centre
+SO-2026-0048,Stark Traders,3421.41,Cancel Order,2026-02-07T07:53:44Z,Cancelled,Priya Nair
+SO-2026-0031,Soylent Foods,24338.50,Invoice Customer,2026-02-07T08:30:19Z,Invoiced,Billing System
+SO-2026-0051,Acme Retail,16707.03,Fulfil Order,2026-02-07T08:36:38Z,Fulfilled,Fulfilment Centre
+SO-2026-0001,Soylent Foods,20982.95,Receive Payment,2026-02-07T09:13:45Z,Paid,Billing System
+SO-2026-0050,Vandelay Co,20825.87,Fulfil Order,2026-02-07T10:00:10Z,Fulfilled,Fulfilment Centre
+SO-2026-0010,Globex Stores,8118.17,Receive Payment,2026-02-07T11:58:07Z,Paid,Billing System
+SO-2026-0043,Globex Stores,18336.59,Invoice Customer,2026-02-07T12:11:16Z,Invoiced,Billing System
+SO-2026-0044,Acme Retail,19170.96,Fulfil Order,2026-02-07T12:11:43Z,Fulfilled,Fulfilment Centre
+SO-2026-0016,Umbrella Group,32624.47,Receive Payment,2026-02-07T12:19:32Z,Paid,Billing System
+SO-2026-0040,Hooli Inc,30357.47,Fulfil Order,2026-02-07T12:36:56Z,Fulfilled,Fulfilment Centre
+SO-2026-0038,Wonka Brands,39923.48,Invoice Customer,2026-02-07T12:51:27Z,Invoiced,Billing System
+SO-2026-0037,Hooli Inc,26254.32,Fulfil Order,2026-02-07T15:21:14Z,Fulfilled,Fulfilment Centre
+SO-2026-0032,Initech Ltd,36183.52,Invoice Customer,2026-02-07T17:10:12Z,Invoiced,Billing System
+SO-2026-0020,Initech Ltd,26015.36,Receive Payment,2026-02-07T17:28:21Z,Paid,Billing System
+SO-2026-0035,Initech Ltd,14465.56,Invoice Customer,2026-02-07T18:32:33Z,Invoiced,Billing System
+SO-2026-0040,Hooli Inc,11006.29,Invoice Customer,2026-02-07T20:37:56Z,Invoiced,Billing System
+SO-2026-0019,Soylent Foods,44327.21,Receive Payment,2026-02-07T21:47:11Z,Paid,Billing System
+SO-2026-0028,Initech Ltd,43218.35,Fulfil Order,2026-02-07T21:58:35Z,Fulfilled,Fulfilment Centre
+SO-2026-0050,Vandelay Co,11425.10,Invoice Customer,2026-02-07T22:59:10Z,Invoiced,Billing System
+SO-2026-0052,Initech Ltd,6901.19,Invoice Customer,2026-02-08T00:13:31Z,Invoiced,Billing System
+SO-2026-0049,Hooli Inc,37913.52,Fulfil Order,2026-02-08T00:35:35Z,Fulfilled,Fulfilment Centre
+SO-2026-0051,Acme Retail,31198.52,Invoice Customer,2026-02-08T01:32:38Z,Invoiced,Billing System
+SO-2026-0044,Acme Retail,40896.45,Invoice Customer,2026-02-08T04:23:43Z,Invoiced,Billing System
+SO-2026-0046,Wonka Brands,5189.31,Fulfil Order,2026-02-08T05:14:33Z,Fulfilled,Fulfilment Centre
+SO-2026-0041,Globex Stores,7925.17,Invoice Customer,2026-02-08T06:16:25Z,Invoiced,Billing System
+SO-2026-0029,Soylent Foods,38412.67,Fulfil Order,2026-02-08T06:46:01Z,Fulfilled,Fulfilment Centre
+SO-2026-0036,Hooli Inc,1003.97,Receive Payment,2026-02-08T07:31:34Z,Paid,Billing System
+SO-2026-0033,Soylent Foods,22815.93,Fulfil Order,2026-02-08T07:49:33Z,Fulfilled,Fulfilment Centre
+SO-2026-0045,Initech Ltd,1972.04,Fulfil Order,2026-02-08T09:51:25Z,Fulfilled,Fulfilment Centre
+SO-2026-0046,Wonka Brands,5049.38,Invoice Customer,2026-02-08T09:54:33Z,Invoiced,Billing System
+SO-2026-0029,Soylent Foods,28586.28,Invoice Customer,2026-02-08T11:31:01Z,Invoiced,Billing System
+SO-2026-0049,Hooli Inc,6706.24,Invoice Customer,2026-02-08T11:36:35Z,Invoiced,Billing System
+SO-2026-0015,Initech Ltd,32731.34,Raise Dispute,2026-02-08T12:43:46Z,Disputed,Luis Ortega
+SO-2026-0037,Hooli Inc,41477.01,Invoice Customer,2026-02-08T14:53:14Z,Invoiced,Billing System
+SO-2026-0045,Initech Ltd,12533.51,Invoice Customer,2026-02-08T16:37:25Z,Invoiced,Billing System
+SO-2026-0028,Initech Ltd,15678.35,Invoice Customer,2026-02-08T16:55:35Z,Invoiced,Billing System
+SO-2026-0003,Globex Stores,1861.42,Receive Payment,2026-02-08T19:42:27Z,Paid,Billing System
+SO-2026-0005,Initech Ltd,40037.17,Receive Payment,2026-02-09T02:36:04Z,Paid,Billing System
+SO-2026-0033,Soylent Foods,42342.88,Invoice Customer,2026-02-09T04:10:33Z,Invoiced,Billing System
+SO-2026-0047,Acme Retail,33079.08,Fulfil Order,2026-02-09T04:53:39Z,Fulfilled,Fulfilment Centre
+SO-2026-0009,Hooli Inc,30786.50,Receive Payment,2026-02-09T05:02:44Z,Paid,Billing System
+SO-2026-0025,Globex Stores,15939.98,Receive Payment,2026-02-09T05:36:23Z,Paid,Billing System
+SO-2026-0047,Acme Retail,42596.10,Invoice Customer,2026-02-09T05:59:39Z,Invoiced,Billing System
+SO-2026-0053,Umbrella Group,13551.71,Receive Order,2026-02-09T08:50:01Z,Received,Tom Becker
+SO-2026-0054,Globex Stores,25265.46,Receive Order,2026-02-09T09:24:19Z,Received,Luis Ortega
+SO-2026-0055,Globex Stores,36315.74,Receive Order,2026-02-09T09:35:24Z,Received,Luis Ortega
+SO-2026-0054,Globex Stores,17880.61,Run Credit Check,2026-02-09T10:42:19Z,Credit Check,Credit Desk
+SO-2026-0056,Wayne Enterprises,30780.16,Receive Order,2026-02-09T12:06:22Z,Received,Priya Nair
+SO-2026-0057,Globex Stores,21022.79,Receive Order,2026-02-09T12:35:52Z,Received,Luis Ortega
+SO-2026-0058,Hooli Inc,26482.88,Receive Order,2026-02-09T12:57:01Z,Received,Luis Ortega
+SO-2026-0059,Umbrella Group,9319.41,Receive Order,2026-02-09T13:08:23Z,Received,Tom Becker
+SO-2026-0060,Vandelay Co,44510.45,Receive Order,2026-02-09T13:24:24Z,Received,Nadia Rahman
+SO-2026-0015,Initech Ltd,24870.83,Resolve Dispute,2026-02-09T14:03:46Z,Invoiced,Billing System
+SO-2026-0055,Globex Stores,19701.92,Run Credit Check,2026-02-09T14:09:24Z,Credit Check,Credit Desk
+SO-2026-0061,Stark Traders,7175.13,Receive Order,2026-02-09T15:01:47Z,Received,Luis Ortega
+SO-2026-0062,Hooli Inc,10771.81,Receive Order,2026-02-09T15:09:31Z,Received,Luis Ortega
+SO-2026-0059,Umbrella Group,15001.75,Run Credit Check,2026-02-09T15:31:23Z,Credit Check,Credit Desk
+SO-2026-0057,Globex Stores,46445.73,Run Credit Check,2026-02-09T16:02:52Z,Credit Check,Credit Desk
+SO-2026-0053,Umbrella Group,11875.08,Run Credit Check,2026-02-09T16:09:01Z,Credit Check,Credit Desk
+SO-2026-0054,Globex Stores,45589.01,Approve Order,2026-02-09T17:22:19Z,Approved,Order Desk
+SO-2026-0058,Hooli Inc,34528.96,Run Credit Check,2026-02-09T17:44:01Z,Credit Check,Credit Desk
+SO-2026-0062,Hooli Inc,750.88,Run Credit Check,2026-02-09T17:56:31Z,Credit Check,Credit Desk
+SO-2026-0055,Globex Stores,19409.78,Approve Order,2026-02-09T18:33:24Z,Approved,Order Desk
+SO-2026-0060,Vandelay Co,36564.54,Run Credit Check,2026-02-09T18:33:24Z,Credit Check,Credit Desk
+SO-2026-0012,Wayne Enterprises,46834.04,Receive Payment,2026-02-09T19:34:53Z,Paid,Billing System
+SO-2026-0021,Acme Retail,18943.77,Receive Payment,2026-02-09T20:44:05Z,Paid,Billing System
+SO-2026-0053,Umbrella Group,23736.94,Approve Order,2026-02-09T20:57:01Z,Approved,Order Desk
+SO-2026-0059,Umbrella Group,40020.30,Approve Order,2026-02-09T22:30:23Z,Approved,Order Desk
+SO-2026-0057,Globex Stores,32440.32,Place On Credit Hold,2026-02-09T23:38:52Z,On Credit Hold,Credit Desk
+SO-2026-0062,Hooli Inc,31950.47,Approve Order,2026-02-10T03:10:31Z,Approved,Order Desk
+SO-2026-0056,Wayne Enterprises,36240.40,Ship Goods,2026-02-10T04:39:22Z,Fulfilled,Fulfilment Centre
+SO-2026-0011,Acme Retail,1870.77,Receive Payment,2026-02-10T06:24:18Z,Paid,Billing System
+SO-2026-0053,Umbrella Group,10212.37,Fulfil Order,2026-02-10T07:36:01Z,Fulfilled,Fulfilment Centre
+SO-2026-0058,Hooli Inc,31224.95,Cancel Order,2026-02-10T07:53:01Z,Cancelled,Luis Ortega
+SO-2026-0063,Vandelay Co,44395.92,Receive Order,2026-02-10T08:12:07Z,Received,Luis Ortega
+SO-2026-0064,Wonka Brands,37192.72,Receive Order,2026-02-10T08:37:45Z,Received,Priya Nair
+SO-2026-0065,Vandelay Co,40623.76,Receive Order,2026-02-10T08:40:32Z,Received,Nadia Rahman
+SO-2026-0040,Hooli Inc,27882.88,Receive Payment,2026-02-10T08:47:56Z,Paid,Billing System
+SO-2026-0054,Globex Stores,24762.33,Fulfil Order,2026-02-10T09:07:19Z,Fulfilled,Fulfilment Centre
+SO-2026-0053,Umbrella Group,45519.77,Invoice Customer,2026-02-10T09:08:01Z,Invoiced,Billing System
+SO-2026-0063,Vandelay Co,21952.15,Run Credit Check,2026-02-10T09:18:07Z,Credit Check,Credit Desk
+SO-2026-0066,Stark Traders,17935.59,Receive Order,2026-02-10T10:48:19Z,Received,Nadia Rahman
+SO-2026-0054,Globex Stores,26844.28,Invoice Customer,2026-02-10T10:49:19Z,Invoiced,Billing System
+SO-2026-0067,Initech Ltd,39909.11,Receive Order,2026-02-10T11:03:31Z,Received,Priya Nair
+SO-2026-0068,Wonka Brands,13409.58,Receive Order,2026-02-10T11:26:46Z,Received,Priya Nair
+SO-2026-0069,Wayne Enterprises,15676.25,Receive Order,2026-02-10T11:32:04Z,Received,Nadia Rahman
+SO-2026-0070,Wayne Enterprises,29349.00,Receive Order,2026-02-10T11:46:27Z,Received,Priya Nair
+SO-2026-0065,Vandelay Co,38022.65,Run Credit Check,2026-02-10T12:34:32Z,Credit Check,Credit Desk
+SO-2026-0071,Hooli Inc,6370.13,Receive Order,2026-02-10T12:39:56Z,Received,Luis Ortega
+SO-2026-0064,Wonka Brands,38029.62,Run Credit Check,2026-02-10T12:58:45Z,Credit Check,Credit Desk
+SO-2026-0068,Wonka Brands,17645.00,Run Credit Check,2026-02-10T12:58:46Z,Credit Check,Credit Desk
+SO-2026-0072,Wonka Brands,30583.93,Receive Order,2026-02-10T13:27:11Z,Received,Tom Becker
+SO-2026-0073,Wonka Brands,40679.87,Receive Order,2026-02-10T13:51:57Z,Received,Tom Becker
+SO-2026-0067,Initech Ltd,38850.20,Run Credit Check,2026-02-10T14:14:31Z,Credit Check,Credit Desk
+SO-2026-0074,Wayne Enterprises,47653.05,Receive Order,2026-02-10T14:33:18Z,Received,Nadia Rahman
+SO-2026-0070,Wayne Enterprises,37982.29,Approve Order,2026-02-10T15:03:27Z,Approved,Order Desk
+SO-2026-0060,Vandelay Co,14667.64,Cancel Order,2026-02-10T15:18:24Z,Cancelled,Nadia Rahman
+SO-2026-0072,Wonka Brands,21960.30,Run Credit Check,2026-02-10T15:34:11Z,Credit Check,Credit Desk
+SO-2026-0075,Umbrella Group,11887.10,Receive Order,2026-02-10T15:47:26Z,Received,Luis Ortega
+SO-2026-0007,Wonka Brands,45237.82,Resolve Dispute,2026-02-10T16:54:05Z,Invoiced,Billing System
+SO-2026-0073,Wonka Brands,32515.97,Run Credit Check,2026-02-10T17:20:57Z,Credit Check,Credit Desk
+SO-2026-0064,Wonka Brands,14342.29,Approve Order,2026-02-10T18:10:45Z,Approved,Order Desk
+SO-2026-0069,Wayne Enterprises,34455.83,Run Credit Check,2026-02-10T19:22:04Z,Credit Check,Credit Desk
+SO-2026-0063,Vandelay Co,14362.31,Approve Order,2026-02-10T19:47:07Z,Approved,Order Desk
+SO-2026-0066,Stark Traders,40412.43,Run Credit Check,2026-02-10T19:47:19Z,Credit Check,Credit Desk
+SO-2026-0002,Wonka Brands,25949.00,Receive Payment,2026-02-10T20:13:36Z,Paid,Billing System
+SO-2026-0068,Wonka Brands,43692.60,Place On Credit Hold,2026-02-10T20:18:46Z,On Credit Hold,Credit Desk
+SO-2026-0071,Hooli Inc,11490.77,Run Credit Check,2026-02-10T20:26:56Z,Credit Check,Credit Desk
+SO-2026-0008,Initech Ltd,15358.66,Receive Payment,2026-02-10T20:27:13Z,Paid,Billing System
+SO-2026-0066,Stark Traders,1364.11,Approve Order,2026-02-10T20:52:19Z,Approved,Order Desk
+SO-2026-0071,Hooli Inc,1320.46,Approve Order,2026-02-10T21:35:56Z,Approved,Order Desk
+SO-2026-0072,Wonka Brands,40324.27,Approve Order,2026-02-10T21:51:11Z,Approved,Order Desk
+SO-2026-0074,Wayne Enterprises,32559.37,Run Credit Check,2026-02-10T22:32:18Z,Credit Check,Credit Desk
+SO-2026-0069,Wayne Enterprises,42054.91,Approve Order,2026-02-10T23:30:04Z,Approved,Order Desk
+SO-2026-0073,Wonka Brands,1588.02,Approve Order,2026-02-10T23:47:57Z,Approved,Order Desk
+SO-2026-0075,Umbrella Group,34357.74,Run Credit Check,2026-02-10T23:55:26Z,Credit Check,Credit Desk
+SO-2026-0056,Wayne Enterprises,13965.98,Invoice Customer,2026-02-11T00:18:22Z,Invoiced,Billing System
+SO-2026-0017,Globex Stores,5234.29,Receive Payment,2026-02-11T00:23:32Z,Paid,Billing System
+SO-2026-0068,Wonka Brands,28069.15,Cancel Order,2026-02-11T00:23:46Z,Cancelled,Priya Nair
+SO-2026-0065,Vandelay Co,38650.50,Approve Order,2026-02-11T01:07:32Z,Approved,Order Desk
+SO-2026-0074,Wayne Enterprises,32026.04,Place On Credit Hold,2026-02-11T01:43:18Z,On Credit Hold,Credit Desk
+SO-2026-0075,Umbrella Group,23903.75,Approve Order,2026-02-11T01:43:26Z,Approved,Order Desk
+SO-2026-0067,Initech Ltd,22310.81,Approve Order,2026-02-11T02:37:31Z,Approved,Order Desk
+SO-2026-0057,Globex Stores,29092.26,Release Credit Hold,2026-02-11T03:09:52Z,Approved,Credit Desk
+SO-2026-0030,Wayne Enterprises,33181.10,Receive Payment,2026-02-11T03:38:33Z,Paid,Billing System
+SO-2026-0027,Wayne Enterprises,34350.54,Receive Payment,2026-02-11T04:57:35Z,Paid,Billing System
+SO-2026-0076,Globex Stores,18300.58,Receive Order,2026-02-11T08:01:05Z,Received,Tom Becker
+SO-2026-0077,Soylent Foods,34493.66,Receive Order,2026-02-11T08:15:05Z,Received,Tom Becker
+SO-2026-0076,Globex Stores,34582.81,Run Credit Check,2026-02-11T09:03:05Z,Credit Check,Credit Desk
+SO-2026-0078,Wayne Enterprises,1165.25,Receive Order,2026-02-11T09:54:21Z,Received,Luis Ortega
+SO-2026-0061,Stark Traders,12197.63,Ship Goods,2026-02-11T10:01:47Z,Fulfilled,Fulfilment Centre
+SO-2026-0062,Hooli Inc,17855.52,Fulfil Order,2026-02-11T11:07:31Z,Fulfilled,Fulfilment Centre
+SO-2026-0079,Acme Retail,26173.88,Receive Order,2026-02-11T11:48:35Z,Received,Luis Ortega
+SO-2026-0080,Wonka Brands,46278.96,Receive Order,2026-02-11T12:08:49Z,Received,Luis Ortega
+SO-2026-0081,Initech Ltd,30570.37,Receive Order,2026-02-11T12:16:03Z,Received,Nadia Rahman
+SO-2026-0082,Soylent Foods,2392.84,Receive Order,2026-02-11T12:31:27Z,Received,Priya Nair
+SO-2026-0057,Globex Stores,36092.86,Fulfil Order,2026-02-11T12:34:52Z,Fulfilled,Fulfilment Centre
+SO-2026-0083,Initech Ltd,7569.74,Receive Order,2026-02-11T12:38:25Z,Received,Luis Ortega
+SO-2026-0084,Acme Retail,17652.85,Receive Order,2026-02-11T12:44:54Z,Received,Luis Ortega
+SO-2026-0080,Wonka Brands,30559.50,Run Credit Check,2026-02-11T13:14:49Z,Credit Check,Credit Desk
+SO-2026-0077,Soylent Foods,25955.33,Run Credit Check,2026-02-11T13:27:05Z,Credit Check,Credit Desk
+SO-2026-0085,Acme Retail,25413.50,Receive Order,2026-02-11T13:46:16Z,Received,Priya Nair
+SO-2026-0081,Initech Ltd,4061.11,Run Credit Check,2026-02-11T14:17:03Z,Credit Check,Credit Desk
+SO-2026-0082,Soylent Foods,15355.94,Run Credit Check,2026-02-11T14:44:27Z,Credit Check,Credit Desk
+SO-2026-0086,Wonka Brands,21529.77,Receive Order,2026-02-11T15:20:24Z,Received,Priya Nair
+SO-2026-0085,Acme Retail,16303.59,Run Credit Check,2026-02-11T15:23:16Z,Credit Check,Credit Desk
+SO-2026-0055,Globex Stores,46937.58,Fulfil Order,2026-02-11T15:46:24Z,Fulfilled,Fulfilment Centre
+SO-2026-0087,Umbrella Group,32920.17,Receive Order,2026-02-11T15:59:20Z,Received,Luis Ortega
+SO-2026-0088,Wayne Enterprises,3727.28,Receive Order,2026-02-11T16:59:26Z,Received,Nadia Rahman
+SO-2026-0066,Stark Traders,13040.55,Fulfil Order,2026-02-11T17:23:19Z,Fulfilled,Fulfilment Centre
+SO-2026-0032,Initech Ltd,18796.97,Receive Payment,2026-02-11T17:25:12Z,Paid,Billing System
+SO-2026-0084,Acme Retail,34760.15,Run Credit Check,2026-02-11T17:35:54Z,Credit Check,Credit Desk
+SO-2026-0078,Wayne Enterprises,26304.26,Run Credit Check,2026-02-11T17:45:21Z,Credit Check,Credit Desk
+SO-2026-0079,Acme Retail,13861.88,Run Credit Check,2026-02-11T18:08:35Z,Credit Check,Credit Desk
+SO-2026-0086,Wonka Brands,47166.25,Run Credit Check,2026-02-11T18:51:24Z,Credit Check,Credit Desk
+SO-2026-0059,Umbrella Group,47711.15,Fulfil Order,2026-02-11T19:11:23Z,Fulfilled,Fulfilment Centre
+SO-2026-0079,Acme Retail,23726.16,Place On Credit Hold,2026-02-11T19:17:35Z,On Credit Hold,Credit Desk
+SO-2026-0057,Globex Stores,23582.52,Invoice Customer,2026-02-11T20:42:52Z,Invoiced,Billing System
+SO-2026-0084,Acme Retail,44640.96,Approve Order,2026-02-11T21:49:54Z,Approved,Order Desk
+SO-2026-0080,Wonka Brands,8174.24,Place On Credit Hold,2026-02-11T22:49:49Z,On Credit Hold,Credit Desk
+SO-2026-0075,Umbrella Group,26964.70,Fulfil Order,2026-02-11T23:07:26Z,Fulfilled,Fulfilment Centre
+SO-2026-0077,Soylent Foods,13405.57,Approve Order,2026-02-12T00:11:05Z,Approved,Order Desk
+SO-2026-0087,Umbrella Group,31801.26,Run Credit Check,2026-02-12T00:22:20Z,Credit Check,Credit Desk
+SO-2026-0088,Wayne Enterprises,42694.29,Run Credit Check,2026-02-12T00:32:26Z,Credit Check,Credit Desk
+SO-2026-0085,Acme Retail,26392.15,Place On Credit Hold,2026-02-12T01:28:16Z,On Credit Hold,Credit Desk
+SO-2026-0070,Wayne Enterprises,24010.31,Fulfil Order,2026-02-12T01:31:27Z,Fulfilled,Fulfilment Centre
+SO-2026-0071,Hooli Inc,22984.98,Fulfil Order,2026-02-12T01:41:56Z,Fulfilled,Fulfilment Centre
+SO-2026-0082,Soylent Foods,34044.64,Approve Order,2026-02-12T02:02:27Z,Approved,Order Desk
+SO-2026-0041,Globex Stores,39305.28,Receive Payment,2026-02-12T02:03:25Z,Paid,Billing System
+SO-2026-0062,Hooli Inc,37683.66,Invoice Customer,2026-02-12T02:19:31Z,Invoiced,Billing System
+SO-2026-0086,Wonka Brands,32684.64,Approve Order,2026-02-12T02:36:24Z,Approved,Order Desk
+SO-2026-0063,Vandelay Co,39601.97,Fulfil Order,2026-02-12T02:39:07Z,Fulfilled,Fulfilment Centre
+SO-2026-0088,Wayne Enterprises,26129.62,Approve Order,2026-02-12T03:14:26Z,Approved,Order Desk
+SO-2026-0073,Wonka Brands,17811.04,Fulfil Order,2026-02-12T03:16:57Z,Fulfilled,Fulfilment Centre
+SO-2026-0078,Wayne Enterprises,34597.02,Approve Order,2026-02-12T04:17:21Z,Approved,Order Desk
+SO-2026-0071,Hooli Inc,9935.90,Invoice Customer,2026-02-12T05:21:56Z,Invoiced,Billing System
+SO-2026-0081,Initech Ltd,12901.12,Cancel Order,2026-02-12T05:23:03Z,Cancelled,Nadia Rahman
+SO-2026-0074,Wayne Enterprises,4639.93,Release Credit Hold,2026-02-12T08:02:18Z,Approved,Credit Desk
+SO-2026-0066,Stark Traders,22488.05,Invoice Customer,2026-02-12T08:07:19Z,Invoiced,Billing System
+SO-2026-0076,Globex Stores,4863.95,Cancel Order,2026-02-12T08:20:05Z,Cancelled,Tom Becker
+SO-2026-0089,Wonka Brands,28073.30,Receive Order,2026-02-12T08:22:41Z,Received,Nadia Rahman
+SO-2026-0061,Stark Traders,37963.33,Invoice Customer,2026-02-12T08:49:47Z,Invoiced,Billing System
+SO-2026-0090,Stark Traders,18993.10,Receive Order,2026-02-12T09:01:03Z,Received,Priya Nair
+SO-2026-0059,Umbrella Group,22431.99,Invoice Customer,2026-02-12T09:44:23Z,Invoiced,Billing System
+SO-2026-0080,Wonka Brands,3329.55,Release Credit Hold,2026-02-12T09:45:49Z,Approved,Credit Desk
+SO-2026-0091,Stark Traders,25566.95,Receive Order,2026-02-12T09:48:26Z,Received,Priya Nair
+SO-2026-0092,Wayne Enterprises,22127.47,Receive Order,2026-02-12T09:55:51Z,Received,Priya Nair
+SO-2026-0093,Vandelay Co,7353.34,Receive Order,2026-02-12T10:17:45Z,Received,Nadia Rahman
+SO-2026-0088,Wayne Enterprises,33303.38,Fulfil Order,2026-02-12T10:51:26Z,Fulfilled,Fulfilment Centre
+SO-2026-0090,Stark Traders,21791.52,Run Credit Check,2026-02-12T10:52:03Z,Credit Check,Credit Desk
+SO-2026-0094,Stark Traders,35963.55,Receive Order,2026-02-12T11:03:46Z,Received,Tom Becker
+SO-2026-0063,Vandelay Co,22997.21,Invoice Customer,2026-02-12T11:15:07Z,Invoiced,Billing System
+SO-2026-0083,Initech Ltd,42215.13,Ship Goods,2026-02-12T11:41:25Z,Fulfilled,Fulfilment Centre
+SO-2026-0091,Stark Traders,15459.07,Run Credit Check,2026-02-12T12:03:26Z,Credit Check,Credit Desk
+SO-2026-0095,Initech Ltd,47345.07,Receive Order,2026-02-12T12:08:46Z,Received,Nadia Rahman
+SO-2026-0087,Umbrella Group,16061.15,Place On Credit Hold,2026-02-12T12:16:20Z,On Credit Hold,Credit Desk
+SO-2026-0055,Globex Stores,36620.68,Invoice Customer,2026-02-12T12:42:24Z,Invoiced,Billing System
+SO-2026-0096,Initech Ltd,43424.63,Receive Order,2026-02-12T13:11:23Z,Received,Luis Ortega
+SO-2026-0079,Acme Retail,46938.81,Ship Goods,2026-02-12T13:29:35Z,Fulfilled,Fulfilment Centre
+SO-2026-0097,Umbrella Group,17243.00,Receive Order,2026-02-12T13:53:25Z,Received,Nadia Rahman
+SO-2026-0069,Wayne Enterprises,18786.12,Fulfil Order,2026-02-12T14:13:04Z,Fulfilled,Fulfilment Centre
+SO-2026-0072,Wonka Brands,3630.24,Fulfil Order,2026-02-12T14:30:11Z,Fulfilled,Fulfilment Centre
+SO-2026-0098,Stark Traders,41598.56,Receive Order,2026-02-12T14:31:56Z,Received,Tom Becker
+SO-2026-0099,Initech Ltd,12167.27,Receive Order,2026-02-12T14:45:32Z,Received,Luis Ortega
+SO-2026-0100,Stark Traders,19950.13,Receive Order,2026-02-12T14:54:54Z,Received,Luis Ortega
+SO-2026-0089,Wonka Brands,35673.39,Run Credit Check,2026-02-12T15:35:41Z,Credit Check,Credit Desk
+SO-2026-0093,Vandelay Co,18062.07,Run Credit Check,2026-02-12T15:35:45Z,Credit Check,Credit Desk
+SO-2026-0080,Wonka Brands,32031.05,Fulfil Order,2026-02-12T16:15:49Z,Fulfilled,Fulfilment Centre
+SO-2026-0101,Stark Traders,31917.32,Receive Order,2026-02-12T16:17:15Z,Received,Tom Becker
+SO-2026-0102,Acme Retail,43992.44,Receive Order,2026-02-12T16:29:13Z,Received,Luis Ortega
+SO-2026-0103,Vandelay Co,4358.71,Receive Order,2026-02-12T16:31:37Z,Received,Tom Becker
+SO-2026-0104,Stark Traders,39387.95,Receive Order,2026-02-12T16:53:29Z,Received,Priya Nair
+SO-2026-0099,Initech Ltd,2307.00,Run Credit Check,2026-02-12T17:32:32Z,Credit Check,Credit Desk
+SO-2026-0101,Stark Traders,43911.24,Run Credit Check,2026-02-12T17:44:15Z,Credit Check,Credit Desk
+SO-2026-0064,Wonka Brands,9493.70,Fulfil Order,2026-02-12T17:47:45Z,Fulfilled,Fulfilment Centre
+SO-2026-0092,Wayne Enterprises,22098.65,Approve Order,2026-02-12T18:02:51Z,Approved,Order Desk
+SO-2026-0103,Vandelay Co,8304.18,Run Credit Check,2026-02-12T18:03:37Z,Credit Check,Credit Desk
+SO-2026-0069,Wayne Enterprises,36198.08,Invoice Customer,2026-02-12T18:05:04Z,Invoiced,Billing System
+SO-2026-0093,Vandelay Co,14591.42,Place On Credit Hold,2026-02-12T18:05:45Z,On Credit Hold,Credit Desk
+SO-2026-0079,Acme Retail,6835.24,Invoice Customer,2026-02-12T18:07:35Z,Invoiced,Billing System
+SO-2026-0075,Umbrella Group,42441.81,Invoice Customer,2026-02-12T18:44:26Z,Invoiced,Billing System
+SO-2026-0094,Stark Traders,25597.34,Run Credit Check,2026-02-12T18:58:46Z,Credit Check,Credit Desk
+SO-2026-0085,Acme Retail,13965.44,Release Credit Hold,2026-02-12T19:08:16Z,Approved,Credit Desk
+SO-2026-0070,Wayne Enterprises,43598.46,Invoice Customer,2026-02-12T19:18:27Z,Invoiced,Billing System
+SO-2026-0073,Wonka Brands,25303.21,Invoice Customer,2026-02-12T19:19:57Z,Invoiced,Billing System
+SO-2026-0065,Vandelay Co,17362.15,Fulfil Order,2026-02-12T19:21:32Z,Fulfilled,Fulfilment Centre
+SO-2026-0100,Stark Traders,15225.58,Run Credit Check,2026-02-12T19:39:54Z,Credit Check,Credit Desk
+SO-2026-0095,Initech Ltd,14127.82,Run Credit Check,2026-02-12T20:20:46Z,Credit Check,Credit Desk
+SO-2026-0096,Initech Ltd,4370.53,Run Credit Check,2026-02-12T20:44:23Z,Credit Check,Credit Desk
+SO-2026-0098,Stark Traders,27546.34,Run Credit Check,2026-02-12T20:58:56Z,Credit Check,Credit Desk
+SO-2026-0094,Stark Traders,26512.34,Approve Order,2026-02-12T21:12:46Z,Approved,Order Desk
+SO-2026-0088,Wayne Enterprises,18827.34,Invoice Customer,2026-02-12T21:18:26Z,Invoiced,Billing System
+SO-2026-0097,Umbrella Group,7819.65,Run Credit Check,2026-02-12T21:41:25Z,Credit Check,Credit Desk
+SO-2026-0091,Stark Traders,46547.57,Approve Order,2026-02-12T22:46:26Z,Approved,Order Desk
+SO-2026-0103,Vandelay Co,29893.52,Place On Credit Hold,2026-02-12T22:54:37Z,On Credit Hold,Credit Desk
+SO-2026-0031,Soylent Foods,9794.29,Receive Payment,2026-02-12T23:01:19Z,Paid,Billing System
+SO-2026-0102,Acme Retail,37007.84,Run Credit Check,2026-02-12T23:11:13Z,Credit Check,Credit Desk
+SO-2026-0089,Wonka Brands,28358.14,Approve Order,2026-02-12T23:37:41Z,Approved,Order Desk
+SO-2026-0104,Stark Traders,33073.10,Run Credit Check,2026-02-12T23:46:29Z,Credit Check,Credit Desk
+SO-2026-0090,Stark Traders,43819.38,Approve Order,2026-02-12T23:51:03Z,Approved,Order Desk
+SO-2026-0067,Initech Ltd,24625.27,Fulfil Order,2026-02-13T01:52:31Z,Fulfilled,Fulfilment Centre
+SO-2026-0103,Vandelay Co,18532.64,Cancel Order,2026-02-13T02:26:37Z,Cancelled,Tom Becker
+SO-2026-0104,Stark Traders,26343.69,Place On Credit Hold,2026-02-13T02:52:29Z,On Credit Hold,Credit Desk
+SO-2026-0101,Stark Traders,36961.20,Place On Credit Hold,2026-02-13T02:58:15Z,On Credit Hold,Credit Desk
+SO-2026-0096,Initech Ltd,3987.70,Approve Order,2026-02-13T03:06:23Z,Approved,Order Desk
+SO-2026-0074,Wayne Enterprises,11094.27,Fulfil Order,2026-02-13T03:56:18Z,Fulfilled,Fulfilment Centre
+SO-2026-0064,Wonka Brands,36709.29,Invoice Customer,2026-02-13T03:59:45Z,Invoiced,Billing System
+SO-2026-0095,Initech Ltd,34390.44,Approve Order,2026-02-13T05:13:46Z,Approved,Order Desk
+SO-2026-0093,Vandelay Co,35988.71,Release Credit Hold,2026-02-13T05:14:45Z,Approved,Credit Desk
+SO-2026-0100,Stark Traders,8546.61,Approve Order,2026-02-13T05:27:54Z,Approved,Order Desk
+SO-2026-0097,Umbrella Group,18287.88,Place On Credit Hold,2026-02-13T05:30:25Z,On Credit Hold,Credit Desk
+SO-2026-0099,Initech Ltd,22257.22,Place On Credit Hold,2026-02-13T05:39:32Z,On Credit Hold,Credit Desk
+SO-2026-0098,Stark Traders,22462.56,Approve Order,2026-02-13T05:46:56Z,Approved,Order Desk
+SO-2026-0084,Acme Retail,41814.67,Fulfil Order,2026-02-13T08:16:54Z,Fulfilled,Fulfilment Centre
+SO-2026-0102,Acme Retail,27235.67,Approve Order,2026-02-13T08:39:13Z,Approved,Order Desk
+SO-2026-0078,Wayne Enterprises,36569.20,Fulfil Order,2026-02-13T08:49:21Z,Fulfilled,Fulfilment Centre
+SO-2026-0083,Initech Ltd,41358.21,Invoice Customer,2026-02-13T09:05:25Z,Invoiced,Billing System
+SO-2026-0105,Vandelay Co,35202.21,Receive Order,2026-02-13T09:10:23Z,Received,Luis Ortega
+SO-2026-0028,Initech Ltd,28395.99,Receive Payment,2026-02-13T09:23:35Z,Paid,Billing System
+SO-2026-0006,Acme Retail,6627.41,Receive Payment,2026-02-13T09:24:28Z,Paid,Billing System
+SO-2026-0106,Initech Ltd,2220.21,Receive Order,2026-02-13T10:09:26Z,Received,Nadia Rahman
+SO-2026-0092,Wayne Enterprises,10892.65,Fulfil Order,2026-02-13T10:20:51Z,Fulfilled,Fulfilment Centre
+SO-2026-0082,Soylent Foods,3819.96,Fulfil Order,2026-02-13T11:30:27Z,Fulfilled,Fulfilment Centre
+SO-2026-0072,Wonka Brands,45632.65,Invoice Customer,2026-02-13T11:39:11Z,Invoiced,Billing System
+SO-2026-0065,Vandelay Co,20989.78,Invoice Customer,2026-02-13T11:42:32Z,Invoiced,Billing System
+SO-2026-0080,Wonka Brands,35485.89,Invoice Customer,2026-02-13T11:50:49Z,Invoiced,Billing System
+SO-2026-0107,Stark Traders,37396.73,Receive Order,2026-02-13T11:56:55Z,Received,Nadia Rahman
+SO-2026-0077,Soylent Foods,6047.52,Fulfil Order,2026-02-13T12:01:05Z,Fulfilled,Fulfilment Centre
+SO-2026-0108,Umbrella Group,38109.06,Receive Order,2026-02-13T12:35:55Z,Received,Luis Ortega
+SO-2026-0109,Umbrella Group,45713.96,Receive Order,2026-02-13T12:45:17Z,Received,Nadia Rahman
+SO-2026-0101,Stark Traders,12060.82,Cancel Order,2026-02-13T13:13:15Z,Cancelled,Tom Becker
+SO-2026-0014,Initech Ltd,23620.74,Receive Payment,2026-02-13T13:15:27Z,Paid,Billing System
+SO-2026-0092,Wayne Enterprises,21773.95,Invoice Customer,2026-02-13T13:45:51Z,Invoiced,Billing System
+SO-2026-0110,Acme Retail,32061.25,Receive Order,2026-02-13T13:51:23Z,Received,Luis Ortega
+SO-2026-0007,Wonka Brands,9984.45,Receive Payment,2026-02-13T14:38:05Z,Paid,Billing System
+SO-2026-0104,Stark Traders,43632.77,Cancel Order,2026-02-13T15:02:29Z,Cancelled,Priya Nair
+SO-2026-0111,Umbrella Group,14018.97,Receive Order,2026-02-13T15:14:18Z,Received,Priya Nair
+SO-2026-0050,Vandelay Co,27329.24,Receive Payment,2026-02-13T15:15:10Z,Paid,Billing System
+SO-2026-0108,Umbrella Group,9258.65,Run Credit Check,2026-02-13T15:38:55Z,Credit Check,Credit Desk
+SO-2026-0107,Stark Traders,3388.59,Run Credit Check,2026-02-13T15:40:55Z,Credit Check,Credit Desk
+SO-2026-0112,Acme Retail,31492.07,Receive Order,2026-02-13T15:49:19Z,Received,Priya Nair
+SO-2026-0110,Acme Retail,11205.76,Run Credit Check,2026-02-13T15:54:23Z,Credit Check,Credit Desk
+SO-2026-0082,Soylent Foods,38508.09,Invoice Customer,2026-02-13T15:58:27Z,Invoiced,Billing System
+SO-2026-0105,Vandelay Co,1423.83,Run Credit Check,2026-02-13T16:17:23Z,Credit Check,Credit Desk
+SO-2026-0055,Globex Stores,36458.23,Receive Payment,2026-02-13T16:33:24Z,Paid,Billing System
+SO-2026-0113,Hooli Inc,16619.38,Receive Order,2026-02-13T16:40:40Z,Received,Tom Becker
+SO-2026-0112,Acme Retail,14488.81,Run Credit Check,2026-02-13T17:02:19Z,Credit Check,Credit Desk
+SO-2026-0106,Initech Ltd,7668.91,Run Credit Check,2026-02-13T17:02:26Z,Credit Check,Credit Desk
+SO-2026-0111,Umbrella Group,31631.24,Run Credit Check,2026-02-13T17:14:18Z,Credit Check,Credit Desk
+SO-2026-0062,Hooli Inc,32879.96,Raise Dispute,2026-02-13T17:16:31Z,Disputed,Luis Ortega
+SO-2026-0085,Acme Retail,46450.69,Fulfil Order,2026-02-13T17:20:16Z,Fulfilled,Fulfilment Centre
+SO-2026-0038,Wonka Brands,3959.75,Receive Payment,2026-02-13T18:18:27Z,Paid,Billing System
+SO-2026-0112,Acme Retail,5218.11,Approve Order,2026-02-13T18:54:19Z,Approved,Order Desk
+SO-2026-0106,Initech Ltd,47501.04,Approve Order,2026-02-13T18:56:26Z,Approved,Order Desk
+SO-2026-0077,Soylent Foods,31725.02,Invoice Customer,2026-02-13T19:00:05Z,Invoiced,Billing System
+SO-2026-0102,Acme Retail,9786.00,Fulfil Order,2026-02-13T19:56:13Z,Fulfilled,Fulfilment Centre
+SO-2026-0109,Umbrella Group,1530.59,Run Credit Check,2026-02-13T21:16:17Z,Credit Check,Credit Desk
+SO-2026-0037,Hooli Inc,10829.77,Receive Payment,2026-02-13T21:27:14Z,Paid,Billing System
+SO-2026-0113,Hooli Inc,11675.11,Run Credit Check,2026-02-13T22:02:40Z,Credit Check,Credit Desk
+SO-2026-0086,Wonka Brands,40141.19,Fulfil Order,2026-02-13T22:46:24Z,Fulfilled,Fulfilment Centre
+SO-2026-0067,Initech Ltd,36677.27,Invoice Customer,2026-02-13T22:58:31Z,Invoiced,Billing System
+SO-2026-0029,Soylent Foods,19873.00,Receive Payment,2026-02-13T23:04:01Z,Paid,Billing System
+SO-2026-0109,Umbrella Group,5399.02,Place On Credit Hold,2026-02-13T23:07:17Z,On Credit Hold,Credit Desk
+SO-2026-0107,Stark Traders,38202.68,Approve Order,2026-02-13T23:20:55Z,Approved,Order Desk
+SO-2026-0093,Vandelay Co,32587.67,Fulfil Order,2026-02-13T23:39:45Z,Fulfilled,Fulfilment Centre
+SO-2026-0108,Umbrella Group,5134.72,Approve Order,2026-02-14T01:43:55Z,Approved,Order Desk
+SO-2026-0113,Hooli Inc,10946.94,Approve Order,2026-02-14T01:46:40Z,Approved,Order Desk
+SO-2026-0105,Vandelay Co,1032.09,Approve Order,2026-02-14T02:05:23Z,Approved,Order Desk
+SO-2026-0084,Acme Retail,40700.32,Invoice Customer,2026-02-14T02:16:54Z,Invoiced,Billing System
+SO-2026-0074,Wayne Enterprises,31681.13,Invoice Customer,2026-02-14T02:56:18Z,Invoiced,Billing System
+SO-2026-0023,Initech Ltd,33636.05,Receive Payment,2026-02-14T02:57:02Z,Paid,Billing System
+SO-2026-0110,Acme Retail,14080.04,Place On Credit Hold,2026-02-14T03:43:23Z,On Credit Hold,Credit Desk
+SO-2026-0111,Umbrella Group,8906.18,Approve Order,2026-02-14T04:27:18Z,Approved,Order Desk
+SO-2026-0094,Stark Traders,23775.80,Fulfil Order,2026-02-14T05:20:46Z,Fulfilled,Fulfilment Centre
+SO-2026-0097,Umbrella Group,7210.89,Release Credit Hold,2026-02-14T05:25:25Z,Approved,Credit Desk
+SO-2026-0098,Stark Traders,41114.07,Fulfil Order,2026-02-14T06:36:56Z,Fulfilled,Fulfilment Centre
+SO-2026-0095,Initech Ltd,3762.24,Fulfil Order,2026-02-14T07:04:46Z,Fulfilled,Fulfilment Centre
+SO-2026-0087,Umbrella Group,15082.20,Release Credit Hold,2026-02-14T07:26:20Z,Approved,Credit Desk
+SO-2026-0075,Umbrella Group,26316.21,Receive Payment,2026-02-14T07:59:26Z,Paid,Billing System
+SO-2026-0089,Wonka Brands,6775.04,Fulfil Order,2026-02-14T08:02:41Z,Fulfilled,Fulfilment Centre
+SO-2026-0078,Wayne Enterprises,14021.38,Invoice Customer,2026-02-14T08:41:21Z,Invoiced,Billing System
+SO-2026-0085,Acme Retail,44798.43,Invoice Customer,2026-02-14T10:07:16Z,Invoiced,Billing System
+SO-2026-0054,Globex Stores,2733.91,Receive Payment,2026-02-14T10:27:19Z,Paid,Billing System
+SO-2026-0107,Stark Traders,24074.81,Fulfil Order,2026-02-14T10:41:55Z,Fulfilled,Fulfilment Centre
+SO-2026-0051,Acme Retail,37335.64,Receive Payment,2026-02-14T10:53:38Z,Paid,Billing System
+SO-2026-0098,Stark Traders,46783.13,Invoice Customer,2026-02-14T11:38:56Z,Invoiced,Billing System
+SO-2026-0090,Stark Traders,46521.01,Fulfil Order,2026-02-14T11:46:03Z,Fulfilled,Fulfilment Centre
+SO-2026-0109,Umbrella Group,2148.24,Cancel Order,2026-02-14T11:48:17Z,Cancelled,Nadia Rahman
+SO-2026-0107,Stark Traders,23517.35,Invoice Customer,2026-02-14T11:51:55Z,Invoiced,Billing System
+SO-2026-0086,Wonka Brands,42351.80,Invoice Customer,2026-02-14T12:03:24Z,Invoiced,Billing System
+SO-2026-0093,Vandelay Co,41923.60,Invoice Customer,2026-02-14T12:14:45Z,Invoiced,Billing System
+SO-2026-0089,Wonka Brands,34053.79,Invoice Customer,2026-02-14T13:06:41Z,Invoiced,Billing System
+SO-2026-0091,Stark Traders,16462.08,Fulfil Order,2026-02-14T13:08:26Z,Fulfilled,Fulfilment Centre
+SO-2026-0100,Stark Traders,44832.96,Fulfil Order,2026-02-14T14:16:54Z,Fulfilled,Fulfilment Centre
+SO-2026-0052,Initech Ltd,7551.56,Receive Payment,2026-02-14T14:42:31Z,Paid,Billing System
+SO-2026-0110,Acme Retail,6717.17,Ship Goods,2026-02-14T15:24:23Z,Fulfilled,Fulfilment Centre
+SO-2026-0096,Initech Ltd,40945.01,Fulfil Order,2026-02-14T15:42:23Z,Fulfilled,Fulfilment Centre
+SO-2026-0113,Hooli Inc,24009.42,Fulfil Order,2026-02-14T16:46:40Z,Fulfilled,Fulfilment Centre
+SO-2026-0091,Stark Traders,4067.26,Invoice Customer,2026-02-14T16:48:26Z,Invoiced,Billing System
+SO-2026-0100,Stark Traders,3775.73,Invoice Customer,2026-02-14T18:22:54Z,Invoiced,Billing System
+SO-2026-0102,Acme Retail,9453.59,Invoice Customer,2026-02-14T19:10:13Z,Invoiced,Billing System
+SO-2026-0106,Initech Ltd,26978.29,Fulfil Order,2026-02-14T20:07:26Z,Fulfilled,Fulfilment Centre
+SO-2026-0097,Umbrella Group,16030.47,Fulfil Order,2026-02-14T20:19:25Z,Fulfilled,Fulfilment Centre
+SO-2026-0112,Acme Retail,30066.86,Fulfil Order,2026-02-14T22:45:19Z,Fulfilled,Fulfilment Centre
+SO-2026-0097,Umbrella Group,31186.22,Invoice Customer,2026-02-14T23:19:25Z,Invoiced,Billing System
+SO-2026-0099,Initech Ltd,32379.46,Release Credit Hold,2026-02-15T01:52:32Z,Approved,Credit Desk
+SO-2026-0090,Stark Traders,30566.31,Invoice Customer,2026-02-15T02:31:03Z,Invoiced,Billing System
+SO-2026-0105,Vandelay Co,29517.14,Fulfil Order,2026-02-15T02:36:23Z,Fulfilled,Fulfilment Centre
+SO-2026-0094,Stark Traders,45835.82,Invoice Customer,2026-02-15T02:40:46Z,Invoiced,Billing System
+SO-2026-0110,Acme Retail,43489.82,Invoice Customer,2026-02-15T03:54:23Z,Invoiced,Billing System
+SO-2026-0095,Initech Ltd,6403.01,Invoice Customer,2026-02-15T04:03:46Z,Invoiced,Billing System
+SO-2026-0113,Hooli Inc,4775.35,Invoice Customer,2026-02-15T04:21:40Z,Invoiced,Billing System
+SO-2026-0111,Umbrella Group,3348.85,Fulfil Order,2026-02-15T07:04:18Z,Fulfilled,Fulfilment Centre
+SO-2026-0108,Umbrella Group,17470.83,Fulfil Order,2026-02-15T07:17:55Z,Fulfilled,Fulfilment Centre
+SO-2026-0047,Acme Retail,40329.23,Receive Payment,2026-02-15T08:09:39Z,Paid,Billing System
+SO-2026-0018,Umbrella Group,25656.86,Receive Payment,2026-02-15T10:14:15Z,Paid,Billing System
+SO-2026-0087,Umbrella Group,11872.65,Fulfil Order,2026-02-15T11:26:20Z,Fulfilled,Fulfilment Centre
+SO-2026-0106,Initech Ltd,42163.21,Invoice Customer,2026-02-15T11:45:26Z,Invoiced,Billing System
+SO-2026-0105,Vandelay Co,25654.49,Invoice Customer,2026-02-15T12:26:23Z,Invoiced,Billing System
+SO-2026-0108,Umbrella Group,47947.23,Invoice Customer,2026-02-15T13:46:55Z,Invoiced,Billing System
+SO-2026-0096,Initech Ltd,37523.22,Invoice Customer,2026-02-15T15:28:23Z,Invoiced,Billing System
+SO-2026-0046,Wonka Brands,22478.07,Receive Payment,2026-02-15T16:00:33Z,Paid,Billing System
+SO-2026-0064,Wonka Brands,6396.42,Receive Payment,2026-02-15T16:23:45Z,Paid,Billing System
+SO-2026-0111,Umbrella Group,19130.51,Invoice Customer,2026-02-15T18:11:18Z,Invoiced,Billing System
+SO-2026-0112,Acme Retail,16763.84,Invoice Customer,2026-02-15T22:32:19Z,Invoiced,Billing System
+SO-2026-0056,Wayne Enterprises,5005.00,Receive Payment,2026-02-15T23:57:22Z,Paid,Billing System
+SO-2026-0087,Umbrella Group,28880.28,Invoice Customer,2026-02-16T02:46:20Z,Invoiced,Billing System
+SO-2026-0045,Initech Ltd,5538.81,Receive Payment,2026-02-16T05:38:25Z,Paid,Billing System
+SO-2026-0067,Initech Ltd,29288.64,Receive Payment,2026-02-16T05:56:31Z,Paid,Billing System
+SO-2026-0095,Initech Ltd,45151.25,Receive Payment,2026-02-16T07:08:46Z,Paid,Billing System
+SO-2026-0114,Vandelay Co,1023.10,Receive Order,2026-02-16T08:08:19Z,Received,Priya Nair
+SO-2026-0039,Vandelay Co,42064.37,Receive Payment,2026-02-16T08:46:49Z,Paid,Billing System
+SO-2026-0115,Wayne Enterprises,10869.66,Receive Order,2026-02-16T09:01:17Z,Received,Priya Nair
+SO-2026-0116,Hooli Inc,23671.80,Receive Order,2026-02-16T10:01:18Z,Received,Tom Becker
+SO-2026-0117,Wayne Enterprises,32884.24,Receive Order,2026-02-16T10:09:51Z,Received,Tom Becker
+SO-2026-0024,Umbrella Group,42814.31,Receive Payment,2026-02-16T10:22:17Z,Paid,Billing System
+SO-2026-0022,Wonka Brands,28565.11,Receive Payment,2026-02-16T10:37:27Z,Paid,Billing System
+SO-2026-0118,Initech Ltd,9386.88,Receive Order,2026-02-16T10:56:49Z,Received,Priya Nair
+SO-2026-0119,Acme Retail,29069.67,Receive Order,2026-02-16T11:41:09Z,Received,Luis Ortega
+SO-2026-0066,Stark Traders,20802.80,Receive Payment,2026-02-16T11:42:19Z,Paid,Billing System
+SO-2026-0061,Stark Traders,24202.28,Receive Payment,2026-02-16T11:47:47Z,Paid,Billing System
+SO-2026-0120,Soylent Foods,37950.69,Receive Order,2026-02-16T12:44:58Z,Received,Nadia Rahman
+SO-2026-0121,Umbrella Group,9492.49,Receive Order,2026-02-16T13:38:35Z,Received,Tom Becker
+SO-2026-0122,Soylent Foods,11771.37,Receive Order,2026-02-16T13:44:26Z,Received,Tom Becker
+SO-2026-0116,Hooli Inc,32887.63,Run Credit Check,2026-02-16T13:46:18Z,Credit Check,Credit Desk
+SO-2026-0114,Vandelay Co,23527.34,Run Credit Check,2026-02-16T14:44:19Z,Credit Check,Credit Desk
+SO-2026-0123,Hooli Inc,35001.05,Receive Order,2026-02-16T15:05:21Z,Received,Luis Ortega
+SO-2026-0053,Umbrella Group,17474.70,Receive Payment,2026-02-16T15:14:01Z,Paid,Billing System
+SO-2026-0115,Wayne Enterprises,31734.59,Run Credit Check,2026-02-16T15:19:17Z,Credit Check,Credit Desk
+SO-2026-0083,Initech Ltd,23880.86,Receive Payment,2026-02-16T15:25:25Z,Paid,Billing System
+SO-2026-0118,Initech Ltd,9773.44,Run Credit Check,2026-02-16T15:56:49Z,Credit Check,Credit Desk
+SO-2026-0124,Umbrella Group,15222.70,Receive Order,2026-02-16T16:27:52Z,Received,Nadia Rahman
+SO-2026-0099,Initech Ltd,46138.24,Fulfil Order,2026-02-16T16:35:32Z,Fulfilled,Fulfilment Centre
+SO-2026-0119,Acme Retail,37704.59,Run Credit Check,2026-02-16T16:38:09Z,Credit Check,Credit Desk
+SO-2026-0125,Acme Retail,8221.43,Receive Order,2026-02-16T16:45:36Z,Received,Tom Becker
+SO-2026-0126,Vandelay Co,34714.96,Receive Order,2026-02-16T16:55:46Z,Received,Tom Becker
+SO-2026-0122,Soylent Foods,32995.40,Run Credit Check,2026-02-16T17:14:26Z,Credit Check,Credit Desk
+SO-2026-0115,Wayne Enterprises,14293.01,Place On Credit Hold,2026-02-16T17:18:17Z,On Credit Hold,Credit Desk
+SO-2026-0089,Wonka Brands,33313.32,Receive Payment,2026-02-16T17:45:41Z,Paid,Billing System
+SO-2026-0120,Soylent Foods,30301.12,Run Credit Check,2026-02-16T18:06:58Z,Credit Check,Credit Desk
+SO-2026-0123,Hooli Inc,37255.69,Run Credit Check,2026-02-16T18:11:21Z,Credit Check,Credit Desk
+SO-2026-0049,Hooli Inc,8757.98,Receive Payment,2026-02-16T18:35:35Z,Paid,Billing System
+SO-2026-0117,Wayne Enterprises,15769.32,Run Credit Check,2026-02-16T18:40:51Z,Credit Check,Credit Desk
+SO-2026-0118,Initech Ltd,20720.29,Place On Credit Hold,2026-02-16T19:16:49Z,On Credit Hold,Credit Desk
+SO-2026-0116,Hooli Inc,1327.25,Place On Credit Hold,2026-02-16T19:34:18Z,On Credit Hold,Credit Desk
+SO-2026-0121,Umbrella Group,46838.92,Run Credit Check,2026-02-16T19:42:35Z,Credit Check,Credit Desk
+SO-2026-0042,Globex Stores,17108.18,Receive Payment,2026-02-16T19:42:44Z,Paid,Billing System
+SO-2026-0035,Initech Ltd,47759.31,Receive Payment,2026-02-16T20:21:33Z,Paid,Billing System
+SO-2026-0062,Hooli Inc,33216.41,Resolve Dispute,2026-02-16T20:22:31Z,Invoiced,Billing System
+SO-2026-0117,Wayne Enterprises,46174.21,Approve Order,2026-02-16T21:08:51Z,Approved,Order Desk
+SO-2026-0084,Acme Retail,4020.67,Receive Payment,2026-02-16T21:15:54Z,Paid,Billing System
+SO-2026-0114,Vandelay Co,33729.64,Approve Order,2026-02-16T21:36:19Z,Approved,Order Desk
+SO-2026-0119,Acme Retail,46504.11,Place On Credit Hold,2026-02-16T21:51:09Z,On Credit Hold,Credit Desk
+SO-2026-0124,Umbrella Group,28156.55,Approve Order,2026-02-16T21:51:52Z,Approved,Order Desk
+SO-2026-0120,Soylent Foods,21401.03,Approve Order,2026-02-16T22:48:58Z,Approved,Order Desk
+SO-2026-0126,Vandelay Co,36764.00,Run Credit Check,2026-02-17T00:48:46Z,Credit Check,Credit Desk
+SO-2026-0125,Acme Retail,6152.69,Run Credit Check,2026-02-17T01:44:36Z,Credit Check,Credit Desk
+SO-2026-0043,Globex Stores,18525.14,Receive Payment,2026-02-17T02:08:16Z,Paid,Billing System
+SO-2026-0122,Soylent Foods,40870.17,Approve Order,2026-02-17T02:24:26Z,Approved,Order Desk
+SO-2026-0080,Wonka Brands,46318.26,Receive Payment,2026-02-17T02:25:49Z,Paid,Billing System
+SO-2026-0121,Umbrella Group,20529.27,Approve Order,2026-02-17T04:22:35Z,Approved,Order Desk
+SO-2026-0113,Hooli Inc,18128.54,Receive Payment,2026-02-17T04:31:40Z,Paid,Billing System
+SO-2026-0069,Wayne Enterprises,27442.05,Receive Payment,2026-02-17T04:54:04Z,Paid,Billing System
+SO-2026-0123,Hooli Inc,16552.53,Approve Order,2026-02-17T05:38:21Z,Approved,Order Desk
+SO-2026-0098,Stark Traders,2926.22,Receive Payment,2026-02-17T06:59:56Z,Paid,Billing System
+SO-2026-0127,Wayne Enterprises,30300.11,Receive Order,2026-02-17T08:17:31Z,Received,Tom Becker
+SO-2026-0106,Initech Ltd,39413.79,Receive Payment,2026-02-17T09:06:26Z,Paid,Billing System
+SO-2026-0128,Globex Stores,20201.48,Receive Order,2026-02-17T09:54:46Z,Received,Luis Ortega
+SO-2026-0125,Acme Retail,9292.57,Approve Order,2026-02-17T10:43:36Z,Approved,Order Desk
+SO-2026-0126,Vandelay Co,26300.88,Approve Order,2026-02-17T11:00:46Z,Approved,Order Desk
+SO-2026-0129,Hooli Inc,46369.18,Receive Order,2026-02-17T11:57:00Z,Received,Tom Becker
+SO-2026-0130,Vandelay Co,35324.67,Receive Order,2026-02-17T12:22:30Z,Received,Tom Becker
+SO-2026-0131,Vandelay Co,26949.65,Receive Order,2026-02-17T13:39:19Z,Received,Priya Nair
+SO-2026-0121,Umbrella Group,4275.12,Fulfil Order,2026-02-17T14:10:35Z,Fulfilled,Fulfilment Centre
+SO-2026-0124,Umbrella Group,44599.70,Fulfil Order,2026-02-17T14:28:52Z,Fulfilled,Fulfilment Centre
+SO-2026-0132,Globex Stores,33769.17,Receive Order,2026-02-17T14:56:19Z,Received,Luis Ortega
+SO-2026-0099,Initech Ltd,18258.02,Invoice Customer,2026-02-17T15:24:32Z,Invoiced,Billing System
+SO-2026-0133,Stark Traders,47943.55,Receive Order,2026-02-17T16:00:39Z,Received,Tom Becker
+SO-2026-0116,Hooli Inc,15431.63,Release Credit Hold,2026-02-17T16:15:18Z,Approved,Credit Desk
+SO-2026-0129,Hooli Inc,26991.88,Run Credit Check,2026-02-17T16:34:00Z,Credit Check,Credit Desk
+SO-2026-0128,Globex Stores,38428.00,Approve Order,2026-02-17T16:35:46Z,Approved,Order Desk
+SO-2026-0132,Globex Stores,18625.24,Run Credit Check,2026-02-17T16:38:19Z,Credit Check,Credit Desk
+SO-2026-0122,Soylent Foods,41955.17,Fulfil Order,2026-02-17T16:44:26Z,Fulfilled,Fulfilment Centre
+SO-2026-0059,Umbrella Group,35612.87,Receive Payment,2026-02-17T17:15:23Z,Paid,Billing System
+SO-2026-0121,Umbrella Group,763.39,Invoice Customer,2026-02-17T18:07:35Z,Invoiced,Billing System
+SO-2026-0131,Vandelay Co,12033.45,Run Credit Check,2026-02-17T18:26:19Z,Credit Check,Credit Desk
+SO-2026-0130,Vandelay Co,45058.02,Run Credit Check,2026-02-17T20:29:30Z,Credit Check,Credit Desk
+SO-2026-0072,Wonka Brands,19551.44,Receive Payment,2026-02-17T22:10:11Z,Paid,Billing System
+SO-2026-0130,Vandelay Co,8466.68,Place On Credit Hold,2026-02-17T22:55:30Z,On Credit Hold,Credit Desk
+SO-2026-0115,Wayne Enterprises,31832.18,Release Credit Hold,2026-02-17T23:12:17Z,Approved,Credit Desk
+SO-2026-0133,Stark Traders,30000.69,Run Credit Check,2026-02-17T23:14:39Z,Credit Check,Credit Desk
+SO-2026-0085,Acme Retail,16247.57,Receive Payment,2026-02-17T23:46:16Z,Paid,Billing System
+SO-2026-0129,Hooli Inc,24417.96,Place On Credit Hold,2026-02-18T00:50:00Z,On Credit Hold,Credit Desk
+SO-2026-0071,Hooli Inc,35152.01,Receive Payment,2026-02-18T01:07:56Z,Paid,Billing System
+SO-2026-0015,Initech Ltd,18932.62,Receive Payment,2026-02-18T01:56:46Z,Paid,Billing System
+SO-2026-0131,Vandelay Co,13218.78,Place On Credit Hold,2026-02-18T02:03:19Z,On Credit Hold,Credit Desk
+SO-2026-0123,Hooli Inc,9516.36,Fulfil Order,2026-02-18T02:20:21Z,Fulfilled,Fulfilment Centre
+SO-2026-0132,Globex Stores,25100.21,Place On Credit Hold,2026-02-18T02:23:19Z,On Credit Hold,Credit Desk
+SO-2026-0044,Acme Retail,986.70,Receive Payment,2026-02-18T03:48:43Z,Paid,Billing System
+SO-2026-0118,Initech Ltd,31938.02,Release Credit Hold,2026-02-18T04:27:49Z,Approved,Credit Desk
+SO-2026-0073,Wonka Brands,27022.32,Receive Payment,2026-02-18T04:41:57Z,Paid,Billing System
+SO-2026-0092,Wayne Enterprises,25226.17,Receive Payment,2026-02-18T05:31:51Z,Paid,Billing System
+SO-2026-0114,Vandelay Co,14399.44,Fulfil Order,2026-02-18T05:34:19Z,Fulfilled,Fulfilment Centre
+SO-2026-0126,Vandelay Co,14474.51,Fulfil Order,2026-02-18T05:50:46Z,Fulfilled,Fulfilment Centre
+SO-2026-0115,Wayne Enterprises,7001.43,Fulfil Order,2026-02-18T07:29:17Z,Fulfilled,Fulfilment Centre
+SO-2026-0124,Umbrella Group,34651.52,Invoice Customer,2026-02-18T09:06:52Z,Invoiced,Billing System
+SO-2026-0122,Soylent Foods,40372.36,Invoice Customer,2026-02-18T09:26:26Z,Invoiced,Billing System
+SO-2026-0116,Hooli Inc,27506.50,Fulfil Order,2026-02-18T09:51:18Z,Fulfilled,Fulfilment Centre
+SO-2026-0134,Wonka Brands,33120.52,Receive Order,2026-02-18T09:54:45Z,Received,Tom Becker
+SO-2026-0127,Wayne Enterprises,40846.79,Ship Goods,2026-02-18T10:09:31Z,Fulfilled,Fulfilment Centre
+SO-2026-0135,Initech Ltd,35420.01,Receive Order,2026-02-18T10:32:09Z,Received,Tom Becker
+SO-2026-0129,Hooli Inc,1982.44,Release Credit Hold,2026-02-18T10:47:00Z,Approved,Credit Desk
+SO-2026-0133,Stark Traders,10520.61,Approve Order,2026-02-18T11:08:39Z,Approved,Order Desk
+SO-2026-0120,Soylent Foods,3984.01,Fulfil Order,2026-02-18T11:15:58Z,Fulfilled,Fulfilment Centre
+SO-2026-0125,Acme Retail,18894.45,Fulfil Order,2026-02-18T11:55:36Z,Fulfilled,Fulfilment Centre
+SO-2026-0136,Vandelay Co,20547.07,Receive Order,2026-02-18T12:57:42Z,Received,Priya Nair
+SO-2026-0137,Hooli Inc,42620.31,Receive Order,2026-02-18T13:06:52Z,Received,Luis Ortega
+SO-2026-0128,Globex Stores,20972.27,Fulfil Order,2026-02-18T13:58:46Z,Fulfilled,Fulfilment Centre
+SO-2026-0123,Hooli Inc,40986.51,Invoice Customer,2026-02-18T14:20:21Z,Invoiced,Billing System
+SO-2026-0033,Soylent Foods,12923.18,Receive Payment,2026-02-18T14:57:33Z,Paid,Billing System
+SO-2026-0117,Wayne Enterprises,1145.95,Fulfil Order,2026-02-18T16:03:51Z,Fulfilled,Fulfilment Centre
+SO-2026-0138,Wayne Enterprises,30611.23,Receive Order,2026-02-18T16:38:46Z,Received,Priya Nair
+SO-2026-0130,Vandelay Co,31213.60,Cancel Order,2026-02-18T17:09:30Z,Cancelled,Tom Becker
+SO-2026-0135,Initech Ltd,11065.44,Run Credit Check,2026-02-18T17:22:09Z,Credit Check,Credit Desk
+SO-2026-0127,Wayne Enterprises,40168.15,Invoice Customer,2026-02-18T17:25:31Z,Invoiced,Billing System
+SO-2026-0120,Soylent Foods,36420.12,Invoice Customer,2026-02-18T18:08:58Z,Invoiced,Billing System
+SO-2026-0136,Vandelay Co,25474.70,Run Credit Check,2026-02-18T18:10:42Z,Credit Check,Credit Desk
+SO-2026-0117,Wayne Enterprises,33237.40,Invoice Customer,2026-02-18T18:15:51Z,Invoiced,Billing System
+SO-2026-0134,Wonka Brands,39719.25,Run Credit Check,2026-02-18T18:48:45Z,Credit Check,Credit Desk
+SO-2026-0115,Wayne Enterprises,7470.29,Invoice Customer,2026-02-18T19:07:17Z,Invoiced,Billing System
+SO-2026-0138,Wayne Enterprises,20069.50,Run Credit Check,2026-02-18T20:05:46Z,Credit Check,Credit Desk
+SO-2026-0135,Initech Ltd,3637.60,Approve Order,2026-02-18T20:06:09Z,Approved,Order Desk
+SO-2026-0137,Hooli Inc,14104.52,Run Credit Check,2026-02-18T20:32:52Z,Credit Check,Credit Desk
+SO-2026-0114,Vandelay Co,45788.99,Invoice Customer,2026-02-18T20:44:19Z,Invoiced,Billing System
+SO-2026-0136,Vandelay Co,13016.71,Place On Credit Hold,2026-02-18T20:53:42Z,On Credit Hold,Credit Desk
+SO-2026-0128,Globex Stores,21680.19,Invoice Customer,2026-02-18T21:22:46Z,Invoiced,Billing System
+SO-2026-0121,Umbrella Group,3629.23,Raise Dispute,2026-02-18T22:02:35Z,Disputed,Tom Becker
+SO-2026-0065,Vandelay Co,34514.24,Receive Payment,2026-02-18T22:32:32Z,Paid,Billing System
+SO-2026-0119,Acme Retail,212.29,Release Credit Hold,2026-02-18T22:37:09Z,Approved,Credit Desk
+SO-2026-0137,Hooli Inc,14050.04,Approve Order,2026-02-18T22:42:52Z,Approved,Order Desk
+SO-2026-0116,Hooli Inc,13676.93,Invoice Customer,2026-02-18T23:56:18Z,Invoiced,Billing System
+SO-2026-0138,Wayne Enterprises,33984.44,Place On Credit Hold,2026-02-19T00:21:46Z,On Credit Hold,Credit Desk
+SO-2026-0086,Wonka Brands,3909.18,Receive Payment,2026-02-19T01:23:24Z,Paid,Billing System
+SO-2026-0125,Acme Retail,18605.71,Invoice Customer,2026-02-19T01:46:36Z,Invoiced,Billing System
+SO-2026-0132,Globex Stores,12611.23,Release Credit Hold,2026-02-19T02:23:19Z,Approved,Credit Desk
+SO-2026-0126,Vandelay Co,40017.84,Invoice Customer,2026-02-19T03:00:46Z,Invoiced,Billing System
+SO-2026-0088,Wayne Enterprises,38709.92,Receive Payment,2026-02-19T03:22:26Z,Paid,Billing System
+SO-2026-0105,Vandelay Co,9501.31,Receive Payment,2026-02-19T03:29:23Z,Paid,Billing System
+SO-2026-0135,Initech Ltd,34282.34,Fulfil Order,2026-02-19T04:24:09Z,Fulfilled,Fulfilment Centre
+SO-2026-0112,Acme Retail,37663.89,Receive Payment,2026-02-19T05:48:19Z,Paid,Billing System
+SO-2026-0138,Wayne Enterprises,47314.87,Cancel Order,2026-02-19T06:33:46Z,Cancelled,Priya Nair
+SO-2026-0133,Stark Traders,22356.55,Fulfil Order,2026-02-19T07:07:39Z,Fulfilled,Fulfilment Centre
+SO-2026-0134,Wonka Brands,26346.47,Approve Order,2026-02-19T07:25:45Z,Approved,Order Desk
+SO-2026-0139,Wonka Brands,6955.48,Receive Order,2026-02-19T08:40:47Z,Received,Luis Ortega
+SO-2026-0140,Wayne Enterprises,32724.18,Receive Order,2026-02-19T11:09:27Z,Received,Nadia Rahman
+SO-2026-0141,Vandelay Co,6844.84,Receive Order,2026-02-19T11:33:14Z,Received,Priya Nair
+SO-2026-0142,Vandelay Co,38271.60,Receive Order,2026-02-19T11:46:10Z,Received,Priya Nair
+SO-2026-0143,Wonka Brands,6508.09,Receive Order,2026-02-19T12:47:50Z,Received,Luis Ortega
+SO-2026-0131,Vandelay Co,1246.08,Release Credit Hold,2026-02-19T12:59:19Z,Approved,Credit Desk
+SO-2026-0139,Wonka Brands,43002.71,Run Credit Check,2026-02-19T13:03:47Z,Credit Check,Credit Desk
+SO-2026-0144,Hooli Inc,19668.06,Receive Order,2026-02-19T13:49:19Z,Received,Tom Becker
+SO-2026-0145,Soylent Foods,38094.06,Receive Order,2026-02-19T14:24:43Z,Received,Luis Ortega
+SO-2026-0146,Soylent Foods,11765.12,Receive Order,2026-02-19T14:31:59Z,Received,Priya Nair
+SO-2026-0143,Wonka Brands,22595.34,Run Credit Check,2026-02-19T14:49:50Z,Credit Check,Credit Desk
+SO-2026-0147,Initech Ltd,4241.90,Receive Order,2026-02-19T14:50:17Z,Received,Tom Becker
+SO-2026-0063,Vandelay Co,46635.21,Receive Payment,2026-02-19T14:53:07Z,Paid,Billing System
+SO-2026-0142,Vandelay Co,34899.49,Approve Order,2026-02-19T15:52:10Z,Approved,Order Desk
+SO-2026-0062,Hooli Inc,24659.70,Receive Payment,2026-02-19T18:10:31Z,Paid,Billing System
+SO-2026-0082,Soylent Foods,32714.26,Receive Payment,2026-02-19T18:16:27Z,Paid,Billing System
+SO-2026-0145,Soylent Foods,14511.43,Run Credit Check,2026-02-19T18:54:43Z,Credit Check,Credit Desk
+SO-2026-0136,Vandelay Co,43122.92,Cancel Order,2026-02-19T19:06:42Z,Cancelled,Priya Nair
+SO-2026-0119,Acme Retail,32416.64,Fulfil Order,2026-02-19T19:47:09Z,Fulfilled,Fulfilment Centre
+SO-2026-0140,Wayne Enterprises,28269.39,Run Credit Check,2026-02-19T19:54:27Z,Credit Check,Credit Desk
+SO-2026-0143,Wonka Brands,14119.47,Place On Credit Hold,2026-02-19T20:13:50Z,On Credit Hold,Credit Desk
+SO-2026-0133,Stark Traders,2671.51,Invoice Customer,2026-02-19T20:22:39Z,Invoiced,Billing System
+SO-2026-0144,Hooli Inc,33301.75,Run Credit Check,2026-02-19T20:28:19Z,Credit Check,Credit Desk
+SO-2026-0147,Initech Ltd,19664.86,Approve Order,2026-02-19T20:58:17Z,Approved,Order Desk
+SO-2026-0140,Wayne Enterprises,30972.25,Cancel Order,2026-02-19T21:51:27Z,Cancelled,Nadia Rahman
+SO-2026-0134,Wonka Brands,11519.03,Fulfil Order,2026-02-19T21:54:45Z,Fulfilled,Fulfilment Centre
+SO-2026-0146,Soylent Foods,3991.62,Run Credit Check,2026-02-19T22:03:59Z,Credit Check,Credit Desk
+SO-2026-0141,Vandelay Co,2963.17,Approve Order,2026-02-19T22:21:14Z,Approved,Order Desk
+SO-2026-0139,Wonka Brands,47875.57,Approve Order,2026-02-19T23:36:47Z,Approved,Order Desk
+SO-2026-0120,Soylent Foods,16200.59,Raise Dispute,2026-02-20T01:18:58Z,Disputed,Nadia Rahman
+SO-2026-0135,Initech Ltd,39672.86,Invoice Customer,2026-02-20T03:04:09Z,Invoiced,Billing System
+SO-2026-0145,Soylent Foods,25083.98,Approve Order,2026-02-20T03:10:43Z,Approved,Order Desk
+SO-2026-0144,Hooli Inc,19947.13,Approve Order,2026-02-20T04:15:19Z,Approved,Order Desk
+SO-2026-0118,Initech Ltd,35209.45,Fulfil Order,2026-02-20T04:49:49Z,Fulfilled,Fulfilment Centre
+SO-2026-0141,Vandelay Co,46145.82,Fulfil Order,2026-02-20T05:53:14Z,Fulfilled,Fulfilment Centre
+SO-2026-0079,Acme Retail,12862.41,Receive Payment,2026-02-20T06:37:35Z,Paid,Billing System
+SO-2026-0129,Hooli Inc,31198.99,Fulfil Order,2026-02-20T08:26:00Z,Fulfilled,Fulfilment Centre
+SO-2026-0137,Hooli Inc,35417.99,Fulfil Order,2026-02-20T09:29:52Z,Fulfilled,Fulfilment Centre
+SO-2026-0132,Globex Stores,39784.26,Fulfil Order,2026-02-20T10:16:19Z,Fulfilled,Fulfilment Centre
+SO-2026-0119,Acme Retail,40042.66,Invoice Customer,2026-02-20T10:27:09Z,Invoiced,Billing System
+SO-2026-0148,Soylent Foods,37538.07,Receive Order,2026-02-20T10:43:23Z,Received,Nadia Rahman
+SO-2026-0131,Vandelay Co,22242.20,Fulfil Order,2026-02-20T11:21:19Z,Fulfilled,Fulfilment Centre
+SO-2026-0149,Acme Retail,1356.23,Receive Order,2026-02-20T11:38:47Z,Received,Nadia Rahman
+SO-2026-0147,Initech Ltd,30515.43,Fulfil Order,2026-02-20T13:18:17Z,Fulfilled,Fulfilment Centre
+SO-2026-0148,Soylent Foods,37868.42,Run Credit Check,2026-02-20T13:20:23Z,Credit Check,Credit Desk
+SO-2026-0150,Initech Ltd,44453.84,Receive Order,2026-02-20T13:53:02Z,Received,Nadia Rahman
+SO-2026-0151,Stark Traders,37223.34,Receive Order,2026-02-20T15:32:49Z,Received,Priya Nair
+SO-2026-0152,Globex Stores,4210.57,Receive Order,2026-02-20T15:37:28Z,Received,Tom Becker
+SO-2026-0131,Vandelay Co,46392.68,Invoice Customer,2026-02-20T15:42:19Z,Invoiced,Billing System
+SO-2026-0145,Soylent Foods,26365.34,Fulfil Order,2026-02-20T15:57:43Z,Fulfilled,Fulfilment Centre
+SO-2026-0134,Wonka Brands,32595.11,Invoice Customer,2026-02-20T16:05:45Z,Invoiced,Billing System
+SO-2026-0149,Acme Retail,4527.42,Run Credit Check,2026-02-20T16:19:47Z,Credit Check,Credit Desk
+SO-2026-0126,Vandelay Co,9802.01,Receive Payment,2026-02-20T16:27:46Z,Paid,Billing System
+SO-2026-0111,Umbrella Group,45842.03,Receive Payment,2026-02-20T16:40:18Z,Paid,Billing System
+SO-2026-0151,Stark Traders,34444.75,Run Credit Check,2026-02-20T16:47:49Z,Credit Check,Credit Desk
+SO-2026-0129,Hooli Inc,19919.06,Invoice Customer,2026-02-20T16:57:00Z,Invoiced,Billing System
+SO-2026-0143,Wonka Brands,13957.40,Release Credit Hold,2026-02-20T17:03:50Z,Approved,Credit Desk
+SO-2026-0150,Initech Ltd,38741.88,Run Credit Check,2026-02-20T17:27:02Z,Credit Check,Credit Desk
+SO-2026-0139,Wonka Brands,24977.25,Fulfil Order,2026-02-20T17:44:47Z,Fulfilled,Fulfilment Centre
+SO-2026-0149,Acme Retail,37096.54,Approve Order,2026-02-20T19:07:47Z,Approved,Order Desk
+SO-2026-0148,Soylent Foods,27577.61,Approve Order,2026-02-20T19:58:23Z,Approved,Order Desk
+SO-2026-0146,Soylent Foods,20885.37,Cancel Order,2026-02-20T20:17:59Z,Cancelled,Priya Nair
+SO-2026-0141,Vandelay Co,41035.19,Invoice Customer,2026-02-20T20:21:14Z,Invoiced,Billing System
+SO-2026-0070,Wayne Enterprises,14313.23,Receive Payment,2026-02-20T21:18:27Z,Paid,Billing System
+SO-2026-0118,Initech Ltd,36014.89,Invoice Customer,2026-02-20T21:25:49Z,Invoiced,Billing System
+SO-2026-0152,Globex Stores,17751.97,Run Credit Check,2026-02-20T22:09:28Z,Credit Check,Credit Desk
+SO-2026-0057,Globex Stores,13331.54,Receive Payment,2026-02-20T22:34:52Z,Paid,Billing System
+SO-2026-0142,Vandelay Co,11233.55,Fulfil Order,2026-02-20T22:58:10Z,Fulfilled,Fulfilment Centre
+SO-2026-0093,Vandelay Co,40167.28,Receive Payment,2026-02-20T23:11:45Z,Paid,Billing System
+SO-2026-0151,Stark Traders,30043.80,Approve Order,2026-02-21T00:29:49Z,Approved,Order Desk
+SO-2026-0121,Umbrella Group,9773.58,Resolve Dispute,2026-02-21T01:11:35Z,Invoiced,Billing System
+SO-2026-0139,Wonka Brands,26852.75,Invoice Customer,2026-02-21T02:07:47Z,Invoiced,Billing System
+SO-2026-0145,Soylent Foods,16468.09,Invoice Customer,2026-02-21T02:20:43Z,Invoiced,Billing System
+SO-2026-0142,Vandelay Co,31807.12,Invoice Customer,2026-02-21T03:58:10Z,Invoiced,Billing System
+SO-2026-0143,Wonka Brands,7782.09,Fulfil Order,2026-02-21T04:41:50Z,Fulfilled,Fulfilment Centre
+SO-2026-0152,Globex Stores,5779.23,Approve Order,2026-02-21T05:04:28Z,Approved,Order Desk
+SO-2026-0150,Initech Ltd,16923.65,Approve Order,2026-02-21T05:25:02Z,Approved,Order Desk
+SO-2026-0143,Wonka Brands,34323.06,Invoice Customer,2026-02-21T06:35:50Z,Invoiced,Billing System
+SO-2026-0120,Soylent Foods,7743.41,Resolve Dispute,2026-02-21T07:02:58Z,Invoiced,Billing System
+SO-2026-0137,Hooli Inc,19098.79,Invoice Customer,2026-02-21T08:06:52Z,Invoiced,Billing System
+SO-2026-0147,Initech Ltd,42565.77,Invoice Customer,2026-02-21T09:44:17Z,Invoiced,Billing System
+SO-2026-0132,Globex Stores,9212.65,Invoice Customer,2026-02-21T10:09:19Z,Invoiced,Billing System
+SO-2026-0149,Acme Retail,45920.22,Fulfil Order,2026-02-21T12:44:47Z,Fulfilled,Fulfilment Centre
+SO-2026-0144,Hooli Inc,32932.80,Fulfil Order,2026-02-21T15:06:19Z,Fulfilled,Fulfilment Centre
+SO-2026-0148,Soylent Foods,32052.01,Fulfil Order,2026-02-21T16:11:23Z,Fulfilled,Fulfilment Centre
+SO-2026-0148,Soylent Foods,19328.88,Invoice Customer,2026-02-21T20:23:23Z,Invoiced,Billing System
+SO-2026-0077,Soylent Foods,24433.79,Receive Payment,2026-02-22T01:03:05Z,Paid,Billing System
+SO-2026-0091,Stark Traders,7270.31,Receive Payment,2026-02-22T01:34:26Z,Paid,Billing System
+SO-2026-0152,Globex Stores,7884.05,Fulfil Order,2026-02-22T01:56:28Z,Fulfilled,Fulfilment Centre
+SO-2026-0144,Hooli Inc,40351.16,Invoice Customer,2026-02-22T02:04:19Z,Invoiced,Billing System
+SO-2026-0151,Stark Traders,45614.27,Fulfil Order,2026-02-22T05:02:49Z,Fulfilled,Fulfilment Centre
+SO-2026-0108,Umbrella Group,43045.67,Receive Payment,2026-02-22T05:37:55Z,Paid,Billing System
+SO-2026-0149,Acme Retail,3026.05,Invoice Customer,2026-02-22T06:56:47Z,Invoiced,Billing System
+SO-2026-0127,Wayne Enterprises,31667.40,Receive Payment,2026-02-22T07:57:31Z,Paid,Billing System
+SO-2026-0152,Globex Stores,4977.63,Invoice Customer,2026-02-22T08:06:28Z,Invoiced,Billing System
+SO-2026-0099,Initech Ltd,31847.90,Receive Payment,2026-02-22T08:52:32Z,Paid,Billing System
+SO-2026-0116,Hooli Inc,27867.30,Receive Payment,2026-02-22T09:58:18Z,Paid,Billing System
+SO-2026-0151,Stark Traders,33731.44,Invoice Customer,2026-02-22T10:40:49Z,Invoiced,Billing System
+SO-2026-0128,Globex Stores,7012.25,Receive Payment,2026-02-22T11:35:46Z,Paid,Billing System
+SO-2026-0090,Stark Traders,35964.55,Receive Payment,2026-02-22T14:12:03Z,Paid,Billing System
+SO-2026-0124,Umbrella Group,25034.71,Receive Payment,2026-02-22T14:24:52Z,Paid,Billing System
+SO-2026-0107,Stark Traders,25125.74,Receive Payment,2026-02-22T18:36:55Z,Paid,Billing System
+SO-2026-0150,Initech Ltd,2311.64,Fulfil Order,2026-02-22T19:40:02Z,Fulfilled,Fulfilment Centre
+SO-2026-0097,Umbrella Group,23883.73,Receive Payment,2026-02-22T21:30:25Z,Paid,Billing System
+SO-2026-0150,Initech Ltd,29396.21,Invoice Customer,2026-02-23T01:11:02Z,Invoiced,Billing System
+SO-2026-0147,Initech Ltd,15815.39,Receive Payment,2026-02-23T03:40:17Z,Paid,Billing System
+SO-2026-0153,Wayne Enterprises,12918.04,Receive Order,2026-02-23T09:27:34Z,Received,Luis Ortega
+SO-2026-0154,Acme Retail,2863.06,Receive Order,2026-02-23T10:02:57Z,Received,Luis Ortega
+SO-2026-0155,Initech Ltd,20110.64,Receive Order,2026-02-23T10:26:17Z,Received,Priya Nair
+SO-2026-0156,Acme Retail,18355.72,Receive Order,2026-02-23T10:49:38Z,Received,Tom Becker
+SO-2026-0125,Acme Retail,26882.10,Receive Payment,2026-02-23T11:26:36Z,Paid,Billing System
+SO-2026-0157,Acme Retail,31854.57,Receive Order,2026-02-23T11:55:54Z,Received,Luis Ortega
+SO-2026-0158,Wonka Brands,33388.84,Receive Order,2026-02-23T12:10:47Z,Received,Priya Nair
+SO-2026-0159,Globex Stores,29978.27,Receive Order,2026-02-23T12:31:55Z,Received,Luis Ortega
+SO-2026-0160,Stark Traders,12151.77,Receive Order,2026-02-23T13:10:41Z,Received,Nadia Rahman
+SO-2026-0161,Wonka Brands,16453.35,Receive Order,2026-02-23T13:55:00Z,Received,Luis Ortega
+SO-2026-0162,Stark Traders,7658.12,Receive Order,2026-02-23T14:50:57Z,Received,Nadia Rahman
+SO-2026-0163,Wonka Brands,19106.88,Receive Order,2026-02-23T15:45:26Z,Received,Nadia Rahman
+SO-2026-0164,Initech Ltd,40316.75,Receive Order,2026-02-23T16:02:58Z,Received,Luis Ortega
+SO-2026-0153,Wayne Enterprises,32401.62,Run Credit Check,2026-02-23T16:46:34Z,Credit Check,Credit Desk
+SO-2026-0156,Acme Retail,39529.59,Run Credit Check,2026-02-23T16:52:38Z,Credit Check,Credit Desk
+SO-2026-0154,Acme Retail,41327.08,Run Credit Check,2026-02-23T17:56:57Z,Credit Check,Credit Desk
+SO-2026-0157,Acme Retail,28513.77,Run Credit Check,2026-02-23T17:57:54Z,Credit Check,Credit Desk
+SO-2026-0160,Stark Traders,9263.77,Approve Order,2026-02-23T18:15:41Z,Approved,Order Desk
+SO-2026-0156,Acme Retail,1099.44,Approve Order,2026-02-23T18:23:38Z,Approved,Order Desk
+SO-2026-0074,Wayne Enterprises,29527.33,Receive Payment,2026-02-23T18:44:18Z,Paid,Billing System
+SO-2026-0158,Wonka Brands,17047.71,Run Credit Check,2026-02-23T18:44:47Z,Credit Check,Credit Desk
+SO-2026-0148,Soylent Foods,2367.02,Receive Payment,2026-02-23T19:25:23Z,Paid,Billing System
+SO-2026-0110,Acme Retail,30992.01,Receive Payment,2026-02-23T19:36:23Z,Paid,Billing System
+SO-2026-0159,Globex Stores,19280.67,Run Credit Check,2026-02-23T19:47:55Z,Credit Check,Credit Desk
+SO-2026-0161,Wonka Brands,22003.82,Run Credit Check,2026-02-23T20:19:00Z,Credit Check,Credit Desk
+SO-2026-0164,Initech Ltd,22560.00,Run Credit Check,2026-02-23T21:14:58Z,Credit Check,Credit Desk
+SO-2026-0162,Stark Traders,47116.53,Run Credit Check,2026-02-23T21:59:57Z,Credit Check,Credit Desk
+SO-2026-0155,Initech Ltd,38314.51,Approve Order,2026-02-23T22:24:17Z,Approved,Order Desk
+SO-2026-0157,Acme Retail,29779.88,Approve Order,2026-02-23T22:43:54Z,Approved,Order Desk
+SO-2026-0163,Wonka Brands,243.42,Run Credit Check,2026-02-23T23:22:26Z,Credit Check,Credit Desk
+SO-2026-0114,Vandelay Co,31177.77,Receive Payment,2026-02-24T00:44:19Z,Paid,Billing System
+SO-2026-0153,Wayne Enterprises,15429.99,Approve Order,2026-02-24T01:27:34Z,Approved,Order Desk
+SO-2026-0164,Initech Ltd,26282.88,Approve Order,2026-02-24T01:36:58Z,Approved,Order Desk
+SO-2026-0158,Wonka Brands,44071.82,Approve Order,2026-02-24T01:43:47Z,Approved,Order Desk
+SO-2026-0096,Initech Ltd,19907.59,Receive Payment,2026-02-24T02:09:23Z,Paid,Billing System
+SO-2026-0100,Stark Traders,7288.13,Receive Payment,2026-02-24T02:18:54Z,Paid,Billing System
+SO-2026-0078,Wayne Enterprises,18365.95,Receive Payment,2026-02-24T02:25:21Z,Paid,Billing System
+SO-2026-0159,Globex Stores,35072.97,Place On Credit Hold,2026-02-24T03:33:55Z,On Credit Hold,Credit Desk
+SO-2026-0142,Vandelay Co,18006.93,Receive Payment,2026-02-24T04:59:10Z,Paid,Billing System
+SO-2026-0154,Acme Retail,9125.82,Approve Order,2026-02-24T05:26:57Z,Approved,Order Desk
+SO-2026-0163,Wonka Brands,16680.99,Approve Order,2026-02-24T05:59:26Z,Approved,Order Desk
+SO-2026-0153,Wayne Enterprises,26955.54,Fulfil Order,2026-02-24T06:10:34Z,Fulfilled,Fulfilment Centre
+SO-2026-0161,Wonka Brands,18859.70,Place On Credit Hold,2026-02-24T07:04:00Z,On Credit Hold,Credit Desk
+SO-2026-0117,Wayne Enterprises,44990.70,Receive Payment,2026-02-24T07:52:51Z,Paid,Billing System
+SO-2026-0094,Stark Traders,16560.32,Receive Payment,2026-02-24T08:58:46Z,Paid,Billing System
+SO-2026-0164,Initech Ltd,45410.08,Fulfil Order,2026-02-24T09:57:58Z,Fulfilled,Fulfilment Centre
+SO-2026-0165,Acme Retail,39273.25,Receive Order,2026-02-24T10:22:05Z,Received,Luis Ortega
+SO-2026-0135,Initech Ltd,43781.38,Receive Payment,2026-02-24T11:11:09Z,Paid,Billing System
+SO-2026-0166,Globex Stores,42954.43,Receive Order,2026-02-24T11:20:29Z,Received,Priya Nair
+SO-2026-0167,Stark Traders,9364.48,Receive Order,2026-02-24T11:33:22Z,Received,Tom Becker
+SO-2026-0168,Stark Traders,11623.81,Receive Order,2026-02-24T11:35:42Z,Received,Nadia Rahman
+SO-2026-0169,Globex Stores,34181.27,Receive Order,2026-02-24T12:09:04Z,Received,Luis Ortega
+SO-2026-0170,Soylent Foods,21168.42,Receive Order,2026-02-24T12:21:28Z,Received,Priya Nair
+SO-2026-0115,Wayne Enterprises,1200.83,Receive Payment,2026-02-24T13:07:17Z,Paid,Billing System
+SO-2026-0165,Acme Retail,2524.82,Run Credit Check,2026-02-24T13:25:05Z,Credit Check,Credit Desk
+SO-2026-0102,Acme Retail,11726.95,Receive Payment,2026-02-24T14:19:13Z,Paid,Billing System
+SO-2026-0171,Hooli Inc,12353.79,Receive Order,2026-02-24T14:58:24Z,Received,Priya Nair
+SO-2026-0170,Soylent Foods,1773.49,Run Credit Check,2026-02-24T14:59:28Z,Credit Check,Credit Desk
+SO-2026-0172,Wayne Enterprises,10628.89,Receive Order,2026-02-24T15:05:03Z,Received,Tom Becker
+SO-2026-0173,Initech Ltd,45532.67,Receive Order,2026-02-24T15:44:39Z,Received,Tom Becker
+SO-2026-0168,Stark Traders,14263.05,Run Credit Check,2026-02-24T15:48:42Z,Credit Check,Credit Desk
+SO-2026-0164,Initech Ltd,9539.05,Invoice Customer,2026-02-24T16:13:58Z,Invoiced,Billing System
+SO-2026-0174,Soylent Foods,14972.87,Receive Order,2026-02-24T16:16:37Z,Received,Tom Becker
+SO-2026-0153,Wayne Enterprises,30529.95,Invoice Customer,2026-02-24T17:44:34Z,Invoiced,Billing System
+SO-2026-0169,Globex Stores,37372.26,Approve Order,2026-02-24T18:01:04Z,Approved,Order Desk
+SO-2026-0167,Stark Traders,38774.50,Ship Goods,2026-02-24T18:31:22Z,Fulfilled,Fulfilment Centre
+SO-2026-0172,Wayne Enterprises,35200.64,Run Credit Check,2026-02-24T18:36:03Z,Credit Check,Credit Desk
+SO-2026-0173,Initech Ltd,36409.36,Run Credit Check,2026-02-24T19:22:39Z,Credit Check,Credit Desk
+SO-2026-0166,Globex Stores,31763.42,Run Credit Check,2026-02-24T19:31:29Z,Credit Check,Credit Desk
+SO-2026-0171,Hooli Inc,42100.46,Run Credit Check,2026-02-24T19:40:24Z,Credit Check,Credit Desk
+SO-2026-0167,Stark Traders,45763.53,Invoice Customer,2026-02-24T20:25:22Z,Invoiced,Billing System
+SO-2026-0174,Soylent Foods,44535.91,Run Credit Check,2026-02-24T20:50:37Z,Credit Check,Credit Desk
+SO-2026-0157,Acme Retail,16135.81,Fulfil Order,2026-02-24T21:55:54Z,Fulfilled,Fulfilment Centre
+SO-2026-0162,Stark Traders,19611.10,Cancel Order,2026-02-24T22:02:57Z,Cancelled,Nadia Rahman
+SO-2026-0172,Wayne Enterprises,20987.66,Approve Order,2026-02-24T23:09:03Z,Approved,Order Desk
+SO-2026-0160,Stark Traders,45963.57,Fulfil Order,2026-02-25T00:58:41Z,Fulfilled,Fulfilment Centre
+SO-2026-0159,Globex Stores,25594.49,Cancel Order,2026-02-25T01:07:55Z,Cancelled,Luis Ortega
+SO-2026-0170,Soylent Foods,38174.12,Approve Order,2026-02-25T01:25:28Z,Approved,Order Desk
+SO-2026-0154,Acme Retail,31024.89,Fulfil Order,2026-02-25T01:53:57Z,Fulfilled,Fulfilment Centre
+SO-2026-0137,Hooli Inc,35305.69,Receive Payment,2026-02-25T02:37:52Z,Paid,Billing System
+SO-2026-0087,Umbrella Group,24108.99,Receive Payment,2026-02-25T02:53:20Z,Paid,Billing System
+SO-2026-0132,Globex Stores,10189.24,Receive Payment,2026-02-25T03:19:19Z,Paid,Billing System
+SO-2026-0160,Stark Traders,22257.64,Invoice Customer,2026-02-25T03:37:41Z,Invoiced,Billing System
+SO-2026-0171,Hooli Inc,1502.54,Cancel Order,2026-02-25T03:44:24Z,Cancelled,Priya Nair
+SO-2026-0169,Globex Stores,8130.25,Fulfil Order,2026-02-25T03:45:04Z,Fulfilled,Fulfilment Centre
+SO-2026-0173,Initech Ltd,26983.36,Approve Order,2026-02-25T03:46:39Z,Approved,Order Desk
+SO-2026-0168,Stark Traders,24517.18,Approve Order,2026-02-25T04:08:42Z,Approved,Order Desk
+SO-2026-0174,Soylent Foods,5855.54,Approve Order,2026-02-25T05:08:37Z,Approved,Order Desk
+SO-2026-0166,Globex Stores,11193.23,Approve Order,2026-02-25T06:07:29Z,Approved,Order Desk
+SO-2026-0155,Initech Ltd,9095.99,Fulfil Order,2026-02-25T07:10:17Z,Fulfilled,Fulfilment Centre
+SO-2026-0165,Acme Retail,14973.20,Cancel Order,2026-02-25T07:30:05Z,Cancelled,Luis Ortega
+SO-2026-0139,Wonka Brands,15707.86,Receive Payment,2026-02-25T07:56:47Z,Paid,Billing System
+SO-2026-0173,Initech Ltd,32117.15,Fulfil Order,2026-02-25T10:52:39Z,Fulfilled,Fulfilment Centre
+SO-2026-0156,Acme Retail,37878.65,Fulfil Order,2026-02-25T11:31:38Z,Fulfilled,Fulfilment Centre
+SO-2026-0175,Umbrella Group,30930.47,Receive Order,2026-02-25T11:54:05Z,Received,Nadia Rahman
+SO-2026-0163,Wonka Brands,20700.80,Fulfil Order,2026-02-25T12:27:26Z,Fulfilled,Fulfilment Centre
+SO-2026-0176,Hooli Inc,13352.55,Receive Order,2026-02-25T12:45:29Z,Received,Luis Ortega
+SO-2026-0177,Initech Ltd,23425.56,Receive Order,2026-02-25T13:28:05Z,Received,Nadia Rahman
+SO-2026-0169,Globex Stores,43195.53,Invoice Customer,2026-02-25T13:31:04Z,Invoiced,Billing System
+SO-2026-0172,Wayne Enterprises,6095.33,Fulfil Order,2026-02-25T13:49:03Z,Fulfilled,Fulfilment Centre
+SO-2026-0178,Globex Stores,17955.08,Receive Order,2026-02-25T14:09:05Z,Received,Tom Becker
+SO-2026-0176,Hooli Inc,21424.90,Run Credit Check,2026-02-25T15:17:29Z,Credit Check,Credit Desk
+SO-2026-0178,Globex Stores,8284.53,Run Credit Check,2026-02-25T15:40:05Z,Credit Check,Credit Desk
+SO-2026-0177,Initech Ltd,37434.15,Run Credit Check,2026-02-25T15:50:05Z,Credit Check,Credit Desk
+SO-2026-0179,Acme Retail,14773.15,Receive Order,2026-02-25T16:03:52Z,Received,Priya Nair
+SO-2026-0157,Acme Retail,1909.97,Invoice Customer,2026-02-25T16:23:54Z,Invoiced,Billing System
+SO-2026-0176,Hooli Inc,14099.34,Place On Credit Hold,2026-02-25T17:08:29Z,On Credit Hold,Credit Desk
+SO-2026-0154,Acme Retail,26896.95,Invoice Customer,2026-02-25T17:16:57Z,Invoiced,Billing System
+SO-2026-0175,Umbrella Group,35494.83,Run Credit Check,2026-02-25T17:44:05Z,Credit Check,Credit Desk
+SO-2026-0172,Wayne Enterprises,41407.99,Invoice Customer,2026-02-25T17:52:03Z,Invoiced,Billing System
+SO-2026-0177,Initech Ltd,10778.49,Place On Credit Hold,2026-02-25T18:07:05Z,On Credit Hold,Credit Desk
+SO-2026-0153,Wayne Enterprises,37789.99,Receive Payment,2026-02-25T18:09:34Z,Paid,Billing System
+SO-2026-0166,Globex Stores,29533.93,Fulfil Order,2026-02-25T18:32:29Z,Fulfilled,Fulfilment Centre
+SO-2026-0179,Acme Retail,27542.58,Approve Order,2026-02-25T18:59:52Z,Approved,Order Desk
+SO-2026-0158,Wonka Brands,35190.77,Fulfil Order,2026-02-25T19:49:47Z,Fulfilled,Fulfilment Centre
+SO-2026-0178,Globex Stores,2325.91,Place On Credit Hold,2026-02-25T20:53:05Z,On Credit Hold,Credit Desk
+SO-2026-0166,Globex Stores,25679.36,Invoice Customer,2026-02-25T21:18:29Z,Invoiced,Billing System
+SO-2026-0173,Initech Ltd,35609.14,Invoice Customer,2026-02-25T21:28:39Z,Invoiced,Billing System
+SO-2026-0170,Soylent Foods,43604.17,Fulfil Order,2026-02-25T21:43:28Z,Fulfilled,Fulfilment Centre
+SO-2026-0118,Initech Ltd,6264.62,Receive Payment,2026-02-25T21:51:49Z,Paid,Billing System
+SO-2026-0155,Initech Ltd,33646.50,Invoice Customer,2026-02-25T21:59:17Z,Invoiced,Billing System
+SO-2026-0177,Initech Ltd,34889.04,Release Credit Hold,2026-02-26T03:25:05Z,Approved,Credit Desk
+SO-2026-0121,Umbrella Group,13218.59,Receive Payment,2026-02-26T04:48:35Z,Paid,Billing System
+SO-2026-0161,Wonka Brands,12884.01,Ship Goods,2026-02-26T05:01:00Z,Fulfilled,Fulfilment Centre
+SO-2026-0163,Wonka Brands,41361.53,Invoice Customer,2026-02-26T05:15:26Z,Invoiced,Billing System
+SO-2026-0175,Umbrella Group,22784.25,Approve Order,2026-02-26T05:47:05Z,Approved,Order Desk
+SO-2026-0156,Acme Retail,36992.20,Invoice Customer,2026-02-26T08:07:38Z,Invoiced,Billing System
+SO-2026-0180,Umbrella Group,40877.33,Receive Order,2026-02-26T09:29:10Z,Received,Luis Ortega
+SO-2026-0174,Soylent Foods,43513.78,Fulfil Order,2026-02-26T10:20:37Z,Fulfilled,Fulfilment Centre
+SO-2026-0158,Wonka Brands,21929.32,Invoice Customer,2026-02-26T11:10:47Z,Invoiced,Billing System
+SO-2026-0178,Globex Stores,29512.33,Release Credit Hold,2026-02-26T11:11:05Z,Approved,Credit Desk
+SO-2026-0181,Globex Stores,23628.81,Receive Order,2026-02-26T12:14:14Z,Received,Luis Ortega
+SO-2026-0182,Hooli Inc,4341.46,Receive Order,2026-02-26T13:24:55Z,Received,Tom Becker
+SO-2026-0183,Wonka Brands,2674.75,Receive Order,2026-02-26T13:29:47Z,Received,Luis Ortega
+SO-2026-0184,Wonka Brands,18704.77,Receive Order,2026-02-26T13:33:00Z,Received,Tom Becker
+SO-2026-0182,Hooli Inc,31099.24,Run Credit Check,2026-02-26T14:26:55Z,Credit Check,Credit Desk
+SO-2026-0185,Initech Ltd,5124.50,Receive Order,2026-02-26T14:28:57Z,Received,Nadia Rahman
+SO-2026-0186,Wonka Brands,42920.39,Receive Order,2026-02-26T14:42:56Z,Received,Tom Becker
+SO-2026-0180,Umbrella Group,4193.97,Run Credit Check,2026-02-26T14:47:10Z,Credit Check,Credit Desk
+SO-2026-0187,Initech Ltd,39149.23,Receive Order,2026-02-26T14:52:01Z,Received,Tom Becker
+SO-2026-0184,Wonka Brands,32783.66,Run Credit Check,2026-02-26T15:15:00Z,Credit Check,Credit Desk
+SO-2026-0188,Vandelay Co,9212.73,Receive Order,2026-02-26T15:29:04Z,Received,Priya Nair
+SO-2026-0185,Initech Ltd,14287.86,Approve Order,2026-02-26T15:55:57Z,Approved,Order Desk
+SO-2026-0177,Initech Ltd,40276.33,Fulfil Order,2026-02-26T16:50:05Z,Fulfilled,Fulfilment Centre
+SO-2026-0189,Wonka Brands,6716.16,Receive Order,2026-02-26T16:51:23Z,Received,Priya Nair
+SO-2026-0152,Globex Stores,47129.59,Receive Payment,2026-02-26T16:54:28Z,Paid,Billing System
+SO-2026-0183,Wonka Brands,9679.54,Run Credit Check,2026-02-26T17:39:47Z,Credit Check,Credit Desk
+SO-2026-0174,Soylent Foods,46815.14,Invoice Customer,2026-02-26T18:17:37Z,Invoiced,Billing System
+SO-2026-0181,Globex Stores,2764.61,Run Credit Check,2026-02-26T18:29:14Z,Credit Check,Credit Desk
+SO-2026-0170,Soylent Foods,25797.19,Invoice Customer,2026-02-26T18:53:28Z,Invoiced,Billing System
+SO-2026-0188,Vandelay Co,19845.38,Run Credit Check,2026-02-26T18:57:04Z,Credit Check,Credit Desk
+SO-2026-0187,Initech Ltd,5380.32,Run Credit Check,2026-02-26T19:13:01Z,Credit Check,Credit Desk
+SO-2026-0133,Stark Traders,12312.25,Receive Payment,2026-02-26T19:24:39Z,Paid,Billing System
+SO-2026-0187,Initech Ltd,30231.71,Approve Order,2026-02-26T20:49:01Z,Approved,Order Desk
+SO-2026-0180,Umbrella Group,1317.16,Place On Credit Hold,2026-02-26T21:03:10Z,On Credit Hold,Credit Desk
+SO-2026-0179,Acme Retail,44148.47,Fulfil Order,2026-02-26T21:22:52Z,Fulfilled,Fulfilment Centre
+SO-2026-0189,Wonka Brands,24538.18,Run Credit Check,2026-02-26T21:26:23Z,Credit Check,Credit Desk
+SO-2026-0123,Hooli Inc,35064.43,Receive Payment,2026-02-26T21:35:21Z,Paid,Billing System
+SO-2026-0188,Vandelay Co,29367.73,Cancel Order,2026-02-26T22:16:04Z,Cancelled,Priya Nair
+SO-2026-0168,Stark Traders,24628.11,Fulfil Order,2026-02-26T22:25:42Z,Fulfilled,Fulfilment Centre
+SO-2026-0177,Initech Ltd,41251.71,Invoice Customer,2026-02-26T22:56:05Z,Invoiced,Billing System
+SO-2026-0183,Wonka Brands,33110.84,Approve Order,2026-02-27T00:28:47Z,Approved,Order Desk
+SO-2026-0182,Hooli Inc,47581.99,Approve Order,2026-02-27T01:06:55Z,Approved,Order Desk
+SO-2026-0181,Globex Stores,21974.83,Approve Order,2026-02-27T01:17:14Z,Approved,Order Desk
+SO-2026-0144,Hooli Inc,5801.08,Receive Payment,2026-02-27T03:53:19Z,Paid,Billing System
+SO-2026-0184,Wonka Brands,2788.39,Place On Credit Hold,2026-02-27T04:13:00Z,On Credit Hold,Credit Desk
+SO-2026-0161,Wonka Brands,11289.68,Invoice Customer,2026-02-27T05:56:00Z,Invoiced,Billing System
+SO-2026-0189,Wonka Brands,36255.04,Approve Order,2026-02-27T06:50:23Z,Approved,Order Desk
+SO-2026-0190,Soylent Foods,40100.10,Receive Order,2026-02-27T08:04:18Z,Received,Priya Nair
+SO-2026-0176,Hooli Inc,47546.29,Release Credit Hold,2026-02-27T08:14:29Z,Approved,Credit Desk
+SO-2026-0191,Soylent Foods,12551.35,Receive Order,2026-02-27T08:21:29Z,Received,Luis Ortega
+SO-2026-0192,Wonka Brands,8304.84,Receive Order,2026-02-27T09:18:47Z,Received,Nadia Rahman
+SO-2026-0193,Wayne Enterprises,35611.35,Receive Order,2026-02-27T09:27:14Z,Received,Nadia Rahman
+SO-2026-0175,Umbrella Group,8805.15,Fulfil Order,2026-02-27T09:59:05Z,Fulfilled,Fulfilment Centre
+SO-2026-0194,Vandelay Co,18849.81,Receive Order,2026-02-27T10:26:33Z,Received,Priya Nair
+SO-2026-0191,Soylent Foods,29315.86,Run Credit Check,2026-02-27T10:29:29Z,Credit Check,Credit Desk
+SO-2026-0193,Wayne Enterprises,39277.27,Run Credit Check,2026-02-27T11:01:14Z,Credit Check,Credit Desk
+SO-2026-0195,Vandelay Co,30852.25,Receive Order,2026-02-27T11:07:35Z,Received,Luis Ortega
+SO-2026-0196,Umbrella Group,43814.51,Receive Order,2026-02-27T11:51:52Z,Received,Nadia Rahman
+SO-2026-0197,Stark Traders,23865.06,Receive Order,2026-02-27T12:09:30Z,Received,Tom Becker
+SO-2026-0186,Wonka Brands,8158.22,Ship Goods,2026-02-27T12:34:56Z,Fulfilled,Fulfilment Centre
+SO-2026-0190,Soylent Foods,33355.84,Run Credit Check,2026-02-27T12:36:18Z,Credit Check,Credit Desk
+SO-2026-0151,Stark Traders,40227.69,Receive Payment,2026-02-27T13:01:49Z,Paid,Billing System
+SO-2026-0198,Soylent Foods,37481.03,Receive Order,2026-02-27T13:08:19Z,Received,Priya Nair
+SO-2026-0196,Umbrella Group,45925.47,Run Credit Check,2026-02-27T13:11:52Z,Credit Check,Credit Desk
+SO-2026-0180,Umbrella Group,35524.79,Ship Goods,2026-02-27T14:26:10Z,Fulfilled,Fulfilment Centre
+SO-2026-0192,Wonka Brands,43499.92,Run Credit Check,2026-02-27T14:26:47Z,Credit Check,Credit Desk
+SO-2026-0199,Hooli Inc,32553.55,Receive Order,2026-02-27T14:41:40Z,Received,Luis Ortega
+SO-2026-0190,Soylent Foods,31224.58,Approve Order,2026-02-27T14:45:18Z,Approved,Order Desk
+SO-2026-0179,Acme Retail,2436.85,Invoice Customer,2026-02-27T15:25:52Z,Invoiced,Billing System
+SO-2026-0186,Wonka Brands,14466.81,Invoice Customer,2026-02-27T15:27:56Z,Invoiced,Billing System
+SO-2026-0187,Initech Ltd,16752.96,Fulfil Order,2026-02-27T15:59:01Z,Fulfilled,Fulfilment Centre
+SO-2026-0200,Umbrella Group,47861.60,Receive Order,2026-02-27T16:13:35Z,Received,Tom Becker
+SO-2026-0194,Vandelay Co,38119.36,Run Credit Check,2026-02-27T16:29:33Z,Credit Check,Credit Desk
+SO-2026-0175,Umbrella Group,15750.23,Invoice Customer,2026-02-27T16:43:05Z,Invoiced,Billing System
+SO-2026-0185,Initech Ltd,33158.25,Fulfil Order,2026-02-27T17:18:57Z,Fulfilled,Fulfilment Centre
+SO-2026-0200,Umbrella Group,45008.09,Run Credit Check,2026-02-27T17:36:35Z,Credit Check,Credit Desk
+SO-2026-0187,Initech Ltd,31154.82,Invoice Customer,2026-02-27T18:25:01Z,Invoiced,Billing System
+SO-2026-0185,Initech Ltd,38534.72,Invoice Customer,2026-02-27T19:05:57Z,Invoiced,Billing System
+SO-2026-0196,Umbrella Group,37499.21,Approve Order,2026-02-27T19:10:52Z,Approved,Order Desk
+SO-2026-0191,Soylent Foods,32642.59,Approve Order,2026-02-27T19:21:29Z,Approved,Order Desk
+SO-2026-0197,Stark Traders,14788.26,Run Credit Check,2026-02-27T19:45:30Z,Credit Check,Credit Desk
+SO-2026-0198,Soylent Foods,16577.24,Run Credit Check,2026-02-27T19:46:19Z,Credit Check,Credit Desk
+SO-2026-0199,Hooli Inc,42684.17,Run Credit Check,2026-02-27T20:32:40Z,Credit Check,Credit Desk
+SO-2026-0192,Wonka Brands,24673.65,Approve Order,2026-02-27T20:36:47Z,Approved,Order Desk
+SO-2026-0168,Stark Traders,24523.86,Invoice Customer,2026-02-27T21:04:42Z,Invoiced,Billing System
+SO-2026-0184,Wonka Brands,19836.82,Release Credit Hold,2026-02-27T23:37:00Z,Approved,Credit Desk
+SO-2026-0131,Vandelay Co,29063.31,Receive Payment,2026-02-28T00:58:19Z,Paid,Billing System
+SO-2026-0122,Soylent Foods,19993.78,Receive Payment,2026-02-28T01:03:26Z,Paid,Billing System
+SO-2026-0183,Wonka Brands,12797.48,Fulfil Order,2026-02-28T01:10:47Z,Fulfilled,Fulfilment Centre
+SO-2026-0199,Hooli Inc,34592.60,Approve Order,2026-02-28T01:50:40Z,Approved,Order Desk
+SO-2026-0198,Soylent Foods,30225.58,Approve Order,2026-02-28T03:54:19Z,Approved,Order Desk
+SO-2026-0178,Globex Stores,47861.52,Fulfil Order,2026-02-28T04:27:05Z,Fulfilled,Fulfilment Centre
+SO-2026-0194,Vandelay Co,4100.28,Approve Order,2026-02-28T05:13:33Z,Approved,Order Desk
+SO-2026-0172,Wayne Enterprises,14978.71,Receive Payment,2026-02-28T06:52:03Z,Paid,Billing System
+SO-2026-0193,Wayne Enterprises,12170.75,Cancel Order,2026-02-28T07:12:14Z,Cancelled,Nadia Rahman
+SO-2026-0177,Initech Ltd,17981.81,Receive Payment,2026-02-28T07:18:05Z,Paid,Billing System
+SO-2026-0197,Stark Traders,38458.56,Approve Order,2026-02-28T07:39:30Z,Approved,Order Desk
+SO-2026-0181,Globex Stores,11279.60,Fulfil Order,2026-02-28T07:48:14Z,Fulfilled,Fulfilment Centre
+SO-2026-0189,Wonka Brands,41988.56,Fulfil Order,2026-02-28T08:58:23Z,Fulfilled,Fulfilment Centre
+SO-2026-0198,Soylent Foods,47358.53,Fulfil Order,2026-02-28T11:33:19Z,Fulfilled,Fulfilment Centre
+SO-2026-0183,Wonka Brands,37512.86,Invoice Customer,2026-02-28T11:39:47Z,Invoiced,Billing System
+SO-2026-0182,Hooli Inc,35746.43,Fulfil Order,2026-02-28T11:46:55Z,Fulfilled,Fulfilment Centre
+SO-2026-0197,Stark Traders,28687.87,Fulfil Order,2026-02-28T11:55:30Z,Fulfilled,Fulfilment Centre
+SO-2026-0200,Umbrella Group,30502.39,Cancel Order,2026-02-28T12:24:35Z,Cancelled,Tom Becker
+SO-2026-0194,Vandelay Co,38770.72,Fulfil Order,2026-02-28T12:33:33Z,Fulfilled,Fulfilment Centre
+SO-2026-0180,Umbrella Group,20622.42,Invoice Customer,2026-02-28T13:47:10Z,Invoiced,Billing System
+SO-2026-0134,Wonka Brands,31502.34,Receive Payment,2026-02-28T15:41:45Z,Paid,Billing System
+SO-2026-0194,Vandelay Co,5654.44,Invoice Customer,2026-02-28T15:47:33Z,Invoiced,Billing System
+SO-2026-0198,Soylent Foods,6895.28,Invoice Customer,2026-02-28T18:00:19Z,Invoiced,Billing System
+SO-2026-0178,Globex Stores,26948.57,Invoice Customer,2026-02-28T20:45:05Z,Invoiced,Billing System
+SO-2026-0189,Wonka Brands,3019.98,Invoice Customer,2026-02-28T20:53:23Z,Invoiced,Billing System
+SO-2026-0155,Initech Ltd,40913.55,Receive Payment,2026-02-28T21:43:17Z,Paid,Billing System
+SO-2026-0129,Hooli Inc,28706.72,Receive Payment,2026-02-28T23:29:00Z,Paid,Billing System

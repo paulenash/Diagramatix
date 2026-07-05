@@ -7,7 +7,7 @@
  * effectiveness lights up. Mirrors app/lib/mining/examplePackage.ts.
  */
 import type { DiagramData } from "../diagram/types";
-import type { LogMapping, MiningStats, Variant, Performance } from "../mining/types";
+import type { LogMapping, MiningStats, Variant, Performance, GovernanceStats } from "../mining/types";
 import type { SampleItem, SampleLink } from "./o2cSample";
 
 export interface RcExampleDiagram {
@@ -25,7 +25,7 @@ export interface RcExampleMining {
   /** Which of the package's diagrams is the reference State Machine to conform
    *  against (matched by name; falls back to the first state-machine diagram). */
   referenceDiagramName: string;
-  run: { name: string; mapping: LogMapping; stats: MiningStats; variants: Variant[]; performance: Performance };
+  run: { name: string; mapping: LogMapping; stats: MiningStats; variants: Variant[]; performance: Performance; governance?: GovernanceStats };
 }
 
 export interface RiskControlExamplePackage {

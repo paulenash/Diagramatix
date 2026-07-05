@@ -164,7 +164,8 @@ export function RiskControlEditor({
                     {kind === "Control" && effectiveness?.[it.id] && (() => {
                       const e = effectiveness[it.id]; const pct = e.effectivenessPct;
                       const cls = pct == null ? "bg-gray-100 text-gray-500" : pct >= 95 ? "bg-emerald-100 text-emerald-700" : pct >= 80 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700";
-                      return <span className={`text-[10px] px-1.5 py-0.5 rounded ${cls}`} title={`Bypassed in ${e.bypassedCases} of ${e.totalCases} cases (from mining conformance)`}>{pct == null ? "—" : `${pct}%`}{e.bypassedCases ? ` · ${e.bypassedCases} bypassed` : ""}</span>;
+                      const src = e.source === "log" ? "from mined Control IDs on events" : "from mining conformance";
+                      return <span className={`text-[10px] px-1.5 py-0.5 rounded ${cls}`} title={`Bypassed in ${e.bypassedCases} of ${e.totalCases} cases (${src})`}>{pct == null ? "—" : `${pct}%`}{e.bypassedCases ? ` · ${e.bypassedCases} bypassed` : ""}</span>;
                     })()}
                     {canEdit && <button onClick={() => setEditId(editId === it.id ? null : it.id)} className="text-[11px] text-gray-500 hover:text-gray-800">{editId === it.id ? "▾" : "▸"}</button>}
                     {canEdit && <button onClick={() => setConfirm({ id: it.id, name: it.name })} className="text-[11px] text-red-500 hover:text-red-700">✕</button>}

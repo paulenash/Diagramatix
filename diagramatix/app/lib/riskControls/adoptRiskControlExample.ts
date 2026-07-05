@@ -75,8 +75,8 @@ export async function adoptRiskControlExample(pkg: RiskControlExamplePackage, ct
       const conf = checkTransitionConformance(m.run.variants, { elements: refPkgDiag.data.elements, connectors: refPkgDiag.data.connectors } as ReferenceSm);
       const run = await prisma.processMiningRun.create({ data: { name: m.run.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId: refSmId } });
       await pgPool.query(
-        'UPDATE "ProcessMiningRun" SET mapping=$1::jsonb, stats=$2::jsonb, variants=$3::jsonb, performance=$4::jsonb, conformance=$5::jsonb, "updatedAt"=NOW() WHERE id=$6',
-        [JSON.stringify(m.run.mapping), JSON.stringify(m.run.stats), JSON.stringify(m.run.variants), JSON.stringify(m.run.performance), JSON.stringify(conf), run.id],
+        'UPDATE "ProcessMiningRun" SET mapping=$1::jsonb, stats=$2::jsonb, variants=$3::jsonb, performance=$4::jsonb, conformance=$5::jsonb, governance=$6::jsonb, "updatedAt"=NOW() WHERE id=$7',
+        [JSON.stringify(m.run.mapping), JSON.stringify(m.run.stats), JSON.stringify(m.run.variants), JSON.stringify(m.run.performance), JSON.stringify(conf), m.run.governance ? JSON.stringify(m.run.governance) : null, run.id],
       );
     }
   }

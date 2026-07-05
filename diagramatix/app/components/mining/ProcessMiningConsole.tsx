@@ -7,8 +7,10 @@
  * digital-twin simulator calibration lands in the final slice.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { parseCsv, guessMapping } from "@/app/lib/mining/parseEventLog";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { parseCsv, guessMapping, distinctActivities } from "@/app/lib/mining/parseEventLog";
+import { parseXes } from "@/app/lib/mining/formats/xes";
+import { parseOcel } from "@/app/lib/mining/formats/ocel";
 import { validateEventLogMapping } from "@/app/lib/mining/validateLog";
 import type { LogMapping, MiningStats } from "@/app/lib/mining/types";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
@@ -33,9 +35,12 @@ const ROLES: { key: keyof LogMapping; label: string; required: boolean; hint: st
   { key: "caseId", label: "Case / entity id", required: true, hint: "The entity instance (e.g. Invoice #123) — the process case" },
   { key: "activity", label: "Activity / event", required: true, hint: "The business event that occurred" },
   { key: "timestamp", label: "Timestamp", required: true, hint: "When it happened (ISO or epoch)" },
-  { key: "state", label: "State", required: true, hint: "The entity's resulting state after the event" },
+  { key: "state", label: "State (optional)", required: false, hint: "The entity's resulting state after the event. Leave blank to map activities → states below." },
   { key: "resource", label: "Resource (optional)", required: false, hint: "Who/what performed it → simulation team" },
   { key: "entityType", label: "Entity type (optional)", required: false, hint: "The entity kind (Invoice, Employee…)" },
+  { key: "controlId", label: "Control ID (optional)", required: false, hint: "The Control (RCM) id exercised — mines control operating-effectiveness" },
+  { key: "riskId", label: "Risk ID (optional)", required: false, hint: "The Risk id the event relates to — GRC traceability" },
+  { key: "policyId", label: "Policy ID (optional)", required: false, hint: "The Policy id the event relates to — GRC traceability" },
 ];
 
 export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose, onOpenSimulator }: { projectId: string; projectName?: string; isAdmin?: boolean; onClose: () => void; onOpenSimulator?: () => void }) {
@@ -157,10 +162,21 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     if (!file) return;
     setErr(null);
     const text = await file.text();
-    const { headers: h, rows: r } = parseCsv(text);
+    const ext = file.name.toLowerCase().split(".").pop() ?? "";
+    // XES (IEEE 1849) and OCEL are parsed to the same { headers, rows, mapping }
+    // table CSV produces, then flow through the identical import pipeline.
+    let h: string[], r: string[][], map: Partial<LogMapping>;
+    if (ext === "xes" || /^<\?xml|<log[\s>]/.test(text.trimStart())) {
+      const parsed = parseXes(text); h = parsed.headers; r = parsed.rows; map = parsed.mapping;
+    } else if (ext === "json" || ext === "ocel" || ext === "jsonocel" || /^\s*\{/.test(text)) {
+      const parsed = parseOcel(text); h = parsed.headers; r = parsed.rows; map = parsed.mapping;
+      if (parsed.objectTypes.length > 1) setErr(`OCEL: projected on object type “${parsed.chosenType}” (${parsed.objectTypes.length} types present).`);
+    } else {
+      const csv = parseCsv(text); h = csv.headers; r = csv.rows; map = guessMapping(h);
+    }
     if (h.length === 0 || r.length === 0) { setErr("Couldn't read any rows from that file."); return; }
     setFileName(file.name); setHeaders(h); setRows(r);
-    setMapping(guessMapping(h));
+    setMapping(map);
     setRunName(file.name.replace(/\.[^.]+$/, ""));
     // A hand-picked file replaces any scenario choice.
     setScenarios(null); setScenarioIdx(-1);
@@ -178,7 +194,18 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   const chooseScenario = (i: number) => { if (!scenarios?.[i]) return; setScenarioIdx(i); loadStaging(scenarios[i]); };
 
   const setRole = (key: keyof LogMapping, col: string) => setMapping((m) => ({ ...m, [key]: col || undefined }));
-  const canImport = mapping.caseId && mapping.activity && mapping.timestamp && mapping.state && rows.length > 0;
+  const canImport = mapping.caseId && mapping.activity && mapping.timestamp && rows.length > 0;
+  // When no State column is mapped, offer an Activity→State table (seeded with a
+  // same-named state per activity) that completes the lifecycle the miner + the
+  // State Machine need. The table lives in mapping.activityState so it's imported.
+  const activities = useMemo(
+    () => (mapping.activity ? distinctActivities(headers, rows, mapping.activity) : []),
+    [headers, rows, mapping.activity],
+  );
+  const needsStateTable = !mapping.state && activities.length > 0;
+  const stateFor = (a: string) => mapping.activityState?.[a] ?? a;
+  const setActivityState = (a: string, s: string) =>
+    setMapping((m) => ({ ...m, activityState: { ...(m.activityState ?? {}), [a]: s } }));
   // Advisory pre-import validation off the already-parsed rows — confirm the
   // mapping is right + see what would be discarded, before ingesting.
   const validation = useMemo(
@@ -268,7 +295,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
         {/* Import */}
         <section className="md:col-span-2 bg-stone-900 border border-stone-700 rounded-lg p-4">
           <h2 className="text-sm font-semibold text-amber-200 mb-1">Import an event log</h2>
-          <p className="text-xs text-stone-400 mb-3">Upload a CSV exported from your source system(s). Map its columns to roles, then import — the process is inferred from the logs.</p>
+          <p className="text-xs text-stone-400 mb-3">Upload an event log — <span className="text-stone-300">CSV/TSV</span>, <span className="text-stone-300">XES</span> (IEEE 1849) or <span className="text-stone-300">OCEL</span> JSON — from your source system(s). Map its columns to roles, then import — the process is inferred from the logs.</p>
 
           {/* Choosable scenarios (adopted example) — pick a period, confirm, import. */}
           {scenarios && scenarios.length > 0 && (
@@ -297,8 +324,8 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
           )}
 
           <label className="inline-block cursor-pointer text-xs bg-amber-700 hover:bg-amber-600 text-white rounded px-3 py-1.5">
-            {fileName ? `↻ ${fileName}` : "⭱ Choose CSV…"}
-            <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={onFile} className="hidden" />
+            {fileName ? `↻ ${fileName}` : "⭱ Choose file…"}
+            <input type="file" accept=".csv,.tsv,.txt,text/csv,.xes,.json,.ocel,.jsonocel,application/xml,application/json" onChange={onFile} className="hidden" />
           </label>
 
           {headers.length > 0 && (
@@ -314,6 +341,24 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                   </label>
                 ))}
               </div>
+
+              {/* Activity → State table — shown when no State column is mapped.
+                  Completes the lifecycle the miner + State Machine need. */}
+              {needsStateTable && (
+                <div className="rounded border border-amber-500/40 bg-amber-950/20 p-2.5 flex flex-col gap-1.5">
+                  <div className="text-[11px] text-amber-200">No <span className="font-semibold">State</span> column mapped — set the state each activity produces. Defaults to the activity name; edit to merge activities into shared lifecycle states.</div>
+                  <div className="max-h-48 overflow-y-auto grid grid-cols-[1fr_auto_1fr] gap-x-2 gap-y-1 items-center">
+                    {activities.map((a) => (
+                      <Fragment key={a}>
+                        <span className="text-[10px] text-stone-300 truncate" title={a}>{a}</span>
+                        <span className="text-stone-500 text-[10px]">→</span>
+                        <input value={stateFor(a)} onChange={(e) => setActivityState(a, e.target.value)} className={`${inp} py-0.5 text-[10px]`} />
+                      </Fragment>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-stone-400">{activities.length.toLocaleString()} distinct activities</p>
+                </div>
+              )}
 
               {/* Preview */}
               <div className="overflow-x-auto border border-stone-700 rounded">
@@ -364,7 +409,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                   {busy ? "Importing…" : "Import log"}
                 </button>
               </div>
-              {!canImport && <p className="text-[10px] text-amber-400">Map case id, activity, timestamp and state to continue.</p>}
+              {!canImport && <p className="text-[10px] text-amber-400">Map case id, activity and timestamp to continue.</p>}
             </div>
           )}
           {err && <p className="text-rose-400 text-xs mt-2">{err}</p>}
@@ -399,6 +444,14 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
               {typeof selected.stats?.unmappedRows === "number" && selected.stats.unmappedRows > 0 && (
                 <Stat label="Dropped rows" value={selected.stats.unmappedRows} />
               )}
+            </div>
+            {/* Interchange export — round-trip with other process-mining tools. */}
+            <div className="mt-3 flex items-center gap-2 text-[11px] text-stone-400">
+              <span>Export log:</span>
+              <a href={`/api/projects/${projectId}/mining/runs/${selected.id}/export?format=xes`} className="text-amber-300 hover:text-amber-200 underline" title="IEEE 1849 XES — ProM, Celonis, Disco, Apromore, Signavio PI">XES</a>
+              <span className="text-stone-600">·</span>
+              <a href={`/api/projects/${projectId}/mining/runs/${selected.id}/export?format=ocel`} className="text-amber-300 hover:text-amber-200 underline" title="OCEL 2.0 JSON (single-object)">OCEL</a>
+              <span className="text-stone-600">— variant-level fidelity</span>
             </div>
             {/* Discover the BPMN process */}
             <div className="mt-4 pt-3 border-t border-stone-700">

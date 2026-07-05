@@ -3,6 +3,7 @@
 import { prisma } from "@/app/lib/db";
 import type { RiskControlLibraryDTO } from "./types";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
+import type { GovernanceStats } from "@/app/lib/mining/types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function serializeLibrary(lib: any): RiskControlLibraryDTO {
@@ -59,6 +60,19 @@ export async function loadLatestConformance(projectId: string): Promise<{ runId:
   for (const r of runs) {
     const c = r.conformance as unknown as ConformanceResult | null;
     if (c && typeof c === "object" && Array.isArray(c.violations)) return { runId: r.id, runName: r.name, conformance: c };
+  }
+  return null;
+}
+
+/** The most recent mining run in the project whose log carried governance ids —
+ *  the source of Control-ID-driven operating-effectiveness (Change B). */
+export async function loadLatestGovernance(projectId: string): Promise<{ runId: string; runName: string; governance: GovernanceStats } | null> {
+  const runs = await prisma.processMiningRun.findMany({
+    where: { projectId }, orderBy: { updatedAt: "desc" }, select: { id: true, name: true, governance: true },
+  });
+  for (const r of runs) {
+    const g = r.governance as unknown as GovernanceStats | null;
+    if (g && typeof g === "object" && g.controls && Object.keys(g.controls).length > 0) return { runId: r.id, runName: r.name, governance: g };
   }
   return null;
 }

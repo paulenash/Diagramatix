@@ -66,12 +66,29 @@ export function guessMapping(headers: string[]): Partial<LogMapping> {
   const state = find([/state/, /status/, /stage/, /phase/]);
   const resource = find([/resource/, /\buser\b/, /agent/, /owner/, /perform/, /\bwho\b/, /assign/, /\bby\b/]);
   const entityType = find([/entity.?type/, /object.?type/, /\btype\b/]);
+  const controlId = find([/control.?id/, /\bcontrol\b/, /\brcm\b/]);
+  const riskId = find([/risk.?id/, /\brisk\b/]);
+  const policyId = find([/policy.?id/, /\bpolicy\b/]);
   if (caseId) out.caseId = caseId;
   if (activity) out.activity = activity;
   if (timestamp) out.timestamp = timestamp;
   if (state) out.state = state;
   if (resource) out.resource = resource;
   if (entityType) out.entityType = entityType;
+  if (controlId) out.controlId = controlId;
+  if (riskId) out.riskId = riskId;
+  if (policyId) out.policyId = policyId;
+  return out;
+}
+
+/** Distinct activity names (in first-seen order) — seeds the Activity→State table
+ *  the console shows when no state column is mapped. */
+export function distinctActivities(headers: string[], rows: string[][], activityCol?: string): string[] {
+  const ai = activityCol ? headers.indexOf(activityCol) : -1;
+  if (ai < 0) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of rows) { const a = (r[ai] ?? "").trim(); if (a && !seen.has(a)) { seen.add(a); out.push(a); } }
   return out;
 }
 
@@ -109,6 +126,14 @@ export function parseTimestamp(v: string): number | null {
 export function buildEventLog(headers: string[], rows: string[][], mapping: LogMapping): EventLog {
   const idx = (col: string | undefined) => (col ? headers.indexOf(col) : -1);
   const ci = idx(mapping.caseId), ai = idx(mapping.activity), ti = idx(mapping.timestamp), si = idx(mapping.state), ri = idx(mapping.resource);
+  const cti = idx(mapping.controlId), rki = idx(mapping.riskId), pli = idx(mapping.policyId);
+  // No state column? Derive each event's state from the Activity→State table
+  // (defaulting an activity to a same-named state) so the lifecycle is complete.
+  const stateMap = mapping.activityState ?? {};
+  const stateFor = (activity: string, raw: string): string => {
+    if (si >= 0) return raw.trim();
+    return (stateMap[activity] ?? activity).trim();
+  };
 
   const events: LogEvent[] = [];
   let unmapped = 0;
@@ -116,13 +141,20 @@ export function buildEventLog(headers: string[], rows: string[][], mapping: LogM
     const caseId = (r[ci] ?? "").trim();
     const timestamp = parseTimestamp(r[ti] ?? "");
     if (!caseId || timestamp === null) { unmapped++; continue; }
+    const activity = (r[ai] ?? "").trim();
     const resource = ri >= 0 ? (r[ri] ?? "").trim() : "";
+    const controlId = cti >= 0 ? (r[cti] ?? "").trim() : "";
+    const riskId = rki >= 0 ? (r[rki] ?? "").trim() : "";
+    const policyId = pli >= 0 ? (r[pli] ?? "").trim() : "";
     events.push({
       caseId,
-      activity: (r[ai] ?? "").trim(),
-      state: (r[si] ?? "").trim(),
+      activity,
+      state: stateFor(activity, r[si] ?? ""),
       timestamp,
       ...(resource ? { resource } : {}),
+      ...(controlId ? { controlId } : {}),
+      ...(riskId ? { riskId } : {}),
+      ...(policyId ? { policyId } : {}),
     });
   }
 

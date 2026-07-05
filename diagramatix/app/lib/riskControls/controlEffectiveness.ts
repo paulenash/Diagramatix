@@ -6,6 +6,7 @@
  * not just that it exists. Pure functions over a ConformanceResult.
  */
 import type { ConformanceResult, ConformanceViolation } from "@/app/lib/mining/transitionConformance";
+import type { GovernanceStats } from "@/app/lib/mining/types";
 
 /** Canonical signature for a deviation, used to match a control to it. */
 export function deviationSignature(v: Pick<ConformanceViolation, "rule" | "data">): string {
@@ -35,6 +36,7 @@ export interface ControlEffectiveness {
   totalCases: number;
   effectivenessPct: number | null;   // null when the run has no cases
   label: string;                      // the matched deviation's message (or the raw signature)
+  source?: "conformance" | "log";     // deviation-based vs Control-ID-on-events
 }
 
 /** Effectiveness of one control against a conformance result. A monitored
@@ -49,5 +51,26 @@ export function controlEffectiveness(
   const match = (conf.violations ?? []).find((v) => deviationSignature(v) === monitorSignature);
   const bypassed = match?.cases ?? 0;
   const pct = total > 0 ? Math.round((1 - bypassed / total) * 1000) / 10 : null;
-  return { bypassedCases: bypassed, totalCases: total, effectivenessPct: pct, label: match?.message ?? monitorSignature };
+  return { bypassedCases: bypassed, totalCases: total, effectivenessPct: pct, label: match?.message ?? monitorSignature, source: "conformance" };
+}
+
+/** Control operating-effectiveness mined DIRECTLY from Control IDs carried on
+ *  events (Change B). Matches a control's `code` to the run's governance summary:
+ *  the control governed `expected` cases and was actually applied in `applied` of
+ *  them — the shortfall was bypassed. Returns null when the log named no such
+ *  control. This closes the loop without needing a hand-set monitorSignature. */
+export function logControlEffectiveness(
+  controlCode: string | null | undefined,
+  governance: GovernanceStats | null | undefined,
+): ControlEffectiveness | null {
+  if (!controlCode || !governance) return null;
+  const obs = governance.controls?.[controlCode];
+  if (!obs) return null;
+  return {
+    bypassedCases: obs.bypassed,
+    totalCases: obs.expected,
+    effectivenessPct: obs.effectivenessPct,
+    label: `Control ${controlCode} applied in ${obs.applied} of ${obs.expected} cases`,
+    source: "log",
+  };
 }

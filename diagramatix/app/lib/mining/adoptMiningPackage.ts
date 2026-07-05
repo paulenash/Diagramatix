@@ -75,7 +75,7 @@ export async function adoptMiningPackage(
     const run = await tx.processMiningRun.create({
       data: { name: r.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId },
     });
-    await tx.$executeRaw`UPDATE "ProcessMiningRun" SET mapping = ${JSON.stringify(r.mapping)}::jsonb, stats = ${JSON.stringify(r.stats)}::jsonb, variants = ${JSON.stringify(r.variants)}::jsonb, performance = ${JSON.stringify(r.performance)}::jsonb, "updatedAt" = NOW() WHERE id = ${run.id}`;
+    await tx.$executeRaw`UPDATE "ProcessMiningRun" SET mapping = ${JSON.stringify(r.mapping)}::jsonb, stats = ${JSON.stringify(r.stats)}::jsonb, variants = ${JSON.stringify(r.variants)}::jsonb, performance = ${JSON.stringify(r.performance)}::jsonb, governance = ${r.governance ? JSON.stringify(r.governance) : null}::jsonb, "updatedAt" = NOW() WHERE id = ${run.id}`;
 
     return { projectId: project.id, projectName: project.name, runId: run.id, openDiagramId };
   });

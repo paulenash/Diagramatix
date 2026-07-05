@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-05  ·  **Document version:** 4.8  ·  **Suite:** 111 test files · 762 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0638  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-06  ·  **Document version:** 4.9  ·  **Suite:** 115 test files · 770 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0646  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0638`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T0646`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -766,6 +766,21 @@ The adoptable process-mining sample (mirrors Simulator Examples): a portable pac
 | T0619 | ships a raw sampleLog that rebuilds to the same run (import-first flow) | The confirm-the-analysis import producing a different run than the baked one | If the sample log or the parser drifted |
 | T0624 | the AI Explain-results brief carries the run's stats, top paths, conformance + artefacts (`explain-results.test.ts`) | The "Explain results" summary being fed wrong/empty numbers | If `buildExplainPrompt` stopped serialising a section |
 | T0625 | ships three choosable period scenarios (Jan 2025 / Jul 2025 / Jan 2026) with compliance DECLINING back in time (fitness strictly increasing toward the present; older months carry the unknown "Disputed" state + undocumented transitions) | The multi-scenario story silently flattening or reversing | If a period's mix/seed or the ordering changed |
+
+### `tests/mining/` — standards interchange + optional state + governance (Changes A/B/C)
+
+Accept a classic activity-only log (no state column), mine governance identifiers straight off events, and round-trip through IEEE XES + OCEL — the process-mining-standards gap analysis, made real.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0639 | `optional-state`: no state column → each event's state defaults to its activity name (classic 3-column log mines) | A standard Case/Activity/Timestamp log failing to import | If `buildEventLog` stopped deriving state |
+| T0640 | `optional-state`: the Activity→State table supplies the lifecycle; `distinctActivities` seeds it in first-seen order | The Activity→State table (shown when no state column) not feeding discovery/the State Machine | If the `activityState` map or the seed helper regressed |
+| T0641 | `governance`: control applied/expected/bypassed + effectiveness maths from Control IDs on events (governed activity ran without the control = bypass) | Mis-computing operating-effectiveness from mined Control IDs | If `computeGovernance` regressed |
+| T0642 | `governance`: `logControlEffectiveness` surfaces it by control code (source "log"); unknown code → null; no ids → `hasGovernance` false (loop closure with GRC) | The GRC effectiveness panel not lighting up from Control IDs on the log | If the log-based effectiveness path or the query filter drifted |
+| T0643 | `formats-xes`: parseXes maps concept/time/resource + custom keys, leaves state unmapped, flows through the normal pipeline | XES import mis-mapping the standard extensions | If the XES scanner or mapping guess regressed |
+| T0644 | `formats-xes`: buildXes reconstructs traces from variants + round-trips back through parseXes | A corrupt/asymmetric XES export | If the exporter or its timestamps changed shape |
+| T0645 | `formats-ocel`: parseOcel projects a multi-object OCEL log onto a chosen object type as the case (`ocelObjectTypes` ranks by reference count) | OCEL import silently dropping or mis-attributing events | If the OCEL normaliser (2.0/1.0) regressed |
+| T0646 | `formats-ocel`: buildOcel emits single-object OCEL 2.0 that re-parses to the same variants | A non-round-tripping OCEL export | If the OCEL exporter shape drifted |
 
 ### `tests/riskControls/` — Risk & Control (catalog + attach + RCM + checks)
 

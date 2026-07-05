@@ -1107,6 +1107,7 @@ model ProcessMiningRun {
   stats            Json     @default("{}")   // headline aggregates
   variants         Json     @default("[]")   // compressed log
   performance      Json     @default("{}")   // timing/resource aggregates (simulator feed)
+  governance       Json?                      // {controls,risks,policies} mined from Control/Risk/Policy IDs on events
   discoveredBpmnId String?                    // Diagram id
   discoveredSmId   String?                    // Diagram id
   referenceSmId    String?                    // Diagram id (user-selected)

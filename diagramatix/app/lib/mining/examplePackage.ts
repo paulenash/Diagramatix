@@ -16,7 +16,7 @@
  */
 
 import type { DiagramData } from "../diagram/types";
-import type { LogMapping, MiningStats, Variant, Performance } from "./types";
+import type { LogMapping, MiningStats, Variant, Performance, GovernanceStats } from "./types";
 
 /** A reference state-machine diagram carried in the bundle. */
 export interface MiningExampleDiagram {
@@ -34,6 +34,9 @@ export interface MiningExampleRun {
   stats: MiningStats;
   variants: Variant[];
   performance: Performance;
+  /** Governance aggregate (Change B) — carried so an adopted run reproduces mined
+   *  control operating-effectiveness. Present only when the log had governance ids. */
+  governance?: GovernanceStats;
   /** Which package diagram (by key) the run should adopt as its reference SM. */
   referenceSmKey?: string;
 }
@@ -74,7 +77,7 @@ export function emptyMiningPackage(): MiningExamplePackage {
     diagrams: [],
     run: {
       name: "Event log",
-      mapping: { caseId: "", activity: "", timestamp: "", state: "" },
+      mapping: { caseId: "", activity: "", timestamp: "" },
       stats: { cases: 0, events: 0, activities: [], states: [], variants: 0 },
       variants: [],
       performance: { clockUnit: "hour", activityDurations: {}, interArrival: [], activityResource: {}, resourceConcurrency: {}, activeHours: new Array(168).fill(0) },
@@ -103,8 +106,8 @@ export function validateMiningExamplePackage(pkg: unknown): string[] {
   const r = p.run;
   if (!r || typeof r !== "object") { errs.push("`run` is required"); return errs; }
   if (typeof r.name !== "string" || !r.name) errs.push("`run.name` is required");
-  if (!r.mapping || !r.mapping.caseId || !r.mapping.activity || !r.mapping.timestamp || !r.mapping.state) {
-    errs.push("`run.mapping` must map caseId, activity, timestamp and state");
+  if (!r.mapping || !r.mapping.caseId || !r.mapping.activity || !r.mapping.timestamp) {
+    errs.push("`run.mapping` must map caseId, activity and timestamp");
   }
   if (!Array.isArray(r.variants) || r.variants.length === 0) errs.push("`run.variants` must be a non-empty array");
   if (!r.performance || typeof r.performance.clockUnit !== "string") errs.push("`run.performance` is required (with a clockUnit)");
@@ -113,8 +116,8 @@ export function validateMiningExamplePackage(pkg: unknown): string[] {
   const validateLog = (sl: MiningExampleSampleLog, label: string) => {
     if (!Array.isArray(sl.headers) || sl.headers.length === 0) errs.push(`\`${label}.headers\` must be a non-empty array`);
     if (!Array.isArray(sl.rows) || sl.rows.length === 0) errs.push(`\`${label}.rows\` must be a non-empty array`);
-    if (!sl.mapping || !sl.mapping.caseId || !sl.mapping.activity || !sl.mapping.timestamp || !sl.mapping.state) {
-      errs.push(`\`${label}.mapping\` must map caseId, activity, timestamp and state`);
+    if (!sl.mapping || !sl.mapping.caseId || !sl.mapping.activity || !sl.mapping.timestamp) {
+      errs.push(`\`${label}.mapping\` must map caseId, activity and timestamp`);
     }
   };
   if (p.sampleLog !== undefined) validateLog(p.sampleLog, "sampleLog");

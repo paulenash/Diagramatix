@@ -333,8 +333,110 @@ const o2cExample = {
   } as MiningExamplePackage,
 };
 
+// ── Service Desk example — NO STATE COLUMN (Change A) ────────────────────────
+// A classic activity-only event log (Case, Activity, Timestamp, Agent) — the
+// smallest useful log, exactly what most tools export. There is NO state column;
+// the Activity→State table supplies the lifecycle the miner + the State Machine
+// need. The bundled mapping ships that table so the console pre-fills it.
+const SD_HEADERS = ["Ticket ID", "Channel", "Priority", "Activity", "Timestamp", "Agent"];   // ← no state column
+const SD_ACTIVITY_STATE: Record<string, string> = {
+  "Log Ticket": "Logged", "Triage": "Triaged", "Assign": "Assigned", "Investigate": "Investigating",
+  "Escalate": "Escalated", "Resolve": "Resolved", "Close": "Closed", "Reopen": "Investigating",
+};
+const SD_MAP: LogMapping = { caseId: "Ticket ID", activity: "Activity", timestamp: "Timestamp", resource: "Agent", activityState: SD_ACTIVITY_STATE };
+const SD_END = Date.UTC(2026, 1, 28, 23, 59, 59);
+const sdAgents = ["Ravi Patel", "Grace Lee", "Mo Farah", "Ingrid Nilsen", "Sam Cole"];
+const sdChannels = ["Email", "Phone", "Portal", "Chat"];
+const sdPriorities = ["Low", "Medium", "High", "Critical"];
+
+type SDStep = [activity: string, gap: [number, number] | null];
+const SD_PATHS: Record<string, SDStep[]> = {
+  happy: [["Log Ticket", null], ["Triage", [0, 2]], ["Assign", [0, 4]], ["Investigate", [1, 8]], ["Resolve", [1, 24]], ["Close", [0, 8]]],
+  escalated: [["Log Ticket", null], ["Triage", [0, 2]], ["Assign", [0, 4]], ["Investigate", [1, 8]], ["Escalate", [1, 12]], ["Resolve", [4, 48]], ["Close", [0, 8]]],
+  reopened: [["Log Ticket", null], ["Triage", [0, 2]], ["Assign", [0, 4]], ["Investigate", [1, 8]], ["Resolve", [1, 24]], ["Close", [0, 8]], ["Reopen", [12, 96]], ["Investigate", [1, 8]], ["Resolve", [1, 24]], ["Close", [0, 8]]],
+  // deviation — triage straight to resolve (skips assign + investigate)
+  quickClose: [["Log Ticket", null], ["Triage", [0, 2]], ["Resolve", [1, 12]], ["Close", [0, 8]]],
+};
+const SD_MIX: string[] = [
+  ...Array(96).fill("happy"), ...Array(34).fill("escalated"), ...Array(20).fill("reopened"), ...Array(18).fill("quickClose"),
+];
+
+function buildServiceDeskLog() {
+  const rnd = mulberry32(20260228);
+  const rint = (lo: number, hi: number) => lo + Math.floor(rnd() * (hi - lo + 1));
+  const pick = <T,>(arr: T[]) => arr[Math.floor(rnd() * arr.length)];
+  const arrival = () => { let ms; do { ms = Date.UTC(2026, 1, rint(1, 28), rint(7, 18), rint(0, 59), rint(0, 59)); } while (isWeekend(ms)); return ms; };
+  const cases = SD_MIX.map((type) => ({ type, arrival: arrival() })) as { type: string; arrival: number; id: string; channel: string; priority: string; agent: string }[];
+  cases.sort((a, b) => a.arrival - b.arrival);
+  cases.forEach((c, i) => { c.id = `TKT-2026-${String(i + 1).padStart(4, "0")}`; c.channel = pick(sdChannels); c.priority = pick(sdPriorities); c.agent = pick(sdAgents); });
+  const rows: { id: string; channel: string; priority: string; activity: string; agent: string; t: number }[] = [];
+  for (const c of cases) {
+    let t = c.arrival;
+    for (const [activity, gap] of SD_PATHS[c.type]) {
+      if (gap) t += rint(gap[0], gap[1]) * HOUR + rint(0, 59) * MIN;
+      if (t > SD_END) break;
+      rows.push({ id: c.id, channel: c.channel, priority: c.priority, activity, agent: c.agent, t });
+    }
+  }
+  rows.sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
+  return {
+    fileName: "service-desk-february-2026.csv", runName: "IT Service Desk — February 2026",
+    headers: SD_HEADERS, mapping: SD_MAP,
+    rows: rows.map((r) => [r.id, r.channel, r.priority, r.activity, iso(r.t), r.agent]),
+  };
+}
+
+// Reference lifecycle — built from the SAME Activity→State table, so a log with no
+// state column still conforms against a proper State Machine.
+const SD_REF_ELEMENTS = [
+  { id: INIT, type: "initial-state", label: "" },
+  { id: FINAL, type: "final-state", label: "" },
+  { id: "logged", type: "state", label: "Logged" },
+  { id: "triaged", type: "state", label: "Triaged" },
+  { id: "assigned", type: "state", label: "Assigned" },
+  { id: "investigating", type: "state", label: "Investigating" },
+  { id: "escalated", type: "state", label: "Escalated" },
+  { id: "resolved", type: "state", label: "Resolved" },
+  { id: "closed", type: "state", label: "Closed" },
+];
+const SD_CONNS = [
+  T(INIT, "logged", "Log Ticket"),
+  T("logged", "triaged", "Triage"),
+  T("triaged", "assigned", "Assign"),
+  T("assigned", "investigating", "Investigate"),
+  T("investigating", "escalated", "Escalate"),
+  T("escalated", "resolved", "Resolve"),
+  T("investigating", "resolved", "Resolve"),
+  T("resolved", "closed", "Close"),
+  T("closed", "investigating", "Reopen"),
+  T("closed", FINAL, ""),
+];
+
+const sdSampleLog = buildServiceDeskLog();
+const sdLog = buildEventLog(sdSampleLog.headers, sdSampleLog.rows, sdSampleLog.mapping);
+const sdPerformance = computePerformance(sdLog.traces);
+const serviceDeskExample = {
+  slug: "service-desk-ticket-lifecycle",
+  title: "IT Service Desk — Activity-Only Log",
+  concept: "Mine a classic activity-only event log (no state column) — the Activity→State table completes the lifecycle.",
+  description: [
+    "The smallest useful event log — just **Ticket ID, Activity, Timestamp and Agent**, with **no state column**, exactly what most systems export.",
+    "",
+    "On import, DiagramatixMINER shows an **Activity → State** table (pre-filled here: *Log Ticket → Logged*, *Investigate → Investigating*, *Resolve → Resolved*…) so you define the lifecycle the discovery, conformance and generated **State Machine** all rely on — merge activities into shared states, or leave each as its own.",
+    "",
+    "~170 tickets flow **Logged → Triaged → Assigned → Investigating → Resolved → Closed**, with an Escalated branch, a Reopen loop, and an off-book *triage-straight-to-resolve* deviation. Discover the lifecycle, run **Conformance** against the bundled reference, then **Calibrate & simulate**.",
+  ].join("\n"),
+  difficulty: "core",
+  package: {
+    version: 1 as const,
+    diagrams: [{ key: "sd-reference", name: "Ticket Lifecycle (Reference)", type: "state-machine", data: buildRef(SD_REF_ELEMENTS, SD_CONNS) }],
+    run: { name: sdSampleLog.runName, mapping: SD_MAP, stats: sdLog.stats, variants: sdLog.variants, performance: sdPerformance, referenceSmKey: "sd-reference" },
+    sampleLog: { ...sdSampleLog },
+  } as MiningExamplePackage,
+};
+
 const outFile = join(__dirname, "..", "app", "lib", "mining", "miningExampleData.json");
-writeFileSync(outFile, JSON.stringify({ examples: [example, o2cExample] }, null, 2) + "\n", "utf8");
+writeFileSync(outFile, JSON.stringify({ examples: [example, o2cExample, serviceDeskExample] }, null, 2) + "\n", "utf8");
 console.log(`Wrote ${outFile}`);
 console.log(`  O2C: ${o2cLog.stats.cases} cases, ${o2cLog.stats.events} events, ${o2cLog.stats.variants} variants`);
 
@@ -351,5 +453,7 @@ for (const s of sampleLogs) {
 }
 writeFileSync(join(miningDir, o2cSampleLog.fileName), toCsv(o2cSampleLog.headers, o2cSampleLog.rows), "utf8");
 console.log(`  O2C log → mining/${o2cSampleLog.fileName}`);
+writeFileSync(join(miningDir, sdSampleLog.fileName), toCsv(sdSampleLog.headers, sdSampleLog.rows), "utf8");
+console.log(`  Service Desk (no state col): ${sdLog.stats.cases} cases, ${sdLog.stats.events} events, ${sdLog.stats.variants} variants → mining/${sdSampleLog.fileName}`);
 console.log(`  current run: ${log.stats.cases} cases, ${log.stats.events} events, ${log.stats.variants} variants; clockUnit=${performance.clockUnit}`);
 console.log(`  references: ${diagrams.map((d) => `${d.key} (${d.data.elements.length} el, ${d.data.connectors.length} conn)`).join(", ")}`);
