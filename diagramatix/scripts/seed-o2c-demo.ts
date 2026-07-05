@@ -31,17 +31,18 @@ async function main() {
   if (!membership) { console.log(`"${EMAIL}" belongs to no org — nothing to seed.`); return; }
   console.log(`Seeding for "${EMAIL}" into org ${membership.orgId}…`);
 
-  const existing = await prisma.project.findFirst({ where: { name: PROJECT_NAME, userId: user.id }, select: { id: true, diagrams: { select: { name: true } } } });
+  const pkg = buildO2cExamplePackage();
+  const expected = pkg.diagrams.length + (pkg.mining ? 1 : 0);   // + the reference State Machine
+  const existing = await prisma.project.findFirst({ where: { name: PROJECT_NAME, userId: user.id }, select: { id: true, _count: { select: { diagrams: true } } } });
   if (existing) {
-    if (existing.diagrams.some((d) => /Value Chain/i.test(d.name))) { console.log(`Skip — "${PROJECT_NAME}" already reconstituted.`); return; }
-    console.log(`Upgrading the older synthetic "${PROJECT_NAME}"…`);
+    if (existing._count.diagrams === expected) { console.log(`Skip — "${PROJECT_NAME}" already up to date (${expected} diagrams).`); return; }
+    console.log(`Rebuilding "${PROJECT_NAME}" (had ${existing._count.diagrams} diagrams, expected ${expected})…`);
     await prisma.riskControlLibrary.deleteMany({ where: { projectId: existing.id } });
     await prisma.processMiningRun.deleteMany({ where: { projectId: existing.id } });
     await prisma.diagram.deleteMany({ where: { projectId: existing.id } });
     await prisma.project.delete({ where: { id: existing.id } });
   }
 
-  const pkg = buildO2cExamplePackage();
   const res = await adoptRiskControlExample(pkg, { userId: user.id, orgId: membership.orgId, ownerName: user.name ?? "", projectName: PROJECT_NAME });
 
   console.log(`Seeded "${PROJECT_NAME}" (project ${res.projectId}) — ${pkg.diagrams.length} diagrams, GRC library + mining run with conformance.`);
