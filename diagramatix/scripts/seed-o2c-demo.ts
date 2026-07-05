@@ -23,8 +23,13 @@ async function main() {
 
   const user = await prisma.user.findFirst({ where: { email: EMAIL }, select: { id: true, name: true } });
   if (!user) { console.log(`No user "${EMAIL}" — nothing to seed.`); return; }
-  const membership = await prisma.orgMember.findFirst({ where: { userId: user.id, role: { in: ["Owner", "Admin"] } }, select: { orgId: true } });
-  if (!membership) { console.log(`"${EMAIL}" owns/admins no org — nothing to seed.`); return; }
+  // Prefer an Owner/Admin org, but fall back to ANY org membership so a differing
+  // prod role setup can't silently skip the demo.
+  const membership =
+    (await prisma.orgMember.findFirst({ where: { userId: user.id, role: { in: ["Owner", "Admin"] } }, select: { orgId: true } }))
+    ?? (await prisma.orgMember.findFirst({ where: { userId: user.id }, select: { orgId: true } }));
+  if (!membership) { console.log(`"${EMAIL}" belongs to no org — nothing to seed.`); return; }
+  console.log(`Seeding for "${EMAIL}" into org ${membership.orgId}…`);
 
   const existing = await prisma.project.findFirst({ where: { name: PROJECT_NAME, userId: user.id }, select: { id: true, diagrams: { select: { name: true } } } });
   if (existing) {
