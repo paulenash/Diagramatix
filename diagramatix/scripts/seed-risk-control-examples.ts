@@ -18,15 +18,18 @@ import projectExport from "../app/lib/riskControls/o2cProjectExport.json";
 export function buildO2cExamplePackage(): RiskControlExamplePackage {
   const mining = STARTER_MINING_EXAMPLES.find((e) => e.slug === "order-to-cash-lifecycle");
   if (!mining) throw new Error("O2C mining example not found — run gen-mining-examples.ts first.");
-  const ref = mining.package.diagrams[0];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const diagrams = (projectExport as any).diagrams.map((d: any) => ({ name: d.name, type: d.type, data: d.data, colorConfig: d.colorConfig, displayMode: d.displayMode }));
+  // The reference State Machine is the project's OWN order-lifecycle diagram, so
+  // the mining run conforms against the exact SM in the project (not a duplicate).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sm = diagrams.find((d: any) => d.type === "state-machine");
   return {
     version: 1,
     diagrams,
     library: { name: O2C_SAMPLE.name, items: O2C_SAMPLE.items, links: O2C_SAMPLE.links },
     attach: O2C_ATTACH,
-    mining: { referenceName: ref.name, referenceData: ref.data, run: mining.package.run },
+    mining: sm ? { referenceDiagramName: sm.name, run: mining.package.run } : undefined,
   };
 }
 

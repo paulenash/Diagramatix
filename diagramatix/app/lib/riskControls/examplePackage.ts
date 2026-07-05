@@ -22,8 +22,9 @@ export interface RcExampleDiagram {
 export interface RcExampleLibrary { name: string; items: SampleItem[]; links: SampleLink[]; }
 
 export interface RcExampleMining {
-  referenceName: string;
-  referenceData: DiagramData;   // the reference State Machine
+  /** Which of the package's diagrams is the reference State Machine to conform
+   *  against (matched by name; falls back to the first state-machine diagram). */
+  referenceDiagramName: string;
   run: { name: string; mapping: LogMapping; stats: MiningStats; variants: Variant[]; performance: Performance };
 }
 
@@ -50,7 +51,10 @@ export function validateRiskControlExamplePackage(pkg: unknown): string[] {
     if (!codes.has(ln.source) || !codes.has(ln.target)) errs.push(`link ${ln.source}→${ln.target} references an unknown item`);
   }
   if (p.mining) {
-    if (!p.mining.referenceData) errs.push("`mining.referenceData` is required when mining is present");
+    if (!p.mining.referenceDiagramName) errs.push("`mining.referenceDiagramName` is required when mining is present");
+    else if (!(p.diagrams ?? []).some((d) => d.name === p.mining!.referenceDiagramName && d.type === "state-machine")) {
+      errs.push(`mining.referenceDiagramName "${p.mining.referenceDiagramName}" doesn't match a state-machine diagram`);
+    }
     if (!Array.isArray(p.mining.run?.variants) || p.mining.run.variants.length === 0) errs.push("`mining.run.variants` must be non-empty");
   }
   return errs;

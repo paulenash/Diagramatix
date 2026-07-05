@@ -49,6 +49,7 @@ export async function adoptRiskControlExample(pkg: RiskControlExamplePackage, ct
 
   // 3) Import process diagrams, attaching risks/controls to the real steps.
   let openDiagramId: string | null = null;
+  const diagIdByName = new Map<string, string>();
   for (const d of pkg.diagrams) {
     const data = JSON.parse(JSON.stringify(d.data));   // don't mutate the shared package
     attachRefs(data, pkg.attach, itemByCode);
@@ -59,25 +60,25 @@ export async function adoptRiskControlExample(pkg: RiskControlExamplePackage, ct
         data: data as any, colorConfig: d.colorConfig ?? undefined, displayMode: d.displayMode ?? undefined,
       },
     });
+    diagIdByName.set(d.name, created.id);
     if (!openDiagramId && d.type === "bpmn") openDiagramId = created.id;
   }
 
-  // 4) Mining run + reference State Machine + conformance (optional).
+  // 4) Mining run — conform against the imported reference State Machine (one of
+  //    the package's own diagrams), so no duplicate reference is created.
   if (pkg.mining) {
     const m = pkg.mining;
-    const refDiag = await prisma.diagram.create({
-      data: {
-        name: m.referenceName, type: "state-machine", userId: ctx.userId, diagramOwnerId: ctx.userId, orgId: ctx.orgId, projectId: project.id,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data: m.referenceData as any,
-      },
-    });
-    const conf = checkTransitionConformance(m.run.variants, { elements: m.referenceData.elements, connectors: m.referenceData.connectors } as ReferenceSm);
-    const run = await prisma.processMiningRun.create({ data: { name: m.run.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId: refDiag.id } });
-    await pgPool.query(
-      'UPDATE "ProcessMiningRun" SET mapping=$1::jsonb, stats=$2::jsonb, variants=$3::jsonb, performance=$4::jsonb, conformance=$5::jsonb, "updatedAt"=NOW() WHERE id=$6',
-      [JSON.stringify(m.run.mapping), JSON.stringify(m.run.stats), JSON.stringify(m.run.variants), JSON.stringify(m.run.performance), JSON.stringify(conf), run.id],
-    );
+    const refPkgDiag = pkg.diagrams.find((d) => d.name === m.referenceDiagramName && d.type === "state-machine")
+      ?? pkg.diagrams.find((d) => d.type === "state-machine");
+    const refSmId = refPkgDiag ? diagIdByName.get(refPkgDiag.name) : undefined;
+    if (refPkgDiag && refSmId) {
+      const conf = checkTransitionConformance(m.run.variants, { elements: refPkgDiag.data.elements, connectors: refPkgDiag.data.connectors } as ReferenceSm);
+      const run = await prisma.processMiningRun.create({ data: { name: m.run.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId: refSmId } });
+      await pgPool.query(
+        'UPDATE "ProcessMiningRun" SET mapping=$1::jsonb, stats=$2::jsonb, variants=$3::jsonb, performance=$4::jsonb, conformance=$5::jsonb, "updatedAt"=NOW() WHERE id=$6',
+        [JSON.stringify(m.run.mapping), JSON.stringify(m.run.stats), JSON.stringify(m.run.variants), JSON.stringify(m.run.performance), JSON.stringify(conf), run.id],
+      );
+    }
   }
 
   return { projectId: project.id, projectName: project.name, openDiagramId };
