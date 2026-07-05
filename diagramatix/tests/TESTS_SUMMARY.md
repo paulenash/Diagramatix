@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-05  ·  **Document version:** 4.5  ·  **Suite:** 110 test files · 759 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0635  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-05  ·  **Document version:** 4.6  ·  **Suite:** 111 test files · 760 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0636  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0631`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance.)
+> **Highest ref allocated: `T0631`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = the ready-made Order-to-Cash sample GRC library.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -783,6 +783,7 @@ Attach Risks/Controls (from an org-master → project-copy GRC catalog — Risks
 | T0633 | GRC objects (Policy/Regulation) + the traceability graph clone on adopt and flow into the export (Traceability sheet verbs, GRC Register, audit-grid governance column) | The wider governance graph (policy↔control↔regulation) not persisting or not reaching the RCM | If the generalized `sourceId/targetId` links or the traceability/register export regressed |
 | T0634 | control effectiveness: deviation-signature matching + bypassed/effectiveness maths (39/200 → 80.5%, unobserved → 100%, none → null) | Mis-computing "is the control operating" from mining conformance | If `deviationSignature`/`controlEffectiveness` regressed |
 | T0635 | control operating-effectiveness from a real mining run's conformance flows into the export (bypassed cases + % in the Control Register; run named in the summary) | The RCM not reflecting whether controls actually operate on real data | If `loadLatestConformance` or the effectiveness export columns regressed |
+| T0636 | the ready-made Order-to-Cash sample GRC library is internally consistent (unique codes, every kind present, links reference real items, every risk mitigated, governance chain present, monitor signatures well-formed) | The one-click O2C sample (`scripts/seed-risk-controls-o2c.ts`) seeding a broken/incoherent library | If `o2cSample.ts` data drifted |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 
