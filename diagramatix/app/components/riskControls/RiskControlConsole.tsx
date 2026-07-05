@@ -80,20 +80,20 @@ export function RiskControlConsole({
   return (
     <div className="fixed inset-0 z-50 bg-stone-50 flex flex-col">
       {/* header */}
-      <header className="bg-teal-800 text-white px-5 py-3 flex items-center justify-between shadow">
+      <header className="bg-blue-800 text-white px-5 py-3 flex items-center justify-between shadow">
         <div className="flex items-baseline gap-3">
           <h1 className="text-base font-semibold tracking-tight">◆ Risk &amp; Controls</h1>
-          <span className="text-teal-200 text-xs">{projectName ?? "Project"}</span>
+          <span className="text-blue-200 text-xs">{projectName ?? "Project"}</span>
           {library && (
-            <span className="text-teal-100/80 text-[11px]">
+            <span className="text-blue-100/80 text-[11px]">
               {library.items.length} items · {library.links.length} links{gaps ? ` · ${gaps} coverage gap${gaps === 1 ? "" : "s"}` : ""}
               {runName && ` · effectiveness from “${runName}”`}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          {library && <a href={`${basePath}/export`} className="text-xs bg-teal-700 hover:bg-teal-600 rounded px-3 py-1.5">⭳ Export Risk-Control Matrix</a>}
-          <button onClick={onClose} className="text-xs bg-teal-900/60 hover:bg-teal-900 rounded px-3 py-1.5">✕ Close</button>
+          {library && <a href={`${basePath}/export`} className="text-xs bg-blue-700 hover:bg-blue-600 rounded px-3 py-1.5">⭳ Export Risk-Control Matrix</a>}
+          <button onClick={onClose} className="text-xs bg-blue-900/60 hover:bg-blue-900 rounded px-3 py-1.5">✕ Close</button>
         </div>
       </header>
 
@@ -108,9 +108,9 @@ export function RiskControlConsole({
               <div className="mb-4 flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-gray-600">
                 <span>Library: <span className="font-medium text-gray-800">{library.name}</span></span>
                 <span>{risks.length} risks · {controls.length} controls</span>
-                {Object.keys(effectiveness).length > 0 && <span className="text-teal-700">{Object.keys(effectiveness).length} controls monitored for bypass</span>}
+                {Object.keys(effectiveness).length > 0 && <span className="text-blue-700">{Object.keys(effectiveness).length} controls monitored for bypass</span>}
               </div>
-              <div className="bg-white border border-teal-200 rounded-lg p-4">
+              <div className="bg-white border border-blue-200 rounded-lg p-4">
                 <RiskControlEditor library={library} basePath={basePath} canEdit={canEdit} onChange={refresh} deviations={deviations} effectiveness={effectiveness} />
               </div>
             </>
@@ -126,10 +126,10 @@ export function RiskControlConsole({
                         <option value="">Adopt from {orgName || "org"}…</option>
                         {masters.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.itemCount})</option>)}
                       </select>
-                      <button onClick={() => adopt(false)} disabled={busy || !chosen} className="text-sm px-3 py-1 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-40">Adopt</button>
+                      <button onClick={() => adopt(false)} disabled={busy || !chosen} className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-40">Adopt</button>
                     </div>
                   )}
-                  <button onClick={createEmpty} className="text-xs text-teal-700 hover:text-teal-900">+ create empty library</button>
+                  <button onClick={createEmpty} className="text-xs text-blue-700 hover:text-blue-900">+ create empty library</button>
                 </div>
               )}
             </div>

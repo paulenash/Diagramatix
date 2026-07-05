@@ -140,7 +140,7 @@ export function RiskControlEditor({
           <section key={kind} className="space-y-1.5">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{KIND_LABEL_PLURAL[kind]} ({items.length})</h4>
-              {canEdit && <button onClick={() => addItem(kind)} disabled={busy} className="text-[11px] text-teal-700 hover:text-teal-900">+ Add {KIND_LABEL[kind].toLowerCase()}</button>}
+              {canEdit && <button onClick={() => addItem(kind)} disabled={busy} className="text-[11px] text-blue-700 hover:text-blue-900">+ Add {KIND_LABEL[kind].toLowerCase()}</button>}
             </div>
             {items.map((it) => {
               const score = kind === "Risk" ? riskScore(it) : null;
@@ -165,9 +165,9 @@ export function RiskControlEditor({
                   {/* traceability links */}
                   <div className="flex flex-wrap gap-1 items-center">
                     {edges.map((e) => (
-                      <span key={e.link.id} className="text-[10px] bg-teal-50 text-teal-700 rounded px-1.5 py-0.5 flex items-center gap-1" title={`${e.outgoing ? "" : "← "}${e.verb}${e.outgoing ? " →" : ""} ${e.other!.name}`}>
+                      <span key={e.link.id} className="text-[10px] bg-blue-50 text-blue-700 rounded px-1.5 py-0.5 flex items-center gap-1" title={`${e.outgoing ? "" : "← "}${e.verb}${e.outgoing ? " →" : ""} ${e.other!.name}`}>
                         {e.outgoing ? "" : "← "}{e.verb} {e.other!.code}{e.outgoing ? " →" : ""}
-                        {canEdit && <button onClick={() => unlink(e.link.sourceId, e.link.targetId)} className="text-teal-500 hover:text-teal-700">×</button>}
+                        {canEdit && <button onClick={() => unlink(e.link.sourceId, e.link.targetId)} className="text-blue-500 hover:text-blue-700">×</button>}
                       </span>
                     ))}
                     {kind === "Risk" && !edges.some((e) => byId.get(e.link.sourceId)?.kind === "Control") && (

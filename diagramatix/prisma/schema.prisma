@@ -1228,6 +1228,27 @@ model MiningExample {
   @@index([published, sortOrder])
 }
 
+// Risk & Control (GRC) example catalog — global, adoptable in one click into a
+// fresh project: process diagrams + a GRC library (risks/controls/policies/…)
+// attached to steps + an optional mining run for control effectiveness. Mirrors
+// MiningExample. `package` (JSON) holds the whole adoptable bundle.
+model RiskControlExample {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  concept     String   @default("")
+  description String   @default("")
+  difficulty  String   @default("core")
+  sortOrder   Int      @default(0)
+  published   Boolean  @default(false)
+  package     Json     @default("{}")
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([published, sortOrder])
+}
+
 // One execution of a scenario — run history for comparison. Snapshots the
 // resolved config + assembled network so a run reproduces even if the model
 // later changes; `metrics` holds the aggregated results.

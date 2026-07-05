@@ -44,7 +44,7 @@ const SIMULATOR_TABLES = [
 // SuperAdmin backup (catalog-driven); wiring them into the SCOPED org/user
 // backups is a deliberate follow-up, single-sourced + pinned here like the
 // Simulator tables so the omission is an asserted decision, not a comment.
-const RISK_CONTROL_TABLES = ["RiskControlLibrary", "RiskControlItem", "RiskControlLink"] as const;
+const RISK_CONTROL_TABLES = ["RiskControlLibrary", "RiskControlItem", "RiskControlLink", "RiskControlExample"] as const;
 
 // Tables the scoped backups deliberately DON'T carry — publish lineage,
 // review workflow, cross-tenant config, notifications, and (for now) the

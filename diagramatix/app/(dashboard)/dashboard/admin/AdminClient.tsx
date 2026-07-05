@@ -727,6 +727,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "features", title: "Features Catalog", description: "Edit the public feature catalog (draft / publish).", href: "/dashboard/admin/features" },
   { id: "simulator-examples", title: "Simulator Examples", description: "Curate the simulation sample processes users can adopt — capture a study, edit metadata, publish / unpublish.", href: "/dashboard/admin/simulator-examples" },
   { id: "mining-examples", title: "Process Mining Examples", description: "Curate the process-mining samples users can adopt — capture a run, edit metadata, publish / unpublish.", href: "/dashboard/admin/mining-examples" },
+  { id: "risk-control-examples", title: "Risk & Control Examples", description: "Curate the GRC examples users can adopt — process + risks/controls + mining effectiveness; edit metadata, publish / unpublish.", href: "/dashboard/admin/risk-control-examples" },
   { id: "groups", title: "Collaboration Groups", description: "Every Collaboration Group in the system.", href: "/dashboard/admin/groups" },
   { id: "ai-plan", title: "AI Plan Formats", description: "Saved AI two-phase plan format templates.", href: "/dashboard/admin/ai-plan-format" },
   { id: "org-settings", title: "Org Settings", description: "Manage Orgs, OrgAdmins, and cross-Org sharing.", href: "/dashboard/admin/org-settings" },

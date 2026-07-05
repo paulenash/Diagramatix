@@ -110,3 +110,31 @@ export const O2C_SAMPLE = {
   items,
   links,
 };
+
+/** Real Order-to-Cash step label → the Risk / Control codes it carries. Used to
+ *  attach the library onto the genuine process diagrams when the example is
+ *  adopted. */
+export const O2C_ATTACH: Record<string, { risks?: string[]; controls?: string[] }> = {
+  "Capture order details": { risks: ["R-01"], controls: ["C-01"] },
+  "Log Order Details": { risks: ["R-01"], controls: ["C-01"] },
+  "Record order in OMS": { risks: ["R-01"], controls: ["C-01"] },
+  "Record Order Formally": { risks: ["R-01"], controls: ["C-01"] },
+  "Check order against duplicates / existing customer": { risks: ["R-04"], controls: ["C-04"] },
+  "Check Duplicate and Customer Match": { risks: ["R-04"], controls: ["C-04"] },
+  "Set Up Customer Record": { risks: ["R-09"], controls: ["C-10"] },
+  "Apply contract / discount pricing": { risks: ["R-02"], controls: ["C-02"] },
+  "Confirm final price and credit terms": { controls: ["C-02"] },
+  "Check credit limit and exposure": { risks: ["R-03"], controls: ["C-03"] },
+  "Credit Officer review": { controls: ["C-07"] },
+  "Request prepayment / hold order": { risks: ["R-03"], controls: ["C-07"] },
+  "Escalate to Credit Manager": { controls: ["C-07"] },
+  "Pick items": { risks: ["R-06"], controls: ["C-06"] },
+  "Pack and label": { controls: ["C-06"] },
+  "Stage for dispatch and update WMS": { risks: ["R-05"], controls: ["C-05"] },
+  "Quality check": { controls: ["C-05"] },
+  "Match payments to invoices": { risks: ["R-08"], controls: ["C-09"] },
+  "Record payment against invoice": { risks: ["R-08"], controls: ["C-09"] },
+  "Investigate and allocate": { controls: ["C-09"] },
+  "Investigate Dispute / Deduction": { risks: ["R-10"], controls: ["C-11"] },
+  "Log Case": { controls: ["C-11"] },
+};
