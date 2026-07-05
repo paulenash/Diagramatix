@@ -95,7 +95,7 @@ describe("User Guide backup round-trip", () => {
     expect(await prisma.helpImage.findUnique({ where: { id: imgA.id } })).not.toBeNull();
 
     // adminOnly survives on both chapter and section.
-    expect((await prisma.helpChapter.findUnique({ where: { slug: "admin" } }))?.adminOnly).toBe(true);
+    expect((await prisma.helpChapter.findFirst({ where: { slug: "admin", collection: "user-guide" } }))?.adminOnly).toBe(true);
     expect((await prisma.helpSection.findFirst({ where: { heading: "Secret" } }))?.adminOnly).toBe(true);
   });
 

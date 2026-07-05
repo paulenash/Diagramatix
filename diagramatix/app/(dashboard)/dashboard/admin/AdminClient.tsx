@@ -646,20 +646,19 @@ function GenerateDdlButton() {
     try {
       const { generateDiagramatixDDL } = await import("@/app/lib/diagram/ddlGenerate");
       const ddl = generateDiagramatixDDL(dbType);
-      const ext = dbType === "mssql" ? "sql" : "sql";
       const dbLabel = { postgres: "PostgreSQL", mysql: "MySQL", mssql: "SQLServer" }[dbType] ?? dbType;
       const blob = new Blob([ddl], { type: "text/sql" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `diagramatix-schema-${dbLabel}.${ext}`;
+      a.download = `diagramatix-logical-ddl-${dbLabel}.sql`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       setOpen(false);
     } catch (err) {
-      setErrorMessage("Failed to generate DDL: " + (err instanceof Error ? err.message : String(err)));
+      setErrorMessage("Failed to generate logical DDL: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setGenerating(false);
     }
@@ -669,7 +668,7 @@ function GenerateDdlButton() {
     <div className="relative">
       <button onClick={() => setOpen(!open)}
         className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50">
-        Generate Diagramatix DDL
+        Generate Logical DDL
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50 p-3 space-y-2">
@@ -692,7 +691,7 @@ function GenerateDdlButton() {
       )}
       {errorMessage && (
         <AlertDialog
-          title="DDL generation failed"
+          title="Logical DDL generation failed"
           message={errorMessage}
           tone="error"
           onClose={() => setErrorMessage(null)}
@@ -721,7 +720,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "ai-rules", title: "AI Rules & Preferences", description: "Geometric + style rules that steer AI BPMN generation.", href: "/dashboard/rules" },
   { id: "ai-model", title: "AI Generate Model", description: "Choose the Claude model AI diagram generation uses (default Haiku 4.5).", href: "/dashboard/admin/ai-model" },
   { id: "database", title: "Database Access", description: "Inspect the live database and run maintenance queries.", href: "/dashboard/admin/database" },
-  { id: "ddl", title: "Generate Diagramatix DDL", description: "Download the schema as PostgreSQL / MySQL / SQL Server DDL.", ddl: true },
+  { id: "ddl", title: "Logical DDL Generation", description: "Download the Diagramatix logical data model as PostgreSQL / MySQL / SQL Server DDL.", ddl: true },
   { id: "archive", title: "System Archive", description: "Archived projects and diagrams across the system.", href: "/dashboard/admin/archive" },
   { id: "subscriptions", title: "Subscription Prices & Limits", description: "Tier pricing and per-tier feature limits.", href: "/dashboard/admin/subscriptions" },
   { id: "features", title: "Features Catalog", description: "Edit the public feature catalog (draft / publish).", href: "/dashboard/admin/features" },
@@ -736,7 +735,9 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "sharing", title: "Project Sharing", description: "Every shared project plus its editors / viewers.", href: "/dashboard/admin/sharing" },
   { id: "scanner-rules", title: "BPMN Scanner Rules", description: "Rules used by the diagram issue scanner.", href: "/dashboard/admin/scanner-rules" },
   { id: "bubble-help", title: "Bubble Help", description: "The contextual help-cloud topics shown in the editor.", href: "/dashboard/admin/bubble-help" },
-  { id: "user-guide", title: "User Guide", description: "Edit the in-app User Guide — chapters & sections, WYSIWYG with tables & symbols.", href: "/dashboard/admin/user-guide" },
+  { id: "user-guide", title: "Document Editor", description: "Edit the in-app User Guide and the SuperAdmin Technical Design Notes — WYSIWYG with tables & symbols; export any document to .docx.", href: "/dashboard/admin/user-guide" },
+  { id: "tech-design-notes", title: "Technical Design Notes", description: "SuperAdmin-only low-level design notes (Simulator / Miner / RCM) + import/export standards. Edit in the Document Editor.", href: "/dashboard/admin/user-guide?collection=tech-design" },
+  { id: "tech-design-notes-read", title: "Read Technical Design Notes", description: "Read-only view of the Technical Design Notes (no editor chrome).", href: "/tech-notes" },
   { id: "diagram-types", title: "Diagram Types", description: "The 2-character codes and pastel colours shown per diagram type.", href: "/dashboard/admin/diagram-types?from=/dashboard/admin" },
   { id: "diagram-type-sort", title: "Diagram Type Sort Order", description: "The order diagram types are listed across the app and in the project Diagram Type sort.", href: "/dashboard/diagram-type-sort-order?from=/dashboard/admin" },
   { id: "prompts", title: "AI Prompt Maintenance", description: "Maintain your own saved AI generation prompts.", href: "/dashboard/prompts?from=/dashboard/admin" },

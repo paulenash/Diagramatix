@@ -1279,22 +1279,25 @@ model SimulationRun {
 // SuperAdmin-only chapter/section is hidden from User/OrgAdmin viewers).
 // ────────────────────────────────────────────────────────────────────────────
 model HelpChapter {
-  id        String        @id @default(cuid())
-  slug      String        @unique
-  title     String
-  sortOrder Int           @default(0)
-  adminOnly Boolean       @default(false)
-  sections  HelpSection[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id         String        @id @default(cuid())
+  slug       String
+  collection String        @default("user-guide")   // "user-guide" (the in-app help) | "tech-design" (SuperAdmin design notes)
+  title      String
+  sortOrder  Int           @default(0)
+  adminOnly  Boolean       @default(false)
+  sections   HelpSection[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 
-  @@index([sortOrder])
+  @@unique([collection, slug])
+  @@index([collection, sortOrder])
 }
 
 model HelpSection {
   id           String      @id @default(cuid())
   chapterId    String
   chapter      HelpChapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  collection   String      @default("user-guide")   // denormalised from the chapter so the PUT's scoped delete needs no join
   heading      String?
   bodyMarkdown String      @db.Text
   adminOnly    Boolean     @default(false)

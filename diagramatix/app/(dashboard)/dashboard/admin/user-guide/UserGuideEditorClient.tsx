@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { GuideEditor } from "./GuideEditor";
 import { ImagePickerDialog } from "./ImagePickerDialog";
@@ -30,7 +31,12 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   return next;
 }
 
+const COLLECTION_LABEL: Record<string, string> = { "user-guide": "User Guide", "tech-design": "Technical Design Notes" };
+
 export function UserGuideEditorClient() {
+  const searchParams = useSearchParams();
+  const initialCollection = searchParams.get("collection") === "tech-design" ? "tech-design" : "user-guide";
+  const [collection, setCollection] = useState<"user-guide" | "tech-design">(initialCollection);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [snapshot, setSnapshot] = useState("");
   const [selCh, setSelCh] = useState(0);
@@ -55,9 +61,10 @@ export function UserGuideEditorClient() {
   };
 
   useEffect(() => {
+    setLoading(true);
     (async () => {
       try {
-        const res = await fetch("/api/admin/user-guide");
+        const res = await fetch(`/api/admin/documents/${collection}`);
         if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`);
         const data = await res.json();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -71,13 +78,15 @@ export function UserGuideEditorClient() {
         }));
         setChapters(chs);
         setSnapshot(JSON.stringify(chs));
+        setSelCh(0); setSelSec(0);
       } catch (e) {
         setStatus({ kind: "error", msg: e instanceof Error ? e.message : "Failed to load" });
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collection]);
 
   const dirty = useMemo(() => JSON.stringify(chapters) !== snapshot, [chapters, snapshot]);
   const ch = chapters[selCh];
@@ -113,7 +122,7 @@ export function UserGuideEditorClient() {
   async function save(): Promise<boolean> {
     setStatus({ kind: "saving" });
     try {
-      const res = await fetch("/api/admin/user-guide", {
+      const res = await fetch(`/api/admin/documents/${collection}`, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chapters }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`);
@@ -134,6 +143,12 @@ export function UserGuideEditorClient() {
     setChapters(JSON.parse(snapshot));
     setSelCh(0); setSelSec(0); setStatus({ kind: "idle" });
   }
+  function switchCollection(next: "user-guide" | "tech-design") {
+    if (next === collection) return;
+    if (dirty) { setConfirm({ msg: "Discard unsaved changes and switch document?", onYes: () => { setConfirm(null); setCollection(next); } }); return; }
+    setCollection(next);
+  }
+  const isTech = collection === "tech-design";
 
   if (loading) return <div className="p-6 text-sm text-gray-500">Loading the guide…</div>;
 
@@ -142,7 +157,18 @@ export function UserGuideEditorClient() {
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <Link href="/dashboard/admin" className="text-sm text-red-600 hover:text-red-800">‹ SuperAdmin</Link>
-          <h1 className="text-lg font-semibold text-gray-900">User Guide editor</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Document Editor</h1>
+          {mode === "edit" && (
+            <select
+              value={collection}
+              onChange={(e) => switchCollection(e.target.value as "user-guide" | "tech-design")}
+              className="text-xs border border-gray-300 rounded px-2 py-1 text-gray-800 bg-white"
+              title="Which document to edit"
+            >
+              <option value="user-guide">User Guide</option>
+              <option value="tech-design">Technical Design Notes</option>
+            </select>
+          )}
           {mode === "edit" && (
             <div className="flex items-center gap-1 ml-1">
               {(["guide", "documents"] as const).map((t) => (
@@ -172,20 +198,23 @@ export function UserGuideEditorClient() {
               {exportMenu && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setExportMenu(false)} />
-                  <div className="absolute right-0 z-30 mt-1 w-60 bg-white border border-gray-200 rounded shadow-lg text-gray-700">
+                  <div className="absolute right-0 z-30 mt-1 w-64 bg-white border border-gray-200 rounded shadow-lg text-gray-700">
+                    <a href={`/api/admin/documents/${collection}/export`} onClick={() => setExportMenu(false)} className="block w-full text-left px-3 py-1.5 hover:bg-blue-50">Whole document (.docx)</a>
+                    {ch?.slug && <a href={`/api/admin/documents/${collection}/export?chapter=${ch.slug}`} onClick={() => setExportMenu(false)} className="block w-full text-left px-3 py-1.5 hover:bg-blue-50">This chapter — {ch.title} (.docx)</a>}
+                    <div className="border-t border-gray-100 my-1" />
                     <button onClick={() => { setExportMenu(false); void exportGuideZip(chapters); }} className="block w-full text-left px-3 py-1.5 hover:bg-blue-50">Bundle (.zip + images/)</button>
                     <button onClick={() => { setExportMenu(false); void exportGuideSelfContained(chapters); }} className="block w-full text-left px-3 py-1.5 hover:bg-blue-50">Self-contained (.md)</button>
                   </div>
                 </>
               )}
             </div>
-            <Link href="/help" target="_blank" className="px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50">Open guide ↗</Link>
+            <Link href={isTech ? "/tech-notes" : "/help"} target="_blank" className="px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50">{isTech ? "Open notes ↗" : "Open guide ↗"}</Link>
             <button onClick={cancel} disabled={!dirty} className="px-3 py-1 rounded border border-gray-300 text-gray-700 disabled:opacity-40">Cancel</button>
             <button onClick={saveAndView} disabled={status.kind === "saving"} className="px-3 py-1 rounded bg-blue-600 text-white font-medium disabled:opacity-40 hover:bg-blue-700">
               Save &amp; View
             </button>
             <button onClick={save} disabled={!dirty || status.kind === "saving"} className="px-3 py-1 rounded bg-red-600 text-white font-medium disabled:opacity-40 hover:bg-red-700">
-              {status.kind === "saving" ? "Saving…" : "Save guide"}
+              {status.kind === "saving" ? "Saving…" : `Save ${isTech ? "notes" : "guide"}`}
             </button>
           </div>
         )}

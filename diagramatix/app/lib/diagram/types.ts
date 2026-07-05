@@ -787,5 +787,18 @@ export interface TemplateData {
  *             org master adopted into a project copy, like Entity Lists; scoped
  *             backup carries them). Two structure rules (B38 control-coverage,
  *             B39 segregation-of-duties) + a Risk-Control Matrix .xlsx export.
+ *
+ *  v1.34 (2026-07-06): DiagramatixMINER standards + Technical Design Notes +
+ *             Logical DDL. (1) Miner: event logs may omit the State column (an
+ *             Activity→State table completes the lifecycle), events may carry
+ *             Control/Risk/Policy IDs (a mined governance aggregate feeds control
+ *             operating-effectiveness), and logs import/export as IEEE XES (1849)
+ *             and OCEL 2.0/1.0 in addition to CSV — new ProcessMiningRun.governance
+ *             JSON column. (2) A SuperAdmin "Technical Design Notes" document
+ *             (the User-Guide editor generalised into a Document Editor over a
+ *             `collection` discriminator on HelpChapter/HelpSection) with Word
+ *             .docx export. (3) The DDL generator is relabelled "Logical DDL
+ *             Generation". Runtime/app only — NO diagram-export or XSD shape
+ *             change; the version advances with the release window.
  */
-export const SCHEMA_VERSION = "1.33";
+export const SCHEMA_VERSION = "1.34";

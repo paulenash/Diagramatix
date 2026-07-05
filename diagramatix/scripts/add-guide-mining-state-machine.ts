@@ -39,7 +39,7 @@ async function main() {
   const url = process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/diagramatix";
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
   try {
-    const chapter = await prisma.helpChapter.findUnique({ where: { slug: "process-mining" }, include: { sections: true } });
+    const chapter = await prisma.helpChapter.findFirst({ where: { slug: "process-mining", collection: "user-guide" }, include: { sections: true } });
     if (!chapter) { console.error('No "process-mining" help chapter — run add-guide-process-mining.ts first.'); process.exit(1); }
 
     const existing = chapter.sections.find((s) => s.heading === HEADING);

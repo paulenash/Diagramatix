@@ -27,6 +27,7 @@ export default async function HelpPage({
   // Nav: all chapters (slug/title/adminOnly only). The guide now lives in the DB
   // (migrated out of chapters.tsx), so SuperAdmins can edit it in-app.
   const navChapters = await prisma.helpChapter.findMany({
+    where: { collection: "user-guide" },
     orderBy: { sortOrder: "asc" },
     select: { slug: true, title: true, adminOnly: true },
   });
@@ -46,8 +47,8 @@ export default async function HelpPage({
   const currentSlug = visibleChapters.find(ch => ch.slug === c)?.slug ?? visibleChapters[0].slug;
 
   // Render only the CURRENT chapter's sections (markdown → sanitised HTML).
-  const dbChapter = await prisma.helpChapter.findUnique({
-    where: { slug: currentSlug },
+  const dbChapter = await prisma.helpChapter.findFirst({
+    where: { slug: currentSlug, collection: "user-guide" },
     include: { sections: { orderBy: { sortOrder: "asc" } } },
   });
   const current: RenderedChapter = {

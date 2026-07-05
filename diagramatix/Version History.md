@@ -6,7 +6,7 @@ Extracted from the canonical history block in [`public/diagramatix-export.xsd`](
 - **`schemaVersion`** (major.minor) — the export *data-structure* version. Bumped only when fields are added, removed, or renamed. *Major* = breaking change; *minor* = additive (new optional fields). Carried on the `<xs:schema version="…">` attribute.
 - **`appVersion`** (major.minor.build) — the Diagramatix *application* version. The build number is the git commit count, so it changes every commit. Injected at runtime via `/api/schema`.
 
-**Current version:** `1.33`. The XSD's own history block starts at **v1.10**; the earlier **v1.2–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`app/lib/diagram/types.ts`](app/lib/diagram/types.ts). **Schema versioning began at v1.2** (the initial XSD release) — **v1.0–v1.1** predate the export schema (early MVP "boxes + arrows", before a formal/versioned export existed).
+**Current version:** `1.34`. The XSD's own history block starts at **v1.10**; the earlier **v1.2–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`app/lib/diagram/types.ts`](app/lib/diagram/types.ts). **Schema versioning began at v1.2** (the initial XSD release) — **v1.0–v1.1** predate the export schema (early MVP "boxes + arrows", before a formal/versioned export existed).
 
 > **Maintenance:** keep this file in sync with the schema. On every `SCHEMA_VERSION` bump, update **all three together** — `app/lib/diagram/types.ts` (the constant + its history comment), `public/diagramatix-export.xsd` (its history block + any actual shape change), and **this file** (add a summary-table row *and* a detail section).
 
@@ -18,7 +18,11 @@ Extracted from the canonical history block in [`public/diagramatix-export.xsd`](
 
 | Version | Title | Schema shape change? |
 |---|---|---|
+| **1.34** | DiagramatixMINER standards (no-state logs + Activity→State table, governance IDs → control effectiveness, IEEE XES + OCEL import/export) + Technical Design Notes (SuperAdmin Document Editor + .docx export) + Logical DDL Generation relabel | No |
 | **1.33** | Risk & Control — attach Risks/Controls to steps (`element.properties.risk`), coverage + segregation-of-duties checks (B38/B39), Risk-Control Matrix .xlsx export; org-master → project-copy catalog | No (open PropertiesType) |
+| **1.32** | DiagramatixMINER Examples — adoptable process-mining sample catalog (`MiningExample`); Accounts Payable starter | No |
+| **1.31** | DiagramatixMINER — Process Mining: ingest event logs → discover BPMN + State-Machine → conformance → calibrate a simulation digital twin (`ProcessMiningRun`) | No |
+| **1.30** | Simulator resource calendars / working hours — project Calendar + per-team working hours, demand presets, day/time clock; BPSim + `.dgxsim` bundle | No |
 | **1.29** | Simulation results & comparison — per-case distribution + histogram, grounded AI assessment, Run History, As-is/To-be example pipeline | No |
 | **1.28** | BPMN layout-geometry rules + scanner checks B33/B34/B35 + lane-tiling & EP-resize fixes | No |
 | **1.27** | DB-backed User Guide, image library, dictation, backup/restore | No |
@@ -52,6 +56,21 @@ Extracted from the canonical history block in [`public/diagramatix-export.xsd`](
 ---
 
 ## Details (newest first)
+
+### v1.34 — DiagramatixMINER standards + Technical Design Notes + Logical DDL
+No diagram-export shape change — Miner ingest/interchange, an application document, and a relabel; the version advances with the release window. **Miner standards:** an event log may now omit the **State** column — an editable **Activity→State** table supplies the lifecycle the discovery, conformance and generated State-Machine rely on, so a classic 3-column (Case, Activity, Timestamp) log imports directly. Events may carry **Control / Risk / Policy IDs**; a mined **governance** aggregate (new `ProcessMiningRun.governance` JSON column) computes per-control *applied / expected / bypassed / effectiveness* and feeds control operating-effectiveness in the Risk-Control Matrix directly (alongside the conformance-deviation path). Logs **import and export as IEEE XES (1849)** and **OCEL 2.0/1.0** in addition to CSV/TSV (export is variant-level; OCEL import is a single-object projection). A new activity-only Service-Desk mining example ships with three choosable periods. **Technical Design Notes:** the User-Guide editor generalises into a **Document Editor** over a `collection` discriminator (`user-guide` vs `tech-design`) on `HelpChapter`/`HelpSection`; a SuperAdmin-only Technical Design Notes document (Simulator / Miner / RCM design + interchange-standards summaries) is seeded and read at `/tech-notes`, and any document exports to a Word **`.docx`** file. **Logical DDL:** the Diagramatix DDL generator is relabelled **"Logical DDL Generation"** (it emits the curated logical data model of the diagram domain). Pinned by unit tests T0639–T0650.
+
+### v1.33 — Risk & Control
+`element.properties.risk` may carry `{ riskRefs[], controlRefs[] }` (each a catalog item id + cached code/label) — the only diagram-export change, permitted by the open `PropertiesType` (as with v1.24 sim params / v1.30 `calendarId`), so the XSD structure is unchanged. New DB tables `RiskControlLibrary` + `RiskControlItem` + `RiskControlLink` (an org master adopted into a project copy, like Entity Lists; scoped backup carries them). Two structure rules — **B38** control-coverage, **B39** segregation-of-duties — plus a multi-sheet **Risk-Control Matrix `.xlsx`** export (audit grid + registers + traceability + coverage). Control operating-effectiveness is proven from a mined run's conformance deviations.
+
+### v1.32 — DiagramatixMINER Examples
+An adoptable process-mining sample catalog (mirrors Simulator Examples). New runtime table `MiningExample` (global catalog; `package` JSON carries a compressed event log + reference State-Machine diagrams). One-click "Load & open" adopts a ready `ProcessMiningRun` + the reference diagrams into a fresh project; SuperAdmins author more by capturing a run. Ships the Accounts Payable invoice-lifecycle starter. Runtime only — no diagram-export or XSD shape change.
+
+### v1.31 — DiagramatixMINER (Process Mining)
+Ingest event logs → discover the implied BPMN + a candidate State-Machine, check state-change conformance against a reference State-Machine, and calibrate a simulation "digital twin" from the mined timing/resource data (cycle times, arrivals, branch probabilities, teams, working hours) that opens in the Simulator. New runtime table `ProcessMiningRun` (compressed variants + stats + performance; backup picks it up automatically). Discovered diagrams are ordinary bpmn/state-machine diagrams — no diagram-export or XSD shape change.
+
+### v1.30 — Simulator resource calendars / working hours
+A project-level Calendar + per-team working hours (with an off-shift dim cue and a day/time clock in the animation), demand presets, and full **BPSim** + `.dgxsim` bundle import/export for the simulation-parameter layer. Simulation runtime/parameters are application database tables, not part of the diagram export — no XSD shape change.
 
 ### v1.29 — Simulation results & comparison
 No schema shape change — simulation runtime, results and example-catalogue only; the version advances with the release window. **Per-case distribution:** the engine now retains individual case flow times (not just each replication's average), so the report shows true per-case **Typical (p50)**, **Near worst (p95)** and **Spread (sd)** plus a **distribution histogram** — the old p50/p95 were run-averages that badly understated the tail (e.g. an As-is near-worst of ~310 min was showing as ~192); the run-to-run figure is kept as a **± confidence** on the mean. **Grounded AI assessment:** an "✨ Explain these results" button on a comparison writes a plain-English verdict — the deltas are computed deterministically and Claude (Opus 4.8) writes the prose from *only* those figures, so it can't misstate a number. **Run History:** runs can be **named** (which pins them) and browsed; unnamed runs prune to the last few per scenario; **any two saved runs** can be compared side by side (e.g. "Large Sales Team (25)" vs "Small Sales Team (3)"), with histograms + assessment. **As-is/To-be example pipeline:** variant-pinned scenarios now survive capture → seed → adopt, and a worked **Aardwolf Loans — As-is vs To-be** comparison ships in the example catalogue. Pinned by unit tests T0542–T0550.

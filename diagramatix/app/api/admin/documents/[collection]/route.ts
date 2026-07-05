@@ -1,13 +1,22 @@
 /**
- * SuperAdmin User Guide editor API.
- *   GET  → every chapter + its sections (full markdown), for the editor.
- *   PUT  → replace the whole guide atomically ({ chapters: [...] }). Chapter +
- *          section order is taken from array position. SuperAdmin only.
+ * SuperAdmin Document Editor API — one editable document collection per URL:
+ *   /api/admin/documents/user-guide   → the in-app User Guide
+ *   /api/admin/documents/tech-design  → SuperAdmin Technical Design Notes
+ *   GET → every chapter + its sections (full markdown) for that collection.
+ *   PUT → replace that collection atomically ({ chapters: [...] }); order from
+ *         array position. The wipe is SCOPED to the collection, so saving one
+ *         document never touches the other. SuperAdmin only.
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
 import { prisma } from "@/app/lib/db";
+
+export const COLLECTIONS = ["user-guide", "tech-design"] as const;
+type Collection = (typeof COLLECTIONS)[number];
+const isCollection = (v: string): v is Collection => (COLLECTIONS as readonly string[]).includes(v);
+
+type Params = { params: Promise<{ collection: string }> };
 
 async function requireAdmin() {
   const session = await auth();
@@ -15,15 +24,12 @@ async function requireAdmin() {
   return session;
 }
 
-// Back-compat alias for the User Guide collection (the Document Editor now uses
-// /api/admin/documents/[collection]). Scoped to "user-guide" so it can never
-// touch the tech-design collection.
-const COLLECTION = "user-guide";
-
-export async function GET() {
+export async function GET(_req: Request, { params }: Params) {
   if (!(await requireAdmin())) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { collection } = await params;
+  if (!isCollection(collection)) return NextResponse.json({ error: "Unknown collection" }, { status: 404 });
   const chapters = await prisma.helpChapter.findMany({
-    where: { collection: COLLECTION },
+    where: { collection },
     orderBy: { sortOrder: "asc" },
     include: { sections: { orderBy: { sortOrder: "asc" } } },
   });
@@ -31,27 +37,25 @@ export async function GET() {
 }
 
 type InSection = {
-  heading?: string | null;
-  bodyMarkdown?: string;
-  adminOnly?: boolean;
-  image?: string | null;
-  imageAlt?: string | null;
-  imageCaption?: string | null;
+  heading?: string | null; bodyMarkdown?: string; adminOnly?: boolean;
+  image?: string | null; imageAlt?: string | null; imageCaption?: string | null;
 };
 type InChapter = { slug?: string; title?: string; adminOnly?: boolean; sections?: InSection[] };
 
 const clean = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-export async function PUT(req: Request) {
+export async function PUT(req: Request, { params }: Params) {
   if (!(await requireAdmin())) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { collection } = await params;
+  if (!isCollection(collection)) return NextResponse.json({ error: "Unknown collection" }, { status: 404 });
 
   let body: { chapters?: InChapter[] };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
   const chapters = Array.isArray(body.chapters) ? body.chapters : null;
   if (!chapters) return NextResponse.json({ error: "chapters[] required" }, { status: 400 });
-  if (JSON.stringify(chapters).length > 5_000_000) return NextResponse.json({ error: "Guide too large" }, { status: 413 });
+  if (JSON.stringify(chapters).length > 5_000_000) return NextResponse.json({ error: "Document too large" }, { status: 413 });
 
-  // Validate slugs: present + unique.
+  // Validate slugs: present + unique WITHIN this collection.
   const seen = new Set<string>();
   for (const ch of chapters) {
     const slug = (ch.slug ?? "").trim();
@@ -62,33 +66,22 @@ export async function PUT(req: Request) {
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.helpSection.deleteMany({ where: { collection: COLLECTION } });
-    await tx.helpChapter.deleteMany({ where: { collection: COLLECTION } });
+    // Scoped wipe — never touches the other collection.
+    await tx.helpSection.deleteMany({ where: { collection } });
+    await tx.helpChapter.deleteMany({ where: { collection } });
     for (let ci = 0; ci < chapters.length; ci++) {
       const ch = chapters[ci];
       const created = await tx.helpChapter.create({
-        data: {
-          slug: (ch.slug ?? "").trim(),
-          collection: COLLECTION,
-          title: (ch.title ?? "").trim() || "Untitled chapter",
-          sortOrder: ci,
-          adminOnly: !!ch.adminOnly,
-        },
+        data: { slug: (ch.slug ?? "").trim(), collection, title: (ch.title ?? "").trim() || "Untitled chapter", sortOrder: ci, adminOnly: !!ch.adminOnly },
       });
       const sections = Array.isArray(ch.sections) ? ch.sections : [];
       for (let si = 0; si < sections.length; si++) {
         const s = sections[si];
         await tx.helpSection.create({
           data: {
-            chapterId: created.id,
-            collection: COLLECTION,
-            heading: clean(s.heading),
-            bodyMarkdown: typeof s.bodyMarkdown === "string" ? s.bodyMarkdown : "",
-            adminOnly: !!s.adminOnly,
-            image: clean(s.image),
-            imageAlt: clean(s.imageAlt),
-            imageCaption: clean(s.imageCaption),
-            sortOrder: si,
+            chapterId: created.id, collection,
+            heading: clean(s.heading), bodyMarkdown: typeof s.bodyMarkdown === "string" ? s.bodyMarkdown : "",
+            adminOnly: !!s.adminOnly, image: clean(s.image), imageAlt: clean(s.imageAlt), imageCaption: clean(s.imageCaption), sortOrder: si,
           },
         });
       }

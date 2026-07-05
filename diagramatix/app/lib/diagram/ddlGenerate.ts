@@ -1,6 +1,8 @@
 /**
- * Generate the Diagramatix relational DDL for PostgreSQL, MySQL, or SQL Server.
- * Produces the full schema from scratch — no JSON columns.
+ * Generate the Diagramatix **logical** relational DDL (the curated logical data
+ * model of the diagram domain) for PostgreSQL, MySQL, or SQL Server. Produces a
+ * fully normalised schema from scratch — no JSON columns. Surfaced in the app as
+ * "Logical DDL Generation".
  */
 
 import { SCHEMA_VERSION } from "./types";
@@ -339,7 +341,7 @@ export function generateDiagramatixDDL(dbType: string): string {
   const term = d === "mssql" ? "" : ";";
 
   lines.push(`-- ============================================================================`);
-  lines.push(`-- Diagramatix Relational Database Schema (DDL)`);
+  lines.push(`-- Diagramatix Logical Data Model — Relational DDL`);
   lines.push(`-- Schema Version: ${SCHEMA_VERSION}`);
   lines.push(`-- Generated: ${new Date().toISOString().slice(0, 10)}`);
   lines.push(`-- Dialect: ${dbLabel}`);

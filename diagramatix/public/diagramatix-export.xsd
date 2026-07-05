@@ -375,6 +375,17 @@
     RiskControlItem, RiskControlLink — an org master adopted into a project copy)
     are not part of the diagram export. The version attribute advances with the
     release window.
+
+  v1.34 — DiagramatixMINER standards + Technical Design Notes + Logical DDL.
+    No diagram-export shape change — this XSD's structure is UNCHANGED; the version
+    advances with the release window. (1) The process miner now accepts logs with
+    no State column (an Activity→State table completes the lifecycle), reads
+    Control/Risk/Policy IDs off events into a governance aggregate, and imports/
+    exports IEEE XES (1849) and OCEL 2.0/1.0 alongside CSV — none of which touch
+    the diagram export. (2) A SuperAdmin "Technical Design Notes" document + Word
+    .docx export (application feature; DB tables HelpChapter/HelpSection gain a
+    `collection` discriminator). (3) The Diagramatix DDL generator is relabelled
+    "Logical DDL Generation". All runtime/app — the diagram bundle is untouched.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

@@ -35,7 +35,7 @@ async function main() {
   const url = process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/diagramatix";
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
   try {
-    const chapter = await prisma.helpChapter.findUnique({ where: { slug: "simulation" }, include: { sections: true } });
+    const chapter = await prisma.helpChapter.findFirst({ where: { slug: "simulation", collection: "user-guide" }, include: { sections: true } });
     if (!chapter) { console.error('No "simulation" help chapter found — nothing to do.'); process.exit(1); }
 
     const existing = chapter.sections.find((s) => s.heading === HEADING);

@@ -93,12 +93,12 @@ async function main() {
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
   try {
     // Place immediately after the "Simulating Processes" chapter; shift later chapters down.
-    let chapter = await prisma.helpChapter.findUnique({ where: { slug: SLUG }, include: { sections: true } });
+    let chapter = await prisma.helpChapter.findFirst({ where: { slug: SLUG, collection: "user-guide" }, include: { sections: true } });
     if (!chapter) {
-      const after = await prisma.helpChapter.findUnique({ where: { slug: AFTER_SLUG } });
+      const after = await prisma.helpChapter.findFirst({ where: { slug: AFTER_SLUG, collection: "user-guide" } });
       const at = (after?.sortOrder ?? 35) + 1;
-      await prisma.helpChapter.updateMany({ where: { sortOrder: { gte: at } }, data: { sortOrder: { increment: 1 } } });
-      const created = await prisma.helpChapter.create({ data: { slug: SLUG, title: TITLE, sortOrder: at } });
+      await prisma.helpChapter.updateMany({ where: { collection: "user-guide", sortOrder: { gte: at } }, data: { sortOrder: { increment: 1 } } });
+      const created = await prisma.helpChapter.create({ data: { slug: SLUG, collection: "user-guide", title: TITLE, sortOrder: at } });
       chapter = { ...created, sections: [] };
       console.log(`Created chapter "${TITLE}" at sortOrder ${at}.`);
     } else {

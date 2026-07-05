@@ -215,6 +215,9 @@ jobs:
           npx --yes tsx@4 scripts/seed-risk-controls-o2c.ts || echo "seed-risk-controls-o2c skipped"
           npx --yes tsx@4 scripts/seed-risk-control-examples.ts || echo "seed-risk-control-examples skipped"
           npx --yes tsx@4 scripts/seed-o2c-demo.ts || echo "seed-o2c-demo skipped"
+          npx --yes tsx@4 scripts/add-tech-design-notes.ts || echo "add-tech-design-notes skipped"
+          npx --yes tsx@4 scripts/add-guide-tech-design-notes.ts || echo "add-guide-tech-design-notes skipped"
+          npx --yes tsx@4 scripts/add-guide-ddl.ts || echo "add-guide-ddl skipped"
 
       - name: Update App Service container image
         # `az webapp config container set` rewrites the container

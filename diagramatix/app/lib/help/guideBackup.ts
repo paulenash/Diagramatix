@@ -17,8 +17,9 @@ export interface GuideRestoreResult { images: number; chapters: number; sections
 
 /** Build a `.diag-guide` ZIP of the whole User Guide (content + image library). */
 export async function buildGuideBackup(exportedBy?: string | null): Promise<Uint8Array> {
-  const HelpChapter = await prisma.helpChapter.findMany({ orderBy: { sortOrder: "asc" } });
-  const HelpSection = await prisma.helpSection.findMany({ orderBy: [{ chapterId: "asc" }, { sortOrder: "asc" }] });
+  // Scoped to the User Guide collection — tech-design notes are exported as .docx.
+  const HelpChapter = await prisma.helpChapter.findMany({ where: { collection: "user-guide" }, orderBy: { sortOrder: "asc" } });
+  const HelpSection = await prisma.helpSection.findMany({ where: { collection: "user-guide" }, orderBy: [{ chapterId: "asc" }, { sortOrder: "asc" }] });
   const images = await prisma.helpImage.findMany({ orderBy: { createdAt: "asc" } });
 
   const zip = new JSZip();
@@ -85,19 +86,23 @@ export async function restoreGuideBackup(
       createdById: restoredById,
     });
   }
+  // Restore into the User Guide collection (a user-guide backup never carries or
+  // touches tech-design rows).
   const helpChapters = (t.HelpChapter ?? []).map((c: any, i: number) => ({
-    id: c.id, slug: c.slug, title: c.title || "Untitled", sortOrder: c.sortOrder ?? i, adminOnly: !!c.adminOnly,
+    id: c.id, slug: c.slug, collection: "user-guide", title: c.title || "Untitled", sortOrder: c.sortOrder ?? i, adminOnly: !!c.adminOnly,
   }));
   const helpSections = (t.HelpSection ?? []).map((s: any, i: number) => ({
-    id: s.id, chapterId: s.chapterId, heading: s.heading ?? null, bodyMarkdown: s.bodyMarkdown ?? "",
+    id: s.id, chapterId: s.chapterId, collection: "user-guide", heading: s.heading ?? null, bodyMarkdown: s.bodyMarkdown ?? "",
     adminOnly: !!s.adminOnly, image: s.image ?? null, imageAlt: s.imageAlt ?? null, imageCaption: s.imageCaption ?? null,
     sortOrder: s.sortOrder ?? i,
   }));
+  const imageIds = helpImages.map((im) => im.id);
 
   await prisma.$transaction(async (tx) => {
-    await tx.helpSection.deleteMany({});
-    await tx.helpChapter.deleteMany({});
-    await tx.helpImage.deleteMany({});
+    // Wipe ONLY the User Guide collection; leave tech-design (and its images) intact.
+    await tx.helpSection.deleteMany({ where: { collection: "user-guide" } });
+    await tx.helpChapter.deleteMany({ where: { collection: "user-guide" } });
+    if (imageIds.length) await tx.helpImage.deleteMany({ where: { id: { in: imageIds } } });   // replace-by-id, don't wipe the library
     if (helpImages.length) await tx.helpImage.createMany({ data: helpImages });
     if (helpChapters.length) await tx.helpChapter.createMany({ data: helpChapters });
     if (helpSections.length) await tx.helpSection.createMany({ data: helpSections });
