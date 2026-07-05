@@ -37,6 +37,10 @@ export function RiskControlEditor({
   const [err, setErr] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ id: string; name: string } | null>(null);
+  // Collapsible kind sections — the RCM core (Risks + Controls) open by default,
+  // the wider governance kinds folded away.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(["Policy", "Regulation", "AuditFinding", "KRI", "KPI"]));
+  const toggle = (kind: string) => setCollapsed((c) => { const n = new Set(c); n.has(kind) ? n.delete(kind) : n.add(kind); return n; });
 
   const byId = new Map(library.items.map((i) => [i.id, i]));
   const itemsUrl = `${basePath}/${library.id}/items`;
@@ -136,13 +140,17 @@ export function RiskControlEditor({
       {err && <p className="text-[11px] text-red-500">{err}</p>}
       {RISK_CONTROL_KINDS.map((kind) => {
         const items = library.items.filter((i) => i.kind === kind);
+        const isOpen = !collapsed.has(kind);
         return (
           <section key={kind} className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{KIND_LABEL_PLURAL[kind]} ({items.length})</h4>
-              {canEdit && <button onClick={() => addItem(kind)} disabled={busy} className="text-[11px] text-blue-700 hover:text-blue-900">+ Add {KIND_LABEL[kind].toLowerCase()}</button>}
+              <button onClick={() => toggle(kind)} className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wide hover:text-gray-900">
+                <span className="text-gray-400 text-[10px] w-3">{isOpen ? "▾" : "▸"}</span>
+                {KIND_LABEL_PLURAL[kind]} <span className="text-gray-400 font-normal">({items.length})</span>
+              </button>
+              {canEdit && isOpen && <button onClick={() => addItem(kind)} disabled={busy} className="text-[11px] text-blue-700 hover:text-blue-900">+ Add {KIND_LABEL[kind].toLowerCase()}</button>}
             </div>
-            {items.map((it) => {
+            {isOpen && items.map((it) => {
               const score = kind === "Risk" ? riskScore(it) : null;
               const edges = edgesOf(it.id);
               return (
