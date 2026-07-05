@@ -1,0 +1,1099 @@
+Ticket ID,Channel,Priority,Activity,Timestamp,Agent
+TKT-2025-0001,Portal,Low,Log Ticket,2025-11-03T10:29:13Z,Ingrid Nilsen
+TKT-2025-0002,Email,Medium,Log Ticket,2025-11-03T11:11:57Z,Ingrid Nilsen
+TKT-2025-0003,Phone,Critical,Log Ticket,2025-11-03T11:22:20Z,Mo Farah
+TKT-2025-0001,Portal,Low,Triage,2025-11-03T11:49:13Z,Ingrid Nilsen
+TKT-2025-0003,Phone,Critical,Triage,2025-11-03T11:49:20Z,Mo Farah
+TKT-2025-0004,Phone,Low,Log Ticket,2025-11-03T11:53:58Z,Ravi Patel
+TKT-2025-0001,Portal,Low,Assign,2025-11-03T13:31:13Z,Ingrid Nilsen
+TKT-2025-0002,Email,Medium,Triage,2025-11-03T13:33:57Z,Ingrid Nilsen
+TKT-2025-0005,Email,Critical,Log Ticket,2025-11-03T14:38:42Z,Ingrid Nilsen
+TKT-2025-0004,Phone,Low,Triage,2025-11-03T14:43:58Z,Ravi Patel
+TKT-2025-0004,Phone,Low,Assign,2025-11-03T15:12:58Z,Ravi Patel
+TKT-2025-0002,Email,Medium,Assign,2025-11-03T16:26:57Z,Ingrid Nilsen
+TKT-2025-0005,Email,Critical,Triage,2025-11-03T16:29:42Z,Ingrid Nilsen
+TKT-2025-0003,Phone,Critical,Assign,2025-11-03T17:12:20Z,Mo Farah
+TKT-2025-0006,Phone,Low,Log Ticket,2025-11-03T18:15:40Z,Mo Farah
+TKT-2025-0001,Portal,Low,Investigate,2025-11-03T18:51:13Z,Ingrid Nilsen
+TKT-2025-0006,Phone,Low,Triage,2025-11-03T19:44:40Z,Mo Farah
+TKT-2025-0004,Phone,Low,Investigate,2025-11-03T20:08:58Z,Ravi Patel
+TKT-2025-0005,Email,Critical,Assign,2025-11-03T21:14:42Z,Ingrid Nilsen
+TKT-2025-0005,Email,Critical,Investigate,2025-11-03T22:53:42Z,Ingrid Nilsen
+TKT-2025-0003,Phone,Critical,Investigate,2025-11-04T00:22:20Z,Mo Farah
+TKT-2025-0002,Email,Medium,Investigate,2025-11-04T03:15:57Z,Ingrid Nilsen
+TKT-2025-0006,Phone,Low,Resolve,2025-11-04T04:42:40Z,Mo Farah
+TKT-2025-0006,Phone,Low,Close,2025-11-04T05:01:40Z,Mo Farah
+TKT-2025-0007,Phone,High,Log Ticket,2025-11-04T07:52:46Z,Ingrid Nilsen
+TKT-2025-0008,Email,Critical,Log Ticket,2025-11-04T08:40:08Z,Ingrid Nilsen
+TKT-2025-0007,Phone,High,Triage,2025-11-04T10:06:46Z,Ingrid Nilsen
+TKT-2025-0004,Phone,Low,Escalate,2025-11-04T10:14:58Z,Ravi Patel
+TKT-2025-0008,Email,Critical,Assign,2025-11-04T11:08:08Z,Ingrid Nilsen
+TKT-2025-0009,Email,Critical,Log Ticket,2025-11-04T13:09:04Z,Ravi Patel
+TKT-2025-0003,Phone,Critical,Escalate,2025-11-04T13:39:20Z,Mo Farah
+TKT-2025-0010,Phone,Critical,Log Ticket,2025-11-04T13:51:34Z,Mo Farah
+TKT-2025-0007,Phone,High,Assign,2025-11-04T14:25:46Z,Ingrid Nilsen
+TKT-2025-0011,Chat,Critical,Log Ticket,2025-11-04T14:38:10Z,Ravi Patel
+TKT-2025-0009,Email,Critical,Triage,2025-11-04T15:07:04Z,Ravi Patel
+TKT-2025-0012,Portal,Critical,Log Ticket,2025-11-04T15:22:13Z,Grace Lee
+TKT-2025-0011,Chat,Critical,Triage,2025-11-04T15:33:10Z,Ravi Patel
+TKT-2025-0007,Phone,High,Investigate,2025-11-04T15:46:46Z,Ingrid Nilsen
+TKT-2025-0010,Phone,Critical,Triage,2025-11-04T16:03:34Z,Mo Farah
+TKT-2025-0013,Chat,Low,Log Ticket,2025-11-04T16:13:48Z,Mo Farah
+TKT-2025-0002,Email,Medium,Escalate,2025-11-04T16:15:57Z,Ingrid Nilsen
+TKT-2025-0009,Email,Critical,Assign,2025-11-04T16:35:04Z,Ravi Patel
+TKT-2025-0013,Chat,Low,Triage,2025-11-04T17:00:48Z,Mo Farah
+TKT-2025-0005,Email,Critical,Resolve,2025-11-04T17:11:42Z,Ingrid Nilsen
+TKT-2025-0008,Email,Critical,Investigate,2025-11-04T17:52:08Z,Ingrid Nilsen
+TKT-2025-0012,Portal,Critical,Triage,2025-11-04T17:53:13Z,Grace Lee
+TKT-2025-0014,Email,Medium,Log Ticket,2025-11-04T17:59:22Z,Grace Lee
+TKT-2025-0013,Chat,Low,Assign,2025-11-04T18:24:48Z,Mo Farah
+TKT-2025-0015,Chat,Low,Log Ticket,2025-11-04T18:47:49Z,Ravi Patel
+TKT-2025-0001,Portal,Low,Resolve,2025-11-04T19:48:13Z,Ingrid Nilsen
+TKT-2025-0012,Portal,Critical,Assign,2025-11-04T19:48:13Z,Grace Lee
+TKT-2025-0014,Email,Medium,Triage,2025-11-04T20:10:22Z,Grace Lee
+TKT-2025-0015,Chat,Low,Triage,2025-11-04T20:17:49Z,Ravi Patel
+TKT-2025-0010,Phone,Critical,Assign,2025-11-04T21:07:34Z,Mo Farah
+TKT-2025-0011,Chat,Critical,Assign,2025-11-04T21:24:10Z,Ravi Patel
+TKT-2025-0014,Email,Medium,Assign,2025-11-04T21:29:22Z,Grace Lee
+TKT-2025-0012,Portal,Critical,Investigate,2025-11-04T22:27:13Z,Grace Lee
+TKT-2025-0011,Chat,Critical,Investigate,2025-11-04T22:36:10Z,Ravi Patel
+TKT-2025-0011,Chat,Critical,Resolve,2025-11-04T23:44:10Z,Ravi Patel
+TKT-2025-0001,Portal,Low,Close,2025-11-04T23:50:13Z,Ingrid Nilsen
+TKT-2025-0015,Chat,Low,Assign,2025-11-05T00:52:49Z,Ravi Patel
+TKT-2025-0009,Email,Critical,Investigate,2025-11-05T01:28:04Z,Ravi Patel
+TKT-2025-0013,Chat,Low,Investigate,2025-11-05T03:21:48Z,Mo Farah
+TKT-2025-0010,Phone,Critical,Investigate,2025-11-05T03:25:34Z,Mo Farah
+TKT-2025-0008,Email,Critical,Resolve,2025-11-05T03:53:08Z,Ingrid Nilsen
+TKT-2025-0005,Email,Critical,Close,2025-11-05T04:01:42Z,Ingrid Nilsen
+TKT-2025-0007,Phone,High,Escalate,2025-11-05T04:24:46Z,Ingrid Nilsen
+TKT-2025-0014,Email,Medium,Investigate,2025-11-05T06:03:22Z,Grace Lee
+TKT-2025-0012,Portal,Critical,Escalate,2025-11-05T06:49:13Z,Grace Lee
+TKT-2025-0011,Chat,Critical,Close,2025-11-05T06:51:10Z,Ravi Patel
+TKT-2025-0016,Chat,High,Log Ticket,2025-11-05T07:01:27Z,Ingrid Nilsen
+TKT-2025-0017,Portal,Medium,Log Ticket,2025-11-05T07:44:08Z,Sam Cole
+TKT-2025-0013,Chat,Low,Escalate,2025-11-05T08:22:48Z,Mo Farah
+TKT-2025-0004,Phone,Low,Resolve,2025-11-05T09:26:58Z,Ravi Patel
+TKT-2025-0016,Chat,High,Triage,2025-11-05T09:36:27Z,Ingrid Nilsen
+TKT-2025-0015,Chat,Low,Investigate,2025-11-05T09:51:49Z,Ravi Patel
+TKT-2025-0017,Portal,Medium,Triage,2025-11-05T10:16:08Z,Sam Cole
+TKT-2025-0008,Email,Critical,Close,2025-11-05T10:28:08Z,Ingrid Nilsen
+TKT-2025-0007,Phone,High,Resolve,2025-11-05T10:33:46Z,Ingrid Nilsen
+TKT-2025-0018,Chat,Critical,Log Ticket,2025-11-05T10:43:24Z,Sam Cole
+TKT-2025-0019,Chat,Low,Log Ticket,2025-11-05T11:46:15Z,Ingrid Nilsen
+TKT-2025-0016,Chat,High,Assign,2025-11-05T12:33:27Z,Ingrid Nilsen
+TKT-2025-0020,Email,Medium,Log Ticket,2025-11-05T12:44:07Z,Ingrid Nilsen
+TKT-2025-0019,Chat,Low,Triage,2025-11-05T12:47:15Z,Ingrid Nilsen
+TKT-2025-0021,Chat,Low,Log Ticket,2025-11-05T12:49:54Z,Mo Farah
+TKT-2025-0021,Chat,Low,Triage,2025-11-05T12:50:54Z,Mo Farah
+TKT-2025-0018,Chat,Critical,Triage,2025-11-05T12:59:24Z,Sam Cole
+TKT-2025-0010,Phone,Critical,Resolve,2025-11-05T13:43:34Z,Mo Farah
+TKT-2025-0020,Email,Medium,Triage,2025-11-05T13:48:07Z,Ingrid Nilsen
+TKT-2025-0010,Phone,Critical,Close,2025-11-05T14:47:34Z,Mo Farah
+TKT-2025-0017,Portal,Medium,Assign,2025-11-05T14:48:08Z,Sam Cole
+TKT-2025-0020,Email,Medium,Assign,2025-11-05T15:07:07Z,Ingrid Nilsen
+TKT-2025-0020,Email,Medium,Investigate,2025-11-05T16:18:07Z,Ingrid Nilsen
+TKT-2025-0022,Portal,Critical,Log Ticket,2025-11-05T16:43:34Z,Grace Lee
+TKT-2025-0007,Phone,High,Close,2025-11-05T16:58:46Z,Ingrid Nilsen
+TKT-2025-0019,Chat,Low,Resolve,2025-11-05T17:13:15Z,Ingrid Nilsen
+TKT-2025-0004,Phone,Low,Close,2025-11-05T17:53:58Z,Ravi Patel
+TKT-2025-0019,Chat,Low,Close,2025-11-05T17:54:15Z,Ingrid Nilsen
+TKT-2025-0023,Chat,Critical,Log Ticket,2025-11-05T17:56:30Z,Ravi Patel
+TKT-2025-0021,Chat,Low,Assign,2025-11-05T18:08:54Z,Mo Farah
+TKT-2025-0023,Chat,Critical,Triage,2025-11-05T18:09:30Z,Ravi Patel
+TKT-2025-0018,Chat,Critical,Assign,2025-11-05T18:12:24Z,Sam Cole
+TKT-2025-0022,Portal,Critical,Assign,2025-11-05T18:28:34Z,Grace Lee
+TKT-2025-0023,Chat,Critical,Assign,2025-11-05T18:57:30Z,Ravi Patel
+TKT-2025-0021,Chat,Low,Investigate,2025-11-05T20:41:54Z,Mo Farah
+TKT-2025-0022,Portal,Critical,Investigate,2025-11-05T20:58:34Z,Grace Lee
+TKT-2025-0003,Phone,Critical,Resolve,2025-11-05T21:50:20Z,Mo Farah
+TKT-2025-0009,Email,Critical,Resolve,2025-11-05T22:12:04Z,Ravi Patel
+TKT-2025-0016,Chat,High,Investigate,2025-11-05T23:06:27Z,Ingrid Nilsen
+TKT-2025-0014,Email,Medium,Resolve,2025-11-05T23:10:22Z,Grace Lee
+TKT-2025-0017,Portal,Medium,Investigate,2025-11-06T00:49:08Z,Sam Cole
+TKT-2025-0018,Chat,Critical,Investigate,2025-11-06T01:41:24Z,Sam Cole
+TKT-2025-0003,Phone,Critical,Close,2025-11-06T01:59:20Z,Mo Farah
+TKT-2025-0023,Chat,Critical,Investigate,2025-11-06T03:07:30Z,Ravi Patel
+TKT-2025-0013,Chat,Low,Resolve,2025-11-06T04:09:48Z,Mo Farah
+TKT-2025-0021,Chat,Low,Resolve,2025-11-06T04:16:54Z,Mo Farah
+TKT-2025-0021,Chat,Low,Close,2025-11-06T04:46:54Z,Mo Farah
+TKT-2025-0014,Email,Medium,Close,2025-11-06T04:51:22Z,Grace Lee
+TKT-2025-0009,Email,Critical,Close,2025-11-06T06:39:04Z,Ravi Patel
+TKT-2025-0012,Portal,Critical,Resolve,2025-11-06T07:25:13Z,Grace Lee
+TKT-2025-0023,Chat,Critical,Escalate,2025-11-06T09:13:30Z,Ravi Patel
+TKT-2025-0022,Portal,Critical,Resolve,2025-11-06T10:34:34Z,Grace Lee
+TKT-2025-0015,Chat,Low,Resolve,2025-11-06T10:38:49Z,Ravi Patel
+TKT-2025-0024,Chat,Medium,Log Ticket,2025-11-06T10:44:56Z,Mo Farah
+TKT-2025-0013,Chat,Low,Close,2025-11-06T11:02:48Z,Mo Farah
+TKT-2025-0024,Chat,Medium,Triage,2025-11-06T11:19:56Z,Mo Farah
+TKT-2025-0017,Portal,Medium,Escalate,2025-11-06T12:07:08Z,Sam Cole
+TKT-2025-0012,Portal,Critical,Close,2025-11-06T12:12:13Z,Grace Lee
+TKT-2025-0002,Email,Medium,Resolve,2025-11-06T12:26:57Z,Ingrid Nilsen
+TKT-2025-0025,Email,Low,Log Ticket,2025-11-06T12:29:03Z,Ingrid Nilsen
+TKT-2025-0026,Portal,High,Log Ticket,2025-11-06T13:02:04Z,Sam Cole
+TKT-2025-0027,Chat,High,Log Ticket,2025-11-06T13:44:11Z,Sam Cole
+TKT-2025-0002,Email,Medium,Close,2025-11-06T13:57:57Z,Ingrid Nilsen
+TKT-2025-0026,Portal,High,Triage,2025-11-06T14:08:04Z,Sam Cole
+TKT-2025-0025,Email,Low,Triage,2025-11-06T14:09:03Z,Ingrid Nilsen
+TKT-2025-0028,Chat,Medium,Log Ticket,2025-11-06T14:42:18Z,Grace Lee
+TKT-2025-0026,Portal,High,Assign,2025-11-06T15:39:04Z,Sam Cole
+TKT-2025-0027,Chat,High,Triage,2025-11-06T15:47:11Z,Sam Cole
+TKT-2025-0029,Phone,Critical,Log Ticket,2025-11-06T16:30:01Z,Ingrid Nilsen
+TKT-2025-0027,Chat,High,Assign,2025-11-06T16:34:11Z,Sam Cole
+TKT-2025-0024,Chat,Medium,Assign,2025-11-06T16:37:56Z,Mo Farah
+TKT-2025-0025,Email,Low,Resolve,2025-11-06T16:40:03Z,Ingrid Nilsen
+TKT-2025-0028,Chat,Medium,Triage,2025-11-06T17:25:18Z,Grace Lee
+TKT-2025-0030,Chat,High,Log Ticket,2025-11-06T17:30:06Z,Grace Lee
+TKT-2025-0028,Chat,Medium,Assign,2025-11-06T17:36:18Z,Grace Lee
+TKT-2025-0029,Phone,Critical,Triage,2025-11-06T18:17:01Z,Ingrid Nilsen
+TKT-2025-0031,Chat,High,Log Ticket,2025-11-06T18:31:41Z,Ingrid Nilsen
+TKT-2025-0015,Chat,Low,Close,2025-11-06T19:00:49Z,Ravi Patel
+TKT-2025-0027,Chat,High,Investigate,2025-11-06T19:06:11Z,Sam Cole
+TKT-2025-0030,Chat,High,Triage,2025-11-06T19:13:06Z,Grace Lee
+TKT-2025-0024,Chat,Medium,Investigate,2025-11-06T19:29:56Z,Mo Farah
+TKT-2025-0030,Chat,High,Assign,2025-11-06T20:51:06Z,Grace Lee
+TKT-2025-0022,Portal,Critical,Close,2025-11-06T21:26:34Z,Grace Lee
+TKT-2025-0009,Email,Critical,Reopen,2025-11-06T21:33:04Z,Ravi Patel
+TKT-2025-0020,Email,Medium,Resolve,2025-11-06T21:46:07Z,Ingrid Nilsen
+TKT-2025-0031,Chat,High,Assign,2025-11-06T22:43:41Z,Ingrid Nilsen
+TKT-2025-0029,Phone,Critical,Assign,2025-11-06T23:07:01Z,Ingrid Nilsen
+TKT-2025-0028,Chat,Medium,Investigate,2025-11-06T23:23:18Z,Grace Lee
+TKT-2025-0026,Portal,High,Investigate,2025-11-06T23:59:04Z,Sam Cole
+TKT-2025-0016,Chat,High,Resolve,2025-11-07T00:05:27Z,Ingrid Nilsen
+TKT-2025-0027,Chat,High,Escalate,2025-11-07T00:09:11Z,Sam Cole
+TKT-2025-0031,Chat,High,Investigate,2025-11-07T01:38:41Z,Ingrid Nilsen
+TKT-2025-0024,Chat,Medium,Resolve,2025-11-07T02:36:56Z,Mo Farah
+TKT-2025-0023,Chat,Critical,Resolve,2025-11-07T02:44:30Z,Ravi Patel
+TKT-2025-0023,Chat,Critical,Close,2025-11-07T02:44:30Z,Ravi Patel
+TKT-2025-0009,Email,Critical,Investigate,2025-11-07T02:54:04Z,Ravi Patel
+TKT-2025-0030,Chat,High,Investigate,2025-11-07T03:26:06Z,Grace Lee
+TKT-2025-0025,Email,Low,Close,2025-11-07T03:36:03Z,Ingrid Nilsen
+TKT-2025-0020,Email,Medium,Close,2025-11-07T05:08:07Z,Ingrid Nilsen
+TKT-2025-0016,Chat,High,Close,2025-11-07T05:41:27Z,Ingrid Nilsen
+TKT-2025-0029,Phone,Critical,Investigate,2025-11-07T05:46:01Z,Ingrid Nilsen
+TKT-2025-0018,Chat,Critical,Resolve,2025-11-07T07:34:24Z,Sam Cole
+TKT-2025-0030,Chat,High,Escalate,2025-11-07T07:48:06Z,Grace Lee
+TKT-2025-0032,Portal,High,Log Ticket,2025-11-07T09:36:00Z,Ingrid Nilsen
+TKT-2025-0018,Chat,Critical,Close,2025-11-07T09:44:24Z,Sam Cole
+TKT-2025-0032,Portal,High,Triage,2025-11-07T10:34:00Z,Ingrid Nilsen
+TKT-2025-0024,Chat,Medium,Close,2025-11-07T11:27:56Z,Mo Farah
+TKT-2025-0033,Chat,Medium,Log Ticket,2025-11-07T13:37:29Z,Ingrid Nilsen
+TKT-2025-0033,Chat,Medium,Triage,2025-11-07T13:53:29Z,Ingrid Nilsen
+TKT-2025-0034,Portal,Critical,Log Ticket,2025-11-07T14:23:54Z,Ingrid Nilsen
+TKT-2025-0033,Chat,Medium,Assign,2025-11-07T15:13:29Z,Ingrid Nilsen
+TKT-2025-0032,Portal,High,Assign,2025-11-07T15:24:00Z,Ingrid Nilsen
+TKT-2025-0028,Chat,Medium,Resolve,2025-11-07T15:41:18Z,Grace Lee
+TKT-2025-0034,Portal,Critical,Triage,2025-11-07T17:02:54Z,Ingrid Nilsen
+TKT-2025-0034,Portal,Critical,Assign,2025-11-07T17:40:54Z,Ingrid Nilsen
+TKT-2025-0035,Email,Critical,Log Ticket,2025-11-07T17:49:59Z,Sam Cole
+TKT-2025-0036,Chat,Low,Log Ticket,2025-11-07T18:29:51Z,Sam Cole
+TKT-2025-0035,Email,Critical,Triage,2025-11-07T18:30:59Z,Sam Cole
+TKT-2025-0037,Phone,High,Log Ticket,2025-11-07T18:34:03Z,Grace Lee
+TKT-2025-0037,Phone,High,Triage,2025-11-07T21:10:03Z,Grace Lee
+TKT-2025-0032,Portal,High,Investigate,2025-11-07T21:12:00Z,Ingrid Nilsen
+TKT-2025-0036,Chat,Low,Triage,2025-11-07T21:16:51Z,Sam Cole
+TKT-2025-0033,Chat,Medium,Investigate,2025-11-07T22:35:29Z,Ingrid Nilsen
+TKT-2025-0037,Phone,High,Assign,2025-11-07T22:38:03Z,Grace Lee
+TKT-2025-0026,Portal,High,Resolve,2025-11-07T23:32:04Z,Sam Cole
+TKT-2025-0035,Email,Critical,Assign,2025-11-07T23:50:59Z,Sam Cole
+TKT-2025-0028,Chat,Medium,Close,2025-11-08T00:11:18Z,Grace Lee
+TKT-2025-0033,Chat,Medium,Resolve,2025-11-08T00:12:29Z,Ingrid Nilsen
+TKT-2025-0029,Phone,Critical,Resolve,2025-11-08T01:21:01Z,Ingrid Nilsen
+TKT-2025-0031,Chat,High,Resolve,2025-11-08T01:54:41Z,Ingrid Nilsen
+TKT-2025-0036,Chat,Low,Assign,2025-11-08T02:47:51Z,Sam Cole
+TKT-2025-0037,Phone,High,Investigate,2025-11-08T02:53:03Z,Grace Lee
+TKT-2025-0030,Chat,High,Resolve,2025-11-08T03:29:06Z,Grace Lee
+TKT-2025-0009,Email,Critical,Resolve,2025-11-08T04:37:04Z,Ravi Patel
+TKT-2025-0034,Portal,Critical,Investigate,2025-11-08T04:39:54Z,Ingrid Nilsen
+TKT-2025-0035,Email,Critical,Investigate,2025-11-08T06:16:59Z,Sam Cole
+TKT-2025-0033,Chat,Medium,Close,2025-11-08T07:28:29Z,Ingrid Nilsen
+TKT-2025-0036,Chat,Low,Investigate,2025-11-08T08:04:51Z,Sam Cole
+TKT-2025-0030,Chat,High,Close,2025-11-08T08:15:06Z,Grace Lee
+TKT-2025-0009,Email,Critical,Close,2025-11-08T08:44:04Z,Ravi Patel
+TKT-2025-0037,Phone,High,Resolve,2025-11-08T09:31:03Z,Grace Lee
+TKT-2025-0029,Phone,Critical,Close,2025-11-08T09:52:01Z,Ingrid Nilsen
+TKT-2025-0026,Portal,High,Close,2025-11-08T10:29:04Z,Sam Cole
+TKT-2025-0037,Phone,High,Close,2025-11-08T11:46:03Z,Grace Lee
+TKT-2025-0017,Portal,Medium,Resolve,2025-11-08T12:03:08Z,Sam Cole
+TKT-2025-0031,Chat,High,Close,2025-11-08T12:15:41Z,Ingrid Nilsen
+TKT-2025-0032,Portal,High,Resolve,2025-11-08T21:02:00Z,Ingrid Nilsen
+TKT-2025-0017,Portal,Medium,Close,2025-11-08T22:16:08Z,Sam Cole
+TKT-2025-0036,Chat,Low,Resolve,2025-11-09T00:56:51Z,Sam Cole
+TKT-2025-0027,Chat,High,Resolve,2025-11-09T01:43:11Z,Sam Cole
+TKT-2025-0034,Portal,Critical,Resolve,2025-11-09T04:07:54Z,Ingrid Nilsen
+TKT-2025-0032,Portal,High,Close,2025-11-09T04:15:00Z,Ingrid Nilsen
+TKT-2025-0034,Portal,Critical,Close,2025-11-09T06:20:54Z,Ingrid Nilsen
+TKT-2025-0035,Email,Critical,Resolve,2025-11-09T06:49:59Z,Sam Cole
+TKT-2025-0036,Chat,Low,Close,2025-11-09T07:13:51Z,Sam Cole
+TKT-2025-0027,Chat,High,Close,2025-11-09T07:38:11Z,Sam Cole
+TKT-2025-0035,Email,Critical,Close,2025-11-09T12:23:59Z,Sam Cole
+TKT-2025-0038,Phone,High,Log Ticket,2025-11-10T07:04:52Z,Ingrid Nilsen
+TKT-2025-0038,Phone,High,Triage,2025-11-10T07:06:52Z,Ingrid Nilsen
+TKT-2025-0039,Phone,Low,Log Ticket,2025-11-10T07:53:33Z,Grace Lee
+TKT-2025-0039,Phone,Low,Triage,2025-11-10T07:53:33Z,Grace Lee
+TKT-2025-0040,Portal,Critical,Log Ticket,2025-11-10T08:31:35Z,Sam Cole
+TKT-2025-0040,Portal,Critical,Triage,2025-11-10T09:19:35Z,Sam Cole
+TKT-2025-0040,Portal,Critical,Assign,2025-11-10T09:21:35Z,Sam Cole
+TKT-2025-0039,Phone,Low,Assign,2025-11-10T10:19:33Z,Grace Lee
+TKT-2025-0041,Email,High,Log Ticket,2025-11-10T10:35:43Z,Mo Farah
+TKT-2025-0039,Phone,Low,Investigate,2025-11-10T11:48:33Z,Grace Lee
+TKT-2025-0040,Portal,Critical,Investigate,2025-11-10T12:06:35Z,Sam Cole
+TKT-2025-0038,Phone,High,Assign,2025-11-10T12:30:52Z,Ingrid Nilsen
+TKT-2025-0041,Email,High,Triage,2025-11-10T12:50:43Z,Mo Farah
+TKT-2025-0042,Portal,Low,Log Ticket,2025-11-10T13:33:07Z,Ravi Patel
+TKT-2025-0043,Chat,Low,Log Ticket,2025-11-10T14:06:02Z,Ingrid Nilsen
+TKT-2025-0044,Phone,High,Log Ticket,2025-11-10T14:47:15Z,Sam Cole
+TKT-2025-0045,Email,Critical,Log Ticket,2025-11-10T15:08:39Z,Grace Lee
+TKT-2025-0041,Email,High,Assign,2025-11-10T15:08:43Z,Mo Farah
+TKT-2025-0042,Portal,Low,Triage,2025-11-10T15:10:07Z,Ravi Patel
+TKT-2025-0045,Email,Critical,Triage,2025-11-10T16:07:39Z,Grace Lee
+TKT-2025-0041,Email,High,Investigate,2025-11-10T16:21:43Z,Mo Farah
+TKT-2025-0045,Email,Critical,Assign,2025-11-10T16:36:39Z,Grace Lee
+TKT-2025-0043,Chat,Low,Triage,2025-11-10T16:40:02Z,Ingrid Nilsen
+TKT-2025-0044,Phone,High,Triage,2025-11-10T17:19:15Z,Sam Cole
+TKT-2025-0038,Phone,High,Investigate,2025-11-10T18:00:52Z,Ingrid Nilsen
+TKT-2025-0043,Chat,Low,Assign,2025-11-10T18:47:02Z,Ingrid Nilsen
+TKT-2025-0044,Phone,High,Resolve,2025-11-10T19:45:15Z,Sam Cole
+TKT-2025-0042,Portal,Low,Assign,2025-11-10T21:00:07Z,Ravi Patel
+TKT-2025-0042,Portal,Low,Investigate,2025-11-10T22:53:07Z,Ravi Patel
+TKT-2025-0043,Chat,Low,Investigate,2025-11-10T23:06:02Z,Ingrid Nilsen
+TKT-2025-0045,Email,Critical,Investigate,2025-11-10T23:23:39Z,Grace Lee
+TKT-2025-0042,Portal,Low,Escalate,2025-11-11T00:08:07Z,Ravi Patel
+TKT-2025-0043,Chat,Low,Resolve,2025-11-11T00:48:02Z,Ingrid Nilsen
+TKT-2025-0044,Phone,High,Close,2025-11-11T03:07:15Z,Sam Cole
+TKT-2025-0038,Phone,High,Resolve,2025-11-11T06:15:52Z,Ingrid Nilsen
+TKT-2025-0043,Chat,Low,Close,2025-11-11T07:13:02Z,Ingrid Nilsen
+TKT-2025-0016,Chat,High,Reopen,2025-11-11T07:43:27Z,Ingrid Nilsen
+TKT-2025-0046,Email,Medium,Log Ticket,2025-11-11T08:22:45Z,Ravi Patel
+TKT-2025-0046,Email,Medium,Triage,2025-11-11T09:04:45Z,Ravi Patel
+TKT-2025-0047,Email,High,Log Ticket,2025-11-11T09:53:40Z,Ingrid Nilsen
+TKT-2025-0048,Chat,High,Log Ticket,2025-11-11T09:56:44Z,Grace Lee
+TKT-2025-0041,Email,High,Resolve,2025-11-11T10:51:43Z,Mo Farah
+TKT-2025-0042,Portal,Low,Resolve,2025-11-11T10:53:07Z,Ravi Patel
+TKT-2025-0046,Email,Medium,Assign,2025-11-11T11:03:45Z,Ravi Patel
+TKT-2025-0042,Portal,Low,Close,2025-11-11T11:09:07Z,Ravi Patel
+TKT-2025-0047,Email,High,Triage,2025-11-11T11:17:40Z,Ingrid Nilsen
+TKT-2025-0049,Chat,High,Log Ticket,2025-11-11T11:46:42Z,Grace Lee
+TKT-2025-0048,Chat,High,Triage,2025-11-11T11:58:44Z,Grace Lee
+TKT-2025-0049,Chat,High,Triage,2025-11-11T12:25:42Z,Grace Lee
+TKT-2025-0050,Phone,High,Log Ticket,2025-11-11T12:40:09Z,Sam Cole
+TKT-2025-0050,Phone,High,Triage,2025-11-11T12:51:09Z,Sam Cole
+TKT-2025-0039,Phone,Low,Resolve,2025-11-11T13:36:33Z,Grace Lee
+TKT-2025-0045,Email,Critical,Resolve,2025-11-11T13:58:39Z,Grace Lee
+TKT-2025-0047,Email,High,Resolve,2025-11-11T14:11:40Z,Ingrid Nilsen
+TKT-2025-0051,Chat,Low,Log Ticket,2025-11-11T15:17:27Z,Ingrid Nilsen
+TKT-2025-0039,Phone,Low,Close,2025-11-11T15:44:33Z,Grace Lee
+TKT-2025-0051,Chat,Low,Triage,2025-11-11T16:24:27Z,Ingrid Nilsen
+TKT-2025-0052,Portal,Critical,Log Ticket,2025-11-11T16:36:11Z,Grace Lee
+TKT-2025-0038,Phone,High,Close,2025-11-11T16:40:52Z,Ingrid Nilsen
+TKT-2025-0049,Chat,High,Assign,2025-11-11T17:03:42Z,Grace Lee
+TKT-2025-0053,Phone,High,Log Ticket,2025-11-11T17:10:29Z,Grace Lee
+TKT-2025-0048,Chat,High,Assign,2025-11-11T17:30:44Z,Grace Lee
+TKT-2025-0054,Phone,Low,Log Ticket,2025-11-11T17:32:58Z,Grace Lee
+TKT-2025-0040,Portal,Critical,Resolve,2025-11-11T17:43:35Z,Sam Cole
+TKT-2025-0016,Chat,High,Investigate,2025-11-11T17:56:27Z,Ingrid Nilsen
+TKT-2025-0052,Portal,Critical,Triage,2025-11-11T18:21:11Z,Grace Lee
+TKT-2025-0050,Phone,High,Assign,2025-11-11T18:25:09Z,Sam Cole
+TKT-2025-0051,Chat,Low,Assign,2025-11-11T18:32:27Z,Ingrid Nilsen
+TKT-2025-0047,Email,High,Close,2025-11-11T19:01:40Z,Ingrid Nilsen
+TKT-2025-0045,Email,Critical,Close,2025-11-11T19:14:39Z,Grace Lee
+TKT-2025-0054,Phone,Low,Triage,2025-11-11T19:22:58Z,Grace Lee
+TKT-2025-0054,Phone,Low,Assign,2025-11-11T19:25:58Z,Grace Lee
+TKT-2025-0053,Phone,High,Triage,2025-11-11T20:04:29Z,Grace Lee
+TKT-2025-0046,Email,Medium,Investigate,2025-11-11T21:10:45Z,Ravi Patel
+TKT-2025-0041,Email,High,Close,2025-11-11T21:38:43Z,Mo Farah
+TKT-2025-0053,Phone,High,Assign,2025-11-11T22:07:29Z,Grace Lee
+TKT-2025-0050,Phone,High,Investigate,2025-11-11T22:25:09Z,Sam Cole
+TKT-2025-0052,Portal,Critical,Assign,2025-11-11T23:21:11Z,Grace Lee
+TKT-2025-0051,Chat,Low,Investigate,2025-11-11T23:28:27Z,Ingrid Nilsen
+TKT-2025-0053,Phone,High,Investigate,2025-11-11T23:31:29Z,Grace Lee
+TKT-2025-0049,Chat,High,Investigate,2025-11-11T23:39:42Z,Grace Lee
+TKT-2025-0040,Portal,Critical,Close,2025-11-12T00:50:35Z,Sam Cole
+TKT-2025-0054,Phone,Low,Investigate,2025-11-12T01:17:58Z,Grace Lee
+TKT-2025-0048,Chat,High,Investigate,2025-11-12T03:48:44Z,Grace Lee
+TKT-2025-0053,Phone,High,Escalate,2025-11-12T04:18:29Z,Grace Lee
+TKT-2025-0055,Email,Critical,Log Ticket,2025-11-12T07:39:29Z,Mo Farah
+TKT-2025-0055,Email,Critical,Triage,2025-11-12T07:53:29Z,Mo Farah
+TKT-2025-0055,Email,Critical,Assign,2025-11-12T08:01:29Z,Mo Farah
+TKT-2025-0046,Email,Medium,Resolve,2025-11-12T08:56:45Z,Ravi Patel
+TKT-2025-0055,Email,Critical,Investigate,2025-11-12T09:04:29Z,Mo Farah
+TKT-2025-0052,Portal,Critical,Investigate,2025-11-12T09:35:11Z,Grace Lee
+TKT-2025-0056,Phone,Critical,Log Ticket,2025-11-12T10:54:48Z,Ravi Patel
+TKT-2025-0055,Email,Critical,Resolve,2025-11-12T11:48:29Z,Mo Farah
+TKT-2025-0048,Chat,High,Escalate,2025-11-12T12:08:44Z,Grace Lee
+TKT-2025-0057,Chat,Low,Log Ticket,2025-11-12T12:10:03Z,Grace Lee
+TKT-2025-0057,Chat,Low,Triage,2025-11-12T12:25:03Z,Grace Lee
+TKT-2025-0056,Phone,Critical,Triage,2025-11-12T13:32:48Z,Ravi Patel
+TKT-2025-0054,Phone,Low,Resolve,2025-11-12T13:54:58Z,Grace Lee
+TKT-2025-0057,Chat,Low,Assign,2025-11-12T14:15:03Z,Grace Lee
+TKT-2025-0058,Phone,High,Log Ticket,2025-11-12T14:27:22Z,Mo Farah
+TKT-2025-0058,Phone,High,Triage,2025-11-12T14:27:22Z,Mo Farah
+TKT-2025-0054,Phone,Low,Close,2025-11-12T14:30:58Z,Grace Lee
+TKT-2025-0056,Phone,Critical,Assign,2025-11-12T14:31:48Z,Ravi Patel
+TKT-2025-0059,Chat,Critical,Log Ticket,2025-11-12T15:41:39Z,Ingrid Nilsen
+TKT-2025-0046,Email,Medium,Close,2025-11-12T16:13:45Z,Ravi Patel
+TKT-2025-0058,Phone,High,Resolve,2025-11-12T16:50:22Z,Mo Farah
+TKT-2025-0050,Phone,High,Resolve,2025-11-12T17:09:09Z,Sam Cole
+TKT-2025-0051,Chat,Low,Resolve,2025-11-12T17:11:27Z,Ingrid Nilsen
+TKT-2025-0049,Chat,High,Resolve,2025-11-12T17:16:42Z,Grace Lee
+TKT-2025-0051,Chat,Low,Close,2025-11-12T17:43:27Z,Ingrid Nilsen
+TKT-2025-0060,Chat,Critical,Log Ticket,2025-11-12T17:43:29Z,Ravi Patel
+TKT-2025-0059,Chat,Critical,Triage,2025-11-12T17:53:39Z,Ingrid Nilsen
+TKT-2025-0049,Chat,High,Close,2025-11-12T18:13:42Z,Grace Lee
+TKT-2025-0057,Chat,Low,Investigate,2025-11-12T18:46:03Z,Grace Lee
+TKT-2025-0061,Phone,Critical,Log Ticket,2025-11-12T18:48:38Z,Ravi Patel
+TKT-2025-0060,Chat,Critical,Triage,2025-11-12T19:48:29Z,Ravi Patel
+TKT-2025-0061,Phone,Critical,Triage,2025-11-12T20:07:38Z,Ravi Patel
+TKT-2025-0059,Chat,Critical,Assign,2025-11-12T20:14:39Z,Ingrid Nilsen
+TKT-2025-0056,Phone,Critical,Investigate,2025-11-12T20:31:48Z,Ravi Patel
+TKT-2025-0048,Chat,High,Resolve,2025-11-12T20:54:44Z,Grace Lee
+TKT-2025-0058,Phone,High,Close,2025-11-12T20:55:22Z,Mo Farah
+TKT-2025-0055,Email,Critical,Close,2025-11-12T22:01:29Z,Mo Farah
+TKT-2025-0060,Chat,Critical,Assign,2025-11-12T22:13:29Z,Ravi Patel
+TKT-2025-0048,Chat,High,Close,2025-11-12T22:59:44Z,Grace Lee
+TKT-2025-0050,Phone,High,Close,2025-11-12T23:04:09Z,Sam Cole
+TKT-2025-0016,Chat,High,Resolve,2025-11-12T23:29:27Z,Ingrid Nilsen
+TKT-2025-0060,Chat,Critical,Investigate,2025-11-13T00:07:29Z,Ravi Patel
+TKT-2025-0056,Phone,Critical,Resolve,2025-11-13T00:38:48Z,Ravi Patel
+TKT-2025-0016,Chat,High,Close,2025-11-13T00:46:27Z,Ingrid Nilsen
+TKT-2025-0061,Phone,Critical,Resolve,2025-11-13T02:06:38Z,Ravi Patel
+TKT-2025-0059,Chat,Critical,Investigate,2025-11-13T04:42:39Z,Ingrid Nilsen
+TKT-2025-0061,Phone,Critical,Close,2025-11-13T06:23:38Z,Ravi Patel
+TKT-2025-0062,Phone,Medium,Log Ticket,2025-11-13T07:02:43Z,Ravi Patel
+TKT-2025-0062,Phone,Medium,Triage,2025-11-13T08:52:43Z,Ravi Patel
+TKT-2025-0057,Chat,Low,Resolve,2025-11-13T09:29:03Z,Grace Lee
+TKT-2025-0063,Email,High,Log Ticket,2025-11-13T09:40:29Z,Mo Farah
+TKT-2025-0064,Phone,Critical,Log Ticket,2025-11-13T09:54:49Z,Mo Farah
+TKT-2025-0065,Phone,Critical,Log Ticket,2025-11-13T10:30:16Z,Ingrid Nilsen
+TKT-2025-0052,Portal,Critical,Resolve,2025-11-13T10:55:11Z,Grace Lee
+TKT-2025-0064,Phone,Critical,Triage,2025-11-13T10:59:49Z,Mo Farah
+TKT-2025-0056,Phone,Critical,Close,2025-11-13T11:12:48Z,Ravi Patel
+TKT-2025-0063,Email,High,Triage,2025-11-13T11:13:29Z,Mo Farah
+TKT-2025-0064,Phone,Critical,Assign,2025-11-13T11:34:49Z,Mo Farah
+TKT-2025-0066,Portal,High,Log Ticket,2025-11-13T11:52:03Z,Sam Cole
+TKT-2025-0065,Phone,Critical,Triage,2025-11-13T12:29:16Z,Ingrid Nilsen
+TKT-2025-0067,Portal,Low,Log Ticket,2025-11-13T12:31:37Z,Grace Lee
+TKT-2025-0052,Portal,Critical,Close,2025-11-13T12:36:11Z,Grace Lee
+TKT-2025-0068,Chat,Medium,Log Ticket,2025-11-13T12:56:08Z,Mo Farah
+TKT-2025-0066,Portal,High,Triage,2025-11-13T13:24:03Z,Sam Cole
+TKT-2025-0060,Chat,Critical,Escalate,2025-11-13T13:26:29Z,Ravi Patel
+TKT-2025-0068,Chat,Medium,Triage,2025-11-13T13:41:08Z,Mo Farah
+TKT-2025-0062,Phone,Medium,Assign,2025-11-13T14:00:43Z,Ravi Patel
+TKT-2025-0069,Chat,Critical,Log Ticket,2025-11-13T14:04:30Z,Mo Farah
+TKT-2025-0070,Portal,Critical,Log Ticket,2025-11-13T15:10:55Z,Ravi Patel
+TKT-2025-0067,Portal,Low,Triage,2025-11-13T15:29:37Z,Grace Lee
+TKT-2025-0067,Portal,Low,Assign,2025-11-13T15:36:37Z,Grace Lee
+TKT-2025-0063,Email,High,Assign,2025-11-13T15:45:29Z,Mo Farah
+TKT-2025-0069,Chat,Critical,Triage,2025-11-13T16:26:30Z,Mo Farah
+TKT-2025-0071,Chat,High,Log Ticket,2025-11-13T16:31:05Z,Ingrid Nilsen
+TKT-2025-0071,Chat,High,Triage,2025-11-13T16:54:05Z,Ingrid Nilsen
+TKT-2025-0065,Phone,Critical,Assign,2025-11-13T16:54:16Z,Ingrid Nilsen
+TKT-2025-0072,Portal,Medium,Log Ticket,2025-11-13T17:00:37Z,Sam Cole
+TKT-2025-0067,Portal,Low,Investigate,2025-11-13T17:15:37Z,Grace Lee
+TKT-2025-0057,Chat,Low,Close,2025-11-13T17:24:03Z,Grace Lee
+TKT-2025-0073,Portal,Critical,Log Ticket,2025-11-13T17:45:48Z,Ravi Patel
+TKT-2025-0066,Portal,High,Resolve,2025-11-13T17:53:03Z,Sam Cole
+TKT-2025-0070,Portal,Critical,Triage,2025-11-13T17:56:55Z,Ravi Patel
+TKT-2025-0071,Chat,High,Assign,2025-11-13T18:38:05Z,Ingrid Nilsen
+TKT-2025-0064,Phone,Critical,Investigate,2025-11-13T18:44:49Z,Mo Farah
+TKT-2025-0073,Portal,Critical,Triage,2025-11-13T18:47:48Z,Ravi Patel
+TKT-2025-0069,Chat,Critical,Assign,2025-11-13T18:54:30Z,Mo Farah
+TKT-2025-0074,Email,Critical,Log Ticket,2025-11-13T18:55:07Z,Mo Farah
+TKT-2025-0068,Chat,Medium,Assign,2025-11-13T19:23:08Z,Mo Farah
+TKT-2025-0068,Chat,Medium,Investigate,2025-11-13T20:23:08Z,Mo Farah
+TKT-2025-0074,Email,Critical,Triage,2025-11-13T20:35:07Z,Mo Farah
+TKT-2025-0053,Phone,High,Resolve,2025-11-13T20:57:29Z,Grace Lee
+TKT-2025-0072,Portal,Medium,Assign,2025-11-13T21:08:37Z,Sam Cole
+TKT-2025-0065,Phone,Critical,Investigate,2025-11-13T22:16:16Z,Ingrid Nilsen
+TKT-2025-0059,Chat,Critical,Resolve,2025-11-13T23:43:39Z,Ingrid Nilsen
+TKT-2025-0062,Phone,Medium,Investigate,2025-11-14T00:23:43Z,Ravi Patel
+TKT-2025-0069,Chat,Critical,Investigate,2025-11-14T01:01:30Z,Mo Farah
+TKT-2025-0053,Phone,High,Close,2025-11-14T01:35:29Z,Grace Lee
+TKT-2025-0074,Email,Critical,Assign,2025-11-14T01:54:07Z,Mo Farah
+TKT-2025-0063,Email,High,Investigate,2025-11-14T02:19:29Z,Mo Farah
+TKT-2025-0066,Portal,High,Close,2025-11-14T02:23:03Z,Sam Cole
+TKT-2025-0072,Portal,Medium,Investigate,2025-11-14T02:53:37Z,Sam Cole
+TKT-2025-0071,Chat,High,Investigate,2025-11-14T03:18:05Z,Ingrid Nilsen
+TKT-2025-0035,Email,Critical,Reopen,2025-11-14T04:30:59Z,Sam Cole
+TKT-2025-0073,Portal,Critical,Resolve,2025-11-14T06:52:48Z,Ravi Patel
+TKT-2025-0035,Email,Critical,Investigate,2025-11-14T06:55:59Z,Sam Cole
+TKT-2025-0075,Portal,Critical,Log Ticket,2025-11-14T07:05:07Z,Grace Lee
+TKT-2025-0064,Phone,Critical,Resolve,2025-11-14T07:26:49Z,Mo Farah
+TKT-2025-0070,Portal,Critical,Resolve,2025-11-14T08:04:55Z,Ravi Patel
+TKT-2025-0076,Email,High,Log Ticket,2025-11-14T08:16:05Z,Ravi Patel
+TKT-2025-0077,Portal,High,Log Ticket,2025-11-14T08:35:37Z,Ravi Patel
+TKT-2025-0078,Phone,Low,Log Ticket,2025-11-14T08:54:19Z,Ravi Patel
+TKT-2025-0076,Email,High,Triage,2025-11-14T08:55:05Z,Ravi Patel
+TKT-2025-0072,Portal,Medium,Resolve,2025-11-14T08:56:37Z,Sam Cole
+TKT-2025-0072,Portal,Medium,Close,2025-11-14T09:45:37Z,Sam Cole
+TKT-2025-0067,Portal,Low,Resolve,2025-11-14T09:49:37Z,Grace Lee
+TKT-2025-0075,Portal,Critical,Triage,2025-11-14T09:54:07Z,Grace Lee
+TKT-2025-0077,Portal,High,Triage,2025-11-14T09:57:37Z,Ravi Patel
+TKT-2025-0070,Portal,Critical,Close,2025-11-14T09:59:55Z,Ravi Patel
+TKT-2025-0059,Chat,Critical,Close,2025-11-14T10:08:39Z,Ingrid Nilsen
+TKT-2025-0079,Portal,Low,Log Ticket,2025-11-14T10:23:36Z,Ingrid Nilsen
+TKT-2025-0080,Portal,Critical,Log Ticket,2025-11-14T10:45:19Z,Ravi Patel
+TKT-2025-0080,Portal,Critical,Triage,2025-11-14T10:52:19Z,Ravi Patel
+TKT-2025-0079,Portal,Low,Triage,2025-11-14T11:58:36Z,Ingrid Nilsen
+TKT-2025-0081,Portal,Medium,Log Ticket,2025-11-14T12:15:47Z,Sam Cole
+TKT-2025-0063,Email,High,Resolve,2025-11-14T12:19:29Z,Mo Farah
+TKT-2025-0082,Phone,Medium,Log Ticket,2025-11-14T12:20:46Z,Mo Farah
+TKT-2025-0074,Email,Critical,Investigate,2025-11-14T12:31:07Z,Mo Farah
+TKT-2025-0081,Portal,Medium,Triage,2025-11-14T12:31:47Z,Sam Cole
+TKT-2025-0065,Phone,Critical,Resolve,2025-11-14T13:00:16Z,Ingrid Nilsen
+TKT-2025-0079,Portal,Low,Assign,2025-11-14T13:24:36Z,Ingrid Nilsen
+TKT-2025-0064,Phone,Critical,Close,2025-11-14T13:35:49Z,Mo Farah
+TKT-2025-0083,Email,Medium,Log Ticket,2025-11-14T13:46:40Z,Grace Lee
+TKT-2025-0073,Portal,Critical,Close,2025-11-14T14:04:48Z,Ravi Patel
+TKT-2025-0084,Phone,Medium,Log Ticket,2025-11-14T14:08:40Z,Grace Lee
+TKT-2025-0078,Phone,Low,Assign,2025-11-14T14:22:19Z,Ravi Patel
+TKT-2025-0074,Email,Critical,Resolve,2025-11-14T14:40:07Z,Mo Farah
+TKT-2025-0063,Email,High,Close,2025-11-14T14:44:29Z,Mo Farah
+TKT-2025-0071,Chat,High,Escalate,2025-11-14T14:50:05Z,Ingrid Nilsen
+TKT-2025-0085,Chat,High,Log Ticket,2025-11-14T14:51:59Z,Ingrid Nilsen
+TKT-2025-0075,Portal,Critical,Resolve,2025-11-14T14:56:07Z,Grace Lee
+TKT-2025-0086,Chat,High,Log Ticket,2025-11-14T15:08:48Z,Mo Farah
+TKT-2025-0087,Email,Medium,Log Ticket,2025-11-14T15:11:20Z,Mo Farah
+TKT-2025-0082,Phone,Medium,Triage,2025-11-14T15:11:46Z,Mo Farah
+TKT-2025-0083,Email,Medium,Triage,2025-11-14T15:17:40Z,Grace Lee
+TKT-2025-0075,Portal,Critical,Close,2025-11-14T15:24:07Z,Grace Lee
+TKT-2025-0086,Chat,High,Assign,2025-11-14T15:33:48Z,Mo Farah
+TKT-2025-0078,Phone,Low,Investigate,2025-11-14T15:55:19Z,Ravi Patel
+TKT-2025-0087,Email,Medium,Triage,2025-11-14T15:58:20Z,Mo Farah
+TKT-2025-0054,Phone,Low,Reopen,2025-11-14T16:06:58Z,Grace Lee
+TKT-2025-0085,Chat,High,Triage,2025-11-14T16:17:59Z,Ingrid Nilsen
+TKT-2025-0087,Email,Medium,Assign,2025-11-14T16:21:20Z,Mo Farah
+TKT-2025-0080,Portal,Critical,Assign,2025-11-14T16:26:19Z,Ravi Patel
+TKT-2025-0084,Phone,Medium,Triage,2025-11-14T16:31:40Z,Grace Lee
+TKT-2025-0088,Email,Critical,Log Ticket,2025-11-14T17:00:05Z,Ingrid Nilsen
+TKT-2025-0067,Portal,Low,Close,2025-11-14T17:36:37Z,Grace Lee
+TKT-2025-0082,Phone,Medium,Assign,2025-11-14T18:03:46Z,Mo Farah
+TKT-2025-0089,Phone,Low,Log Ticket,2025-11-14T18:08:41Z,Sam Cole
+TKT-2025-0090,Phone,Critical,Log Ticket,2025-11-14T18:09:41Z,Grace Lee
+TKT-2025-0080,Portal,Critical,Investigate,2025-11-14T19:07:19Z,Ravi Patel
+TKT-2025-0090,Phone,Critical,Triage,2025-11-14T19:16:41Z,Grace Lee
+TKT-2025-0088,Email,Critical,Triage,2025-11-14T19:28:05Z,Ingrid Nilsen
+TKT-2025-0090,Phone,Critical,Assign,2025-11-14T19:43:41Z,Grace Lee
+TKT-2025-0076,Email,High,Resolve,2025-11-14T20:03:05Z,Ravi Patel
+TKT-2025-0074,Email,Critical,Close,2025-11-14T20:09:07Z,Mo Farah
+TKT-2025-0065,Phone,Critical,Close,2025-11-14T20:20:16Z,Ingrid Nilsen
+TKT-2025-0089,Phone,Low,Triage,2025-11-14T20:24:41Z,Sam Cole
+TKT-2025-0054,Phone,Low,Investigate,2025-11-14T20:25:58Z,Grace Lee
+TKT-2025-0077,Portal,High,Resolve,2025-11-14T21:03:37Z,Ravi Patel
+TKT-2025-0083,Email,Medium,Assign,2025-11-14T21:04:40Z,Grace Lee
+TKT-2025-0085,Chat,High,Assign,2025-11-14T21:27:59Z,Ingrid Nilsen
+TKT-2025-0084,Phone,Medium,Assign,2025-11-14T21:36:40Z,Grace Lee
+TKT-2025-0076,Email,High,Close,2025-11-14T21:37:05Z,Ravi Patel
+TKT-2025-0086,Chat,High,Investigate,2025-11-14T21:58:48Z,Mo Farah
+TKT-2025-0079,Portal,Low,Investigate,2025-11-14T22:19:36Z,Ingrid Nilsen
+TKT-2025-0088,Email,Critical,Assign,2025-11-14T22:20:05Z,Ingrid Nilsen
+TKT-2025-0085,Chat,High,Investigate,2025-11-14T22:40:59Z,Ingrid Nilsen
+TKT-2025-0069,Chat,Critical,Resolve,2025-11-14T23:06:30Z,Mo Farah
+TKT-2025-0087,Email,Medium,Investigate,2025-11-14T23:12:20Z,Mo Farah
+TKT-2025-0081,Portal,Medium,Resolve,2025-11-14T23:55:47Z,Sam Cole
+TKT-2025-0085,Chat,High,Resolve,2025-11-15T00:48:59Z,Ingrid Nilsen
+TKT-2025-0062,Phone,Medium,Resolve,2025-11-15T01:01:43Z,Ravi Patel
+TKT-2025-0081,Portal,Medium,Close,2025-11-15T01:17:47Z,Sam Cole
+TKT-2025-0069,Chat,Critical,Close,2025-11-15T01:23:30Z,Mo Farah
+TKT-2025-0082,Phone,Medium,Investigate,2025-11-15T01:26:46Z,Mo Farah
+TKT-2025-0068,Chat,Medium,Resolve,2025-11-15T02:20:08Z,Mo Farah
+TKT-2025-0084,Phone,Medium,Investigate,2025-11-15T04:10:40Z,Grace Lee
+TKT-2025-0060,Chat,Critical,Resolve,2025-11-15T04:13:29Z,Ravi Patel
+TKT-2025-0090,Phone,Critical,Investigate,2025-11-15T04:20:41Z,Grace Lee
+TKT-2025-0077,Portal,High,Close,2025-11-15T05:13:37Z,Ravi Patel
+TKT-2025-0062,Phone,Medium,Close,2025-11-15T06:52:43Z,Ravi Patel
+TKT-2025-0090,Phone,Critical,Escalate,2025-11-15T06:53:41Z,Grace Lee
+TKT-2025-0083,Email,Medium,Investigate,2025-11-15T07:24:40Z,Grace Lee
+TKT-2025-0078,Phone,Low,Resolve,2025-11-15T08:41:19Z,Ravi Patel
+TKT-2025-0089,Phone,Low,Resolve,2025-11-15T08:49:41Z,Sam Cole
+TKT-2025-0088,Email,Critical,Investigate,2025-11-15T08:52:05Z,Ingrid Nilsen
+TKT-2025-0060,Chat,Critical,Close,2025-11-15T08:57:29Z,Ravi Patel
+TKT-2025-0068,Chat,Medium,Close,2025-11-15T09:35:08Z,Mo Farah
+TKT-2025-0054,Phone,Low,Resolve,2025-11-15T09:36:58Z,Grace Lee
+TKT-2025-0085,Chat,High,Close,2025-11-15T10:52:59Z,Ingrid Nilsen
+TKT-2025-0087,Email,Medium,Resolve,2025-11-15T11:17:20Z,Mo Farah
+TKT-2025-0079,Portal,Low,Resolve,2025-11-15T11:46:36Z,Ingrid Nilsen
+TKT-2025-0035,Email,Critical,Resolve,2025-11-15T12:43:59Z,Sam Cole
+TKT-2025-0067,Portal,Low,Reopen,2025-11-15T12:54:37Z,Grace Lee
+TKT-2025-0082,Phone,Medium,Escalate,2025-11-15T13:51:46Z,Mo Farah
+TKT-2025-0071,Chat,High,Resolve,2025-11-15T14:18:05Z,Ingrid Nilsen
+TKT-2025-0054,Phone,Low,Close,2025-11-15T15:08:58Z,Grace Lee
+TKT-2025-0067,Portal,Low,Investigate,2025-11-15T15:41:37Z,Grace Lee
+TKT-2025-0089,Phone,Low,Close,2025-11-15T16:42:41Z,Sam Cole
+TKT-2025-0078,Phone,Low,Close,2025-11-15T16:53:19Z,Ravi Patel
+TKT-2025-0067,Portal,Low,Resolve,2025-11-15T18:01:37Z,Grace Lee
+TKT-2025-0084,Phone,Medium,Escalate,2025-11-15T18:01:40Z,Grace Lee
+TKT-2025-0079,Portal,Low,Close,2025-11-15T18:04:36Z,Ingrid Nilsen
+TKT-2025-0035,Email,Critical,Close,2025-11-15T18:09:59Z,Sam Cole
+TKT-2025-0087,Email,Medium,Close,2025-11-15T19:24:20Z,Mo Farah
+TKT-2025-0090,Phone,Critical,Resolve,2025-11-15T20:03:41Z,Grace Lee
+TKT-2025-0080,Portal,Critical,Resolve,2025-11-15T21:52:19Z,Ravi Patel
+TKT-2025-0086,Chat,High,Resolve,2025-11-15T22:15:48Z,Mo Farah
+TKT-2025-0071,Chat,High,Close,2025-11-15T22:21:05Z,Ingrid Nilsen
+TKT-2025-0067,Portal,Low,Close,2025-11-15T23:01:37Z,Grace Lee
+TKT-2025-0088,Email,Critical,Resolve,2025-11-16T02:03:05Z,Ingrid Nilsen
+TKT-2025-0090,Phone,Critical,Close,2025-11-16T02:56:41Z,Grace Lee
+TKT-2025-0086,Chat,High,Close,2025-11-16T02:56:48Z,Mo Farah
+TKT-2025-0080,Portal,Critical,Close,2025-11-16T03:32:19Z,Ravi Patel
+TKT-2025-0038,Phone,High,Reopen,2025-11-16T06:00:52Z,Ingrid Nilsen
+TKT-2025-0088,Email,Critical,Close,2025-11-16T09:51:05Z,Ingrid Nilsen
+TKT-2025-0083,Email,Medium,Resolve,2025-11-16T10:11:40Z,Grace Lee
+TKT-2025-0038,Phone,High,Investigate,2025-11-16T12:09:52Z,Ingrid Nilsen
+TKT-2025-0082,Phone,Medium,Resolve,2025-11-16T15:00:46Z,Mo Farah
+TKT-2025-0082,Phone,Medium,Close,2025-11-16T15:07:46Z,Mo Farah
+TKT-2025-0083,Email,Medium,Close,2025-11-16T18:09:40Z,Grace Lee
+TKT-2025-0038,Phone,High,Resolve,2025-11-16T20:55:52Z,Ingrid Nilsen
+TKT-2025-0064,Phone,Critical,Reopen,2025-11-16T21:57:49Z,Mo Farah
+TKT-2025-0064,Phone,Critical,Investigate,2025-11-17T00:32:49Z,Mo Farah
+TKT-2025-0084,Phone,Medium,Resolve,2025-11-17T02:48:40Z,Grace Lee
+TKT-2025-0038,Phone,High,Close,2025-11-17T05:01:52Z,Ingrid Nilsen
+TKT-2025-0091,Portal,Critical,Log Ticket,2025-11-17T07:08:09Z,Sam Cole
+TKT-2025-0091,Portal,Critical,Triage,2025-11-17T07:19:09Z,Sam Cole
+TKT-2025-0092,Portal,Critical,Log Ticket,2025-11-17T08:16:05Z,Sam Cole
+TKT-2025-0091,Portal,Critical,Assign,2025-11-17T09:42:09Z,Sam Cole
+TKT-2025-0084,Phone,Medium,Close,2025-11-17T10:29:40Z,Grace Lee
+TKT-2025-0092,Portal,Critical,Triage,2025-11-17T10:38:05Z,Sam Cole
+TKT-2025-0093,Phone,Low,Log Ticket,2025-11-17T11:51:56Z,Ravi Patel
+TKT-2025-0093,Phone,Low,Triage,2025-11-17T13:01:56Z,Ravi Patel
+TKT-2025-0094,Email,Low,Log Ticket,2025-11-17T14:05:34Z,Ingrid Nilsen
+TKT-2025-0094,Email,Low,Assign,2025-11-17T15:22:34Z,Ingrid Nilsen
+TKT-2025-0092,Portal,Critical,Assign,2025-11-17T15:55:05Z,Sam Cole
+TKT-2025-0095,Portal,High,Log Ticket,2025-11-17T16:15:33Z,Mo Farah
+TKT-2025-0096,Email,High,Log Ticket,2025-11-17T16:39:25Z,Grace Lee
+TKT-2025-0096,Email,High,Triage,2025-11-17T17:05:25Z,Grace Lee
+TKT-2025-0091,Portal,Critical,Investigate,2025-11-17T17:52:09Z,Sam Cole
+TKT-2025-0097,Chat,High,Log Ticket,2025-11-17T18:31:31Z,Ingrid Nilsen
+TKT-2025-0097,Chat,High,Triage,2025-11-17T18:38:31Z,Ingrid Nilsen
+TKT-2025-0095,Portal,High,Triage,2025-11-17T18:45:33Z,Mo Farah
+TKT-2025-0093,Phone,Low,Assign,2025-11-17T18:53:56Z,Ravi Patel
+TKT-2025-0094,Email,Low,Investigate,2025-11-17T19:24:34Z,Ingrid Nilsen
+TKT-2025-0064,Phone,Critical,Resolve,2025-11-17T19:43:49Z,Mo Farah
+TKT-2025-0097,Chat,High,Assign,2025-11-17T20:14:31Z,Ingrid Nilsen
+TKT-2025-0092,Portal,Critical,Investigate,2025-11-17T21:12:05Z,Sam Cole
+TKT-2025-0064,Phone,Critical,Close,2025-11-17T21:27:49Z,Mo Farah
+TKT-2025-0093,Phone,Low,Investigate,2025-11-17T22:56:56Z,Ravi Patel
+TKT-2025-0096,Email,High,Resolve,2025-11-17T23:00:25Z,Grace Lee
+TKT-2025-0096,Email,High,Close,2025-11-17T23:05:25Z,Grace Lee
+TKT-2025-0095,Portal,High,Assign,2025-11-18T00:26:33Z,Mo Farah
+TKT-2025-0091,Portal,Critical,Resolve,2025-11-18T01:51:09Z,Sam Cole
+TKT-2025-0097,Chat,High,Investigate,2025-11-18T03:49:31Z,Ingrid Nilsen
+TKT-2025-0098,Email,Critical,Log Ticket,2025-11-18T07:21:17Z,Grace Lee
+TKT-2025-0099,Phone,Low,Log Ticket,2025-11-18T08:31:13Z,Sam Cole
+TKT-2025-0095,Portal,High,Investigate,2025-11-18T08:42:33Z,Mo Farah
+TKT-2025-0100,Phone,Medium,Log Ticket,2025-11-18T08:58:38Z,Grace Lee
+TKT-2025-0091,Portal,Critical,Close,2025-11-18T09:01:09Z,Sam Cole
+TKT-2025-0101,Chat,Low,Log Ticket,2025-11-18T09:17:39Z,Ravi Patel
+TKT-2025-0100,Phone,Medium,Triage,2025-11-18T09:54:38Z,Grace Lee
+TKT-2025-0099,Phone,Low,Triage,2025-11-18T10:17:13Z,Sam Cole
+TKT-2025-0098,Email,Critical,Triage,2025-11-18T10:19:17Z,Grace Lee
+TKT-2025-0101,Chat,Low,Assign,2025-11-18T10:24:39Z,Ravi Patel
+TKT-2025-0099,Phone,Low,Assign,2025-11-18T10:34:13Z,Sam Cole
+TKT-2025-0092,Portal,Critical,Resolve,2025-11-18T10:36:05Z,Sam Cole
+TKT-2025-0102,Email,Medium,Log Ticket,2025-11-18T10:37:00Z,Sam Cole
+TKT-2025-0057,Chat,Low,Reopen,2025-11-18T10:43:03Z,Grace Lee
+TKT-2025-0103,Phone,Low,Log Ticket,2025-11-18T12:06:15Z,Grace Lee
+TKT-2025-0099,Phone,Low,Investigate,2025-11-18T12:10:13Z,Sam Cole
+TKT-2025-0104,Chat,Low,Log Ticket,2025-11-18T12:15:46Z,Mo Farah
+TKT-2025-0103,Phone,Low,Triage,2025-11-18T12:22:15Z,Grace Lee
+TKT-2025-0097,Chat,High,Escalate,2025-11-18T12:25:31Z,Ingrid Nilsen
+TKT-2025-0079,Portal,Low,Reopen,2025-11-18T12:45:36Z,Ingrid Nilsen
+TKT-2025-0102,Email,Medium,Triage,2025-11-18T13:12:00Z,Sam Cole
+TKT-2025-0095,Portal,High,Resolve,2025-11-18T13:17:33Z,Mo Farah
+TKT-2025-0105,Portal,Medium,Log Ticket,2025-11-18T13:45:33Z,Sam Cole
+TKT-2025-0104,Chat,Low,Triage,2025-11-18T14:04:46Z,Mo Farah
+TKT-2025-0105,Portal,Medium,Triage,2025-11-18T14:11:33Z,Sam Cole
+TKT-2025-0106,Chat,Critical,Log Ticket,2025-11-18T14:53:55Z,Ravi Patel
+TKT-2025-0057,Chat,Low,Investigate,2025-11-18T15:20:03Z,Grace Lee
+TKT-2025-0100,Phone,Medium,Assign,2025-11-18T15:34:38Z,Grace Lee
+TKT-2025-0098,Email,Critical,Assign,2025-11-18T15:38:17Z,Grace Lee
+TKT-2025-0101,Chat,Low,Investigate,2025-11-18T16:09:39Z,Ravi Patel
+TKT-2025-0106,Chat,Critical,Triage,2025-11-18T16:37:55Z,Ravi Patel
+TKT-2025-0103,Phone,Low,Assign,2025-11-18T16:48:15Z,Grace Lee
+TKT-2025-0102,Email,Medium,Assign,2025-11-18T17:35:00Z,Sam Cole
+TKT-2025-0107,Portal,High,Log Ticket,2025-11-18T17:54:28Z,Grace Lee
+TKT-2025-0094,Email,Low,Resolve,2025-11-18T18:01:34Z,Ingrid Nilsen
+TKT-2025-0108,Phone,Medium,Log Ticket,2025-11-18T18:02:56Z,Grace Lee
+TKT-2025-0099,Phone,Low,Escalate,2025-11-18T18:21:13Z,Sam Cole
+TKT-2025-0094,Email,Low,Close,2025-11-18T18:25:34Z,Ingrid Nilsen
+TKT-2025-0105,Portal,Medium,Assign,2025-11-18T18:45:33Z,Sam Cole
+TKT-2025-0079,Portal,Low,Investigate,2025-11-18T18:49:36Z,Ingrid Nilsen
+TKT-2025-0103,Phone,Low,Investigate,2025-11-18T18:51:15Z,Grace Lee
+TKT-2025-0092,Portal,Critical,Close,2025-11-18T19:02:05Z,Sam Cole
+TKT-2025-0104,Chat,Low,Assign,2025-11-18T19:38:46Z,Mo Farah
+TKT-2025-0107,Portal,High,Triage,2025-11-18T19:40:28Z,Grace Lee
+TKT-2025-0101,Chat,Low,Resolve,2025-11-18T20:29:39Z,Ravi Patel
+TKT-2025-0095,Portal,High,Close,2025-11-18T20:34:33Z,Mo Farah
+TKT-2025-0108,Phone,Medium,Triage,2025-11-18T20:45:56Z,Grace Lee
+TKT-2025-0093,Phone,Low,Resolve,2025-11-18T21:59:56Z,Ravi Patel
+TKT-2025-0106,Chat,Critical,Assign,2025-11-18T22:11:55Z,Ravi Patel
+TKT-2025-0098,Email,Critical,Investigate,2025-11-18T22:25:17Z,Grace Lee
+TKT-2025-0102,Email,Medium,Investigate,2025-11-18T23:08:00Z,Sam Cole
+TKT-2025-0057,Chat,Low,Resolve,2025-11-18T23:14:03Z,Grace Lee
+TKT-2025-0100,Phone,Medium,Investigate,2025-11-18T23:41:38Z,Grace Lee
+TKT-2025-0103,Phone,Low,Escalate,2025-11-19T00:00:15Z,Grace Lee
+TKT-2025-0093,Phone,Low,Close,2025-11-19T00:39:56Z,Ravi Patel
+TKT-2025-0097,Chat,High,Resolve,2025-11-19T00:53:31Z,Ingrid Nilsen
+TKT-2025-0108,Phone,Medium,Assign,2025-11-19T00:54:56Z,Grace Lee
+TKT-2025-0107,Portal,High,Assign,2025-11-19T01:05:28Z,Grace Lee
+TKT-2025-0105,Portal,Medium,Investigate,2025-11-19T01:10:33Z,Sam Cole
+TKT-2025-0101,Chat,Low,Close,2025-11-19T01:26:39Z,Ravi Patel
+TKT-2025-0062,Phone,Medium,Reopen,2025-11-19T02:43:43Z,Ravi Patel
+TKT-2025-0106,Chat,Critical,Investigate,2025-11-19T03:15:55Z,Ravi Patel
+TKT-2025-0091,Portal,Critical,Reopen,2025-11-19T05:13:09Z,Sam Cole
+TKT-2025-0097,Chat,High,Close,2025-11-19T05:37:31Z,Ingrid Nilsen
+TKT-2025-0104,Chat,Low,Investigate,2025-11-19T06:26:46Z,Mo Farah
+TKT-2025-0074,Email,Critical,Reopen,2025-11-19T07:44:07Z,Mo Farah
+TKT-2025-0079,Portal,Low,Resolve,2025-11-19T08:28:36Z,Ingrid Nilsen
+TKT-2025-0108,Phone,Medium,Investigate,2025-11-19T09:42:56Z,Grace Lee
+TKT-2025-0109,Portal,Low,Log Ticket,2025-11-19T09:55:35Z,Grace Lee
+TKT-2025-0057,Chat,Low,Close,2025-11-19T10:10:03Z,Grace Lee
+TKT-2025-0110,Email,Critical,Log Ticket,2025-11-19T10:54:54Z,Ingrid Nilsen
+TKT-2025-0111,Chat,Medium,Log Ticket,2025-11-19T11:29:15Z,Sam Cole
+TKT-2025-0062,Phone,Medium,Investigate,2025-11-19T11:34:43Z,Ravi Patel
+TKT-2025-0107,Portal,High,Investigate,2025-11-19T11:37:28Z,Grace Lee
+TKT-2025-0109,Portal,Low,Assign,2025-11-19T12:09:35Z,Grace Lee
+TKT-2025-0112,Email,High,Log Ticket,2025-11-19T12:12:58Z,Sam Cole
+TKT-2025-0111,Chat,Medium,Triage,2025-11-19T12:16:15Z,Sam Cole
+TKT-2025-0113,Chat,Low,Log Ticket,2025-11-19T12:23:43Z,Ingrid Nilsen
+TKT-2025-0103,Phone,Low,Resolve,2025-11-19T12:24:15Z,Grace Lee
+TKT-2025-0114,Portal,Low,Log Ticket,2025-11-19T12:50:21Z,Ravi Patel
+TKT-2025-0091,Portal,Critical,Investigate,2025-11-19T12:52:09Z,Sam Cole
+TKT-2025-0100,Phone,Medium,Resolve,2025-11-19T13:09:38Z,Grace Lee
+TKT-2025-0110,Email,Critical,Triage,2025-11-19T13:14:54Z,Ingrid Nilsen
+TKT-2025-0100,Phone,Medium,Close,2025-11-19T13:18:38Z,Grace Lee
+TKT-2025-0114,Portal,Low,Triage,2025-11-19T13:26:21Z,Ravi Patel
+TKT-2025-0110,Email,Critical,Assign,2025-11-19T13:26:54Z,Ingrid Nilsen
+TKT-2025-0112,Email,High,Triage,2025-11-19T13:44:58Z,Sam Cole
+TKT-2025-0114,Portal,Low,Assign,2025-11-19T14:10:21Z,Ravi Patel
+TKT-2025-0111,Chat,Medium,Assign,2025-11-19T14:19:15Z,Sam Cole
+TKT-2025-0103,Phone,Low,Close,2025-11-19T14:34:15Z,Grace Lee
+TKT-2025-0115,Portal,High,Log Ticket,2025-11-19T14:42:45Z,Ingrid Nilsen
+TKT-2025-0113,Chat,Low,Triage,2025-11-19T14:51:43Z,Ingrid Nilsen
+TKT-2025-0116,Chat,Critical,Log Ticket,2025-11-19T15:00:37Z,Ravi Patel
+TKT-2025-0079,Portal,Low,Close,2025-11-19T15:33:36Z,Ingrid Nilsen
+TKT-2025-0112,Email,High,Assign,2025-11-19T15:39:58Z,Sam Cole
+TKT-2025-0074,Email,Critical,Investigate,2025-11-19T15:43:07Z,Mo Farah
+TKT-2025-0116,Chat,Critical,Triage,2025-11-19T16:24:37Z,Ravi Patel
+TKT-2025-0098,Email,Critical,Resolve,2025-11-19T16:40:17Z,Grace Lee
+TKT-2025-0115,Portal,High,Triage,2025-11-19T17:15:45Z,Ingrid Nilsen
+TKT-2025-0106,Chat,Critical,Resolve,2025-11-19T17:20:55Z,Ravi Patel
+TKT-2025-0117,Email,Critical,Log Ticket,2025-11-19T17:33:26Z,Mo Farah
+TKT-2025-0118,Email,Critical,Log Ticket,2025-11-19T18:06:23Z,Sam Cole
+TKT-2025-0098,Email,Critical,Close,2025-11-19T18:34:17Z,Grace Lee
+TKT-2025-0117,Email,Critical,Triage,2025-11-19T18:42:26Z,Mo Farah
+TKT-2025-0113,Chat,Low,Assign,2025-11-19T19:09:43Z,Ingrid Nilsen
+TKT-2025-0104,Chat,Low,Escalate,2025-11-19T19:10:46Z,Mo Farah
+TKT-2025-0111,Chat,Medium,Investigate,2025-11-19T19:41:15Z,Sam Cole
+TKT-2025-0115,Portal,High,Assign,2025-11-19T19:44:45Z,Ingrid Nilsen
+TKT-2025-0118,Email,Critical,Triage,2025-11-19T20:22:23Z,Sam Cole
+TKT-2025-0114,Portal,Low,Investigate,2025-11-19T20:30:21Z,Ravi Patel
+TKT-2025-0113,Chat,Low,Investigate,2025-11-19T20:49:43Z,Ingrid Nilsen
+TKT-2025-0105,Portal,Medium,Resolve,2025-11-19T20:54:33Z,Sam Cole
+TKT-2025-0111,Chat,Medium,Resolve,2025-11-19T21:05:15Z,Sam Cole
+TKT-2025-0118,Email,Critical,Assign,2025-11-19T21:14:23Z,Sam Cole
+TKT-2025-0110,Email,Critical,Investigate,2025-11-19T21:23:54Z,Ingrid Nilsen
+TKT-2025-0114,Portal,Low,Resolve,2025-11-19T21:37:21Z,Ravi Patel
+TKT-2025-0117,Email,Critical,Assign,2025-11-19T21:41:26Z,Mo Farah
+TKT-2025-0106,Chat,Critical,Close,2025-11-19T21:49:55Z,Ravi Patel
+TKT-2025-0116,Chat,Critical,Assign,2025-11-19T22:09:37Z,Ravi Patel
+TKT-2025-0109,Portal,Low,Investigate,2025-11-19T22:10:35Z,Grace Lee
+TKT-2025-0091,Portal,Critical,Resolve,2025-11-19T23:43:09Z,Sam Cole
+TKT-2025-0108,Phone,Medium,Escalate,2025-11-19T23:48:56Z,Grace Lee
+TKT-2025-0107,Portal,High,Resolve,2025-11-20T00:39:28Z,Grace Lee
+TKT-2025-0112,Email,High,Investigate,2025-11-20T02:23:58Z,Sam Cole
+TKT-2025-0105,Portal,Medium,Close,2025-11-20T02:37:33Z,Sam Cole
+TKT-2025-0114,Portal,Low,Close,2025-11-20T03:01:21Z,Ravi Patel
+TKT-2025-0113,Chat,Low,Resolve,2025-11-20T04:16:43Z,Ingrid Nilsen
+TKT-2025-0116,Chat,Critical,Investigate,2025-11-20T04:30:37Z,Ravi Patel
+TKT-2025-0102,Email,Medium,Resolve,2025-11-20T05:05:00Z,Sam Cole
+TKT-2025-0115,Portal,High,Investigate,2025-11-20T05:50:45Z,Ingrid Nilsen
+TKT-2025-0118,Email,Critical,Investigate,2025-11-20T06:04:23Z,Sam Cole
+TKT-2025-0107,Portal,High,Close,2025-11-20T06:42:28Z,Grace Lee
+TKT-2025-0112,Email,High,Escalate,2025-11-20T07:06:58Z,Sam Cole
+TKT-2025-0102,Email,Medium,Close,2025-11-20T07:43:00Z,Sam Cole
+TKT-2025-0111,Chat,Medium,Close,2025-11-20T07:56:15Z,Sam Cole
+TKT-2025-0117,Email,Critical,Investigate,2025-11-20T08:39:26Z,Mo Farah
+TKT-2025-0091,Portal,Critical,Close,2025-11-20T08:42:09Z,Sam Cole
+TKT-2025-0119,Email,High,Log Ticket,2025-11-20T08:54:21Z,Ingrid Nilsen
+TKT-2025-0113,Chat,Low,Close,2025-11-20T09:06:43Z,Ingrid Nilsen
+TKT-2025-0120,Email,Critical,Log Ticket,2025-11-20T09:26:57Z,Sam Cole
+TKT-2025-0074,Email,Critical,Resolve,2025-11-20T09:43:07Z,Mo Farah
+TKT-2025-0109,Portal,Low,Resolve,2025-11-20T09:45:35Z,Grace Lee
+TKT-2025-0119,Email,High,Triage,2025-11-20T10:18:21Z,Ingrid Nilsen
+TKT-2025-0117,Email,Critical,Escalate,2025-11-20T10:37:26Z,Mo Farah
+TKT-2025-0120,Email,Critical,Triage,2025-11-20T10:38:57Z,Sam Cole
+TKT-2025-0074,Email,Critical,Close,2025-11-20T10:39:07Z,Mo Farah
+TKT-2025-0121,Email,High,Log Ticket,2025-11-20T11:24:57Z,Sam Cole
+TKT-2025-0122,Chat,High,Log Ticket,2025-11-20T11:58:57Z,Grace Lee
+TKT-2025-0109,Portal,Low,Close,2025-11-20T12:13:35Z,Grace Lee
+TKT-2025-0080,Portal,Critical,Reopen,2025-11-20T12:25:19Z,Ravi Patel
+TKT-2025-0123,Email,Critical,Log Ticket,2025-11-20T12:28:42Z,Grace Lee
+TKT-2025-0122,Chat,High,Triage,2025-11-20T12:54:57Z,Grace Lee
+TKT-2025-0123,Email,Critical,Triage,2025-11-20T13:32:42Z,Grace Lee
+TKT-2025-0121,Email,High,Triage,2025-11-20T13:47:57Z,Sam Cole
+TKT-2025-0099,Phone,Low,Resolve,2025-11-20T13:52:13Z,Sam Cole
+TKT-2025-0124,Email,Medium,Log Ticket,2025-11-20T13:54:23Z,Mo Farah
+TKT-2025-0125,Portal,Medium,Log Ticket,2025-11-20T14:01:50Z,Grace Lee
+TKT-2025-0062,Phone,Medium,Resolve,2025-11-20T14:14:43Z,Ravi Patel
+TKT-2025-0126,Chat,Low,Log Ticket,2025-11-20T14:55:12Z,Grace Lee
+TKT-2025-0126,Chat,Low,Triage,2025-11-20T15:02:12Z,Grace Lee
+TKT-2025-0122,Chat,High,Assign,2025-11-20T15:22:57Z,Grace Lee
+TKT-2025-0123,Email,Critical,Assign,2025-11-20T15:23:42Z,Grace Lee
+TKT-2025-0119,Email,High,Resolve,2025-11-20T15:29:21Z,Ingrid Nilsen
+TKT-2025-0110,Email,Critical,Resolve,2025-11-20T15:38:54Z,Ingrid Nilsen
+TKT-2025-0120,Email,Critical,Resolve,2025-11-20T15:49:57Z,Sam Cole
+TKT-2025-0127,Phone,High,Log Ticket,2025-11-20T16:06:40Z,Ravi Patel
+TKT-2025-0121,Email,High,Assign,2025-11-20T16:06:57Z,Sam Cole
+TKT-2025-0116,Chat,Critical,Resolve,2025-11-20T16:11:37Z,Ravi Patel
+TKT-2025-0099,Phone,Low,Close,2025-11-20T16:20:13Z,Sam Cole
+TKT-2025-0125,Portal,Medium,Triage,2025-11-20T16:21:50Z,Grace Lee
+TKT-2025-0124,Email,Medium,Triage,2025-11-20T16:43:23Z,Mo Farah
+TKT-2025-0122,Chat,High,Investigate,2025-11-20T16:46:57Z,Grace Lee
+TKT-2025-0124,Email,Medium,Assign,2025-11-20T17:17:23Z,Mo Farah
+TKT-2025-0119,Email,High,Close,2025-11-20T17:18:21Z,Ingrid Nilsen
+TKT-2025-0127,Phone,High,Triage,2025-11-20T17:19:40Z,Ravi Patel
+TKT-2025-0125,Portal,Medium,Assign,2025-11-20T17:44:50Z,Grace Lee
+TKT-2025-0080,Portal,Critical,Investigate,2025-11-20T18:11:19Z,Ravi Patel
+TKT-2025-0112,Email,High,Resolve,2025-11-20T18:37:58Z,Sam Cole
+TKT-2025-0121,Email,High,Investigate,2025-11-20T19:05:57Z,Sam Cole
+TKT-2025-0104,Chat,Low,Resolve,2025-11-20T19:57:46Z,Mo Farah
+TKT-2025-0122,Chat,High,Escalate,2025-11-20T21:28:57Z,Grace Lee
+TKT-2025-0123,Email,Critical,Investigate,2025-11-20T21:46:42Z,Grace Lee
+TKT-2025-0062,Phone,Medium,Close,2025-11-20T22:01:43Z,Ravi Patel
+TKT-2025-0127,Phone,High,Resolve,2025-11-20T23:05:40Z,Ravi Patel
+TKT-2025-0115,Portal,High,Resolve,2025-11-20T23:08:45Z,Ingrid Nilsen
+TKT-2025-0112,Email,High,Close,2025-11-20T23:16:58Z,Sam Cole
+TKT-2025-0115,Portal,High,Close,2025-11-20T23:31:45Z,Ingrid Nilsen
+TKT-2025-0120,Email,Critical,Close,2025-11-20T23:57:57Z,Sam Cole
+TKT-2025-0080,Portal,Critical,Resolve,2025-11-21T00:05:19Z,Ravi Patel
+TKT-2025-0125,Portal,Medium,Investigate,2025-11-21T00:18:50Z,Grace Lee
+TKT-2025-0116,Chat,Critical,Close,2025-11-21T00:30:37Z,Ravi Patel
+TKT-2025-0124,Email,Medium,Investigate,2025-11-21T01:51:23Z,Mo Farah
+TKT-2025-0110,Email,Critical,Close,2025-11-21T02:34:54Z,Ingrid Nilsen
+TKT-2025-0126,Chat,Low,Resolve,2025-11-21T03:33:12Z,Grace Lee
+TKT-2025-0118,Email,Critical,Resolve,2025-11-21T04:30:23Z,Sam Cole
+TKT-2025-0127,Phone,High,Close,2025-11-21T04:40:40Z,Ravi Patel
+TKT-2025-0104,Chat,Low,Close,2025-11-21T06:21:46Z,Mo Farah
+TKT-2025-0128,Chat,Low,Log Ticket,2025-11-21T07:37:53Z,Ravi Patel
+TKT-2025-0128,Chat,Low,Triage,2025-11-21T07:56:53Z,Ravi Patel
+TKT-2025-0108,Phone,Medium,Resolve,2025-11-21T08:04:56Z,Grace Lee
+TKT-2025-0129,Email,Critical,Log Ticket,2025-11-21T08:43:23Z,Grace Lee
+TKT-2025-0080,Portal,Critical,Close,2025-11-21T08:53:19Z,Ravi Patel
+TKT-2025-0130,Email,High,Log Ticket,2025-11-21T08:53:32Z,Mo Farah
+TKT-2025-0124,Email,Medium,Resolve,2025-11-21T08:56:23Z,Mo Farah
+TKT-2025-0131,Portal,High,Log Ticket,2025-11-21T09:14:35Z,Ravi Patel
+TKT-2025-0118,Email,Critical,Close,2025-11-21T09:16:23Z,Sam Cole
+TKT-2025-0129,Email,Critical,Triage,2025-11-21T09:19:23Z,Grace Lee
+TKT-2025-0126,Chat,Low,Close,2025-11-21T09:46:12Z,Grace Lee
+TKT-2025-0108,Phone,Medium,Close,2025-11-21T10:26:56Z,Grace Lee
+TKT-2025-0105,Portal,Medium,Reopen,2025-11-21T10:46:33Z,Sam Cole
+TKT-2025-0132,Chat,Critical,Log Ticket,2025-11-21T11:22:21Z,Ravi Patel
+TKT-2025-0130,Email,High,Triage,2025-11-21T11:28:32Z,Mo Farah
+TKT-2025-0133,Portal,High,Log Ticket,2025-11-21T11:41:06Z,Mo Farah
+TKT-2025-0131,Portal,High,Triage,2025-11-21T12:05:35Z,Ravi Patel
+TKT-2025-0125,Portal,Medium,Resolve,2025-11-21T12:16:50Z,Grace Lee
+TKT-2025-0128,Chat,Low,Assign,2025-11-21T12:34:53Z,Ravi Patel
+TKT-2025-0133,Portal,High,Triage,2025-11-21T12:41:06Z,Mo Farah
+TKT-2025-0134,Phone,Low,Log Ticket,2025-11-21T12:55:41Z,Mo Farah
+TKT-2025-0124,Email,Medium,Close,2025-11-21T13:09:23Z,Mo Farah
+TKT-2025-0134,Phone,Low,Triage,2025-11-21T13:13:41Z,Mo Farah
+TKT-2025-0132,Chat,Critical,Triage,2025-11-21T13:30:21Z,Ravi Patel
+TKT-2025-0130,Email,High,Assign,2025-11-21T13:41:32Z,Mo Farah
+TKT-2025-0135,Phone,Critical,Log Ticket,2025-11-21T13:46:39Z,Ingrid Nilsen
+TKT-2025-0131,Portal,High,Assign,2025-11-21T14:27:35Z,Ravi Patel
+TKT-2025-0105,Portal,Medium,Investigate,2025-11-21T15:40:33Z,Sam Cole
+TKT-2025-0129,Email,Critical,Resolve,2025-11-21T15:42:23Z,Grace Lee
+TKT-2025-0136,Email,Low,Log Ticket,2025-11-21T16:12:42Z,Grace Lee
+TKT-2025-0132,Chat,Critical,Assign,2025-11-21T16:27:21Z,Ravi Patel
+TKT-2025-0135,Phone,Critical,Triage,2025-11-21T16:28:39Z,Ingrid Nilsen
+TKT-2025-0133,Portal,High,Resolve,2025-11-21T16:53:06Z,Mo Farah
+TKT-2025-0136,Email,Low,Triage,2025-11-21T17:07:42Z,Grace Lee
+TKT-2025-0134,Phone,Low,Assign,2025-11-21T17:14:41Z,Mo Farah
+TKT-2025-0133,Portal,High,Close,2025-11-21T18:18:06Z,Mo Farah
+TKT-2025-0137,Portal,Medium,Log Ticket,2025-11-21T18:35:49Z,Ravi Patel
+TKT-2025-0129,Email,Critical,Close,2025-11-21T18:39:23Z,Grace Lee
+TKT-2025-0132,Chat,Critical,Investigate,2025-11-21T18:40:21Z,Ravi Patel
+TKT-2025-0135,Phone,Critical,Assign,2025-11-21T18:47:39Z,Ingrid Nilsen
+TKT-2025-0137,Portal,Medium,Triage,2025-11-21T18:48:49Z,Ravi Patel
+TKT-2025-0136,Email,Low,Assign,2025-11-21T19:22:42Z,Grace Lee
+TKT-2025-0137,Portal,Medium,Assign,2025-11-21T19:59:49Z,Ravi Patel
+TKT-2025-0125,Portal,Medium,Close,2025-11-21T20:26:50Z,Grace Lee
+TKT-2025-0136,Email,Low,Investigate,2025-11-21T21:24:42Z,Grace Lee
+TKT-2025-0134,Phone,Low,Investigate,2025-11-21T21:30:41Z,Mo Farah
+TKT-2025-0130,Email,High,Investigate,2025-11-21T21:52:32Z,Mo Farah
+TKT-2025-0128,Chat,Low,Investigate,2025-11-21T22:53:53Z,Ravi Patel
+TKT-2025-0131,Portal,High,Investigate,2025-11-21T23:10:35Z,Ravi Patel
+TKT-2025-0136,Email,Low,Resolve,2025-11-22T00:12:42Z,Grace Lee
+TKT-2025-0135,Phone,Critical,Investigate,2025-11-22T00:50:39Z,Ingrid Nilsen
+TKT-2025-0121,Email,High,Resolve,2025-11-22T00:53:57Z,Sam Cole
+TKT-2025-0137,Portal,Medium,Investigate,2025-11-22T01:32:49Z,Ravi Patel
+TKT-2025-0123,Email,Critical,Resolve,2025-11-22T02:01:42Z,Grace Lee
+TKT-2025-0122,Chat,High,Resolve,2025-11-22T03:11:57Z,Grace Lee
+TKT-2025-0131,Portal,High,Resolve,2025-11-22T05:30:35Z,Ravi Patel
+TKT-2025-0128,Chat,Low,Escalate,2025-11-22T05:42:53Z,Ravi Patel
+TKT-2025-0123,Email,Critical,Close,2025-11-22T06:01:42Z,Grace Lee
+TKT-2025-0131,Portal,High,Close,2025-11-22T06:32:35Z,Ravi Patel
+TKT-2025-0105,Portal,Medium,Resolve,2025-11-22T06:34:33Z,Sam Cole
+TKT-2025-0135,Phone,Critical,Resolve,2025-11-22T06:56:39Z,Ingrid Nilsen
+TKT-2025-0136,Email,Low,Close,2025-11-22T08:05:42Z,Grace Lee
+TKT-2025-0121,Email,High,Close,2025-11-22T08:43:57Z,Sam Cole
+TKT-2025-0105,Portal,Medium,Close,2025-11-22T09:07:33Z,Sam Cole
+TKT-2025-0122,Chat,High,Close,2025-11-22T09:25:57Z,Grace Lee
+TKT-2025-0134,Phone,Low,Resolve,2025-11-22T17:06:41Z,Mo Farah
+TKT-2025-0135,Phone,Critical,Close,2025-11-22T17:30:39Z,Ingrid Nilsen
+TKT-2025-0134,Phone,Low,Close,2025-11-22T19:07:41Z,Mo Farah
+TKT-2025-0117,Email,Critical,Resolve,2025-11-22T19:15:26Z,Mo Farah
+TKT-2025-0137,Portal,Medium,Resolve,2025-11-22T19:28:49Z,Ravi Patel
+TKT-2025-0132,Chat,Critical,Resolve,2025-11-22T20:35:21Z,Ravi Patel
+TKT-2025-0132,Chat,Critical,Close,2025-11-22T20:48:21Z,Ravi Patel
+TKT-2025-0130,Email,High,Resolve,2025-11-22T22:33:32Z,Mo Farah
+TKT-2025-0130,Email,High,Close,2025-11-23T01:28:32Z,Mo Farah
+TKT-2025-0117,Email,Critical,Close,2025-11-23T01:53:26Z,Mo Farah
+TKT-2025-0137,Portal,Medium,Close,2025-11-23T06:20:49Z,Ravi Patel
+TKT-2025-0128,Chat,Low,Resolve,2025-11-23T16:04:53Z,Ravi Patel
+TKT-2025-0128,Chat,Low,Close,2025-11-23T17:06:53Z,Ravi Patel
+TKT-2025-0138,Email,High,Log Ticket,2025-11-24T11:02:00Z,Grace Lee
+TKT-2025-0138,Email,High,Triage,2025-11-24T11:09:00Z,Grace Lee
+TKT-2025-0139,Phone,Critical,Log Ticket,2025-11-24T11:39:09Z,Ingrid Nilsen
+TKT-2025-0140,Chat,Low,Log Ticket,2025-11-24T12:07:04Z,Grace Lee
+TKT-2025-0138,Email,High,Resolve,2025-11-24T12:25:00Z,Grace Lee
+TKT-2025-0141,Phone,Medium,Log Ticket,2025-11-24T12:38:55Z,Mo Farah
+TKT-2025-0139,Phone,Critical,Triage,2025-11-24T13:21:09Z,Ingrid Nilsen
+TKT-2025-0141,Phone,Medium,Triage,2025-11-24T13:46:55Z,Mo Farah
+TKT-2025-0142,Portal,High,Log Ticket,2025-11-24T13:54:38Z,Ravi Patel
+TKT-2025-0140,Chat,Low,Triage,2025-11-24T14:41:04Z,Grace Lee
+TKT-2025-0142,Portal,High,Triage,2025-11-24T15:19:38Z,Ravi Patel
+TKT-2025-0140,Chat,Low,Assign,2025-11-24T15:26:04Z,Grace Lee
+TKT-2025-0138,Email,High,Close,2025-11-24T17:46:00Z,Grace Lee
+TKT-2025-0143,Portal,Medium,Log Ticket,2025-11-24T18:02:57Z,Sam Cole
+TKT-2025-0139,Phone,Critical,Resolve,2025-11-24T18:16:09Z,Ingrid Nilsen
+TKT-2025-0141,Phone,Medium,Assign,2025-11-24T19:05:55Z,Mo Farah
+TKT-2025-0140,Chat,Low,Investigate,2025-11-24T19:37:04Z,Grace Lee
+TKT-2025-0143,Portal,Medium,Triage,2025-11-24T19:50:57Z,Sam Cole
+TKT-2025-0139,Phone,Critical,Close,2025-11-24T20:42:09Z,Ingrid Nilsen
+TKT-2025-0142,Portal,High,Assign,2025-11-24T20:42:38Z,Ravi Patel
+TKT-2025-0143,Portal,Medium,Resolve,2025-11-25T01:50:57Z,Sam Cole
+TKT-2025-0141,Phone,Medium,Investigate,2025-11-25T03:08:55Z,Mo Farah
+TKT-2025-0142,Portal,High,Investigate,2025-11-25T03:52:38Z,Ravi Patel
+TKT-2025-0143,Portal,Medium,Close,2025-11-25T03:58:57Z,Sam Cole
+TKT-2025-0142,Portal,High,Resolve,2025-11-25T05:01:38Z,Ravi Patel
+TKT-2025-0142,Portal,High,Close,2025-11-25T06:53:38Z,Ravi Patel
+TKT-2025-0131,Portal,High,Reopen,2025-11-25T06:54:35Z,Ravi Patel
+TKT-2025-0144,Chat,High,Log Ticket,2025-11-25T08:29:03Z,Ravi Patel
+TKT-2025-0145,Email,Low,Log Ticket,2025-11-25T08:54:02Z,Grace Lee
+TKT-2025-0145,Email,Low,Triage,2025-11-25T09:05:02Z,Grace Lee
+TKT-2025-0145,Email,Low,Assign,2025-11-25T09:05:02Z,Grace Lee
+TKT-2025-0146,Phone,Low,Log Ticket,2025-11-25T09:06:19Z,Grace Lee
+TKT-2025-0147,Phone,Medium,Log Ticket,2025-11-25T09:10:26Z,Grace Lee
+TKT-2025-0141,Phone,Medium,Resolve,2025-11-25T09:10:55Z,Mo Farah
+TKT-2025-0147,Phone,Medium,Triage,2025-11-25T09:17:26Z,Grace Lee
+TKT-2025-0147,Phone,Medium,Assign,2025-11-25T10:05:26Z,Grace Lee
+TKT-2025-0141,Phone,Medium,Close,2025-11-25T10:07:55Z,Mo Farah
+TKT-2025-0148,Chat,High,Log Ticket,2025-11-25T10:14:19Z,Grace Lee
+TKT-2025-0146,Phone,Low,Triage,2025-11-25T10:21:19Z,Grace Lee
+TKT-2025-0144,Chat,High,Triage,2025-11-25T10:31:03Z,Ravi Patel
+TKT-2025-0149,Phone,Critical,Log Ticket,2025-11-25T10:43:35Z,Ingrid Nilsen
+TKT-2025-0146,Phone,Low,Assign,2025-11-25T11:22:19Z,Grace Lee
+TKT-2025-0150,Portal,Low,Log Ticket,2025-11-25T11:55:23Z,Grace Lee
+TKT-2025-0151,Chat,Critical,Log Ticket,2025-11-25T12:04:14Z,Mo Farah
+TKT-2025-0140,Chat,Low,Resolve,2025-11-25T12:19:04Z,Grace Lee
+TKT-2025-0149,Phone,Critical,Triage,2025-11-25T12:25:35Z,Ingrid Nilsen
+TKT-2025-0152,Portal,Low,Log Ticket,2025-11-25T12:32:11Z,Sam Cole
+TKT-2025-0140,Chat,Low,Close,2025-11-25T12:33:04Z,Grace Lee
+TKT-2025-0151,Chat,Critical,Triage,2025-11-25T12:36:14Z,Mo Farah
+TKT-2025-0148,Chat,High,Triage,2025-11-25T12:40:19Z,Grace Lee
+TKT-2025-0147,Phone,Medium,Investigate,2025-11-25T12:49:26Z,Grace Lee
+TKT-2025-0149,Phone,Critical,Resolve,2025-11-25T13:31:35Z,Ingrid Nilsen
+TKT-2025-0153,Phone,Critical,Log Ticket,2025-11-25T14:26:58Z,Ingrid Nilsen
+TKT-2025-0149,Phone,Critical,Close,2025-11-25T14:31:35Z,Ingrid Nilsen
+TKT-2025-0153,Phone,Critical,Triage,2025-11-25T15:01:58Z,Ingrid Nilsen
+TKT-2025-0145,Email,Low,Investigate,2025-11-25T15:10:02Z,Grace Lee
+TKT-2025-0152,Portal,Low,Triage,2025-11-25T15:17:11Z,Sam Cole
+TKT-2025-0154,Chat,Medium,Log Ticket,2025-11-25T15:33:36Z,Ingrid Nilsen
+TKT-2025-0154,Chat,Medium,Triage,2025-11-25T15:45:36Z,Ingrid Nilsen
+TKT-2025-0155,Email,Critical,Log Ticket,2025-11-25T16:13:47Z,Ingrid Nilsen
+TKT-2025-0150,Portal,Low,Assign,2025-11-25T17:35:23Z,Grace Lee
+TKT-2025-0131,Portal,High,Investigate,2025-11-25T17:47:35Z,Ravi Patel
+TKT-2025-0152,Portal,Low,Assign,2025-11-25T18:05:11Z,Sam Cole
+TKT-2025-0148,Chat,High,Assign,2025-11-25T18:16:19Z,Grace Lee
+TKT-2025-0155,Email,Critical,Triage,2025-11-25T18:52:47Z,Ingrid Nilsen
+TKT-2025-0153,Phone,Critical,Assign,2025-11-25T19:02:58Z,Ingrid Nilsen
+TKT-2025-0144,Chat,High,Resolve,2025-11-25T20:42:03Z,Ravi Patel
+TKT-2025-0146,Phone,Low,Investigate,2025-11-25T21:33:19Z,Grace Lee
+TKT-2025-0137,Portal,Medium,Reopen,2025-11-25T22:23:49Z,Ravi Patel
+TKT-2025-0155,Email,Critical,Assign,2025-11-25T23:38:47Z,Ingrid Nilsen
+TKT-2025-0144,Chat,High,Close,2025-11-26T01:05:03Z,Ravi Patel
+TKT-2025-0137,Portal,Medium,Investigate,2025-11-26T01:14:49Z,Ravi Patel
+TKT-2025-0123,Email,Critical,Reopen,2025-11-26T02:11:42Z,Grace Lee
+TKT-2025-0151,Chat,Critical,Resolve,2025-11-26T02:22:14Z,Mo Farah
+TKT-2025-0150,Portal,Low,Investigate,2025-11-26T02:22:23Z,Grace Lee
+TKT-2025-0148,Chat,High,Investigate,2025-11-26T02:53:19Z,Grace Lee
+TKT-2025-0153,Phone,Critical,Investigate,2025-11-26T03:29:58Z,Ingrid Nilsen
+TKT-2025-0154,Chat,Medium,Resolve,2025-11-26T03:35:36Z,Ingrid Nilsen
+TKT-2025-0155,Email,Critical,Investigate,2025-11-26T04:06:47Z,Ingrid Nilsen
+TKT-2025-0148,Chat,High,Resolve,2025-11-26T04:49:19Z,Grace Lee
+TKT-2025-0152,Portal,Low,Investigate,2025-11-26T04:57:11Z,Sam Cole
+TKT-2025-0147,Phone,Medium,Resolve,2025-11-26T04:59:26Z,Grace Lee
+TKT-2025-0145,Email,Low,Escalate,2025-11-26T05:35:02Z,Grace Lee
+TKT-2025-0156,Chat,Medium,Log Ticket,2025-11-26T07:46:59Z,Ingrid Nilsen
+TKT-2025-0151,Chat,Critical,Close,2025-11-26T08:03:14Z,Mo Farah
+TKT-2025-0146,Phone,Low,Resolve,2025-11-26T08:06:19Z,Grace Lee
+TKT-2025-0157,Portal,Medium,Log Ticket,2025-11-26T08:23:29Z,Grace Lee
+TKT-2025-0156,Chat,Medium,Triage,2025-11-26T08:31:59Z,Ingrid Nilsen
+TKT-2025-0148,Chat,High,Close,2025-11-26T09:16:19Z,Grace Lee
+TKT-2025-0154,Chat,Medium,Close,2025-11-26T09:41:36Z,Ingrid Nilsen
+TKT-2025-0146,Phone,Low,Close,2025-11-26T10:21:19Z,Grace Lee
+TKT-2025-0158,Phone,Low,Log Ticket,2025-11-26T10:27:50Z,Grace Lee
+TKT-2025-0158,Phone,Low,Triage,2025-11-26T10:48:50Z,Grace Lee
+TKT-2025-0157,Portal,Medium,Triage,2025-11-26T10:53:29Z,Grace Lee
+TKT-2025-0157,Portal,Medium,Assign,2025-11-26T11:05:29Z,Grace Lee
+TKT-2025-0147,Phone,Medium,Close,2025-11-26T11:41:26Z,Grace Lee
+TKT-2025-0123,Email,Critical,Investigate,2025-11-26T12:34:42Z,Grace Lee
+TKT-2025-0156,Chat,Medium,Assign,2025-11-26T13:28:59Z,Ingrid Nilsen
+TKT-2025-0158,Phone,Low,Assign,2025-11-26T13:32:50Z,Grace Lee
+TKT-2025-0131,Portal,High,Resolve,2025-11-26T14:17:35Z,Ravi Patel
+TKT-2025-0153,Phone,Critical,Resolve,2025-11-26T14:28:58Z,Ingrid Nilsen
+TKT-2025-0156,Chat,Medium,Investigate,2025-11-26T16:02:59Z,Ingrid Nilsen
+TKT-2025-0137,Portal,Medium,Resolve,2025-11-26T16:07:49Z,Ravi Patel
+TKT-2025-0159,Chat,Critical,Log Ticket,2025-11-26T17:31:32Z,Sam Cole
+TKT-2025-0159,Chat,Critical,Triage,2025-11-26T17:32:32Z,Sam Cole
+TKT-2025-0157,Portal,Medium,Investigate,2025-11-26T17:44:29Z,Grace Lee
+TKT-2025-0160,Phone,Low,Log Ticket,2025-11-26T18:23:57Z,Sam Cole
+TKT-2025-0160,Phone,Low,Triage,2025-11-26T19:56:57Z,Sam Cole
+TKT-2025-0153,Phone,Critical,Close,2025-11-26T20:03:58Z,Ingrid Nilsen
+TKT-2025-0131,Portal,High,Close,2025-11-26T20:13:35Z,Ravi Patel
+TKT-2025-0137,Portal,Medium,Close,2025-11-26T20:23:49Z,Ravi Patel
+TKT-2025-0158,Phone,Low,Investigate,2025-11-26T20:53:50Z,Grace Lee
+TKT-2025-0159,Chat,Critical,Assign,2025-11-26T22:38:32Z,Sam Cole
+TKT-2025-0157,Portal,Medium,Resolve,2025-11-27T01:44:29Z,Grace Lee
+TKT-2025-0160,Phone,Low,Resolve,2025-11-27T02:41:57Z,Sam Cole
+TKT-2025-0150,Portal,Low,Resolve,2025-11-27T03:25:23Z,Grace Lee
+TKT-2025-0152,Portal,Low,Resolve,2025-11-27T03:28:11Z,Sam Cole
+TKT-2025-0160,Phone,Low,Close,2025-11-27T04:17:57Z,Sam Cole
+TKT-2025-0135,Phone,Critical,Reopen,2025-11-27T05:30:39Z,Ingrid Nilsen
+TKT-2025-0155,Email,Critical,Resolve,2025-11-27T05:34:47Z,Ingrid Nilsen
+TKT-2025-0157,Portal,Medium,Close,2025-11-27T06:03:29Z,Grace Lee
+TKT-2025-0159,Chat,Critical,Investigate,2025-11-27T06:07:32Z,Sam Cole
+TKT-2025-0161,Phone,High,Log Ticket,2025-11-27T07:58:10Z,Ravi Patel
+TKT-2025-0123,Email,Critical,Resolve,2025-11-27T08:19:42Z,Grace Lee
+TKT-2025-0162,Chat,Critical,Log Ticket,2025-11-27T09:09:11Z,Grace Lee
+TKT-2025-0163,Email,High,Log Ticket,2025-11-27T09:28:25Z,Ingrid Nilsen
+TKT-2025-0161,Phone,High,Triage,2025-11-27T09:37:10Z,Ravi Patel
+TKT-2025-0162,Chat,Critical,Triage,2025-11-27T10:06:11Z,Grace Lee
+TKT-2025-0135,Phone,Critical,Investigate,2025-11-27T11:13:39Z,Ingrid Nilsen
+TKT-2025-0155,Email,Critical,Close,2025-11-27T11:41:47Z,Ingrid Nilsen
+TKT-2025-0163,Email,High,Assign,2025-11-27T11:56:25Z,Ingrid Nilsen
+TKT-2025-0164,Phone,Low,Log Ticket,2025-11-27T13:02:01Z,Ravi Patel
+TKT-2025-0152,Portal,Low,Close,2025-11-27T13:30:11Z,Sam Cole
+TKT-2025-0161,Phone,High,Assign,2025-11-27T13:39:10Z,Ravi Patel
+TKT-2025-0123,Email,Critical,Close,2025-11-27T14:01:42Z,Grace Lee
+TKT-2025-0150,Portal,Low,Close,2025-11-27T14:18:23Z,Grace Lee
+TKT-2025-0164,Phone,Low,Triage,2025-11-27T14:58:01Z,Ravi Patel
+TKT-2025-0135,Phone,Critical,Resolve,2025-11-27T15:35:39Z,Ingrid Nilsen
+TKT-2025-0162,Chat,Critical,Assign,2025-11-27T15:50:11Z,Grace Lee
+TKT-2025-0158,Phone,Low,Resolve,2025-11-27T15:50:50Z,Grace Lee
+TKT-2025-0163,Email,High,Investigate,2025-11-27T16:45:25Z,Ingrid Nilsen
+TKT-2025-0165,Phone,Critical,Log Ticket,2025-11-27T17:18:46Z,Ingrid Nilsen
+TKT-2025-0165,Phone,Critical,Triage,2025-11-27T17:28:46Z,Ingrid Nilsen
+TKT-2025-0166,Portal,Medium,Log Ticket,2025-11-27T18:21:46Z,Mo Farah
+TKT-2025-0167,Chat,High,Log Ticket,2025-11-27T18:39:43Z,Ingrid Nilsen
+TKT-2025-0156,Chat,Medium,Resolve,2025-11-27T18:41:59Z,Ingrid Nilsen
+TKT-2025-0166,Portal,Medium,Triage,2025-11-27T19:04:46Z,Mo Farah
+TKT-2025-0166,Portal,Medium,Assign,2025-11-27T19:19:46Z,Mo Farah
+TKT-2025-0162,Chat,Critical,Investigate,2025-11-27T19:57:11Z,Grace Lee
+TKT-2025-0167,Chat,High,Triage,2025-11-27T20:43:43Z,Ingrid Nilsen
+TKT-2025-0167,Chat,High,Assign,2025-11-27T20:52:43Z,Ingrid Nilsen
+TKT-2025-0163,Email,High,Resolve,2025-11-27T20:54:25Z,Ingrid Nilsen
+TKT-2025-0161,Phone,High,Investigate,2025-11-27T21:54:10Z,Ravi Patel
+TKT-2025-0164,Phone,Low,Resolve,2025-11-27T21:55:01Z,Ravi Patel
+TKT-2025-0158,Phone,Low,Close,2025-11-27T22:22:50Z,Grace Lee
+TKT-2025-0165,Phone,Critical,Assign,2025-11-27T22:45:46Z,Ingrid Nilsen
+TKT-2025-0165,Phone,Critical,Investigate,2025-11-28T01:22:46Z,Ingrid Nilsen
+TKT-2025-0135,Phone,Critical,Close,2025-11-28T01:56:39Z,Ingrid Nilsen
+TKT-2025-0145,Email,Low,Resolve,2025-11-28T02:16:02Z,Grace Lee
+TKT-2025-0145,Email,Low,Close,2025-11-28T02:20:02Z,Grace Lee
+TKT-2025-0156,Chat,Medium,Close,2025-11-28T02:45:59Z,Ingrid Nilsen
+TKT-2025-0146,Phone,Low,Reopen,2025-11-28T03:31:19Z,Grace Lee
+TKT-2025-0164,Phone,Low,Close,2025-11-28T03:44:01Z,Ravi Patel
+TKT-2025-0161,Phone,High,Resolve,2025-11-28T03:47:10Z,Ravi Patel
+TKT-2025-0163,Email,High,Close,2025-11-28T04:43:25Z,Ingrid Nilsen
+TKT-2025-0159,Chat,Critical,Resolve,2025-11-28T05:09:32Z,Sam Cole
+TKT-2025-0161,Phone,High,Close,2025-11-28T05:41:10Z,Ravi Patel
+TKT-2025-0166,Portal,Medium,Investigate,2025-11-28T06:15:46Z,Mo Farah
+TKT-2025-0159,Chat,Critical,Close,2025-11-28T06:50:32Z,Sam Cole
+TKT-2025-0167,Chat,High,Investigate,2025-11-28T07:12:43Z,Ingrid Nilsen
+TKT-2025-0168,Portal,Critical,Log Ticket,2025-11-28T07:17:16Z,Ravi Patel
+TKT-2025-0169,Chat,High,Log Ticket,2025-11-28T07:45:19Z,Ingrid Nilsen
+TKT-2025-0165,Phone,Critical,Escalate,2025-11-28T07:50:46Z,Ingrid Nilsen
+TKT-2025-0170,Chat,High,Log Ticket,2025-11-28T08:20:32Z,Ravi Patel
+TKT-2025-0170,Chat,High,Triage,2025-11-28T08:21:32Z,Ravi Patel
+TKT-2025-0171,Chat,Low,Log Ticket,2025-11-28T08:22:54Z,Ingrid Nilsen
+TKT-2025-0169,Chat,High,Triage,2025-11-28T09:55:19Z,Ingrid Nilsen
+TKT-2025-0168,Portal,Critical,Triage,2025-11-28T10:12:16Z,Ravi Patel
+TKT-2025-0170,Chat,High,Assign,2025-11-28T10:41:32Z,Ravi Patel
+TKT-2025-0146,Phone,Low,Investigate,2025-11-28T10:43:19Z,Grace Lee
+TKT-2025-0171,Chat,Low,Triage,2025-11-28T11:20:54Z,Ingrid Nilsen
+TKT-2025-0169,Chat,High,Assign,2025-11-28T11:50:19Z,Ingrid Nilsen
+TKT-2025-0146,Phone,Low,Resolve,2025-11-28T11:56:19Z,Grace Lee
+TKT-2025-0172,Chat,Low,Log Ticket,2025-11-28T12:31:54Z,Sam Cole
+TKT-2025-0169,Chat,High,Investigate,2025-11-28T13:28:19Z,Ingrid Nilsen
+TKT-2025-0166,Portal,Medium,Resolve,2025-11-28T14:23:46Z,Mo Farah
+TKT-2025-0173,Portal,Medium,Log Ticket,2025-11-28T14:43:25Z,Grace Lee
+TKT-2025-0172,Chat,Low,Triage,2025-11-28T15:13:54Z,Sam Cole
+TKT-2025-0174,Email,Critical,Log Ticket,2025-11-28T15:23:32Z,Sam Cole
+TKT-2025-0166,Portal,Medium,Close,2025-11-28T15:23:46Z,Mo Farah
+TKT-2025-0169,Chat,High,Resolve,2025-11-28T15:42:19Z,Ingrid Nilsen
+TKT-2025-0168,Portal,Critical,Assign,2025-11-28T15:59:16Z,Ravi Patel
+TKT-2025-0171,Chat,Low,Assign,2025-11-28T16:05:54Z,Ingrid Nilsen
+TKT-2025-0162,Chat,Critical,Resolve,2025-11-28T16:55:11Z,Grace Lee
+TKT-2025-0175,Email,High,Log Ticket,2025-11-28T17:23:43Z,Sam Cole
+TKT-2025-0173,Portal,Medium,Assign,2025-11-28T17:30:25Z,Grace Lee
+TKT-2025-0175,Email,High,Triage,2025-11-28T17:40:43Z,Sam Cole
+TKT-2025-0174,Email,Critical,Triage,2025-11-28T18:04:32Z,Sam Cole
+TKT-2025-0146,Phone,Low,Close,2025-11-28T18:21:19Z,Grace Lee
+TKT-2025-0170,Chat,High,Investigate,2025-11-28T18:28:32Z,Ravi Patel
+TKT-2025-0176,Email,Critical,Log Ticket,2025-11-28T18:31:23Z,Sam Cole
+TKT-2025-0177,Phone,Critical,Log Ticket,2025-11-28T18:31:39Z,Grace Lee
+TKT-2025-0178,Chat,Medium,Log Ticket,2025-11-28T18:39:00Z,Sam Cole
+TKT-2025-0176,Email,Critical,Triage,2025-11-28T19:34:23Z,Sam Cole
+TKT-2025-0177,Phone,Critical,Triage,2025-11-28T21:02:39Z,Grace Lee
+TKT-2025-0171,Chat,Low,Investigate,2025-11-28T21:22:54Z,Ingrid Nilsen
+TKT-2025-0165,Phone,Critical,Resolve,2025-11-28T21:23:46Z,Ingrid Nilsen
+TKT-2025-0162,Chat,Critical,Close,2025-11-28T21:26:11Z,Grace Lee
+TKT-2025-0169,Chat,High,Close,2025-11-28T21:27:19Z,Ingrid Nilsen
+TKT-2025-0178,Chat,Medium,Triage,2025-11-28T21:28:00Z,Sam Cole
+TKT-2025-0168,Portal,Critical,Investigate,2025-11-28T21:48:16Z,Ravi Patel
+TKT-2025-0172,Chat,Low,Resolve,2025-11-28T21:55:54Z,Sam Cole
+TKT-2025-0174,Email,Critical,Assign,2025-11-28T22:43:32Z,Sam Cole
+TKT-2025-0165,Phone,Critical,Close,2025-11-28T23:57:46Z,Ingrid Nilsen
+TKT-2025-0173,Portal,Medium,Investigate,2025-11-29T00:12:25Z,Grace Lee
+TKT-2025-0176,Email,Critical,Assign,2025-11-29T00:31:23Z,Sam Cole
+TKT-2025-0175,Email,High,Resolve,2025-11-29T00:36:43Z,Sam Cole
+TKT-2025-0161,Phone,High,Reopen,2025-11-29T01:34:10Z,Ravi Patel
+TKT-2025-0177,Phone,Critical,Resolve,2025-11-29T02:20:39Z,Grace Lee
+TKT-2025-0178,Chat,Medium,Assign,2025-11-29T03:23:00Z,Sam Cole
+TKT-2025-0175,Email,High,Close,2025-11-29T04:40:43Z,Sam Cole
+TKT-2025-0172,Chat,Low,Close,2025-11-29T04:45:54Z,Sam Cole
+TKT-2025-0176,Email,Critical,Investigate,2025-11-29T06:33:23Z,Sam Cole
+TKT-2025-0174,Email,Critical,Investigate,2025-11-29T07:11:32Z,Sam Cole
+TKT-2025-0167,Chat,High,Resolve,2025-11-29T07:36:43Z,Ingrid Nilsen
+TKT-2025-0168,Portal,Critical,Resolve,2025-11-29T08:26:16Z,Ravi Patel
+TKT-2025-0161,Phone,High,Investigate,2025-11-29T09:35:10Z,Ravi Patel
+TKT-2025-0177,Phone,Critical,Close,2025-11-29T09:53:39Z,Grace Lee
+TKT-2025-0167,Chat,High,Close,2025-11-29T10:32:43Z,Ingrid Nilsen
+TKT-2025-0178,Chat,Medium,Investigate,2025-11-29T11:55:00Z,Sam Cole
+TKT-2025-0168,Portal,Critical,Close,2025-11-29T13:54:16Z,Ravi Patel
+TKT-2025-0161,Phone,High,Resolve,2025-11-29T17:00:10Z,Ravi Patel
+TKT-2025-0176,Email,Critical,Resolve,2025-11-29T18:54:23Z,Sam Cole
+TKT-2025-0161,Phone,High,Close,2025-11-29T19:19:10Z,Ravi Patel
+TKT-2025-0174,Email,Critical,Resolve,2025-11-29T19:45:32Z,Sam Cole
+TKT-2025-0174,Email,Critical,Close,2025-11-29T20:56:32Z,Sam Cole
+TKT-2025-0171,Chat,Low,Resolve,2025-11-29T21:11:54Z,Ingrid Nilsen
+TKT-2025-0170,Chat,High,Resolve,2025-11-29T22:38:32Z,Ravi Patel
+TKT-2025-0173,Portal,Medium,Resolve,2025-11-30T00:03:25Z,Grace Lee
+TKT-2025-0178,Chat,Medium,Escalate,2025-11-30T00:32:00Z,Sam Cole
+TKT-2025-0169,Chat,High,Reopen,2025-11-30T03:24:19Z,Ingrid Nilsen
+TKT-2025-0170,Chat,High,Close,2025-11-30T04:08:32Z,Ravi Patel
+TKT-2025-0171,Chat,Low,Close,2025-11-30T04:49:54Z,Ingrid Nilsen
+TKT-2025-0176,Email,Critical,Close,2025-11-30T05:07:23Z,Sam Cole
+TKT-2025-0173,Portal,Medium,Close,2025-11-30T08:40:25Z,Grace Lee
+TKT-2025-0169,Chat,High,Investigate,2025-11-30T09:42:19Z,Ingrid Nilsen

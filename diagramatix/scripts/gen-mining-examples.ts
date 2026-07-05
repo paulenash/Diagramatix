@@ -344,7 +344,6 @@ const SD_ACTIVITY_STATE: Record<string, string> = {
   "Escalate": "Escalated", "Resolve": "Resolved", "Close": "Closed", "Reopen": "Investigating",
 };
 const SD_MAP: LogMapping = { caseId: "Ticket ID", activity: "Activity", timestamp: "Timestamp", resource: "Agent", activityState: SD_ACTIVITY_STATE };
-const SD_END = Date.UTC(2026, 1, 28, 23, 59, 59);
 const sdAgents = ["Ravi Patel", "Grace Lee", "Mo Farah", "Ingrid Nilsen", "Sam Cole"];
 const sdChannels = ["Email", "Phone", "Portal", "Chat"];
 const sdPriorities = ["Low", "Medium", "High", "Critical"];
@@ -354,35 +353,64 @@ const SD_PATHS: Record<string, SDStep[]> = {
   happy: [["Log Ticket", null], ["Triage", [0, 2]], ["Assign", [0, 4]], ["Investigate", [1, 8]], ["Resolve", [1, 24]], ["Close", [0, 8]]],
   escalated: [["Log Ticket", null], ["Triage", [0, 2]], ["Assign", [0, 4]], ["Investigate", [1, 8]], ["Escalate", [1, 12]], ["Resolve", [4, 48]], ["Close", [0, 8]]],
   reopened: [["Log Ticket", null], ["Triage", [0, 2]], ["Assign", [0, 4]], ["Investigate", [1, 8]], ["Resolve", [1, 24]], ["Close", [0, 8]], ["Reopen", [12, 96]], ["Investigate", [1, 8]], ["Resolve", [1, 24]], ["Close", [0, 8]]],
-  // deviation — triage straight to resolve (skips assign + investigate)
-  quickClose: [["Log Ticket", null], ["Triage", [0, 2]], ["Resolve", [1, 12]], ["Close", [0, 8]]],
+  // ── deviations (undocumented vs the reference; more of these further back in time) ──
+  quickClose: [["Log Ticket", null], ["Triage", [0, 2]], ["Resolve", [1, 12]], ["Close", [0, 8]]],   // Triaged → Resolved (skips assign + investigate)
+  skipTriage: [["Log Ticket", null], ["Assign", [0, 4]], ["Investigate", [1, 8]], ["Resolve", [1, 24]], ["Close", [0, 8]]],   // Logged → Assigned (skips triage)
 };
-const SD_MIX: string[] = [
-  ...Array(96).fill("happy"), ...Array(34).fill("escalated"), ...Array(20).fill("reopened"), ...Array(18).fill("quickClose"),
+
+interface SDPeriodCfg {
+  seed: number; year: number; monthIndex: number; monthLabel: string;
+  slow: number; mix: Record<string, number>; note: string;
+}
+// Three past periods of the SAME service desk — adherence declines the further
+// back you go (mirrors the Accounts Payable example), so the console shows the
+// scenario chooser. Every scenario is activity-only (no state column).
+const SD_PERIODS: SDPeriodCfg[] = [
+  {
+    seed: 20250831, year: 2025, monthIndex: 7, monthLabel: "August 2025", slow: 1.4,
+    note: "Oldest — lowest adherence. Frequent quick-closes (triage straight to resolve) and tickets assigned without triage; slowest handling.",
+    mix: { happy: 62, escalated: 26, reopened: 24, quickClose: 44, skipTriage: 22 },
+  },
+  {
+    seed: 20251130, year: 2025, monthIndex: 10, monthLabel: "November 2025", slow: 1.2,
+    note: "Mid — improving. Some quick-closes and a few skipped triages remain; moderate handling times.",
+    mix: { happy: 80, escalated: 30, reopened: 22, quickClose: 34, skipTriage: 12 },
+  },
+  {
+    seed: 20260228, year: 2026, monthIndex: 1, monthLabel: "February 2026 (current)", slow: 1.0,
+    note: "Current — best adherence. Nearly every ticket follows Logged → Triaged → Assigned → Investigating → Resolved → Closed; fastest handling.",
+    mix: { happy: 96, escalated: 34, reopened: 20, quickClose: 18 },
+  },
 ];
 
-function buildServiceDeskLog() {
-  const rnd = mulberry32(20260228);
+function buildSDPeriod(cfg: SDPeriodCfg) {
+  const rnd = mulberry32(cfg.seed);
   const rint = (lo: number, hi: number) => lo + Math.floor(rnd() * (hi - lo + 1));
   const pick = <T,>(arr: T[]) => arr[Math.floor(rnd() * arr.length)];
-  const arrival = () => { let ms; do { ms = Date.UTC(2026, 1, rint(1, 28), rint(7, 18), rint(0, 59), rint(0, 59)); } while (isWeekend(ms)); return ms; };
-  const cases = SD_MIX.map((type) => ({ type, arrival: arrival() })) as { type: string; arrival: number; id: string; channel: string; priority: string; agent: string }[];
+  const monthDays = DAYS_IN_MONTH[cfg.monthIndex];
+  const monthEnd = Date.UTC(cfg.year, cfg.monthIndex, monthDays, 23, 59, 59);
+  const arrival = () => { let ms; do { ms = Date.UTC(cfg.year, cfg.monthIndex, rint(1, monthDays), rint(7, 18), rint(0, 59), rint(0, 59)); } while (isWeekend(ms)); return ms; };
+  const mix: string[] = [];
+  for (const [type, n] of Object.entries(cfg.mix)) for (let i = 0; i < n; i++) mix.push(type);
+  const cases = mix.map((type) => ({ type, arrival: arrival() })) as { type: string; arrival: number; id: string; channel: string; priority: string; agent: string }[];
   cases.sort((a, b) => a.arrival - b.arrival);
-  cases.forEach((c, i) => { c.id = `TKT-2026-${String(i + 1).padStart(4, "0")}`; c.channel = pick(sdChannels); c.priority = pick(sdPriorities); c.agent = pick(sdAgents); });
+  cases.forEach((c, i) => { c.id = `TKT-${cfg.year}-${String(i + 1).padStart(4, "0")}`; c.channel = pick(sdChannels); c.priority = pick(sdPriorities); c.agent = pick(sdAgents); });
   const rows: { id: string; channel: string; priority: string; activity: string; agent: string; t: number }[] = [];
   for (const c of cases) {
     let t = c.arrival;
     for (const [activity, gap] of SD_PATHS[c.type]) {
-      if (gap) t += rint(gap[0], gap[1]) * HOUR + rint(0, 59) * MIN;
-      if (t > SD_END) break;
+      if (gap) t += Math.round(rint(gap[0], gap[1]) * cfg.slow) * HOUR + rint(0, 59) * MIN;
+      if (t > monthEnd) break;
       rows.push({ id: c.id, channel: c.channel, priority: c.priority, activity, agent: c.agent, t });
     }
   }
   rows.sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
   return {
-    fileName: "service-desk-february-2026.csv", runName: "IT Service Desk — February 2026",
+    fileName: `service-desk-${cfg.monthLabel.toLowerCase().replace(/[()]/g, "").trim().replace(/ +/g, "-")}.csv`,
+    runName: `IT Service Desk — ${cfg.monthLabel}`,
     headers: SD_HEADERS, mapping: SD_MAP,
     rows: rows.map((r) => [r.id, r.channel, r.priority, r.activity, iso(r.t), r.agent]),
+    scenario: cfg.monthLabel, note: cfg.note,
   };
 }
 
@@ -412,8 +440,9 @@ const SD_CONNS = [
   T("closed", FINAL, ""),
 ];
 
-const sdSampleLog = buildServiceDeskLog();
-const sdLog = buildEventLog(sdSampleLog.headers, sdSampleLog.rows, sdSampleLog.mapping);
+const sdSampleLogs = SD_PERIODS.map(buildSDPeriod);            // [aug2025, nov2025, feb2026]
+const sdCurrent = sdSampleLogs[sdSampleLogs.length - 1];       // current = best adherence, backs the run
+const sdLog = buildEventLog(sdCurrent.headers, sdCurrent.rows, sdCurrent.mapping);
 const sdPerformance = computePerformance(sdLog.traces);
 const serviceDeskExample = {
   slug: "service-desk-ticket-lifecycle",
@@ -424,14 +453,15 @@ const serviceDeskExample = {
     "",
     "On import, DiagramatixMINER shows an **Activity → State** table (pre-filled here: *Log Ticket → Logged*, *Investigate → Investigating*, *Resolve → Resolved*…) so you define the lifecycle the discovery, conformance and generated **State Machine** all rely on — merge activities into shared states, or leave each as its own.",
     "",
-    "~170 tickets flow **Logged → Triaged → Assigned → Investigating → Resolved → Closed**, with an Escalated branch, a Reopen loop, and an off-book *triage-straight-to-resolve* deviation. Discover the lifecycle, run **Conformance** against the bundled reference, then **Calibrate & simulate**.",
+    "Choose one of **three past periods** on entry — **August 2025**, **November 2025** or the **current February 2026** — the same service desk with **adherence declining the further back you go**: older months quick-close (triage straight to resolve) and assign without triage, and run slower. ~170 tickets flow **Logged → Triaged → Assigned → Investigating → Resolved → Closed**, with an Escalated branch and a Reopen loop. Discover the lifecycle, run **Conformance** against the bundled reference (older months score lower), then **Calibrate & simulate**.",
   ].join("\n"),
   difficulty: "core",
   package: {
     version: 1 as const,
     diagrams: [{ key: "sd-reference", name: "Ticket Lifecycle (Reference)", type: "state-machine", data: buildRef(SD_REF_ELEMENTS, SD_CONNS) }],
-    run: { name: sdSampleLog.runName, mapping: SD_MAP, stats: sdLog.stats, variants: sdLog.variants, performance: sdPerformance, referenceSmKey: "sd-reference" },
-    sampleLog: { ...sdSampleLog },
+    run: { name: sdCurrent.runName, mapping: SD_MAP, stats: sdLog.stats, variants: sdLog.variants, performance: sdPerformance, referenceSmKey: "sd-reference" },
+    sampleLog: { ...sdCurrent },
+    sampleLogs: sdSampleLogs.map((s) => ({ ...s })),
   } as MiningExamplePackage,
 };
 
@@ -453,7 +483,11 @@ for (const s of sampleLogs) {
 }
 writeFileSync(join(miningDir, o2cSampleLog.fileName), toCsv(o2cSampleLog.headers, o2cSampleLog.rows), "utf8");
 console.log(`  O2C log → mining/${o2cSampleLog.fileName}`);
-writeFileSync(join(miningDir, sdSampleLog.fileName), toCsv(sdSampleLog.headers, sdSampleLog.rows), "utf8");
-console.log(`  Service Desk (no state col): ${sdLog.stats.cases} cases, ${sdLog.stats.events} events, ${sdLog.stats.variants} variants → mining/${sdSampleLog.fileName}`);
+for (const s of sdSampleLogs) {
+  const diskName = s.fileName.replace(/-current\.csv$/, ".csv");
+  writeFileSync(join(miningDir, diskName), toCsv(s.headers, s.rows), "utf8");
+  console.log(`  Service Desk "${s.scenario}" (no state col): ${s.rows.length} rows → mining/${diskName}`);
+}
+console.log(`  Service Desk current run: ${sdLog.stats.cases} cases, ${sdLog.stats.events} events, ${sdLog.stats.variants} variants`);
 console.log(`  current run: ${log.stats.cases} cases, ${log.stats.events} events, ${log.stats.variants} variants; clockUnit=${performance.clockUnit}`);
 console.log(`  references: ${diagrams.map((d) => `${d.key} (${d.data.elements.length} el, ${d.data.connectors.length} conn)`).join(", ")}`);
