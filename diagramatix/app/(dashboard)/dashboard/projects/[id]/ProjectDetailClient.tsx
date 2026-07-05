@@ -12,7 +12,7 @@ import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { ProjectStructureSection } from "@/app/components/entityLists/ProjectStructureSection";
-import { ProjectRiskControlSection } from "@/app/components/riskControls/ProjectRiskControlSection";
+import { RiskControlConsole } from "@/app/components/riskControls/RiskControlConsole";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
@@ -389,6 +389,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   // from the toolbar (same as the dashboard project menu).
   const [showSim, setShowSim] = useState(false);
   const [showMining, setShowMining] = useState(false);
+  const [showRcm, setShowRcm] = useState(false);
   // When the Simulator was launched from the MINER, exiting it returns to the
   // MINER (skipping its intro) rather than falling back to the project screen.
   const [simFromMining, setSimFromMining] = useState(false);
@@ -2357,6 +2358,13 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               >
                 ⛏ Process Mining
               </button>
+              <button
+                onClick={() => setShowRcm(true)}
+                className="px-3 py-1 text-xs font-medium rounded-md border text-teal-700 border-teal-300 hover:bg-teal-50"
+                title="Risk & Controls — maintain the risk/control catalog + Risk-Control Matrix"
+              >
+                ◆ Risk &amp; Controls
+              </button>
             </>
           )}
           <a href="/help" className="text-xs text-blue-600 hover:underline ml-1" title="User Guide">User Guide</a>
@@ -2399,7 +2407,11 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             </select>
           </div>
           <ProjectStructureSection projectId={project.id} canEdit={!readOnly} />
-          <ProjectRiskControlSection projectId={project.id} canEdit={!readOnly} />
+          <button onClick={() => setShowRcm(true)}
+            className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-medium text-teal-800 hover:bg-teal-50 border-b border-gray-100">
+            <span>◆ Risk &amp; Controls <span className="text-gray-400 ml-1">— catalog + Risk-Control Matrix</span></span>
+            <span className="text-teal-500">open ⤢</span>
+          </button>
           <div className="overflow-y-auto p-2 flex-1">
             {renderFolder(ROOT_ID, 0)}
           </div>
@@ -2836,6 +2848,14 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           skipIntro={miningSkipIntro}
           onClose={() => { setShowMining(false); setMiningSkipIntro(false); }}
           onOpenSimulator={() => { setShowMining(false); setSimFromMining(true); setShowSim(true); }}
+        />
+      )}
+      {showRcm && (
+        <RiskControlConsole
+          projectId={project.id}
+          projectName={project.name}
+          canEdit={!readOnly}
+          onClose={() => setShowRcm(false)}
         />
       )}
 
