@@ -212,6 +212,7 @@ jobs:
           npx --yes tsx@4 scripts/add-guide-mining-state-machine.ts
           npx --yes tsx@4 scripts/add-guide-mining-sample.ts
           npx --yes tsx@4 scripts/add-features-risk-controls.ts
+          npx --yes tsx@4 scripts/seed-risk-controls-o2c.ts
 
       - name: Update App Service container image
         # `az webapp config container set` rewrites the container
