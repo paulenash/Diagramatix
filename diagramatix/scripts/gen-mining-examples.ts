@@ -216,9 +216,127 @@ const example = {
   package: pkg,
 };
 
+// ── Order-to-Cash example ────────────────────────────────────────────────────
+// A second mining example whose deviations line up EXACTLY with the monitor
+// signatures on the Order-to-Cash sample GRC library (app/lib/riskControls/
+// o2cSample.ts), so once this log is mined the Risk-Control Matrix shows control
+// operating-effectiveness. Order lifecycle:
+//   Received → Credit Check → Approved (or On Credit Hold → Approved) →
+//   Fulfilled → Invoiced → Paid   (+ Cancelled / off-book Disputed exceptions)
+const O2C_HEADERS = ["Order ID", "Customer", "Amount", "Activity", "Timestamp", "Order Status", "Resource"];
+const O2C_MAP: LogMapping = { caseId: "Order ID", activity: "Activity", timestamp: "Timestamp", state: "Order Status", resource: "Resource" };
+const O2C_END = Date.UTC(2026, 1, 28, 23, 59, 59);
+const salesReps = ["Nadia Rahman", "Tom Becker", "Priya Nair", "Luis Ortega"];
+const O2C_ROLE: Record<string, string> = { sales: "", credit: "Credit Desk", approver: "Order Desk", warehouse: "Fulfilment Centre", billing: "Billing System" };
+const o2cCustomers = ["Acme Retail", "Globex Stores", "Initech Ltd", "Umbrella Group", "Wayne Enterprises", "Soylent Foods", "Hooli Inc", "Stark Traders", "Vandelay Co", "Wonka Brands"];
+
+type O2Step = [activity: string, state: string, role: string, gap: [number, number] | null];
+const OS_RECEIVE: O2Step = ["Receive Order", "Received", "sales", null];
+const OS_CREDIT: O2Step = ["Run Credit Check", "Credit Check", "credit", [1, 8]];
+const OS_HOLD: O2Step = ["Place On Credit Hold", "On Credit Hold", "credit", [1, 12]];
+const OS_RELEASE: O2Step = ["Release Credit Hold", "Approved", "credit", [4, 48]];
+const OS_APPROVE: O2Step = ["Approve Order", "Approved", "approver", [1, 12]];
+const OS_FULFIL: O2Step = ["Fulfil Order", "Fulfilled", "warehouse", [4, 48]];
+const OS_SHIP: O2Step = ["Ship Goods", "Fulfilled", "warehouse", [4, 48]];       // used on deviant skip paths
+const OS_INVOICE: O2Step = ["Invoice Customer", "Invoiced", "billing", [1, 24]];
+const OS_PAY: O2Step = ["Receive Payment", "Paid", "billing", [24, 240]];
+const OS_CANCEL: O2Step = ["Cancel Order", "Cancelled", "sales", [1, 24]];
+const OS_DISPUTE: O2Step = ["Raise Dispute", "Disputed", "sales", [2, 48]];       // Disputed = off-book (unknown) state
+const OS_RESOLVE: O2Step = ["Resolve Dispute", "Invoiced", "billing", [12, 120]];
+const O2C_PATHS: Record<string, O2Step[]> = {
+  happy: [OS_RECEIVE, OS_CREDIT, OS_APPROVE, OS_FULFIL, OS_INVOICE, OS_PAY],
+  onHold: [OS_RECEIVE, OS_CREDIT, OS_HOLD, OS_RELEASE, OS_FULFIL, OS_INVOICE, OS_PAY],
+  cancelEarly: [OS_RECEIVE, OS_CREDIT, OS_CANCEL],
+  cancelHold: [OS_RECEIVE, OS_CREDIT, OS_HOLD, OS_CANCEL],
+  // ── deviations matching the O2C control monitor signatures ──
+  creditBypass: [OS_RECEIVE, OS_APPROVE, OS_FULFIL, OS_INVOICE, OS_PAY],           // Received → Approved (skip credit check)
+  fulfilNoApproval: [OS_RECEIVE, OS_SHIP, OS_INVOICE, OS_PAY],                     // Received → Fulfilled (skip approval)
+  shipOnHold: [OS_RECEIVE, OS_CREDIT, OS_HOLD, OS_SHIP, OS_INVOICE, OS_PAY],       // On Credit Hold → Fulfilled
+  disputed: [OS_RECEIVE, OS_CREDIT, OS_APPROVE, OS_FULFIL, OS_INVOICE, OS_DISPUTE, OS_RESOLVE, OS_PAY],  // off-book Disputed
+};
+const O2C_MIX: string[] = [
+  ...Array(110).fill("happy"), ...Array(30).fill("onHold"), ...Array(15).fill("cancelEarly"), ...Array(10).fill("cancelHold"),
+  ...Array(15).fill("creditBypass"), ...Array(8).fill("fulfilNoApproval"), ...Array(7).fill("shipOnHold"), ...Array(5).fill("disputed"),
+];
+
+function buildO2CLog() {
+  const rnd = mulberry32(20260228);
+  const rint = (lo: number, hi: number) => lo + Math.floor(rnd() * (hi - lo + 1));
+  const pick = <T,>(arr: T[]) => arr[Math.floor(rnd() * arr.length)];
+  const arrival = () => { let ms; do { ms = Date.UTC(2026, 1, rint(1, 28), rint(8, 16), rint(0, 59), rint(0, 59)); } while (isWeekend(ms)); return ms; };
+  const cases = O2C_MIX.map((type) => ({ type, arrival: arrival() })) as { type: string; arrival: number; id: string; customer: string; rep: string }[];
+  cases.sort((a, b) => a.arrival - b.arrival);
+  cases.forEach((c, i) => { c.id = `SO-2026-${String(i + 1).padStart(4, "0")}`; c.customer = pick(o2cCustomers); c.rep = pick(salesReps); });
+  const rows: { id: string; customer: string; amount: string; activity: string; state: string; resource: string; t: number }[] = [];
+  for (const c of cases) {
+    let t = c.arrival;
+    for (const [activity, state, role, gap] of O2C_PATHS[c.type]) {
+      if (gap) t += rint(gap[0], gap[1]) * HOUR + rint(0, 59) * MIN;
+      if (t > O2C_END) break;
+      const resource = role === "sales" ? c.rep : (O2C_ROLE[role] || role);
+      rows.push({ id: c.id, customer: c.customer, amount: (rint(200, 48000) + rint(0, 99) / 100).toFixed(2), activity, state, resource, t });
+    }
+  }
+  rows.sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
+  return {
+    fileName: "order-to-cash-february-2026.csv", runName: "Order-to-Cash — February 2026",
+    headers: O2C_HEADERS, mapping: O2C_MAP,
+    rows: rows.map((r) => [r.id, r.customer, r.amount, r.activity, iso(r.t), r.state, r.resource]),
+  };
+}
+
+const O2C_REF_ELEMENTS = [
+  { id: INIT, type: "initial-state", label: "" },
+  { id: FINAL, type: "final-state", label: "" },
+  { id: "received", type: "state", label: "Received" },
+  { id: "credit-check", type: "state", label: "Credit Check" },
+  { id: "on-hold", type: "state", label: "On Credit Hold" },
+  { id: "approved", type: "state", label: "Approved" },
+  { id: "fulfilled", type: "state", label: "Fulfilled" },
+  { id: "invoiced", type: "state", label: "Invoiced" },
+  { id: "paid", type: "state", label: "Paid" },
+  { id: "cancelled", type: "state", label: "Cancelled" },
+];
+const O2C_CONNS = [
+  T(INIT, "received", "Receive Order"),
+  T("received", "credit-check", "Run Credit Check"),
+  T("credit-check", "approved", "Approve Order"),
+  T("credit-check", "on-hold", "Place On Credit Hold"),
+  T("on-hold", "approved", "Release Credit Hold"),
+  T("approved", "fulfilled", "Fulfil Order"),
+  T("fulfilled", "invoiced", "Invoice Customer"),
+  T("invoiced", "paid", "Receive Payment"),
+  T("credit-check", "cancelled", "Cancel Order"),
+  T("on-hold", "cancelled", "Cancel Order"),
+  T("paid", FINAL, ""),
+  T("cancelled", FINAL, ""),
+];
+
+const o2cSampleLog = buildO2CLog();
+const o2cLog = buildEventLog(o2cSampleLog.headers, o2cSampleLog.rows, o2cSampleLog.mapping);
+const o2cPerformance = computePerformance(o2cLog.traces);
+const o2cExample = {
+  slug: "order-to-cash-lifecycle",
+  title: "Order-to-Cash — Order Lifecycle",
+  concept: "Mine a real sales-order process, check it against the reference lifecycle, and prove control effectiveness.",
+  description: [
+    "A month of Order-to-Cash activity — ~200 sales orders flowing through **Received → Credit Check → Approved → Fulfilled → Invoiced → Paid**, with an On Credit Hold branch and a Cancelled branch.",
+    "",
+    "The log deliberately contains the control-failure patterns an auditor cares about: orders **approved without a credit check**, orders **fulfilled without approval**, goods **shipped while on credit hold**, and an off-book **Disputed** status. Discover the lifecycle, run **Conformance** against the bundled reference state machine (~66% fitness — the off-book cases + in-flight orders deviate), then — after adopting the **Order-to-Cash Sample GRC Library** into the same project — map each control to the deviation it guards to see its **operating effectiveness** (“bypassed in N of 200 cases”) right in the Risk-Control Matrix.",
+  ].join("\n"),
+  difficulty: "core",
+  package: {
+    version: 1 as const,
+    diagrams: [{ key: "o2c-reference", name: "Order Lifecycle (Reference)", type: "state-machine", data: buildRef(O2C_REF_ELEMENTS, O2C_CONNS) }],
+    run: { name: o2cSampleLog.runName, mapping: O2C_MAP, stats: o2cLog.stats, variants: o2cLog.variants, performance: o2cPerformance, referenceSmKey: "o2c-reference" },
+    sampleLog: { ...o2cSampleLog },
+  } as MiningExamplePackage,
+};
+
 const outFile = join(__dirname, "..", "app", "lib", "mining", "miningExampleData.json");
-writeFileSync(outFile, JSON.stringify({ examples: [example] }, null, 2) + "\n", "utf8");
+writeFileSync(outFile, JSON.stringify({ examples: [example, o2cExample] }, null, 2) + "\n", "utf8");
 console.log(`Wrote ${outFile}`);
+console.log(`  O2C: ${o2cLog.stats.cases} cases, ${o2cLog.stats.events} events, ${o2cLog.stats.variants} variants`);
 
 // Also emit each scenario as a real .csv under the repo-root /mining folder, so
 // the raw files exist on disk (inspect / download / manual-upload) and stay in
@@ -231,5 +349,7 @@ for (const s of sampleLogs) {
   writeFileSync(join(miningDir, diskName), toCsv(s.headers, s.rows), "utf8");
   console.log(`  scenario "${s.scenario}": ${s.rows.length} rows → mining/${diskName}`);
 }
+writeFileSync(join(miningDir, o2cSampleLog.fileName), toCsv(o2cSampleLog.headers, o2cSampleLog.rows), "utf8");
+console.log(`  O2C log → mining/${o2cSampleLog.fileName}`);
 console.log(`  current run: ${log.stats.cases} cases, ${log.stats.events} events, ${log.stats.variants} variants; clockUnit=${performance.clockUnit}`);
 console.log(`  references: ${diagrams.map((d) => `${d.key} (${d.data.elements.length} el, ${d.data.connectors.length} conn)`).join(", ")}`);
