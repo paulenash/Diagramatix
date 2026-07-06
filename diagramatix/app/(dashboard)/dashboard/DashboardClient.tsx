@@ -1846,7 +1846,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                           ? "bg-purple-50 border-purple-300 hover:border-purple-400"
                           : ex
                             ? ex.base
-                            : "bg-white border-gray-200 hover:border-blue-300"
+                            : "bg-white border-gray-300 hover:border-blue-300"
                   }`}
                 >
                   <div className="flex items-center justify-between group/row">
