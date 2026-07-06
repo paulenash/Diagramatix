@@ -67,21 +67,21 @@ type ProjectRole = "owner" | "edit" | "view";
  *  example) — each tint + badge matches that feature's console identity:
  *  Simulator teal, DiagramatixMINER amber, Risk & Controls sky/blue. Applied
  *  only to owned (not shared) projects, so it replaces the plain-white tile. */
-const EXAMPLE_TILE: Record<string, { base: string; selected: string; badge: string; label: string }> = {
+const EXAMPLE_TILE: Record<string, { base: string; selected: string; badge: string; name: string }> = {
   simulation: {
-    base: "bg-teal-100 border-teal-300 hover:border-teal-400",
-    selected: "bg-teal-100 border-teal-500 ring-1 ring-teal-300",
-    badge: "bg-teal-200 text-teal-800", label: "Simulator example",
+    base: "bg-green-200 border-green-400 hover:border-green-500",
+    selected: "bg-green-200 border-green-600 ring-1 ring-green-300",
+    badge: "bg-green-300 text-green-900", name: "Simulator",
   },
   mining: {
     base: "bg-amber-100 border-amber-300 hover:border-amber-400",
     selected: "bg-amber-100 border-amber-500 ring-1 ring-amber-300",
-    badge: "bg-amber-200 text-amber-900", label: "MINER example",
+    badge: "bg-amber-200 text-amber-900", name: "Mining",
   },
   "risk-control": {
     base: "bg-blue-100 border-blue-300 hover:border-blue-400",
     selected: "bg-blue-100 border-blue-500 ring-1 ring-blue-300",
-    badge: "bg-blue-200 text-blue-800", label: "Risk & Controls example",
+    badge: "bg-blue-200 text-blue-800", name: "Risk & Controls",
   },
 };
 function deriveProjectRole(p: ProjectSummary): ProjectRole {
@@ -1882,8 +1882,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     </span>
                     <span className="text-[10px] text-gray-400">{new Date(p.updatedAt).toLocaleDateString()}</span>
                     {ex && (
-                      <span className={`text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium ${ex.badge}`} title="Created from a ready-made example">
-                        {ex.label}
+                      <span className={`text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium text-center leading-tight ${ex.badge}`} title="Created from a ready-made example">
+                        {ex.name}<br />example
                       </span>
                     )}
                   </div>

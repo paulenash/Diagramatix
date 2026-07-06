@@ -52,8 +52,10 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
       const res = await fetch(`/api/simulation-examples/${id}/adopt`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Could not load example"); return; }
-      if (json.openDiagramId) router.push(`/diagram/${json.openDiagramId}`);
-      else if (json.projectId) router.push(`/dashboard/projects/${json.projectId}`);
+      // Always land on the new project (not straight into a diagram) so the
+      // user sees the whole adopted example — its diagrams, study and library.
+      if (json.projectId) router.push(`/dashboard/projects/${json.projectId}`);
+      else if (json.openDiagramId) router.push(`/diagram/${json.openDiagramId}`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not load example");
     } finally { setAdopting(null); }
@@ -72,8 +74,8 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
           <a href="/dashboard" className="text-sm text-green-400/60 hover:text-green-300">← Dashboard</a>
         </div>
         <p className="text-sm text-green-400/70 mb-6">
-          Ready-made simulations to explore or demo. <span className="text-green-300">Load &amp; open</span> copies one into a
-          new project of your own; open the <span className="text-green-300">◈ Simulator</span> on its diagram to Run, Replay, and compare scenarios.
+          Ready-made simulations to explore or demo. <span className="text-green-300">Load</span> copies one into a
+          new project of your own; open a diagram there and launch the <span className="text-green-300">◈ Simulator</span> to Run, Replay, and compare scenarios.
         </p>
 
         {err && <div className="mb-4 rounded border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-300">{err}</div>}
@@ -100,7 +102,7 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
               <div className="flex-1" />
               <div className="mt-3">
                 <MatrixButton onClick={() => adopt(ex.id)}>
-                  {adopting === ex.id ? "◴ Loading…" : "▶ Load & open"}
+                  {adopting === ex.id ? "◴ Loading…" : "▶ Load"}
                 </MatrixButton>
               </div>
             </div>
