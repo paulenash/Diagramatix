@@ -69,19 +69,19 @@ type ProjectRole = "owner" | "edit" | "view";
  *  only to owned (not shared) projects, so it replaces the plain-white tile. */
 const EXAMPLE_TILE: Record<string, { base: string; selected: string; badge: string; label: string }> = {
   simulation: {
-    base: "bg-teal-50 border-teal-300 hover:border-teal-400",
-    selected: "bg-teal-50 border-teal-500 ring-1 ring-teal-300",
-    badge: "bg-teal-100 text-teal-700", label: "Simulator example",
+    base: "bg-teal-100 border-teal-300 hover:border-teal-400",
+    selected: "bg-teal-100 border-teal-500 ring-1 ring-teal-300",
+    badge: "bg-teal-200 text-teal-800", label: "Simulator example",
   },
   mining: {
-    base: "bg-amber-50 border-amber-300 hover:border-amber-400",
-    selected: "bg-amber-50 border-amber-500 ring-1 ring-amber-300",
-    badge: "bg-amber-100 text-amber-800", label: "MINER example",
+    base: "bg-amber-100 border-amber-300 hover:border-amber-400",
+    selected: "bg-amber-100 border-amber-500 ring-1 ring-amber-300",
+    badge: "bg-amber-200 text-amber-900", label: "MINER example",
   },
   "risk-control": {
-    base: "bg-sky-50 border-sky-300 hover:border-sky-400",
-    selected: "bg-sky-50 border-sky-500 ring-1 ring-sky-300",
-    badge: "bg-sky-100 text-sky-700", label: "Risk & Controls example",
+    base: "bg-blue-100 border-blue-300 hover:border-blue-400",
+    selected: "bg-blue-100 border-blue-500 ring-1 ring-blue-300",
+    badge: "bg-blue-200 text-blue-800", label: "Risk & Controls example",
   },
 };
 function deriveProjectRole(p: ProjectSummary): ProjectRole {
