@@ -1019,6 +1019,19 @@ model RiskControlItem {
   @@index([libraryId, kind, sortOrder])
 }
 
+// Org-scoped RCM code counter — codes (R-001, C-001, …) are numbered org-wide,
+// one running sequence per (org, kind), so a code is unique across ALL of an
+// org's projects. Incremented atomically when a new item is minted; the
+// renumber action seeds it to the current max. `counter` = last number assigned.
+model RiskControlCodeSequence {
+  id      String          @id @default(cuid())
+  orgId   String
+  kind    RiskControlKind
+  counter Int             @default(0)
+
+  @@unique([orgId, kind])
+}
+
 model RiskControlLink {
   id         String             @id @default(cuid())
   libraryId  String

@@ -54,6 +54,7 @@ export default async function ProjectPage({ params }: Props) {
       ? prisma.project.findUnique({
           where: { id },
           include: {
+            org: { select: { name: true } },
             diagrams: {
               orderBy: { updatedAt: "desc" },
               select: { id: true, name: true, type: true, createdAt: true, updatedAt: true, data: true },
@@ -89,9 +90,18 @@ export default async function ProjectPage({ params }: Props) {
 
   const impersonationMode = viewing ? getImpersonationMode(cookieStore) : undefined;
 
+  // Org Owner row: everyone sees the owning org's name; only a SuperAdmin gets
+  // the picker, so only they need the full org list.
+  const orgName = (project as { org?: { name?: string } | null }).org?.name ?? "";
+  const allOrgs = isSuperuser(session)
+    ? await prisma.org.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
+    : [];
+
   return (
     <ProjectDetailClient
       project={project}
+      orgName={orgName}
+      allOrgs={allOrgs}
       otherProjects={otherProjects}
       version={commitCount}
       readOnly={viewing && impersonationMode === "view"}

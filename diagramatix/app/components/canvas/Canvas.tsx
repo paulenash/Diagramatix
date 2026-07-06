@@ -247,6 +247,9 @@ interface Props {
    *  fades so the user can see where they are without losing the wider
    *  scan context. */
   currentIssueIds?: Set<string>;
+  /** Risk & Control highlight: element id → whether it carries a Risk, a Control,
+   *  or both. Shown while the Properties-Panel "Risk & Controls" section is open. */
+  riskHighlightById?: Map<string, "risk" | "control" | "both">;
   onSetSelectedElements: (ids: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
   onSelectConnector: (id: string | null) => void;
   onMoveElements?: (ids: string[], dx: number, dy: number) => void;
@@ -502,6 +505,7 @@ export function Canvas({
   scanHighlightById,
   scanHighlightConnectorById,
   currentIssueIds,
+  riskHighlightById,
   onSetSelectedElements,
   onSelectConnector,
   onMoveElements,
@@ -6429,6 +6433,26 @@ export function Canvas({
                   pointerEvents="none"
                 />
               );
+            })}
+
+          {/* Risk & Control highlight — shown while the Properties-Panel "Risk &
+              Controls" section is expanded. Red ring = the element carries a
+              Risk, green = a Control, both = concentric rings. */}
+          {riskHighlightById && riskHighlightById.size > 0 && data.elements
+            .filter((el: DiagramElement) => riskHighlightById.has(el.id))
+            .flatMap((el: DiagramElement) => {
+              const kind = riskHighlightById.get(el.id);
+              const rings: { pad: number; color: string }[] = [];
+              if (kind === "risk" || kind === "both") rings.push({ pad: 5, color: "#dc2626" });
+              if (kind === "control" || kind === "both") rings.push({ pad: kind === "both" ? 2 : 5, color: "#16a34a" });
+              return rings.map((r, i) => (
+                <rect
+                  key={`rc-hl-${el.id}-${i}`}
+                  x={el.x - r.pad} y={el.y - r.pad}
+                  width={el.width + r.pad * 2} height={el.height + r.pad * 2}
+                  fill="none" stroke={r.color} strokeWidth={2.5 / zoom} rx={4} pointerEvents="none"
+                />
+              ));
             })}
 
         </g>

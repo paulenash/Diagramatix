@@ -30,16 +30,41 @@ export async function createItem(
   const automation = input.automation ? (input.automation as ControlAutomation) : null;
   if (automation && !CONTROL_AUTOMATIONS.includes(automation)) throw new ItemOpError("Invalid automation", 400);
 
-  // Default sortOrder = end of the kind group; default code = kind prefix + n.
+  const suppliedCode = asStr(input.code);
+  // The library's org (project copy → its project's org; org master → its org)
+  // determines the org-wide numbering sequence.
+  const lib = await prisma.riskControlLibrary.findUnique({
+    where: { id: libraryId }, select: { orgId: true, project: { select: { orgId: true } } },
+  });
+  const orgId = lib?.orgId ?? lib?.project?.orgId ?? null;
+
+  // Default sortOrder = end of the kind group.
   const last = await prisma.riskControlItem.findFirst({
     where: { libraryId, kind }, orderBy: { sortOrder: "desc" }, select: { sortOrder: true },
   });
   const sortOrder = (last?.sortOrder ?? -1) + 1;
-  const code = asStr(input.code) || `${KIND_PREFIX[kind]}-${String(sortOrder + 1).padStart(2, "0")}`;
   const isRisk = kind === "Risk", isControl = kind === "Control";
   const generic = !isRisk;   // owner + frameworkRef apply to controls + governance objects
 
-  return prisma.riskControlItem.create({
+  return prisma.$transaction(async (tx) => {
+    // Code: a supplied code wins; otherwise draw the next ORG-WIDE number for this
+    // kind (one running sequence per (org, kind)). Falls back to a per-library
+    // number only when the library has no resolvable org (shouldn't happen).
+    let code = suppliedCode;
+    if (!code) {
+      if (orgId) {
+        const seq = await tx.riskControlCodeSequence.upsert({
+          where: { orgId_kind: { orgId, kind } },
+          create: { orgId, kind, counter: 1 },
+          update: { counter: { increment: 1 } },
+          select: { counter: true },
+        });
+        code = `${KIND_PREFIX[kind]}-${String(seq.counter).padStart(3, "0")}`;
+      } else {
+        code = `${KIND_PREFIX[kind]}-${String(sortOrder + 1).padStart(2, "0")}`;
+      }
+    }
+    return tx.riskControlItem.create({
     data: {
       libraryId, kind, name, code, sortOrder,
       description: asStr(input.description) || null,
@@ -58,6 +83,7 @@ export async function createItem(
       testFrequency: isControl ? (asStr(input.testFrequency) || null) : null,
       monitorSignature: isControl ? (asStr(input.monitorSignature) || null) : null,
     },
+    });
   });
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DiagramElement } from "@/app/lib/diagram/types";
 import { getRiskControl, riskControlPatch, type RiskControlRef } from "@/app/lib/diagram/riskControl";
 import type { RiskControlKind } from "@/app/lib/riskControls/types";
@@ -18,15 +18,20 @@ const ATTACHABLE = new Set(["task", "subprocess", "subprocess-expanded", "call-a
  * params pattern). Shown only for activity/gateway/data element types.
  */
 export function RiskControlSection({
-  element, catalog, onUpdateProperties, onCreate,
+  element, catalog, onUpdateProperties, onCreate, onOpenChange,
 }: {
   element: DiagramElement;
   catalog: RiskCatalogItem[];
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
   /** Create a new catalog Risk/Control from the diagram, then attach it. */
   onCreate?: (kind: "Risk" | "Control", name: string) => Promise<RiskCatalogItem | null>;
+  /** Report the section's open state (drives the canvas risk/control highlight). */
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Mirror the open state up (for the canvas highlight); clear on unmount.
+  useEffect(() => { onOpenChange?.(open); }, [open, onOpenChange]);
+  useEffect(() => () => { onOpenChange?.(false); }, [onOpenChange]);
   const [creating, setCreating] = useState<null | "risk" | "control">(null);
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);

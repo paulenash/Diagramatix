@@ -86,10 +86,19 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   const body = await req.json();
-  const { name, colorConfig, fontConfig, description, ownerName, folderTree } = body;
+  const { name, colorConfig, fontConfig, description, ownerName, folderTree, orgId } = body;
 
   if (name !== undefined && !name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+  // Reassigning a project's owning Org (the "Org Owner", which drives org-wide RCM
+  // numbering) is SuperAdmin-only — the owner/OrgAdmin edits everything else.
+  if (orgId !== undefined && orgId !== existing.orgId) {
+    if (!isSuperuser(session)) {
+      return NextResponse.json({ error: "Only a SuperAdmin can change a project's Org Owner" }, { status: 403 });
+    }
+    const org = await prisma.org.findUnique({ where: { id: orgId }, select: { id: true } });
+    if (!org) return NextResponse.json({ error: "Org not found" }, { status: 400 });
   }
 
   try {
@@ -97,6 +106,7 @@ export async function PUT(req: Request, { params }: Params) {
     if (name !== undefined) dataUpdate.name = name.trim();
     if (description !== undefined) dataUpdate.description = description;
     if (ownerName !== undefined) dataUpdate.ownerName = ownerName;
+    if (orgId !== undefined && orgId !== existing.orgId && isSuperuser(session)) dataUpdate.orgId = orgId;
     if (Object.keys(dataUpdate).length > 0) {
       await prisma.project.update({ where: { id }, data: dataUpdate });
     }

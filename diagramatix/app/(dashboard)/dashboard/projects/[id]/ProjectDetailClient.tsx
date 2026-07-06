@@ -300,6 +300,7 @@ interface ProjectDetail {
   name: string;
   description?: string;
   ownerName?: string;
+  orgId?: string;
   colorConfig?: unknown;
   fontConfig?: unknown;
   folderTree?: unknown;
@@ -327,6 +328,8 @@ interface VisioImportResult {
 
 interface Props {
   project: ProjectDetail;
+  orgName?: string;
+  allOrgs?: { id: string; name: string }[];
   otherProjects: OtherProject[];
   version?: number;
   readOnly?: boolean;
@@ -348,10 +351,30 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "flowchart", label: "Standard Flowchart", description: "Classic black-and-white flowchart with terminators, processes, decisions, and flowlines" },
 ];
 
-export function ProjectDetailClient({ project, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft }: Props) {
+export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft }: Props) {
   const router = useRouter();
   const [diagrams, setDiagrams] = useState(project.diagrams);
   const [projectName, setProjectName] = useState(project.name);
+  // "Org Owner": the owning Org drives org-wide RCM numbering. Read-only for
+  // everyone; only a SuperAdmin can reassign it (server also enforces this).
+  const [orgOwnerId, setOrgOwnerId] = useState(project.orgId ?? "");
+  const [orgOwnerBusy, setOrgOwnerBusy] = useState(false);
+  const orgOwnerName = allOrgs?.find((o) => o.id === orgOwnerId)?.name ?? orgName ?? "";
+  const reassignOrgOwner = async (newOrgId: string) => {
+    const prev = orgOwnerId;
+    setOrgOwnerId(newOrgId);
+    setOrgOwnerBusy(true);
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: newOrgId }),
+      });
+      if (!res.ok) { setOrgOwnerId(prev); }
+      else { router.refresh(); }
+    } catch { setOrgOwnerId(prev); }
+    finally { setOrgOwnerBusy(false); }
+  };
 
   // Tile grid column count — computed from the grid container's actual width
   // (not the viewport). This gives "primacy" to the nav-tree width: when the
@@ -2108,6 +2131,26 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               project header to match the sidebar. Value still lives on
               project.ownerName and round-trips through exports. */}
           <span className="text-[10px] text-gray-400 shrink-0" title="Diagramatix version">v{SCHEMA_VERSION}{version ? `.${version}` : ""}</span>
+          {/* Org Owner — the owning Org drives org-wide RCM code numbering.
+              Read-only chip for everyone; SuperAdmin gets an inline picker
+              (red styling per the role convention). */}
+          {(orgOwnerName || isAdmin) && (
+            <span className="shrink-0 inline-flex items-center gap-1 text-[11px]" title="Org Owner — drives org-wide Risk & Control numbering (SuperAdmin can reassign)">
+              <span className="text-gray-400">Org&nbsp;Owner:</span>
+              {isAdmin && allOrgs && allOrgs.length > 0 ? (
+                <select
+                  value={orgOwnerId}
+                  disabled={orgOwnerBusy}
+                  onChange={(e) => reassignOrgOwner(e.target.value)}
+                  className="text-[11px] font-medium text-red-700 border border-red-300 rounded px-1 py-0.5 bg-red-50 outline-none disabled:opacity-50"
+                >
+                  {allOrgs.map((o) => (<option key={o.id} value={o.id}>{o.name}</option>))}
+                </select>
+              ) : (
+                <span className="font-medium text-gray-600">{orgOwnerName}</span>
+              )}
+            </span>
+          )}
           {/* SuperAdmin shortcut — leftmost item in the header menu
               cluster, SuperAdmin-only. `?from=` carries this project's
               URL so the admin's Back link returns here. Mirrors the

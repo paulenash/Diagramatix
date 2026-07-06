@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-06  ·  **Document version:** 5.2  ·  **Suite:** 118 test files · 777 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0652  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-06  ·  **Document version:** 5.3  ·  **Suite:** 119 test files · 779 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0654  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -812,6 +812,8 @@ Attach Risks/Controls (from an org-master → project-copy GRC catalog — Risks
 | T0636 | the ready-made Order-to-Cash sample GRC library is internally consistent (unique codes, every kind present, links reference real items, every risk mitigated, governance chain present, monitor signatures well-formed) | The one-click O2C sample (`scripts/seed-risk-controls-o2c.ts`) seeding a broken/incoherent library | If `o2cSample.ts` data drifted |
 | T0637 | the O2C mining example's deviations match the library's control monitor signatures (every monitored control finds its deviation in the mined log, cases > 0) — the self-contained demo | The demo project's controls showing no operating-effectiveness because the mined log and the library drifted apart | If the `gen-mining-examples.ts` O2C log or `o2cSample.ts` signatures changed independently |
 | T0638 | the Risk & Control Examples package validates/summarizes + `O2C_ATTACH` references only real library codes | A GRC example (3rd catalog) adopting to a broken project or attaching to unresolvable codes | If `examplePackage.ts` validation or the `O2C_ATTACH` map drifted from the library |
+| T0653 | org-wide renumber: clones of a master control collapse to one shared code; project-local items reusing a code stay distinct; each kind is one running org-wide sequence | Org-wide RCM numbering merging unrelated controls or splitting clones apart | If `assignOrgWideCodes` canonical grouping regressed |
+| T0654 | the renumber is idempotent — re-running on already-numbered codes is a no-op | The renumber action churning codes every time it runs | If the stable ordering in `assignOrgWideCodes` regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 

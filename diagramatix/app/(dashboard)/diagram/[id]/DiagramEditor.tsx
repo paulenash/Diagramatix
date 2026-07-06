@@ -29,6 +29,7 @@ import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { AnimateOverlay } from "@/app/components/canvas/AnimateOverlay";
 import type { RiskCatalogItem } from "@/app/components/canvas/RiskControlSection";
+import { getRiskControl } from "@/app/lib/diagram/riskControl";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
@@ -498,6 +499,9 @@ export function DiagramEditor({
 
   // Project Risk & Control catalog — items available to attach to a step.
   const [riskCatalog, setRiskCatalog] = useState<RiskCatalogItem[]>([]);
+  // Whether a step's "Risk & Controls" Properties-Panel section is expanded —
+  // drives the red/green canvas highlight.
+  const [rcSectionOpen, setRcSectionOpen] = useState(false);
   const [riskLibraryId, setRiskLibraryId] = useState<string | null>(null);
   const refreshRiskCatalog = useCallback(async () => {
     if (!projectId) return;
@@ -1201,6 +1205,22 @@ export function DiagramEditor({
     }
     return m.size > 0 ? m : null;
   }, [activeIssues, data.elements]);
+
+  // Risk & Control highlight — active only while a step's "Risk & Controls"
+  // Properties-Panel section is expanded: red = carries a Risk, green = a
+  // Control, both = both. Non-destructive canvas overlay.
+  const riskHighlight = useMemo<Map<string, "risk" | "control" | "both"> | null>(() => {
+    if (!rcSectionOpen) return null;
+    const m = new Map<string, "risk" | "control" | "both">();
+    for (const el of data.elements) {
+      const rc = getRiskControl(el);
+      const hasR = !!rc.riskRefs?.length, hasC = !!rc.controlRefs?.length;
+      if (hasR && hasC) m.set(el.id, "both");
+      else if (hasR) m.set(el.id, "risk");
+      else if (hasC) m.set(el.id, "control");
+    }
+    return m.size > 0 ? m : null;
+  }, [rcSectionOpen, data.elements]);
 
   // Parallel highlight map for connectors — same severity-wins rule but keyed
   // by connector id. Drives the orange overlay path drawn in Canvas.
@@ -3444,6 +3464,7 @@ export function DiagramEditor({
           selectedElementIds={selectedElementIds}
           selectedConnectorId={selectedConnectorId}
           scanHighlightById={scanHighlight ?? undefined}
+          riskHighlightById={riskHighlight ?? undefined}
           scanHighlightConnectorById={scanConnectorHighlight ?? undefined}
           currentIssueIds={currentIssueIds.size > 0 ? currentIssueIds : undefined}
           onSetSelectedElements={setSelectedElementIds}
@@ -3501,6 +3522,7 @@ export function DiagramEditor({
             onUpdateProperties={updateProperties}
             riskCatalog={riskCatalog}
             onCreateRiskItem={riskLibraryId ? onCreateRiskItem : undefined}
+            onRcSectionOpenChange={setRcSectionOpen}
             onLinkSharePointFile={(id) => setSpLinkElId(id)}
             onPreviewSharePointFile={(link) => setSpPreview(link)}
             onSetEventBoundary={(id, hostId) => {

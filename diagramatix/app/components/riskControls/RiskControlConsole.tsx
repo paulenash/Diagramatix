@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { RiskControlEditor } from "./RiskControlEditor";
+import { RiskControlAnalytics } from "./RiskControlAnalytics";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import type { RiskControlLibraryDTO } from "@/app/lib/riskControls/types";
 import type { ObservedDeviation, ControlEffectiveness } from "@/app/lib/riskControls/controlEffectiveness";
@@ -35,6 +36,7 @@ export function RiskControlConsole({
   const [effectiveness, setEffectiveness] = useState<Record<string, ControlEffectiveness>>({});
   const [runName, setRunName] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<Record<string, string[]>>({});
+  const [tab, setTab] = useState<"editor" | "analytics">("editor");
 
   const refresh = useCallback(async () => {
     const res = await fetch(basePath);
@@ -108,14 +110,26 @@ export function RiskControlConsole({
             <p className="text-sm text-gray-400">Loading…</p>
           ) : library ? (
             <>
-              <div className="mb-4 flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-gray-600">
+              <div className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-[12px] text-gray-600">
                 <span>Library: <span className="font-medium text-gray-800">{library.name}</span></span>
                 <span>{risks.length} risks · {controls.length} controls</span>
                 {Object.keys(effectiveness).length > 0 && <span className="text-blue-700">{Object.keys(effectiveness).length} controls monitored for bypass</span>}
               </div>
-              <div className="bg-white border border-blue-200 rounded-lg p-4">
-                <RiskControlEditor library={library} basePath={basePath} canEdit={canEdit} onChange={refresh} deviations={deviations} effectiveness={effectiveness} attachments={attachments} />
+              <div className="mb-3 flex items-center gap-1">
+                {(["editor", "analytics"] as const).map((t) => (
+                  <button key={t} onClick={() => setTab(t)}
+                    className={`text-xs px-3 py-1 rounded ${tab === t ? "bg-blue-700 text-white" : "text-gray-600 border border-gray-300 hover:bg-gray-50"}`}>
+                    {t === "editor" ? "Catalog" : "📊 Analytics"}
+                  </button>
+                ))}
               </div>
+              {tab === "analytics" ? (
+                <RiskControlAnalytics library={library} effectiveness={effectiveness} attachments={attachments} />
+              ) : (
+                <div className="bg-white border border-blue-200 rounded-lg p-4">
+                  <RiskControlEditor library={library} basePath={basePath} canEdit={canEdit} onChange={refresh} deviations={deviations} effectiveness={effectiveness} attachments={attachments} />
+                </div>
+              )}
             </>
           ) : (
             <div className="bg-white border border-gray-200 rounded-lg p-6 max-w-xl">
