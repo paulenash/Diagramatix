@@ -78,6 +78,20 @@ export function PublishedSection() {
   const [bundles, setBundles] = useState<BundlesPayload | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<BundleSummary | null>(null);
   const [archiving, setArchiving] = useState(false);
+  // Which published section to auto-expand on return. Both start collapsed
+  // (dashboard default = only Projects open); opening a tile stashes where the
+  // user came from so returning re-expands that section (issue #2).
+  const [openSection, setOpenSection] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const s = sessionStorage.getItem("dgx.dashSection");
+      if (s) { setOpenSection(s); sessionStorage.removeItem("dgx.dashSection"); }
+    } catch { /* ignore */ }
+  }, []);
+  const openPublished = (section: "publishedByMe" | "publishedToMe", href: string) => {
+    try { sessionStorage.setItem("dgx.dashSection", section); } catch { /* ignore */ }
+    router.push(href);
+  };
 
   const refresh = useCallback(async () => {
     const [dRes, bRes] = await Promise.all([
@@ -141,7 +155,7 @@ export function PublishedSection() {
   return (
     <>
     {(diagrams.length > 0 || createdBundles.length > 0) && (
-    <CollapsibleSection title="Published by me" count={diagrams.length + createdBundles.length}>
+    <CollapsibleSection key={`by-${openSection === "publishedByMe"}`} title="Published by me" count={diagrams.length + createdBundles.length} defaultOpen={openSection === "publishedByMe"}>
 
       {/* Diagrams */}
       {diagrams.length > 0 && (
@@ -153,7 +167,7 @@ export function PublishedSection() {
             {diagrams.map(d => (
               <button
                 key={d.id}
-                onClick={() => router.push(`/diagram/${d.id}?from=/dashboard`)}
+                onClick={() => openPublished("publishedByMe", `/diagram/${d.id}?from=/dashboard`)}
                 style={{ backgroundColor: lightenHex(getTypeStyle(d.type).bgColor, 0.5) }}
                 className="text-left border border-gray-200 rounded-lg p-3 hover:border-blue-400 hover:shadow transition"
               >
@@ -250,7 +264,7 @@ export function PublishedSection() {
 
     {/* Published to me — bundles + root processes I'm in the audience of */}
     {receivedBundles.length > 0 && (
-      <CollapsibleSection title="Published to me" count={receivedBundles.length + sharedRoots.length}>
+      <CollapsibleSection key={`to-${openSection === "publishedToMe"}`} title="Published to me" count={receivedBundles.length + sharedRoots.length} defaultOpen={openSection === "publishedToMe"}>
 
         {/* Bundles shared with me */}
         <div className="mb-4">
@@ -261,7 +275,7 @@ export function PublishedSection() {
             {receivedBundles.map(b => (
               <button
                 key={b.id}
-                onClick={() => router.push(`/processes/bundle/${b.id}`)}
+                onClick={() => openPublished("publishedToMe", `/processes/bundle/${b.id}`)}
                 className="text-left bg-white border border-blue-200 rounded-lg p-3 hover:border-blue-400 hover:shadow transition"
               >
                 <div className="text-sm font-medium text-gray-900 truncate">{b.name}</div>
@@ -286,7 +300,7 @@ export function PublishedSection() {
               {sharedRoots.map(r => (
                 <button
                   key={r.id}
-                  onClick={() => router.push(`/processes/${r.id}?bundle=${r.bundleId}`)}
+                  onClick={() => openPublished("publishedToMe", `/processes/${r.id}?bundle=${r.bundleId}`)}
                   style={{ backgroundColor: lightenHex(getTypeStyle(r.type).bgColor, 0.5) }}
                   className="text-left border border-blue-200 rounded-lg p-3 hover:border-blue-400 hover:shadow transition"
                 >

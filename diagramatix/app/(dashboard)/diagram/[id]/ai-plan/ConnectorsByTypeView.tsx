@@ -26,8 +26,9 @@ export function ConnectorsByTypeView({ elements, connections, onRenameLabel, onD
   const byType = useMemo(() => {
     const seq = withIdx.filter(x => (x.c.type ?? "sequence") === "sequence");
     const msg = withIdx.filter(x => x.c.type === "message");
-    const other = withIdx.filter(x => x.c.type != null && x.c.type !== "sequence" && x.c.type !== "message");
-    return { seq, msg, other };
+    const assoc = withIdx.filter(x => x.c.type === "association");
+    const other = withIdx.filter(x => x.c.type != null && !["sequence", "message", "association"].includes(x.c.type));
+    return { seq, msg, assoc, other };
   }, [withIdx]);
 
   if (connections.length === 0) {
@@ -40,7 +41,7 @@ export function ConnectorsByTypeView({ elements, connections, onRenameLabel, onD
     return el.label || `(${el.type})`;
   }
 
-  function Section({ title, tone, items }: { title: string; tone: string; items: typeof withIdx }) {
+  function Section({ title, tone, bar, items }: { title: string; tone: string; bar: string; items: typeof withIdx }) {
     if (items.length === 0) return null;
     return (
       <div className="border border-gray-200 rounded overflow-hidden">
@@ -48,7 +49,7 @@ export function ConnectorsByTypeView({ elements, connections, onRenameLabel, onD
           {title} <span className="text-[9px] opacity-70">({items.length})</span>
         </div>
         {items.map(({ c, idx }) => (
-          <div key={idx} className="flex items-center gap-1.5 px-3 py-1 text-[11px] group hover:bg-gray-50 border-t border-gray-100">
+          <div key={idx} className={`flex items-center gap-1.5 px-3 py-1 text-[11px] group hover:bg-gray-50 border-t border-gray-100 border-l-4 ${bar}`}>
             <span className="text-gray-700 truncate max-w-[30%]" title={c.sourceId}>{describe(c.sourceId)}</span>
             <span className="text-gray-400">→</span>
             <span className="text-gray-700 truncate max-w-[30%]" title={c.targetId}>{describe(c.targetId)}</span>
@@ -72,9 +73,10 @@ export function ConnectorsByTypeView({ elements, connections, onRenameLabel, onD
 
   return (
     <div className="space-y-3">
-      <Section title="Sequence" tone="bg-blue-50 text-blue-700" items={byType.seq} />
-      <Section title="Message"  tone="bg-green-50 text-green-700" items={byType.msg} />
-      <Section title="Other"    tone="bg-gray-50 text-gray-600"  items={byType.other} />
+      <Section title="Sequence"    tone="bg-green-50 text-green-700"  bar="border-l-green-500"  items={byType.seq} />
+      <Section title="Message"     tone="bg-blue-50 text-blue-700"    bar="border-l-blue-500"   items={byType.msg} />
+      <Section title="Association"  tone="bg-purple-50 text-purple-700" bar="border-l-purple-500" items={byType.assoc} />
+      <Section title="Other"       tone="bg-gray-50 text-gray-600"    bar="border-l-gray-400"   items={byType.other} />
     </div>
   );
 }

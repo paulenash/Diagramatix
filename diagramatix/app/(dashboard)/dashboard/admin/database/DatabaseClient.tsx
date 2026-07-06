@@ -568,7 +568,7 @@ export function DatabaseClient() {
   const tableNames = schemaData ? Object.keys(schemaData.schema).sort() : [];
 
   return (
-    <div className="min-h-screen dgx-dashboard-bg flex flex-col">
+    <div className="h-screen dgx-dashboard-bg flex flex-col overflow-hidden">
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <button
@@ -791,7 +791,7 @@ export function DatabaseClient() {
         <main className="flex-1 flex flex-col overflow-hidden">
           {/* SQL editor */}
           <div className="border-b border-gray-200 p-3 bg-white flex-shrink-0">
-            <div className="flex items-end gap-2">
+            <div className="flex items-start gap-2">
               <div className="flex-1">
                 <textarea
                   ref={textareaRef}
@@ -799,8 +799,8 @@ export function DatabaseClient() {
                   onChange={(e) => setSql(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Enter SQL query... (Ctrl+Enter to execute, Alt+Up/Down for history)"
-                  rows={3}
-                  className="w-full font-mono text-xs border border-gray-300 rounded px-3 py-2 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none resize-y"
+                  rows={15}
+                  className="w-full h-[38vh] min-h-[16rem] font-mono text-xs border border-gray-300 rounded px-3 py-2 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none resize-y"
                   spellCheck={false}
                 />
               </div>

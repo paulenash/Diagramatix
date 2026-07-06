@@ -15,9 +15,11 @@ interface Props {
   onRename: (id: string, label: string) => void;
   onDelete: (id: string) => void;
   onMove: (draggedId: string, targetId: string, position: "before" | "after") => void;
+  /** Structured editor: toggle the IT-System flag on a black-box pool. */
+  onSetSystem?: (id: string, isSystem: boolean) => void;
 }
 
-export function PoolsLanesTree({ elements, onRename, onDelete, onMove }: Props) {
+export function PoolsLanesTree({ elements, onRename, onDelete, onMove, onSetSystem }: Props) {
   const tree = useMemo(() => {
     const pools = elements.filter(e => e.type === "pool");
     return pools.map(pool => ({
@@ -42,6 +44,9 @@ export function PoolsLanesTree({ elements, onRename, onDelete, onMove }: Props) 
             onRename={onRename}
             onDelete={onDelete}
             onMove={onMove}
+            system={(pool.poolType as string | undefined) === "black-box" && onSetSystem
+              ? { isSystem: !!(pool.isSystem ?? (pool.properties?.isSystem as boolean | undefined)), onChange: (v) => onSetSystem(pool.id, v) }
+              : undefined}
           />
           {lanes.length > 0 && (
             <div className="pl-4 border-t border-gray-100">
@@ -66,7 +71,7 @@ export function PoolsLanesTree({ elements, onRename, onDelete, onMove }: Props) 
 }
 
 function Row({
-  el, badge, badgeTone, groupKey, onRename, onDelete, onMove,
+  el, badge, badgeTone, groupKey, onRename, onDelete, onMove, system,
 }: {
   el: AiElement;
   badge: string;
@@ -75,6 +80,7 @@ function Row({
   onRename: (id: string, label: string) => void;
   onDelete: (id: string) => void;
   onMove: (draggedId: string, targetId: string, position: "before" | "after") => void;
+  system?: { isSystem: boolean; onChange: (v: boolean) => void };
 }) {
   const toneCls = badgeTone === "blue"
     ? "bg-blue-50 text-blue-700 border-blue-200"
@@ -141,6 +147,12 @@ function Row({
         className="flex-1 bg-transparent border-0 border-b border-transparent focus:border-blue-400 outline-none px-0.5 py-0"
         spellCheck={false}
       />
+      {system && (
+        <label className="flex items-center gap-1 text-[9px] text-gray-600 shrink-0" title="IT System (black-box): renders below the main pools; unchecked = external entity (above)">
+          <input type="checkbox" checked={system.isSystem} onChange={e => system.onChange(e.target.checked)} className="w-3 h-3" />
+          IT System
+        </label>
+      )}
       <button
         onClick={() => onDelete(el.id)}
         className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 text-xs px-1"

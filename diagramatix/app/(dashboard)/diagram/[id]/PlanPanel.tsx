@@ -20,6 +20,7 @@ import { usePlanState, type Plan } from "./ai-plan/usePlanState";
 import { PoolsLanesTree } from "./ai-plan/PoolsLanesTree";
 import { ElementsByContainerView } from "./ai-plan/ElementsByContainerView";
 import { ConnectorsByTypeView } from "./ai-plan/ConnectorsByTypeView";
+import { PlanStructureModal } from "./ai-plan/PlanStructureModal";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
@@ -364,6 +365,7 @@ export function PlanPanel({
   const [savedPromptsH, setSavedPromptsH] = useState(96);
   const [tabsH, setTabsH] = useState(280);
   const [tabsExpanded, setTabsExpanded] = useState(false);
+  const [structOpen, setStructOpen] = useState(false);
 
   function startResize(
     setter: React.Dispatch<React.SetStateAction<number>>,
@@ -1047,6 +1049,15 @@ export function PlanPanel({
               </button>
             ))}
           </div>
+          {hasPlan && (
+            <button
+              onClick={() => setStructOpen(true)}
+              className="px-2 py-1 text-blue-600 hover:text-blue-800 font-medium"
+              title="Open the full structure editor in a pop-up"
+            >
+              ⤢ Editor
+            </button>
+          )}
           <button
             onClick={() => setTabsExpanded(v => !v)}
             className="px-2 py-1 text-gray-500 hover:text-gray-700"
@@ -1095,6 +1106,23 @@ export function PlanPanel({
           )}
         </div>
       </div>
+
+      {structOpen && (
+        <PlanStructureModal
+          plan={plan}
+          diagramType={diagramType}
+          isFlowchart={isFlowchart}
+          applying={busy === "apply"}
+          updateElement={updateElement}
+          deleteElement={deleteElement}
+          updateConnection={updateConnection}
+          deleteConnection={deleteConnection}
+          moveElementRelativeTo={moveElementRelativeTo}
+          setPlan={setPlan}
+          onApply={() => { void callApplyLayout(); }}
+          onClose={() => setStructOpen(false)}
+        />
+      )}
 
       {replacePlanConfirm && (
         <ConfirmDialog

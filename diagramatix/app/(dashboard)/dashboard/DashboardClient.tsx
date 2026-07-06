@@ -1917,12 +1917,12 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             content (handled inside PublishedSection) and is collapsible. */}
         <PublishedSection />
 
-        {/* Sandpit — collapsible; collapsed by default when empty, but the
-            New Diagram button stays inline with the label either way. */}
+        {/* Sandpit — collapsed by default (dashboard default = only Projects
+            open); the New Diagram button stays inline with the label either way. */}
         <CollapsibleSection
           title="Sandpit"
           count={unorganized.length}
-          defaultOpen={unorganized.length > 0}
+          defaultOpen={false}
           action={
             <button
               onClick={() => setShowNewDiagram(true)}
