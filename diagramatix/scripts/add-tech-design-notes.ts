@@ -213,7 +213,7 @@ const CHAPTERS: Chapter[] = [
       {
         heading: "Data model",
         body: [
-          "Three relational models: `RiskControlLibrary` → `RiskControlItem` → `RiskControlLink`.",
+          "Four relational models: `RiskControlLibrary` → `RiskControlItem` → `RiskControlLink`, plus `RiskControlCodeSequence` (the org-wide numbering counter).",
           "",
           "An **item** is one of seven kinds: **Risk, Control, Policy, Regulation, Audit Finding, KRI, KPI**. A **link** is a directed edge `{ sourceId, targetId }`, so the whole catalog is a **directed traceability graph** (Risk ↔ Control ↔ Policy ↔ Regulation ↔ Audit Finding ↔ KRI ↔ KPI).",
           "",
@@ -224,6 +224,25 @@ const CHAPTERS: Chapter[] = [
         heading: "Attaching to process steps",
         body: [
           "Risks/Controls are attached to elements via `element.properties.risk` (mirroring the simulation-params annotation pattern). References are stored **by id** with a **cached label**, so a step shows its risks/controls on the model and the RCM export can resolve them even if a label later changes.",
+        ].join("\n"),
+      },
+      {
+        heading: "Org-wide numbering & the Org Owner",
+        body: [
+          "Every item carries a stable **code** (`R-001`, `C-001`, `P-001`, `REG-001`, `AF-001`, `KRI-001`, `KPI-001`). Codes are **org-wide**: a single running sequence per (org, kind) spans *all* of the org's projects, so the same control reads the same code everywhere.",
+          "",
+          "- **The counter** is `RiskControlCodeSequence { orgId, kind, counter, @@unique([orgId, kind]) }`. `createItem` mints the next code with an atomic `upsert` + `increment` **inside its transaction** — concurrency-safe, no gaps under parallel creates. The library's org is resolved from the library itself (project copy → `project.orgId`; org master → `orgId`). A caller-supplied code still overrides.",
+          "- **Clones stay consistent.** Adopt/clone copy codes *verbatim*, so a control cloned into a project keeps its org-master code. The one-time reconciliation `scripts/renumber-org-rcm-codes.ts` (pure core in `app/lib/riskControls/renumber.ts`, tested) canonicalises every item org-wide: clones of a master control collapse to one shared code, project-local items reusing a code stay distinct, and it rewrites the **cached codes on diagram attachments** (`element.properties.risk[].code`, keyed by `itemId`). Idempotent — safe to re-run.",
+          "",
+          "**Org Owner** — the owning Org (`Project.orgId`) is what drives an item's numbering sequence. It is **SuperAdmin-only reassignable**: `PUT /api/projects/[id]` accepts `orgId` behind an `isSuperuser` field-gate (non-SuperAdmin → 403). Everyone sees a read-only Org Owner chip in the project header; a SuperAdmin gets an inline org picker (red, per the role convention).",
+        ].join("\n"),
+      },
+      {
+        heading: "Analytics panel & on-model highlight",
+        body: [
+          "**Analytics panel** — the Risk & Control console has a **Catalog / Analytics** tab toggle (`RiskControlAnalytics.tsx`). Analytics is computed **client-side** from the already-loaded library + effectiveness + attachments (no extra fetch), with hand-rolled SVG bars (the `FlowHistogram` idiom): counts by kind, control coverage vs gaps, inherent/residual risk posture by band, control type & automation mix, on-model coverage, and operating-effectiveness distribution.",
+          "",
+          "**On-model highlight** — while a step's **Risk & Controls** section is expanded in the Properties Panel, the canvas rings **risk-carrying elements red** and **control-carrying elements green** (both → two offset rings). The section lifts an `onOpenChange` flag up through `PropertiesPanel` → `DiagramEditor`, which computes a `riskHighlightById` map over `data.elements` via `getRiskControl` and passes it to `Canvas` as an additive `<rect>` overlay (coexists with the issue-scan tint).",
         ].join("\n"),
       },
       {
