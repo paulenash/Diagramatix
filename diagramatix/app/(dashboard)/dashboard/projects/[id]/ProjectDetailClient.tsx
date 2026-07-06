@@ -390,6 +390,13 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [showSim, setShowSim] = useState(false);
   const [showMining, setShowMining] = useState(false);
   const [showRcm, setShowRcm] = useState(false);
+  // Deep-link (?rcm=1) — e.g. adopting a Risk & Control example lands here and
+  // opens the Risk & Control console straight away rather than the bare project.
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get("rcm") === "1") setShowRcm(true);
+    } catch { /* ignore */ }
+  }, []);
   // When the Simulator was launched from the MINER, exiting it returns to the
   // MINER (skipping its intro) rather than falling back to the project screen.
   const [simFromMining, setSimFromMining] = useState(false);

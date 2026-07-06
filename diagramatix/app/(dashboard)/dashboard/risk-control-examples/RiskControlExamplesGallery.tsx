@@ -42,7 +42,9 @@ export function RiskControlExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
       const res = await fetch(`/api/risk-control-examples/${id}/adopt`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Could not load example"); return; }
-      if (json.projectId) router.push(`/dashboard/projects/${json.projectId}`);
+      // Land in the new project with the Risk & Control console open (the point
+      // of a GRC example) rather than the bare project detail.
+      if (json.projectId) router.push(`/dashboard/projects/${json.projectId}?rcm=1`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not load example");
     } finally { setAdopting(null); }

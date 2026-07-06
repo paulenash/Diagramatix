@@ -3009,13 +3009,6 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               Open
             </button>
             <button
-              onClick={() => { close(); setSimProject({ id: p.id, name: p.name }); }}
-              className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
-              title="Simulate + compare the processes in this project (As-is / To-be)"
-            >
-              ◈ Simulator
-            </button>
-            <button
               onClick={() => { close(); setSkipMiningIntro(false); setMiningProject({ id: p.id, name: p.name }); }}
               className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
               title="Process Mining — discover the real process from event logs + check conformance"
