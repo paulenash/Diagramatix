@@ -40,7 +40,7 @@ function attachRefs(
 
 export async function adoptRiskControlExample(pkg: RiskControlExamplePackage, ctx: AdoptRcExampleCtx): Promise<AdoptRcExampleResult> {
   // 1) Project.
-  const project = await prisma.project.create({ data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName } });
+  const project = await prisma.project.create({ data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName, exampleType: "risk-control" } });
 
   // 2) GRC library → code → item.
   const { idByCode } = await prisma.$transaction((tx) => createLibraryFrom(tx, { projectId: project.id }, pkg.library));

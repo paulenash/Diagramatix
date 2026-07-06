@@ -20,7 +20,7 @@ export async function adoptPackage(pkg: ExamplePackage, ctx: AdoptCtx): Promise<
   // One transaction so a partial failure never leaves a half-built project.
   return prisma.$transaction(async (tx) => {
     const project = await tx.project.create({
-      data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName },
+      data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName, exampleType: "simulation" },
     });
 
     // Diagrams — preserve `data`; pre-assign ids so a subprocess's

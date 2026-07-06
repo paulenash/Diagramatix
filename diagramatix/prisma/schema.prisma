@@ -232,6 +232,10 @@ model Project {
   colorConfig Json      @default("{}")
   fontConfig  Json      @default("{}")
   folderTree  Json      @default("{}")
+  // When this project was created by adopting a ready-made example, which
+  // feature it demonstrates ("simulation" | "mining" | "risk-control"). Drives
+  // the feature-coloured dashboard tile. Null for ordinary projects.
+  exampleType String?
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Org scoping — required after Phase 0 backfill (scripts/backfill-orgs.ts).

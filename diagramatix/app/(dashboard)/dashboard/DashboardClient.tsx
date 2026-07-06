@@ -36,6 +36,9 @@ interface ProjectSummary {
   name: string;
   description?: string;
   ownerName?: string;
+  /** Set when the project was created by adopting a ready-made example —
+   *  "simulation" | "mining" | "risk-control". Drives the feature-coloured tile. */
+  exampleType?: string | null;
   createdAt: Date;
   updatedAt: Date;
   /** Server-side diagrams + shares count. shares may be 0 (not shared). */
@@ -59,6 +62,28 @@ interface ProjectSummary {
  * the owner signal — no extra userId comparison needed.
  */
 type ProjectRole = "owner" | "edit" | "view";
+
+/** Feature-coloured tiles for example projects (adopted from a ready-made
+ *  example) — each tint + badge matches that feature's console identity:
+ *  Simulator teal, DiagramatixMINER amber, Risk & Controls sky/blue. Applied
+ *  only to owned (not shared) projects, so it replaces the plain-white tile. */
+const EXAMPLE_TILE: Record<string, { base: string; selected: string; badge: string; label: string }> = {
+  simulation: {
+    base: "bg-teal-50 border-teal-300 hover:border-teal-400",
+    selected: "bg-teal-50 border-teal-500 ring-1 ring-teal-300",
+    badge: "bg-teal-100 text-teal-700", label: "Simulator example",
+  },
+  mining: {
+    base: "bg-amber-50 border-amber-300 hover:border-amber-400",
+    selected: "bg-amber-50 border-amber-500 ring-1 ring-amber-300",
+    badge: "bg-amber-100 text-amber-800", label: "MINER example",
+  },
+  "risk-control": {
+    base: "bg-sky-50 border-sky-300 hover:border-sky-400",
+    selected: "bg-sky-50 border-sky-500 ring-1 ring-sky-300",
+    badge: "bg-sky-100 text-sky-700", label: "Risk & Controls example",
+  },
+};
 function deriveProjectRole(p: ProjectSummary): ProjectRole {
   const share = p.shares?.[0]?.role;
   if (share === "EDIT") return "edit";
@@ -1776,6 +1801,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   : "";
                 const tileSharedListOpen = tileShareDropdownProjectId === p.id;
                 const tileSharedList = shareListByProject[p.id];
+                // Example projects (owned, not shared) take a feature-coloured tile.
+                const ex = !isSharedToMe && !isSharedOut && p.exampleType ? EXAMPLE_TILE[p.exampleType] : null;
                 return (
                 <div
                   key={p.id}
@@ -1810,12 +1837,16 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                         ? "bg-amber-50 border-amber-500 ring-1 ring-amber-300"
                         : isSharedOut
                           ? "bg-purple-50 border-purple-500 ring-1 ring-purple-300"
-                          : "bg-white border-blue-500 ring-1 ring-blue-300"
+                          : ex
+                            ? ex.selected
+                            : "bg-white border-blue-500 ring-1 ring-blue-300"
                       : isSharedToMe
                         ? "bg-amber-50 border-amber-300 hover:border-amber-400"
                         : isSharedOut
                           ? "bg-purple-50 border-purple-300 hover:border-purple-400"
-                          : "bg-white border-gray-200 hover:border-blue-300"
+                          : ex
+                            ? ex.base
+                            : "bg-white border-gray-200 hover:border-blue-300"
                   }`}
                 >
                   <div className="flex items-center justify-between group/row">
@@ -1850,6 +1881,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       {p._count.diagrams} {p._count.diagrams === 1 ? "diagram" : "diagrams"}
                     </span>
                     <span className="text-[10px] text-gray-400">{new Date(p.updatedAt).toLocaleDateString()}</span>
+                    {ex && (
+                      <span className={`text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium ${ex.badge}`} title="Created from a ready-made example">
+                        {ex.label}
+                      </span>
+                    )}
                   </div>
                   {isSharedToMe && (
                     <div

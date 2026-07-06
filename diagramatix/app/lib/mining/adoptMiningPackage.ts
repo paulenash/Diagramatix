@@ -40,7 +40,7 @@ export async function adoptMiningPackage(
   // One transaction so a partial failure never leaves a half-built project.
   return prisma.$transaction(async (tx) => {
     const project = await tx.project.create({
-      data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName },
+      data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName, exampleType: "mining" },
     });
 
     // Reference diagrams — preserve `data`; pre-assign ids so the run's
