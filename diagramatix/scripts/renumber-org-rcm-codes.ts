@@ -18,47 +18,7 @@
  */
 import { PrismaClient } from "../app/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { assignOrgWideCodes, type RenumberLib } from "../app/lib/riskControls/renumber";
-
-async function renumberOrg(prisma: PrismaClient, orgId: string) {
-  const rows = await prisma.riskControlLibrary.findMany({
-    where: { OR: [{ orgId }, { project: { orgId } }] },
-    select: { id: true, orgId: true, sourceLibraryId: true, items: { select: { id: true, kind: true, code: true, name: true } } },
-  });
-  if (rows.length === 0) return { org: orgId, groups: 0, items: 0 };
-
-  const libs: RenumberLib[] = rows.map((l) => ({ id: l.id, isMaster: !!l.orgId, sourceLibraryId: l.sourceLibraryId, items: l.items }));
-  const { newCodeByItem, counters } = assignOrgWideCodes(libs);
-
-  // Apply: item codes, the sequence counters, then the cached codes on diagrams.
-  await prisma.$transaction(async (tx) => {
-    for (const [itemId, code] of newCodeByItem) await tx.riskControlItem.update({ where: { id: itemId }, data: { code } });
-    for (const c of counters) await tx.riskControlCodeSequence.upsert({ where: { orgId_kind: { orgId, kind: c.kind } }, create: { orgId, kind: c.kind, counter: c.count }, update: { counter: c.count } });
-  }, { timeout: 120_000 });
-
-  // Rewrite element.properties.risk[].code across the org's diagrams by itemId.
-  const diagrams = await prisma.diagram.findMany({ where: { project: { orgId } }, select: { id: true, data: true } });
-  let touched = 0;
-  for (const d of diagrams) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = (d.data ?? {}) as any;
-    let changed = false;
-    for (const el of data.elements ?? []) {
-      const rc = el?.properties?.risk;
-      if (!rc) continue;
-      for (const key of ["riskRefs", "controlRefs"] as const) {
-        for (const ref of rc[key] ?? []) {
-          const nc = newCodeByItem.get(ref.itemId);
-          if (nc && nc !== ref.code) { ref.code = nc; changed = true; }
-        }
-      }
-    }
-    if (changed) { await prisma.$executeRawUnsafe('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', JSON.stringify(data), d.id); touched++; }
-  }
-
-  const groupCount = counters.reduce((s, c) => s + c.count, 0);
-  return { org: orgId, groups: groupCount, items: newCodeByItem.size, diagrams: touched };
-}
+import { renumberOrgCodes } from "../app/lib/riskControls/renumberOrg";
 
 async function main() {
   const url = process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/diagramatix";
@@ -67,8 +27,8 @@ async function main() {
     const only = process.argv[2];
     const orgs = only ? [{ id: only }] : await prisma.org.findMany({ select: { id: true } });
     for (const o of orgs) {
-      const r = await renumberOrg(prisma, o.id);
-      console.log(`org ${r.org}: ${r.groups} controls renumbered across ${r.items} item(s); ${r.diagrams ?? 0} diagram(s) updated`);
+      const r = await renumberOrgCodes(prisma, o.id);
+      console.log(`org ${o.id}: ${r.groups} controls renumbered across ${r.items} item(s); ${r.diagrams} diagram(s) updated`);
     }
     console.log("Done.");
   } finally { await prisma.$disconnect(); }

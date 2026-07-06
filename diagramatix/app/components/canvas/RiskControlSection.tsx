@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { DiagramElement } from "@/app/lib/diagram/types";
 import { getRiskControl, riskControlPatch, type RiskControlRef } from "@/app/lib/diagram/riskControl";
 import type { RiskControlKind } from "@/app/lib/riskControls/types";
@@ -18,20 +18,21 @@ const ATTACHABLE = new Set(["task", "subprocess", "subprocess-expanded", "call-a
  * params pattern). Shown only for activity/gateway/data element types.
  */
 export function RiskControlSection({
-  element, catalog, onUpdateProperties, onCreate, onOpenChange,
+  element, catalog, onUpdateProperties, onCreate, open: controlledOpen, onToggle,
 }: {
   element: DiagramElement;
   catalog: RiskCatalogItem[];
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
   /** Create a new catalog Risk/Control from the diagram, then attach it. */
   onCreate?: (kind: "Risk" | "Control", name: string) => Promise<RiskCatalogItem | null>;
-  /** Report the section's open state (drives the canvas risk/control highlight). */
-  onOpenChange?: (open: boolean) => void;
+  /** Controlled open state (owned by the editor so it's sticky across diagrams
+   *  and drives the canvas highlight). Falls back to local state if omitted. */
+  open?: boolean;
+  onToggle?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  // Mirror the open state up (for the canvas highlight); clear on unmount.
-  useEffect(() => { onOpenChange?.(open); }, [open, onOpenChange]);
-  useEffect(() => () => { onOpenChange?.(false); }, [onOpenChange]);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
+  const setOpen = (next: boolean) => { if (onToggle) onToggle(next); else setLocalOpen(next); };
   const [creating, setCreating] = useState<null | "risk" | "control">(null);
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -87,7 +88,7 @@ export function RiskControlSection({
 
   return (
     <div className="border-t border-gray-200 pt-2 mt-2">
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between text-[11px] font-medium text-gray-700">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between text-[11px] font-medium text-gray-700">
         <span>Risk &amp; Controls {(rc.riskRefs?.length || rc.controlRefs?.length) ? <span className="text-gray-400">({(rc.riskRefs?.length ?? 0) + (rc.controlRefs?.length ?? 0)})</span> : null}{gap && <span className="text-red-500 ml-1">• gap</span>}</span>
         <span className="text-gray-400">{open ? "▲" : "▼"}</span>
       </button>

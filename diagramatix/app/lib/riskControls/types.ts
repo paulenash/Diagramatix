@@ -124,3 +124,7 @@ export function riskBand(score: number | null): "none" | "low" | "medium" | "hig
   if (score >= 6) return "medium";
   return "low";
 }
+
+/** One place a Risk/Control is attached to a process step, with the ids the
+ *  Risk & Control screen needs to deep-link to the step on its diagram. */
+export interface RcAttachment { diagramId: string; diagramName: string; elementId: string; label: string; }

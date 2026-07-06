@@ -49,8 +49,10 @@ interface Props {
   riskCatalog?: RiskCatalogItem[];
   /** Create a new catalog Risk/Control from the diagram (undefined = not permitted). */
   onCreateRiskItem?: (kind: "Risk" | "Control", name: string) => Promise<RiskCatalogItem | null>;
-  /** Report the Risk & Controls section's open state (drives the canvas highlight). */
-  onRcSectionOpenChange?: (open: boolean) => void;
+  /** Controlled open state for the Risk & Controls section — owned by the editor
+   *  so it stays open (sticky) across diagrams and drives the canvas highlight. */
+  rcSectionOpen?: boolean;
+  onRcSectionToggle?: (open: boolean) => void;
   /** Open the SharePoint picker to link a file to this Data Object / Store. */
   onLinkSharePointFile?: (elementId: string) => void;
   /** Open the embedded preview for an already-linked SharePoint file. */
@@ -700,7 +702,8 @@ export function PropertiesPanel({
   isAdmin: _isAdmin,
   riskCatalog,
   onCreateRiskItem,
-  onRcSectionOpenChange,
+  rcSectionOpen,
+  onRcSectionToggle,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
   // Auto-grow textarea ref for task/subprocess Name editing — height
@@ -2929,7 +2932,7 @@ export function PropertiesPanel({
       </div>
     )}
       <SimulationSection element={element} onUpdateProperties={onUpdateProperties} />
-      <RiskControlSection element={element} catalog={riskCatalog ?? []} onUpdateProperties={onUpdateProperties} onCreate={onCreateRiskItem} onOpenChange={onRcSectionOpenChange} />
+      <RiskControlSection element={element} catalog={riskCatalog ?? []} onUpdateProperties={onUpdateProperties} onCreate={onCreateRiskItem} open={rcSectionOpen} onToggle={onRcSectionToggle} />
     </div>
   );
 }

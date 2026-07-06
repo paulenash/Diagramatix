@@ -499,9 +499,22 @@ export function DiagramEditor({
 
   // Project Risk & Control catalog — items available to attach to a step.
   const [riskCatalog, setRiskCatalog] = useState<RiskCatalogItem[]>([]);
-  // Whether a step's "Risk & Controls" Properties-Panel section is expanded —
-  // drives the red/green canvas highlight.
-  const [rcSectionOpen, setRcSectionOpen] = useState(false);
+  // Whether the "Risk & Controls" Properties-Panel section is expanded — drives
+  // the red/green canvas highlight. STICKY across diagrams within a project:
+  // persisted in sessionStorage keyed by the project id, so paging through a
+  // project's diagrams (prev/next) keeps the panel open and every diagram shows
+  // its risk/control rings on load. A different project starts closed by default.
+  const RC_OPEN_KEY = "dgx_rc_panel_open_project";
+  const [rcSectionOpen, setRcSectionOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined" || !projectId) return false;
+    return window.sessionStorage.getItem(RC_OPEN_KEY) === projectId;
+  });
+  const toggleRcSection = useCallback((open: boolean) => {
+    setRcSectionOpen(open);
+    if (typeof window === "undefined") return;
+    if (open && projectId) window.sessionStorage.setItem(RC_OPEN_KEY, projectId);
+    else window.sessionStorage.removeItem(RC_OPEN_KEY);
+  }, [projectId]);
   const [riskLibraryId, setRiskLibraryId] = useState<string | null>(null);
   const refreshRiskCatalog = useCallback(async () => {
     if (!projectId) return;
@@ -937,6 +950,11 @@ export function DiagramEditor({
   // a context banner, and Submit/Decline.
   const searchParams = useSearchParams();
   const reviewIdParam = searchParams.get("review");
+  // Deep-link from the Risk & Control screen: focus a step (?rcElement=…) and,
+  // if present, offer a "← Risk & Controls" return to that project's console
+  // (?rcReturn=<projectId>).
+  const rcElementParam = searchParams.get("rcElement");
+  const rcReturnParam = searchParams.get("rcReturn");
   const [reviewCtx, setReviewCtx] = useState<{
     reviewId: string; diagramId: string; objective: string; dueDate: string; status: string;
     requesterName: string; requesterEmail: string; isRequester: boolean;
@@ -957,6 +975,21 @@ export function DiagramEditor({
     })();
     return () => { cancelled = true; };
   }, [reviewIdParam]);
+
+  // On arrival from the R&C screen, once the target step exists in the loaded
+  // diagram: select it, open the (sticky) Risk & Controls panel so the rings
+  // show, and centre the canvas on it. Runs once per rcElement.
+  const rcFocusedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!rcElementParam || rcFocusedRef.current === rcElementParam) return;
+    if (!data.elements.some((el) => el.id === rcElementParam)) return;
+    rcFocusedRef.current = rcElementParam;
+    setSelectedElementIds(new Set([rcElementParam]));
+    toggleRcSection(true);
+    // Defer the centre so the canvas has mounted + measured its viewport.
+    const t = setTimeout(() => window.dispatchEvent(new CustomEvent("dgx:centerElement", { detail: { id: rcElementParam } })), 120);
+    return () => clearTimeout(t);
+  }, [rcElementParam, data.elements, toggleRcSection]);
 
   const reviewMode = !!reviewCtx && !reviewCtx.isRequester;
 
@@ -2369,6 +2402,17 @@ export function DiagramEditor({
       {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
         <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} currentDiagramId={diagramId} />
       )}
+      {rcReturnParam && (
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-1.5 text-xs text-blue-800 flex items-center justify-between">
+          <span>Viewing a step linked from the Risk &amp; Control screen.</span>
+          <button
+            onClick={() => router.push(`/dashboard/projects/${rcReturnParam}?rcm=1`)}
+            className="font-medium text-blue-700 hover:text-blue-900 underline"
+          >
+            ← Back to Risk &amp; Controls
+          </button>
+        </div>
+      )}
       {elementLimitToast && (
         <div className="bg-red-50 border-b border-red-200 px-4 py-2 text-xs text-red-800 flex items-center justify-between">
           <span>{elementLimitToast}</span>
@@ -3522,7 +3566,8 @@ export function DiagramEditor({
             onUpdateProperties={updateProperties}
             riskCatalog={riskCatalog}
             onCreateRiskItem={riskLibraryId ? onCreateRiskItem : undefined}
-            onRcSectionOpenChange={setRcSectionOpen}
+            rcSectionOpen={rcSectionOpen}
+            onRcSectionToggle={toggleRcSection}
             onLinkSharePointFile={(id) => setSpLinkElId(id)}
             onPreviewSharePointFile={(link) => setSpPreview(link)}
             onSetEventBoundary={(id, hostId) => {

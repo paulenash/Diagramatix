@@ -6,7 +6,7 @@ import {
   RISK_CONTROL_KINDS, KIND_LABEL, KIND_LABEL_PLURAL,
   CONTROL_TYPES, CONTROL_TYPE_LABELS, CONTROL_AUTOMATIONS, CONTROL_AUTOMATION_LABELS,
   RATING_SCALE, riskScore, riskBand, relationVerb, aIsSource,
-  type RiskControlLibraryDTO, type RiskControlItemDTO, type RiskControlKind,
+  type RiskControlLibraryDTO, type RiskControlItemDTO, type RiskControlKind, type RcAttachment,
 } from "@/app/lib/riskControls/types";
 import type { ObservedDeviation, ControlEffectiveness } from "@/app/lib/riskControls/controlEffectiveness";
 
@@ -22,18 +22,20 @@ const BAND_COLOR: Record<string, string> = {
 };
 
 export function RiskControlEditor({
-  library, basePath, canEdit, onChange, deviations, effectiveness, attachments,
+  library, basePath, projectId, canEdit, onChange, deviations, effectiveness, attachments,
 }: {
   library: RiskControlLibraryDTO;
   basePath: string;
+  /** Owning project id — used to deep-link an attachment to its step + return here. */
+  projectId?: string;
   canEdit: boolean;
   onChange: () => void;
   /** Observed mining deviations to map controls against (project context only). */
   deviations?: ObservedDeviation[];
   /** Per-control operating effectiveness from the latest conformance run. */
   effectiveness?: Record<string, ControlEffectiveness>;
-  /** Per-item process steps it's attached to ("<Diagram> — <Step>"), reverse lookup. */
-  attachments?: Record<string, string[]>;
+  /** Per-item process steps it's attached to (reverse lookup, with deep-link ids). */
+  attachments?: Record<string, RcAttachment[]>;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -192,10 +194,23 @@ export function RiskControlEditor({
                       </select>
                     )}
                   </div>
-                  {/* Which process steps this item is attached to (reverse lookup). */}
+                  {/* Which process steps this item is attached to (reverse lookup).
+                      Each links to the step on its diagram and returns to this
+                      console (?rc=1) via the rcReturn param. */}
                   {attachments?.[it.id]?.length ? (
-                    <div className="text-[10px] text-gray-500 mt-0.5" title={attachments[it.id].join("\n")}>
-                      <span className="text-gray-400">on:</span> {attachments[it.id].slice(0, 3).join(" · ")}{attachments[it.id].length > 3 ? ` +${attachments[it.id].length - 3} more` : ""}
+                    <div className="text-[10px] text-gray-500 mt-0.5">
+                      <span className="text-gray-400">on:</span>{" "}
+                      {attachments[it.id].map((a, i) => {
+                        const href = `/diagram/${a.diagramId}?rcElement=${encodeURIComponent(a.elementId)}${projectId ? `&rcReturn=${encodeURIComponent(projectId)}` : ""}`;
+                        return (
+                          <span key={`${a.diagramId}:${a.elementId}`}>
+                            {i > 0 && <span className="text-gray-300"> · </span>}
+                            <a href={href} className="text-blue-600 hover:text-blue-800 hover:underline" title={`Open ${a.diagramName} — ${a.label}`}>
+                              {a.diagramName} — {a.label}
+                            </a>
+                          </span>
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>

@@ -1079,6 +1079,27 @@ export function Canvas({
     return () => window.removeEventListener("dgx:fitToContent", onFit);
   }, [performFit]);
 
+  // Centre the viewport on one element — used when arriving from the Risk &
+  // Control screen (?rcElement=…) so the linked step is front-and-centre. Keeps
+  // the current zoom (or lifts a very zoomed-out view to a readable 0.8×).
+  useEffect(() => {
+    function onCenter(e: Event) {
+      const id = (e as CustomEvent<{ id: string }>).detail?.id;
+      if (!id || !svgRef.current) return;
+      const el = data.elements.find((x) => x.id === id);
+      if (!el) return;
+      const rect = svgRef.current.getBoundingClientRect();
+      if (rect.width < 10 || rect.height < 10) return;
+      const z = Math.max(zoom, 0.8);
+      const cx = el.x + el.width / 2;
+      const cy = el.y + el.height / 2;
+      setPan({ x: rect.width / 2 - cx * z, y: rect.height / 2 - cy * z });
+      setZoom(z);
+    }
+    window.addEventListener("dgx:centerElement", onCenter as EventListener);
+    return () => window.removeEventListener("dgx:centerElement", onCenter as EventListener);
+  }, [data.elements, zoom]);
+
   // Reset picker offset when a new pending drop appears
   useEffect(() => { setPickerOffset({ x: 0, y: 0 }); }, [pendingDrop]);
   useEffect(() => { setFocusedEndpoint(null); }, [selectedConnectorId]);

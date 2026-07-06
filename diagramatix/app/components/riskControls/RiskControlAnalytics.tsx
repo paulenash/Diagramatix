@@ -7,7 +7,7 @@
  * sheet and adds risk-posture / control-mix / effectiveness distributions.
  */
 import { useMemo } from "react";
-import type { RiskControlLibraryDTO, RiskControlItemDTO } from "@/app/lib/riskControls/types";
+import type { RiskControlLibraryDTO, RiskControlItemDTO, RcAttachment } from "@/app/lib/riskControls/types";
 import { KIND_LABEL, riskScore, residualScore, riskBand } from "@/app/lib/riskControls/types";
 import type { ControlEffectiveness } from "@/app/lib/riskControls/controlEffectiveness";
 
@@ -49,7 +49,7 @@ export function RiskControlAnalytics({
 }: {
   library: RiskControlLibraryDTO;
   effectiveness?: Record<string, ControlEffectiveness>;
-  attachments?: Record<string, string[]>;
+  attachments?: Record<string, RcAttachment[]>;
 }) {
   const a = useMemo(() => {
     const items = library.items;

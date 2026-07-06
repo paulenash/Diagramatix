@@ -52,6 +52,26 @@ describe("org-wide RCM renumber", () => {
     expect(control.count).toBe(1);
   });
 
+  it("T0655 — per-kind scope: renumbering only Controls leaves Risks untouched", () => {
+    const libs: RenumberLib[] = [{
+      id: "m", isMaster: true, sourceLibraryId: null,
+      items: [
+        { id: "r1", kind: "Risk", code: "R-05", name: "A" },
+        { id: "r2", kind: "Risk", code: "R-09", name: "B" },
+        { id: "c1", kind: "Control", code: "C-03", name: "C" },
+        { id: "c2", kind: "Control", code: "C-07", name: "D" },
+      ],
+    }];
+    const { newCodeByItem, counters } = assignOrgWideCodes(libs, ["Control"]);
+    // Controls renumbered…
+    expect(newCodeByItem.get("c1")).toBe("C-001");
+    expect(newCodeByItem.get("c2")).toBe("C-002");
+    // …Risks left completely alone (no entries, no counter).
+    expect(newCodeByItem.has("r1")).toBe(false);
+    expect(newCodeByItem.has("r2")).toBe(false);
+    expect(counters.map((c) => c.kind)).toEqual(["Control"]);
+  });
+
   it("T0654 — idempotent: re-running on already-numbered codes is a no-op", () => {
     const libs: RenumberLib[] = [{
       id: "m", isMaster: true, sourceLibraryId: null,

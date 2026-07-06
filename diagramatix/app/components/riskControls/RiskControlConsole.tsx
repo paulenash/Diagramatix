@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { RiskControlEditor } from "./RiskControlEditor";
 import { RiskControlAnalytics } from "./RiskControlAnalytics";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
-import type { RiskControlLibraryDTO } from "@/app/lib/riskControls/types";
+import type { RiskControlLibraryDTO, RcAttachment } from "@/app/lib/riskControls/types";
 import type { ObservedDeviation, ControlEffectiveness } from "@/app/lib/riskControls/controlEffectiveness";
 
 /**
@@ -35,7 +35,7 @@ export function RiskControlConsole({
   const [deviations, setDeviations] = useState<ObservedDeviation[] | undefined>(undefined);
   const [effectiveness, setEffectiveness] = useState<Record<string, ControlEffectiveness>>({});
   const [runName, setRunName] = useState<string | null>(null);
-  const [attachments, setAttachments] = useState<Record<string, string[]>>({});
+  const [attachments, setAttachments] = useState<Record<string, RcAttachment[]>>({});
   const [tab, setTab] = useState<"editor" | "analytics">("editor");
 
   const refresh = useCallback(async () => {
@@ -127,7 +127,7 @@ export function RiskControlConsole({
                 <RiskControlAnalytics library={library} effectiveness={effectiveness} attachments={attachments} />
               ) : (
                 <div className="bg-white border border-blue-200 rounded-lg p-4">
-                  <RiskControlEditor library={library} basePath={basePath} canEdit={canEdit} onChange={refresh} deviations={deviations} effectiveness={effectiveness} attachments={attachments} />
+                  <RiskControlEditor library={library} basePath={basePath} projectId={projectId} canEdit={canEdit} onChange={refresh} deviations={deviations} effectiveness={effectiveness} attachments={attachments} />
                 </div>
               )}
             </>

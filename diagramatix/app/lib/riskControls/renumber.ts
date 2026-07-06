@@ -10,10 +10,13 @@ export interface RenumberLib { id: string; isMaster: boolean; sourceLibraryId: s
 
 const numOf = (code: string) => { const m = code.match(/(\d+)/); return m ? parseInt(m[1], 10) : 1e9; };
 
-export function assignOrgWideCodes(libs: RenumberLib[]): {
+export function assignOrgWideCodes(libs: RenumberLib[], kinds?: RiskControlKind[]): {
   newCodeByItem: Map<string, string>;
   counters: { kind: RiskControlKind; count: number }[];
 } {
+  // Optional per-kind scope (OrgAdmin can renumber e.g. only Risks). Kinds not in
+  // the filter are left completely untouched — no code change, no counter change.
+  const only = kinds && kinds.length ? new Set(kinds) : null;
   const masterLibIds = new Set(libs.filter((l) => l.isMaster).map((l) => l.id));
 
   // Canonical key: an item cloned from an org master (its library's sourceLibraryId
@@ -38,6 +41,7 @@ export function assignOrgWideCodes(libs: RenumberLib[]): {
 
   const perKind = new Map<RiskControlKind, Group[]>();
   for (const g of groups.values()) {
+    if (only && !only.has(g.kind)) continue;
     const arr = perKind.get(g.kind) ?? [];
     arr.push(g);
     perKind.set(g.kind, arr);
