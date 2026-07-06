@@ -18,6 +18,18 @@ async function main() {
   const url = process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/diagramatix";
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
   try {
+    // Cleanup first: an adopted example that has since been RENAMED away from its
+    // "… (example)" / demo name is now the user's own project — drop the tint so
+    // it reads as a normal white tile. (Going forward the rename API clears it
+    // live; this catches ones renamed before that shipped.)
+    const cleaned = await prisma.$executeRawUnsafe(
+      `UPDATE "Project" SET "exampleType" = NULL
+       WHERE "exampleType" IS NOT NULL
+         AND lower("name") NOT LIKE '%(example)%'
+         AND lower("name") NOT LIKE '%demo%'`,
+    );
+    console.log(`Cleared example tint from ${cleaned} renamed project(s).`);
+
     // Candidates: untagged projects whose name reads as an adopted example or a
     // seeded demo. Postgres ILIKE via a raw name filter through Prisma's contains.
     const candidates = await prisma.project.findMany({

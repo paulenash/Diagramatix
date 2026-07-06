@@ -102,11 +102,14 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   try {
-    const dataUpdate: Record<string, string> = {};
+    const dataUpdate: Record<string, string | null> = {};
     if (name !== undefined) dataUpdate.name = name.trim();
     if (description !== undefined) dataUpdate.description = description;
     if (ownerName !== undefined) dataUpdate.ownerName = ownerName;
     if (orgId !== undefined && orgId !== existing.orgId && isSuperuser(session)) dataUpdate.orgId = orgId;
+    // Renaming an adopted example makes it the user's own project — drop the
+    // example tint so it reads as a normal (white) tile, not a sample.
+    if (name !== undefined && name.trim() !== existing.name && existing.exampleType) dataUpdate.exampleType = null;
     if (Object.keys(dataUpdate).length > 0) {
       await prisma.project.update({ where: { id }, data: dataUpdate });
     }
