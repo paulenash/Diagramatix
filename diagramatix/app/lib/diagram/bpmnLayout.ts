@@ -571,6 +571,12 @@ export function layoutBpmnDiagram(
 
     // R6.02: Compute lane heights — each lane needs room for its elements + vertical padding
     const taskDef = getSymbolDefinition("task");
+    // R6.02c (routing clearance): a Pool/Lane carrying process flow reserves 2×
+    // Task-height of vertical clearance above the topmost and below the bottommost
+    // element it contains — since elements are vertically CENTRED in the band, a
+    // symmetric buffer of 2× Task-height delivers that both sides — so connector
+    // routing is never pinched against the Pool/Lane boundary.
+    const VCLEAR = 2 * taskDef.defaultHeight;
     const laneHeights: number[] = [];
     for (const lane of pLanes) {
       const els = laneElements.get(lane.id) ?? [];
@@ -581,12 +587,13 @@ export function layoutBpmnDiagram(
         colCounts.set(c, (colCounts.get(c) ?? 0) + 1);
       }
       const maxStack = Math.max(1, ...colCounts.values());
-      // Each lane needs at least room for 1 task height + generous vertical buffer
-      const vertBuffer = 40; // buffer above and below content
+      // Each lane needs room for its tallest column stack + 2× Task-height above
+      // and below (VCLEAR) — the R6.02c routing-clearance buffer.
+      const vertBuffer = VCLEAR;
       const minLaneH = taskDef.defaultHeight + vertBuffer * 2;
       laneHeights.push(Math.max(minLaneH, maxStack * (taskDef.defaultHeight + 30) + vertBuffer * 2));
     }
-    if (pLanes.length === 0) laneHeights.push(taskDef.defaultHeight + 80);
+    if (pLanes.length === 0) laneHeights.push(taskDef.defaultHeight + VCLEAR * 2);
 
     let totalLaneH = laneHeights.reduce((s, h) => s + h, 0);
 
@@ -1267,8 +1274,12 @@ export function layoutBpmnDiagram(
       maxBottom = Math.max(maxBottom, child.y + child.height);
     }
     const PAD = 30;
+    // R6.02c: keep 2× Task-height of clearance below the lowest child (matching the
+    // top clearance built into lane sizing) so overflow growth doesn't pinch routing
+    // against the boundary.
+    const VPAD = 2 * getSymbolDefinition("task").defaultHeight;
     const neededW = maxRight - container.x + PAD;
-    const neededH = maxBottom - container.y + PAD;
+    const neededH = maxBottom - container.y + VPAD;
     if (neededW > container.width) container.width = neededW;
     if (containerType === "pool") {
       // Pool height must cover all its lanes exactly (lanes already grew to fit content)
@@ -2468,19 +2479,18 @@ export function layoutBpmnDiagram(
 
       if (srcIsDecision || tgtIsMerge || srcIsMerge || tgtIsDecision) {
         if (srcIsDecision) {
-          // R3.10 (decision side): idx 0 → top, idx 1 → right (when n ≥ 3),
-          // idx ≥ 2 → bottom. For n=2 fall back to top/bottom.
+          // R3.10/R3.11 (decision side): a Decision gateway (any type) attaches from
+          // its TOP connection point to a target above it and its BOTTOM point to a
+          // target below it (index 0 → top, index ≥ 2 → bottom; middles → right). For
+          // n=2 the top/bottom choice is made ONLY when the target is actually above/
+          // below the gateway box — a target level with the gateway exits "right" so
+          // the route doesn't jog up/down INTO the target body, and the branch label
+          // doesn't pile onto the gateway (surfaced by book-trip-allornothing).
           const list = decisionOutgoings.get(src.id) ?? [];
           const idx = list.indexOf(c);
           const n = list.length;
           if (idx < 0 || n <= 1) srcSide = "right";
           else if (n === 2) {
-            // idx 0 = topmost target, idx 1 = bottommost — but only exit
-            // top/bottom when the target is ACTUALLY above/below the gateway.
-            // A target sitting level with the gateway (mainly to the side, e.g.
-            // a compensation fan-out) exits "right" so the route doesn't jog
-            // up/down INTO the target body (sequence-clips-own-endpoint).
-            // Surfaced by the AI harness: book-trip-allornothing.
             srcSide = tgtCy < src.y - 10 ? "top"
               : tgtCy > src.y + src.height + 10 ? "bottom"
               : "right";

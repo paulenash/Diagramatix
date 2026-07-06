@@ -50,6 +50,31 @@ const BPMN_LAYOUT_RULES: LayoutRule[] = [
     },
   },
   {
+    id: "R6.02c",
+    title: "a Pool/Lane reserves ≥ 2× Task-height of clearance above the top element and below the bottom element (routing clearance)",
+    check: () => {
+      const TASK_H = 65; // symbols/definitions.ts: task defaultHeight
+      const out = layout(
+        [
+          { id: "p", type: "pool", label: "Sales", poolType: "white-box" },
+          { id: "L", type: "lane", label: "Rep", parentPool: "p", pool: "p" },
+          { id: "t1", type: "task", label: "Receive", pool: "p", lane: "L" },
+          { id: "t2", type: "task", label: "Process", pool: "p", lane: "L" },
+        ],
+        [{ sourceId: "t1", targetId: "t2" }],
+      );
+      const lane = out.elements.find((e) => e.id === "L")!;
+      const laneEls = out.elements.filter((e) => e.parentId === "L");
+      expect(laneEls.length, "lane should contain its tasks").toBeGreaterThan(0);
+      const topMost = Math.min(...laneEls.map((e) => e.y));
+      const bottomMost = Math.max(...laneEls.map((e) => e.y + e.height));
+      const topClearance = topMost - lane.y;
+      const bottomClearance = lane.y + lane.height - bottomMost;
+      expect(topClearance, `top clearance ${topClearance} < 2× task height`).toBeGreaterThanOrEqual(2 * TASK_H);
+      expect(bottomClearance, `bottom clearance ${bottomClearance} < 2× task height`).toBeGreaterThanOrEqual(2 * TASK_H);
+    },
+  },
+  {
     id: "R8.04",
     title: "right-to-left loop-back flows route via top/bottom, never the left face",
     check: () => {
