@@ -27,10 +27,13 @@ function depthOf(el: DiagramElement, byId: Map<string, DiagramElement>): number 
 // too — otherwise their box paints over the connectors drawn within.
 const CONTAINER = new Set(["pool", "lane", "subprocess-expanded"]);
 
-export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data }: { data: DiagramData }) {
+export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data, visibleIds }: { data: DiagramData; visibleIds?: Set<string> }) {
   const byId = new Map(data.elements.map((e) => [e.id, e]));
-  const containers = data.elements.filter((e) => CONTAINER.has(e.type)).sort((a, b) => depthOf(a, byId) - depthOf(b, byId));
-  const others = data.elements.filter((e) => !CONTAINER.has(e.type));
+  // Optional progressive-reveal gate (the Animate feature): render only ids in
+  // the set. Undefined = render everything (the normal replay backdrop).
+  const showEl = (id: string) => !visibleIds || visibleIds.has(id);
+  const containers = data.elements.filter((e) => CONTAINER.has(e.type) && showEl(e.id)).sort((a, b) => depthOf(a, byId) - depthOf(b, byId));
+  const others = data.elements.filter((e) => !CONTAINER.has(e.type) && showEl(e.id));
 
   const sym = (el: DiagramElement) => (
     <SymbolRenderer
@@ -50,7 +53,7 @@ export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data 
     <g style={{ pointerEvents: "none" }}>
       {/* pools + lanes (background), then connectors, then the flow shapes on top */}
       {containers.map(sym)}
-      {data.connectors.map((c) => <ConnectorRenderer key={c.id} connector={c} selected={false} onSelect={noop} />)}
+      {data.connectors.filter((c) => showEl(c.id)).map((c) => <ConnectorRenderer key={c.id} connector={c} selected={false} onSelect={noop} />)}
       {others.map(sym)}
     </g>
   );

@@ -27,6 +27,7 @@ import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
+import { AnimateOverlay } from "@/app/components/canvas/AnimateOverlay";
 import type { RiskCatalogItem } from "@/app/components/canvas/RiskControlSection";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -900,6 +901,7 @@ export function DiagramEditor({
   const [aiPanelNarrativeGenerating, setAiPanelNarrativeGenerating] = useState(false);
   const [showPlanPanel, setShowPlanPanel] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
+  const [showAnimate, setShowAnimate] = useState(false);
   // BPMN and Standard Flowchart both use the 2-phase Plan panel (plan → edit →
   // apply deterministic layout). Other types use the legacy one-shot AI panel.
   const usesPlanPanel = diagramType === "bpmn" || diagramType === "flowchart";
@@ -2971,6 +2973,15 @@ export function DiagramEditor({
             ◈ Simulator
           </button>
         )}
+        {!readOnly && data.elements.length > 0 && (
+          <button
+            onClick={() => setShowAnimate(true)}
+            className="px-2 py-0.5 text-[11px] rounded border border-blue-500 text-blue-700 hover:bg-blue-50 font-medium"
+            title="Animate! — gradually draw the diagram (Breadth- or Depth-first), with a movable speed/traversal control"
+          >
+            ▸ Animate!
+          </button>
+        )}
         {/* Send for Review (Phase 2) — owner sends the diagram to one or
             more Collaboration Groups for feedback. */}
         {!readOnly && (
@@ -3570,6 +3581,10 @@ export function DiagramEditor({
             onClose={() => setShowComparisonModal(false)}
           />
         ) : null}
+
+        {showAnimate && (
+          <AnimateOverlay data={data} diagramName={diagramName} onClose={() => setShowAnimate(false)} />
+        )}
 
         {showSimulator && (
           <SimulatorOverlay
