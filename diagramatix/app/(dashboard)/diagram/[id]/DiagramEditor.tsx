@@ -498,13 +498,31 @@ export function DiagramEditor({
 
   // Project Risk & Control catalog — items available to attach to a step.
   const [riskCatalog, setRiskCatalog] = useState<RiskCatalogItem[]>([]);
-  useEffect(() => {
+  const [riskLibraryId, setRiskLibraryId] = useState<string | null>(null);
+  const refreshRiskCatalog = useCallback(async () => {
     if (!projectId) return;
-    fetch(`/api/projects/${projectId}/risk-controls`)
-      .then((r) => (r.ok ? r.json() : { library: null }))
-      .then((j) => setRiskCatalog((j.library?.items ?? []).map((it: RiskCatalogItem) => ({ id: it.id, code: it.code, name: it.name, kind: it.kind }))))
-      .catch(() => {});
+    try {
+      const r = await fetch(`/api/projects/${projectId}/risk-controls`);
+      const j = r.ok ? await r.json() : { library: null };
+      setRiskLibraryId(j.library?.id ?? null);
+      setRiskCatalog((j.library?.items ?? []).map((it: RiskCatalogItem) => ({ id: it.id, code: it.code, name: it.name, kind: it.kind })));
+    } catch { /* ignore */ }
   }, [projectId]);
+  useEffect(() => { void refreshRiskCatalog(); }, [refreshRiskCatalog]);
+  // Create a brand-new catalog Risk/Control straight from the diagram (owner-gated
+  // by the API), then refresh the catalog so it can be attached to the step.
+  const onCreateRiskItem = useCallback(async (kind: "Risk" | "Control", name: string): Promise<RiskCatalogItem | null> => {
+    if (!projectId || !riskLibraryId || !name.trim()) return null;
+    try {
+      const res = await fetch(`/api/projects/${projectId}/risk-controls/${riskLibraryId}/items`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, name: name.trim() }),
+      });
+      if (!res.ok) return null;
+      const j = await res.json();
+      await refreshRiskCatalog();
+      return j.item ? { id: j.item.id, code: j.item.code, name: j.item.name, kind: j.item.kind } : null;
+    } catch { return null; }
+  }, [projectId, riskLibraryId, refreshRiskCatalog]);
 
   // Persist a brand-new pool/lane name into the project structure, then
   // refresh local suggestions. Returns true on success.
@@ -3482,6 +3500,7 @@ export function DiagramEditor({
             onUpdateLabel={updateLabel}
             onUpdateProperties={updateProperties}
             riskCatalog={riskCatalog}
+            onCreateRiskItem={riskLibraryId ? onCreateRiskItem : undefined}
             onLinkSharePointFile={(id) => setSpLinkElId(id)}
             onPreviewSharePointFile={(link) => setSpPreview(link)}
             onSetEventBoundary={(id, hostId) => {

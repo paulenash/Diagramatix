@@ -42,7 +42,7 @@ export function SimulationSection({
   element: DiagramElement;
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
 }) {
-  const [open, setOpen] = useState(true); // open by default so simulation data is discoverable
+  const [open, setOpen] = useState(false); // collapsed by default (matches Risk & Controls)
   const sim = getSimParams(element);
   const patch = (p: Partial<ElementSimParams>) => onUpdateProperties(element.id, simPatch(element, p));
 

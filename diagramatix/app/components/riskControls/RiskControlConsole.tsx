@@ -34,6 +34,7 @@ export function RiskControlConsole({
   const [deviations, setDeviations] = useState<ObservedDeviation[] | undefined>(undefined);
   const [effectiveness, setEffectiveness] = useState<Record<string, ControlEffectiveness>>({});
   const [runName, setRunName] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<Record<string, string[]>>({});
 
   const refresh = useCallback(async () => {
     const res = await fetch(basePath);
@@ -46,6 +47,8 @@ export function RiskControlConsole({
       setEffectiveness(e.effectiveness ?? {});
       setRunName(e.run?.name ?? null);
     }).catch(() => {});
+    // Which process steps each Risk/Control is attached to (reverse lookup).
+    fetch(`${basePath}/attachments`).then((r) => (r.ok ? r.json() : null)).then((a) => { if (a) setAttachments(a.attachments ?? {}); }).catch(() => {});
   }, [basePath]);
 
   useEffect(() => {
@@ -111,7 +114,7 @@ export function RiskControlConsole({
                 {Object.keys(effectiveness).length > 0 && <span className="text-blue-700">{Object.keys(effectiveness).length} controls monitored for bypass</span>}
               </div>
               <div className="bg-white border border-blue-200 rounded-lg p-4">
-                <RiskControlEditor library={library} basePath={basePath} canEdit={canEdit} onChange={refresh} deviations={deviations} effectiveness={effectiveness} />
+                <RiskControlEditor library={library} basePath={basePath} canEdit={canEdit} onChange={refresh} deviations={deviations} effectiveness={effectiveness} attachments={attachments} />
               </div>
             </>
           ) : (

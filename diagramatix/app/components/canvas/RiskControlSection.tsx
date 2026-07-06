@@ -18,13 +18,18 @@ const ATTACHABLE = new Set(["task", "subprocess", "subprocess-expanded", "call-a
  * params pattern). Shown only for activity/gateway/data element types.
  */
 export function RiskControlSection({
-  element, catalog, onUpdateProperties,
+  element, catalog, onUpdateProperties, onCreate,
 }: {
   element: DiagramElement;
   catalog: RiskCatalogItem[];
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
+  /** Create a new catalog Risk/Control from the diagram, then attach it. */
+  onCreate?: (kind: "Risk" | "Control", name: string) => Promise<RiskCatalogItem | null>;
 }) {
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState<null | "risk" | "control">(null);
+  const [newName, setNewName] = useState("");
+  const [busy, setBusy] = useState(false);
   const gatewayLike = element.type === "gateway" || element.type.startsWith("gateway");
   if (!ATTACHABLE.has(element.type) && !gatewayLike) return null;
 
@@ -37,6 +42,28 @@ export function RiskControlSection({
     if (cur.some((r) => r.itemId === item.id)) return;
     onUpdateProperties(element.id, riskControlPatch(element, { [key]: [...cur, { itemId: item.id, code: item.code, label: item.name }] }));
   };
+  const createAndAttach = async (kind: "risk" | "control") => {
+    if (!onCreate || !newName.trim() || busy) return;
+    setBusy(true);
+    try {
+      const item = await onCreate(kind === "risk" ? "Risk" : "Control", newName);
+      if (item) attach(kind, item);
+      setNewName(""); setCreating(null);
+    } finally { setBusy(false); }
+  };
+  const createRow = (kind: "risk" | "control") => onCreate && (
+    creating === kind ? (
+      <div className="flex items-center gap-1">
+        <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void createAndAttach(kind); if (e.key === "Escape") { setCreating(null); setNewName(""); } }}
+          placeholder={`New ${kind} name…`} className="text-[10px] border border-gray-300 rounded px-1 py-0.5 flex-1" />
+        <button onClick={() => void createAndAttach(kind)} disabled={busy || !newName.trim()} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-600 text-white disabled:opacity-40">{busy ? "…" : "Add"}</button>
+        <button onClick={() => { setCreating(null); setNewName(""); }} className="text-[10px] text-gray-400 px-1">✕</button>
+      </div>
+    ) : (
+      <button onClick={() => { setCreating(kind); setNewName(""); }} className="text-[10px] text-blue-600 hover:text-blue-800">＋ new {kind}</button>
+    )
+  );
   const detach = (kind: "risk" | "control", itemId: string) => {
     const key = kind === "risk" ? "riskRefs" : "controlRefs";
     const cur = (rc[key] ?? []) as RiskControlRef[];
@@ -57,7 +84,7 @@ export function RiskControlSection({
     <div className="border-t border-gray-200 pt-2 mt-2">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between text-[11px] font-medium text-gray-700">
         <span>Risk &amp; Controls {(rc.riskRefs?.length || rc.controlRefs?.length) ? <span className="text-gray-400">({(rc.riskRefs?.length ?? 0) + (rc.controlRefs?.length ?? 0)})</span> : null}{gap && <span className="text-red-500 ml-1">• gap</span>}</span>
-        <span className="text-gray-400">{open ? "▾" : "▸"}</span>
+        <span className="text-gray-400">{open ? "▲" : "▼"}</span>
       </button>
       {open && (
         <div className="mt-2 space-y-2">
@@ -72,6 +99,7 @@ export function RiskControlSection({
                 {risks.map((r) => <option key={r.id} value={r.id}>{r.code} {r.name}</option>)}
               </select>
             )}
+            {createRow("risk")}
           </div>
           {/* Controls */}
           <div className="space-y-1">
@@ -83,6 +111,7 @@ export function RiskControlSection({
                 {controls.map((c) => <option key={c.id} value={c.id}>{c.code} {c.name}</option>)}
               </select>
             )}
+            {createRow("control")}
           </div>
           {gap && <p className="text-[10px] text-red-500">This step has a risk with no control (coverage gap — flagged by the diagram scan).</p>}
         </div>

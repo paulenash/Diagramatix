@@ -22,7 +22,7 @@ const BAND_COLOR: Record<string, string> = {
 };
 
 export function RiskControlEditor({
-  library, basePath, canEdit, onChange, deviations, effectiveness,
+  library, basePath, canEdit, onChange, deviations, effectiveness, attachments,
 }: {
   library: RiskControlLibraryDTO;
   basePath: string;
@@ -32,6 +32,8 @@ export function RiskControlEditor({
   deviations?: ObservedDeviation[];
   /** Per-control operating effectiveness from the latest conformance run. */
   effectiveness?: Record<string, ControlEffectiveness>;
+  /** Per-item process steps it's attached to ("<Diagram> — <Step>"), reverse lookup. */
+  attachments?: Record<string, string[]>;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -190,6 +192,12 @@ export function RiskControlEditor({
                       </select>
                     )}
                   </div>
+                  {/* Which process steps this item is attached to (reverse lookup). */}
+                  {attachments?.[it.id]?.length ? (
+                    <div className="text-[10px] text-gray-500 mt-0.5" title={attachments[it.id].join("\n")}>
+                      <span className="text-gray-400">on:</span> {attachments[it.id].slice(0, 3).join(" · ")}{attachments[it.id].length > 3 ? ` +${attachments[it.id].length - 3} more` : ""}
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

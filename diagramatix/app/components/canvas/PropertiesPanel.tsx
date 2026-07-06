@@ -47,6 +47,8 @@ interface Props {
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
   /** Project Risk & Control catalog items available to attach to a step. */
   riskCatalog?: RiskCatalogItem[];
+  /** Create a new catalog Risk/Control from the diagram (undefined = not permitted). */
+  onCreateRiskItem?: (kind: "Risk" | "Control", name: string) => Promise<RiskCatalogItem | null>;
   /** Open the SharePoint picker to link a file to this Data Object / Store. */
   onLinkSharePointFile?: (elementId: string) => void;
   /** Open the embedded preview for an already-linked SharePoint file. */
@@ -695,6 +697,7 @@ export function PropertiesPanel({
   onSetDiagramOwner,
   isAdmin: _isAdmin,
   riskCatalog,
+  onCreateRiskItem,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
   // Auto-grow textarea ref for task/subprocess Name editing — height
@@ -2923,7 +2926,7 @@ export function PropertiesPanel({
       </div>
     )}
       <SimulationSection element={element} onUpdateProperties={onUpdateProperties} />
-      <RiskControlSection element={element} catalog={riskCatalog ?? []} onUpdateProperties={onUpdateProperties} />
+      <RiskControlSection element={element} catalog={riskCatalog ?? []} onUpdateProperties={onUpdateProperties} onCreate={onCreateRiskItem} />
     </div>
   );
 }
