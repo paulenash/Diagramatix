@@ -152,7 +152,11 @@ export function PcfClient({
           <button type="submit" disabled={importing} className="text-xs px-3 py-1.5 rounded bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50">
             {importing ? "Importing…" : "Import as global reference"}
           </button>
-          {importMsg && <span className="text-[11px] text-gray-600">{importMsg}</span>}
+          {importMsg && (
+            <span className={`text-[11px] font-medium ${/^Imported/.test(importMsg) ? "text-emerald-700" : /already/.test(importMsg) ? "text-gray-600" : "text-red-600"}`}>
+              {importMsg}
+            </span>
+          )}
           <p className="w-full text-[10px] text-gray-400">Imports an APQC PCF workbook as a global reference framework (all orgs). A newer version of the same variant supersedes the previous. Convert .xls to .xlsx first.</p>
         </form>
       )}

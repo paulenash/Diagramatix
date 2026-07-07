@@ -65,7 +65,7 @@ export function RiskControlsClient({
         </div>
         {isSuperAdmin && orgs.length > 1 && (
           <select value={orgId} onChange={(e) => router.push(`/dashboard/admin/risk-controls?orgId=${e.target.value}`)}
-            className="text-sm border border-gray-300 rounded px-2 py-1">
+            className="text-sm border border-gray-300 rounded px-2 py-1 bg-white text-gray-800">
             {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
           </select>
         )}
@@ -97,7 +97,7 @@ export function RiskControlsClient({
           {RISK_CONTROL_KINDS.map((k) => (
             <button key={k} disabled={renumberBusy}
               onClick={() => setConfirmRenumber({ kinds: [k], label: `${KIND_LABEL[k]} codes` })}
-              className="text-xs px-2.5 py-1 rounded border border-orange-300 text-orange-700 hover:bg-orange-100 disabled:opacity-40">
+              className="text-xs px-2.5 py-1 rounded border border-orange-300 bg-white text-orange-700 hover:bg-orange-100 disabled:opacity-40">
               {KIND_LABEL[k]}
             </button>
           ))}
