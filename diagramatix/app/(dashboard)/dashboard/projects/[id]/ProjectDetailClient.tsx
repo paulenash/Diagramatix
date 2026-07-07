@@ -7,6 +7,7 @@ import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceModal";
 import { LinkScanDialog } from "./LinkScanDialog";
+import { PcfSeedFoldersDialog } from "./PcfSeedFoldersDialog";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -405,6 +406,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     title: string; message: string; onConfirm: () => void;
   } | null>(null);
   const [showMaintenance, setShowMaintenance] = useState(false);
+  const [showPcfSeed, setShowPcfSeed] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportLog, setExportLog] = useState<string[]>([]);
   const [exportResult, setExportResult] = useState<"success" | "failed" | null>(null);
@@ -2177,6 +2179,15 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                   >
                     Configuration
                   </button>
+                  {!readOnly && (
+                    <button
+                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                      onClick={() => { setShowProjectMenu(false); setShowPcfSeed(true); }}
+                      title="Create a folder structure mirroring an APQC PCF branch"
+                    >
+                      Seed folders from APQC PCF…
+                    </button>
+                  )}
                   <button
                     className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                     disabled={scanBusy}
@@ -2841,6 +2852,10 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             )}
           </div>
         </div>
+      )}
+
+      {showPcfSeed && (
+        <PcfSeedFoldersDialog projectId={project.id} onClose={() => setShowPcfSeed(false)} onDone={refreshProjectData} />
       )}
 
       {/* Project Config modal */}

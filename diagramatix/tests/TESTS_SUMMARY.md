@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-07  ·  **Document version:** 5.8  ·  **Suite:** 122 test files · 786 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0661  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-07  ·  **Document version:** 5.9  ·  **Suite:** 123 test files · 788 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0663  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -835,6 +835,8 @@ Level 0 of the APQC Process Classification Framework feature: hand-parsing the A
 | T0659 | `levelAndParent` derives the right level + parent code from a dotted Hierarchy ID (categories `N.0` = level 1; `N.M` parents to `N.0`; deeper drops the last segment) | A mis-built PCF tree (wrong depth or orphaned nodes) | If the dotted-code level/parent logic regressed |
 | T0660 | `parsePcfWorkbook` parses a synthetic Combined sheet into a node tree — skips the header, unescapes XML entities, reads change-type / metrics-flag / description, keys on the stable PCF ID | A corrupt import (dropped rows, wrong names, broken parent links, lost attribution) | If the OOXML hand-parser or shared-string resolution regressed |
 | T0661 | parses the **legacy per-category** format (no Combined sheet — one sheet per category, element in its level column, dotted code embedded in the cell) into the same node tree | Older APQC workbooks (e.g. Telecommunications v5.0.x) failing to import or building a wrong tree | If the legacy-format branch / embedded-code extraction regressed |
+| T0662 | `seedFoldersFromPcf` (Level 2) mirrors a PCF branch to a depth cap, links folders to their PCF parent, and keeps the project's existing folders + diagram map | The "seed folders from PCF" action losing existing folders, ignoring the depth cap, or building flat/mis-parented folders | If the folder-seed builder regressed |
+| T0663 | seeded folders anchor under a chosen parent folder | Seeded PCF folders always landing at the project root | If the `underFolderId` anchoring regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 
