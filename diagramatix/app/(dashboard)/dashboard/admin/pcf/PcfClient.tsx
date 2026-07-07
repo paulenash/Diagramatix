@@ -96,14 +96,14 @@ export function PcfClient({
       <>
         <div className="flex items-start gap-2 py-1 hover:bg-orange-50/60 rounded" style={{ paddingLeft: depth * 16 + 4 }}>
           <button onClick={() => kids.length && toggle(n.id)} className={`w-4 text-gray-400 shrink-0 ${kids.length ? "hover:text-gray-700" : "opacity-0"}`}>{open ? "▾" : "▸"}</button>
-          <span className="font-mono text-[11px] text-gray-500 shrink-0 w-20">{n.orgCode ?? n.hierarchyId}</span>
+          <span className="font-mono text-[11px] text-gray-600 shrink-0 w-20">{n.orgCode ?? n.hierarchyId}</span>
           <span className="text-[12px] text-gray-800 flex-1">
             {n.name}
             {n.changeType && <span className="ml-1 text-[9px] uppercase px-1 py-0.5 rounded bg-emerald-100 text-emerald-700">{n.changeType}</span>}
             {n.metricsAvailable && <span className="ml-1 text-[8px] uppercase tracking-wide px-1 py-0.5 rounded bg-gray-100 text-gray-400" title="APQC OSB benchmark metrics available for this element (separate APQC licence)">metrics</span>}
-            {n.description && <span className="block text-[10px] text-gray-400 leading-snug">{n.description}</span>}
+            {n.description && <span className="block text-[10px] text-gray-600 leading-snug">{n.description}</span>}
           </span>
-          <span className="text-[9px] text-gray-300 shrink-0">{LEVEL_LABEL[n.level]}</span>
+          <span className="text-[9px] text-gray-600 shrink-0">{LEVEL_LABEL[n.level]}</span>
         </div>
         {open && kids.map((k) => <Row key={k.id} n={k} depth={depth + 1} />)}
       </>
@@ -193,8 +193,8 @@ export function PcfClient({
                 <p className="text-[11px] text-gray-400 mb-1">{matches.length} match{matches.length === 1 ? "" : "es"}{matches.length === 300 ? " (showing first 300)" : ""}</p>
                 {matches.map((n) => (
                   <div key={n.id} className="flex items-baseline gap-2 py-0.5">
-                    <span className="font-mono text-[11px] text-gray-500 w-24 shrink-0">{n.hierarchyId}</span>
-                    <span className="text-[12px] text-gray-800">{n.name} <span className="text-[9px] text-gray-300">{LEVEL_LABEL[n.level]}</span></span>
+                    <span className="font-mono text-[11px] text-gray-600 w-24 shrink-0">{n.hierarchyId}</span>
+                    <span className="text-[12px] text-gray-800">{n.name} <span className="text-[9px] text-gray-600">{LEVEL_LABEL[n.level]}</span></span>
                   </div>
                 ))}
               </div>
