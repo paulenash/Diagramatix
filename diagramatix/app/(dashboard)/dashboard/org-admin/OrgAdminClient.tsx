@@ -58,6 +58,12 @@ const CARDS: MenuCard[] = [
       "Master library of Risks and Controls that projects adopt, attach to process steps and export as a Risk-Control Matrix.",
   },
   {
+    href: "/dashboard/compliance?from=/dashboard/org-admin",
+    title: "Compliance Monitoring",
+    description:
+      "How well your controls are operating over time — effectiveness trends and alerts assembled from DiagramatixMINER runs across every project.",
+  },
+  {
     href: "/dashboard/diagram-type-sort-order?from=/dashboard/org-admin",
     title: "Diagram Type Sort Order",
     description:

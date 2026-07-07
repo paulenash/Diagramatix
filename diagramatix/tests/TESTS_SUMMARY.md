@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-07  ·  **Document version:** 5.4  ·  **Suite:** 119 test files · 780 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0655  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-07  ·  **Document version:** 5.5  ·  **Suite:** 120 test files · 782 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0657  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -815,6 +815,8 @@ Attach Risks/Controls (from an org-master → project-copy GRC catalog — Risks
 | T0653 | org-wide renumber: clones of a master control collapse to one shared code; project-local items reusing a code stay distinct; each kind is one running org-wide sequence | Org-wide RCM numbering merging unrelated controls or splitting clones apart | If `assignOrgWideCodes` canonical grouping regressed |
 | T0654 | the renumber is idempotent — re-running on already-numbered codes is a no-op | The renumber action churning codes every time it runs | If the stable ordering in `assignOrgWideCodes` regressed |
 | T0655 | per-kind renumber scope — renumbering only Controls leaves Risks untouched (no code + no counter change) | The OrgAdmin "renumber one kind" action silently reflowing other kinds' codes | If the `kinds` filter in `assignOrgWideCodes` regressed |
+| T0656 | Compliance Monitoring rollup — Σapplied/Σexpected per control code over runs; below-threshold + declining detection; per-project latest | The org-wide compliance trend mis-aggregating effectiveness or missing at-risk controls | If `buildComplianceReport` rollup / flagging regressed |
+| T0657 | Compliance falls back to conformance-deviation effectiveness when a run has no mined governance | Compliance ignoring controls that only have a `monitorSignature` (no Control-ID evidence) | If the `logControlEffectiveness ?? controlEffectiveness` fallback in `measure` regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 
