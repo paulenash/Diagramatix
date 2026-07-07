@@ -63,4 +63,34 @@ describe("PCF workbook parser", () => {
     // No APQC notice in the synthetic strings → the attribution fallback still cites APQC.
     expect(attributionNote).toMatch(/APQC/);
   });
+
+  it("T0661 — parses the legacy per-category format (no Combined sheet; embedded dotted code)", async () => {
+    // Legacy v5.0.x: one sheet per category, the element in its level column, the
+    // dotted code embedded at the start of the cell ("1.1.1 Assess…").
+    const legacyStr = ["Process Category", "Process Group", "Process", "Activity"]; // header labels (idx 0-3)
+    const legacySst = `<sst>${legacyStr.map((s) => `<si><t>${s}</t></si>`).join("")}</sst>`;
+    const row = (r: number, idCol: string, lvlCol: string, text: string) =>
+      `<row r="${r}">${cell("A", r, "", idCol)}${lvlCol ? `<c r="${lvlCol}${r}" t="inlineStr"><is><t>${text}</t></is></c>` : ""}</row>`;
+    const sheet10 =
+      `<worksheet><sheetData>` +
+      `<row r="4">${cell("C", 4, "s", "0")}${cell("D", 4, "s", "1")}${cell("E", 4, "s", "2")}${cell("F", 4, "s", "3")}</row>` +
+      row(5, "10002", "C", "1 Develop Vision and Strategy (10002)") +
+      row(6, "10014", "D", "1.1 Define the business concept") +
+      row(7, "10017", "E", "1.1.1 Assess the external environment") +
+      row(8, "10021", "F", "1.1.1.1 Analyze and evaluate competition") +
+      `</sheetData></worksheet>`;
+
+    const zip = new JSZip();
+    zip.file("xl/workbook.xml", `<?xml version="1.0"?><workbook xmlns:r="http://x"><sheets><sheet name="Summary" sheetId="1" r:id="rId1"/><sheet name="1.0" sheetId="2" r:id="rId2"/></sheets></workbook>`);
+    zip.file("xl/_rels/workbook.xml.rels", `<?xml version="1.0"?><Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Target="worksheets/sheet2.xml"/></Relationships>`);
+    zip.file("xl/sharedStrings.xml", legacySst);
+    zip.file("xl/worksheets/sheet1.xml", `<worksheet><sheetData></sheetData></worksheet>`);
+    zip.file("xl/worksheets/sheet2.xml", sheet10);
+    const { nodes } = await parsePcfWorkbook(await zip.generateAsync({ type: "uint8array" }));
+
+    expect(nodes).toHaveLength(4);
+    expect(nodes.find((n) => n.pcfId === 10002)).toMatchObject({ hierarchyId: "1.0", level: 1, name: "Develop Vision and Strategy" }); // "(10002)" stripped, "1"→"1.0"
+    expect(nodes.find((n) => n.pcfId === 10014)).toMatchObject({ hierarchyId: "1.1", level: 2, parentHierarchyId: "1.0" });
+    expect(nodes.find((n) => n.pcfId === 10021)).toMatchObject({ hierarchyId: "1.1.1.1", level: 4, parentHierarchyId: "1.1.1", name: "Analyze and evaluate competition" });
+  });
 });

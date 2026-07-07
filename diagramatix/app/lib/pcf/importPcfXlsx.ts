@@ -95,21 +95,62 @@ function readSheetRows(sheetXml: string, shared: string[]): Record<string, strin
   return rows;
 }
 
-/** Resolve the "Combined" worksheet's XML path via workbook.xml + its rels. */
-async function combinedSheetPath(zip: JSZip): Promise<string> {
+/** Map every worksheet name → its XML path (via workbook.xml + rels). */
+async function sheetPathsByName(zip: JSZip): Promise<Map<string, string>> {
   const wb = await zip.file("xl/workbook.xml")!.async("string");
   const rels = await zip.file("xl/_rels/workbook.xml.rels")!.async("string");
+  const out = new Map<string, string>();
   const sheetRe = /<sheet[^>]*\bname="([^"]+)"[^>]*\br:id="([^"]+)"[^>]*\/?>/g;
-  let m: RegExpExecArray | null, rid: string | null = null;
+  let m: RegExpExecArray | null;
   while ((m = sheetRe.exec(wb))) {
-    if (m[1].trim().toLowerCase() === "combined") { rid = m[2]; break; }
+    const rm = new RegExp(`<Relationship[^>]*\\bId="${m[2]}"[^>]*\\bTarget="([^"]+)"`, "i").exec(rels);
+    if (rm) out.set(m[1].trim(), `xl/${rm[1].replace(/^\/?xl\//, "")}`);
   }
-  if (!rid) throw new Error('Workbook has no "Combined" sheet — not a recognised APQC PCF export.');
-  const relRe = new RegExp(`<Relationship[^>]*\\bId="${rid}"[^>]*\\bTarget="([^"]+)"`, "i");
-  const rm = relRe.exec(rels);
-  if (!rm) throw new Error("Could not resolve the Combined sheet target.");
-  const target = rm[1].replace(/^\/?xl\//, "");
-  return `xl/${target}`;
+  return out;
+}
+
+/** Build a ParsedPcfNode from an already-dotted code + name (shared by both
+ *  formats). Normalises a bare category code ("1" → "1.0"). */
+function nodeFromCode(rawCode: string, name: string, pcfId: number, description: string | null, extra?: { changeType?: string | null; metricsAvailable?: boolean }): ParsedPcfNode {
+  const hierarchyId = rawCode.includes(".") ? rawCode : `${rawCode}.0`;
+  const { level, parentHierarchyId } = levelAndParent(hierarchyId);
+  return { pcfId, hierarchyId, name, description, level, parentHierarchyId, changeType: extra?.changeType ?? null, metricsAvailable: extra?.metricsAvailable ?? false };
+}
+
+/** Legacy per-category format (e.g. APQC PCF v5.0.x): no Combined sheet — one
+ *  sheet per category ("1.0" … "13.0"), the element sits in the column for its
+ *  level (Category / Group / Process / Activity), and the dotted code is embedded
+ *  at the start of that cell ("1.1.1 Assess the external environment"). PCF ID is
+ *  in column A. We extract the embedded code + name and reuse the standard tree. */
+async function parseLegacyPerCategory(zip: JSZip, shared: string[]): Promise<ParsedPcfNode[]> {
+  const paths = await sheetPathsByName(zip);
+  const catSheets = [...paths.entries()]
+    .filter(([name]) => /^\d+\.0$/.test(name))
+    .sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+  const nodes: ParsedPcfNode[] = [];
+  const seen = new Set<string>();
+  for (const [, path] of catSheets) {
+    const rows = readSheetRows(await zip.file(path)!.async("string"), shared);
+    for (const cells of rows) {
+      // The level cell: any column (not A) whose text starts with a dotted code.
+      let codeCell = "";
+      for (const [col, val] of Object.entries(cells)) {
+        if (col === "A") continue;
+        if (/^\d+(?:\.\d+)*\s+\S/.test(val)) { codeCell = val; break; }
+      }
+      if (!codeCell) continue;
+      const cm = /^(\d+(?:\.\d+)*)\s+([\s\S]*)$/.exec(codeCell);
+      if (!cm) continue;
+      const name = cm[2].replace(/\s*\(\d+\)\s*$/, "").trim(); // strip trailing "(pcfId)"
+      if (!name) continue;
+      const pcfId = parseInt((cells.A ?? "").trim(), 10);
+      const node = nodeFromCode(cm[1], name, Number.isFinite(pcfId) ? pcfId : 0, null);
+      if (seen.has(node.hierarchyId)) continue;
+      seen.add(node.hierarchyId);
+      nodes.push(node);
+    }
+  }
+  return nodes;
 }
 
 function findAttribution(shared: string[]): string {
@@ -121,15 +162,23 @@ export async function parsePcfWorkbook(buf: ArrayBuffer | Uint8Array): Promise<P
   const zip = await JSZip.loadAsync(buf);
   const ssFile = zip.file("xl/sharedStrings.xml");
   const shared = ssFile ? parseSharedStrings(await ssFile.async("string")) : [];
-  const sheetXml = await zip.file(await combinedSheetPath(zip))!.async("string");
-  const rows = readSheetRows(sheetXml, shared);
+  const attributionNote = findAttribution(shared);
 
+  const paths = await sheetPathsByName(zip);
+  const combined = [...paths.entries()].find(([name]) => name.toLowerCase() === "combined")?.[1];
+
+  // Legacy per-category workbooks (v5.0.x) have no Combined sheet.
+  if (!combined) {
+    return { attributionNote, nodes: await parseLegacyPerCategory(zip, shared) };
+  }
+
+  // Modern format — the Combined sheet, cols A pcfId / B hierarchyId / C name / …
+  const rows = readSheetRows(await zip.file(combined)!.async("string"), shared);
   const nodes: ParsedPcfNode[] = [];
   const seen = new Set<string>();
   for (const cells of rows) {
     const hierarchyId = (cells.B ?? "").trim();
     const name = (cells.C ?? "").trim();
-    // Skip the header row + any row without a real dotted code / name.
     if (!hierarchyId || !name || !/^\d+(\.\d+)+$/.test(hierarchyId)) continue;
     if (seen.has(hierarchyId)) continue;
     seen.add(hierarchyId);
@@ -137,14 +186,12 @@ export async function parsePcfWorkbook(buf: ArrayBuffer | Uint8Array): Promise<P
     const pcfId = parseInt((cells.A ?? "").trim(), 10);
     nodes.push({
       pcfId: Number.isFinite(pcfId) ? pcfId : 0,
-      hierarchyId,
-      name,
+      hierarchyId, name,
       description: (cells.G ?? "").trim() || null,
-      level,
-      parentHierarchyId,
+      level, parentHierarchyId,
       changeType: deriveChangeType(cells.E ?? ""),
       metricsAvailable: /^y/i.test((cells.F ?? "").trim()),
     });
   }
-  return { attributionNote: findAttribution(shared), nodes };
+  return { attributionNote, nodes };
 }

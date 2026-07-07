@@ -18,6 +18,7 @@ import { persistPcfFramework } from "../app/lib/pcf/persistFramework";
 // Metadata for the bundled workbooks, keyed by K-number (robust to filename noise).
 const META: Record<string, { familyKey: string; variant: string; version: string }> = {
   K016808: { familyKey: "cross-industry", variant: "Cross-Industry", version: "8.0" },
+  K05756:  { familyKey: "telecommunications", variant: "Telecommunications", version: "5.0.1" },
   K06637:  { familyKey: "aerospace-defense", variant: "Aerospace & Defense", version: "7.2.2" },
   K06638:  { familyKey: "airline", variant: "Airline", version: "7.2.2" },
   K06639:  { familyKey: "automotive", variant: "Automotive", version: "7.2.2" },
