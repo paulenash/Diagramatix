@@ -1,9 +1,15 @@
 /**
  * Seed the SuperAdmin **Technical Design Notes** (the `tech-design` document
- * collection): three chapters — Simulator Design, Miner Design, RCM Design — of
- * low-level design notes, each ending with a summary of the import/export
- * standards that area supports. Idempotent: chapters upserted by (collection,
- * slug), sections upserted by heading. Mirrors scripts/add-guide-*.ts.
+ * collection): a full low-level design reference in reading order — Platform &
+ * Architecture, Diagram Model & Canvas, Layout Engines, AI Diagram Generation,
+ * Identity/Multi-tenancy & Access, Collaboration/Review & Publishing,
+ * Interoperability & Standards, the four analytical engines (Simulator, Miner,
+ * RCM, Compliance Monitoring), Content/Catalogs & Examples, Billing &
+ * Subscriptions, Data Protection & Operations, and Quality & Testing.
+ *
+ * Idempotent: chapters upserted by (collection, slug) with sortOrder re-applied
+ * (so reordering the array reorders existing rows), sections upserted by heading.
+ * Mirrors scripts/add-guide-*.ts.
  *
  * Run: DATABASE_URL="postgres://postgres:postgres@localhost:5432/diagramatix" npx tsx scripts/add-tech-design-notes.ts
  */
@@ -16,6 +22,153 @@ interface Section { heading: string; body: string }
 interface Chapter { slug: string; title: string; sections: Section[] }
 
 const CHAPTERS: Chapter[] = [
+  {
+    slug: "platform-architecture",
+    title: "Platform & Architecture",
+    sections: [
+      { heading: "Stack overview", body: [
+        "Diagramatix is a **Next.js 16 App Router** application (TypeScript, Tailwind CSS v4). There is no `src/` prefix — routes live under `app/` at the repo root. The diagram canvas is **hand-built SVG** (no `bpmn-js` or third-party diagramming library), which is what lets the app own connector routing, ellipse edge-connection and per-project typography.",
+        "",
+        "Server work happens in App-Router **route handlers** (`app/api/**/route.ts`) and **server components**; interactive surfaces are `\"use client\"` components. Editor diagram state is a `useReducer` store (`app/hooks/useDiagram.ts`).",
+      ].join("\n") },
+      { heading: "Data layer (Prisma 7)", body: [
+        "Persistence is **PostgreSQL** via **Prisma 7** using the `@prisma/adapter-pg` adapter — the `datasource` block carries **no `url`**; the connection string is handed to `PrismaPg` in `app/lib/db.ts`. The generated client lives at `app/generated/prisma/client`.",
+        "",
+        "Prisma 7 omits JSON fields from model update inputs, so **JSON column writes use raw SQL** (`$executeRawUnsafe` / the exported `pgPool`) — e.g. `colorConfig`, `fontConfig`, `Diagram.data`. Schema changes are applied with **`prisma db push`** (the shadow DB `migrate dev` needs is not available). `SCHEMA_VERSION` is the human-facing version shown in the app header.",
+      ].join("\n") },
+      { heading: "Rendering model", body: [
+        "The canvas is a single SVG surface (`app/components/canvas/Canvas.tsx`) handling pan/zoom/drop; elements are drawn by `SymbolRenderer` from per-type `symbols/definitions.ts`, and connectors by `ConnectorRenderer` from waypoints computed in `routing.ts`. A lightweight **window CustomEvent bus** (`dgx:fitToContent`, `dgx:centerElement`) lets non-canvas UI drive viewport actions without prop-drilling.",
+      ].join("\n") },
+      { heading: "Deployment & CI", body: [
+        "The app is containerised (ACR) and runs on **Azure App Service (Linux)** against **Azure Database for PostgreSQL Flexible Server**. `azure-deploy.yml` builds the image, **runs `prisma db push` against prod** (so schema changes need no manual SQL), then runs the idempotent **content seeds** (guide chapters, examples, tech-design notes, backfills) before swapping the container image.",
+        "",
+        "`ci.yml` runs the full Vitest suite on every PR and push to `main`. Because deploy applies the schema and seeds automatically, the delivery model is simply *merge to `main` → GitHub Actions → Azure*.",
+      ].join("\n") },
+      { heading: "Auth runtime split", body: [
+        "Next.js 16 renames `middleware.ts` to **`proxy.ts`** (exporting a `proxy` function). The proxy must run on the Edge runtime, which can't load Prisma — so route protection uses a **Prisma-free `auth.config.ts`**, while the full Auth.js setup with the database adapter lives in `auth.ts` for server components and route handlers.",
+      ].join("\n") },
+    ],
+  },
+  {
+    slug: "diagram-canvas",
+    title: "Diagram Model & Canvas",
+    sections: [
+      { heading: "Diagram data model", body: [
+        "A diagram is `{ elements, connectors, title, ... }` persisted as JSON on `Diagram.data`. Every element carries geometry (`x/y/width/height`), a `type`, an optional `parentId` (pool/lane/subprocess containment) and a `properties` bag; subsystems annotate `properties` without schema changes — e.g. `properties.simulation` (Simulator) and `properties.risk` (RCM). All TypeScript shapes live in `app/lib/diagram/types.ts`.",
+      ].join("\n") },
+      { heading: "Canvas interaction", body: [
+        "`Canvas.tsx` owns pan/zoom (with a stored initial-zoom preference), drag-drop from the palette, marquee and multi-select (`selectedElementIds`), and connection-mode gestures. Selection and viewport are editor-level state; the canvas exposes fit/centre via CustomEvents so the properties panel, Risk & Control screen deep-links, and AI-apply can recentre the view.",
+      ].join("\n") },
+      { heading: "Symbol & connector rendering", body: [
+        "Each diagram type contributes symbol definitions (shape, ports, label placement) consumed by `SymbolRenderer`. Connectors are orthogonal by default: `routing.ts` computes waypoints, connects to the **true ellipse edge** for round nodes, and applies **bridges** where lines cross. Endpoints are movable and, for some types (ArchiMate), rendered on top with an offset model.",
+      ].join("\n") },
+      { heading: "Typography & colour config", body: [
+        "Colour themes and fonts are **per-project** (`Project.colorConfig` / `fontConfig`, JSON) so a project renders with its own palette and independent typography — a deliberate differentiator. These JSON columns are written via raw SQL per the Prisma-7 rule.",
+      ].join("\n") },
+    ],
+  },
+  {
+    slug: "layout-engines",
+    title: "Layout Engines",
+    sections: [
+      { heading: "BPMN auto-layout", body: [
+        "`layoutBpmnDiagram` places a BPMN model deterministically: a **column map** from the directed-follows structure (handling back-edges/loops), then **pool/lane placement**, then **subprocess + boundary-event** placement, container expansion, and finally connector waypoints. It is the single layout used by AI generation and by mining discovery.",
+      ].join("\n") },
+      { heading: "Geometry red-rules", body: [
+        "Geometric constraints are **code-enforced in the layout function, not the prompt** (e.g. start-event clearance, pool/lane routing clearance, de-overlap passes). Each code-enforced rule is pinned by a **behavioural test** in a rule registry, and `findLayoutViolations` catches rules that conflict with each other.",
+      ].join("\n") },
+      { heading: "State-machine layout", body: [
+        "Flat state machines use a dedicated `layoutStateMachine` with its own red rules (the S3.xx set): initial state top-left, finals bottom-right, left-to-right flow, fanned connection points, reciprocal transitions that don't cross, and label de-overlap.",
+      ].join("\n") },
+      { heading: "Violation detection", body: [
+        "`findLayoutViolations` / `findRoutingViolations` are pure analyzers over a diagram: they surface overlaps, clearance breaches and connectors grazing obstacles. They back the issue scanner and are the regression net that lets the routing/layout code evolve safely.",
+      ].join("\n") },
+    ],
+  },
+  {
+    slug: "ai-generation",
+    title: "AI Diagram Generation",
+    sections: [
+      { heading: "Two-phase flow", body: [
+        "AI BPMN generation is **two-phase**: first a structured **plan** (the process broken into an editable structure), then the diagram. The plan is user-editable before it becomes geometry, which keeps the model in control of the shape while Claude supplies the language.",
+      ].join("\n") },
+      { heading: "Hybrid pipeline", body: [
+        "Generation is a **hybrid**: a deterministic extractor produces a structured skeleton, Claude rewrites/enriches it, and an **editable `DiagramRules` briefing** steers the result. Geometry is never left to the model — the deterministic `layoutBpmnDiagram` places everything.",
+      ].join("\n") },
+      { heading: "Rule enforcement (green-only)", body: [
+        "Rules are split by enforcement: only **green (advisory-to-the-model)** rules reach the prompt via `splitRulesByEnforcement`; **red (geometric)** rules are enforced in code. This prevents the model from being asked to satisfy constraints the layout engine already guarantees.",
+      ].join("\n") },
+      { heading: "Prompt structure & model", body: [
+        "Prompts follow a canonical **six-section order** (see the BPMN prompt-structure reference). The generation model is a **SuperAdmin setting** (default Haiku 4.5); the multi-model comparison fills its output from the best-scoring result.",
+      ].join("\n") },
+      { heading: "Conformance harness", body: [
+        "`findConnectorConformance` + `npm run ai:report` run generated diagrams against the geometric expectations with a live model (not in CI — needs an API key), giving a measurable read on how well AI output conforms to the red rules.",
+      ].join("\n") },
+    ],
+  },
+  {
+    slug: "identity-access",
+    title: "Identity, Multi-tenancy & Access",
+    sections: [
+      { heading: "Authentication", body: [
+        "Auth is **Auth.js v5** (email + password, JWT sessions). The Edge proxy authorises with a Prisma-free config; the full session (with DB) resolves in `auth.ts`. `AUTH_TRUST_HOST=true` is required.",
+      ].join("\n") },
+      { heading: "Org context & resolution", body: [
+        "Every request resolves an **active org**. `app/lib/auth/orgContext.ts` centralises this: `getCurrentOrgId`, `requireRole([...])`, `requireOrgAdminFor(org)` and `requireProjectAccess(...)` throw a typed `OrgContextError` (with an HTTP status) that route handlers translate to a JSON response. This is the single choke-point for tenancy.",
+      ].join("\n") },
+      { heading: "Roles & elevation", body: [
+        "Two elevated roles: **SuperAdmin** (system-wide, red UI accent) and **OrgAdmin** (Owner/Admin within an org, orange accent). SuperAdmins and OrgAdmins get **silent elevation** into projects they don't own (read/edit as appropriate) without a share row.",
+      ].join("\n") },
+      { heading: "Impersonation", body: [
+        "A SuperAdmin can **view as** another user via a `dgx_view_as` cookie; the effective user id flows through `getEffectiveUserId`. Impersonation is guarded: a read-only view blocks mutations (`isReadOnlyImpersonation`) so support browsing can't accidentally change a user's data.",
+      ].join("\n") },
+      { heading: "Entity Lists", body: [
+        "Org structures, external participants and IT systems are **Entity Lists**, kept as an org master that each project **adopts a copy** of and edits independently. They drive BPMN pool/lane naming from the project's own copy, not the org master.",
+      ].join("\n") },
+    ],
+  },
+  {
+    slug: "collaboration-publishing",
+    title: "Collaboration, Review & Publishing",
+    sections: [
+      { heading: "Project sharing", body: [
+        "`ProjectShare` grants another user **VIEW** or **EDIT** on a project. Editor share gives write access to the *diagrams*, not the project's own properties (name/typography stay owner-level). The caller's share row is resolved server-side, so an empty row means \"owner\".",
+      ].join("\n") },
+      { heading: "Collaboration groups", body: [
+        "Collaboration Groups bundle users so a diagram can be sent to a set of reviewers at once, rather than addressing individuals every time.",
+      ].join("\n") },
+      { heading: "Review workflow", body: [
+        "A diagram can be **sent for review** to reviewers who open it in **Review Mode** (`?review=<id>`): a context banner, the review-comment symbol, and Submit / Decline. The owner tracks outstanding reviews from the dashboard and finishes the round. Backed by `DiagramReview` / `DiagramReviewer`.",
+      ].join("\n") },
+      { heading: "Publishing & bundles", body: [
+        "The BPMN lifecycle publishes immutable **`PublishedVersion`s** and groups them into **`PublicationBundle`s** with **audiences**. The Diagram↔PublishedVersion relation is the one FK cycle the backup insert-order deliberately breaks.",
+      ].join("\n") },
+      { heading: "Notifications & feedback", body: [
+        "System events (reviews, publishing, feedback) raise `Notification`s surfaced in a per-user feed; a SuperAdmin/OrgAdmin can inspect any user's feed filtered by org and user.",
+      ].join("\n") },
+    ],
+  },
+  {
+    slug: "interoperability",
+    title: "Interoperability & Standards",
+    sections: [
+      { heading: "Visio (VSDX)", body: [
+        "Diagrams export to and import from **Visio VSDX**. Colour is applied by **pre-colouring masters** in the stencil/template rather than injecting at export, and Visio paints the first frame from a **cached `V=`** so geometry-row X/Y cells must be rescaled per instance. Pool/Lane is the most complete master; the CFF three-shape constellation is byte-sensitive.",
+      ].join("\n") },
+      { heading: "Document Editor & .docx", body: [
+        "The SuperAdmin **Document Editor** (User Guide + Technical Design Notes) exports any document to **`.docx`**: a hand-built OOXML `word/document.xml` walked from the parsed Markdown (title, headings, tables, code fences, `:sym[…]:` shortcodes rendered to label text). Pandoc is available for other conversions.",
+      ].join("\n") },
+      { heading: "DDL import & generation", body: [
+        "Database Domain diagrams **import DDL** and can **generate logical DDL** (PostgreSQL / MySQL / SQL Server) from the Diagramatix data model — the round-trip between a drawn domain model and executable schema.",
+      ].join("\n") },
+      { heading: "Mining & simulation interchange", body: [
+        "DiagramatixMINER reads/writes **IEEE XES** and **OCEL** event logs; the Simulator exports **BPSim** and a full **`.dgxsim`** bundle (study + scenarios + calendars). These sit alongside the engine chapters, which document each format's mapping in detail.",
+      ].join("\n") },
+      { heading: "SharePoint & format governance", body: [
+        "**SharePoint** integration imports/exports diagrams and links Data Objects to files. Any change to an export format is mirrored into the corresponding **XSD** and version numbers — export-format governance is a maintained discipline, not incidental.",
+      ].join("\n") },
+    ],
+  },
   {
     slug: "simulator-design",
     title: "Simulator Design",
@@ -285,6 +438,87 @@ const CHAPTERS: Chapter[] = [
           "Framework references (e.g. **SOX**, **ISO 27001**) are carried as control *metadata* (attributes), not an import standard — they identify which external framework a control satisfies.",
         ].join("\n"),
       },
+    ],
+  },
+  {
+    slug: "compliance-design",
+    title: "Compliance Monitoring Design",
+    sections: [
+      { heading: "Overview", body: [
+        "Compliance Monitoring is the org-level counterpart to the per-project RCM screen: **how well controls are operating over time**, assembled from the DiagramatixMINER runs retained across *all* of an org's projects. It is a **read-only aggregation** — no new persistence, no schema change; the data already exists on the runs and in the RCM catalog.",
+      ].join("\n") },
+      { heading: "Data sources", body: [
+        "`GET /api/orgs/[id]/compliance` (guarded by `requireOrgAdminFor`) enumerates every `ProcessMiningRun` across the org's projects (a relational `project.orgId` filter, which also covers legacy runs whose own `orgId` is null) and loads the org's control catalog (master + project copies), **deduped by code** — codes are org-wide, so a code is the canonical unit.",
+      ].join("\n") },
+      { heading: "Aggregation (Σapplied/Σexpected)", body: [
+        "Per (run, control), effectiveness reuses the same two evidence sources as the RCM screen: mined Control IDs (`logControlEffectiveness`, preferred) else a conformance deviation (`controlEffectiveness`). Both expose bypassed/total, giving `applied = total − bypassed` and `expected = total`. Because `ControlObservation` is **additive**, an org-level effectiveness for a control code = **Σapplied / Σexpected** over the matching runs. The pure `buildComplianceReport` (`app/lib/riskControls/compliance.ts`) emits the run time-series, per-control series, per-project latest, and a summary.",
+      ].join("\n") },
+      { heading: "Alerts, thresholds & decline", body: [
+        "A control is **below threshold** when its most-recent effectiveness is under the org threshold (default 80%, overridable via `?threshold=`), and **declining** when the latest point dropped run-over-run. The report ranks controls most-at-risk first so the console leads with what needs attention.",
+      ].join("\n") },
+      { heading: "Access & console", body: [
+        "The console (`dashboard/compliance`) is gated like OrgAdmin, plus SuperAdmin (who can pass `?orgId=` to inspect any org). It renders hand-rolled SVG trend charts (the `FlowHistogram` idiom): a headline effectiveness-vs-fitness trend, an alerts list, a per-control detail chart, and a by-project table with drill-through. It becomes meaningful once an org has **two or more runs** to trend across.",
+      ].join("\n") },
+    ],
+  },
+  {
+    slug: "content-catalogs",
+    title: "Content, Catalogs & Examples",
+    sections: [
+      { heading: "Editable-catalog pattern", body: [
+        "Curated \"sets of things\" are **admin-editable catalogs with an optional seed**, never hardcoded lists — with a **draft / publish** lifecycle where the content is public-facing. This pattern recurs across features, scanner rules, diagram-type styles, bubble-help topics and the examples catalogs.",
+      ].join("\n") },
+      { heading: "Feature catalog", body: [
+        "The public `/features` page is driven by an admin-editable **Feature** catalog (draft/publish). New capabilities seed a Features row as a **draft** on deploy; a SuperAdmin publishes it once — deploys never auto-publish marketing copy.",
+      ].join("\n") },
+      { heading: "Examples catalogs", body: [
+        "Simulator, Mining and Risk-&-Control each have an **examples catalog** (`SimulationExample` / `MiningExample` / `RiskControlExample`) with a common **package · adopt · capture** flow: an admin captures a real project artefact into a published example; a user adopts a **copy** into a fresh project. Adopted example projects are tagged (`Project.exampleType`) so the dashboard tile is feature-coloured; renaming clears the tag.",
+      ].join("\n") },
+      { heading: "DB-backed help (Document model)", body: [
+        "The in-app **User Guide** and these **Technical Design Notes** are the same `HelpChapter` / `HelpSection` model split by a `collection` field (`user-guide` vs `tech-design`), edited in the SuperAdmin Document Editor. They are **not bundled in the build** — they auto-seed on deploy from idempotent `add-guide-*` / `add-tech-design-*` scripts. Editor bubble-help is a separate `BubbleHelp` catalog.",
+      ].join("\n") },
+    ],
+  },
+  {
+    slug: "billing",
+    title: "Billing & Subscriptions",
+    sections: [
+      { heading: "Stripe integration", body: [
+        "Self-serve payments run on **Stripe**: `/api/stripe/checkout` starts a subscription, the Customer Portal manages it, and webhooks reconcile state. Tiers and their prices/limits are an admin-editable catalog (`SubscriptionLevel` / `Feature`). A known open issue: upgrading with an active sub can create a second parallel subscription — the checkout path and Portal plan-switch need the guard re-enabled before a wider launch.",
+      ].join("\n") },
+      { heading: "Usage counters & limits", body: [
+        "Per-tier limits are enforced against `UsageCounter` rows; the dashboard shows a usage snapshot. Limits are data (per subscription level), not hardcoded, so pricing/limit changes are an admin edit.",
+      ].join("\n") },
+    ],
+  },
+  {
+    slug: "data-ops",
+    title: "Data Protection & Operations",
+    sections: [
+      { heading: "Backup & restore", body: [
+        "Backup is **catalog-driven**: the full SuperAdmin backup enumerates every table automatically, ordered to break the one Diagram↔PublishedVersion FK cycle. **Scoped** backups (org / user, `org-backup.ts`) carry a deliberate subset; the User Guide has its own collection-scoped `guideBackup`. A coverage test **fails when a new table isn't consciously covered or omitted**, so nothing silently drops out of backup.",
+      ].join("\n") },
+      { heading: "Archive & three-tier delete", body: [
+        "Project delete is a **three-tier** model: `x` (diagrams → Unorganised, owner/OrgAdmin/SuperAdmin), `x+` (`?cascade=archive` → system Archive, OrgAdmin), `x++` (`?hardDelete=true`, SuperAdmin AND owner). The tier rules live in `authorizeProjectDelete` so they're unit-tested directly; the data effects live in `deleteProjectCascade`.",
+      ].join("\n") },
+      { heading: "Diagnostics", body: [
+        "Connector issues are diagnosed with an in-page route tracer (`window.__DIAG_ROUTE_TRACE`, plus a verbose flag) rather than guesswork — it's a kept tool, not throwaway. A feature-flagged live \"Diagram Health\" panel (via `findLayoutViolations` / `findRoutingViolations`) is designed for surfacing violations in the editor.",
+      ].join("\n") },
+    ],
+  },
+  {
+    slug: "quality-testing",
+    title: "Quality & Testing",
+    sections: [
+      { heading: "Test strategy", body: [
+        "The **Vitest** suite is the primary net (see `tests/TESTS_SUMMARY.md`, refs are append-only `Tnnnn`). Every code-enforced BPMN/geometry rule is pinned by a **behavioural test in a rule registry**, so a regression trips a red test rather than shipping. Pure engine logic (routing, layout, mining conformance, RCM effectiveness, compliance rollup) is tested without a DB; DB round-trips cover adopt/export/backup.",
+      ].join("\n") },
+      { heading: "End-to-end", body: [
+        "A **Playwright** browser suite (`npm run e2e`) runs against a dedicated port/DB, covering flows the unit tests can't (real editor interaction, auth). e2e specs must not collide by filename with a Vitest spec.",
+      ].join("\n") },
+      { heading: "CI & regression nets", body: [
+        "`ci.yml` runs the full suite on every PR and push to `main`. Combined with schema-push-on-deploy, green CI plus a merge is the release. The Visio export net, the backup-coverage guard and the layout/routing violation analyzers are the standing regression nets that let the risky subsystems evolve.",
+      ].join("\n") },
     ],
   },
 ];
