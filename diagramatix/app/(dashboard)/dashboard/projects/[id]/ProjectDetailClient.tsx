@@ -8,6 +8,7 @@ import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/a
 import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceModal";
 import { LinkScanDialog } from "./LinkScanDialog";
 import { PcfSeedFoldersDialog } from "./PcfSeedFoldersDialog";
+import { PcfCreateProcessDialog } from "./PcfCreateProcessDialog";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -407,6 +408,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   } | null>(null);
   const [showMaintenance, setShowMaintenance] = useState(false);
   const [showPcfSeed, setShowPcfSeed] = useState(false);
+  const [showPcfCreate, setShowPcfCreate] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportLog, setExportLog] = useState<string[]>([]);
   const [exportResult, setExportResult] = useState<"success" | "failed" | null>(null);
@@ -2403,6 +2405,13 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                 + New Diagram
               </button>
               <button
+                onClick={() => setShowPcfCreate(true)}
+                className="px-3 py-1 text-xs font-medium rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                title="Create an APQC PCF-classified process — pick a standard process, AI-generate the BPMN model, and open it"
+              >
+                ◎ Create APQC Process
+              </button>
+              <button
                 onClick={() => setShowSim(true)}
                 className="px-3 py-1 text-xs font-medium rounded-md border text-gray-700 border-gray-300 hover:bg-gray-50"
                 title="Simulate + compare the processes in this project (As-is / To-be)"
@@ -2856,6 +2865,20 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
 
       {showPcfSeed && (
         <PcfSeedFoldersDialog projectId={project.id} onClose={() => setShowPcfSeed(false)} onDone={refreshProjectData} />
+      )}
+
+      {showPcfCreate && (
+        <PcfCreateProcessDialog
+          projectId={project.id}
+          defaultQuery={selectedFolderId !== ROOT_ID ? folderTree.folders.find(f => f.id === selectedFolderId)?.name : undefined}
+          onClose={() => setShowPcfCreate(false)}
+          onCreated={(diagramId) => {
+            if (selectedFolderId !== ROOT_ID) {
+              updateTree(t => ({ ...t, diagramFolderMap: { ...t.diagramFolderMap, [diagramId]: selectedFolderId } }));
+            }
+            router.push(`/diagram/${diagramId}`);
+          }}
+        />
       )}
 
       {/* Project Config modal */}

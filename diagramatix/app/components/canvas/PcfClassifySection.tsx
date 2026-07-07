@@ -57,9 +57,9 @@ export function PcfClassifySection({ projectId, value, onChange }: {
     <div className="space-y-1.5">
       {value ? (
         <div className="flex items-start gap-1.5">
-          <span className="flex-1 text-[11px]">
-            <span className="font-mono text-gray-500">{value.hierarchyId}</span> {value.name}
-            <span className="block text-[9px] text-gray-400">{value.variant}</span>
+          <span className="flex-1 text-[11px] text-gray-900 font-medium">
+            <span className="font-mono text-gray-600 font-normal">{value.hierarchyId}</span> {value.name}
+            <span className="block text-[10px] text-gray-600 font-normal">{value.variant}</span>
           </span>
           <button onClick={() => setOpen((o) => !o)} className="text-[10px] text-blue-600 hover:text-blue-800">Change</button>
           <button onClick={() => onChange(undefined)} className="text-[10px] text-gray-400 hover:text-red-600">Clear</button>
@@ -70,7 +70,7 @@ export function PcfClassifySection({ projectId, value, onChange }: {
 
       {open && (
         <div className="border border-gray-200 rounded p-1.5 space-y-1 bg-gray-50/60">
-          <select value={fw} onChange={(e) => setFw(e.target.value)} className="w-full text-[10px] border border-gray-300 rounded px-1 py-0.5 bg-white">
+          <select value={fw} onChange={(e) => setFw(e.target.value)} className="w-full text-[10px] border border-gray-300 rounded px-1 py-0.5 bg-white text-gray-800">
             <optgroup label="APQC reference">
               {frameworks.filter((f) => f.kind === "reference").map((f) => <option key={f.id} value={f.id}>{f.variant} v{f.version}</option>)}
             </optgroup>
@@ -80,13 +80,13 @@ export function PcfClassifySection({ projectId, value, onChange }: {
               </optgroup>
             )}
           </select>
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search process / code…" className="w-full text-[10px] border border-gray-300 rounded px-1 py-0.5" />
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search process / code…" className="w-full text-[10px] border border-gray-300 rounded px-1 py-0.5 bg-white text-gray-800" />
           <div className="max-h-40 overflow-y-auto">
             {hits.length === 0 ? <p className="text-[9px] text-gray-400 px-1 py-1">Type to search…</p> : hits.map((n) => (
               <button key={n.id} onClick={() => pick(n)} className="w-full text-left px-1 py-0.5 text-[10px] hover:bg-blue-50 rounded flex items-baseline gap-1">
                 <span className="font-mono text-gray-500 shrink-0">{n.hierarchyId}</span>
                 <span className="flex-1 text-gray-800">{n.name}</span>
-                <span className="text-[8px] text-gray-300 shrink-0">{LEVEL[n.level]}</span>
+                <span className="text-[8px] text-gray-500 shrink-0">{LEVEL[n.level]}</span>
               </button>
             ))}
           </div>

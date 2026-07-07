@@ -720,6 +720,25 @@ export function PropertiesPanel({
   // tracks content up to 6 lines, then scrolls.
   const nameTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
+  // Resizable panel width (drag the left edge). Persisted per-browser.
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return 224;
+    const v = parseInt(window.localStorage.getItem("dgx_props_panel_width") || "", 10);
+    return Number.isFinite(v) && v >= 200 && v <= 640 ? v : 224;
+  });
+  useEffect(() => { if (typeof window !== "undefined") window.localStorage.setItem("dgx_props_panel_width", String(panelWidth)); }, [panelWidth]);
+  function startPanelResize(e: React.MouseEvent) {
+    e.preventDefault();
+    const startX = e.clientX, startW = panelWidth;
+    const onMove = (m: MouseEvent) => setPanelWidth(Math.max(200, Math.min(640, startW + (startX - m.clientX))));
+    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+  const resizeHandle = (
+    <div onMouseDown={startPanelResize} title="Drag to resize panel"
+      className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400/40 z-20" />
+  );
   const [titleOpen, setTitleOpen] = useState(true);
   const [connectorOpen, setConnectorOpen] = useState(true);
   const [propsOpen, setPropsOpen] = useState(true);
@@ -1028,7 +1047,7 @@ export function PropertiesPanel({
 
   if (multiSelectionCount && multiSelectionCount > 1) {
     return (
-      <div className="w-56 border-l border-gray-200 bg-white p-2 overflow-y-auto relative">
+      <div style={{ width: panelWidth }} className="border-l border-gray-200 bg-white p-2 overflow-y-auto relative shrink-0">{resizeHandle}
         <CollapseButton />
         <SectionHeader label="Diagram Properties" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
         {titleOpen && TitleSection()}
@@ -1040,7 +1059,7 @@ export function PropertiesPanel({
 
   if (!element && !connector) {
     return (
-      <div className="w-56 border-l border-gray-200 bg-white p-2 overflow-y-auto relative">
+      <div style={{ width: panelWidth }} className="border-l border-gray-200 bg-white p-2 overflow-y-auto relative shrink-0">{resizeHandle}
         <CollapseButton />
         <SectionHeader label="Diagram Properties" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
         {titleOpen && TitleSection()}
@@ -1051,7 +1070,7 @@ export function PropertiesPanel({
 
   if (connector) {
     return (
-      <div className="w-56 border-l border-gray-200 bg-white p-2 overflow-y-auto relative">
+      <div style={{ width: panelWidth }} className="border-l border-gray-200 bg-white p-2 overflow-y-auto relative shrink-0">{resizeHandle}
         <CollapseButton />
         <SectionHeader label="Diagram Properties" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
         {titleOpen && TitleSection()}
@@ -1716,7 +1735,7 @@ export function PropertiesPanel({
     element.type === "end-event";
 
   return (
-    <div className="w-56 border-l border-gray-200 bg-white p-3 overflow-y-auto relative">
+    <div style={{ width: panelWidth }} className="border-l border-gray-200 bg-white p-3 overflow-y-auto relative shrink-0">{resizeHandle}
       <CollapseButton />
       <SectionHeader label="Diagram Properties" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
       {titleOpen && TitleSection()}
