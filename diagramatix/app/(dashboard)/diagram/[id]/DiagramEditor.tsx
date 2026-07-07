@@ -806,6 +806,7 @@ export function DiagramEditor({
     setDescriptionFontSize,
     setDatabase,
     setProcessOwner,
+    setPcf,
     setAiFeedback,
     elementMoveEnd,
     flipForkJoin,
@@ -3606,6 +3607,9 @@ export function DiagramEditor({
             onUpdateDiagramTitle={updateDiagramTitle}
             processOwner={data.processOwner}
             onSetProcessOwner={setProcessOwner}
+            projectId={projectId ?? undefined}
+            pcf={data.pcf}
+            onSetPcf={setPcf}
             diagramOwner={diagramOwner}
             diagramOwnerCandidates={diagramOwnerCandidates}
             canEditDiagramOwner={canEditDiagramOwner}

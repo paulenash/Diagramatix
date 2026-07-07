@@ -14,6 +14,7 @@ import type {
   DiagramElement,
   DiagramTitle,
   AiFeedback,
+  PcfClassification,
   DirectionType,
   Point,
   RoutingType,
@@ -382,6 +383,7 @@ export type Action =
   | { type: "SET_DESCRIPTION_FONT_SIZE"; payload: number }
   | { type: "SET_DATABASE"; payload: string }
   | { type: "SET_PROCESS_OWNER"; payload: { name?: string; email?: string } }
+  | { type: "SET_PCF"; payload: PcfClassification | undefined }
   | { type: "SET_AI_FEEDBACK"; payload: AiFeedback | undefined }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number } }
@@ -6939,6 +6941,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       };
     }
 
+    case "SET_PCF":
+      return { ...state, pcf: action.payload };
+
     case "SET_AI_FEEDBACK":
       return {
         ...state,
@@ -8926,6 +8931,12 @@ export function useDiagram(initialData: DiagramData) {
       (owner: { name?: string; email?: string }) => {
         pushHistory(snapshotData());
         dispatch({ type: "SET_PROCESS_OWNER", payload: owner });
+      }, []
+    ),
+    setPcf: useCallback(
+      (pcf: PcfClassification | undefined) => {
+        pushHistory(snapshotData());
+        dispatch({ type: "SET_PCF", payload: pcf });
       }, []
     ),
     setAiFeedback: useCallback(

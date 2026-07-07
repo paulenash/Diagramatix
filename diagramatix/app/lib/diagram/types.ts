@@ -267,6 +267,10 @@ export interface DiagramData {
   /** Per-diagram process owner — shown in the Diagram Properties panel
    *  alongside Title / Authors. Both fields optional and free-text. */
   processOwner?: ProcessOwner;
+  /** APQC PCF classification for this diagram — which standard process this
+   *  model represents. Keyed on the stable `pcfId` so it survives PCF version
+   *  bumps; `nodeId`/`hierarchyId`/`name`/`variant` are cached for display. */
+  pcf?: PcfClassification;
   /** AI-generated feedback for this diagram — the "open questions" the AI
    *  raised while building it (e.g. from a recorded meeting / transcript via
    *  the AI-tidy pass). Preserved so the user can revisit and answer them
@@ -277,6 +281,16 @@ export interface DiagramData {
 export interface ProcessOwner {
   name?: string;
   email?: string;
+}
+
+/** APQC PCF classification reference on a diagram (cached from the catalog). */
+export interface PcfClassification {
+  nodeId: string;
+  pcfId: number;
+  hierarchyId: string;
+  name: string;
+  frameworkId: string;
+  variant: string;
 }
 
 /** A persisted set of AI clarification questions + the user's answers. */

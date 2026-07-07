@@ -19,6 +19,8 @@ import type {
 import { RichTextEditor } from "./RichTextEditor";
 import { SimulationSection } from "./SimulationSection";
 import { RiskControlSection, type RiskCatalogItem } from "./RiskControlSection";
+import { PcfClassifySection } from "./PcfClassifySection";
+import type { PcfClassification } from "@/app/lib/diagram/types";
 import { getCachedCatalogue, findShapeByKey, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
 
 // ArchiMate relationship metadata — maps the archi-* connector type to its
@@ -104,6 +106,11 @@ interface Props {
    *  sub-section. Both name + email are optional free-text. */
   processOwner?: { name?: string; email?: string };
   onSetProcessOwner?: (owner: { name?: string; email?: string }) => void;
+  /** APQC PCF classification for this diagram (diagram-level). `projectId` powers
+   *  the picker's framework/search fetch. */
+  projectId?: string;
+  pcf?: PcfClassification;
+  onSetPcf?: (pcf: PcfClassification | undefined) => void;
   /** Current Diagram Owner (hard FK to a registered user). Displayed
    *  in a new sub-section directly above Process Owner. Null means the
    *  diagram has no owner-of-record set (legacy diagram or orphan). */
@@ -694,6 +701,9 @@ export function PropertiesPanel({
   forceCollapseTitle,
   processOwner,
   onSetProcessOwner,
+  projectId,
+  pcf,
+  onSetPcf,
   diagramOwner,
   diagramOwnerCandidates,
   canEditDiagramOwner,
@@ -721,6 +731,7 @@ export function PropertiesPanel({
   const [databaseSubOpen, setDatabaseSubOpen] = useState(true);
   const [diagramOwnerSubOpen, setDiagramOwnerSubOpen] = useState(true);
   const [processOwnerSubOpen, setProcessOwnerSubOpen] = useState(true);
+  const [pcfSubOpen, setPcfSubOpen] = useState(true);
 
 
   // Confirm-and-delete modal for switching black-box (with messages) → white-box.
@@ -999,6 +1010,16 @@ export function PropertiesPanel({
                 onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
             </InlineField>
           </>)}
+        </>)}
+
+        {/* Process Classification (APQC PCF) — diagram-level, every type. */}
+        {onSetPcf && projectId && (<>
+          <SubHeader label="Process Classification (PCF)" open={pcfSubOpen} onToggle={() => setPcfSubOpen(o => !o)} />
+          {pcfSubOpen && (
+            <div className="px-1 py-1">
+              <PcfClassifySection projectId={projectId} value={pcf} onChange={onSetPcf} />
+            </div>
+          )}
         </>)}
 
       </div>
