@@ -32,16 +32,33 @@ export function PcfClient({
   const [loadingTree, setLoadingTree] = useState(false);
   const [q, setQ] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [showImport, setShowImport] = useState(false);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const res = await fetch(`/api/orgs/${orgId}/pcf`);
-      const j = await res.json().catch(() => ({ frameworks: [] }));
-      setFrameworks(j.frameworks ?? []);
-      setSelectedId((prev) => prev || j.frameworks?.[0]?.id || "");
-      setLoading(false);
-    })();
+  const loadFrameworks = useCallback(async () => {
+    const res = await fetch(`/api/orgs/${orgId}/pcf`);
+    const j = await res.json().catch(() => ({ frameworks: [] }));
+    setFrameworks(j.frameworks ?? []);
+    setSelectedId((prev) => prev || j.frameworks?.[0]?.id || "");
+    setLoading(false);
   }, [orgId]);
+  useEffect(() => { loadFrameworks(); }, [loadFrameworks]);
+
+  async function submitImport(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    if (!(form.get("file") instanceof File) || !(form.get("file") as File).name) { setImportMsg("Choose a .xlsx file"); return; }
+    setImporting(true); setImportMsg(null);
+    try {
+      const res = await fetch("/api/admin/pcf/import", { method: "POST", body: form });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setImportMsg(j.error ?? "Import failed"); return; }
+      setImportMsg(j.skipped ? "That version is already loaded." : `Imported ${j.nodeCount} elements.`);
+      await loadFrameworks();
+    } catch { setImportMsg("Import failed"); }
+    finally { setImporting(false); }
+  }
 
   const loadTree = useCallback(async (fid: string) => {
     if (!fid) return;
@@ -103,12 +120,41 @@ export function PcfClient({
           <h1 className="text-xl font-semibold text-gray-900">Process Classification Framework <span className="text-gray-400 text-sm">(APQC PCF®)</span></h1>
           <p className="text-sm text-gray-500">Reference taxonomy for <span className="font-medium text-orange-700">{orgName}</span> — browse the standard, classify processes, build a tailored framework.</p>
         </div>
-        {isSuperAdmin && orgs.length > 1 && (
-          <select value={orgId} onChange={(e) => router.push(`/dashboard/admin/pcf?orgId=${e.target.value}`)} className="text-sm border border-gray-300 rounded px-2 py-1">
-            {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </select>
-        )}
+        <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <button onClick={() => setShowImport((v) => !v)} className="text-xs px-3 py-1.5 rounded border border-orange-300 text-orange-700 hover:bg-orange-50">
+              ⭱ Import workbook
+            </button>
+          )}
+          {isSuperAdmin && orgs.length > 1 && (
+            <select value={orgId} onChange={(e) => router.push(`/dashboard/admin/pcf?orgId=${e.target.value}`)} className="text-sm border border-gray-300 rounded px-2 py-1">
+              {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+          )}
+        </div>
       </div>
+
+      {isSuperAdmin && showImport && (
+        <form onSubmit={submitImport} className="bg-white border border-orange-200 rounded-lg p-4 mb-4 flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Workbook (.xlsx)</label>
+            <input type="file" name="file" accept=".xlsx" className="text-xs" />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Variant</label>
+            <input name="variant" placeholder="Cross-Industry / Retail…" className="text-xs border border-gray-300 rounded px-2 py-1 w-44" />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Version</label>
+            <input name="version" placeholder="8.0" className="text-xs border border-gray-300 rounded px-2 py-1 w-24" />
+          </div>
+          <button type="submit" disabled={importing} className="text-xs px-3 py-1.5 rounded bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50">
+            {importing ? "Importing…" : "Import as global reference"}
+          </button>
+          {importMsg && <span className="text-[11px] text-gray-600">{importMsg}</span>}
+          <p className="w-full text-[10px] text-gray-400">Imports an APQC PCF workbook as a global reference framework (all orgs). A newer version of the same variant supersedes the previous. Convert .xls to .xlsx first.</p>
+        </form>
+      )}
 
       {loading ? (
         <p className="text-sm text-gray-400">Loading…</p>
