@@ -127,7 +127,7 @@ export function PcfClient({
             </button>
           )}
           {isSuperAdmin && orgs.length > 1 && (
-            <select value={orgId} onChange={(e) => router.push(`/dashboard/admin/pcf?orgId=${e.target.value}`)} className="text-sm border border-gray-300 rounded px-2 py-1">
+            <select value={orgId} onChange={(e) => router.push(`/dashboard/admin/pcf?orgId=${e.target.value}`)} className="text-sm border border-gray-300 rounded px-2 py-1 bg-white text-gray-800">
               {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
             </select>
           )}
@@ -138,15 +138,16 @@ export function PcfClient({
         <form onSubmit={submitImport} className="bg-white border border-orange-200 rounded-lg p-4 mb-4 flex flex-wrap items-end gap-3">
           <div>
             <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Workbook (.xlsx)</label>
-            <input type="file" name="file" accept=".xlsx" className="text-xs" />
+            <input type="file" name="file" accept=".xlsx"
+              className="text-xs text-gray-600 file:mr-2 file:px-2 file:py-1 file:rounded file:border-0 file:bg-orange-100 file:text-orange-700 hover:file:bg-orange-200 file:cursor-pointer" />
           </div>
           <div>
             <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Variant</label>
-            <input name="variant" placeholder="Cross-Industry / Retail…" className="text-xs border border-gray-300 rounded px-2 py-1 w-44" />
+            <input name="variant" placeholder="Cross-Industry / Retail…" className="text-xs border border-gray-300 rounded px-2 py-1 w-44 bg-white text-gray-800" />
           </div>
           <div>
             <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Version</label>
-            <input name="version" placeholder="8.0" className="text-xs border border-gray-300 rounded px-2 py-1 w-24" />
+            <input name="version" placeholder="8.0" className="text-xs border border-gray-300 rounded px-2 py-1 w-24 bg-white text-gray-800" />
           </div>
           <button type="submit" disabled={importing} className="text-xs px-3 py-1.5 rounded bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50">
             {importing ? "Importing…" : "Import as global reference"}
@@ -166,7 +167,7 @@ export function PcfClient({
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-3 mb-3">
-            <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} className="text-sm border border-gray-300 rounded px-2 py-1 bg-white max-w-md">
+            <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} className="text-sm border border-gray-300 rounded px-2 py-1 bg-white text-gray-800 max-w-md">
               <optgroup label="APQC reference">
                 {frameworks.filter((f) => f.kind === "reference").map((f) => <option key={f.id} value={f.id}>{f.variant} — v{f.version} ({f._count.nodes})</option>)}
               </optgroup>
@@ -176,7 +177,7 @@ export function PcfClient({
                 </optgroup>
               )}
             </select>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / code…" className="text-sm border border-gray-300 rounded px-2 py-1 flex-1 min-w-[180px] max-w-xs" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / code…" className="text-sm border border-gray-300 rounded px-2 py-1 flex-1 min-w-[180px] max-w-xs bg-white text-gray-800" />
             {selected && <span className="text-[11px] text-gray-400">{selected._count.nodes} elements · {selected.kind}</span>}
           </div>
 
