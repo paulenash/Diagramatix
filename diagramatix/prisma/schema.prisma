@@ -87,6 +87,7 @@ model Org {
   collaborationGroups CollaborationGroup[]
   entityLists         EntityList[]
   riskControlLibraries RiskControlLibrary[]
+  pcfFrameworks       PcfFramework[]
   simulationTeams     SimulationTeam[]
   simulationCalendars SimulationCalendar[]
   processMiningRuns   ProcessMiningRun[]
@@ -1038,6 +1039,60 @@ model RiskControlCodeSequence {
   counter Int             @default(0)
 
   @@unique([orgId, kind])
+}
+
+// ── APQC Process Classification Framework (PCF) ──────────────────────────────
+// Standalone feature (NOT Entity Lists). Two layers: read-only global reference
+// frameworks (imported from the APQC workbooks) and org-owned tailored
+// frameworks composed/extended/curated from them. pcfId is APQC's stable id and
+// is the key everything (classification refs + tailored provenance) hangs off,
+// so tags survive version bumps.
+model PcfFramework {
+  id              String    @id @default(cuid())
+  orgId           String?   // null = global reference; set = org's (imported reference or tailored)
+  org             Org?      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  kind            String    // "reference" | "tailored"
+  familyKey       String    // stable variant identity: "cross-industry" | "telecom" | tailored cuid
+  name            String
+  variant         String    // "Cross-Industry" | "Retail" | …
+  version         String    // "8.0" | "7.21" | tailored rev
+  isCurrent       Boolean   @default(true)
+  sourceKNumber   String?   // provenance of the source workbook, e.g. "K09276"
+  division        String?   // tailored only — optional business-unit scope
+  attributionNote String    @default("") // ©APQC notice — travels with copies/exports
+  nodes           PcfNode[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([orgId])
+  @@index([familyKey, isCurrent])
+}
+
+model PcfNode {
+  id               String    @id @default(cuid())
+  frameworkId      String
+  framework        PcfFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  pcfId            Int       // APQC col A — STABLE across releases (the upgrade key)
+  hierarchyId      String    // dotted code col B — display only, NOT stable
+  name             String
+  description      String?
+  level            Int
+  parentId         String?
+  parent           PcfNode?  @relation("PcfTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children         PcfNode[] @relation("PcfTree")
+  sortOrder        Int       @default(0)
+  metricsAvailable Boolean   @default(false) // flag only, never OSB values
+  changeType       String?   // "NEW" | "RENAMED" from the workbook's Change Details
+  // tailored-layer fields:
+  isCustom         Boolean   @default(false)
+  active           Boolean   @default(true)
+  orgCode          String?
+  sourceFrameworkId String?  // provenance: reference framework a composed node came from
+  sourcePcfId      Int?      // provenance: the APQC pcfId it was composed from
+
+  @@index([frameworkId, parentId, sortOrder])
+  @@index([frameworkId, hierarchyId])
+  @@index([sourcePcfId])
 }
 
 model RiskControlLink {

@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-07  ·  **Document version:** 5.6  ·  **Suite:** 121 test files · 783 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0658  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-07  ·  **Document version:** 5.7  ·  **Suite:** 122 test files · 785 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0660  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -825,6 +825,15 @@ The SuperAdmin **DDL Generation** tile now offers, alongside the curated logical
 | Ref | Test | Protects you against | How it would break (go red) |
 |------|------|----------------------|------------------------------|
 | T0658 | `buildPhysicalDdl` emits enums, table columns (type / NOT NULL / DEFAULT), PK/unique/FK constraints and secondary indexes, filtering out indexes that back a constraint | A corrupt or duplicate-DDL physical export (e.g. re-emitting the PK's implicit index) | If the introspection-row assembly or the constraint-index filter regressed |
+
+### `tests/pcf/importPcfXlsx.test.ts` — APQC PCF workbook parser
+
+Level 0 of the APQC Process Classification Framework feature: hand-parsing the APQC PCF `.xlsx` (Combined sheet, via JSZip) into a node tree, deriving level + parent from the dotted Hierarchy ID.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0659 | `levelAndParent` derives the right level + parent code from a dotted Hierarchy ID (categories `N.0` = level 1; `N.M` parents to `N.0`; deeper drops the last segment) | A mis-built PCF tree (wrong depth or orphaned nodes) | If the dotted-code level/parent logic regressed |
+| T0660 | `parsePcfWorkbook` parses a synthetic Combined sheet into a node tree — skips the header, unescapes XML entities, reads change-type / metrics-flag / description, keys on the stable PCF ID | A corrupt import (dropped rows, wrong names, broken parent links, lost attribution) | If the OOXML hand-parser or shared-string resolution regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 

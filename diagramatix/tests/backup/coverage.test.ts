@@ -46,6 +46,11 @@ const SIMULATOR_TABLES = [
 // Simulator tables so the omission is an asserted decision, not a comment.
 const RISK_CONTROL_TABLES = ["RiskControlLibrary", "RiskControlItem", "RiskControlLink", "RiskControlExample", "RiskControlCodeSequence"] as const;
 
+// APQC PCF — global reference frameworks (system content, seeded/imported) +
+// org tailored frameworks. Carried by the full SuperAdmin backup (catalog-driven);
+// scoped org/user backup wiring is a deliberate follow-up, pinned here.
+const PCF_TABLES = ["PcfFramework", "PcfNode"] as const;
+
 // Tables the scoped backups deliberately DON'T carry — publish lineage,
 // review workflow, cross-tenant config, notifications, and (for now) the
 // Simulator. Only the SuperAdmin full backup carries these. A new table lands
@@ -66,6 +71,7 @@ const SCOPED_OMITTED = new Set<string>([
   "AppSetting",
   ...SIMULATOR_TABLES,
   ...RISK_CONTROL_TABLES,
+  ...PCF_TABLES,
 ]);
 
 describe("backup coverage", () => {

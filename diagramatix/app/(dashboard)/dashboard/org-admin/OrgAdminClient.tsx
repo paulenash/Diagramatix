@@ -64,6 +64,12 @@ const CARDS: MenuCard[] = [
       "How well your controls are operating over time — effectiveness trends and alerts assembled from DiagramatixMINER runs across every project.",
   },
   {
+    href: "/dashboard/admin/pcf?from=/dashboard/org-admin",
+    title: "Process Classification (APQC PCF)",
+    description:
+      "Browse the APQC Process Classification Framework — the Cross-Industry standard and industry variants — to classify and structure your processes.",
+  },
+  {
     href: "/dashboard/diagram-type-sort-order?from=/dashboard/org-admin",
     title: "Diagram Type Sort Order",
     description:
