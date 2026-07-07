@@ -25,7 +25,7 @@ export async function GET(_req: Request, { params }: Params) {
     select: {
       id: true, name: true, stats: true, mapping: true,
       discoveredBpmnId: true, discoveredSmId: true, referenceSmId: true,
-      conformance: true, studyId: true, createdAt: true,
+      conformance: true, studyId: true, createdAt: true, excludeFromCompliance: true,
     },
   });
   return NextResponse.json({ runs });

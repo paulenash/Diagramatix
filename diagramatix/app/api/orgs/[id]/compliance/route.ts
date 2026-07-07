@@ -35,7 +35,7 @@ export async function GET(req: Request, { params }: Params) {
   const [runs, libraries] = await Promise.all([
     prisma.processMiningRun.findMany({
       where: { project: { orgId: id } },
-      select: { id: true, name: true, projectId: true, createdAt: true, conformance: true, governance: true, project: { select: { name: true } } },
+      select: { id: true, name: true, projectId: true, createdAt: true, conformance: true, governance: true, excludeFromCompliance: true, project: { select: { name: true } } },
       orderBy: { createdAt: "asc" },
     }),
     prisma.riskControlLibrary.findMany({
@@ -43,6 +43,14 @@ export async function GET(req: Request, { params }: Params) {
       select: { items: { where: { kind: "Control" }, select: { code: true, name: true, monitorSignature: true } } },
     }),
   ]);
+
+  // The full run catalog (for the console's include/exclude panel) — every run,
+  // flagged. Only NON-excluded runs feed the aggregation below.
+  const runsCatalog = runs.map((r) => ({
+    id: r.id, name: r.name, projectId: r.projectId ?? "", projectName: r.project?.name ?? "(project)",
+    createdAt: r.createdAt.toISOString(), excluded: r.excludeFromCompliance,
+  }));
+  const includedRuns = runs.filter((r) => !r.excludeFromCompliance);
 
   // Dedupe controls by code; prefer an entry that actually names a monitorSignature.
   const controlByCode = new Map<string, ComplianceControlInput>();
@@ -55,7 +63,7 @@ export async function GET(req: Request, { params }: Params) {
     }
   }
 
-  const runInputs: ComplianceRunInput[] = runs.map((r) => ({
+  const runInputs: ComplianceRunInput[] = includedRuns.map((r) => ({
     id: r.id,
     name: r.name,
     projectId: r.projectId ?? "",
@@ -66,5 +74,5 @@ export async function GET(req: Request, { params }: Params) {
   }));
 
   const report = buildComplianceReport(runInputs, [...controlByCode.values()], { threshold });
-  return NextResponse.json(report);
+  return NextResponse.json({ ...report, runsCatalog });
 }

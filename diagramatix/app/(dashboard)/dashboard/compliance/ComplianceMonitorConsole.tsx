@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ComplianceReport, ControlSeries } from "@/app/lib/riskControls/compliance";
+
+interface RunCatalogEntry { id: string; name: string; projectId: string; projectName: string; createdAt: string; excluded: boolean }
+type Report = ComplianceReport & { runsCatalog?: RunCatalogEntry[] };
 
 /**
  * Compliance Monitoring — org-wide control operating-effectiveness over time,
@@ -16,26 +19,36 @@ export function ComplianceMonitorConsole({
   orgId: string; orgName: string; backHref?: string;
 }) {
   const router = useRouter();
-  const [report, setReport] = useState<ComplianceReport | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [showRuns, setShowRuns] = useState(false);
+  const [busyRun, setBusyRun] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/orgs/${orgId}/compliance`);
-        const j = await res.json().catch(() => ({}));
-        if (cancelled) return;
-        if (!res.ok) { setErr(j.error ?? "Could not load compliance data"); return; }
-        setReport(j);
-        setSelectedCode(j.controls?.[0]?.code ?? null);
-      } catch { if (!cancelled) setErr("Could not load compliance data"); }
-      finally { if (!cancelled) setLoading(false); }
-    })();
-    return () => { cancelled = true; };
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/orgs/${orgId}/compliance`);
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(j.error ?? "Could not load compliance data"); return; }
+      setErr(null);
+      setReport(j);
+      setSelectedCode((prev) => prev && j.controls?.some((c: ControlSeries) => c.code === prev) ? prev : (j.controls?.[0]?.code ?? null));
+    } catch { setErr("Could not load compliance data"); }
+    finally { setLoading(false); }
   }, [orgId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggleRun = useCallback(async (runId: string, exclude: boolean) => {
+    setBusyRun(runId);
+    try {
+      const res = await fetch(`/api/orgs/${orgId}/compliance/runs/${runId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ exclude }),
+      });
+      if (res.ok) await load();
+    } finally { setBusyRun(null); }
+  }, [orgId, load]);
 
   const selected = useMemo(
     () => report?.controls.find((c) => c.code === selectedCode) ?? null,
@@ -62,10 +75,17 @@ export function ComplianceMonitorConsole({
           {err && <p className="text-[12px] text-red-600">{err}</p>}
           {loading ? (
             <p className="text-sm text-gray-400">Loading…</p>
-          ) : !report || report.summary.runCount === 0 ? (
-            <EmptyState />
+          ) : !report ? (
+            <EmptyState excludedCount={0} />
           ) : (
             <>
+              {report.runsCatalog && report.runsCatalog.length > 0 && (
+                <RunsPanel runs={report.runsCatalog} open={showRuns} onToggleOpen={() => setShowRuns((v) => !v)} onToggleRun={toggleRun} busyRun={busyRun} />
+              )}
+              {report.summary.runCount === 0 ? (
+                <EmptyState excludedCount={(report.runsCatalog ?? []).filter((r) => r.excluded).length} />
+              ) : (
+              <>
               <HeadlineStats report={report} />
               <Card title="Control effectiveness over time" subtitle="Org-wide (solid) vs conformance fitness (dashed). Each point is a mining run.">
                 <TrendChart
@@ -132,6 +152,8 @@ export function ComplianceMonitorConsole({
                   </div>
                 </Card>
               </div>
+              </>
+              )}
             </>
           )}
         </div>
@@ -142,7 +164,7 @@ export function ComplianceMonitorConsole({
 
 // ————— pieces —————
 
-function EmptyState() {
+function EmptyState({ excludedCount }: { excludedCount: number }) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6 max-w-xl">
       <h2 className="text-sm font-semibold text-gray-800 mb-1">No compliance data yet</h2>
@@ -152,6 +174,56 @@ function EmptyState() {
         project’s Miner (with controls attached in Risk &amp; Controls), then return here. It becomes meaningful once an
         org has <span className="font-medium">two or more runs</span> to trend across.
       </p>
+      {excludedCount > 0 && (
+        <p className="text-xs text-amber-700 mt-2">
+          {excludedCount} run{excludedCount === 1 ? " is" : "s are"} currently excluded — re-include from the <span className="font-medium">Runs</span> panel above to see the trend.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Curate which runs feed the analysis — exclude throwaway/test runs. */
+function RunsPanel({ runs, open, onToggleOpen, onToggleRun, busyRun }: {
+  runs: RunCatalogEntry[];
+  open: boolean;
+  onToggleOpen: () => void;
+  onToggleRun: (runId: string, exclude: boolean) => void;
+  busyRun: string | null;
+}) {
+  const excluded = runs.filter((r) => r.excluded).length;
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg">
+      <button onClick={onToggleOpen} className="w-full flex items-center justify-between px-4 py-2.5 text-left">
+        <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Runs feeding this analysis</span>
+        <span className="text-[11px] text-gray-500">{runs.length - excluded} included{excluded ? ` · ${excluded} excluded` : ""} <span className="text-gray-400 ml-1">{open ? "▲" : "▼"}</span></span>
+      </button>
+      {open && (
+        <div className="px-4 pb-3 max-h-64 overflow-y-auto">
+          <p className="text-[10px] text-gray-400 mb-2">Exclude throwaway or test runs so they don’t pollute the effectiveness trend. Excluded runs keep their data — they just don’t count here.</p>
+          <table className="w-full text-[11px]">
+            <tbody>
+              {runs.map((r) => (
+                <tr key={r.id} className={`border-b border-gray-100 ${r.excluded ? "opacity-50" : ""}`}>
+                  <td className="py-1 pr-2 text-gray-400 whitespace-nowrap">{fmtDate(r.createdAt)}</td>
+                  <td className="py-1 pr-2 truncate max-w-[140px]" title={r.projectName}>{r.projectName}</td>
+                  <td className="py-1 pr-2 truncate max-w-[180px] text-gray-600" title={r.name}>{r.name}</td>
+                  <td className="py-1 pl-2 text-right">
+                    <button
+                      disabled={busyRun === r.id}
+                      onClick={() => onToggleRun(r.id, !r.excluded)}
+                      className={`text-[10px] px-2 py-0.5 rounded border disabled:opacity-40 ${r.excluded
+                        ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                        : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}>
+                      {busyRun === r.id ? "…" : r.excluded ? "Include" : "Exclude"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

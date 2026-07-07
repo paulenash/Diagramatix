@@ -12,7 +12,7 @@ import { createLibraryFrom } from "./seedO2c";
 import { checkTransitionConformance, type ReferenceSm } from "@/app/lib/mining/transitionConformance";
 import type { RiskControlExamplePackage } from "./examplePackage";
 
-export interface AdoptRcExampleCtx { userId: string; orgId: string; ownerName: string; projectName: string; }
+export interface AdoptRcExampleCtx { userId: string; orgId: string; ownerName: string; projectName: string; sourceExampleId?: string; }
 export interface AdoptRcExampleResult { projectId: string; projectName: string; openDiagramId: string | null; }
 
 type Ref = { itemId: string; code: string; label: string };
@@ -40,7 +40,7 @@ function attachRefs(
 
 export async function adoptRiskControlExample(pkg: RiskControlExamplePackage, ctx: AdoptRcExampleCtx): Promise<AdoptRcExampleResult> {
   // 1) Project.
-  const project = await prisma.project.create({ data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName, exampleType: "risk-control" } });
+  const project = await prisma.project.create({ data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName, exampleType: "risk-control", sourceExampleId: ctx.sourceExampleId ?? null } });
 
   // 2) GRC library → code → item.
   const { idByCode } = await prisma.$transaction((tx) => createLibraryFrom(tx, { projectId: project.id }, pkg.library));

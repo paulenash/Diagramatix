@@ -236,6 +236,10 @@ model Project {
   // feature it demonstrates ("simulation" | "mining" | "risk-control"). Drives
   // the feature-coloured dashboard tile. Null for ordinary projects.
   exampleType String?
+  // The example this project was adopted from (SimulationExample / MiningExample
+  // / RiskControlExample id). Enforces "one copy per user" — re-adopting the same
+  // example overwrites this project. Cleared on rename (it becomes the user's own).
+  sourceExampleId String?
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Org scoping — required after Phase 0 backfill (scripts/backfill-orgs.ts).
@@ -1130,6 +1134,9 @@ model ProcessMiningRun {
   referenceSmId    String?                    // Diagram id (user-selected)
   conformance      Json?                      // {fitness, violations[], transitionStats}
   studyId          String?                    // SimulationStudy id (calibrated twin)
+  // Excluded from org Compliance Monitoring — a throwaway/test run the OrgAdmin
+  // (or run owner) doesn't want polluting the effectiveness trend. Default false.
+  excludeFromCompliance Boolean @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

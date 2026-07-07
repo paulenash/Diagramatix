@@ -14,13 +14,14 @@ export interface AdoptCtx {
   orgId: string;
   ownerName: string;
   projectName: string;
+  sourceExampleId?: string;
 }
 
 export async function adoptPackage(pkg: ExamplePackage, ctx: AdoptCtx): Promise<{ projectId: string; openDiagramId: string | null }> {
   // One transaction so a partial failure never leaves a half-built project.
   return prisma.$transaction(async (tx) => {
     const project = await tx.project.create({
-      data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName, exampleType: "simulation" },
+      data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName, exampleType: "simulation", sourceExampleId: ctx.sourceExampleId ?? null },
     });
 
     // Diagrams — preserve `data`; pre-assign ids so a subprocess's

@@ -17,6 +17,7 @@ export interface AdoptMiningCtx {
   orgId: string;
   ownerName: string;
   projectName: string;
+  sourceExampleId?: string;
 }
 
 export interface AdoptMiningResult {
@@ -40,7 +41,7 @@ export async function adoptMiningPackage(
   // One transaction so a partial failure never leaves a half-built project.
   return prisma.$transaction(async (tx) => {
     const project = await tx.project.create({
-      data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName, exampleType: "mining" },
+      data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName, exampleType: "mining", sourceExampleId: ctx.sourceExampleId ?? null },
     });
 
     // Reference diagrams — preserve `data`; pre-assign ids so the run's

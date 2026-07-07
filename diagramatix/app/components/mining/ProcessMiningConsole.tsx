@@ -21,7 +21,7 @@ interface RunRow {
   id: string; name: string; stats: MiningStats; mapping: Partial<LogMapping>;
   discoveredBpmnId: string | null; discoveredSmId: string | null; referenceSmId: string | null;
   conformance: ConformanceResult | null;
-  studyId: string | null; createdAt: string;
+  studyId: string | null; createdAt: string; excludeFromCompliance?: boolean;
 }
 
 /** A choosable raw sample log handed over from an adopted example. */
@@ -76,6 +76,16 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     if (res.ok) setRuns((await res.json()).runs ?? []);
   }, [projectId]);
   useEffect(() => { load(); }, [load]);
+  // Include/exclude this run from org Compliance Monitoring (test runs shouldn't
+  // pollute the trend). Optimistic; PATCH persists on the run.
+  const toggleRunCompliance = useCallback(async (runId: string, exclude: boolean) => {
+    setRuns((rs) => rs.map((r) => (r.id === runId ? { ...r, excludeFromCompliance: exclude } : r)));
+    try {
+      await fetch(`/api/projects/${projectId}/mining/runs/${runId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ excludeFromCompliance: exclude }),
+      });
+    } catch { load(); }
+  }, [projectId, load]);
   const loadReferenceSms = useCallback(async () => {
     try { const r = await fetch(`/api/projects/${projectId}/mining/reference-sms`); if (r.ok) { const j = await r.json(); if (j?.diagrams) setReferenceSms(j.diagrams); } } catch { /* ignore */ }
   }, [projectId]);
@@ -453,6 +463,12 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
               <a href={`/api/projects/${projectId}/mining/runs/${selected.id}/export?format=ocel`} className="text-amber-300 hover:text-amber-200 underline" title="OCEL 2.0 JSON (single-object)">OCEL</a>
               <span className="text-stone-600">— variant-level fidelity</span>
             </div>
+            {/* Include/exclude from org Compliance Monitoring — keep test runs out of the trend. */}
+            <label className="mt-2 flex items-center gap-2 text-[11px] text-stone-400 cursor-pointer select-none">
+              <input type="checkbox" checked={!selected.excludeFromCompliance} onChange={(e) => toggleRunCompliance(selected.id, !e.target.checked)} className="accent-amber-500" />
+              <span>Include in <span className="text-stone-200">Compliance Monitoring</span></span>
+              {selected.excludeFromCompliance && <span className="text-amber-300/80">— excluded (a test/throwaway run)</span>}
+            </label>
             {/* Discover the BPMN process */}
             <div className="mt-4 pt-3 border-t border-stone-700">
               <h3 className="text-xs font-semibold text-amber-200 mb-1">Discover the process</h3>

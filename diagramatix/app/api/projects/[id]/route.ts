@@ -108,8 +108,12 @@ export async function PUT(req: Request, { params }: Params) {
     if (ownerName !== undefined) dataUpdate.ownerName = ownerName;
     if (orgId !== undefined && orgId !== existing.orgId && isSuperuser(session)) dataUpdate.orgId = orgId;
     // Renaming an adopted example makes it the user's own project — drop the
-    // example tint so it reads as a normal (white) tile, not a sample.
-    if (name !== undefined && name.trim() !== existing.name && existing.exampleType) dataUpdate.exampleType = null;
+    // example tint (normal white tile) AND decouple it from its source example
+    // so a future re-adopt creates a fresh copy instead of overwriting this work.
+    if (name !== undefined && name.trim() !== existing.name && (existing.exampleType || existing.sourceExampleId)) {
+      dataUpdate.exampleType = null;
+      dataUpdate.sourceExampleId = null;
+    }
     if (Object.keys(dataUpdate).length > 0) {
       await prisma.project.update({ where: { id }, data: dataUpdate });
     }

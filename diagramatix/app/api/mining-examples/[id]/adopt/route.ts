@@ -13,6 +13,7 @@ import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
 import { validateMiningExamplePackage, type MiningExamplePackage } from "@/app/lib/mining/examplePackage";
 import { adoptMiningPackage } from "@/app/lib/mining/adoptMiningPackage";
+import { purgePriorExampleCopies } from "@/app/lib/examples/singleCopy";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -41,11 +42,15 @@ export async function POST(_req: Request, { params }: Params) {
   const errs = validateMiningExamplePackage(pkg);
   if (errs.length) return NextResponse.json({ error: `Example package invalid: ${errs.join("; ")}` }, { status: 500 });
 
+  // One copy per user — overwrite any prior copy of this example.
+  await purgePriorExampleCopies(example.id, { id: session.user.id, email: session.user.email ?? "" });
+
   const result = await adoptMiningPackage(pkg, {
     userId: session.user.id,
     orgId,
     ownerName: session.user.name ?? session.user.email ?? "",
     projectName: `${example.title} (example)`,
+    sourceExampleId: example.id,
   });
 
   return NextResponse.json(result, { status: 201 });
