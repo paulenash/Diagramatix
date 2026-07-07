@@ -268,7 +268,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
               ? (showUsers ? "Registered Users" : "SuperAdmin")
               : `Registered Users — ${activeOrgName ?? "Your Org"}`}
           </h1>
-          <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{commitCount}</span>
+          <span className="text-[10px] text-gray-900">v{SCHEMA_VERSION}.{commitCount}</span>
         </div>
         <div className="flex items-center gap-2" />
       </header>

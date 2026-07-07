@@ -241,6 +241,19 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   }
   const [projects, setProjects] = useState(initialProjects);
   const [unorganized, setUnorganized] = useState(initialUnorganized);
+  // Hide/Show adopted example projects on the dashboard (persisted per-browser).
+  // The toggle is disabled when the org has no example projects.
+  const [hideExamples, setHideExamples] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("dgx_hide_examples") === "1";
+  });
+  const hasExamples = projects.some((p) => p.exampleType);
+  const visibleProjects = hideExamples && hasExamples ? projects.filter((p) => !p.exampleType) : projects;
+  const toggleHideExamples = () => setHideExamples((v) => {
+    const nv = !v;
+    if (typeof window !== "undefined") window.localStorage.setItem("dgx_hide_examples", nv ? "1" : "0");
+    return nv;
+  });
   const [showUsagePopover, setShowUsagePopover] = useState(false);
   // Welcome tier picker — initialised from the SSR-fetched flag. After
   // the user picks or skips, we close locally (router.refresh() is fired
@@ -1395,7 +1408,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             alt="Diagramatix"
             className="h-8 w-auto"
           />
-          {version ? <span className="text-xs text-gray-400 ml-1">v{SCHEMA_VERSION}.{version}</span> : null}
+          {version ? <span className="text-xs text-gray-900 ml-1">v{SCHEMA_VERSION}.{version}</span> : null}
           {usageSnapshot && (
             <button
               onClick={() => setShowUsagePopover(true)}
@@ -1751,7 +1764,19 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         {/* Projects — collapsible, first below Reviews. */}
         <CollapsibleSection
           title="Projects"
-          count={projects.length}
+          count={visibleProjects.length}
+          titleAction={
+            <button
+              onClick={toggleHideExamples}
+              disabled={!hasExamples}
+              title={hasExamples ? (hideExamples ? "Show adopted example projects" : "Hide adopted example projects") : "No example projects"}
+              className={`text-xs font-medium border rounded px-2 py-1 transition-colors ${hasExamples
+                ? "text-blue-700 border-blue-300 hover:bg-blue-50"
+                : "text-gray-400 border-gray-200 cursor-not-allowed"}`}
+            >
+              {hasExamples && hideExamples ? "Show Examples" : "Hide Examples"}
+            </button>
+          }
           action={!readOnly ? (
             <button
               onClick={() => setShowNewProject(true)}
@@ -1762,10 +1787,12 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           ) : undefined}
         >
 
-          {projects.length === 0 ? (
+          {visibleProjects.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-              <p className="text-gray-500 mb-4">{readOnly ? "No projects" : "No projects yet"}</p>
-              {!readOnly && (
+              <p className="text-gray-500 mb-4">
+                {projects.length > 0 && hideExamples ? "All projects are examples (hidden)" : readOnly ? "No projects" : "No projects yet"}
+              </p>
+              {!readOnly && !(projects.length > 0 && hideExamples) && (
                 <button
                   onClick={() => setShowNewProject(true)}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
@@ -1776,7 +1803,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-              {projects.map((p) => {
+              {visibleProjects.map((p) => {
                 // Tile state taxonomy \u2014 two distinct shared states, two
                 // distinct colour schemes:
                 //   \u2022 isSharedToMe \u2014 the caller is a recipient. Pale
@@ -2104,7 +2131,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   )}
                 </div>
               )}
-              {selectedRole === "owner" && !readOnly && (
+              {selectedRole === "owner" && !readOnly && !selectedProject.exampleType && (
                 <button
                   onClick={() => setShareDialogOpen(true)}
                   className={
@@ -2116,6 +2143,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 >
                   Manage Sharing{"\u2026"}
                 </button>
+              )}
+              {selectedRole === "owner" && !readOnly && selectedProject.exampleType && (
+                <p className="mt-2 text-[10px] text-gray-400 italic">Example projects can\u2019t be shared or published. Rename it to make it your own.</p>
               )}
             </div>
 

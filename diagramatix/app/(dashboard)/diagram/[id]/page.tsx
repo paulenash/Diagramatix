@@ -168,6 +168,7 @@ export default async function DiagramPage({ params, searchParams }: Props) {
   //      facts are already in hand: diagram.projectId + projectRole.
   let diagramOwner: { id: string; name: string | null; email: string } | null = null;
   let diagramOwnerCandidates: { id: string; name: string | null; email: string }[] = [];
+  let isExampleProject = false;
   if (diagram.diagramOwnerId) {
     diagramOwner = await prisma.user.findUnique({
       where: { id: diagram.diagramOwnerId },
@@ -178,6 +179,7 @@ export default async function DiagramPage({ params, searchParams }: Props) {
     const project = await prisma.project.findUnique({
       where: { id: diagram.projectId },
       select: {
+        exampleType: true,
         user: { select: { id: true, name: true, email: true } },
         shares: {
           select: { user: { select: { id: true, name: true, email: true } } },
@@ -185,6 +187,7 @@ export default async function DiagramPage({ params, searchParams }: Props) {
       },
     });
     if (project) {
+      isExampleProject = !!project.exampleType;
       // Dedup on user.id — the project owner is always included, then
       // each sharee on top. Stable order: owner first, sharees by
       // name/email.
@@ -257,6 +260,7 @@ export default async function DiagramPage({ params, searchParams }: Props) {
         elementCountLimit={elementCountLimit}
         initialDiagramOwner={diagramOwner}
         diagramOwnerCandidates={diagramOwnerCandidates}
+        isExampleProject={isExampleProject}
         canEditDiagramOwner={isProjectOwner}
         currentUserId={session.user.id}
         backFromHref={backFromHref}

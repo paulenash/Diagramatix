@@ -64,6 +64,15 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Adopted example projects are personal, disposable copies — their diagrams
+  // can't be published (nor shared). Rename the project to make it your own.
+  if (diagram.projectId) {
+    const proj = await prisma.project.findUnique({ where: { id: diagram.projectId }, select: { exampleType: true } });
+    if (proj?.exampleType) {
+      return NextResponse.json({ error: "Diagrams in example projects can't be published. Rename the project to make it your own first." }, { status: 400 });
+    }
+  }
+
   // Second gate: diagramOwnerId must equal the caller. A project owner
   // who isn't the diagram owner cannot publish.
   if (diagram.diagramOwnerId !== session.user.id) {

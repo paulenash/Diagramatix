@@ -112,6 +112,12 @@ export async function POST(req: Request, { params }: Params) {
     throw err;
   }
 
+  // Adopted example projects are personal, disposable copies — not shareable.
+  const proj = await prisma.project.findUnique({ where: { id }, select: { exampleType: true } });
+  if (proj?.exampleType) {
+    return NextResponse.json({ error: "Example projects can't be shared. Rename it to make it your own project first." }, { status: 400 });
+  }
+
   const body = (await req.json().catch(() => ({}))) as {
     userIdOrEmail?: string;
     role?: string;

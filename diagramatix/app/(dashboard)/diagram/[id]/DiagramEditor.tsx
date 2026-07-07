@@ -107,6 +107,9 @@ interface Props {
   /** Whether the picker is editable. True only when the caller is the
    *  project owner. Server still re-checks every PUT regardless. */
   canEditDiagramOwner?: boolean;
+  /** True when this diagram's project is an adopted example — such projects
+   *  can't be shared or published, so the Publish dropdown is hidden. */
+  isExampleProject?: boolean;
   /** Current user's id, for the "am I the diagram owner?" check that
    *  gates the publish button. */
   currentUserId?: string;
@@ -381,6 +384,7 @@ export function DiagramEditor({
   initialDiagramOwner,
   diagramOwnerCandidates = [],
   canEditDiagramOwner = false,
+  isExampleProject = false,
   currentUserId,
   backFromHref = null,
   openFeedbackPanel = false,
@@ -2444,7 +2448,7 @@ export function DiagramEditor({
         <div className="flex items-center gap-1.5">
           <span className="font-semibold text-gray-900 text-xs">{diagramName}</span>
           <DiagramTypeBadge type={diagramType} showLabel showCode={false} />
-          {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
+          {version ? <span className="text-[10px] text-gray-900">v{SCHEMA_VERSION}.{version}</span> : null}
         </div>
 
         <div className="flex-1" />
@@ -2505,7 +2509,10 @@ export function DiagramEditor({
             Publish bundle. The dropdown items keep their colours (blue
             version, purple bundle); the bundle item is disabled until the
             diagram has been published at least once. */}
-        {!readOnly && isDiagramOwner && (
+        {!readOnly && isDiagramOwner && isExampleProject && (
+          <span className="text-[11px] text-gray-400 italic" title="Adopted example projects can't be published — rename the project to make it your own first.">Example — not publishable</span>
+        )}
+        {!readOnly && isDiagramOwner && !isExampleProject && (
           <div className="relative" ref={publishDropdownRef}>
             <button
               onClick={() => setPublishDropdownOpen(prev => !prev)}
@@ -3014,29 +3021,9 @@ export function DiagramEditor({
             unified "Diagram ▾" dropdown further along the toolbar — those
             standalone buttons were removed in favour of a single menu. */}
 
-        {/* AI Generate button. For BPMN this opens the 2-phase Plan panel;
-            for other diagram types it opens the legacy one-shot AI panel. */}
-        {!readOnly && diagramType !== "basic" && (
-          <button
-            onClick={() => {
-              if (usesPlanPanel) {
-                setShowPlanPanel(prev => !prev);
-                if (!showPlanPanel) { setShowAiPanel(false); setShowHistoryPanel(false); }
-              } else {
-                setShowAiPanel(prev => !prev);
-                if (!showAiPanel) { setShowHistoryPanel(false); setShowPlanPanel(false); }
-              }
-            }}
-            className={`px-2 py-0.5 text-[11px] rounded border ${
-              (usesPlanPanel ? showPlanPanel : showAiPanel)
-                ? "text-blue-700 border-blue-400 bg-blue-50"
-                : "text-gray-700 border-gray-300 hover:bg-gray-50"
-            }`}
-            title={usesPlanPanel ? "Two-phase AI generation: plan first, then apply layout" : "Generate a diagram from a natural-language description"}
-          >
-            AI Generate
-          </button>
-        )}
+        {/* AI Generate, Simulator, Animate!, Send for Review and Get help were
+            moved into the unified "Diagram ▾" menu further along the toolbar
+            (2026-07-07) to declutter the top bar. */}
         {isAdmin && aiComparison ? (
           <button
             onClick={() => setShowComparisonModal(true)}
@@ -3046,35 +3033,6 @@ export function DiagramEditor({
             AI Comparison Results
           </button>
         ) : null}
-        {!readOnly && supportsSimulator && (
-          <button
-            onClick={() => setShowSimulator(true)}
-            className="px-2 py-0.5 text-[11px] rounded border border-green-500 text-green-700 bg-black/0 hover:bg-green-50 font-mono tracking-wider"
-            title="Enter the Diagramatix Simulator — event-based process simulation"
-          >
-            ◈ Simulator
-          </button>
-        )}
-        {!readOnly && data.elements.length > 0 && (
-          <button
-            onClick={() => setShowAnimate(true)}
-            className="px-2 py-0.5 text-[11px] rounded border border-blue-500 text-blue-700 hover:bg-blue-50 font-medium"
-            title="Animate! — gradually draw the diagram (Breadth- or Depth-first), with a movable speed/traversal control"
-          >
-            ▸ Animate!
-          </button>
-        )}
-        {/* Send for Review (Phase 2) — owner sends the diagram to one or
-            more Collaboration Groups for feedback. */}
-        {!readOnly && (
-          <button
-            onClick={() => setShowSendReview(true)}
-            className="px-2 py-0.5 text-[11px] rounded border text-gray-700 border-gray-300 hover:bg-gray-50"
-            title="Send this diagram to a Collaboration Group for review"
-          >
-            Send for Review
-          </button>
-        )}
         {/* Review-comment filter — appears once a diagram carries review
             comments, letting the owner focus on one reviewer at a time. */}
         {reviewCommenters.length > 0 && (
@@ -3338,16 +3296,68 @@ export function DiagramEditor({
             <button
               onClick={() => setClearMenuOpen(prev => !prev)}
               className={`px-2 py-0.5 text-[11px] rounded border ${
-                showHistoryPanel
+                showHistoryPanel || showPlanPanel || showAiPanel
                   ? "text-blue-700 border-blue-400 bg-blue-50"
                   : "text-gray-700 border-gray-300 hover:bg-gray-50"
               }`}
-              title="Diagram-level actions"
+              title="Diagram actions — generate, simulate, animate, review, help + configuration"
             >
               Diagram ▾
             </button>
             {clearMenuOpen && (
               <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50">
+                {/* Primary actions (moved here from the toolbar 2026-07-07). */}
+                {diagramType !== "basic" && (
+                  <button
+                    onClick={() => {
+                      setClearMenuOpen(false);
+                      if (usesPlanPanel) {
+                        setShowPlanPanel(prev => !prev);
+                        if (!showPlanPanel) { setShowAiPanel(false); setShowHistoryPanel(false); }
+                      } else {
+                        setShowAiPanel(prev => !prev);
+                        if (!showAiPanel) { setShowHistoryPanel(false); setShowPlanPanel(false); }
+                      }
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-blue-50"
+                    title={usesPlanPanel ? "Two-phase AI generation: plan first, then apply layout" : "Generate a diagram from a natural-language description"}
+                  >
+                    AI Generate
+                  </button>
+                )}
+                {supportsSimulator && (
+                  <button
+                    onClick={() => { setClearMenuOpen(false); setShowSimulator(true); }}
+                    className="w-full text-left px-3 py-2 text-xs text-green-700 hover:bg-green-50 font-mono tracking-wider"
+                    title="Enter the Diagramatix Simulator — event-based process simulation"
+                  >
+                    ◈ Simulator
+                  </button>
+                )}
+                {data.elements.length > 0 && (
+                  <button
+                    onClick={() => { setClearMenuOpen(false); setShowAnimate(true); }}
+                    className="w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-blue-50"
+                    title="Animate! — gradually draw the diagram (Breadth- or Depth-first), with a movable speed/traversal control"
+                  >
+                    ▸ Animate!
+                  </button>
+                )}
+                <button
+                  onClick={() => { setClearMenuOpen(false); setShowSendReview(true); }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  title="Send this diagram to a Collaboration Group for review"
+                >
+                  Send for Review
+                </button>
+                <button
+                  onClick={() => { setClearMenuOpen(false); setShowSupportDialog(true); }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  title="Send this diagram to support with a question"
+                >
+                  Get help
+                </button>
+                <div className="border-t border-gray-100" />
                 <button
                   onClick={() => { setClearMenuOpen(false); setClearConfirmOpen("all"); }}
                   disabled={data.elements.length === 0 && data.connectors.length === 0}
@@ -3414,17 +3424,6 @@ export function DiagramEditor({
           User Guide
         </a>
 
-        {/* "Get help" — sends a screenshot + JSON of this diagram to
-            support@diagramatix.com.au with the user's message. Available
-            to anyone with view access on the diagram. */}
-        <button
-          type="button"
-          onClick={() => setShowSupportDialog(true)}
-          title="Send this diagram to support with a question"
-          className="text-[11px] text-gray-600 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-50 hover:text-blue-600"
-        >
-          Get help
-        </button>
       </header>
 
       {/* Main editor area */}

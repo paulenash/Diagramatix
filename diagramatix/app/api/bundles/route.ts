@@ -91,6 +91,12 @@ export async function POST(req: Request) {
   if (!projectAccess) {
     return NextResponse.json({ error: "Project not found or access denied" }, { status: 404 });
   }
+
+  // Example projects are personal disposable copies — nothing in them publishes.
+  const exProj = await prisma.project.findUnique({ where: { id: projectId }, select: { exampleType: true } });
+  if (exProj?.exampleType) {
+    return NextResponse.json({ error: "Example projects can't be published. Rename the project to make it your own first." }, { status: 400 });
+  }
   const projectOrgId = projectAccess.projectOrgId;
 
   // Verify every root: in the named project AND the caller is its diagramOwner.

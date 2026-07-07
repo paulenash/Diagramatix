@@ -1812,24 +1812,21 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   }
 
   // Get all diagram IDs visible under a folder (recursively)
+  // Flatten a folder subtree into ONE ordered list of diagrams that matches the
+  // nav tree's reading order — child folders first (in Folder Sort Order), then
+  // this folder's own diagrams (in the configured diagram sort / drag order),
+  // recursively. So the tile grid flows top-left → bottom-right in the same order
+  // as the Folder Sort Order, rather than a flat most-recently-modified list.
   function getDiagramsInFolder(folderId: string): DiagramSummary[] {
-    if (folderId === ROOT_ID) return diagrams; // project root shows ALL
-    const childFolderIds = new Set<string>([folderId]);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const f of folderTree.folders) {
-        const pid = f.parentId === null ? ROOT_ID : f.parentId;
-        if (childFolderIds.has(pid) && !childFolderIds.has(f.id)) {
-          childFolderIds.add(f.id);
-          changed = true;
-        }
-      }
+    const out: DiagramSummary[] = [];
+    for (const cf of getOrderedChildFolders(folderId)) out.push(...getDiagramsInFolder(cf.id));
+    out.push(...getOrderedDiagramsInFolder(folderId));
+    if (folderId === ROOT_ID) {
+      // Project root shows ALL — append any orphans (folder deleted, map stale).
+      const seen = new Set(out.map(d => d.id));
+      for (const d of diagrams) if (!seen.has(d.id)) out.push(d);
     }
-    return diagrams.filter(d => {
-      const dFolder = folderTree.diagramFolderMap[d.id] ?? ROOT_ID;
-      return childFolderIds.has(dFolder);
-    });
+    return out;
   }
 
   // Render folder tree recursively
@@ -2130,7 +2127,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           {/* Export Owner display hidden 2026-06-06 — kept off the
               project header to match the sidebar. Value still lives on
               project.ownerName and round-trips through exports. */}
-          <span className="text-[10px] text-gray-400 shrink-0" title="Diagramatix version">v{SCHEMA_VERSION}{version ? `.${version}` : ""}</span>
+          <span className="text-[10px] text-gray-900 shrink-0" title="Diagramatix version">v{SCHEMA_VERSION}{version ? `.${version}` : ""}</span>
           {/* Org Owner — the owning Org drives org-wide RCM code numbering.
               Read-only chip for everyone; SuperAdmin gets an inline picker
               (red styling per the role convention). */}

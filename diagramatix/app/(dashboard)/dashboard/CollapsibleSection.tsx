@@ -14,6 +14,7 @@ export function CollapsibleSection({
   count,
   defaultOpen = true,
   action,
+  titleAction,
   children,
 }: {
   title: string;
@@ -21,23 +22,28 @@ export function CollapsibleSection({
   count?: number;
   defaultOpen?: boolean;
   action?: ReactNode;
+  /** Rendered immediately to the right of the title/count (e.g. a Hide Examples toggle). */
+  titleAction?: ReactNode;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <section>
       <div className="flex items-center justify-between mb-3">
-        <button
-          type="button"
-          onClick={() => setOpen(o => !o)}
-          className="flex items-center gap-1.5 text-left group"
-        >
-          <span className="text-gray-400 text-lg leading-none w-4 group-hover:text-gray-600">{open ? "▾" : "▸"}</span>
-          <h2 className="text-base font-semibold text-gray-900">
-            {title}
-            {typeof count === "number" && <span className="text-gray-400 font-normal ml-1">({count})</span>}
-          </h2>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            className="flex items-center gap-1.5 text-left group"
+          >
+            <span className="text-gray-400 text-lg leading-none w-4 group-hover:text-gray-600">{open ? "▾" : "▸"}</span>
+            <h2 className="text-base font-semibold text-gray-900">
+              {title}
+              {typeof count === "number" && <span className="text-gray-400 font-normal ml-1">({count})</span>}
+            </h2>
+          </button>
+          {titleAction}
+        </div>
         {action}
       </div>
       {open && children}
