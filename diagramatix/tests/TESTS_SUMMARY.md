@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-07  ·  **Document version:** 5.9  ·  **Suite:** 123 test files · 788 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0663  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-08  ·  **Document version:** 6.0  ·  **Suite:** 124 test files · 790 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0665  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -837,6 +837,8 @@ Level 0 of the APQC Process Classification Framework feature: hand-parsing the A
 | T0661 | parses the **legacy per-category** format (no Combined sheet — one sheet per category, element in its level column, dotted code embedded in the cell) into the same node tree | Older APQC workbooks (e.g. Telecommunications v5.0.x) failing to import or building a wrong tree | If the legacy-format branch / embedded-code extraction regressed |
 | T0662 | `seedFoldersFromPcf` (Level 2) mirrors a PCF branch to a depth cap, links folders to their PCF parent, and keeps the project's existing folders + diagram map | The "seed folders from PCF" action losing existing folders, ignoring the depth cap, or building flat/mis-parented folders | If the folder-seed builder regressed |
 | T0663 | seeded folders anchor under a chosen parent folder | Seeded PCF folders always landing at the project root | If the `underFolderId` anchoring regressed |
+| T0664 | (L3 AI grounding) `renderPcfBranchForPrompt` renders a classified process + its sub-activities as an aligned, indented reference block | AI generation losing the PCF alignment context or mis-nesting the sub-activities | If the branch-render / indentation regressed |
+| T0665 | `groundRulesWithPcf` appends the PCF block to the AI rules, and is a no-op without a classification or when the node is a leaf | The PCF grounding silently dropping, or injecting an empty block | If the append / null-guard logic regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 

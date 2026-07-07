@@ -72,6 +72,9 @@ interface Props {
   diagramId?: string;
   /** Notifies the parent when a model comparison was produced. */
   onComparison?: (comparison: unknown) => void;
+  /** The diagram's APQC PCF classification — grounds the plan to that standard
+   *  process's decomposition (Level 3). */
+  pcf?: { nodeId: string; hierarchyId: string; name: string; variant: string };
 }
 
 interface SavedPrompt { id: string; name: string; text: string; }
@@ -91,6 +94,7 @@ export function PlanPanel({
   onAiFeedback,
   diagramId,
   onComparison,
+  pcf,
 }: Props) {
   const { data: authSession } = useSession();
   const isSuperuser = !!authSession?.user?.email
@@ -515,7 +519,7 @@ export function PlanPanel({
       const res = await fetch(`${apiBase}/plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: effPrompt, attachment: attachment ?? undefined }),
+        body: JSON.stringify({ prompt: effPrompt, attachment: attachment ?? undefined, pcfNodeId: pcf?.nodeId }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -745,6 +749,11 @@ export function PlanPanel({
               listening ? (dictEngine === "deepgram" ? "border-blue-400 bg-blue-50/30" : "border-red-300 bg-red-50/30") : "border-gray-300"
             }`}
           />
+          {pcf && (
+            <p className="mt-1 shrink-0 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1" title="The plan is aligned to this APQC PCF standard process's decomposition">
+              ◎ Aligning to APQC PCF: <span className="font-mono">{pcf.hierarchyId}</span> {pcf.name}
+            </p>
+          )}
           {isSuperuser && diagramType === "bpmn" && (
             <div className="mt-1 shrink-0">
               <button onClick={() => handleCompare()} disabled={comparing || !prompt.trim() || !diagramId}

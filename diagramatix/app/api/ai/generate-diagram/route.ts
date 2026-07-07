@@ -5,6 +5,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import { buildGenericSystemPrompt } from "@/app/lib/ai/generateDiagramPrompt";
+import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 
 
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "AI not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 503 });
 
-  const { prompt, diagramType, attachment } = await req.json();
+  const { prompt, diagramType, attachment, pcfNodeId } = await req.json();
   if (!prompt?.trim()) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
   if (!diagramType) return NextResponse.json({ error: "diagramType required" }, { status: 400 });
 
@@ -37,7 +38,8 @@ export async function POST(req: Request) {
   } catch {}
   const fullLen = rules.length;
   rules = splitRulesByEnforcement(rules).aiRules;
-  console.log("[AI generate-diagram]", diagramType, "full:", fullLen, "chars → green-only:", rules.length, "chars");
+  rules = await groundRulesWithPcf(prisma, rules, pcfNodeId);
+  console.log("[AI generate-diagram]", diagramType, "full:", fullLen, "chars → green-only+pcf:", rules.length, "chars");
 
   try {
     const client = new Anthropic({ apiKey });

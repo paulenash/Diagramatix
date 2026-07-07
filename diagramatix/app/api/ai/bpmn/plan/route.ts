@@ -10,6 +10,7 @@ import { prisma } from "@/app/lib/db";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
+import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 
 export async function POST(req: Request) {
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "AI service not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 503 });
   }
 
-  const { prompt, attachment } = await req.json();
+  const { prompt, attachment, pcfNodeId } = await req.json();
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
@@ -54,10 +55,11 @@ export async function POST(req: Request) {
   } catch { /* proceed without rules */ }
 
   const { aiRules } = splitRulesByEnforcement(fullRules);
-  console.log("[AI plan] full:", fullRules.length, "chars → green-only:", aiRules.length, "chars");
+  const grounded = await groundRulesWithPcf(prisma, aiRules, pcfNodeId);
+  console.log("[AI plan] full:", fullRules.length, "chars → green-only:", aiRules.length, "chars", pcfNodeId ? "+ PCF grounding" : "");
 
   try {
-    const result = await planBpmn({ apiKey, prompt, attachment, rules: aiRules, model: await getAiGenerateModel() });
+    const result = await planBpmn({ apiKey, prompt, attachment, rules: grounded, model: await getAiGenerateModel() });
     if (!result.ok) {
       return NextResponse.json({ error: result.error, raw: result.raw }, { status: result.status });
     }

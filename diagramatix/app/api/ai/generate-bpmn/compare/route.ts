@@ -4,6 +4,7 @@ import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
+import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import {
   findConnectorConformance,
@@ -68,6 +69,10 @@ export async function POST(req: Request) {
     }
   } catch { /* proceed without rules */ }
   const { aiRules } = splitRulesByEnforcement(rules);
+  // Ground on the diagram's own APQC PCF classification, if any.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pcfNodeId = (current.data as any)?.pcf?.nodeId as string | undefined;
+  const grounded = await groundRulesWithPcf(prisma, aiRules, pcfNodeId);
 
   const results: ModelResult[] = [];
   // Keep each model's laid-out diagram so we can fill with whichever wins.
@@ -77,7 +82,7 @@ export async function POST(req: Request) {
   for (const m of MODELS) {
     const t0 = Date.now();
     try {
-      const res = await planBpmn({ apiKey, prompt, rules: aiRules, model: m.id });
+      const res = await planBpmn({ apiKey, prompt, rules: grounded, model: m.id });
       const ms = Date.now() - t0;
       if (!res.ok) { results.push({ model: m.id, label: m.label, ok: false, ms, error: res.error }); continue; }
       const data = layoutBpmnDiagram(res.plan.elements, res.plan.connections);

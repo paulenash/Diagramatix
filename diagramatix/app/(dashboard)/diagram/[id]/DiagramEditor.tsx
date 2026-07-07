@@ -3634,6 +3634,7 @@ export function DiagramEditor({
         {showAiPanel && (
           <AiPanel
             diagramType={diagramType}
+            pcf={data.pcf}
             onApplyDiagram={(aiData: DiagramData) => {
               // Replace: set entire diagram data
               setData({
@@ -3695,6 +3696,7 @@ export function DiagramEditor({
         {showPlanPanel && (
           <PlanPanel
             diagramType={diagramType}
+            pcf={data.pcf}
             isAdmin={isAdmin}
             currentElements={data.elements}
             currentConnectors={data.connectors}

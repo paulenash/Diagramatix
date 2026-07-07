@@ -53,12 +53,15 @@ interface Props {
   /** Notifies the parent when a model comparison was produced, so it can show
    *  the "AI Comparison Results" button. */
   onComparison?: (comparison: unknown) => void;
+  /** The diagram's APQC PCF classification — when set, generation is grounded to
+   *  that standard process's decomposition (Level 3). */
+  pcf?: { nodeId: string; hierarchyId: string; name: string; variant: string };
 }
 
 export function AiPanel({
   diagramType, onApplyDiagram, onAddToDiagram, onClose, onGeneratingChange,
   isAdmin, currentElements, currentConnectors, onNarrativeGeneratingChange,
-  onAudioPhaseChange, aiFeedback, onAiFeedback, diagramId, onComparison,
+  onAudioPhaseChange, aiFeedback, onAiFeedback, diagramId, onComparison, pcf,
 }: Props) {
   const { data: authSession } = useSession();
   const isSuperuser = !!authSession?.user?.email
@@ -230,8 +233,8 @@ export function AiPanel({
       // Use BPMN-specific endpoint (with layout engine) for BPMN, generic for others
       const endpoint = diagramType === "bpmn" ? "/api/ai/generate-bpmn" : "/api/ai/generate-diagram";
       const body = diagramType === "bpmn"
-        ? { prompt: effPrompt, mode: "generate", attachment: attachment ?? undefined }
-        : { prompt: effPrompt, diagramType, attachment: attachment ?? undefined };
+        ? { prompt: effPrompt, mode: "generate", attachment: attachment ?? undefined, pcfNodeId: pcf?.nodeId }
+        : { prompt: effPrompt, diagramType, attachment: attachment ?? undefined, pcfNodeId: pcf?.nodeId };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -554,6 +557,12 @@ export function AiPanel({
               void handleGenerate(newPrompt);
             }}
           />
+        )}
+
+        {pcf && (
+          <p className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 mb-1.5" title="Generation is aligned to this APQC PCF standard process's decomposition">
+            ◎ Aligning to APQC PCF: <span className="font-mono">{pcf.hierarchyId}</span> {pcf.name}
+          </p>
         )}
 
         <div className="flex gap-1.5">
