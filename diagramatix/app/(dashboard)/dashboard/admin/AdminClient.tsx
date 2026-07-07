@@ -637,28 +637,43 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
 
 function GenerateDdlButton() {
   const [open, setOpen] = useState(false);
+  const [model, setModel] = useState<"logical" | "physical">("logical");
   const [dbType, setDbType] = useState("postgres");
   const [generating, setGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  function download(text: string, filename: string) {
+    const blob = new Blob([text], { type: "text/sql" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   async function handleGenerate() {
     setGenerating(true);
     try {
-      const { generateDiagramatixDDL } = await import("@/app/lib/diagram/ddlGenerate");
-      const ddl = generateDiagramatixDDL(dbType);
-      const dbLabel = { postgres: "PostgreSQL", mysql: "MySQL", mssql: "SQLServer" }[dbType] ?? dbType;
-      const blob = new Blob([ddl], { type: "text/sql" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `diagramatix-logical-ddl-${dbLabel}.sql`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (model === "physical") {
+        // Introspects the live database server-side (SuperAdmin-gated).
+        const res = await fetch("/api/admin/physical-ddl");
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error ?? `Request failed (${res.status})`);
+        }
+        download(await res.text(), "diagramatix-physical-ddl-PostgreSQL.sql");
+      } else {
+        const { generateDiagramatixDDL } = await import("@/app/lib/diagram/ddlGenerate");
+        const ddl = generateDiagramatixDDL(dbType);
+        const dbLabel = { postgres: "PostgreSQL", mysql: "MySQL", mssql: "SQLServer" }[dbType] ?? dbType;
+        download(ddl, `diagramatix-logical-ddl-${dbLabel}.sql`);
+      }
       setOpen(false);
     } catch (err) {
-      setErrorMessage("Failed to generate logical DDL: " + (err instanceof Error ? err.message : String(err)));
+      setErrorMessage(`Failed to generate ${model} DDL: ` + (err instanceof Error ? err.message : String(err)));
     } finally {
       setGenerating(false);
     }
@@ -668,17 +683,29 @@ function GenerateDdlButton() {
     <div className="relative">
       <button onClick={() => setOpen(!open)}
         className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50">
-        Generate Logical DDL
+        Generate DDL
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50 p-3 space-y-2">
-          <p className="text-xs font-medium text-gray-700">Database Type</p>
-          <select value={dbType} onChange={e => setDbType(e.target.value)}
+        <div className="absolute right-0 top-full mt-1 w-60 bg-white border border-gray-200 rounded shadow-lg z-50 p-3 space-y-2">
+          <p className="text-xs font-medium text-gray-700">Model</p>
+          <select value={model} onChange={e => setModel(e.target.value as "logical" | "physical")}
             className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white">
-            <option value="postgres">PostgreSQL</option>
-            <option value="mysql">MySQL</option>
-            <option value="mssql">SQL Server</option>
+            <option value="logical">Logical — curated data model</option>
+            <option value="physical">Physical — live database</option>
           </select>
+          {model === "logical" ? (
+            <>
+              <p className="text-xs font-medium text-gray-700">Database Type</p>
+              <select value={dbType} onChange={e => setDbType(e.target.value)}
+                className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white">
+                <option value="postgres">PostgreSQL</option>
+                <option value="mysql">MySQL</option>
+                <option value="mssql">SQL Server</option>
+              </select>
+            </>
+          ) : (
+            <p className="text-[11px] text-gray-500 leading-snug">The actual deployed PostgreSQL schema — real tables, native types, enums, keys and indexes, introspected live.</p>
+          )}
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={() => setOpen(false)}
               className="px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
@@ -691,7 +718,7 @@ function GenerateDdlButton() {
       )}
       {errorMessage && (
         <AlertDialog
-          title="Logical DDL generation failed"
+          title="DDL generation failed"
           message={errorMessage}
           tone="error"
           onClose={() => setErrorMessage(null)}
@@ -720,7 +747,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "ai-rules", title: "AI Rules & Preferences", description: "Geometric + style rules that steer AI BPMN generation.", href: "/dashboard/rules" },
   { id: "ai-model", title: "AI Generate Model", description: "Choose the Claude model AI diagram generation uses (default Haiku 4.5).", href: "/dashboard/admin/ai-model" },
   { id: "database", title: "Database Access", description: "Inspect the live database and run maintenance queries.", href: "/dashboard/admin/database" },
-  { id: "ddl", title: "Logical DDL Generation", description: "Download the Diagramatix logical data model as PostgreSQL / MySQL / SQL Server DDL.", ddl: true },
+  { id: "ddl", title: "DDL Generation", description: "Download the Diagramatix schema as DDL — the curated LOGICAL model (PostgreSQL / MySQL / SQL Server) or the PHYSICAL DDL of the live database.", ddl: true },
   { id: "archive", title: "System Archive", description: "Archived projects and diagrams across the system.", href: "/dashboard/admin/archive" },
   { id: "subscriptions", title: "Subscription Prices & Limits", description: "Tier pricing and per-tier feature limits.", href: "/dashboard/admin/subscriptions" },
   { id: "features", title: "Features Catalog", description: "Edit the public feature catalog (draft / publish).", href: "/dashboard/admin/features" },

@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-07  ·  **Document version:** 5.5  ·  **Suite:** 120 test files · 782 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0657  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-07  ·  **Document version:** 5.6  ·  **Suite:** 121 test files · 783 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0658  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -817,6 +817,14 @@ Attach Risks/Controls (from an org-master → project-copy GRC catalog — Risks
 | T0655 | per-kind renumber scope — renumbering only Controls leaves Risks untouched (no code + no counter change) | The OrgAdmin "renumber one kind" action silently reflowing other kinds' codes | If the `kinds` filter in `assignOrgWideCodes` regressed |
 | T0656 | Compliance Monitoring rollup — Σapplied/Σexpected per control code over runs; below-threshold + declining detection; per-project latest | The org-wide compliance trend mis-aggregating effectiveness or missing at-risk controls | If `buildComplianceReport` rollup / flagging regressed |
 | T0657 | Compliance falls back to conformance-deviation effectiveness when a run has no mined governance | Compliance ignoring controls that only have a `monitorSignature` (no Control-ID evidence) | If the `logControlEffectiveness ?? controlEffectiveness` fallback in `measure` regressed |
+
+### `tests/ddl/physicalDdl.test.ts` — physical DDL of the live database
+
+The SuperAdmin **DDL Generation** tile now offers, alongside the curated logical model, a **physical** DDL introspected straight from the live PostgreSQL catalog (real tables, native types, enums, keys, indexes). This pins the assembler.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0658 | `buildPhysicalDdl` emits enums, table columns (type / NOT NULL / DEFAULT), PK/unique/FK constraints and secondary indexes, filtering out indexes that back a constraint | A corrupt or duplicate-DDL physical export (e.g. re-emitting the PK's implicit index) | If the introspection-row assembly or the constraint-index filter regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 
