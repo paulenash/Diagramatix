@@ -47,7 +47,12 @@ export function PcfCreateProjectDialog({ onClose }: { onClose: () => void }) {
 
   function pickRoot(n: Hit) {
     setRoot(n);
-    if (!nameDirty) setName(`${n.hierarchyId} ${n.name}`);
+    // Default name: "APQC: <FrameworkName> - <LevelNumber> <LevelName>".
+    // FrameworkName = the framework's variant/name (already the human label, so
+    // the "APQC:" prefix isn't doubled up with the "APQC PCF — …" full name).
+    const f = frameworks.find((x) => x.id === fw);
+    const frameworkName = f?.variant || f?.name || "";
+    if (!nameDirty) setName(`APQC: ${frameworkName} - ${n.hierarchyId} ${n.name}`);
   }
 
   const wholeLabels = ["", "Categories only", "+ Process Groups", "+ Processes", "+ Activities"];
