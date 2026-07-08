@@ -12,9 +12,13 @@ name: Mining live-source poll
 # The endpoint is a no-op (503) until CRON_SECRET is configured on the app.
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"   # every 15 minutes
-  workflow_dispatch: {}       # allow manual runs
+  # DISABLED until the live-connectors feature is resumed. The scheduled poll is
+  # a no-op until CRON_SECRET (App Service env) + APP_BASE_URL/CRON_SECRET (repo
+  # secrets) are configured, so the 15-min cron only cluttered the Actions log.
+  # To re-enable: uncomment the `schedule:` block below and set the secrets.
+  # schedule:
+  #   - cron: "*/15 * * * *"   # every 15 minutes
+  workflow_dispatch: {}       # manual runs still allowed
 
 jobs:
   poll:
