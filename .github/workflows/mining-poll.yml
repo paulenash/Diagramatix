@@ -1,0 +1,33 @@
+name: Mining live-source poll
+
+# Scheduled poller for DiagramatixMINER live sources (Phase 1 connectors).
+# Flushes debounced webhook buffers and polls Azure Blob sources, then refreshes
+# each affected live run. The app has no in-process scheduler (App Service
+# recycles), so this GitHub Actions cron is the trigger.
+#
+# Required repository secrets:
+#   APP_BASE_URL  — the deployed app origin, e.g. https://diagramatix.azurewebsites.net
+#   CRON_SECRET   — must match the CRON_SECRET env var set on the App Service
+#
+# The endpoint is a no-op (503) until CRON_SECRET is configured on the app.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes
+  workflow_dispatch: {}       # allow manual runs
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger live-source poll
+        run: |
+          if [ -z "${{ secrets.APP_BASE_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "APP_BASE_URL / CRON_SECRET not set — skipping."; exit 0
+          fi
+          code=$(curl -s -o /tmp/out.json -w "%{http_code}" -X POST \
+            -H "X-Cron-Key: ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_BASE_URL }}/api/mining/poll")
+          echo "HTTP $code"; cat /tmp/out.json || true
+          # Don't fail the workflow on a transient app error.
+          if [ "$code" = "401" ]; then echo "::error::CRON_SECRET mismatch"; exit 1; fi

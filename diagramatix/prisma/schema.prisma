@@ -265,6 +265,7 @@ model Project {
   simulationCalendars SimulationCalendar[]
   simulationStudies SimulationStudy[]
   processMiningRuns ProcessMiningRun[]
+  miningSources     MiningSource[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -1202,6 +1203,39 @@ model ProcessMiningRun {
 
   @@index([orgId])
   @@index([projectId])
+}
+
+// A live event-ingestion source (Phase 1 connectors) — pushes (webhook) or pulls
+// (watched folder) events that keep one "live" ProcessMiningRun refreshed in
+// place. Buffer is a windowed accumulation of normalised rows (capped at
+// maxEvents); config/cursor drive pull sources. The webhook key is stored as a
+// sha256 hash only (raw shown once). See app/lib/mining/refreshRun.ts.
+model MiningSource {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  orgId         String?
+  createdById   String?
+  name          String
+  kind          String   // "webhook" | "azure-blob" | "sharepoint"
+  apiKeyHash    String?  // sha256 hex of the webhook key
+  apiKeyPrefix  String?  // first 8 chars, for display
+  mapping       Json     @default("{}")   // LogMapping: incoming field → role
+  config        Json     @default("{}")   // { blobListUrl } | { driveId, itemId, folderPath, folderName }
+  cursor        Json     @default("{}")   // watermark for pull: { lastModified, seenNames[] }
+  buffer        Json     @default("[]")   // windowed accumulated event rows (capped)
+  headerFields  Json     @default("[]")   // stable column order for buildEventLog
+  runId         String?  // the live ProcessMiningRun this source maintains
+  maxEvents     Int      @default(100000)
+  autoRefresh   Boolean  @default(true)
+  lastIngestAt  DateTime?
+  lastRefreshAt DateTime?
+  eventCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([kind])
 }
 
 // A simulation Study (the portfolio) — a named set of root diagrams whose

@@ -37,7 +37,7 @@ const SCOPED_COVERED = new Set<string>([
 const SIMULATOR_TABLES = [
   "SimulationTeam", "SimulationCalendar", "SimulationStudy", "SimulationStudyRoot",
   "SimulationScenario", "SimulationRun", "SimulationExample",
-  "ProcessMiningRun", "MiningExample",
+  "ProcessMiningRun", "MiningExample", "MiningSource",
 ] as const;
 
 // Risk & Control catalog (org master + project copy). Carried by the full

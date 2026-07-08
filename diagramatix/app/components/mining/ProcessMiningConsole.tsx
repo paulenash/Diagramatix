@@ -12,6 +12,7 @@ import { parseCsv, guessMapping, distinctActivities } from "@/app/lib/mining/par
 import { parseXes } from "@/app/lib/mining/formats/xes";
 import { parseOcel } from "@/app/lib/mining/formats/ocel";
 import { validateEventLogMapping } from "@/app/lib/mining/validateLog";
+import { MiningSourcesPanel } from "./MiningSourcesPanel";
 import type { LogMapping, MiningStats } from "@/app/lib/mining/types";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -424,6 +425,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
           )}
           {err && <p className="text-rose-400 text-xs mt-2">{err}</p>}
         </section>
+
+        {/* Live sources — push (webhook) / pull (watched folder) auto-refresh */}
+        <MiningSourcesPanel projectId={projectId} />
 
         {/* Runs */}
         <section className="bg-stone-900 border border-stone-700 rounded-lg p-4">
