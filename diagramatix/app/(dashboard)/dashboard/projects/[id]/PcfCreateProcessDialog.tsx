@@ -20,7 +20,15 @@ export interface CreatedPcf {
   rootHierarchyId?: string; rootName?: string;
 }
 
-export interface BulkContext { rootFolder: { id: string; name: string }; subtree: BulkFolder[] }
+export interface BulkContext {
+  rootFolder: { id: string; name: string };
+  subtree: BulkFolder[];
+  /** folderId → an existing diagram id already in that folder (conflict). */
+  existingByFolder?: Record<string, string>;
+}
+
+/** Hard cap on how many diagrams any one generation request may produce. */
+export const MAX_BULK_DIAGRAMS = 50;
 
 export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFrameworkId, isAdmin, bulk, onClose, onCreated, onBulkCreated }: {
   projectId: string; defaultQuery?: string; defaultFrameworkId?: string;
@@ -39,6 +47,9 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFramewo
   const [status, setStatus] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; label: string } | null>(null);
+  // Existing-diagram conflict: pause the bulk loop and ask Skip/Replace.
+  const [conflict, setConflict] = useState<{ folderName: string; resolve: (a: "skip" | "replace", all: boolean) => void } | null>(null);
+  const [conflictAll, setConflictAll] = useState(false);
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}/pcf`).then((r) => r.json()).then((j) => {
@@ -154,7 +165,10 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFramewo
       const nodeByCode: Record<string, { nodeId: string; pcfId: number; name: string; level: number }> =
         (await fetch(`/api/projects/${projectId}/pcf/resolve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ frameworkId: fw, codes }) }).then((r) => r.json()).catch(() => ({ nodes: {} }))).nodes ?? {};
 
-      const ordered = orderDeepestFirst(subtree); // children before their parents
+      // Hard cap: never generate more than MAX_BULK_DIAGRAMS in one request.
+      const ordered = orderDeepestFirst(subtree).slice(0, MAX_BULK_DIAGRAMS); // children before their parents
+      const existingByFolder = bulk.existingByFolder ?? {};
+      let applyToAll: "skip" | "replace" | null = null;
 
       for (let i = 0; i < ordered.length; i++) {
         const folder = ordered[i];
@@ -162,6 +176,21 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFramewo
         const code = folderCode(folder.name);
         const node = code ? nodeByCode[code] : undefined;
         const kids = childrenInSubtree(subtree, folder.id);
+        const existingId = existingByFolder[folder.id];
+
+        // Conflict: a diagram already exists in this folder → ask Skip / Replace.
+        if (existingId) {
+          let action: "skip" | "replace";
+          if (applyToAll) action = applyToAll;
+          else {
+            const choice = await new Promise<{ action: "skip" | "replace"; all: boolean }>((resolve) =>
+              setConflict({ folderName: folder.name, resolve: (a, all) => resolve({ action: a, all }) }));
+            setConflict(null); setConflictAll(false);
+            if (choice.all) applyToAll = choice.action;
+            action = choice.action;
+          }
+          if (action === "skip") { createdByFolder[folder.id] = existingId; continue; } // link parents to the existing diagram
+        }
 
         let diagramData: { elements?: unknown[] } | undefined;
         let generated: "decompose" | "ai" = "decompose";
@@ -181,15 +210,23 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFramewo
         }
 
         const data = { ...diagramData, pcf: { nodeId: node?.nodeId, pcfId: node?.pcfId, hierarchyId: code, name: node?.name ?? folder.name, frameworkId: fw, variant, frameworkName: f?.name, version: f?.version, level: node?.level, numbered: numbering, generated } };
-        const cr = await fetch("/api/diagrams", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: folder.name, type: "bpmn", projectId, data }) });
-        const cj = await cr.json().catch(() => ({}));
-        if (!cr.ok || !cj.id) { setErr(cj.error ?? "Failed to create a diagram"); break; }
-        createdByFolder[folder.id] = cj.id;
-        assign[cj.id] = folder.id;
+        if (existingId) {
+          // Replace: overwrite the existing diagram's content in place (keeps its
+          // id/name/folder, so links pointing at it stay valid).
+          const up = await fetch(`/api/diagrams/${existingId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data }) });
+          if (!up.ok) { setErr("Failed to replace a diagram"); break; }
+          createdByFolder[folder.id] = existingId;
+        } else {
+          const cr = await fetch("/api/diagrams", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: folder.name, type: "bpmn", projectId, data }) });
+          const cj = await cr.json().catch(() => ({}));
+          if (!cr.ok || !cj.id) { setErr(cj.error ?? "Failed to create a diagram"); break; }
+          createdByFolder[folder.id] = cj.id;
+          assign[cj.id] = folder.id;
+        }
       }
     } catch { setErr("Bulk generation failed"); }
     finally {
-      setBusy(false); setBulkProgress(null);
+      setBusy(false); setBulkProgress(null); setConflict(null); setConflictAll(false);
       // Hand back whatever was created so folders are assigned + links normalised.
       onBulkCreated?.(assign, createdByFolder[bulk.rootFolder.id] ?? null, { frameworkId: fw, frameworkName: f?.name, variant, rootName: bulk.rootFolder.name });
     }
@@ -249,21 +286,32 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFramewo
           </button>
         </div>
 
-        {isAdmin && bulk && bulk.subtree.length > 1 && (
+        {isAdmin && bulk && bulk.subtree.length > 1 && (() => {
+          const total = bulk.subtree.length;
+          const overLimit = total > MAX_BULK_DIAGRAMS;
+          const existingCount = bulk.subtree.filter((s) => bulk.existingByFolder?.[s.id]).length;
+          return (
           <div className="mt-4 pt-3 border-t border-gray-200">
             <p className="text-[11px] text-gray-700 mb-1">
-              <span className="font-medium">Bulk generate</span> <span className="text-[9px] uppercase tracking-wide text-red-600">SuperAdmin</span> — one diagram per folder in <span className="font-mono text-gray-600">{bulk.rootFolder.name}</span> and its {bulk.subtree.length - 1} descendant folder{bulk.subtree.length - 1 === 1 ? "" : "s"}.
+              <span className="font-medium">Bulk generate</span> <span className="text-[9px] uppercase tracking-wide text-red-600">SuperAdmin</span> — one diagram per folder in <span className="font-mono text-gray-600">{bulk.rootFolder.name}</span> and its {total - 1} descendant folder{total - 1 === 1 ? "" : "s"}.
             </p>
             <p className="text-[10px] text-gray-500 mb-2">
-              <span className="font-medium text-gray-700">{bulk.subtree.length} diagrams</span> will be generated, strictly from the project&rsquo;s seeded folders (not the full framework). Non-leaf folders decompose into linked sub-processes; leaf folders are AI-generated. Child diagrams are auto-linked to their parent sub-processes.
+              <span className="font-medium text-gray-700">{total} diagrams</span> will be generated, strictly from the project&rsquo;s seeded folders (not the full framework). Non-leaf folders decompose into linked sub-processes; leaf folders are AI-generated. Child diagrams are auto-linked to their parent sub-processes.
             </p>
+            {existingCount > 0 && !overLimit && (
+              <p className="text-[10px] text-amber-700 mb-2">{existingCount} folder{existingCount === 1 ? "" : "s"} already contain a diagram — you&rsquo;ll be asked to Skip or Replace each.</p>
+            )}
+            {overLimit && (
+              <p className="text-[11px] text-red-600 mb-2">This subtree has {total} folders, over the {MAX_BULK_DIAGRAMS}-diagram limit per request. Select a smaller folder.</p>
+            )}
             <div className="flex justify-end">
-              <button onClick={createBulk} disabled={busy || !fw} className="px-3 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50">
-                Create processes ({bulk.subtree.length})
+              <button onClick={createBulk} disabled={busy || !fw || overLimit} className="px-3 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50">
+                Create processes ({total})
               </button>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {bulkProgress && (
           <div className="absolute inset-0 bg-white/95 rounded-lg flex flex-col items-center justify-center p-6 z-10">
@@ -273,6 +321,25 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFramewo
             </div>
             <p className="text-[11px] text-gray-500 tabular-nums">{bulkProgress.current} of {bulkProgress.total}</p>
             <p className="text-[10px] text-gray-400 mt-1 max-w-xs truncate" title={bulkProgress.label}>{bulkProgress.label}</p>
+          </div>
+        )}
+
+        {conflict && (
+          <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center p-4 z-20">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-xl p-4 w-[340px]">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Diagram already exists</h3>
+              <p className="text-[11px] text-gray-600 mb-3">
+                <span className="font-mono text-gray-700">{conflict.folderName}</span> already contains a diagram. Skip it (keep the existing one) or replace its contents?
+              </p>
+              <label className="flex items-center gap-2 mb-3 text-[11px] text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={conflictAll} onChange={(e) => setConflictAll(e.target.checked)} />
+                Do this for all subsequent diagrams
+              </label>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => conflict.resolve("skip", conflictAll)} className="px-3 py-1 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50">Skip</button>
+                <button onClick={() => conflict.resolve("replace", conflictAll)} className="px-3 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700">Replace</button>
+              </div>
+            </div>
           </div>
         )}
       </div>

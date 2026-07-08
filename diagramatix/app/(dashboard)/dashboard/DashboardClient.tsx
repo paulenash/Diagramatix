@@ -40,6 +40,8 @@ interface ProjectSummary {
   /** Set when the project was created by adopting a ready-made example —
    *  "simulation" | "mining" | "risk-control". Drives the feature-coloured tile. */
   exampleType?: string | null;
+  /** APQC PCF association (Project.pcf). Non-empty → APQC-generated → black tile border. */
+  pcf?: unknown;
   createdAt: Date;
   updatedAt: Date;
   /** Server-side diagrams + shares count. shares may be 0 (not shared). */
@@ -1841,6 +1843,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 const tileSharedList = shareListByProject[p.id];
                 // Example projects (owned, not shared) take a feature-coloured tile.
                 const ex = !isSharedToMe && !isSharedOut && p.exampleType ? EXAMPLE_TILE[p.exampleType] : null;
+                // APQC-generated projects (a linked PCF framework) get a black boundary.
+                const isApqc = !!(p.pcf && typeof p.pcf === "object" && Object.keys(p.pcf as object).length > 0);
                 return (
                 <div
                   key={p.id}
@@ -1885,7 +1889,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                           : ex
                             ? ex.base
                             : "bg-white border-gray-300 hover:border-blue-300"
-                  }`}
+                  } ${isApqc ? "!border-black !border-2" : ""}`}
                 >
                   <div className="flex items-center justify-between group/row">
                     <h3

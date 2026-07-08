@@ -2913,10 +2913,20 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       {showPcfCreate && (() => {
         const selFolder = selectedFolderId !== ROOT_ID ? folderTree.folders.find(f => f.id === selectedFolderId) : null;
         const subtree = selFolder ? folderSubtree(folderTree.folders, selFolder.id) : [];
+        // Existing diagram (if any) per folder in the subtree → the bulk flow
+        // asks Skip/Replace for each conflict.
+        const existingByFolder: Record<string, string> = {};
+        if (selFolder) {
+          const inSub = new Set(subtree.map(s => s.id));
+          for (const d of diagrams) {
+            const fid = folderTree.diagramFolderMap[d.id];
+            if (fid && inSub.has(fid) && !existingByFolder[fid]) existingByFolder[fid] = d.id;
+          }
+        }
         // SuperAdmin bulk is offered only in an APQC-linked project when the
         // highlighted folder actually contains a sub-folder hierarchy.
         const bulk = (isAdmin && selFolder && projectPcf?.frameworkId && subtree.length > 1)
-          ? { rootFolder: { id: selFolder.id, name: selFolder.name }, subtree }
+          ? { rootFolder: { id: selFolder.id, name: selFolder.name }, subtree, existingByFolder }
           : undefined;
         const adoptFramework = (createdPcf: { frameworkId?: string }) => {
           if (!projectPcf && createdPcf?.frameworkId) {
