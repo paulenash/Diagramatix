@@ -1773,6 +1773,16 @@ export function PropertiesPanel({
         })()}
       </div>
 
+      {(element.properties?.pcfHierarchyId != null || element.properties?.pcfId != null) && (
+        <div className="mb-3 rounded border border-indigo-100 bg-indigo-50/50 px-2 py-1.5">
+          <p className="text-[9px] uppercase tracking-wide text-indigo-400 mb-0.5">APQC PCF</p>
+          <p className="text-[11px] text-gray-800">
+            {element.properties?.pcfHierarchyId != null && <span className="font-mono text-gray-600">{String(element.properties.pcfHierarchyId)}</span>}
+            {element.properties?.pcfId != null && <span className="text-gray-400 ml-1">#{String(element.properties.pcfId)}</span>}
+          </p>
+        </div>
+      )}
+
       <div>
         <label className="block text-[10px] font-medium text-gray-500 mb-0.5">
           {element.type === "uml-class" || element.type === "uml-enumeration" ||

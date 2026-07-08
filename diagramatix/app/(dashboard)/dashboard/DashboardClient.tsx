@@ -15,6 +15,7 @@ import { ReviewsSection } from "./ReviewsSection";
 import { PublishedSection } from "./PublishedSection";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { ProjectShareDialog } from "./ProjectShareDialog";
+import { PcfCreateProjectDialog } from "./PcfCreateProjectDialog";
 import { NotificationsClient } from "../notifications/NotificationsClient";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
@@ -388,6 +389,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
   // New project state
   const [showNewProject, setShowNewProject] = useState(false);
+  const [showPcfProject, setShowPcfProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
 
@@ -1778,12 +1780,21 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             </button>
           }
           action={!readOnly ? (
-            <button
-              onClick={() => setShowNewProject(true)}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
-            >
-              + New Project
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowNewProject(true)}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
+              >
+                + New Project
+              </button>
+              <button
+                onClick={() => setShowPcfProject(true)}
+                className="px-3 py-1.5 rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs font-medium"
+                title="Create a project pre-seeded with an APQC PCF folder structure"
+              >
+                ◎ Create APQC Project
+              </button>
+            </div>
           ) : undefined}
         >
 
@@ -2924,6 +2935,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           </div>
         </div>
       )}
+
+      {showPcfProject && <PcfCreateProjectDialog onClose={() => setShowPcfProject(false)} />}
 
       {/* New Project dialog */}
       {showNewProject && (

@@ -2200,15 +2200,6 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                   >
                     Configuration
                   </button>
-                  {!readOnly && (
-                    <button
-                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
-                      onClick={() => { setShowProjectMenu(false); setShowPcfSeed(true); }}
-                      title="Create a folder structure mirroring an APQC PCF branch"
-                    >
-                      Seed folders from APQC PCF…
-                    </button>
-                  )}
                   <button
                     className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                     disabled={scanBusy}
@@ -2907,7 +2898,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       {showPcfCreate && (
         <PcfCreateProcessDialog
           projectId={project.id}
-          defaultQuery={selectedFolderId !== ROOT_ID ? folderTree.folders.find(f => f.id === selectedFolderId)?.name : undefined}
+          defaultQuery={selectedFolderId !== ROOT_ID ? folderTree.folders.find(f => f.id === selectedFolderId)?.name : (projectPcf?.rootHierarchyId ? `${projectPcf.rootHierarchyId} ${projectPcf.rootName ?? ""}`.trim() : undefined)}
+          defaultFrameworkId={projectPcf?.frameworkId}
           onClose={() => setShowPcfCreate(false)}
           onCreated={(diagramId, createdPcf) => {
             if (selectedFolderId !== ROOT_ID) {

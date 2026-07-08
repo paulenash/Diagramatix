@@ -19,8 +19,9 @@ export interface CreatedPcf {
   rootHierarchyId?: string; rootName?: string;
 }
 
-export function PcfCreateProcessDialog({ projectId, defaultQuery, onClose, onCreated }: {
-  projectId: string; defaultQuery?: string; onClose: () => void; onCreated: (diagramId: string, pcf: CreatedPcf) => void;
+export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFrameworkId, onClose, onCreated }: {
+  projectId: string; defaultQuery?: string; defaultFrameworkId?: string;
+  onClose: () => void; onCreated: (diagramId: string, pcf: CreatedPcf) => void;
 }) {
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [fw, setFw] = useState("");
@@ -36,8 +37,11 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, onClose, onCre
     fetch(`/api/projects/${projectId}/pcf`).then((r) => r.json()).then((j) => {
       const fws: Framework[] = j.frameworks ?? [];
       setFrameworks(fws);
+      // Default to the project's own APQC framework (item #4) when it has one,
+      // else Cross-Industry.
+      const preferred = defaultFrameworkId && fws.some((f) => f.id === defaultFrameworkId) ? defaultFrameworkId : undefined;
       const xi = fws.find((f) => f.variant === "Cross-Industry" && f.kind === "reference");
-      setFw((p) => p || xi?.id || fws[0]?.id || "");
+      setFw((p) => p || preferred || xi?.id || fws[0]?.id || "");
     }).catch(() => {});
   }, [projectId]);
 
@@ -53,13 +57,15 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, onClose, onCre
   // Prefix a task/subprocess element's label with a sequential APQC sub-code
   // (e.g. "1.1.1.1", "1.1.1.2") derived from the chosen node's code. Used for
   // the AI (leaf) path — the decompose path already carries authoritative codes.
-  function applyNumbering(diagramData: { elements?: { type: string; label?: string }[] }, rootCode: string) {
+  function applyNumbering(diagramData: { elements?: { type: string; label?: string; properties?: Record<string, unknown> }[] }, rootCode: string) {
     let n = 0;
     for (const el of diagramData.elements ?? []) {
       if (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded") {
         n += 1;
         const code = `${rootCode}.${n}`;
         if (!(el.label ?? "").startsWith(code)) el.label = `${code} ${el.label ?? ""}`.trim();
+        // Stamp element-level APQC attributes so the Properties Panel shows them.
+        el.properties = { ...(el.properties ?? {}), pcfHierarchyId: code };
       }
     }
   }
