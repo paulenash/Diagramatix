@@ -843,6 +843,7 @@ Level 0 of the APQC Process Classification Framework feature: hand-parsing the A
 | T0667 | `buildPcfNodeWhere` resolves bare-code, bare-name and forgiving "code + name" APQC searches (code prefix OR name; bare integer also matches pcfId) | The Create-APQC pickers finding nothing when the field holds a seeded folder's "code + name" | If the search-matcher query shapes regressed |
 | T0668 | (L4a) `computePcfCoverage` marks nodes modelled by nodeId or by pcfId (same framework only) and rolls modelled/total counts up the tree into per-category and per-level totals | APQC coverage over-counting cross-framework classifications, or mis-rolling category/level totals | If the coverage aggregation regressed |
 | T0669 | (L4b) `buildComplianceReport` rolls control effectiveness up by APQC category (Σapplied/Σexpected + mean fitness per category), ordered worst-first and flagged below-threshold | The by-APQC-category compliance rollup mis-summing or mis-ordering | If the `byPcfCategory` grouping regressed |
+| T0670 | (L5) `composeBranch` copies a subtree into a tailored framework with provenance (sourceFrameworkId/sourcePcfId), re-based levels, remapped parents and preserved sortOrder | The tailored-framework compose losing provenance or mis-nesting the grafted branch | If the compose logic regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 

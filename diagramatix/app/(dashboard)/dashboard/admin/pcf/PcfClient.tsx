@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PcfBuilder } from "./PcfBuilder";
+import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 interface FrameworkSummary {
   id: string; name: string; variant: string; version: string;
@@ -35,6 +37,35 @@ export function PcfClient({
   const [showImport, setShowImport] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createDivision, setCreateDivision] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [confirmDeleteFw, setConfirmDeleteFw] = useState(false);
+
+  async function createTailored() {
+    if (!createName.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fetch(`/api/orgs/${orgId}/pcf`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: createName.trim(), division: createDivision.trim() || undefined }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok && j.framework?.id) {
+        setShowCreate(false); setCreateName(""); setCreateDivision("");
+        await loadFrameworks();
+        setSelectedId(j.framework.id);
+      }
+    } finally { setCreating(false); }
+  }
+
+  async function deleteFramework() {
+    setConfirmDeleteFw(false);
+    await fetch(`/api/orgs/${orgId}/pcf/${selectedId}`, { method: "DELETE" });
+    setSelectedId("");
+    await loadFrameworks();
+  }
 
   const loadFrameworks = useCallback(async () => {
     const res = await fetch(`/api/orgs/${orgId}/pcf`);
@@ -121,6 +152,9 @@ export function PcfClient({
           <p className="text-sm text-gray-500">Reference taxonomy for <span className="font-medium text-orange-700">{orgName}</span> — browse the standard, classify processes, build a tailored framework.</p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => setShowCreate(true)} className="text-xs px-3 py-1.5 rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-50">
+            ＋ New tailored framework
+          </button>
           {isSuperAdmin && (
             <button onClick={() => setShowImport((v) => !v)} className="text-xs px-3 py-1.5 rounded border border-orange-300 text-orange-700 hover:bg-orange-50">
               ⭱ Import workbook
@@ -181,10 +215,21 @@ export function PcfClient({
                 </optgroup>
               )}
             </select>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / code…" className="text-sm border border-gray-300 rounded px-2 py-1 flex-1 min-w-[180px] max-w-xs bg-white text-gray-800" />
+            {selected?.kind !== "tailored" && (
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / code…" className="text-sm border border-gray-300 rounded px-2 py-1 flex-1 min-w-[180px] max-w-xs bg-white text-gray-800" />
+            )}
             {selected && <span className="text-[11px] text-gray-400">{selected._count.nodes} elements · {selected.kind}</span>}
+            {selected?.kind === "tailored" && (
+              <button onClick={() => setConfirmDeleteFw(true)} className="ml-auto text-[11px] px-2 py-1 rounded border border-gray-300 text-gray-500 hover:border-red-300 hover:text-red-600">Delete framework</button>
+            )}
           </div>
 
+          {selected?.kind === "tailored" ? (
+            <div className="bg-white border border-indigo-200 rounded-lg p-3 min-h-[300px]">
+              <PcfBuilder orgId={orgId} frameworkId={selectedId} frameworks={frameworks}
+                onChanged={() => { loadFrameworks(); }} />
+            </div>
+          ) : (
           <div className="bg-white border border-orange-200 rounded-lg p-3 min-h-[300px]">
             {loadingTree ? (
               <p className="text-sm text-gray-400">Loading tree…</p>
@@ -202,11 +247,38 @@ export function PcfClient({
               roots.map((n) => <Row key={n.id} n={n} depth={0} />)
             )}
           </div>
+          )}
 
-          {attribution && (
+          {attribution && selected?.kind !== "tailored" && (
             <p className="text-[10px] text-gray-400 mt-3 leading-snug border-t border-gray-100 pt-2">{attribution}</p>
           )}
         </>
+      )}
+
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50" onClick={() => !creating && setShowCreate(false)}>
+          <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-5 w-[400px]" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-sm font-semibold text-gray-900 mb-1">New tailored framework</h2>
+            <p className="text-[11px] text-gray-500 mb-4">An org-owned framework you compose from reference branches and extend with custom nodes. Carries the APQC attribution notice.</p>
+            <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Name</label>
+            <input autoFocus value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="e.g. Acme — Retail Division"
+              onKeyDown={(e) => { if (e.key === "Enter") createTailored(); }}
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 mb-3 bg-white text-gray-800" />
+            <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Division (optional)</label>
+            <input value={createDivision} onChange={(e) => setCreateDivision(e.target.value)} placeholder="e.g. Retail"
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 mb-4 bg-white text-gray-800" />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowCreate(false)} disabled={creating} className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+              <button onClick={createTailored} disabled={creating || !createName.trim()} className="px-3 py-1 text-xs text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50">{creating ? "Creating…" : "Create"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteFw && (
+        <ConfirmDialog title="Delete tailored framework"
+          message={`Delete "${selected?.name ?? "this framework"}" and all its nodes? Diagrams classified against it keep their stored code but lose the link.`}
+          confirmLabel="Delete" destructive onConfirm={deleteFramework} onCancel={() => setConfirmDeleteFw(false)} />
       )}
     </div>
   );
