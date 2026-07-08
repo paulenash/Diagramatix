@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireOrgAdminFor, OrgContextError } from "@/app/lib/auth/orgContext";
+import { isSuperuser } from "@/app/lib/superuser";
 
 type Params = { params: Promise<{ id: string; frameworkId: string }> };
 
@@ -40,7 +41,11 @@ async function requireTailored(orgId: string, frameworkId: string) {
 
 /**
  * PATCH /api/orgs/[id]/pcf/[frameworkId]  { name?, division? }
- * Rename / re-scope a tailored framework. SuperAdmin OR Owner/Admin.
+ * Rename / re-scope a framework.
+ *   • Tailored (this org's) — any Owner/Admin (or SuperAdmin). name + division.
+ *   • Reference (global APQC) — SuperAdmin ONLY, since it's shared across every
+ *     org. name only (division is a tailored concept). Durable: the seed skips
+ *     existing frameworks, so a rename survives re-seeds.
  */
 export async function PATCH(req: Request, { params }: Params) {
   const session = await auth();
@@ -51,12 +56,23 @@ export async function PATCH(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  if (!(await requireTailored(id, frameworkId))) return NextResponse.json({ error: "Not an editable tailored framework" }, { status: 403 });
+
+  const fw = await prisma.pcfFramework.findFirst({
+    where: { id: frameworkId, OR: [{ orgId: null }, { orgId: id }] },
+    select: { id: true, kind: true, orgId: true },
+  });
+  if (!fw) return NextResponse.json({ error: "Framework not found" }, { status: 404 });
+  const isTailored = fw.kind === "tailored" && fw.orgId === id;
+  const isReference = fw.kind === "reference" && fw.orgId === null;
+  if (isReference && !isSuperuser(session)) {
+    return NextResponse.json({ error: "Only a SuperAdmin can rename a global reference framework" }, { status: 403 });
+  }
+  if (!isTailored && !isReference) return NextResponse.json({ error: "Not editable" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const data: { name?: string; variant?: string; division?: string | null } = {};
   if (typeof body?.name === "string" && body.name.trim()) { data.name = body.name.trim(); data.variant = body.name.trim(); }
-  if (body?.division !== undefined) data.division = typeof body.division === "string" && body.division.trim() ? body.division.trim() : null;
+  if (isTailored && body?.division !== undefined) data.division = typeof body.division === "string" && body.division.trim() ? body.division.trim() : null;
   if (Object.keys(data).length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
   const framework = await prisma.pcfFramework.update({ where: { id: frameworkId }, data, select: { id: true, name: true, variant: true, version: true, kind: true, division: true } });

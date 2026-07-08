@@ -44,6 +44,25 @@ export function PcfClient({
   const [creating, setCreating] = useState(false);
   const [confirmDeleteFw, setConfirmDeleteFw] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [showRename, setShowRename] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [renameErr, setRenameErr] = useState<string | null>(null);
+
+  async function renameFramework() {
+    if (!renameValue.trim() || !selectedId) return;
+    setRenaming(true); setRenameErr(null);
+    try {
+      const res = await fetch(`/api/orgs/${orgId}/pcf/${selectedId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: renameValue.trim() }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setRenameErr(j.error ?? "Rename failed"); return; }
+      setShowRename(false);
+      await loadFrameworks();
+    } finally { setRenaming(false); }
+  }
 
   async function createTailored() {
     if (!createName.trim()) return;
@@ -221,12 +240,19 @@ export function PcfClient({
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / code…" className="text-sm border border-gray-300 rounded px-2 py-1 flex-1 min-w-[180px] max-w-xs bg-white text-gray-800" />
             )}
             {selected && <span className="text-[11px] text-gray-400">{selected._count.nodes} elements · {selected.kind}</span>}
-            {selected?.kind === "reference" && (
-              <button onClick={() => setShowUpgrade(true)} className="ml-auto text-[11px] px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50" title="Diff vs the previous version + re-point your usage">⭫ Version upgrade…</button>
-            )}
-            {selected?.kind === "tailored" && (
-              <button onClick={() => setConfirmDeleteFw(true)} className="ml-auto text-[11px] px-2 py-1 rounded border border-gray-300 text-gray-500 hover:border-red-300 hover:text-red-600">Delete framework</button>
-            )}
+            <div className="ml-auto flex items-center gap-2">
+              {selected && (selected.kind === "tailored" || isSuperAdmin) && (
+                <button onClick={() => { setRenameValue(selected.kind === "tailored" ? selected.name : selected.variant); setShowRename(true); }}
+                  className="text-[11px] px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+                  title={selected.kind === "reference" ? "Rename this global reference framework (SuperAdmin)" : "Rename this tailored framework"}>✎ Rename</button>
+              )}
+              {selected?.kind === "reference" && (
+                <button onClick={() => setShowUpgrade(true)} className="text-[11px] px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50" title="Diff vs the previous version + re-point your usage">⭫ Version upgrade…</button>
+              )}
+              {selected?.kind === "tailored" && (
+                <button onClick={() => setConfirmDeleteFw(true)} className="text-[11px] px-2 py-1 rounded border border-gray-300 text-gray-500 hover:border-red-300 hover:text-red-600">Delete framework</button>
+              )}
+            </div>
           </div>
 
           {selected?.kind === "tailored" ? (
@@ -275,6 +301,28 @@ export function PcfClient({
             <div className="flex justify-end gap-2">
               <button onClick={() => setShowCreate(false)} disabled={creating} className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
               <button onClick={createTailored} disabled={creating || !createName.trim()} className="px-3 py-1 text-xs text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50">{creating ? "Creating…" : "Create"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRename && selected && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50" onClick={() => !renaming && setShowRename(false)}>
+          <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-5 w-[400px]" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-sm font-semibold text-gray-900 mb-1">Rename framework</h2>
+            <p className="text-[11px] text-gray-500 mb-4">
+              {selected.kind === "reference"
+                ? "Renames this global reference framework's label (shown in pickers and APQC project names). Applies to every org — SuperAdmin only."
+                : "Renames this tailored framework."}
+            </p>
+            <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Name</label>
+            <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") renameFramework(); if (e.key === "Escape") setShowRename(false); }}
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 mb-2 bg-white text-gray-800" />
+            {renameErr && <p className="text-[11px] text-red-600 mb-2">{renameErr}</p>}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowRename(false)} disabled={renaming} className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+              <button onClick={renameFramework} disabled={renaming || !renameValue.trim()} className="px-3 py-1 text-xs text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50">{renaming ? "Renaming…" : "Rename"}</button>
             </div>
           </div>
         </div>
