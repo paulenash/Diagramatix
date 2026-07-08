@@ -386,6 +386,16 @@
     .docx export (application feature; DB tables HelpChapter/HelpSection gain a
     `collection` discriminator). (3) The Diagramatix DDL generator is relabelled
     "Logical DDL Generation". All runtime/app — the diagram bundle is untouched.
+
+  v1.35 — APQC Process Classification Framework (PCF). SHAPE CHANGE: a new
+    OPTIONAL top-level <pcfAttribution> element on the export root (between
+    <project> and <diagrams>), carrying APQC's verbatim ©notice — emitted whenever
+    the export contains PCF-derived content (a diagram classification or an element
+    tagged with a pcfId). APQC's royalty-free licence requires the notice to travel
+    with every copy/derivative. Diagrams may also carry an OPTIONAL DiagramData.pcf
+    classification and element.properties.pcfHierarchyId/pcfId (open PropertiesType,
+    unchanged). New runtime tables PcfFramework + PcfNode and a Project.pcf column
+    are not part of the diagram export.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

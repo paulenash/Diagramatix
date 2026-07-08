@@ -821,5 +821,20 @@ export interface TemplateData {
  *             .docx export. (3) The DDL generator is relabelled "Logical DDL
  *             Generation". Runtime/app only — NO diagram-export or XSD shape
  *             change; the version advances with the release window.
+ *
+ *  v1.35 (2026-07-08): APQC Process Classification Framework (PCF) — full L0–L5.
+ *             Diagrams carry an OPTIONAL `DiagramData.pcf` classification
+ *             ({ nodeId, pcfId, hierarchyId, name, frameworkId, variant, +opt
+ *             frameworkName/version/level/numbered/generated }) and elements may
+ *             carry `properties.pcfHierarchyId`/`pcfId` (open PropertiesType). The
+ *             ONE XSD shape change: a new OPTIONAL top-level `<pcfAttribution>`
+ *             element on the export root, emitted (with the verbatim ©APQC
+ *             notice) whenever the export carries PCF-derived content — APQC's
+ *             royalty-free licence requires the notice to travel with every copy
+ *             and derivative. New runtime tables PcfFramework + PcfNode (global
+ *             reference frameworks + org-owned tailored frameworks w/ provenance);
+ *             Project gains a `pcf` JSON column. Reference frameworks import from
+ *             APQC .xlsx; tailoring/versioning/divisions + coverage + by-category
+ *             compliance are runtime/app, not part of the diagram export.
  */
-export const SCHEMA_VERSION = "1.34";
+export const SCHEMA_VERSION = "1.35";

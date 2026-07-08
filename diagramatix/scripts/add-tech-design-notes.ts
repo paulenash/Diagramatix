@@ -462,6 +462,35 @@ const CHAPTERS: Chapter[] = [
     ],
   },
   {
+    slug: "pcf-design",
+    title: "APQC PCF (Process Classification)",
+    sections: [
+      { heading: "Two-layer model", body: [
+        "The APQC Process Classification Framework is a standalone feature (never folded into Entity Lists). Two layers: a **reference layer** (read-only, global — `PcfFramework.orgId = null`, `kind = \"reference\"`: the Cross-Industry spine + industry variants + version history) and a **tailored layer** (org-owned, editable — `orgId` set, `kind = \"tailored\"`: composed from reference branches + org extensions).",
+        "",
+        "`PcfFramework` (id, orgId?, kind, familyKey, name, variant, version, isCurrent, division?, attributionNote) has many `PcfNode` (pcfId = APQC col A, the **STABLE** upgrade key; hierarchyId = dotted display code, NOT stable; level, parentId, sortOrder, metricsAvailable, changeType?, plus tailored-layer fields isCustom / active / orgCode / sourceFrameworkId / sourcePcfId). Both tables are pinned in the backup coverage guard.",
+      ].join("\n") },
+      { heading: "Import & versioning", body: [
+        "`app/lib/pcf/importPcfXlsx.ts` hand-parses the APQC `.xlsx` with JSZip (no new dep): a modern **Combined** sheet, or the legacy per-category format that embeds the dotted code in the name cell. Column F is read as a `metricsAvailable` **boolean only** — OSB benchmark *values* are never imported (separate APQC product, separate terms). `persistPcfFramework` pre-assigns node ids so the whole tree lands in one `createMany`; importing a newer version of a `familyKey` flips the previous to `isCurrent = false` and keeps it for history.",
+      ].join("\n") },
+      { heading: "Classify, seed & AI grounding (L1–L3)", body: [
+        "A diagram carries an optional `DiagramData.pcf` classification keyed on the stable `pcfId` (additive JSON, mirroring `processOwner`). **Create APQC Project** seeds a project folder tree from a branch — with an optional root and depth **relative** to it (BFS in the seed route). **AI grounding** (`app/lib/pcf/promptGrounding.ts`) injects the selected branch at the `${rules}` seam so generated models align to the standard.",
+      ].join("\n") },
+      { heading: "Create APQC Process (decompose vs AI)", body: [
+        "One click generates a BPMN model for a standard process. A node **above** Task level **decomposes** deterministically (`/pcf/decompose`: Start → a Collapsed Subprocess per APQC child → End, via `layoutBpmnDiagram`); a **Task-level leaf** falls back to AI generation. Optional **APQC numbering** prefixes each task/subprocess label with its code, and stamps `properties.pcfHierarchyId`/`pcfId` on the element so the Properties Panel shows it. The chosen framework/root default onto the project via `Project.pcf`.",
+      ].join("\n") },
+      { heading: "Analytics — coverage & by-category compliance (L4)", body: [
+        "**Coverage** (`app/lib/pcf/coverage.ts`, pure): of the nodes in a project's framework/branch, which are *modelled* (a diagram classified to them, matched by nodeId or same-framework pcfId), rolled up per category and level. **By-category compliance** (L4b): `buildComplianceReport` gains an optional `pcfCategory` per run — the org Compliance console attributes each mining run to the APQC category of its project's linked root and rolls control effectiveness + fitness up **by category**, worst-first.",
+      ].join("\n") },
+      { heading: "Tailoring, provenance & upgrade (L5)", body: [
+        "`composeBranch` (`app/lib/pcf/compose.ts`, pure) copies a reference subtree into a tailored framework carrying `sourceFrameworkId` + `sourcePcfId` provenance, re-based levels and remapped parents (one self-referential `createMany` — Postgres checks the FK at statement end). Orgs **compose / extend (custom nodes get a synthetic negative pcfId) / curate (rename-keeps-provenance, hide, org-code, remove) / scope to divisions**. The **upgrade wizard** (`diffPcfVersions` by stable pcfId → added/removed/renamed) re-points classifications + tailored provenance to a newer version by `pcfId`; removed ids are flagged (`removedInVersion`), not broken.",
+      ].join("\n") },
+      { heading: "APQC licence & attribution", body: [
+        "APQC grants a perpetual, worldwide, royalty-free licence to use / copy / modify / redistribute the PCF — including inside this paid SaaS and in derivative (tailored) frameworks — **provided every copy and derivative carries APQC's notice**. So `attributionNote` is stored per framework, tailored frameworks are seeded with it (they're derivatives), and `app/lib/pcf/attribution.ts` (`APQC_ATTRIBUTION` + `dataHasPcf`) makes the notice **ride along on any export carrying PCF content** — project + single-diagram JSON/XML (a new optional `<pcfAttribution>` XSD element) and the public process/bundle view footer. Visio (labels/mapped-props only), docx (doc editor) and backups (carry `attributionNote` inherently) don't need injection. **OSB benchmark values are never bundled** — only the `metricsAvailable` flag.",
+      ].join("\n") },
+    ],
+  },
+  {
     slug: "content-catalogs",
     title: "Content, Catalogs & Examples",
     sections: [

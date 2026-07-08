@@ -213,6 +213,7 @@ jobs:
           npx --yes tsx@4 scripts/add-guide-mining-sample.ts
           npx --yes tsx@4 scripts/add-features-risk-controls.ts || echo "add-features-risk-controls skipped"
           npx --yes tsx@4 scripts/add-features-pcf.ts || echo "add-features-pcf skipped"
+          npx --yes tsx@4 scripts/add-guide-pcf.ts || echo "add-guide-pcf skipped"
           npx --yes tsx@4 scripts/add-guide-risk-controls.ts || echo "add-guide-risk-controls skipped"
           npx --yes tsx@4 scripts/seed-risk-controls-o2c.ts || echo "seed-risk-controls-o2c skipped"
           npx --yes tsx@4 scripts/seed-risk-control-examples.ts || echo "seed-risk-control-examples skipped"
