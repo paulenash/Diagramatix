@@ -10,6 +10,7 @@ import { LinkScanDialog } from "./LinkScanDialog";
 import { PcfSeedFoldersDialog } from "./PcfSeedFoldersDialog";
 import { PcfCreateProcessDialog } from "./PcfCreateProcessDialog";
 import { ProjectPropertiesPanel } from "./ProjectPropertiesPanel";
+import { PcfCoveragePanel } from "./PcfCoveragePanel";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -428,6 +429,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   const [showMaintenance, setShowMaintenance] = useState(false);
   const [showPcfSeed, setShowPcfSeed] = useState(false);
   const [showPcfCreate, setShowPcfCreate] = useState(false);
+  const [showPcfCoverage, setShowPcfCoverage] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportLog, setExportLog] = useState<string[]>([]);
   const [exportResult, setExportResult] = useState<"success" | "failed" | null>(null);
@@ -2623,9 +2625,14 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             onOwner={setProjectOwner}
             onPcf={setProjectPcf}
             save={saveProjectField}
+            onViewCoverage={projectPcf?.frameworkId ? () => setShowPcfCoverage(true) : undefined}
           />
         )}
       </div>
+
+      {showPcfCoverage && (
+        <PcfCoveragePanel projectId={project.id} onClose={() => setShowPcfCoverage(false)} />
+      )}
 
       {/* SharePoint folder picker (project export) / file picker (project import) */}
       {(spExportFormat || spImportFmt) && (() => {

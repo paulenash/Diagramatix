@@ -25,7 +25,7 @@ interface Hit { id: string; pcfId: number; hierarchyId: string; name: string; le
  */
 export function ProjectPropertiesPanel({
   projectId, name, description, ownerName, pcf, readOnly,
-  onName, onDescription, onOwner, onPcf, save,
+  onName, onDescription, onOwner, onPcf, save, onViewCoverage,
 }: {
   projectId: string;
   name: string; description: string; ownerName: string;
@@ -36,6 +36,7 @@ export function ProjectPropertiesPanel({
   onOwner: (v: string) => void;
   onPcf: (v: ProjectPcf | null) => void;
   save: (fields: Record<string, string>) => void;
+  onViewCoverage?: () => void;
 }) {
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [editingPcf, setEditingPcf] = useState(false);
@@ -118,6 +119,9 @@ export function ProjectPropertiesPanel({
               </div>
             )}
             {pcf.seededAt && <div className="text-[10px] text-gray-400">Seeded {new Date(pcf.seededAt).toLocaleDateString()}</div>}
+            {onViewCoverage && (
+              <button onClick={onViewCoverage} className="mt-1 text-[11px] text-emerald-700 hover:text-emerald-900">◑ View APQC coverage…</button>
+            )}
             {!readOnly && (
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setEditingPcf((o) => !o)} className="text-[11px] text-blue-600 hover:text-blue-800">Change</button>
