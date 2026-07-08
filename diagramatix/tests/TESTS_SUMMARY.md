@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-08  ·  **Document version:** 6.2  ·  **Suite:** 130 test files · 815 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0675  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-07-09  ·  **Document version:** 6.3  ·  **Suite:** 131 test files · 820 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0676  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -849,6 +849,7 @@ Level 0 of the APQC Process Classification Framework feature: hand-parsing the A
 | T0673 | (Live sources) `mintIngestKey`/`verifyIngestKey` mint a prefixed webhook key, store only its sha256 hash, verify the right key and reject wrong/missing keys (constant-time); `readIngestKey` reads X-Api-Key or Bearer | A webhook ingest key stored in plaintext, or accepting a wrong/blank key | If the ingest-key auth regressed |
 | T0674 | (Live sources) `sourceHeaderFields` derives distinct role fields (dedup, drop blanks); `safeSource` never leaks the key hash, event buffer or secret connection config (Blob SAS URL / SharePoint ids) | A source-list response leaking the ingest hash or a Blob SAS URL | If the client-safe source projection regressed |
 | T0675 | (Live sources) `parseAnyLog` routes CSV to headers/rows + guessed mapping and XES-shaped content to the XES parser | The pull connectors (Blob/SharePoint) mis-parsing a fetched log file | If the shared parse dispatch regressed |
+| T0676 | (SuperAdmin bulk APQC gen) `folderSubtree`/`childrenInSubtree`/`orderDeepestFirst` walk the project's seeded folders (self+descendants, direct children, deepest-first so a child diagram exists before its parent links to it); `folderCode`/`folderCodeStrip` parse the APQC prefix | Bulk generation mis-counting diagrams, linking parents before children exist, or straying beyond the seeded folders | If the bulk folder-walk/ordering regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 

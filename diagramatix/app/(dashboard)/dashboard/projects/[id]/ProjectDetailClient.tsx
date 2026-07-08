@@ -9,6 +9,7 @@ import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceMo
 import { LinkScanDialog } from "./LinkScanDialog";
 import { PcfSeedFoldersDialog } from "./PcfSeedFoldersDialog";
 import { PcfCreateProcessDialog } from "./PcfCreateProcessDialog";
+import { folderSubtree } from "@/app/lib/pcf/bulkFolders";
 import { ProjectPropertiesPanel } from "./ProjectPropertiesPanel";
 import { PcfCoveragePanel } from "./PcfCoveragePanel";
 import { APQC_ATTRIBUTION, anyDiagramHasPcf } from "@/app/lib/pcf/attribution";
@@ -975,6 +976,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       return next;
     });
   }, [project.id]);
+
 
   // Fetch fresh colorConfig from API on mount
   useEffect(() => {
@@ -2908,30 +2910,50 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
         <PcfSeedFoldersDialog projectId={project.id} onClose={() => setShowPcfSeed(false)} onDone={refreshProjectData} />
       )}
 
-      {showPcfCreate && (
+      {showPcfCreate && (() => {
+        const selFolder = selectedFolderId !== ROOT_ID ? folderTree.folders.find(f => f.id === selectedFolderId) : null;
+        const subtree = selFolder ? folderSubtree(folderTree.folders, selFolder.id) : [];
+        // SuperAdmin bulk is offered only in an APQC-linked project when the
+        // highlighted folder actually contains a sub-folder hierarchy.
+        const bulk = (isAdmin && selFolder && projectPcf?.frameworkId && subtree.length > 1)
+          ? { rootFolder: { id: selFolder.id, name: selFolder.name }, subtree }
+          : undefined;
+        const adoptFramework = (createdPcf: { frameworkId?: string }) => {
+          if (!projectPcf && createdPcf?.frameworkId) {
+            const next = { ...createdPcf, seededAt: new Date().toISOString() } as typeof projectPcf & object;
+            setProjectPcf(next as never);
+            fetch(`/api/projects/${project.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pcf: next }) }).catch(() => {});
+          }
+        };
+        return (
         <PcfCreateProcessDialog
           projectId={project.id}
           defaultQuery={selectedFolderId !== ROOT_ID ? folderTree.folders.find(f => f.id === selectedFolderId)?.name : (projectPcf?.rootHierarchyId ? `${projectPcf.rootHierarchyId} ${projectPcf.rootName ?? ""}`.trim() : undefined)}
           defaultFrameworkId={projectPcf?.frameworkId}
+          isAdmin={isAdmin}
+          bulk={bulk}
           onClose={() => setShowPcfCreate(false)}
           onCreated={(diagramId, createdPcf) => {
             if (selectedFolderId !== ROOT_ID) {
               updateTree(t => ({ ...t, diagramFolderMap: { ...t.diagramFolderMap, [diagramId]: selectedFolderId } }));
             }
-            // If the project has no APQC framework yet, adopt the one this
-            // diagram was generated from (item #3).
-            if (!projectPcf && createdPcf?.frameworkId) {
-              const next = { ...createdPcf, seededAt: new Date().toISOString() };
-              setProjectPcf(next);
-              fetch(`/api/projects/${project.id}`, {
-                method: "PUT", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ pcf: next }),
-              }).catch(() => {});
-            }
+            adoptFramework(createdPcf);
             router.push(`/diagram/${diagramId}`);
           }}
+          onBulkCreated={async (assign, rootDiagramId, createdPcf) => {
+            // Place every generated diagram into its folder, then normalise the
+            // parent↔child subprocess links (recomputes parentDiagramIds from the
+            // linkedDiagramId fields set during decomposition).
+            if (Object.keys(assign).length > 0) updateTree(t => ({ ...t, diagramFolderMap: { ...t.diagramFolderMap, ...assign } }));
+            adoptFramework(createdPcf);
+            await fetch(`/api/projects/${project.id}/scan-links`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }).catch(() => {});
+            setShowPcfCreate(false);
+            if (rootDiagramId) router.push(`/diagram/${rootDiagramId}`);
+            else refreshProjectData();
+          }}
         />
-      )}
+        );
+      })()}
 
       {/* Project Config modal */}
       {showMaintenance && (
