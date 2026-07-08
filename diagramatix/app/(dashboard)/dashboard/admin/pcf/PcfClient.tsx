@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PcfBuilder } from "./PcfBuilder";
+import { PcfUpgradeModal } from "./PcfUpgradeModal";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 interface FrameworkSummary {
@@ -42,6 +43,7 @@ export function PcfClient({
   const [createDivision, setCreateDivision] = useState("");
   const [creating, setCreating] = useState(false);
   const [confirmDeleteFw, setConfirmDeleteFw] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   async function createTailored() {
     if (!createName.trim()) return;
@@ -219,6 +221,9 @@ export function PcfClient({
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name / code…" className="text-sm border border-gray-300 rounded px-2 py-1 flex-1 min-w-[180px] max-w-xs bg-white text-gray-800" />
             )}
             {selected && <span className="text-[11px] text-gray-400">{selected._count.nodes} elements · {selected.kind}</span>}
+            {selected?.kind === "reference" && (
+              <button onClick={() => setShowUpgrade(true)} className="ml-auto text-[11px] px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50" title="Diff vs the previous version + re-point your usage">⭫ Version upgrade…</button>
+            )}
             {selected?.kind === "tailored" && (
               <button onClick={() => setConfirmDeleteFw(true)} className="ml-auto text-[11px] px-2 py-1 rounded border border-gray-300 text-gray-500 hover:border-red-300 hover:text-red-600">Delete framework</button>
             )}
@@ -273,6 +278,12 @@ export function PcfClient({
             </div>
           </div>
         </div>
+      )}
+
+      {showUpgrade && selected?.kind === "reference" && (
+        <PcfUpgradeModal orgId={orgId} frameworkId={selectedId}
+          onClose={() => setShowUpgrade(false)}
+          onApplied={() => { loadTree(selectedId); }} />
       )}
 
       {confirmDeleteFw && (
