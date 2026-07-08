@@ -151,6 +151,35 @@ export function ComplianceMonitorConsole({
                     </table>
                   </div>
                 </Card>
+
+                {report.byPcfCategory && report.byPcfCategory.length > 0 && (
+                  <Card title="By APQC category" subtitle="Control effectiveness rolled up by the APQC PCF category each project is aligned to.">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[11px]">
+                        <thead>
+                          <tr className="text-gray-400 text-left border-b border-gray-200">
+                            <th className="py-1 pr-2 font-medium">Category</th>
+                            <th className="py-1 px-2 font-medium text-right">Eff.</th>
+                            <th className="py-1 px-2 font-medium text-right">Fitness</th>
+                            <th className="py-1 pl-2 font-medium text-right">Runs</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {report.byPcfCategory.map((c) => (
+                            <tr key={c.code} className="border-b border-gray-100">
+                              <td className="py-1 pr-2 truncate max-w-[200px]" title={`${c.code} ${c.name}`}>
+                                <span className="font-mono text-gray-400">{c.code}</span> {c.name}
+                              </td>
+                              <td className={`py-1 px-2 text-right tabular-nums font-medium ${effColor(c.effPct, report.threshold)}`}>{fmtPct(c.effPct)}</td>
+                              <td className="py-1 px-2 text-right tabular-nums text-gray-600">{fmtPct(c.fitnessPct)}</td>
+                              <td className="py-1 pl-2 text-right text-gray-400 tabular-nums">{c.runCount}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                )}
               </div>
               </>
               )}

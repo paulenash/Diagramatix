@@ -24,6 +24,9 @@ export interface ComplianceRunInput {
   createdAt: string;                       // ISO — supplied by the caller (no clock here)
   conformance: ConformanceResult | null;
   governance: GovernanceStats | null;
+  // APQC PCF category this run rolls up under (L4b). The caller resolves the
+  // label from the run's project's linked framework root; the lib just groups.
+  pcfCategory?: { code: string; name: string } | null;
 }
 export interface ComplianceControlInput {
   code: string;
@@ -51,10 +54,19 @@ export interface ProjectRow {
   latestFitnessPct: number | null; latestEffPct: number | null;
   lastRunAt: string; runCount: number;
 }
+/** Control operating-effectiveness rolled up under one APQC PCF category (L4b). */
+export interface PcfCategoryRow {
+  code: string; name: string;
+  runCount: number; applied: number; expected: number;
+  effPct: number | null;                   // Σapplied/Σexpected across the category's runs
+  fitnessPct: number | null;               // mean conformance fitness across the category's runs
+  belowThreshold: boolean;
+}
 export interface ComplianceReport {
   runs: RunSummary[];                      // chronological (oldest → newest)
   controls: ControlSeries[];               // measured controls, most-at-risk first
   projects: ProjectRow[];                  // one row per project, by name
+  byPcfCategory: PcfCategoryRow[];         // effectiveness by APQC category (L4b)
   summary: {
     runCount: number; projectCount: number; controlCount: number;
     controlsBelowThreshold: number; decliningControls: number;
@@ -91,6 +103,8 @@ export function buildComplianceReport(
 
   const runSummaries: RunSummary[] = [];
   const pointsByCode = new Map<string, ControlPoint[]>();
+  // APQC-category accumulators (L4b): Σapplied/Σexpected + fitness mean per category.
+  const catAcc = new Map<string, { name: string; applied: number; expected: number; fitnessSum: number; fitnessN: number; runCount: number }>();
 
   for (const run of runs) {
     let runApplied = 0, runExpected = 0;
@@ -105,12 +119,30 @@ export function buildComplianceReport(
       });
       pointsByCode.set(control.code, pts);
     }
+    const fitnessPct = run.conformance ? Math.round((run.conformance.fitness ?? 0) * 1000) / 10 : null;
     runSummaries.push({
       runId: run.id, runName: run.name, projectId: run.projectId, projectName: run.projectName, createdAt: run.createdAt,
-      fitnessPct: run.conformance ? Math.round((run.conformance.fitness ?? 0) * 1000) / 10 : null,
+      fitnessPct,
       overallEffPct: pct(runApplied, runExpected),
     });
+    if (run.pcfCategory) {
+      const acc = catAcc.get(run.pcfCategory.code)
+        ?? catAcc.set(run.pcfCategory.code, { name: run.pcfCategory.name, applied: 0, expected: 0, fitnessSum: 0, fitnessN: 0, runCount: 0 }).get(run.pcfCategory.code)!;
+      acc.applied += runApplied; acc.expected += runExpected; acc.runCount += 1;
+      if (fitnessPct != null) { acc.fitnessSum += fitnessPct; acc.fitnessN += 1; }
+    }
   }
+
+  const byPcfCategory: PcfCategoryRow[] = [...catAcc.entries()]
+    .map(([code, a]) => {
+      const effPct = pct(a.applied, a.expected);
+      return {
+        code, name: a.name, runCount: a.runCount, applied: a.applied, expected: a.expected,
+        effPct, fitnessPct: a.fitnessN > 0 ? Math.round((a.fitnessSum / a.fitnessN) * 10) / 10 : null,
+        belowThreshold: effPct != null && effPct < threshold,
+      };
+    })
+    .sort((x, y) => (x.effPct ?? 101) - (y.effPct ?? 101) || x.code.localeCompare(y.code, undefined, { numeric: true }));
 
   // Per-control series (points already chronological — built in run order).
   const controlSeries: ControlSeries[] = [];
@@ -158,6 +190,7 @@ export function buildComplianceReport(
     runs: runSummaries,
     controls: controlSeries,
     projects,
+    byPcfCategory,
     summary: {
       runCount: runs.length,
       projectCount: byProject.size,

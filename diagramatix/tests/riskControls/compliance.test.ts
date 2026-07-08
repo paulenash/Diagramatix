@@ -84,4 +84,21 @@ describe("compliance aggregation", () => {
     expect(c.points[0].applied).toBe(160);
     expect(c.points[0].expected).toBe(200);
   });
+
+  it("T0669 — rolls control effectiveness up by APQC category, ordered worst-first", () => {
+    const runs: ComplianceRunInput[] = [
+      { ...run("A", "P1", "Alpha", "2026-01-01T00:00:00Z", gov({ "C-001": { applied: 90, expected: 100 } }), 0.9), pcfCategory: { code: "1.0", name: "Develop Vision" } },
+      { ...run("B", "P2", "Bravo", "2026-01-02T00:00:00Z", gov({ "C-001": { applied: 50, expected: 100 } }), 0.6), pcfCategory: { code: "2.0", name: "Develop Products" } },
+      { ...run("C", "P3", "Charlie", "2026-01-03T00:00:00Z", gov({ "C-001": { applied: 70, expected: 100 } }), 0.8), pcfCategory: { code: "2.0", name: "Develop Products" } },
+    ];
+    const controls: ComplianceControlInput[] = [{ code: "C-001", name: "Three-way match", monitorSignature: null }];
+    const r = buildComplianceReport(runs, controls, { threshold: 80 });
+
+    expect(r.byPcfCategory.map((c) => c.code)).toEqual(["2.0", "1.0"]); // worst (60%) first
+    const cat2 = r.byPcfCategory.find((c) => c.code === "2.0")!;
+    expect(cat2).toMatchObject({ name: "Develop Products", runCount: 2, applied: 120, expected: 200, effPct: 60, belowThreshold: true });
+    expect(cat2.fitnessPct).toBe(70); // mean of 60 and 80
+    const cat1 = r.byPcfCategory.find((c) => c.code === "1.0")!;
+    expect(cat1).toMatchObject({ effPct: 90, belowThreshold: false });
+  });
 });
