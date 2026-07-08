@@ -2000,7 +2000,7 @@ export function Canvas({
         const LINE_H = 14;
         const PAD = 4;
         const labelLines = (el!.type === "uml-enumeration" || el!.type === "uml-class")
-          ? (editingLabel?.elementId === el!.id ? editingLabel.value : el!.label).split("\n") : [el!.label];
+          ? (editingLabel?.elementId === el!.id ? editingLabel.value : (el!.label ?? "")).split("\n") : [el!.label ?? ""];
         const extraLines = Math.max(0, labelLines.length - 1);
         const headerH = HEADER_H + extraLines * LINE_H;
         const labelMaxW = Math.max(...labelLines.map((l: string) => l.length * CHAR_W));

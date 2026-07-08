@@ -1293,7 +1293,7 @@ function UmlClassShape({ el }: { el: DiagramElement }) {
   const isDbDiagram = db && db !== "none";
   const showStereotype = (el.properties.showStereotype as boolean | undefined) ?? !!isDbDiagram;
   const stereotype = isDbDiagram ? "table" : ((el.properties.stereotype as string | undefined) ?? "entity");
-  const labelLines = el.label.split("\n");
+  const labelLines = (el.label ?? "").split("\n");
   const lineH = Math.round(14 * fsc);
   const labelFontSize = Math.round(12 * fsc * 10) / 10;
   const attrFontSize = Math.round(10 * fsc * 10) / 10;
@@ -1380,7 +1380,7 @@ function UmlEnumerationShape({ el }: { el: DiagramElement }) {
   const labelFontSize = Math.round(12 * fsc * 10) / 10;
   const lineH = Math.round(14 * fsc);
   const PAD = 4;
-  const labelLines = el.label.split("\n");
+  const labelLines = (el.label ?? "").split("\n");
   const extraLabelLines = Math.max(0, labelLines.length - 1);
   const headerH = HEADER_H + extraLabelLines * lineH;
   // Stereotype at top, then label lines centred in remaining header space
@@ -1449,7 +1449,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
   const LW = typeof storedLW === "number" && storedLW > 0 ? storedLW : 36;
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
-  const lines = el.label.split('\n');
+  const lines = (el.label ?? "").split('\n');
   const fontSize = Math.round(poolFs * 10) / 10;
   const lineH = Math.round(poolFs * 1.18);
   const isWhiteBox = ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
@@ -1505,7 +1505,7 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
   const LW = typeof storedLW === "number" && storedLW > 0 ? storedLW : 36;
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
-  const lines = el.label.split('\n');
+  const lines = (el.label ?? "").split('\n');
   const fontSize = Math.round(laneFs * 10) / 10;
   const lineH = Math.round(laneFs * 1.2);
   // Lighten fill based on nesting depth beyond direct sublane (depth 1)
@@ -2817,7 +2817,7 @@ export function SymbolRenderer({
         // standard near-black.
         const chevronFill = isChevron ? (element.properties.fillColor as string | undefined) : undefined;
         const labelFill = chevronFill ? readableTextOn(chevronFill) : "#111827";
-        const labelLines = element.label.split('\n');
+        const labelLines = (element.label ?? "").split('\n');
         // The Value Chain element (process-group) name has its own configurable
         // font size (default 16); already display-mode-scaled by its provider.
         const fSize = element.type === 'process-group' ? valueChainFontSize : fs(isActorOrTeam ? 11 : 12);

@@ -14,14 +14,20 @@ const LEVEL = ["", "Category", "Process Group", "Process", "Activity", "Task"];
  * diagram with the PCF classification, and open it. Orchestrated over existing
  * endpoints (generate-bpmn → /api/diagrams).
  */
+export interface CreatedPcf {
+  frameworkId: string; frameworkName?: string; variant?: string; version?: string;
+  rootHierarchyId?: string; rootName?: string;
+}
+
 export function PcfCreateProcessDialog({ projectId, defaultQuery, onClose, onCreated }: {
-  projectId: string; defaultQuery?: string; onClose: () => void; onCreated: (diagramId: string) => void;
+  projectId: string; defaultQuery?: string; onClose: () => void; onCreated: (diagramId: string, pcf: CreatedPcf) => void;
 }) {
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [fw, setFw] = useState("");
   const [q, setQ] = useState(defaultQuery ?? "");
   const [hits, setHits] = useState<Hit[]>([]);
   const [picked, setPicked] = useState<Hit | null>(null);
+  const [numbering, setNumbering] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -44,19 +50,62 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, onClose, onCre
     return () => clearTimeout(t);
   }, [q, fw, projectId]);
 
+  // Prefix a task/subprocess element's label with a sequential APQC sub-code
+  // (e.g. "1.1.1.1", "1.1.1.2") derived from the chosen node's code. Used for
+  // the AI (leaf) path — the decompose path already carries authoritative codes.
+  function applyNumbering(diagramData: { elements?: { type: string; label?: string }[] }, rootCode: string) {
+    let n = 0;
+    for (const el of diagramData.elements ?? []) {
+      if (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded") {
+        n += 1;
+        const code = `${rootCode}.${n}`;
+        if (!(el.label ?? "").startsWith(code)) el.label = `${code} ${el.label ?? ""}`.trim();
+      }
+    }
+  }
+
   async function create() {
     if (!picked || !fw) return;
-    const variant = frameworks.find((f) => f.id === fw)?.variant ?? "";
+    const f = frameworks.find((x) => x.id === fw);
+    const variant = f?.variant ?? "";
     setBusy(true); setErr(null);
     try {
-      setStatus("Generating the process with AI (15–30s)…");
-      const gen = await fetch("/api/ai/generate-bpmn", {
+      // R8.APQC / item #6: a node ABOVE Task level decomposes into Collapsed
+      // Subprocesses (deterministic). A Task-level leaf falls back to AI detail.
+      setStatus("Building the process from APQC…");
+      const dec = await fetch(`/api/projects/${projectId}/pcf/decompose`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: `Generate a BPMN process model for the standard process "${picked.hierarchyId} ${picked.name}".`, pcfNodeId: picked.id }),
+        body: JSON.stringify({ frameworkId: fw, nodeId: picked.id, numbering }),
       });
-      const gj = await gen.json().catch(() => ({}));
-      if (!gen.ok || !gj.diagramData?.elements) { setErr(gj.error ?? "AI generation failed"); return; }
-      const data = { ...gj.diagramData, pcf: { nodeId: picked.id, pcfId: picked.pcfId, hierarchyId: picked.hierarchyId, name: picked.name, frameworkId: fw, variant } };
+      const dj = await dec.json().catch(() => ({}));
+
+      let diagramData: { elements?: unknown[] } | undefined;
+      let generated: "decompose" | "ai" = "decompose";
+
+      if (dec.ok && dj.diagramData?.elements) {
+        diagramData = dj.diagramData;
+      } else {
+        // Leaf / no children → AI-generate a detailed task-level model.
+        generated = "ai";
+        setStatus("Generating the process with AI (15–30s)…");
+        const gen = await fetch("/api/ai/generate-bpmn", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: `Generate a BPMN process model for the standard process "${picked.hierarchyId} ${picked.name}".`, pcfNodeId: picked.id }),
+        });
+        const gj = await gen.json().catch(() => ({}));
+        if (!gen.ok || !gj.diagramData?.elements) { setErr(gj.error ?? "AI generation failed"); return; }
+        diagramData = gj.diagramData;
+        if (numbering) applyNumbering(diagramData as never, picked.hierarchyId);
+      }
+
+      const data = {
+        ...diagramData,
+        pcf: {
+          nodeId: picked.id, pcfId: picked.pcfId, hierarchyId: picked.hierarchyId, name: picked.name,
+          frameworkId: fw, variant, frameworkName: f?.name, version: f?.version,
+          level: picked.level, numbered: numbering, generated,
+        },
+      };
       setStatus("Saving the diagram…");
       const cr = await fetch("/api/diagrams", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -64,7 +113,10 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, onClose, onCre
       });
       const cj = await cr.json().catch(() => ({}));
       if (!cr.ok || !cj.id) { setErr(cj.error ?? "Failed to create the diagram"); return; }
-      onCreated(cj.id);
+      onCreated(cj.id, {
+        frameworkId: fw, frameworkName: f?.name, variant, version: f?.version,
+        rootHierarchyId: picked.hierarchyId, rootName: picked.name,
+      });
     } catch { setErr("Failed"); }
     finally { setBusy(false); setStatus(null); }
   }
@@ -99,13 +151,27 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, onClose, onCre
           ))}
         </div>
 
+        <label className="flex items-start gap-2 mb-2 cursor-pointer">
+          <input type="checkbox" checked={numbering} onChange={(e) => setNumbering(e.target.checked)} className="mt-0.5" />
+          <span className="text-[11px] text-gray-700">
+            <span className="font-medium">APQC numbering</span> — prefix each task / subprocess label with its APQC code.
+          </span>
+        </label>
+        {picked && (
+          <p className="text-[10px] text-gray-500 mb-2">
+            {picked.level >= 5
+              ? "Task-level process → AI generates a detailed model."
+              : "Above Task level → each child activity becomes a Collapsed Subprocess."}
+          </p>
+        )}
+
         {status && <p className="text-[11px] text-blue-700 mb-2 flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse" />{status}</p>}
         {err && <p className="text-[11px] text-red-600 mb-2">{err}</p>}
 
         <div className="flex justify-end gap-2">
           <button onClick={onClose} disabled={busy} className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">Cancel</button>
           <button onClick={create} disabled={busy || !picked} className="px-3 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
-            {busy ? "Working…" : "Create & generate"}
+            {busy ? "Working…" : "Create process"}
           </button>
         </div>
       </div>

@@ -9,6 +9,7 @@ import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceMo
 import { LinkScanDialog } from "./LinkScanDialog";
 import { PcfSeedFoldersDialog } from "./PcfSeedFoldersDialog";
 import { PcfCreateProcessDialog } from "./PcfCreateProcessDialog";
+import { ProjectPropertiesPanel } from "./ProjectPropertiesPanel";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -306,7 +307,19 @@ interface ProjectDetail {
   colorConfig?: unknown;
   fontConfig?: unknown;
   folderTree?: unknown;
+  pcf?: unknown; // Prisma JsonValue; narrowed to ProjectPcf at use
   diagrams: DiagramSummary[];
+}
+
+/** APQC PCF association stored on the project (see Project.pcf). */
+interface ProjectPcf {
+  frameworkId: string;
+  frameworkName?: string;
+  variant?: string;
+  version?: string;
+  rootHierarchyId?: string;
+  rootName?: string;
+  seededAt?: string;
 }
 
 interface OtherProject {
@@ -401,6 +414,12 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   const [projectDescription, setProjectDescription] = useState(project.description ?? "");
   const [projectOwner, setProjectOwner] = useState(project.ownerName ?? "");
   const [editingProjectName, setEditingProjectName] = useState(false);
+  // APQC PCF association for the whole project — shown/edited in the
+  // Project Properties panel (top folder selected). Empty {} → treat as null.
+  const [projectPcf, setProjectPcf] = useState<ProjectPcf | null>(() => {
+    const p = project.pcf as ProjectPcf | null | undefined;
+    return p && Object.keys(p).length ? p : null;
+  });
 
   const [showNewDiagram, setShowNewDiagram] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -743,7 +762,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   const [selectedTreeItem, setSelectedTreeItem] = useState<string | null>(null); // folder or diagram id
 
   // Resizable nav panel — initialize with default, load from localStorage in useEffect
-  const [navWidth, setNavWidth] = useState(208);
+  const [navWidth, setNavWidth] = useState(416);
   const resizingRef = useRef(false);
 
   // Diagram sort order within each folder in the nav tree. Persists per
@@ -797,7 +816,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       } catch {}
     }
     const savedWidth = localStorage.getItem(`nav-width-${project.id}`);
-    if (savedWidth) setNavWidth(parseInt(savedWidth, 10) || 208);
+    if (savedWidth) setNavWidth(parseInt(savedWidth, 10) || 416);
     const savedTreeItem = localStorage.getItem(`selected-tree-${project.id}`);
     const savedFolder = localStorage.getItem(`selected-folder-${project.id}`);
     if (savedTreeItem) setSelectedTreeItem(savedTreeItem);
@@ -2522,7 +2541,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             let lastW = startW;
             function onMove(ev: MouseEvent) {
               if (!resizingRef.current) return;
-              lastW = Math.max(120, Math.min(500, startW + ev.clientX - startX));
+              lastW = Math.max(120, Math.min(900, startW + ev.clientX - startX));
               setNavWidth(lastW);
             }
             function onUp() {
@@ -2597,6 +2616,24 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             </div>
           )}
         </main>
+
+        {/* Right: Project Properties — shown when the top ("whole project")
+            folder is selected and nothing is multi-selected / focused. */}
+        {selectedFolderId === ROOT_ID && selectedDiagramIds.size === 0 && !selectedDiagram && (
+          <ProjectPropertiesPanel
+            projectId={project.id}
+            name={projectName}
+            description={projectDescription}
+            ownerName={projectOwner}
+            pcf={projectPcf}
+            readOnly={!!readOnly}
+            onName={setProjectName}
+            onDescription={setProjectDescription}
+            onOwner={setProjectOwner}
+            onPcf={setProjectPcf}
+            save={saveProjectField}
+          />
+        )}
       </div>
 
       {/* SharePoint folder picker (project export) / file picker (project import) */}
@@ -2872,9 +2909,19 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           projectId={project.id}
           defaultQuery={selectedFolderId !== ROOT_ID ? folderTree.folders.find(f => f.id === selectedFolderId)?.name : undefined}
           onClose={() => setShowPcfCreate(false)}
-          onCreated={(diagramId) => {
+          onCreated={(diagramId, createdPcf) => {
             if (selectedFolderId !== ROOT_ID) {
               updateTree(t => ({ ...t, diagramFolderMap: { ...t.diagramFolderMap, [diagramId]: selectedFolderId } }));
+            }
+            // If the project has no APQC framework yet, adopt the one this
+            // diagram was generated from (item #3).
+            if (!projectPcf && createdPcf?.frameworkId) {
+              const next = { ...createdPcf, seededAt: new Date().toISOString() };
+              setProjectPcf(next);
+              fetch(`/api/projects/${project.id}`, {
+                method: "PUT", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pcf: next }),
+              }).catch(() => {});
             }
             router.push(`/diagram/${diagramId}`);
           }}

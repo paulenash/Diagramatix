@@ -97,6 +97,27 @@ const BPMN_STRUCTURAL_RULES: StructuralRule[] = [
       ).toBe(false);
     },
   },
+  {
+    id: "R6.14",
+    title: "an element the AI left label-less gets an empty-string label (never undefined) so the renderer's el.label.split never crashes",
+    check: () => {
+      const out = layout(
+        [
+          { id: "s", type: "start-event", label: "S" },
+          // AI omitted the label entirely — modelled here as an undefined label.
+          { id: "g", type: "gateway", label: undefined as unknown as string },
+          { id: "e", type: "end-event", label: "E" },
+        ],
+        [
+          { sourceId: "s", targetId: "g" },
+          { sourceId: "g", targetId: "e" },
+        ],
+      );
+      for (const el of out.elements) {
+        expect(typeof el.label, `${el.id} must have a string label`).toBe("string");
+      }
+    },
+  },
 ];
 
 describe("BPMN structural rules (generative)", () => {

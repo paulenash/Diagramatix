@@ -59,7 +59,15 @@ export function PcfClassifySection({ projectId, value, onChange }: {
         <div className="flex items-start gap-1.5">
           <span className="flex-1 text-[11px] text-gray-900 font-medium">
             <span className="font-mono text-gray-600 font-normal">{value.hierarchyId}</span> {value.name}
-            <span className="block text-[10px] text-gray-600 font-normal">{value.variant}</span>
+            <span className="block text-[10px] text-gray-600 font-normal">
+              {value.variant}{value.version ? ` · v${value.version}` : ""}
+            </span>
+            {(value.numbered || value.generated) && (
+              <span className="block text-[9px] text-gray-400 font-normal">
+                {value.generated === "decompose" ? "Decomposed to subprocesses" : value.generated === "ai" ? "AI-generated" : ""}
+                {value.numbered ? (value.generated ? " · APQC-numbered" : "APQC-numbered") : ""}
+              </span>
+            )}
           </span>
           <button onClick={() => setOpen((o) => !o)} className="text-[10px] text-blue-600 hover:text-blue-800">Change</button>
           <button onClick={() => onChange(undefined)} className="text-[10px] text-gray-400 hover:text-red-600">Clear</button>

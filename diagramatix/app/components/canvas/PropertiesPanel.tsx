@@ -721,12 +721,19 @@ export function PropertiesPanel({
   const nameTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
   // Resizable panel width (drag the left edge). Persisted per-browser.
-  const [panelWidth, setPanelWidth] = useState<number>(() => {
-    if (typeof window === "undefined") return 224;
+  // NOTE: seed with the constant default on both server render and first
+  // client render (no localStorage in the initializer) so hydration matches;
+  // the stored value is applied in an effect after mount.
+  const [panelWidth, setPanelWidth] = useState<number>(224);
+  const panelWidthLoaded = useRef(false);
+  useEffect(() => {
     const v = parseInt(window.localStorage.getItem("dgx_props_panel_width") || "", 10);
-    return Number.isFinite(v) && v >= 200 && v <= 640 ? v : 224;
-  });
-  useEffect(() => { if (typeof window !== "undefined") window.localStorage.setItem("dgx_props_panel_width", String(panelWidth)); }, [panelWidth]);
+    if (Number.isFinite(v) && v >= 200 && v <= 640) setPanelWidth(v);
+    panelWidthLoaded.current = true;
+  }, []);
+  useEffect(() => {
+    if (panelWidthLoaded.current) window.localStorage.setItem("dgx_props_panel_width", String(panelWidth));
+  }, [panelWidth]);
   function startPanelResize(e: React.MouseEvent) {
     e.preventDefault();
     const startX = e.clientX, startW = panelWidth;

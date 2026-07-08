@@ -217,6 +217,13 @@ export function layoutBpmnDiagram(
   }
   aiElements = [...aiElements, ...injected];
 
+  // Normalize labels: the AI sometimes omits a label on an element (e.g. a
+  // gateway or event), which would leave `label: undefined` on the built
+  // DiagramElement even though the type requires a string — and the renderer
+  // does `el.label.split("\n")`, white-screening the whole editor. Coerce to
+  // "" here so every downstream element satisfies the contract.
+  aiElements = aiElements.map(a => (a.label == null ? { ...a, label: "" } : a));
+
   phase("event-sub-injection done");
 
   // ── Pull each EP's flow span inside the EP ──

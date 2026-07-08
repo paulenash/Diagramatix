@@ -32,10 +32,32 @@ export async function GET(req: Request, { params }: Params) {
   });
   if (!fw) return NextResponse.json({ error: "Framework not found" }, { status: 404 });
 
+  // Match on APQC ID (the dotted hierarchy code), Name, or both together.
+  //  • "1.1.1"            → code prefix (or exact pcfId if a bare integer)
+  //  • "assess"           → name contains
+  //  • "1.1.1 assess ..." → code prefix AND name contains the rest
+  // A leading dotted/numeric token followed by a space is treated as an
+  // "APQC ID + Name" query so pasting a classification label like
+  // "1.1.1 Assess the external environment" resolves to its node.
+  const codeName = q.match(/^(\d+(?:\.\d+)*)\s+(.+)$/);
+  let match: Record<string, unknown> = {};
+  if (q) {
+    if (codeName) {
+      match = { AND: [{ hierarchyId: { startsWith: codeName[1] } }, { name: { contains: codeName[2].trim(), mode: "insensitive" } }] };
+    } else {
+      const or: Record<string, unknown>[] = [
+        { name: { contains: q, mode: "insensitive" } },
+        { hierarchyId: { startsWith: q } },
+      ];
+      if (/^\d+$/.test(q)) or.push({ pcfId: parseInt(q, 10) });
+      match = { OR: or };
+    }
+  }
+
   const nodes = await prisma.pcfNode.findMany({
     where: {
       frameworkId, active: true,
-      ...(q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { hierarchyId: { startsWith: q } }] } : {}),
+      ...match,
     },
     orderBy: [{ level: "asc" }, { sortOrder: "asc" }],
     take: 40,

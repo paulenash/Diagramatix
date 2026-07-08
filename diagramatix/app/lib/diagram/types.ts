@@ -291,6 +291,13 @@ export interface PcfClassification {
   name: string;
   frameworkId: string;
   variant: string;
+  // Extra attributes captured when a diagram is generated from APQC (optional
+  // so existing classifications stay valid). See the Create APQC Process flow.
+  frameworkName?: string;
+  version?: string;
+  level?: number;
+  numbered?: boolean;      // labels were prefixed with APQC codes
+  generated?: "decompose" | "ai"; // how the diagram was produced
 }
 
 /** A persisted set of AI clarification questions + the user's answers. */

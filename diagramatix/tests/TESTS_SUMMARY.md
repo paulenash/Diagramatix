@@ -839,6 +839,7 @@ Level 0 of the APQC Process Classification Framework feature: hand-parsing the A
 | T0663 | seeded folders anchor under a chosen parent folder | Seeded PCF folders always landing at the project root | If the `underFolderId` anchoring regressed |
 | T0664 | (L3 AI grounding) `renderPcfBranchForPrompt` renders a classified process + its sub-activities as an aligned, indented reference block | AI generation losing the PCF alignment context or mis-nesting the sub-activities | If the branch-render / indentation regressed |
 | T0665 | `groundRulesWithPcf` appends the PCF block to the AI rules, and is a no-op without a classification or when the node is a leaf | The PCF grounding silently dropping, or injecting an empty block | If the append / null-guard logic regressed |
+| T0666 | (R6.14) `layoutBpmnDiagram` coerces a label-less element to an empty-string label (never `undefined`) so the renderer's `el.label.split` cannot white-screen the editor | A generated element with no label crashing the whole diagram editor on open | If the label-normalization pass in `layoutBpmnDiagram` regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 
