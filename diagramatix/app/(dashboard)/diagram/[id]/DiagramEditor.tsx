@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { APQC_ATTRIBUTION, dataHasPcf } from "@/app/lib/pcf/attribution";
 import {
   SCHEMA_VERSION,
   type ConnectorType,
@@ -1825,6 +1826,7 @@ export function DiagramEditor({
           schemaVersion: SCHEMA_VERSION, appVersion, exportedAt: new Date().toISOString(),
           project: { name: "(single diagram)", description: "", ownerName: "", colorConfig: {} },
           diagrams: [{ originalId: diagramId, name: diagramName, type: diagramType, data, colorConfig: diagramColorConfig, displayMode }],
+          ...(dataHasPcf(data) ? { pcfAttribution: APQC_ATTRIBUTION } : {}),
         };
         await uploadOne(`${safe}.json`, "application/json", JSON.stringify(payload, null, 2));
         saved = `${safe}.json`;
@@ -1835,6 +1837,7 @@ export function DiagramEditor({
         const xml = buildSingleDiagramXml({
           schemaVersion: SCHEMA_VERSION, appVersion, diagramName, diagramType,
           diagramData: data, diagramId, displayMode, diagramColorConfig,
+          pcfAttribution: dataHasPcf(data) ? APQC_ATTRIBUTION : undefined,
         });
         await uploadOne(`${safe}.xml`, "application/xml", xml);
         if (xsdText) await uploadOne(`diagramatix-export-v${appVersion}.xsd`, "application/xml", xsdText);

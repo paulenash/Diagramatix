@@ -11,6 +11,7 @@ import { PcfSeedFoldersDialog } from "./PcfSeedFoldersDialog";
 import { PcfCreateProcessDialog } from "./PcfCreateProcessDialog";
 import { ProjectPropertiesPanel } from "./ProjectPropertiesPanel";
 import { PcfCoveragePanel } from "./PcfCoveragePanel";
+import { APQC_ATTRIBUTION, anyDiagramHasPcf } from "@/app/lib/pcf/attribution";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -55,7 +56,7 @@ function pointXml(tag: string, p: { x: number; y: number } | undefined | null, i
 }
 
 interface ExportDiagramRecord { originalId: string; name: string; type: string; data: DiagramData; colorConfig?: unknown; displayMode?: string }
-interface ExportPayload { schemaVersion: string; appVersion: string; exportedAt: string; project: { name: string; description: string; ownerName: string; colorConfig: unknown }; diagrams: ExportDiagramRecord[]; folderTree: FolderTree }
+interface ExportPayload { schemaVersion: string; appVersion: string; exportedAt: string; project: { name: string; description: string; ownerName: string; colorConfig: unknown }; diagrams: ExportDiagramRecord[]; folderTree: FolderTree; pcfAttribution?: string }
 
 function convertExportToXml(exp: ExportPayload): string {
   let x = `<?xml version="1.0" encoding="UTF-8"?>\n`;
@@ -70,6 +71,9 @@ function convertExportToXml(exp: ExportPayload): string {
     x += `    <dgx:colorConfig>${esc(JSON.stringify(exp.project.colorConfig))}</dgx:colorConfig>\n`;
   }
   x += `  </dgx:project>\n`;
+
+  // APQC PCF attribution — required whenever the export carries PCF-derived content.
+  if (exp.pcfAttribution) x += `  <dgx:pcfAttribution>${esc(exp.pcfAttribution)}</dgx:pcfAttribution>\n`;
 
   // Diagrams
   x += `  <dgx:diagrams>\n`;
@@ -1118,6 +1122,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           displayMode: d.displayMode,
         })),
         folderTree,
+        // APQC licence: any export carrying PCF-derived content must include the notice.
+        ...(anyDiagramHasPcf(diagramsWithData as { data?: unknown }[]) ? { pcfAttribution: APQC_ATTRIBUTION } : {}),
       };
 
       const isXml = format === "xml";

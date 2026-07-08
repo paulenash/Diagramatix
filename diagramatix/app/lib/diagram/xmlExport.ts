@@ -587,6 +587,7 @@ export function buildSingleDiagramXml(args: {
   displayMode?: string;
   diagramColorConfig?: unknown;
   projectName?: string;
+  pcfAttribution?: string;
 }): string {
   const exportedAt = new Date().toISOString();
   let x = `<?xml version="1.0" encoding="UTF-8"?>\n`;
@@ -596,6 +597,9 @@ export function buildSingleDiagramXml(args: {
   x += `  <dgx:project>\n`;
   x += `    <dgx:name>${esc(args.projectName ?? "(single diagram)")}</dgx:name>\n`;
   x += `  </dgx:project>\n`;
+
+  // APQC PCF attribution — required whenever the export carries PCF-derived content.
+  if (args.pcfAttribution) x += `  <dgx:pcfAttribution>${esc(args.pcfAttribution)}</dgx:pcfAttribution>\n`;
 
   // One diagram
   x += `  <dgx:diagrams>\n`;

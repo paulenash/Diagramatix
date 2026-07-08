@@ -845,6 +845,7 @@ Level 0 of the APQC Process Classification Framework feature: hand-parsing the A
 | T0669 | (L4b) `buildComplianceReport` rolls control effectiveness up by APQC category (Σapplied/Σexpected + mean fitness per category), ordered worst-first and flagged below-threshold | The by-APQC-category compliance rollup mis-summing or mis-ordering | If the `byPcfCategory` grouping regressed |
 | T0670 | (L5) `composeBranch` copies a subtree into a tailored framework with provenance (sourceFrameworkId/sourcePcfId), re-based levels, remapped parents and preserved sortOrder | The tailored-framework compose losing provenance or mis-nesting the grafted branch | If the compose logic regressed |
 | T0671 | (L5) `diffPcfVersions` classifies added / removed / renamed nodes across two framework versions by stable pcfId (not the display code) | The upgrade wizard mis-detecting APQC version changes, or keying off the unstable hierarchyId | If the version-diff logic regressed |
+| T0672 | `dataHasPcf` / `anyDiagramHasPcf` detect PCF-derived content (classification or a pcf-tagged element) so the APQC attribution notice rides along on exports; the notice carries APQC's derivative-works clause | An export leaking PCF content without the APQC attribution notice (licence breach) | If the export attribution-gating regressed |
 
 ### `tests/ai/pickBestModel.test.ts` — the multi-model comparison "winner" rule
 

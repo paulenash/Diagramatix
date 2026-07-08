@@ -422,9 +422,12 @@
 
   <xs:complexType name="ExportType">
     <xs:sequence>
-      <xs:element name="project"    type="dgx:ProjectType"/>
-      <xs:element name="diagrams"   type="dgx:DiagramListType"/>
-      <xs:element name="folderTree" type="dgx:FolderTreeType" minOccurs="0"/>
+      <xs:element name="project"        type="dgx:ProjectType"/>
+      <!-- APQC PCF attribution notice — present whenever the export carries
+           PCF-derived content (a classification or a pcf-tagged element). -->
+      <xs:element name="pcfAttribution" type="xs:string" minOccurs="0"/>
+      <xs:element name="diagrams"       type="dgx:DiagramListType"/>
+      <xs:element name="folderTree"     type="dgx:FolderTreeType" minOccurs="0"/>
     </xs:sequence>
     <xs:attribute name="schemaVersion" type="dgx:SchemaVersionString" use="required"/>
     <xs:attribute name="appVersion"    type="dgx:AppVersionString"    use="required"/>

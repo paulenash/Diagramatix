@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Canvas } from "@/app/components/canvas/Canvas";
 import type { DiagramData, DiagramType } from "@/app/lib/diagram/types";
+import { APQC_ATTRIBUTION, dataHasPcf } from "@/app/lib/pcf/attribution";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 import { FeedbackDialog } from "./FeedbackDialog";
@@ -377,6 +378,13 @@ export function ProcessView({
           )
         )}
       </main>
+
+      {/* APQC PCF attribution — required on any public view carrying PCF content. */}
+      {dataHasPcf(data) && (
+        <footer className="shrink-0 border-t border-gray-100 bg-gray-50 px-4 py-1 text-[9px] leading-tight text-gray-400">
+          {APQC_ATTRIBUTION}
+        </footer>
+      )}
 
       {feedbackOpen && !pickMode && (
         <FeedbackDialog
