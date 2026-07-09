@@ -655,6 +655,51 @@ function InlineField({ label, children }: { label: string; children: React.React
   );
 }
 
+// Editable APQC PCF reference block: the process's dotted hierarchy number
+// (e.g. 1.1.1) and its stable 5-digit PCF id (e.g. 10017). Both are stored on
+// the element's properties so they travel with the diagram and can be entered
+// or corrected by hand — e.g. tagging an activity that was added after an APQC
+// project was generated. Module scope keeps input focus stable across renders;
+// mount with key={element.id} so the drafts reset when the selection changes.
+function PcfRefEditor({ element, onUpdateProperties }: {
+  element: DiagramElement;
+  onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
+}) {
+  const [hier, setHier] = useState(element.properties?.pcfHierarchyId != null ? String(element.properties.pcfHierarchyId) : "");
+  const [pid, setPid] = useState(element.properties?.pcfId != null ? String(element.properties.pcfId) : "");
+
+  const commitHier = () => {
+    const v = hier.trim();
+    if (v === (element.properties?.pcfHierarchyId != null ? String(element.properties.pcfHierarchyId) : "")) return;
+    onUpdateProperties(element.id, { pcfHierarchyId: v || null });
+  };
+  const commitPid = () => {
+    const digits = pid.replace(/\D/g, "");
+    setPid(digits);
+    const n = digits ? parseInt(digits, 10) : NaN;
+    const cur = element.properties?.pcfId != null ? String(element.properties.pcfId) : "";
+    if (digits === cur) return;
+    onUpdateProperties(element.id, { pcfId: Number.isFinite(n) ? n : null });
+  };
+  const inputCls = "w-full px-1.5 py-0.5 border border-gray-300 rounded text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-indigo-400";
+
+  return (
+    <div className="mb-3 rounded border border-indigo-100 bg-indigo-50/50 px-2 py-1.5 space-y-1">
+      <p className="text-[9px] uppercase tracking-wide text-indigo-400">APQC PCF</p>
+      <InlineField label="Hierarchy">
+        <input value={hier} onChange={(e) => setHier(e.target.value)} onBlur={commitHier}
+          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+          placeholder="e.g. 1.1.1" className={inputCls} />
+      </InlineField>
+      <InlineField label="PCF ID">
+        <input value={pid} onChange={(e) => setPid(e.target.value)} onBlur={commitPid}
+          inputMode="numeric" onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+          placeholder="e.g. 10017" className={inputCls} />
+      </InlineField>
+    </div>
+  );
+}
+
 export function PropertiesPanel({
   element,
   connector,
@@ -1773,15 +1818,16 @@ export function PropertiesPanel({
         })()}
       </div>
 
-      {(element.properties?.pcfHierarchyId != null || element.properties?.pcfId != null) && (
-        <div className="mb-3 rounded border border-indigo-100 bg-indigo-50/50 px-2 py-1.5">
-          <p className="text-[9px] uppercase tracking-wide text-indigo-400 mb-0.5">APQC PCF</p>
-          <p className="text-[11px] text-gray-800">
-            {element.properties?.pcfHierarchyId != null && <span className="font-mono text-gray-600">{String(element.properties.pcfHierarchyId)}</span>}
-            {element.properties?.pcfId != null && <span className="text-gray-400 ml-1">#{String(element.properties.pcfId)}</span>}
-          </p>
-        </div>
-      )}
+      {(() => {
+        const hasPcf = element.properties?.pcfHierarchyId != null || element.properties?.pcfId != null;
+        const isActivity = element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded";
+        // An APQC-derived diagram: at least one element already carries a PCF ref.
+        const diagramIsApqc = (allElements ?? []).some((e) => e.properties?.pcfHierarchyId != null || e.properties?.pcfId != null);
+        // Editable when the element already has a ref, or is an activity in an
+        // APQC diagram (so refs can be added after generation).
+        if (!hasPcf && !(isActivity && diagramIsApqc)) return null;
+        return <PcfRefEditor key={element.id} element={element} onUpdateProperties={onUpdateProperties} />;
+      })()}
 
       <div>
         <label className="block text-[10px] font-medium text-gray-500 mb-0.5">

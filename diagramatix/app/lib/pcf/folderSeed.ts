@@ -13,7 +13,7 @@ export interface SeedFolderTree {
   diagramOrder?: Record<string, string[]>;
   folderOrder?: Record<string, string[]>;
 }
-export interface SeedPcfNode { id: string; hierarchyId: string; name: string; level: number; parentId: string | null }
+export interface SeedPcfNode { id: string; hierarchyId: string; name: string; level: number; parentId: string | null; pcfId?: number | null }
 
 export function seedFoldersFromPcf(
   existing: SeedFolderTree,
@@ -32,7 +32,9 @@ export function seedFoldersFromPcf(
     // Parent folder = the seeded folder for the PCF parent (if it's in scope),
     // else the chosen root/anchor folder.
     const parentId = n.parentId && folderIdByPcf.has(n.parentId) ? folderIdByPcf.get(n.parentId)! : under;
-    newFolders.push({ id, name: `${n.hierarchyId} ${n.name}`, parentId });
+    // Append the stable 5-digit APQC PCF id in parens, e.g. "1.1.1 Assess … (10017)".
+    const suffix = n.pcfId != null ? ` (${n.pcfId})` : "";
+    newFolders.push({ id, name: `${n.hierarchyId} ${n.name}${suffix}`, parentId });
   }
 
   return {

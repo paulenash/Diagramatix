@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { folderSubtree, childrenInSubtree, orderDeepestFirst, folderCode, folderCodeStrip, type BulkFolder } from "@/app/lib/pcf/bulkFolders";
+import { folderSubtree, childrenInSubtree, orderDeepestFirst, folderCode, folderCodeStrip, folderPcfId, type BulkFolder } from "@/app/lib/pcf/bulkFolders";
 
 // root(4.1) ─ a(4.1.1), b(4.1.2), c(4.1.3 ─ c1(4.1.3.1))  + unrelated sibling(4.2)
 const FOLDERS: BulkFolder[] = [
@@ -46,5 +46,12 @@ describe("bulk folder helpers (T0676)", () => {
     expect(folderCode("No code here")).toBe("");
     expect(folderCodeStrip("4.1.3 Deliver")).toBe("Deliver");
     expect(folderCodeStrip("Plain")).toBe("Plain");
+  });
+
+  it("T0679 — folderPcfId / folderCodeStrip handle a trailing 5-digit id", () => {
+    expect(folderPcfId("4.1.3 Deliver (10021)")).toBe("10021");
+    expect(folderPcfId("4.1.3 Deliver")).toBe("");
+    expect(folderCode("4.1.3 Deliver (10021)")).toBe("4.1.3");           // leading code still parses
+    expect(folderCodeStrip("4.1.3 Deliver (10021)")).toBe("Deliver");    // both ends stripped
   });
 });

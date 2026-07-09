@@ -38,4 +38,15 @@ describe("PCF folder seeding", () => {
     const { tree } = seedFoldersFromPcf({ folders: [] }, NODES, { maxLevel: 1, underFolderId: "anchor", newId: () => "x" });
     expect(tree.folders[0].parentId).toBe("anchor"); // top-level PCF node hangs under the anchor
   });
+
+  it("T0678 — appends the 5-digit PCF id in parens when present, omits it when absent", () => {
+    const nodes: SeedPcfNode[] = [
+      { id: "A", hierarchyId: "1.0", name: "Vision", level: 1, parentId: null, pcfId: 10002 },
+      { id: "B", hierarchyId: "1.1", name: "Strategy", level: 2, parentId: "A" }, // no pcfId
+    ];
+    let i = 0;
+    const { tree } = seedFoldersFromPcf({ folders: [] }, nodes, { maxLevel: 2, newId: () => `f${++i}` });
+    expect(tree.folders.some((f) => f.name === "1.0 Vision (10002)")).toBe(true);
+    expect(tree.folders.some((f) => f.name === "1.1 Strategy")).toBe(true); // no suffix
+  });
 });

@@ -41,5 +41,11 @@ export function orderDeepestFirst(subtree: BulkFolder[]): BulkFolder[] {
 /** The leading dotted APQC code parsed from a seeded folder name ("1.1.1 Foo" → "1.1.1"). */
 export const folderCode = (name: string): string => name.match(/^(\d+(?:\.\d+)*)/)?.[1] ?? "";
 
-/** A folder name with its leading APQC code stripped ("1.1.1 Foo" → "Foo"). */
-export const folderCodeStrip = (name: string): string => name.replace(/^(\d+(?:\.\d+)*)\s*/, "").trim();
+/** A folder name with its leading APQC code and trailing 5-digit id stripped
+ *  ("1.1.1 Foo (10017)" → "Foo"). */
+export const folderCodeStrip = (name: string): string =>
+  name.replace(/^(\d+(?:\.\d+)*)\s*/, "").replace(/\s*\(\d{3,}\)\s*$/, "").trim();
+
+/** The trailing 5-digit APQC PCF id parsed from a seeded folder name
+ *  ("1.1.1 Foo (10017)" → "10017"), or "" when absent. */
+export const folderPcfId = (name: string): string => name.match(/\((\d{3,})\)\s*$/)?.[1] ?? "";

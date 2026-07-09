@@ -61,7 +61,7 @@ export async function POST(req: Request, { params }: Params) {
     const all = await prisma.pcfNode.findMany({
       where: { frameworkId, active: true, level: { lte: root.level + depth } },
       orderBy: [{ level: "asc" }, { sortOrder: "asc" }],
-      select: { id: true, hierarchyId: true, name: true, level: true, parentId: true },
+      select: { id: true, hierarchyId: true, name: true, level: true, parentId: true, pcfId: true },
     });
     // BFS from the root through the parent links, keeping only descendants
     // within `depth` levels (root inclusive).
@@ -85,7 +85,7 @@ export async function POST(req: Request, { params }: Params) {
     pcfNodes = await prisma.pcfNode.findMany({
       where: { frameworkId, active: true, level: { lte: depth } },
       orderBy: [{ level: "asc" }, { sortOrder: "asc" }],
-      select: { id: true, hierarchyId: true, name: true, level: true, parentId: true },
+      select: { id: true, hierarchyId: true, name: true, level: true, parentId: true, pcfId: true },
     }) as SeedPcfNode[];
   }
 
