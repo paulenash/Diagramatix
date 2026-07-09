@@ -164,10 +164,16 @@ export interface OcelTypeProjection {
   attributes: string[]; // distinct object attribute names of this type (Domain entity attributes)
 }
 export interface OcelO2O { fromType: string; toType: string; qualifier: string; count: number }
+/** Behavioural interaction between two object types: how many events touch BOTH
+ *  types (a synchronisation point between their lifecycles) + the activity that
+ *  binds them most. `typeA` < `typeB` (lexical) so pairs are unordered/stable. */
+export interface OcelInteraction { typeA: string; typeB: string; count: number; topActivity: string }
 export interface OcelObjectCentric {
   objectTypes: string[];                        // most-referenced first, then event-less declared types
   perType: Record<string, OcelTypeProjection>;  // one normalised table per object type
   o2o: OcelO2O[];                               // object-to-object relationships, aggregated by type pair + qualifier
+  interactions: OcelInteraction[];              // shared-event interactions (Domain association weights + edges)
+  activityTypes: Record<string, string[]>;      // activity → distinct object types its events touch (transition notes)
 }
 
 const STATUS_RE = /^(state|status|stage|phase)$/i;
@@ -179,7 +185,7 @@ const STATUS_RE = /^(state|status|stage|phase)$/i;
  *  activity→state table). Also returns the object-to-object relationship edges so
  *  the object model can be drawn as a Domain Diagram. Pure. */
 export function parseOcelObjectCentric(text: string): OcelObjectCentric {
-  let doc: any; try { doc = JSON.parse(text); } catch { return { objectTypes: [], perType: {}, o2o: [] }; }
+  let doc: any; try { doc = JSON.parse(text); } catch { return { objectTypes: [], perType: {}, o2o: [], interactions: [], activityTypes: {} }; }
   const log = normalise(doc);
   const byFreq = ocelObjectTypes(text);
   const objectTypes = [...byFreq, ...log.objectTypeNames.filter((t) => !byFreq.includes(t))];
@@ -246,7 +252,32 @@ export function parseOcelObjectCentric(text: string): OcelObjectCentric {
       cur.count++; o2oMap.set(key, cur);
     }
   }
-  return { objectTypes, perType, o2o: [...o2oMap.values()] };
+
+  // Behavioural interactions: an event touching ≥2 object types is a
+  // synchronisation point between those lifecycles. Count per unordered type
+  // pair + the binding activity; also record which types each activity touches.
+  const pairMap = new Map<string, { typeA: string; typeB: string; count: number; byAct: Map<string, number> }>();
+  const actTypes = new Map<string, Set<string>>();
+  for (const e of log.events) {
+    const types = [...new Set(e.objects.map((oid) => log.objectType[oid]).filter(Boolean))];
+    const at = actTypes.get(e.activity) ?? actTypes.set(e.activity, new Set()).get(e.activity)!;
+    for (const t of types) at.add(t);
+    for (let i = 0; i < types.length; i++) for (let j = i + 1; j < types.length; j++) {
+      const [a, b] = types[i] < types[j] ? [types[i], types[j]] : [types[j], types[i]];
+      const key = `${a}${SEP}${b}`;
+      const cur = pairMap.get(key) ?? { typeA: a, typeB: b, count: 0, byAct: new Map() };
+      cur.count++; cur.byAct.set(e.activity, (cur.byAct.get(e.activity) ?? 0) + 1);
+      pairMap.set(key, cur);
+    }
+  }
+  const interactions: OcelInteraction[] = [...pairMap.values()].map((p) => ({
+    typeA: p.typeA, typeB: p.typeB, count: p.count,
+    topActivity: [...p.byAct.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? "",
+  }));
+  const activityTypes: Record<string, string[]> = {};
+  for (const [a, set] of actTypes) activityTypes[a] = [...set];
+
+  return { objectTypes, perType, o2o: [...o2oMap.values()], interactions, activityTypes };
 }
 
 // ── export ────────────────────────────────────────────────────────────────────

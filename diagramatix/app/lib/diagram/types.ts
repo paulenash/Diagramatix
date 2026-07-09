@@ -194,6 +194,14 @@ export interface Connector {
   transitionCount?: number;
   transitionIllegal?: boolean;
   transitionCountOffset?: Point;
+  // OCEL object model: other object types a transition's activity also touches
+  // (a small "⇄ Item" synchronisation note on a per-type state machine).
+  transitionTouches?: string[];
+  // OCEL Domain Diagram associations: interaction weight → line thickness
+  // (stroke-width px, already scaled) and a dashed behavioural-interaction edge
+  // (types that synchronise via shared events but have no declared O2O relationship).
+  weight?: number;
+  dashed?: boolean;
   // UML association end properties
   sourceRole?: string;
   sourceMultiplicity?: string;

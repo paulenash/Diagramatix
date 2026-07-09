@@ -846,8 +846,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         d={visibleD}
         fill="none"
         stroke={strokeColor}
-        strokeWidth={highlight && !selected ? 2.5 : isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5)}
-        strokeDasharray={isMessageBPMN ? "10 5" : isAssocBPMN ? "0.5 3" : isFlowchartAssoc ? "1 3" : isReviewLink ? "4 3" : (isMessage ? "6 3" : undefined)}
+        strokeWidth={connector.type === "uml-association" && connector.weight ? (selected ? connector.weight + 0.5 : connector.weight) : (highlight && !selected ? 2.5 : isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5))}
+        strokeDasharray={connector.type === "uml-association" && connector.dashed ? "6 4" : isMessageBPMN ? "10 5" : isAssocBPMN ? "0.5 3" : isFlowchartAssoc ? "1 3" : isReviewLink ? "4 3" : (isMessage ? "6 3" : undefined)}
         strokeLinecap={isAssocBPMN || isFlowchartAssoc ? "round" : undefined}
         markerStart={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-start-${connector.id})`
@@ -1197,6 +1197,32 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
               fontSize={Math.round(r * 0.95)} fontWeight={700} fill="#ffffff"
               style={{ pointerEvents: "none", userSelect: "none" }}>{count}</text>
           </g>
+        );
+      })()}
+
+      {/* OCEL "⇄ also touches X" — a small, subtle synchronisation note under a
+          state-machine transition whose activity also touches other object types. */}
+      {connector.transitionTouches?.length && visibleWaypoints.length >= 2 && (() => {
+        let total = 0; const segs: number[] = [];
+        for (let i = 0; i < visibleWaypoints.length - 1; i++) {
+          segs.push(Math.hypot(visibleWaypoints[i + 1].x - visibleWaypoints[i].x, visibleWaypoints[i + 1].y - visibleWaypoints[i].y));
+          total += segs[i];
+        }
+        let half = total / 2, mx = visibleWaypoints[0].x, my = visibleWaypoints[0].y;
+        for (let i = 0; i < segs.length; i++) {
+          if (half <= segs[i] || i === segs.length - 1) {
+            const t = segs[i] > 0 ? half / segs[i] : 0;
+            mx = visibleWaypoints[i].x + t * (visibleWaypoints[i + 1].x - visibleWaypoints[i].x);
+            my = visibleWaypoints[i].y + t * (visibleWaypoints[i + 1].y - visibleWaypoints[i].y);
+            break;
+          }
+          half -= segs[i];
+        }
+        return (
+          <text x={mx} y={my + 18} textAnchor="middle" fontSize={8} fill="#94a3b8" fontStyle="italic"
+            style={{ pointerEvents: "none", userSelect: "none" }}>
+            ⇄ {connector.transitionTouches!.join(", ")}
+          </text>
         );
       })()}
 

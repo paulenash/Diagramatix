@@ -51,6 +51,15 @@ export function buildOcelStudy(text: string, opts: {
     const performance = computePerformance(log.traces);
     const governance = computeGovernance(log.traces);
     const smData = discoverStateMachine(log.variants);
+    // "⇄ also touches X" — a transition whose activity's events also touch other
+    // object types is a synchronisation point with those lifecycles.
+    for (const c of smData.connectors) {
+      if (c.type !== "transition") continue;
+      const acts = (c.transitionEvent ?? c.label ?? "").split(" / ").map((s) => s.trim()).filter(Boolean);
+      const touched = new Set<string>();
+      for (const a of acts) for (const ty of oc.activityTypes[a] ?? []) if (ty !== t) touched.add(ty);
+      if (touched.size) c.transitionTouches = [...touched];
+    }
     types.push({
       objectType: t,
       mapping,
