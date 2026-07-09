@@ -7,7 +7,7 @@
  * digital-twin simulator calibration lands in the final slice.
  */
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { parseCsv, guessMapping, distinctActivities } from "@/app/lib/mining/parseEventLog";
 import { parseXes } from "@/app/lib/mining/formats/xes";
 import { parseOcel } from "@/app/lib/mining/formats/ocel";
@@ -84,18 +84,6 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     if (res.ok) setRuns((await res.json()).runs ?? []);
   }, [projectId]);
   useEffect(() => { load(); }, [load]);
-  // Open the Miner ON a run when the project already has one (e.g. a just-adopted
-  // example) instead of the empty Import panel. One-shot on first load, and only
-  // when nothing else claimed the selection (mining-return) or is being imported
-  // (a staged sample scenario). Newest run first (runs are createdAt desc).
-  const didAutoSelect = useRef(false);
-  useEffect(() => {
-    if (didAutoSelect.current) return;
-    if (runs.length === 0) return;
-    didAutoSelect.current = true;
-    setSelectedId((cur) => (cur ?? (!scenarios?.length ? runs[0].id : null)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runs]);
   // Include/exclude this run from org Compliance Monitoring (test runs shouldn't
   // pollute the trend). Optimistic; PATCH persists on the run.
   const toggleRunCompliance = useCallback(async (runId: string, exclude: boolean) => {
