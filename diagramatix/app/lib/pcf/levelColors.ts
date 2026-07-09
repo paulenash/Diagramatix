@@ -41,6 +41,15 @@ export const DEFAULT_PCF_LEVEL_COLORS: PcfLevelColor[] = [
   { level: 5, name: "Task",          main: "#1f26e5", lightPct: 90 }, // Dark Blue
 ];
 
+/** PCF level (1..5) from a dotted hierarchy code: "1.0"→1 (Category), "1.1"→2,
+ *  "1.1.1"→3, deeper by segment count. Returns 0 for a non-PCF/blank code. */
+export function pcfLevelFromCode(code: string | null | undefined): number {
+  const c = (code ?? "").trim();
+  if (!/^\d+(?:\.\d+)*$/.test(c)) return 0;
+  if (/^\d+\.0$/.test(c)) return 1;
+  return c.split(".").length;
+}
+
 const HEX_RE = /^#?([0-9a-fA-F]{6})$/;
 
 /** Normalise a hex string to "#rrggbb" (lowercase), or null if invalid. */

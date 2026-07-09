@@ -9,7 +9,9 @@ import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceMo
 import { LinkScanDialog } from "./LinkScanDialog";
 import { PcfSeedFoldersDialog } from "./PcfSeedFoldersDialog";
 import { PcfCreateProcessDialog } from "./PcfCreateProcessDialog";
-import { folderSubtree } from "@/app/lib/pcf/bulkFolders";
+import { folderSubtree, folderCode } from "@/app/lib/pcf/bulkFolders";
+import { usePcfLevelColors } from "@/app/lib/pcf/usePcfLevelColors";
+import { pcfLevelStyle, pcfLevelFromCode } from "@/app/lib/pcf/levelColors";
 import { ProjectPropertiesPanel } from "./ProjectPropertiesPanel";
 import { PcfCoveragePanel } from "./PcfCoveragePanel";
 import { APQC_ATTRIBUTION, anyDiagramHasPcf } from "@/app/lib/pcf/attribution";
@@ -374,6 +376,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
 
 export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft }: Props) {
   const router = useRouter();
+  const pcfColors = usePcfLevelColors();
   const [diagrams, setDiagrams] = useState(project.diagrams);
   const [projectName, setProjectName] = useState(project.name);
   // "Org Owner": the owning Org drives org-wide RCM numbering. Read-only for
@@ -1894,6 +1897,10 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     const childFolders = getOrderedChildFolders(folderId);
     const directDiagrams = getOrderedDiagramsInFolder(folderId);
     const hasChildren = childFolders.length > 0 || directDiagrams.length > 0;
+    // APQC colour coding: a seeded folder ("1.1.1 … (10017)") gets its PCF
+    // level's main colour on the folder icon; non-PCF folders stay amber.
+    const pcfLvl = folder ? pcfLevelFromCode(folderCode(folder.name)) : 0;
+    const folderIconFill = isRoot ? "#3b82f6" : pcfLvl ? pcfLevelStyle(pcfLvl, pcfColors).main : "#fbbf24";
 
     return (
       <div key={folderId}>
@@ -1942,7 +1949,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           {/* Folder icon */}
           <svg width={14} height={12} viewBox="0 0 16 14" fill="none">
             <path d="M1 3V12a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1H8L6.5 2H2a1 1 0 00-1 1z"
-              fill={isRoot ? "#3b82f6" : "#fbbf24"} stroke="#78716c" strokeWidth={0.5} />
+              fill={folderIconFill} stroke="#78716c" strokeWidth={0.5} />
           </svg>
           {editingId === folderId ? (
             <input autoFocus type="text" value={editingName}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { lightenHex, normalizeHex, normalizeScheme, pcfLevelStyle, DEFAULT_PCF_LEVEL_COLORS } from "@/app/lib/pcf/levelColors";
+import { lightenHex, normalizeHex, normalizeScheme, pcfLevelStyle, pcfLevelFromCode, DEFAULT_PCF_LEVEL_COLORS } from "@/app/lib/pcf/levelColors";
 
 describe("PCF level colours (T0680)", () => {
   it("lightenHex mixes toward white by percentage", () => {
@@ -37,6 +37,16 @@ describe("PCF level colours (T0680)", () => {
     expect(l2.lightPct).toBe(100);           // clamped from 200
     // untouched level keeps the default
     expect(merged.find((c) => c.level === 1)!.main).toBe(DEFAULT_PCF_LEVEL_COLORS[0].main);
+  });
+
+  it("pcfLevelFromCode derives the level from a dotted code (for folder colouring)", () => {
+    expect(pcfLevelFromCode("1.0")).toBe(1);      // Category
+    expect(pcfLevelFromCode("1.1")).toBe(2);      // Process Group
+    expect(pcfLevelFromCode("1.1.1")).toBe(3);    // Process
+    expect(pcfLevelFromCode("1.1.1.1")).toBe(4);  // Activity
+    expect(pcfLevelFromCode("1.1.1.1.1")).toBe(5);// Task
+    expect(pcfLevelFromCode("")).toBe(0);         // non-PCF
+    expect(pcfLevelFromCode("My folder")).toBe(0);
   });
 
   it("normalizeScheme ignores malformed input and unknown levels", () => {

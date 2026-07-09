@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { childrenInSubtree, orderDeepestFirst, folderCode, folderCodeStrip, type BulkFolder } from "@/app/lib/pcf/bulkFolders";
+import { usePcfLevelColors } from "@/app/lib/pcf/usePcfLevelColors";
+import { pcfLevelStyle } from "@/app/lib/pcf/levelColors";
 
 interface Framework { id: string; name: string; variant: string; version: string; kind: string; division: string | null }
 interface Hit { id: string; pcfId: number; hierarchyId: string; name: string; level: number }
@@ -37,6 +39,7 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFramewo
   onCreated: (diagramId: string, pcf: CreatedPcf) => void;
   onBulkCreated?: (assign: Record<string, string>, rootDiagramId: string | null, pcf: CreatedPcf) => void;
 }) {
+  const pcfColors = usePcfLevelColors();
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [fw, setFw] = useState("");
   const [q, setQ] = useState(defaultQuery ?? "");
@@ -255,9 +258,11 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFramewo
         <div className="max-h-44 overflow-y-auto border border-gray-100 rounded mb-3">
           {hits.length === 0 ? <p className="text-[11px] text-gray-400 px-2 py-2">Type to search…</p> : hits.map((n) => (
             <button key={n.id} onClick={() => setPicked(n)} className={`w-full text-left px-2 py-1 text-[11px] flex items-baseline gap-1.5 ${picked?.id === n.id ? "bg-blue-100" : "hover:bg-blue-50"}`}>
-              <span className="font-mono text-gray-600 shrink-0">{n.hierarchyId}</span>
+              <span className="font-mono shrink-0 font-semibold" style={{ color: pcfLevelStyle(n.level, pcfColors).main }}>{n.hierarchyId}</span>
               <span className="flex-1 text-gray-900">{n.name}</span>
-              <span className="text-[8px] text-gray-500 shrink-0">{LEVEL[n.level]}</span>
+              {(() => { const st = pcfLevelStyle(n.level, pcfColors); return (
+                <span className="text-[8px] px-1 rounded shrink-0 font-medium" style={{ background: st.main, color: st.textOnMain }}>{LEVEL[n.level]}</span>
+              ); })()}
             </button>
           ))}
         </div>

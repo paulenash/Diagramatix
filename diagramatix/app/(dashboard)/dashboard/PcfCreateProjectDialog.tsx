@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePcfLevelColors } from "@/app/lib/pcf/usePcfLevelColors";
+import { pcfLevelStyle } from "@/app/lib/pcf/levelColors";
 
 interface Framework { id: string; name: string; variant: string; version: string; kind: string; division: string | null }
 interface Hit { id: string; pcfId: number; hierarchyId: string; name: string; level: number }
@@ -15,6 +17,7 @@ interface Hit { id: string; pcfId: number; hierarchyId: string; name: string; le
  */
 export function PcfCreateProjectDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const pcfColors = usePcfLevelColors();
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [fw, setFw] = useState("");
   const [name, setName] = useState("");
@@ -117,7 +120,7 @@ export function PcfCreateProjectDialog({ onClose }: { onClose: () => void }) {
         <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Root process (optional — blank = whole framework)</label>
         {root ? (
           <div className="flex items-center gap-2 mb-3 text-xs text-gray-800">
-            <span className="font-mono text-gray-500">{root.hierarchyId}</span>
+            <span className="font-mono font-semibold" style={{ color: pcfLevelStyle(root.level, pcfColors).main }}>{root.hierarchyId}</span>
             <span className="flex-1">{root.name}</span>
             <button onClick={() => setRoot(null)} className="text-[11px] text-gray-400 hover:text-red-600">Clear</button>
           </div>
@@ -127,8 +130,11 @@ export function PcfCreateProjectDialog({ onClose }: { onClose: () => void }) {
             <div className="max-h-36 overflow-y-auto border border-gray-100 rounded mb-3">
               {hits.length === 0 ? <p className="text-[11px] text-gray-400 px-2 py-1.5">Type to search, or leave blank for the whole framework.</p> : hits.map((n) => (
                 <button key={n.id} onClick={() => pickRoot(n)} className="w-full text-left px-2 py-1 text-[11px] hover:bg-blue-50 flex items-baseline gap-1.5">
-                  <span className="font-mono text-gray-500 shrink-0">{n.hierarchyId}</span>
+                  <span className="font-mono shrink-0 font-semibold" style={{ color: pcfLevelStyle(n.level, pcfColors).main }}>{n.hierarchyId}</span>
                   <span className="flex-1 text-gray-800">{n.name}</span>
+                  {(() => { const st = pcfLevelStyle(n.level, pcfColors); return (
+                    <span className="text-[8px] px-1 rounded shrink-0 font-medium" style={{ background: st.main, color: st.textOnMain }}>{["", "Category", "Process Group", "Process", "Activity", "Task"][n.level]}</span>
+                  ); })()}
                 </button>
               ))}
             </div>

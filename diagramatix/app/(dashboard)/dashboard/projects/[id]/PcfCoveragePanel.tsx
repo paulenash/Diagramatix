@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePcfLevelColors } from "@/app/lib/pcf/usePcfLevelColors";
+import { pcfLevelStyle } from "@/app/lib/pcf/levelColors";
 
 interface CovNode {
   id: string; pcfId: number; hierarchyId: string; name: string; level: number; parentId: string | null;
@@ -39,6 +41,7 @@ function Bar({ m, t }: { m: number; t: number }) {
  */
 export function PcfCoveragePanel({ projectId, onClose }: { projectId: string; onClose: () => void }) {
   const router = useRouter();
+  const pcfColors = usePcfLevelColors();
   const [data, setData] = useState<CovData | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -82,7 +85,7 @@ export function PcfCoveragePanel({ projectId, onClose }: { projectId: string; on
         <div className="flex items-center gap-1.5 py-0.5 hover:bg-gray-50 rounded" style={{ paddingLeft: depth * 16 + 4 }}>
           <button onClick={() => hasKids && toggle(n.id)} className={`w-3 text-[9px] text-gray-400 ${hasKids ? "" : "invisible"}`}>{isCollapsed ? "▶" : "▼"}</button>
           <span className="w-3 text-center text-[11px]">{marker}</span>
-          <span className="font-mono text-[10px] text-gray-500 shrink-0">{n.hierarchyId}</span>
+          <span className="font-mono text-[10px] shrink-0 font-semibold" style={{ color: pcfLevelStyle(n.level, pcfColors).main }}>{n.hierarchyId}</span>
           <span className={`text-[11px] flex-1 ${n.modelled ? "text-gray-900" : "text-gray-600"}`}>{n.name}</span>
           {hasKids && <span className="text-[9px] text-gray-400 tabular-nums shrink-0">{n.subtreeModelled}/{n.subtreeTotal}</span>}
           {n.diagrams.map((d) => (
@@ -121,9 +124,12 @@ export function PcfCoveragePanel({ projectId, onClose }: { projectId: string; on
                 <span className="text-[11px] text-gray-500">modelled — {data.modelled} of {data.total} PCF processes have a classified diagram</span>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1">
-                {data.byLevel.map((l) => (
-                  <span key={l.level} className="text-[10px] text-gray-500">{LEVEL[l.level] || `L${l.level}`}: <span className="text-gray-800 font-medium">{l.modelled}/{l.total}</span></span>
-                ))}
+                {data.byLevel.map((l) => { const st = pcfLevelStyle(l.level, pcfColors); return (
+                  <span key={l.level} className="text-[10px] text-gray-600 inline-flex items-center gap-1">
+                    <span className="px-1 py-0.5 rounded font-medium" style={{ background: st.main, color: st.textOnMain }}>{LEVEL[l.level] || `L${l.level}`}</span>
+                    <span className="text-gray-800 font-medium">{l.modelled}/{l.total}</span>
+                  </span>
+                ); })}
               </div>
             </div>
 
