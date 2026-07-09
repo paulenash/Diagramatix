@@ -69,7 +69,8 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   const [discovering, setDiscovering] = useState(false); // any discovery in flight (disables all buttons)
   const [aiSm, setAiSm] = useState(false);   // AI reference-SM generation in flight (its own spinner)
   const [smBusy, setSmBusy] = useState(false); // deterministic state-machine discovery in flight
-  const [aiBpmn, setAiBpmn] = useState(false); // process discovery in flight
+  const [aiBpmn, setAiBpmn] = useState(false);   // AI process curation in flight (its own spinner)
+  const [bpmnBusy, setBpmnBusy] = useState(false); // deterministic process discovery in flight
   // Conformance
   const [referenceSms, setReferenceSms] = useState<{ id: string; name: string }[]>([]);
   const [refSmId, setRefSmId] = useState("");
@@ -282,7 +283,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   }
 
   async function discover(runId: string, ai = false) {
-    setDiscovering(true); if (ai) setAiBpmn(true); setErr(null);
+    setDiscovering(true); if (ai) setAiBpmn(true); else setBpmnBusy(true); setErr(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/discover`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ai }),
@@ -290,7 +291,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Discovery failed"); return; }
       await load();
-    } finally { setDiscovering(false); setAiBpmn(false); }
+    } finally { setDiscovering(false); setAiBpmn(false); setBpmnBusy(false); }
   }
 
   async function discoverSm(runId: string, opts: { ai?: boolean; as?: "discovered" | "reference" } = {}): Promise<string | null> {
@@ -544,10 +545,14 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
             {/* Discover the BPMN process */}
             <div className="mt-4 pt-3 border-t border-stone-700">
               <h3 className="text-xs font-semibold text-amber-200 mb-1">Discover the process</h3>
-              <p className="text-[11px] text-stone-400 mb-2">Turn the mined paths into a clean, readable BPMN process — AI-curated (rules + template + your configured model): gateways at real branches, rework loops, tidy labels, noise dropped.</p>
+              <p className="text-[11px] text-stone-400 mb-2">Turn the mined paths into a BPMN process — a faithful directly-follows model of the log (no AI needed). Optionally <span className="text-stone-300">AI-curate</span> a cleaner version (gateways at real branches, tidy labels, noise dropped) — needs API credits.</p>
               <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => discover(selected.id, true)} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
-                  {aiBpmn ? "✨ Generating…" : "✨ Discover process"}
+                <button onClick={() => discover(selected.id, false)} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5" title="Build the BPMN directly from the mined paths (a faithful mirror of the log)">
+                  {bpmnBusy ? "Discovering…" : "Discover process"}
+                </button>
+                {bpmnBusy && <DiagramatixThrobber size={20} tone="amber" />}
+                <button onClick={() => discover(selected.id, true)} disabled={discovering} className="text-xs bg-amber-900/60 hover:bg-amber-800 disabled:opacity-40 text-amber-100 rounded px-2.5 py-1.5" title="Use AI (rules + template + your configured model) to curate a cleaner process — needs ANTHROPIC_API_KEY + credits">
+                  {aiBpmn ? "✨ Curating…" : "✨ AI-curate"}
                 </button>
                 {aiBpmn && <DiagramatixThrobber size={20} tone="amber" />}
                 {selected.discoveredBpmnId && (
@@ -650,8 +655,8 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
               {/* Prerequisites — the button lights up when every step is done. */}
               <ul className="text-[11px] mb-2.5 flex flex-col gap-0.5">
                 {[
-                  { done: !!selected.discoveredBpmnId, label: "Discover the process", hint: "the ✨ Discover process step" },
-                  { done: !!selected.discoveredSmId, label: "Discover the state machine", hint: "the ✨ Discover state machine step" },
+                  { done: !!selected.discoveredBpmnId, label: "Discover the process", hint: "the Discover process step" },
+                  { done: !!selected.discoveredSmId, label: "Discover the state machine", hint: "the Discover state machine step" },
                   { done: !!selected.conformance, label: "Check conformance against a reference", hint: "pick a reference state machine + run conformance" },
                 ].map((s, i) => (
                   <li key={i} className="flex items-baseline gap-1.5">

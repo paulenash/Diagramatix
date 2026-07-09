@@ -1,0 +1,984 @@
+{
+  "objectTypes": [
+    {
+      "name": "order",
+      "attributes": [
+        {
+          "name": "status",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "item",
+      "attributes": [
+        {
+          "name": "status",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "invoice",
+      "attributes": [
+        {
+          "name": "status",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "customer",
+      "attributes": [
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "eventTypes": [
+    {
+      "name": "place order",
+      "attributes": []
+    },
+    {
+      "name": "confirm order",
+      "attributes": []
+    },
+    {
+      "name": "pick item",
+      "attributes": []
+    },
+    {
+      "name": "pack item",
+      "attributes": []
+    },
+    {
+      "name": "issue invoice",
+      "attributes": []
+    },
+    {
+      "name": "ship order",
+      "attributes": []
+    },
+    {
+      "name": "pay invoice",
+      "attributes": []
+    },
+    {
+      "name": "deliver order",
+      "attributes": []
+    },
+    {
+      "name": "cancel order",
+      "attributes": []
+    }
+  ],
+  "objects": [
+    {
+      "id": "cust-A",
+      "type": "customer",
+      "attributes": [
+        {
+          "name": "name",
+          "time": "2026-01-01T08:00:00.000Z",
+          "value": "Acme Ltd"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "cust-B",
+      "type": "customer",
+      "attributes": [
+        {
+          "name": "name",
+          "time": "2026-01-01T08:00:00.000Z",
+          "value": "Globex"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "ord-1",
+      "type": "order",
+      "attributes": [
+        {
+          "name": "status",
+          "time": "2026-01-05T09:00:00.000Z",
+          "value": "placed"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-05T10:00:00.000Z",
+          "value": "confirmed"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-05T15:00:00.000Z",
+          "value": "shipped"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-05T18:00:00.000Z",
+          "value": "delivered"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "item-1a",
+          "qualifier": "comprises"
+        },
+        {
+          "objectId": "item-1b",
+          "qualifier": "comprises"
+        },
+        {
+          "objectId": "inv-1",
+          "qualifier": "billed by"
+        }
+      ]
+    },
+    {
+      "id": "item-1a",
+      "type": "item",
+      "attributes": [
+        {
+          "name": "status",
+          "time": "2026-01-05T09:00:00.000Z",
+          "value": "ordered"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-05T11:00:00.000Z",
+          "value": "picked"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-05T12:00:00.000Z",
+          "value": "packed"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-05T15:00:00.000Z",
+          "value": "shipped"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "item-1b",
+      "type": "item",
+      "attributes": [
+        {
+          "name": "status",
+          "time": "2026-01-05T09:00:00.000Z",
+          "value": "ordered"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-05T12:00:00.000Z",
+          "value": "picked"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-05T13:00:00.000Z",
+          "value": "packed"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-05T15:00:00.000Z",
+          "value": "shipped"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "inv-1",
+      "type": "invoice",
+      "attributes": [
+        {
+          "name": "status",
+          "time": "2026-01-05T14:00:00.000Z",
+          "value": "issued"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-05T16:00:00.000Z",
+          "value": "paid"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "ord-2",
+      "type": "order",
+      "attributes": [
+        {
+          "name": "status",
+          "time": "2026-01-06T09:00:00.000Z",
+          "value": "placed"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-06T10:00:00.000Z",
+          "value": "confirmed"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-06T15:00:00.000Z",
+          "value": "shipped"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-06T18:00:00.000Z",
+          "value": "delivered"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "item-2a",
+          "qualifier": "comprises"
+        },
+        {
+          "objectId": "inv-2",
+          "qualifier": "billed by"
+        }
+      ]
+    },
+    {
+      "id": "item-2a",
+      "type": "item",
+      "attributes": [
+        {
+          "name": "status",
+          "time": "2026-01-06T09:00:00.000Z",
+          "value": "ordered"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-06T11:00:00.000Z",
+          "value": "picked"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-06T12:00:00.000Z",
+          "value": "packed"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-06T15:00:00.000Z",
+          "value": "shipped"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "inv-2",
+      "type": "invoice",
+      "attributes": [
+        {
+          "name": "status",
+          "time": "2026-01-06T14:00:00.000Z",
+          "value": "issued"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-06T16:00:00.000Z",
+          "value": "paid"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "ord-3",
+      "type": "order",
+      "attributes": [
+        {
+          "name": "status",
+          "time": "2026-01-07T09:00:00.000Z",
+          "value": "placed"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-07T10:00:00.000Z",
+          "value": "confirmed"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-07T15:00:00.000Z",
+          "value": "shipped"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-07T18:00:00.000Z",
+          "value": "delivered"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "item-3a",
+          "qualifier": "comprises"
+        },
+        {
+          "objectId": "inv-3",
+          "qualifier": "billed by"
+        }
+      ]
+    },
+    {
+      "id": "item-3a",
+      "type": "item",
+      "attributes": [
+        {
+          "name": "status",
+          "time": "2026-01-07T09:00:00.000Z",
+          "value": "ordered"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-07T11:00:00.000Z",
+          "value": "picked"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-07T12:00:00.000Z",
+          "value": "packed"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-07T15:00:00.000Z",
+          "value": "shipped"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "inv-3",
+      "type": "invoice",
+      "attributes": [
+        {
+          "name": "status",
+          "time": "2026-01-07T14:00:00.000Z",
+          "value": "issued"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-07T16:00:00.000Z",
+          "value": "paid"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "ord-4",
+      "type": "order",
+      "attributes": [
+        {
+          "name": "status",
+          "time": "2026-01-08T09:00:00.000Z",
+          "value": "placed"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-08T10:00:00.000Z",
+          "value": "cancelled"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "item-4a",
+          "qualifier": "comprises"
+        }
+      ]
+    },
+    {
+      "id": "item-4a",
+      "type": "item",
+      "attributes": [
+        {
+          "name": "status",
+          "time": "2026-01-08T09:00:00.000Z",
+          "value": "ordered"
+        },
+        {
+          "name": "status",
+          "time": "2026-01-08T10:00:00.000Z",
+          "value": "cancelled"
+        }
+      ],
+      "relationships": []
+    }
+  ],
+  "events": [
+    {
+      "id": "e1",
+      "type": "place order",
+      "time": "2026-01-05T09:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-1",
+          "qualifier": ""
+        },
+        {
+          "objectId": "item-1a",
+          "qualifier": ""
+        },
+        {
+          "objectId": "item-1b",
+          "qualifier": ""
+        },
+        {
+          "objectId": "cust-A",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e2",
+      "type": "confirm order",
+      "time": "2026-01-05T10:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-1",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e3",
+      "type": "pick item",
+      "time": "2026-01-05T11:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "item-1a",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e4",
+      "type": "pack item",
+      "time": "2026-01-05T12:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "item-1a",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e5",
+      "type": "pick item",
+      "time": "2026-01-05T12:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "item-1b",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e6",
+      "type": "pack item",
+      "time": "2026-01-05T13:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "item-1b",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e7",
+      "type": "issue invoice",
+      "time": "2026-01-05T14:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-1",
+          "qualifier": ""
+        },
+        {
+          "objectId": "inv-1",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e8",
+      "type": "ship order",
+      "time": "2026-01-05T15:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-1",
+          "qualifier": ""
+        },
+        {
+          "objectId": "item-1a",
+          "qualifier": ""
+        },
+        {
+          "objectId": "item-1b",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e9",
+      "type": "pay invoice",
+      "time": "2026-01-05T16:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "inv-1",
+          "qualifier": ""
+        },
+        {
+          "objectId": "cust-A",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e10",
+      "type": "deliver order",
+      "time": "2026-01-05T18:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-1",
+          "qualifier": ""
+        },
+        {
+          "objectId": "cust-A",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e11",
+      "type": "place order",
+      "time": "2026-01-06T09:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "bob"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-2",
+          "qualifier": ""
+        },
+        {
+          "objectId": "item-2a",
+          "qualifier": ""
+        },
+        {
+          "objectId": "cust-A",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e12",
+      "type": "confirm order",
+      "time": "2026-01-06T10:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "bob"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-2",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e13",
+      "type": "pick item",
+      "time": "2026-01-06T11:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "bob"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "item-2a",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e14",
+      "type": "pack item",
+      "time": "2026-01-06T12:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "bob"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "item-2a",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e15",
+      "type": "issue invoice",
+      "time": "2026-01-06T14:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "bob"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-2",
+          "qualifier": ""
+        },
+        {
+          "objectId": "inv-2",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e16",
+      "type": "ship order",
+      "time": "2026-01-06T15:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "bob"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-2",
+          "qualifier": ""
+        },
+        {
+          "objectId": "item-2a",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e17",
+      "type": "pay invoice",
+      "time": "2026-01-06T16:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "bob"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "inv-2",
+          "qualifier": ""
+        },
+        {
+          "objectId": "cust-A",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e18",
+      "type": "deliver order",
+      "time": "2026-01-06T18:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "bob"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-2",
+          "qualifier": ""
+        },
+        {
+          "objectId": "cust-A",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e19",
+      "type": "place order",
+      "time": "2026-01-07T09:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-3",
+          "qualifier": ""
+        },
+        {
+          "objectId": "item-3a",
+          "qualifier": ""
+        },
+        {
+          "objectId": "cust-B",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e20",
+      "type": "confirm order",
+      "time": "2026-01-07T10:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-3",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e21",
+      "type": "pick item",
+      "time": "2026-01-07T11:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "item-3a",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e22",
+      "type": "pack item",
+      "time": "2026-01-07T12:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "item-3a",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e23",
+      "type": "issue invoice",
+      "time": "2026-01-07T14:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-3",
+          "qualifier": ""
+        },
+        {
+          "objectId": "inv-3",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e24",
+      "type": "ship order",
+      "time": "2026-01-07T15:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-3",
+          "qualifier": ""
+        },
+        {
+          "objectId": "item-3a",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e25",
+      "type": "pay invoice",
+      "time": "2026-01-07T16:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "inv-3",
+          "qualifier": ""
+        },
+        {
+          "objectId": "cust-B",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e26",
+      "type": "deliver order",
+      "time": "2026-01-07T18:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "alice"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-3",
+          "qualifier": ""
+        },
+        {
+          "objectId": "cust-B",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e27",
+      "type": "place order",
+      "time": "2026-01-08T09:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "bob"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-4",
+          "qualifier": ""
+        },
+        {
+          "objectId": "item-4a",
+          "qualifier": ""
+        },
+        {
+          "objectId": "cust-B",
+          "qualifier": ""
+        }
+      ]
+    },
+    {
+      "id": "e28",
+      "type": "cancel order",
+      "time": "2026-01-08T10:00:00.000Z",
+      "attributes": [
+        {
+          "name": "resource",
+          "value": "bob"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ord-4",
+          "qualifier": ""
+        },
+        {
+          "objectId": "item-4a",
+          "qualifier": ""
+        }
+      ]
+    }
+  ]
+}
