@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { usePcfLevelColors } from "@/app/lib/pcf/usePcfLevelColors";
+import { pcfLevelStyle, PCF_LEVEL_NAMES } from "@/app/lib/pcf/levelColors";
 
 interface Node {
   id: string; pcfId: number; hierarchyId: string; name: string; description: string | null;
@@ -21,6 +23,7 @@ const LEVEL = ["", "Category", "Process Group", "Process", "Activity", "Task"];
 export function PcfBuilder({ orgId, frameworkId, frameworks, onChanged }: {
   orgId: string; frameworkId: string; frameworks: Framework[]; onChanged: () => void;
 }) {
+  const pcfColors = usePcfLevelColors();
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -84,7 +87,9 @@ export function PcfBuilder({ orgId, frameworkId, frameworks, onChanged }: {
               {n.isCustom && <span className="ml-1 text-[8px] uppercase px-1 py-0.5 rounded bg-indigo-100 text-indigo-700">custom</span>}
               {!n.active && <span className="ml-1 text-[8px] uppercase px-1 py-0.5 rounded bg-gray-100 text-gray-500">hidden</span>}
               {n.sourcePcfId != null && <span className="ml-1 text-[8px] text-gray-300" title="Sourced from an APQC reference (provenance kept)">◆ apqc</span>}
-              <span className="ml-1 text-[9px] text-gray-400">{LEVEL[n.level]}</span>
+              {(() => { const st = pcfLevelStyle(n.level, pcfColors); return (
+                <span className="ml-1 text-[9px] px-1 py-0.5 rounded font-medium" style={{ background: st.main, color: st.textOnMain }}>{PCF_LEVEL_NAMES[n.level] ?? LEVEL[n.level]}</span>
+              ); })()}
             </span>
           )}
           <span className="hidden group-hover:flex items-center gap-1 shrink-0 pr-1">
@@ -147,6 +152,7 @@ function ComposeModal({ orgId, frameworkId, frameworks, targetParentId, onClose,
   orgId: string; frameworkId: string; frameworks: Framework[]; targetParentId: string | null;
   onClose: () => void; onDone: () => void;
 }) {
+  const pcfColors = usePcfLevelColors();
   const sources = frameworks.filter((f) => f.id !== frameworkId);
   const [src, setSrc] = useState(sources.find((f) => f.kind === "reference")?.id ?? sources[0]?.id ?? "");
   const [nodes, setNodes] = useState<{ id: string; hierarchyId: string; name: string; level: number }[]>([]);
@@ -193,7 +199,9 @@ function ComposeModal({ orgId, frameworkId, frameworks, targetParentId, onClose,
             <button key={n.id} disabled={busy} onClick={() => compose(n.id)} className="w-full text-left px-2 py-1 text-[11px] hover:bg-blue-50 flex items-baseline gap-1.5 disabled:opacity-50">
               <span className="font-mono text-gray-500 shrink-0">{n.hierarchyId}</span>
               <span className="flex-1 text-gray-800">{n.name}</span>
-              <span className="text-[8px] text-gray-400">{LEVEL[n.level]}</span>
+              {(() => { const st = pcfLevelStyle(n.level, pcfColors); return (
+                <span className="text-[8px] px-1 rounded font-medium" style={{ background: st.main, color: st.textOnMain }}>{PCF_LEVEL_NAMES[n.level] ?? LEVEL[n.level]}</span>
+              ); })()}
             </button>
           ))}
           {hits.length === 0 && <p className="text-[11px] text-gray-400 px-2 py-2">No nodes.</p>}

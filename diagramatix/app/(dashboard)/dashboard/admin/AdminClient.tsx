@@ -761,6 +761,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "risk-controls", title: "Risk & Control Catalog", description: "Master library of Risks and Controls; projects adopt a copy, attach them to steps and export a Risk-Control Matrix.", href: "/dashboard/admin/risk-controls" },
   { id: "compliance", title: "Compliance Monitoring", description: "Org-wide control operating-effectiveness over time — trends + alerts from DiagramatixMINER runs across every project.", href: "/dashboard/compliance?from=/dashboard/admin" },
   { id: "pcf", title: "Process Classification (APQC PCF)", description: "Browse the APQC Process Classification Framework® — Cross-Industry + industry variants — the reference taxonomy for classifying processes.", href: "/dashboard/admin/pcf?from=/dashboard/admin" },
+  { id: "pcf-colours", title: "APQC PCF Hierarchy Colours", description: "The two-tone colour per PCF level (Category → Task) — one main colour + a lightness %; applied wherever the APQC hierarchy is shown.", href: "/dashboard/admin/pcf-colours" },
   { id: "sharing", title: "Project Sharing", description: "Every shared project plus its editors / viewers.", href: "/dashboard/admin/sharing" },
   { id: "scanner-rules", title: "BPMN Scanner Rules", description: "Rules used by the diagram issue scanner.", href: "/dashboard/admin/scanner-rules" },
   { id: "bubble-help", title: "Bubble Help", description: "The contextual help-cloud topics shown in the editor.", href: "/dashboard/admin/bubble-help" },

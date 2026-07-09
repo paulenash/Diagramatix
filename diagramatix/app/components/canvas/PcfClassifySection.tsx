@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { PcfClassification } from "@/app/lib/diagram/types";
+import { usePcfLevelColors } from "@/app/lib/pcf/usePcfLevelColors";
+import { pcfLevelStyle, PCF_LEVEL_NAMES } from "@/app/lib/pcf/levelColors";
 
 interface Framework { id: string; name: string; variant: string; version: string; kind: string; division: string | null }
 interface Hit { id: string; pcfId: number; hierarchyId: string; name: string; level: number }
@@ -18,6 +20,7 @@ export function PcfClassifySection({ projectId, value, onChange }: {
   value?: PcfClassification;
   onChange: (v: PcfClassification | undefined) => void;
 }) {
+  const pcfColors = usePcfLevelColors();
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [fw, setFw] = useState<string>(value?.frameworkId ?? "");
   const [q, setQ] = useState("");
@@ -94,7 +97,9 @@ export function PcfClassifySection({ projectId, value, onChange }: {
               <button key={n.id} onClick={() => pick(n)} className="w-full text-left px-1 py-0.5 text-[10px] hover:bg-blue-50 rounded flex items-baseline gap-1">
                 <span className="font-mono text-gray-500 shrink-0">{n.hierarchyId}</span>
                 <span className="flex-1 text-gray-800">{n.name}</span>
-                <span className="text-[8px] text-gray-500 shrink-0">{LEVEL[n.level]}</span>
+                {(() => { const st = pcfLevelStyle(n.level, pcfColors); return (
+                  <span className="text-[8px] px-1 rounded shrink-0 font-medium" style={{ background: st.main, color: st.textOnMain }}>{PCF_LEVEL_NAMES[n.level] ?? LEVEL[n.level]}</span>
+                ); })()}
               </button>
             ))}
           </div>

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { PcfBuilder } from "./PcfBuilder";
 import { PcfUpgradeModal } from "./PcfUpgradeModal";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { usePcfLevelColors } from "@/app/lib/pcf/usePcfLevelColors";
+import { pcfLevelStyle, PCF_LEVEL_NAMES } from "@/app/lib/pcf/levelColors";
 
 interface FrameworkSummary {
   id: string; name: string; variant: string; version: string;
@@ -27,6 +29,7 @@ export function PcfClient({
   orgs: { id: string; name: string }[]; backHref: string;
 }) {
   const router = useRouter();
+  const pcfColors = usePcfLevelColors();
   const [frameworks, setFrameworks] = useState<FrameworkSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [nodes, setNodes] = useState<PcfNode[]>([]);
@@ -155,7 +158,9 @@ export function PcfClient({
             {n.metricsAvailable && <span className="ml-1 text-[8px] uppercase tracking-wide px-1 py-0.5 rounded bg-gray-100 text-gray-400" title="APQC OSB benchmark metrics available for this element (separate APQC licence)">metrics</span>}
             {n.description && <span className="block text-[10px] text-gray-600 leading-snug">{n.description}</span>}
           </span>
-          <span className="text-[9px] text-gray-600 shrink-0">{LEVEL_LABEL[n.level]}</span>
+          {(() => { const st = pcfLevelStyle(n.level, pcfColors); return (
+            <span className="text-[9px] px-1 py-0.5 rounded shrink-0 font-medium" style={{ background: st.main, color: st.textOnMain }}>{PCF_LEVEL_NAMES[n.level] ?? LEVEL_LABEL[n.level]}</span>
+          ); })()}
         </div>
         {open && kids.map((k) => <Row key={k.id} n={k} depth={depth + 1} />)}
       </>
@@ -270,7 +275,9 @@ export function PcfClient({
                 {matches.map((n) => (
                   <div key={n.id} className="flex items-baseline gap-2 py-0.5">
                     <span className="font-mono text-[11px] text-gray-600 w-24 shrink-0">{n.hierarchyId}</span>
-                    <span className="text-[12px] text-gray-800">{n.name} <span className="text-[9px] text-gray-600">{LEVEL_LABEL[n.level]}</span></span>
+                    {(() => { const st = pcfLevelStyle(n.level, pcfColors); return (
+                      <span className="text-[12px] text-gray-800">{n.name} <span className="text-[9px] px-1 py-0.5 rounded font-medium" style={{ background: st.main, color: st.textOnMain }}>{PCF_LEVEL_NAMES[n.level] ?? LEVEL_LABEL[n.level]}</span></span>
+                    ); })()}
                   </div>
                 ))}
               </div>
