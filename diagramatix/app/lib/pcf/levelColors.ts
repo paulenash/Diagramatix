@@ -30,13 +30,15 @@ export const PCF_LEVEL_NAMES: Record<number, string> = {
   5: "Task",
 };
 
-/** Built-in default scheme (a blue ramp). SuperAdmin-overridable. */
+/** Built-in default scheme — APQC's per-level hues. SuperAdmin-overridable.
+ *  Maroon · Green · Brown · Burnt Orange · Dark Blue (the dark "main" tone;
+ *  the light tone is each lightened toward white by lightPct). */
 export const DEFAULT_PCF_LEVEL_COLORS: PcfLevelColor[] = [
-  { level: 1, name: "Category",      main: "#00426F", lightPct: 82 },
-  { level: 2, name: "Process Group", main: "#00588B", lightPct: 82 },
-  { level: 3, name: "Process",       main: "#0089CF", lightPct: 82 },
-  { level: 4, name: "Activity",      main: "#3D8FBF", lightPct: 82 },
-  { level: 5, name: "Task",          main: "#5D97C9", lightPct: 82 },
+  { level: 1, name: "Category",      main: "#800000", lightPct: 82 }, // Maroon
+  { level: 2, name: "Process Group", main: "#2E7D32", lightPct: 82 }, // Green
+  { level: 3, name: "Process",       main: "#8B4513", lightPct: 82 }, // Brown
+  { level: 4, name: "Activity",      main: "#CC5500", lightPct: 82 }, // Burnt Orange
+  { level: 5, name: "Task",          main: "#003366", lightPct: 82 }, // Dark Blue
 ];
 
 const HEX_RE = /^#?([0-9a-fA-F]{6})$/;
