@@ -178,7 +178,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
                   </p>
                 )}
                 {canEditActive
-                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} onOpenDiagram={setActiveId} calendars={calendars} />
+                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} onOpenDiagram={setActiveId} calendars={calendars} teams={Object.keys(teamCapacities)} />
                   : <p className="text-xs text-green-400/60">{loadingVariant ? "Loading variant…" : "Open this diagram from its editor to edit simulation data here."}</p>}
               </MatrixPanel>
               <MatrixPanel title="Interchange — BPSim export / import" className="md:col-span-3">

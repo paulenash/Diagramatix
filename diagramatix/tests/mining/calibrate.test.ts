@@ -80,6 +80,37 @@ describe("calibrate the twin", () => {
     expect(cal.clockUnit).toBe("hour");
   });
 
+  it("T0685 — tasks with no mined resource fall back to their pool team, which is in the library", () => {
+    const variants: Variant[] = [
+      { events: ["Create", "Submit", "Approve"], states: ["Draft", "Pending", "Approved"], count: 5 },
+    ];
+    const { plan } = discoverProcess(variants);
+    const data = layoutBpmnDiagram(plan.elements, plan.connections);
+    // Only "Create" has a mined resource; Submit/Approve have none → pool fallback.
+    const perf = {
+      clockUnit: "hour" as const,
+      activityDurations: { Create: [2], Submit: [1], Approve: [3] },
+      interArrival: [10],
+      activityResource: { Create: "alice" },
+      resourceConcurrency: { alice: 1 },
+      activeHours: new Array(168).fill(1),
+    };
+    const cal = calibrateSimulation(data, perf);
+    const poolLabel = (cal.data.elements.find((e) => e.type === "pool")?.label ?? "").trim();
+    expect(poolLabel).toBeTruthy();
+
+    const task = (label: string) => cal.data.elements.find((e) => e.type === "task" && e.label === label)!;
+    expect(getSimParams(task("Create")).teamId).toBe("alice");        // resource wins
+    expect(getSimParams(task("Submit")).teamId).toBe(poolLabel);      // no resource → pool team
+    expect(getSimParams(task("Approve")).teamId).toBe(poolLabel);
+    // Every task is team-assigned, and every referenced team is in the library.
+    const taskTeams = cal.data.elements.filter((e) => e.type === "task").map((e) => getSimParams(e).teamId);
+    expect(taskTeams.every((t) => typeof t === "string" && t)).toBe(true);
+    const libNames = new Set(cal.teams.map((t) => t.name));
+    for (const t of taskTeams) expect(libNames.has(t!)).toBe(true);   // no orphan team → run needs no fix-up
+    expect(libNames.has(poolLabel)).toBe(true);
+  });
+
   it("T0603 — the whole pipeline yields a twin that actually simulates (completes work)", () => {
     const HEADERS = ["case", "activity", "ts", "state", "user"];
     const MAP: LogMapping = { caseId: "case", activity: "activity", timestamp: "ts", state: "state", resource: "user" };

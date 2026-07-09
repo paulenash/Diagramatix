@@ -63,10 +63,28 @@ export function calibrateSimulation(data: DiagramData, perf: Performance): Calib
   const byId = new Map(data.elements.map((e) => [e.id, e] as const));
   const patchEl = (el: DiagramElement, patch: Parameters<typeof simPatch>[1]) => ({ ...el, properties: { ...el.properties, ...simPatch(el, patch) } });
 
+  // Nearest containing lane/pool label — the team a task falls back to when the
+  // log carried no resource for its activity. Keeps every task team-assigned so
+  // the twin is runnable without a manual "Fill missing" pass.
+  const laneLabelOf = (el: DiagramElement): string | undefined => {
+    let cur: DiagramElement | undefined = el.parentId ? byId.get(el.parentId) : undefined;
+    const seen = new Set<string>();
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      if (cur.type === "lane" || cur.type === "pool") { const l = (cur.label ?? "").trim(); if (l) return l; }
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    return undefined;
+  };
+
+  // Every team a task ends up referencing → so the returned library covers them
+  // all (mined resources AND any pool/lane fallback), never leaving an orphan.
+  const usedTeams = new Set<string>();
   const elements = data.elements.map((el) => {
     if (TASK_TYPES.has(el.type)) {
       const label = el.label ?? "";
-      const team = perf.activityResource[label];
+      const team = perf.activityResource[label] ?? laneLabelOf(el);
+      if (team) usedTeams.add(team);
       return patchEl(el, { cycleTime: fitDuration(perf.activityDurations[label] ?? []), ...(team ? { teamId: team } : {}) });
     }
     if ((el.type === "start-event" || el.type === "intermediate-event") && !el.boundaryHostId) {
@@ -88,10 +106,11 @@ export function calibrateSimulation(data: DiagramData, perf: Performance): Calib
     for (const c of outs) c.branchProbability = Math.round(100 * (parseFloat(c.label ?? "") || 0) / total);
   }
 
-  const teams = Object.entries(
-    // one team per distinct mined resource, capacity = its peak concurrency
-    Object.fromEntries(Object.values(perf.activityResource).map((res) => [res, Math.max(1, perf.resourceConcurrency[res] ?? 1)])),
-  ).map(([name, capacity]) => ({ name, capacity: capacity as number }));
+  // One team per distinct team a task actually references — a mined resource
+  // (capacity = its peak concurrency) or a pool/lane fallback (capacity 1). This
+  // guarantees the library covers every task's teamId, so the run needs no
+  // manual team fix-up.
+  const teams = [...usedTeams].map((name) => ({ name, capacity: Math.max(1, perf.resourceConcurrency[name] ?? 1) }));
 
   return {
     data: { ...data, elements, connectors },

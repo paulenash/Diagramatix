@@ -60,7 +60,7 @@ function MatrixDist({ value, onChange }: { value?: SimDist; onChange: (d: SimDis
 
 const num = (v: string) => (v === "" ? undefined : Math.max(0, Number(v) || 0));
 
-export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, calendars = [] }: {
+export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, calendars = [], teams = [] }: {
   data: DiagramData;
   onApplyData: (next: DiagramData) => void;
   onFillMissing?: () => number;
@@ -69,6 +69,8 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
   onOpenDiagram?: (diagramId: string) => void;
   /** Working calendars, for the per-source operating-hours picker. */
   calendars?: { id: string; name: string }[];
+  /** Defined team names (from the Team library) for the per-task Team picker. */
+  teams?: string[];
 }) {
   const [confirmClear, setConfirmClear] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -171,7 +173,20 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
                 <Cell w={W.team}>
                   {onOpenDiagram && typeof t.properties?.linkedDiagramId === "string"
                     ? <button onClick={() => onOpenDiagram(t.properties!.linkedDiagramId as string)} className="text-green-300 hover:text-green-200 text-[10px]" title="Open the linked subprocess diagram to edit its tasks">⤢ edit child →</button>
-                    : <input type="text" value={sim.teamId ?? ""} placeholder="team" onChange={(e) => patchEl(t.id, { teamId: e.target.value || undefined })} className={`${inp} w-40`} />}
+                    : teams.length > 0
+                      ? (() => {
+                          const cur = sim.teamId ?? "";
+                          const known = !cur || teams.includes(cur);
+                          return (
+                            <select value={cur} onChange={(e) => patchEl(t.id, { teamId: e.target.value || undefined })} className={`${inp} w-40`} title="Assign this task to a defined Team">
+                              <option value="">— no team —</option>
+                              {teams.map((tm) => <option key={tm} value={tm}>{tm}</option>)}
+                              {/* Preserve an existing value that isn't in the library so it's visible + fixable. */}
+                              {!known && <option value={cur}>{cur} (not in library)</option>}
+                            </select>
+                          );
+                        })()
+                      : <input type="text" value={sim.teamId ?? ""} placeholder="team" onChange={(e) => patchEl(t.id, { teamId: e.target.value || undefined })} className={`${inp} w-40`} />}
                 </Cell>
                 <Cell w={W.units}><input type="number" min={1} value={sim.resourceUnits ?? 1} onChange={(e) => patchEl(t.id, { resourceUnits: Math.max(1, parseInt(e.target.value, 10) || 1) })} className={`${inp} w-10`} /></Cell>
               </Row>
