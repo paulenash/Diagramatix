@@ -1,14 +1,16 @@
 /**
- * POST — discover a candidate STATE MACHINE from a run's state sequences → a new
- * `state-machine` diagram in the project; records the diagram id on the run.
+ * POST — build a STATE MACHINE from a run's state sequences → a NEW
+ * `state-machine` diagram in the project; records its id on the run.
  *
- * Two modes (body `{ ai?: boolean }`):
- *   • default  — deterministic discoverStateMachine (mirrors the log 1:1).
- *   • ai:true  — Claude curates a clean, governable REFERENCE via the app's AI
- *                Generate pipeline (general + state-machine rules, the
- *                state-machine template, the configured model). Metered against
- *                the AI-attempts quota; needs ANTHROPIC_API_KEY.
- * Either way the user can edit it and select it as the conformance reference.
+ * `{ ai?: boolean, as?: "discovered" | "reference" }`:
+ *   • ai:false — deterministic discoverStateMachine (mirrors the log 1:1).
+ *   • ai:true  — Claude curates a clean, governable variant via the app's AI
+ *                Generate pipeline. Metered against aiAttempts; needs ANTHROPIC_API_KEY.
+ *   • as:"discovered" (default) — the DISCOVERED mirror, stored in discoveredSmId.
+ *     Regenerated on refresh; treat as read-mostly.
+ *   • as:"reference" — a SEPARATE governed rulebook, stored in referenceSmId. It
+ *     is a distinct diagram: discovery + refresh never overwrite it, so edits are
+ *     safe. (This is the fix for discovered/reference sharing one diagram.)
  */
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -43,6 +45,7 @@ export async function POST(req: Request, { params }: Params) {
 
   const body = await req.json().catch(() => ({}));
   const useAi = body?.ai === true;
+  const asReference = body?.as === "reference";
 
   const run = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id } });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -53,7 +56,7 @@ export async function POST(req: Request, { params }: Params) {
   const userId = session?.user?.id;
 
   let data: DiagramData;
-  let nameSuffix = "states";
+  let nameSuffix = asReference ? "reference" : "states";
   if (useAi) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return NextResponse.json({ error: "AI not configured. Set ANTHROPIC_API_KEY." }, { status: 503 });
@@ -82,7 +85,7 @@ export async function POST(req: Request, { params }: Params) {
       return NextResponse.json({ error: `AI generation failed: ${msg}` }, { status: 502 });
     }
     if (userId) await recordUsage(userId, "aiAttempts"); // only after success
-    nameSuffix = "states (AI)";
+    nameSuffix = asReference ? "reference (AI)" : "states (AI)";
   } else {
     data = discoverStateMachine(variants);
   }
@@ -97,7 +100,12 @@ export async function POST(req: Request, { params }: Params) {
     },
     select: { id: true },
   });
-  await prisma.processMiningRun.update({ where: { id: runId }, data: { discoveredSmId: diagram.id } });
+  // A reference is a SEPARATE governed diagram (referenceSmId) — never the
+  // discovered mirror — so editing/refreshing one can't disturb the other.
+  await prisma.processMiningRun.update({
+    where: { id: runId },
+    data: asReference ? { referenceSmId: diagram.id } : { discoveredSmId: diagram.id },
+  });
 
-  return NextResponse.json({ diagramId: diagram.id, ai: useAi }, { status: 201 });
+  return NextResponse.json({ diagramId: diagram.id, ai: useAi, as: asReference ? "reference" : "discovered" }, { status: 201 });
 }
