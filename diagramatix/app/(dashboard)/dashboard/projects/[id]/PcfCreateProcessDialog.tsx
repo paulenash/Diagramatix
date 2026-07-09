@@ -211,9 +211,9 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFramewo
 
         const data = { ...diagramData, pcf: { nodeId: node?.nodeId, pcfId: node?.pcfId, hierarchyId: code, name: node?.name ?? folder.name, frameworkId: fw, variant, frameworkName: f?.name, version: f?.version, level: node?.level, numbered: numbering, generated } };
         if (existingId) {
-          // Replace: overwrite the existing diagram's content in place (keeps its
-          // id/name/folder, so links pointing at it stay valid).
-          const up = await fetch(`/api/diagrams/${existingId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data }) });
+          // Replace: overwrite the existing diagram's content AND name in place
+          // (keeps its id/folder, so links pointing at it stay valid).
+          const up = await fetch(`/api/diagrams/${existingId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data, name: folder.name }) });
           if (!up.ok) { setErr("Failed to replace a diagram"); break; }
           createdByFolder[folder.id] = existingId;
         } else {
