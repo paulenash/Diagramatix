@@ -4,11 +4,12 @@ import { auth } from "@/auth";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { isSuperuser } from "@/app/lib/superuser";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
+import { addDescriptionAnnotation } from "@/app/lib/pcf/descAnnotation";
 
 type Params = { params: Promise<{ id: string }> };
 
 /**
- * POST /api/projects/[id]/pcf/decompose-folder  { children:[{name,code,pcfId?,linkedDiagramId?}], numbering }
+ * POST /api/projects/[id]/pcf/decompose-folder  { children:[{name,code,pcfId?,linkedDiagramId?}], numbering, description? }
  *
  * Deterministic decomposition driven by the PROJECT'S FOLDER TREE (not the APQC
  * framework): builds Start → a Collapsed Subprocess per given child folder → End,
@@ -30,6 +31,7 @@ export async function POST(req: Request, { params }: Params) {
 
   const body = await req.json().catch(() => ({}));
   const numbering: boolean = !!body?.numbering;
+  const description: string = typeof body?.description === "string" ? body.description : "";
   const children = (Array.isArray(body?.children) ? body.children : []) as { name?: string; code?: string; pcfId?: number; linkedDiagramId?: string }[];
   if (children.length === 0) return NextResponse.json({ error: "No child folders provided" }, { status: 400 });
 
@@ -51,6 +53,6 @@ export async function POST(req: Request, { params }: Params) {
   elements.push({ id: "end", type: "end-event", label: "" });
   connections.push({ sourceId: prev, targetId: "end", type: "sequence" });
 
-  const diagramData = layoutBpmnDiagram(elements, connections);
+  const diagramData = addDescriptionAnnotation(layoutBpmnDiagram(elements, connections), description);
   return NextResponse.json({ diagramData, childCount: children.length });
 }

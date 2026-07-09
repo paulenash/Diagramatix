@@ -694,6 +694,18 @@ const ANNOTATION_COLORS: Record<string, string> = {
 function TextAnnotationShape({ el }: { el: DiagramElement }) {
   const annotationColor = (el.properties.annotationColor as string | undefined) ?? "black";
   const bracketColor = ANNOTATION_COLORS[annotationColor] ?? "#000000";
+
+  // Boxed variant — a full rectangular text box (rather than the BPMN bracket).
+  // Used for PCF element-description annotations on generated diagrams.
+  if (el.properties.boxed === true) {
+    return (
+      <g>
+        <rect x={el.x} y={el.y} width={el.width} height={el.height} rx={3}
+          fill="#FFFDF5" stroke={bracketColor} strokeWidth={1} />
+      </g>
+    );
+  }
+
   const capLen = 24; // doubled horizontal cap length
   // Compute visible text height so bracket matches the rendered text
   const PAD = 10;

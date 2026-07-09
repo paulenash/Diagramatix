@@ -33,9 +33,9 @@ export async function POST(req: Request, { params }: Params) {
 
   const rows = await prisma.pcfNode.findMany({
     where: { frameworkId, active: true, hierarchyId: { in: [...new Set(codes)] } },
-    select: { id: true, pcfId: true, hierarchyId: true, name: true, level: true },
+    select: { id: true, pcfId: true, hierarchyId: true, name: true, level: true, description: true },
   });
-  const nodes: Record<string, { nodeId: string; pcfId: number; name: string; level: number }> = {};
-  for (const n of rows) if (!nodes[n.hierarchyId]) nodes[n.hierarchyId] = { nodeId: n.id, pcfId: n.pcfId, name: n.name, level: n.level };
+  const nodes: Record<string, { nodeId: string; pcfId: number; name: string; level: number; description: string | null }> = {};
+  for (const n of rows) if (!nodes[n.hierarchyId]) nodes[n.hierarchyId] = { nodeId: n.id, pcfId: n.pcfId, name: n.name, level: n.level, description: n.description };
   return NextResponse.json({ nodes });
 }

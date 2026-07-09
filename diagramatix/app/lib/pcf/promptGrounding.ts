@@ -13,10 +13,16 @@ export async function groundRulesWithPcf(prisma: PrismaClient, aiRules: string, 
   return block ? (aiRules ? `${aiRules}\n\n${block}` : block) : aiRules;
 }
 
+/** Trim an APQC element description to a prompt-friendly length. */
+function shortDesc(d: string | null | undefined, max = 220): string {
+  const s = (d ?? "").replace(/\s+/g, " ").trim();
+  return s.length > max ? s.slice(0, max - 1).trimEnd() + "…" : s;
+}
+
 export async function renderPcfBranchForPrompt(prisma: PrismaClient, nodeId: string): Promise<string | null> {
   const node = await prisma.pcfNode.findUnique({
     where: { id: nodeId },
-    select: { hierarchyId: true, name: true, level: true, frameworkId: true, framework: { select: { variant: true } } },
+    select: { hierarchyId: true, name: true, level: true, description: true, frameworkId: true, framework: { select: { variant: true } } },
   });
   if (!node) return null;
 
@@ -30,13 +36,19 @@ export async function renderPcfBranchForPrompt(prisma: PrismaClient, nodeId: str
     },
     orderBy: [{ level: "asc" }, { sortOrder: "asc" }],
     take: 80,
-    select: { hierarchyId: true, name: true, level: true },
+    select: { hierarchyId: true, name: true, level: true, description: true },
   });
   if (descendants.length === 0) return null;
 
-  const lines = descendants.map((d) => `${"  ".repeat(Math.max(0, d.level - node.level - 1))}- ${d.hierarchyId} ${d.name}`);
+  // Each sub-activity: "- <code> <name> — <APQC element description>" so the AI
+  // has the standard's own definition of what the step entails, not just its name.
+  const lines = descendants.map((d) => {
+    const desc = shortDesc(d.description);
+    return `${"  ".repeat(Math.max(0, d.level - node.level - 1))}- ${d.hierarchyId} ${d.name}${desc ? ` — ${desc}` : ""}`;
+  });
+  const nodeDesc = shortDesc(node.description, 400);
   return [
-    `APQC PCF ALIGNMENT — the target process maps to the APQC ${node.framework.variant} standard process "${node.hierarchyId} ${node.name}". Use the standard sub-activities below as a reference for completeness and naming; adapt them to the user's described process, and omit any that don't apply:`,
+    `APQC PCF ALIGNMENT — the target process maps to the APQC ${node.framework.variant} standard process "${node.hierarchyId} ${node.name}"${nodeDesc ? ` (${nodeDesc})` : ""}. Use the standard sub-activities below (with their APQC element descriptions) as a reference for completeness and naming; adapt them to the user's described process, and omit any that don't apply:`,
     ...lines,
   ].join("\n");
 }

@@ -162,7 +162,7 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFramewo
     try {
       // Resolve every folder's APQC node once (for classification + grounding).
       const codes = [...new Set(subtree.map((s) => folderCode(s.name)).filter(Boolean))];
-      const nodeByCode: Record<string, { nodeId: string; pcfId: number; name: string; level: number }> =
+      const nodeByCode: Record<string, { nodeId: string; pcfId: number; name: string; level: number; description?: string | null }> =
         (await fetch(`/api/projects/${projectId}/pcf/resolve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ frameworkId: fw, codes }) }).then((r) => r.json()).catch(() => ({ nodes: {} }))).nodes ?? {};
 
       // Hard cap: never generate more than MAX_BULK_DIAGRAMS in one request.
@@ -196,7 +196,7 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFramewo
         let generated: "decompose" | "ai" = "decompose";
         if (kids.length > 0) {
           const children = kids.map((cf) => { const cc = folderCode(cf.name); return { name: nodeByCode[cc]?.name ?? folderCodeStrip(cf.name), code: cc, pcfId: nodeByCode[cc]?.pcfId, linkedDiagramId: createdByFolder[cf.id] }; });
-          const dec = await fetch(`/api/projects/${projectId}/pcf/decompose-folder`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ children, numbering }) });
+          const dec = await fetch(`/api/projects/${projectId}/pcf/decompose-folder`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ children, numbering, description: node?.description ?? "" }) });
           const dj = await dec.json().catch(() => ({}));
           if (!dec.ok || !dj.diagramData?.elements) { setErr(dj.error ?? "Decomposition failed"); break; }
           diagramData = dj.diagramData;

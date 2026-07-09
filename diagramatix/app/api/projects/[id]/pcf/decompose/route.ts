@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
+import { addDescriptionAnnotation } from "@/app/lib/pcf/descAnnotation";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -43,7 +44,7 @@ export async function POST(req: Request, { params }: Params) {
 
   const node = await prisma.pcfNode.findFirst({
     where: { id: nodeId, frameworkId },
-    select: { id: true, pcfId: true, hierarchyId: true, name: true, level: true },
+    select: { id: true, pcfId: true, hierarchyId: true, name: true, level: true, description: true },
   });
   if (!node) return NextResponse.json({ error: "Node not found" }, { status: 404 });
 
@@ -77,7 +78,7 @@ export async function POST(req: Request, { params }: Params) {
   elements.push({ id: "end", type: "end-event", label: "" });
   connections.push({ sourceId: prev, targetId: "end", type: "sequence" });
 
-  const diagramData = layoutBpmnDiagram(elements, connections);
+  const diagramData = addDescriptionAnnotation(layoutBpmnDiagram(elements, connections), node.description);
 
   return NextResponse.json({
     diagramData,
