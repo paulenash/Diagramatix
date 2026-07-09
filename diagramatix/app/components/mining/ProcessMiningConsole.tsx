@@ -58,6 +58,12 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   // Choosable scenarios (an example may ship several period logs to pick between).
   const [scenarios, setScenarios] = useState<SampleScenario[] | null>(null);
   const [scenarioIdx, setScenarioIdx] = useState(-1);
+  // OCEL 2.0 object-centric study: the raw log + the object types the user picks
+  // to mine (one state machine + run each) tied together by a Domain Diagram.
+  const [ocelText, setOcelText] = useState<string | null>(null);
+  const [ocelTypes, setOcelTypes] = useState<string[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [ocelDomainId, setOcelDomainId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [discovering, setDiscovering] = useState(false); // any discovery in flight (disables all buttons)
@@ -191,12 +197,15 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     const ext = file.name.toLowerCase().split(".").pop() ?? "";
     // XES (IEEE 1849) and OCEL are parsed to the same { headers, rows, mapping }
     // table CSV produces, then flow through the identical import pipeline.
+    setOcelText(null); setOcelTypes([]);
     let h: string[], r: string[][], map: Partial<LogMapping>;
     if (ext === "xes" || /^<\?xml|<log[\s>]/.test(text.trimStart())) {
       const parsed = parseXes(text); h = parsed.headers; r = parsed.rows; map = parsed.mapping;
     } else if (ext === "json" || ext === "ocel" || ext === "jsonocel" || /^\s*\{/.test(text)) {
       const parsed = parseOcel(text); h = parsed.headers; r = parsed.rows; map = parsed.mapping;
-      if (parsed.objectTypes.length > 1) setErr(`OCEL: projected on object type “${parsed.chosenType}” (${parsed.objectTypes.length} types present).`);
+      // Object-centric: offer an OCEL 2.0 STUDY (one lifecycle per object type +
+      // a Domain Diagram). The single-object flatten stays as an advanced fallback.
+      if (parsed.objectTypes.length > 0) { setOcelText(text); setOcelTypes(parsed.objectTypes); setSelectedTypes(parsed.objectTypes); }
     } else {
       const csv = parseCsv(text); h = csv.headers; r = csv.rows; map = guessMapping(h);
     }
@@ -211,7 +220,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   // Load a scenario/sample log into the Import staging (confirm-the-analysis flow).
   function loadStaging(s: SampleScenario) {
     if (!Array.isArray(s?.headers) || !Array.isArray(s?.rows) || !s.headers.length || !s.rows.length) return;
-    setErr(null);
+    setErr(null); setOcelText(null); setOcelTypes([]);
     setHeaders(s.headers); setRows(s.rows);
     setMapping(s.mapping ?? guessMapping(s.headers));
     setFileName(s.fileName ?? "sample.csv");
@@ -252,6 +261,28 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       setFileName(null); setHeaders([]); setRows([]); setMapping({}); setRunName("");
       await load();
       setSelectedId(json.run?.id ?? null);
+    } finally { setBusy(false); }
+  }
+
+  const toggleType = (t: string) => setSelectedTypes((ts) => (ts.includes(t) ? ts.filter((x) => x !== t) : [...ts, t]));
+
+  // OCEL 2.0 object-centric import: one discovered state machine + run per chosen
+  // object type, plus the shared Domain Diagram that links them.
+  async function importOcelStudy() {
+    if (!ocelText || selectedTypes.length === 0) return;
+    setBusy(true); setErr(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/mining/import-ocel`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: runName.trim() || "OCEL log", ocelText, selectedTypes }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(json.error ?? "OCEL study import failed"); return; }
+      setOcelText(null); setOcelTypes([]); setFileName(null); setHeaders([]); setRows([]); setMapping({}); setRunName("");
+      setOcelDomainId(json.domainDiagramId ?? null);
+      await loadReferenceSms();
+      await load();
+      setSelectedId(json.runs?.[0]?.id ?? null);
     } finally { setBusy(false); }
   }
 
@@ -358,6 +389,35 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
             {fileName ? `↻ ${fileName}` : "⭱ Choose file…"}
             <input type="file" accept=".csv,.tsv,.txt,text/csv,.xes,.json,.ocel,.jsonocel,application/xml,application/json" onChange={onFile} className="hidden" />
           </label>
+
+          {/* OCEL 2.0 object-centric study — one lifecycle per object type + a Domain Diagram. */}
+          {ocelText && ocelTypes.length > 0 && (
+            <div className="mt-4 rounded border border-emerald-500/40 bg-emerald-950/20 p-3 flex flex-col gap-2">
+              <div className="text-[11px] text-emerald-200">
+                <span className="font-semibold">OCEL 2.0 object-centric log</span> — {ocelTypes.length} object type{ocelTypes.length === 1 ? "" : "s"}. Import as a study: one discovered state machine + run per selected type, tied together by a <span className="text-emerald-100">Domain Diagram</span> (object model).
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {ocelTypes.map((t) => (
+                  <label key={t} className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded cursor-pointer border ${selectedTypes.includes(t) ? "bg-emerald-800/50 border-emerald-500 text-emerald-100" : "border-stone-600 text-stone-400"}`}>
+                    <input type="checkbox" className="accent-emerald-500" checked={selectedTypes.includes(t)} onChange={() => toggleType(t)} />
+                    {t}
+                  </label>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input value={runName} onChange={(e) => setRunName(e.target.value)} placeholder="Study name" className={`${inp} min-w-[10rem]`} />
+                <button onClick={importOcelStudy} disabled={busy || selectedTypes.length === 0} className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
+                  {busy ? "Importing…" : `Import OCEL study (${selectedTypes.length})`}
+                </button>
+                <span className="text-[10px] text-stone-500">or map columns below to flatten onto a single object (advanced).</span>
+              </div>
+            </div>
+          )}
+          {ocelDomainId && (
+            <div className="mt-2 text-[11px] text-emerald-300">
+              ✓ OCEL study created. <a href={openDiagram(ocelDomainId)} onClick={stashReturn} className="underline hover:text-emerald-200">Open the object model (Domain Diagram) →</a>
+            </div>
+          )}
 
           {headers.length > 0 && (
             <div className="mt-4 flex flex-col gap-3">
