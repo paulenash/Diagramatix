@@ -34,11 +34,11 @@ export const PCF_LEVEL_NAMES: Record<number, string> = {
  *  Maroon · Green · Brown · Burnt Orange · Dark Blue (the dark "main" tone;
  *  the light tone is each lightened toward white by lightPct). */
 export const DEFAULT_PCF_LEVEL_COLORS: PcfLevelColor[] = [
-  { level: 1, name: "Category",      main: "#800000", lightPct: 82 }, // Maroon
-  { level: 2, name: "Process Group", main: "#2E7D32", lightPct: 82 }, // Green
-  { level: 3, name: "Process",       main: "#8B4513", lightPct: 82 }, // Brown
-  { level: 4, name: "Activity",      main: "#CC5500", lightPct: 82 }, // Burnt Orange
-  { level: 5, name: "Task",          main: "#003366", lightPct: 82 }, // Dark Blue
+  { level: 1, name: "Category",      main: "#c51111", lightPct: 90 }, // Maroon
+  { level: 2, name: "Process Group", main: "#19a422", lightPct: 90 }, // Green
+  { level: 3, name: "Process",       main: "#816928", lightPct: 90 }, // Brown
+  { level: 4, name: "Activity",      main: "#de6a17", lightPct: 90 }, // Burnt Orange
+  { level: 5, name: "Task",          main: "#1f26e5", lightPct: 90 }, // Dark Blue
 ];
 
 const HEX_RE = /^#?([0-9a-fA-F]{6})$/;
