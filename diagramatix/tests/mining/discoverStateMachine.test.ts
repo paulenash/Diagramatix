@@ -50,4 +50,18 @@ describe("state-machine discovery", () => {
     const labelled = data.connectors.find((c) => c.transitionEvent === "Submit");
     expect(labelled?.labelMode).toBe("formal");
   });
+
+  it("T0682 — every connector carries its case-count frequency (green badge)", () => {
+    const data = discoverStateMachine(BRANCHING);
+    // Draft→Pending took 7 cases; Pending→Approved 5; Pending→Rejected 2.
+    const submit = data.connectors.find((c) => c.transitionEvent === "Submit")!;
+    expect(submit.transitionCount).toBe(7);
+    // Entry (init→Draft) = 7 cases; terminals carry their case counts too.
+    const entry = data.connectors.find((c) => c.sourceId === "__init")!;
+    expect(entry.transitionCount).toBe(7);
+    const toFinal = data.connectors.filter((c) => c.targetId === "__final");
+    expect(toFinal.reduce((a, c) => a + (c.transitionCount ?? 0), 0)).toBe(7); // 5 approved + 2 rejected
+    // Every transition connector has a count.
+    expect(data.connectors.every((c) => typeof c.transitionCount === "number")).toBe(true);
+  });
 });

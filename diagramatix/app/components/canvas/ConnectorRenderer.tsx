@@ -1134,6 +1134,72 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         );
       })()}
 
+      {/* Mining transition-frequency badge — a movable, tethered circle showing
+          how many cases took this transition (green), or red when the reference
+          disallows it. Discovered state machines only. */}
+      {connector.transitionCount != null && visibleWaypoints.length >= 2 && (() => {
+        // Midpoint of the visible path.
+        let totalLen = 0; const segLens: number[] = [];
+        for (let i = 0; i < visibleWaypoints.length - 1; i++) {
+          segLens.push(Math.hypot(visibleWaypoints[i + 1].x - visibleWaypoints[i].x, visibleWaypoints[i + 1].y - visibleWaypoints[i].y));
+          totalLen += segLens[i];
+        }
+        let half = totalLen / 2, midX = visibleWaypoints[0].x, midY = visibleWaypoints[0].y;
+        for (let i = 0; i < segLens.length; i++) {
+          if (half <= segLens[i] || i === segLens.length - 1) {
+            const t = segLens[i] > 0 ? half / segLens[i] : 0;
+            midX = visibleWaypoints[i].x + t * (visibleWaypoints[i + 1].x - visibleWaypoints[i].x);
+            midY = visibleWaypoints[i].y + t * (visibleWaypoints[i + 1].y - visibleWaypoints[i].y);
+            break;
+          }
+          half -= segLens[i];
+        }
+        const ox = connector.transitionCountOffset?.x ?? 0;
+        const oy = connector.transitionCountOffset?.y ?? 0;
+        const bx = midX + ox, by = midY + oy;
+        const count = connector.transitionCount!;
+        const illegal = !!connector.transitionIllegal;
+        const fill = illegal ? "#dc2626" : "#16a34a";
+        const digits = String(count).length;
+        const r = Math.max(11, 8 + digits * 3.2);
+        const moved = ox !== 0 || oy !== 0;
+        const isDragging = draggingEndLabel === "transitionCountOffset";
+        function handleBadgeMouseDown(e: React.MouseEvent) {
+          if (!svgToWorld || !onUpdateEndOffset) return;
+          e.stopPropagation();
+          const start = svgToWorld(e.clientX, e.clientY);
+          const startOx = ox, startOy = oy;
+          document.body.style.cursor = "grabbing";
+          setDraggingEndLabel("transitionCountOffset");
+          function onMove(ev: MouseEvent) {
+            const cur = svgToWorld!(ev.clientX, ev.clientY);
+            onUpdateEndOffset!(connector.id, "transitionCountOffset", { x: startOx + cur.x - start.x, y: startOy + cur.y - start.y });
+          }
+          function onUp() {
+            document.body.style.cursor = "";
+            setDraggingEndLabel(null);
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+          }
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
+        }
+        return (
+          <g>
+            {(moved || isDragging) && (
+              <line x1={midX} y1={midY} x2={bx} y2={by} stroke={fill} strokeWidth={0.9} strokeDasharray="3 2" style={{ pointerEvents: "none" }} />
+            )}
+            <circle cx={bx} cy={by} r={r} fill={fill} stroke="#ffffff" strokeWidth={1.5}
+              style={{ cursor: onUpdateEndOffset ? "grab" : "default" }} onMouseDown={handleBadgeMouseDown}>
+              <title>{count.toLocaleString()} case{count === 1 ? "" : "s"} took this transition{illegal ? " — not allowed by the reference" : ""}</title>
+            </circle>
+            <text x={bx} y={by} textAnchor="middle" dominantBaseline="central"
+              fontSize={Math.round(r * 0.95)} fontWeight={700} fill="#ffffff"
+              style={{ pointerEvents: "none", userSelect: "none" }}>{count}</text>
+          </g>
+        );
+      })()}
+
       {/* UML association name with reading direction arrow */}
       {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
         connector.type === "uml-composition") && connector.associationName && visibleWaypoints.length >= 2 && (() => {

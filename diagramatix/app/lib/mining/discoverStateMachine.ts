@@ -19,7 +19,7 @@ export interface SmTransition { from: string; to: string; events: string[]; coun
 
 export interface StateMachinePlan {
   elements: { id: string; type: string; label: string }[];
-  connections: { sourceId: string; targetId: string; label: string; type: string }[];
+  connections: { sourceId: string; targetId: string; label: string; type: string; count?: number }[];
   transitions: SmTransition[];
 }
 
@@ -42,7 +42,7 @@ export function buildStateMachinePlan(variants: Variant[]): StateMachinePlan {
   const states = new Set<string>();
   const trans = new Map<string, { from: string; to: string; events: Map<string, number>; count: number }>();
   const entry = new Map<string, Map<string, number>>();  // first state → entry event → count
-  const terminal = new Set<string>();
+  const terminal = new Map<string, number>();            // terminal state → cases ending there
   const bump = (m: Map<string, number>, k: string, n: number) => m.set(k, (m.get(k) ?? 0) + n);
 
   for (const v of variants) {
@@ -59,7 +59,7 @@ export function buildStateMachinePlan(variants: Variant[]): StateMachinePlan {
       trans.set(key, t);
     }
     const last = st[st.length - 1];
-    if (last) terminal.add(last);
+    if (last) bump(terminal, last, v.count);
   }
 
   const id = slugger();
@@ -72,14 +72,15 @@ export function buildStateMachinePlan(variants: Variant[]): StateMachinePlan {
   const connections: StateMachinePlan["connections"] = [];
   const transitions: SmTransition[] = [];
   for (const [s, em] of entry) {
-    connections.push({ sourceId: INIT, targetId: id(s), label: [...em.keys()].filter(Boolean).join(" / "), type: "transition" });
+    const count = [...em.values()].reduce((a, b) => a + b, 0);
+    connections.push({ sourceId: INIT, targetId: id(s), label: [...em.keys()].filter(Boolean).join(" / "), type: "transition", count });
   }
   for (const t of trans.values()) {
     const events = [...t.events.keys()].filter(Boolean);
-    connections.push({ sourceId: id(t.from), targetId: id(t.to), label: events.join(" / "), type: "transition" });
+    connections.push({ sourceId: id(t.from), targetId: id(t.to), label: events.join(" / "), type: "transition", count: t.count });
     transitions.push({ from: t.from, to: t.to, events, count: t.count });
   }
-  for (const s of terminal) connections.push({ sourceId: id(s), targetId: FINAL, label: "", type: "transition" });
+  for (const [s, count] of terminal) connections.push({ sourceId: id(s), targetId: FINAL, label: "", type: "transition", count });
 
   return { elements, connections, transitions };
 }
@@ -88,7 +89,12 @@ export function buildStateMachinePlan(variants: Variant[]): StateMachinePlan {
 export function discoverStateMachine(variants: Variant[]): DiagramData {
   const plan = buildStateMachinePlan(variants);
   const data = layoutGenericDiagram({ elements: plan.elements, connections: plan.connections }, "state-machine");
+  // Frequency per edge (source→target) so each connector carries its case count.
+  const countByEdge = new Map<string, number>();
+  for (const c of plan.connections) if (c.count != null) countByEdge.set(`${c.sourceId}${SEP}${c.targetId}`, c.count);
   for (const c of data.connectors) {
+    const count = countByEdge.get(`${c.sourceId}${SEP}${c.targetId}`);
+    if (count != null) c.transitionCount = count;   // green frequency badge
     if (c.type === "transition" && c.label) {
       c.labelMode = "formal";
       c.transitionEvent = c.label;

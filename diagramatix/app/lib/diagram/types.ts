@@ -188,6 +188,12 @@ export interface Connector {
   transitionEvent?: string;
   transitionGuard?: string;
   transitionActions?: string;
+  // Mining (discovered state machine): how many cases took this transition
+  // (green count badge); illegal vs the conformance reference (red badge). The
+  // badge is movable — its offset from the connector midpoint is kept here.
+  transitionCount?: number;
+  transitionIllegal?: boolean;
+  transitionCountOffset?: Point;
   // UML association end properties
   sourceRole?: string;
   sourceMultiplicity?: string;

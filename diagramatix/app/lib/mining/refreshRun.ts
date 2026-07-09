@@ -15,7 +15,9 @@ import { discoverProcess } from "./discoverProcess";
 import { discoverStateMachine } from "./discoverStateMachine";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { checkTransitionConformance, type ReferenceSm } from "./transitionConformance";
+import { flagIllegalTransitions } from "./flagIllegalTransitions";
 import type { LogMapping } from "./types";
+import type { DiagramData } from "@/app/lib/diagram/types";
 
 export interface RefreshableSource {
   id: string;
@@ -57,18 +59,20 @@ export async function refreshRunFromSource(source: RefreshableSource): Promise<R
       const data = layoutBpmnDiagram(plan.elements, plan.connections, { promptLabel: source.name });
       await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(data), run.discoveredBpmnId]);
     }
-    // Re-discover the state machine in place.
-    if (run.discoveredSmId) {
-      const data = discoverStateMachine(log.variants);
-      await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(data), run.discoveredSmId]);
-    }
-    // Re-run conformance against the chosen reference (feeds Compliance Monitoring).
+    // Re-discover the state machine in place (deterministic mirror + frequencies).
+    let smData: DiagramData | null = run.discoveredSmId ? discoverStateMachine(log.variants) : null;
+    // Re-run conformance against the chosen reference (feeds Compliance Monitoring)
+    // and paint the illegal transitions red on the discovered mirror.
     if (run.referenceSmId) {
       const ref = await prisma.diagram.findFirst({ where: { id: run.referenceSmId, type: "state-machine" }, select: { data: true } });
       if (ref) {
         const result = checkTransitionConformance(log.variants, (ref.data ?? { elements: [], connectors: [] }) as unknown as ReferenceSm);
         await pgPool.query('UPDATE "ProcessMiningRun" SET conformance = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(result), source.runId]);
+        if (smData) smData = flagIllegalTransitions(smData, result.transitionStats);
       }
+    }
+    if (run.discoveredSmId && smData) {
+      await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(smData), run.discoveredSmId]);
     }
   }
 

@@ -10,7 +10,9 @@ import { prisma, pgPool } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { checkTransitionConformance, type ReferenceSm } from "@/app/lib/mining/transitionConformance";
+import { flagIllegalTransitions } from "@/app/lib/mining/flagIllegalTransitions";
 import type { Variant } from "@/app/lib/mining/types";
+import type { DiagramData } from "@/app/lib/diagram/types";
 
 type Params = { params: Promise<{ id: string; runId: string }> };
 
@@ -44,6 +46,16 @@ export async function POST(req: Request, { params }: Params) {
     'UPDATE "ProcessMiningRun" SET conformance = $1::jsonb, "referenceSmId" = $2, "updatedAt" = NOW() WHERE id = $3',
     [JSON.stringify(result), referenceSmId, runId],
   );
+
+  // Paint the illegal (undocumented) transitions red on the DISCOVERED state
+  // machine so the count badges show which moves the reference disallows.
+  if (run.discoveredSmId) {
+    const disc = await prisma.diagram.findFirst({ where: { id: run.discoveredSmId, projectId: id, type: "state-machine" }, select: { data: true } });
+    if (disc?.data) {
+      const flagged = flagIllegalTransitions(disc.data as unknown as DiagramData, result.transitionStats);
+      await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(flagged), run.discoveredSmId]);
+    }
+  }
 
   return NextResponse.json({ conformance: result }, { status: 200 });
 }
