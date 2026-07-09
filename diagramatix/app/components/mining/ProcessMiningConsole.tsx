@@ -60,9 +60,10 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   const [scenarioIdx, setScenarioIdx] = useState(-1);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [discovering, setDiscovering] = useState(false);
-  const [aiSm, setAiSm] = useState(false);   // AI state-machine generation in flight
-  const [aiBpmn, setAiBpmn] = useState(false); // AI process generation in flight
+  const [discovering, setDiscovering] = useState(false); // any discovery in flight (disables all buttons)
+  const [aiSm, setAiSm] = useState(false);   // AI reference-SM generation in flight (its own spinner)
+  const [smBusy, setSmBusy] = useState(false); // deterministic state-machine discovery in flight
+  const [aiBpmn, setAiBpmn] = useState(false); // process discovery in flight
   // Conformance
   const [referenceSms, setReferenceSms] = useState<{ id: string; name: string }[]>([]);
   const [refSmId, setRefSmId] = useState("");
@@ -263,7 +264,10 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
 
   async function discoverSm(runId: string, opts: { ai?: boolean; as?: "discovered" | "reference" } = {}): Promise<string | null> {
     const { ai = false, as = "discovered" } = opts;
-    setDiscovering(true); if (ai) setAiSm(true); setErr(null);
+    // Isolate the spinners: a reference build spins its own button (aiSm); the
+    // deterministic discovered SM spins its button (smBusy). `discovering`
+    // disables every discovery button while any one runs.
+    setDiscovering(true); if (as === "reference") setAiSm(true); else setSmBusy(true); setErr(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/mining/runs/${runId}/discover-sm`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ai, as }),
@@ -273,7 +277,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       await load();
       await loadReferenceSms();       // so the new diagram appears in the conformance picker
       return (json.diagramId as string) ?? null;
-    } finally { setDiscovering(false); setAiSm(false); }
+    } finally { setDiscovering(false); setAiSm(false); setSmBusy(false); }
   }
 
   // Create the governed REFERENCE — a SEPARATE, AI-curated state machine (its own
@@ -498,9 +502,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
               <p className="text-[11px] text-stone-400 mb-2">Infer the entity&rsquo;s lifecycle — the states and the events that move between them — a faithful mirror of the event log. It refreshes with the data; your governed <span className="text-stone-300">reference</span> below is a separate diagram you edit.</p>
               <div className="flex items-center gap-3 flex-wrap">
                 <button onClick={() => discoverSm(selected.id, { ai: false, as: "discovered" })} disabled={discovering} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5" title="Build the discovered state machine directly from the mined state sequences (a faithful mirror of the log)">
-                  {discovering && !aiSm ? "Discovering…" : "Discover state machine"}
+                  {smBusy ? "Discovering…" : "Discover state machine"}
                 </button>
-                {discovering && !aiSm && <DiagramatixThrobber size={20} tone="amber" />}
+                {smBusy && <DiagramatixThrobber size={20} tone="amber" />}
                 {selected.discoveredSmId && (
                   <a href={openDiagram(selected.discoveredSmId)} onClick={stashReturn} className="text-xs text-amber-300 hover:text-amber-200 underline">Open state machine →</a>
                 )}
