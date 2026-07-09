@@ -7,6 +7,7 @@
  *   S3.04 transition connection points not shared (≥10px apart on a node side)
  *   S3.05 reciprocal transitions (A↔B) don't cross
  *   S3.06 transition labels separated vertically by ≥ ½ label height
+ *   S3.07 states alternate above/below a central line (column-parity zig-zag)
  */
 import { describe, it, expect } from "vitest";
 import { layoutGenericDiagram } from "@/app/lib/diagram/genericLayout";
@@ -76,6 +77,28 @@ describe("state-machine layout red rules", () => {
     const seg = (c: typeof fwd) => [c.waypoints[0], c.waypoints[c.waypoints.length - 1]] as const;
     const [a, b] = seg(fwd), [p, q] = seg(bwd);
     expect(segCross(a, b, p, q)).toBe(false);
+  });
+
+  it("T0684 — S3.07: successive states alternate above/below a central line (zig-zag)", () => {
+    // A near-linear chain would otherwise sit in one flat row — S3.07 staggers it.
+    const LIN = {
+      elements: [
+        { id: INIT, type: "initial-state", label: "" }, { id: FINAL, type: "final-state", label: "" },
+        { id: "a", type: "state", label: "A" }, { id: "b", type: "state", label: "B" },
+        { id: "c", type: "state", label: "C" }, { id: "d", type: "state", label: "D" },
+      ],
+      connections: [
+        T(INIT, "a", "start"), T("a", "b", "e1"), T("b", "c", "e2"), T("c", "d", "e3"), T("d", FINAL, ""),
+      ],
+    };
+    const d = layoutGenericDiagram(LIN, "state-machine");
+    // Intermediate states in flow (x) order.
+    const chain = ["a", "b", "c", "d"].map((id) => el(d, id)).sort((p, q) => p.x - q.x);
+    const cy = chain.map((e) => e.y + e.height / 2);
+    // Not a flat line, and the vertical direction flips between each pair.
+    const diffs = cy.slice(1).map((y, i) => y - cy[i]);
+    for (const df of diffs) expect(Math.abs(df)).toBeGreaterThan(1); // staggered, not flat
+    for (let i = 1; i < diffs.length; i++) expect(Math.sign(diffs[i])).toBe(-Math.sign(diffs[i - 1])); // alternates
   });
 
   it("T0623 — S3.06: horizontally-overlapping transition labels are ≥ ½ label height apart", () => {

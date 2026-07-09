@@ -111,7 +111,7 @@ const CHAPTERS: Chapter[] = [
         "Geometric constraints are **code-enforced in the layout function, not the prompt** (e.g. start-event clearance, pool/lane routing clearance, de-overlap passes). Each code-enforced rule is pinned by a **behavioural test** in a rule registry, and `findLayoutViolations` catches rules that conflict with each other.",
       ].join("\n") },
       { heading: "State-machine layout", body: [
-        "Flat state machines use a dedicated `layoutStateMachine` with its own red rules (the S3.xx set): initial state top-left, finals bottom-right, left-to-right flow, fanned connection points, reciprocal transitions that don't cross, and label de-overlap.",
+        "Flat state machines use a dedicated `layoutStateMachine` with its own red rules (the S3.xx set): initial state top-left, finals bottom-right, left-to-right flow, fanned connection points, reciprocal transitions that don't cross, label de-overlap, and a column-parity zig-zag (S3.07) that staggers states above/below a central line so the transition connectors are easier to tell apart.",
       ].join("\n") },
       { heading: "Violation detection", body: [
         "`findLayoutViolations` / `findRoutingViolations` are pure analyzers over a diagram: they surface overlaps, clearance breaches and connectors grazing obstacles. They back the issue scanner and are the regression net that lets the routing/layout code evolve safely.",

@@ -6,6 +6,8 @@
  *   S3.04  Transition connection points not shared — fanned ≥ MIN_POINT_GAP px.
  *   S3.05  Reciprocal transitions (A↔B) routed apart so they don't cross.
  *   S3.06  Transition labels de-overlapped vertically (≥ ½ label height).
+ *   S3.07  States alternate above/below a central line (column-parity zig-zag)
+ *          so successive transition connectors are angled and easier to tell apart.
  *
  * Replaces the generic grid for `state-machine` (dispatched from
  * layoutGenericDiagram). Reuses the shared router (computeWaypoints), which takes
@@ -24,6 +26,7 @@ const START_X = 80, START_Y = 80;
 const MIN_POINT_GAP = 12;     // S3.04 — ≥10px; use 12 for margin
 const LABEL_H = 14;           // approx transition-label height
 const LABEL_MIN_GAP = LABEL_H + LABEL_H / 2; // S3.06 — centres ≥ label height + ½
+const ZIGZAG = 46;            // S3.07 — vertical stagger between alternating columns
 
 function nodeSize(el: AiEl): { w: number; h: number } {
   const def = getSymbolDefinition(el.type as DiagramElement["type"]);
@@ -121,6 +124,15 @@ export function layoutStateMachine(aiElements: AiEl[], aiConnections: AiConn[]):
       pos.set(id, { x: colX[ci] + (colW[ci] - s.w) / 2, y: START_Y + ri * (rowH + V_GAP), w: s.w, h: s.h });
     });
   }
+  // S3.07: zig-zag — offset alternate columns downward so successive states sit
+  // above/below a central line. On a near-linear flow this turns a flat row of
+  // states into a stagger, angling the transition connectors so they're easier
+  // to tell apart. Column 0 (holding the Initial State, S3.01) stays on the top
+  // line; odd columns drop by ZIGZAG. Finals are re-pinned to the bottom below.
+  for (let ci = 1; ci < cols.length; ci++) {
+    if (ci % 2 === 1) for (const id of cols[ci]) { const p = pos.get(id); if (p) p.y += ZIGZAG; }
+  }
+
   // S3.01: sit the finals on the global bottom line (bottom-right).
   const bottom = Math.max(...[...pos.values()].map((p) => p.y + p.h));
   const finals = els.filter((e) => isFinal(e.id));
