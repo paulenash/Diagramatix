@@ -16,6 +16,7 @@ import { discoverStateMachine } from "./discoverStateMachine";
 
 export interface OcelStudyType {
   objectType: string;
+  mapping: LogMapping;                 // the resolved column→role mapping used
   log: EventLog;                       // variants + stats (+ transient traces)
   performance: Performance;
   governance: GovernanceStats | null;
@@ -52,6 +53,7 @@ export function buildOcelStudy(text: string, opts: {
     const smData = discoverStateMachine(log.variants);
     types.push({
       objectType: t,
+      mapping,
       log,
       performance,
       governance: hasGovernance(governance) ? governance : null,

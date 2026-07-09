@@ -1195,6 +1195,11 @@ model ProcessMiningRun {
   referenceSmId    String?                    // Diagram id (user-selected)
   conformance      Json?                      // {fitness, violations[], transitionStats}
   studyId          String?                    // SimulationStudy id (calibrated twin)
+  // OCEL study grouping — an object-centric OCEL import mines one run per object
+  // type, tied together by ocelGroupId and to the shared Domain Diagram.
+  ocelGroupId      String?                    // groups the per-object-type runs of one OCEL import
+  objectType       String?                    // the OCEL object type this run's lifecycle is for
+  domainDiagramId  String?                    // the shared Domain Diagram (object model backbone)
   // Excluded from org Compliance Monitoring — a throwaway/test run the OrgAdmin
   // (or run owner) doesn't want polluting the effectiveness trend. Default false.
   excludeFromCompliance Boolean @default(false)
