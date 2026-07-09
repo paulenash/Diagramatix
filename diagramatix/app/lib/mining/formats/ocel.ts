@@ -161,6 +161,7 @@ export interface OcelTypeProjection {
   mapping: Partial<LogMapping>;
   stateAttr?: string;   // the object status attribute used to derive `state`, if any
   cases: number;        // distinct objects of this type that carry events
+  attributes: string[]; // distinct object attribute names of this type (Domain entity attributes)
 }
 export interface OcelO2O { fromType: string; toType: string; qualifier: string; count: number }
 export interface OcelObjectCentric {
@@ -185,12 +186,13 @@ export function parseOcelObjectCentric(text: string): OcelObjectCentric {
 
   const perType: Record<string, OcelTypeProjection> = {};
   for (const type of objectTypes) {
-    // A status/state attribute on this type's objects → the proper lifecycle source.
+    // A status/state attribute on this type's objects → the proper lifecycle
+    // source; also collect the type's distinct attribute names (Domain entity).
     let stateAttr: string | undefined;
+    const attrNames = new Set<string>();
     for (const o of Object.values(log.objects)) {
       if (o.type !== type) continue;
-      const hit = o.attributes.find((a) => STATUS_RE.test(a.name));
-      if (hit) { stateAttr = hit.name; break; }
+      for (const a of o.attributes) { attrNames.add(a.name); if (!stateAttr && STATUS_RE.test(a.name)) stateAttr = a.name; }
     }
 
     const extraKeys: string[] = [];
@@ -229,7 +231,7 @@ export function parseOcelObjectCentric(text: string): OcelObjectCentric {
     if (ctl) mapping.controlId = ctl;
     if (rsk) mapping.riskId = rsk;
     if (pol) mapping.policyId = pol;
-    perType[type] = { headers, rows, mapping, ...(stateAttr ? { stateAttr } : {}), cases: caseSet.size };
+    perType[type] = { headers, rows, mapping, ...(stateAttr ? { stateAttr } : {}), cases: caseSet.size, attributes: [...attrNames] };
   }
 
   // Object-to-object relationships, aggregated by (fromType, toType, qualifier).
