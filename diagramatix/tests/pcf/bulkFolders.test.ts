@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { folderSubtree, childrenInSubtree, orderDeepestFirst, folderCode, folderCodeStrip, folderPcfId, type BulkFolder } from "@/app/lib/pcf/bulkFolders";
+import { folderSubtree, childrenInSubtree, orderDeepestFirst, folderCode, folderCodeStrip, folderPcfId, nextCopyName, type BulkFolder } from "@/app/lib/pcf/bulkFolders";
 
 // root(4.1) ─ a(4.1.1), b(4.1.2), c(4.1.3 ─ c1(4.1.3.1))  + unrelated sibling(4.2)
 const FOLDERS: BulkFolder[] = [
@@ -53,5 +53,14 @@ describe("bulk folder helpers (T0676)", () => {
     expect(folderPcfId("4.1.3 Deliver")).toBe("");
     expect(folderCode("4.1.3 Deliver (10021)")).toBe("4.1.3");           // leading code still parses
     expect(folderCodeStrip("4.1.3 Deliver (10021)")).toBe("Deliver");    // both ends stripped
+  });
+
+  it("T0681 — nextCopyName appends the next (n), starting at 1 and skipping existing copies", () => {
+    expect(nextCopyName("Assess", ["Assess"])).toBe("Assess (1)");            // first copy
+    expect(nextCopyName("Assess", ["Assess", "Assess (1)"])).toBe("Assess (2)");
+    expect(nextCopyName("Assess", ["Assess", "Assess (1)", "Assess (2)"])).toBe("Assess (3)");
+    expect(nextCopyName("Assess", [])).toBe("Assess (1)");                    // none present → still (1)
+    expect(nextCopyName("Assess", ["Assess (5)"])).toBe("Assess (6)");        // skips over gaps to max+1
+    expect(nextCopyName("Plan (A)", ["Plan (A)"])).toBe("Plan (A) (1)");      // parens in base are literal
   });
 });

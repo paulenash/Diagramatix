@@ -49,3 +49,15 @@ export const folderCodeStrip = (name: string): string =>
 /** The trailing 5-digit APQC PCF id parsed from a seeded folder name
  *  ("1.1.1 Foo (10017)" → "10017"), or "" when absent. */
 export const folderPcfId = (name: string): string => name.match(/\((\d{3,})\)\s*$/)?.[1] ?? "";
+
+/** The next "(n)" copy name for `base` given the diagram names already in the
+ *  target folder — "X" + ["X"] → "X (1)"; then "X (2)", "X (3)", … Numbering
+ *  starts at 1 and skips over any existing "(k)" copies. Used by the "Add"
+ *  conflict option so a regenerated process sits alongside the existing one. */
+export function nextCopyName(base: string, existing: string[]): string {
+  const esc = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${esc} \\((\\d+)\\)$`);
+  let max = 0;
+  for (const nm of existing) { const m = re.exec((nm ?? "").trim()); if (m) max = Math.max(max, parseInt(m[1], 10)); }
+  return `${base} (${max + 1})`;
+}

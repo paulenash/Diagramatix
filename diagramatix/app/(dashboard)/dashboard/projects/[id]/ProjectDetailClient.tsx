@@ -2930,11 +2930,18 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             if (fid && inSub.has(fid) && !existingByFolder[fid]) existingByFolder[fid] = d.id;
           }
         }
+        // Names of the diagrams already in each folder (for the "Add" → next "(n)").
+        const existingNamesByFolder: Record<string, string[]> = {};
+        if (selFolder) for (const s of subtree) existingNamesByFolder[s.id] = getOrderedDiagramsInFolder(s.id).map(d => d.name);
         // SuperAdmin bulk is offered only in an APQC-linked project when the
         // highlighted folder actually contains a sub-folder hierarchy.
         const bulk = (isAdmin && selFolder && projectPcf?.frameworkId && subtree.length > 1)
-          ? { rootFolder: { id: selFolder.id, name: selFolder.name }, subtree, existingByFolder }
+          ? { rootFolder: { id: selFolder.id, name: selFolder.name }, subtree, existingByFolder, existingNamesByFolder }
           : undefined;
+        // Single create: an existing diagram directly in the selected folder → Skip/Replace/Add.
+        const targetDirect = selFolder ? getOrderedDiagramsInFolder(selFolder.id) : [];
+        const targetExistingId = targetDirect[0]?.id;
+        const targetExistingNames = targetDirect.map(d => d.name);
         const adoptFramework = (createdPcf: { frameworkId?: string }) => {
           if (!projectPcf && createdPcf?.frameworkId) {
             const next = { ...createdPcf, seededAt: new Date().toISOString() } as typeof projectPcf & object;
@@ -2949,6 +2956,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           defaultFrameworkId={projectPcf?.frameworkId}
           isAdmin={isAdmin}
           bulk={bulk}
+          targetExistingId={targetExistingId}
+          targetExistingNames={targetExistingNames}
           onClose={() => setShowPcfCreate(false)}
           onCreated={(diagramId, createdPcf) => {
             if (selectedFolderId !== ROOT_ID) {
