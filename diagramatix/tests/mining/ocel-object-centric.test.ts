@@ -63,11 +63,11 @@ describe("OCEL 2.0 object-centric parse (T0686)", () => {
     // Order's events (place order @09:00, ship order @11:00) → states placed, shipped.
     const log = buildEventLog(order.headers, order.rows, order.mapping as LogMapping);
     expect(log.variants).toHaveLength(1);
-    expect(log.variants[0].states).toEqual(["placed", "shipped"]);   // effective-at-time, not last-value
+    expect(log.variants[0].states).toEqual(["Placed", "Shipped"]);   // effective-at-time + Capitalised (S1.06)
     expect(log.variants[0].events).toEqual(["place order", "ship order"]);
 
     const item = buildEventLog(oc.perType.item.headers, oc.perType.item.rows, oc.perType.item.mapping as LogMapping);
-    expect(item.variants[0].states).toEqual(["ordered", "picked"]);
+    expect(item.variants[0].states).toEqual(["Ordered", "Picked"]);
   });
 
   it("extracts object-to-object relationships (the Domain Diagram edges)", () => {

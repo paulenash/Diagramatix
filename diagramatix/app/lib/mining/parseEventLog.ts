@@ -129,11 +129,13 @@ export function buildEventLog(headers: string[], rows: string[][], mapping: LogM
   const cti = idx(mapping.controlId), rki = idx(mapping.riskId), pli = idx(mapping.policyId);
   // No state column? Derive each event's state from the Activity→State table
   // (defaulting an activity to a same-named state) so the lifecycle is complete.
+  // State names are Capitalised (S1.06) so a discovered state machine reads
+  // consistently and lines up with a conventionally-capitalised reference —
+  // e.g. an OCEL status attribute "placed" becomes "Placed".
   const stateMap = mapping.activityState ?? {};
-  const stateFor = (activity: string, raw: string): string => {
-    if (si >= 0) return raw.trim();
-    return (stateMap[activity] ?? activity).trim();
-  };
+  const cap = (s: string): string => { const t = (s ?? "").trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; };
+  const stateFor = (activity: string, raw: string): string =>
+    cap(si >= 0 ? raw : (stateMap[activity] ?? activity));
 
   const events: LogEvent[] = [];
   let unmapped = 0;

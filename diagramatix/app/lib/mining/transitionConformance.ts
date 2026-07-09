@@ -47,23 +47,21 @@ export function checkTransitionConformance(variants: Variant[], ref: ReferenceSm
       kindById.set(e.id, { label: (e.label ?? "").trim(), kind: e.type });
     }
   }
+  // State matching is CASE-INSENSITIVE (+ trimmed): a discovered "placed" must
+  // conform to a reference "Placed". Original labels are kept for the messages.
+  const norm = (s: string) => (s ?? "").trim().toLowerCase();
   const refStates = new Set<string>();
-  for (const v of kindById.values()) if (v.kind === "state" && v.label) refStates.add(v.label);
-  const refEdges = new Map<string, string>();   // "from→to" → connector id
-  const guarded = new Set<string>();
+  for (const v of kindById.values()) if (v.kind === "state" && v.label) refStates.add(norm(v.label));
+  const refEdges = new Map<string, { id: string; from: string; to: string }>();   // norm "from→to" → { connId, original labels }
   const refEntry = new Set<string>();
   const refExit = new Set<string>();
   for (const c of ref.connectors) {
     if (c.type !== "transition") continue;
     const s = kindById.get(c.sourceId), t = kindById.get(c.targetId);
     if (!s || !t) continue;
-    if (s.kind === "initial-state" && t.kind === "state") refEntry.add(t.label);
-    else if (t.kind === "final-state" && s.kind === "state") refExit.add(s.label);
-    else if (s.kind === "state" && t.kind === "state") {
-      const k = key(s.label, t.label);
-      refEdges.set(k, c.id);
-      if (c.transitionGuard) guarded.add(k);
-    }
+    if (s.kind === "initial-state" && t.kind === "state") refEntry.add(norm(t.label));
+    else if (t.kind === "final-state" && s.kind === "state") refExit.add(norm(s.label));
+    else if (s.kind === "state" && t.kind === "state") refEdges.set(key(norm(s.label), norm(t.label)), { id: c.id, from: s.label, to: t.label });
   }
 
   // ── Replay each variant ──
@@ -77,17 +75,16 @@ export function checkTransitionConformance(variants: Variant[], ref: ReferenceSm
   for (const v of variants) {
     const S = v.states;
     const seenUndoc = new Set<string>(), seenUnknown = new Set<string>();
-    for (const s of S) if (s && !refStates.has(s)) seenUnknown.add(s);
+    for (const s of S) if (s && !refStates.has(norm(s))) seenUnknown.add(s);
     for (let i = 1; i < S.length; i++) {
       const from = S[i - 1], to = S[i];
       if (!from || !to) continue;
-      const k = key(from, to);
-      bump(observed, k, v.count);
-      if (!refEdges.has(k)) seenUndoc.add(k);
+      bump(observed, key(from, to), v.count);                  // raw key: display + illegal-flagging
+      if (!refEdges.has(key(norm(from), norm(to)))) seenUndoc.add(key(from, to));
     }
     const first = S[0], last = S[S.length - 1];
-    const entryBad = refEntry.size > 0 && first ? !refEntry.has(first) : false;
-    const exitBad = refExit.size > 0 && last ? !refExit.has(last) : false;
+    const entryBad = refEntry.size > 0 && first ? !refEntry.has(norm(first)) : false;
+    const exitBad = refExit.size > 0 && last ? !refExit.has(norm(last)) : false;
 
     const clean = seenUndoc.size === 0 && seenUnknown.size === 0 && !entryBad && !exitBad;
     if (clean) conformingCases += v.count;
@@ -103,13 +100,14 @@ export function checkTransitionConformance(variants: Variant[], ref: ReferenceSm
   for (const [s, cases] of unknown) violations.push({ rule: "unknown-state", severity: "error", message: `State "${s}" is not in the reference`, cases, data: { state: s } });
   for (const [s, cases] of badEntry) violations.push({ rule: "unexpected-entry", severity: "warning", message: `Cases start in "${s}", not a reference entry state`, cases, data: { state: s } });
   for (const [s, cases] of badExit) violations.push({ rule: "unexpected-exit", severity: "warning", message: `Cases end in "${s}", not a reference final state`, cases, data: { state: s } });
-  for (const [k, connId] of refEdges) if (!observed.has(k)) { const [from, to] = unkey(k); violations.push({ rule: "dead-transition", severity: "warning", message: `Reference transition ${from} → ${to} was never observed`, cases: 0, ids: [connId], data: { from, to } }); }
+  const observedNorm = new Set([...observed.keys()].map((k) => { const [f, t] = unkey(k); return key(norm(f), norm(t)); }));
+  for (const [k, e] of refEdges) if (!observedNorm.has(k)) violations.push({ rule: "dead-transition", severity: "warning", message: `Reference transition ${e.from} → ${e.to} was never observed`, cases: 0, ids: [e.id], data: { from: e.from, to: e.to } });
   violations.sort((a, b) => b.cases - a.cases);
 
   const transitionStats: TransitionStat[] = [...observed].map(([k, o]) => {
     const [from, to] = unkey(k);
-    const refId = refEdges.get(k);
-    return { from, to, observed: o, inReference: !!refId, ...(refId ? { refConnectorId: refId } : {}) };
+    const e = refEdges.get(key(norm(from), norm(to)));
+    return { from, to, observed: o, inReference: !!e, ...(e ? { refConnectorId: e.id } : {}) };
   });
 
   return {

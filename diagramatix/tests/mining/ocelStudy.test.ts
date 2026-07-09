@@ -34,7 +34,7 @@ describe("buildOcelStudy (T0688)", () => {
     expect(plan.types.map((t) => t.objectType).sort()).toEqual(["item", "order"]);
     const order = plan.types.find((t) => t.objectType === "order")!;
     expect(order.stateAttr).toBe("status");
-    expect(order.log.variants[0].states).toEqual(["placed", "shipped"]);       // status-derived lifecycle
+    expect(order.log.variants[0].states).toEqual(["Placed", "Shipped"]);       // status-derived lifecycle, Capitalised (S1.06)
     // A discovered state machine with state nodes + transitions was produced.
     expect(order.smData.elements.some((e) => e.type === "state")).toBe(true);
     expect(order.smData.connectors.length).toBeGreaterThan(0);

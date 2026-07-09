@@ -55,6 +55,18 @@ describe("state-change conformance", () => {
     expect(clean.violations).toEqual([]);   // every ref transition was observed → no dead ones either
   });
 
+  it("T0690 — matching is case-insensitive: lowercase discovered states conform to a capitalised reference", () => {
+    // A discovered SM built from raw lowercase log values must still conform to a
+    // conventionally-capitalised reference (the OCEL status-attribute case).
+    const lower: Variant[] = [{ events: ["Create", "Submit", "Approve"], states: ["draft", "pending", "approved"], count: 3 }];
+    const r = checkTransitionConformance(lower, REF);   // REF states are Capitalised
+    expect(r.fitness).toBe(1);
+    expect(r.violations).toEqual([]);
+    // …and the deviating case is still caught regardless of case.
+    const mixed = checkTransitionConformance([...lower, { events: ["Create", "Reject"], states: ["draft", "rejected"], count: 1 }], REF);
+    expect(mixed.violations.some((v) => v.rule === "unknown-state" && v.data?.state === "rejected")).toBe(true);
+  });
+
   it("T0599 — a reference transition never seen in the log is flagged as dead", () => {
     // Log only ever does Draft→Pending; Pending→Approved is never exercised.
     const partial: Variant[] = [{ events: ["Create", "Submit"], states: ["Draft", "Pending"], count: 3 }];
