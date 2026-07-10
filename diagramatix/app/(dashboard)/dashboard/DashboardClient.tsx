@@ -23,6 +23,7 @@ import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { BackupProgressModal } from "@/app/components/BackupProgressModal";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
+import { RiskControlConsole } from "@/app/components/riskControls/RiskControlConsole";
 
 interface DiagramSummary {
   id: string;
@@ -325,6 +326,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [simProject, setSimProject] = useState<{ id: string; name: string } | null>(null);
   // Project-level Process Mining — opened from a project's menu.
   const [miningProject, setMiningProject] = useState<{ id: string; name: string } | null>(null);
+  // Project-level Risk & Controls — opened from the selected-project panel.
+  const [rcmProject, setRcmProject] = useState<{ id: string; name: string } | null>(null);
   // Skip the intro when RETURNING to the console (e.g. back from a discovered
   // diagram, ?pmnoi=1) — the intro is only for a fresh entry.
   const [skipMiningIntro, setSkipMiningIntro] = useState(false);
@@ -2173,6 +2176,34 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               {selectedRole === "owner" && !readOnly && selectedProject.exampleType && (
                 <p className="mt-2 text-[10px] text-gray-400 italic">Example projects can\u2019t be shared or published. Rename it to make it your own.</p>
               )}
+
+              {/* Feature launchers \u2014 moved here from the project screen. Each
+                  opens on the selected project, tinted its characteristic
+                  colour (Simulator green, Miner amber, Risk & Controls blue). */}
+              <div className="mt-3 pt-2 border-t border-gray-200 space-y-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Tools</p>
+                <button
+                  onClick={() => setSimProject({ id: selectedProject.id, name: selectedProject.name })}
+                  className="w-full text-left px-2 py-1 text-xs font-medium rounded border text-green-700 border-green-400 hover:bg-green-50"
+                  title="Simulate + compare the processes in this project (As-is / To-be)"
+                >
+                  \u25c8 Simulator
+                </button>
+                <button
+                  onClick={() => setMiningProject({ id: selectedProject.id, name: selectedProject.name })}
+                  className="w-full text-left px-2 py-1 text-xs font-medium rounded border text-amber-700 border-amber-400 hover:bg-amber-50"
+                  title="Process Mining \u2014 discover the real process from event logs + check conformance"
+                >
+                  \u26cf Process Mining
+                </button>
+                <button
+                  onClick={() => setRcmProject({ id: selectedProject.id, name: selectedProject.name })}
+                  className="w-full text-left px-2 py-1 text-xs font-medium rounded border text-blue-700 border-blue-400 hover:bg-blue-50"
+                  title="Risk & Controls \u2014 maintain the risk/control catalog + Risk-Control Matrix"
+                >
+                  \u25c6 Risk &amp; Controls
+                </button>
+              </div>
             </div>
 
             {/* Open Project button removed 2026-06-06 \u2014 double-click the
@@ -3174,6 +3205,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           skipIntro={skipMiningIntro}
           onClose={() => setMiningProject(null)}
           onOpenSimulator={() => { const p = miningProject; setMiningProject(null); setSimFromMining(p); setSimProject(p); }}
+        />
+      )}
+
+      {rcmProject && (
+        <RiskControlConsole
+          projectId={rcmProject.id}
+          projectName={rcmProject.name}
+          canEdit={!readOnly}
+          onClose={() => setRcmProject(null)}
         />
       )}
 

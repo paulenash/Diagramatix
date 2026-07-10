@@ -39,21 +39,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Invalid package: ${errs.join("; ")}` }, { status: 400 });
   }
 
-  let slug = typeof body.slug === "string" && body.slug ? slugify(body.slug) : slugify(title);
-  for (let i = 2; await prisma.miningExample.findUnique({ where: { slug } }); i++) slug = `${slugify(title)}-${i}`;
-
+  // One catalog copy per example: the slug is the stable identity. A create
+  // for an existing slug OVERWRITES it (refreshing content + package) rather
+  // than minting a `-2`/`-3` duplicate — published state + order preserved.
+  const slug = typeof body.slug === "string" && body.slug ? slugify(body.slug) : slugify(title);
+  const meta = {
+    title,
+    concept: typeof body.concept === "string" ? body.concept : "",
+    description: typeof body.description === "string" ? body.description : "",
+    difficulty: DIFFICULTIES.has(body.difficulty) ? body.difficulty : "core",
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    package: pkg as any,
+  };
+  const existing = await prisma.miningExample.findUnique({ where: { slug }, select: { id: true } });
+  if (existing) {
+    const example = await prisma.miningExample.update({ where: { id: existing.id }, data: meta });
+    return NextResponse.json({ example, overwritten: true });
+  }
   const max = await prisma.miningExample.aggregate({ _max: { sortOrder: true } });
   const example = await prisma.miningExample.create({
-    data: {
-      slug, title,
-      concept: typeof body.concept === "string" ? body.concept : "",
-      description: typeof body.description === "string" ? body.description : "",
-      difficulty: DIFFICULTIES.has(body.difficulty) ? body.difficulty : "core",
-      sortOrder: (max._max.sortOrder ?? 0) + 1,
-      createdById: session?.user?.id ?? null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      package: pkg as any,
-    },
+    data: { slug, ...meta, sortOrder: (max._max.sortOrder ?? 0) + 1, createdById: session?.user?.id ?? null },
   });
   return NextResponse.json({ example }, { status: 201 });
 }

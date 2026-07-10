@@ -40,22 +40,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: msg }, { status: msg.includes("not found") ? 404 : 400 });
   }
 
-  let slug = slugify(title);
-  for (let i = 2; await prisma.simulationExample.findUnique({ where: { slug } }); i++) slug = `${slugify(title)}-${i}`;
+  // One catalog copy per example: the slug (derived from the title) is the
+  // stable identity. Re-capturing the SAME title OVERWRITES the existing entry
+  // (refreshing its content + package), rather than minting a `-2`/`-3`
+  // duplicate — its published state + order are preserved.
+  const slug = slugify(title);
+  const meta = {
+    title,
+    concept: typeof body.concept === "string" ? body.concept : "",
+    description: typeof body.description === "string" ? body.description : "",
+    difficulty: DIFFICULTIES.has(body.difficulty) ? body.difficulty : "core",
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    package: pkg as any,
+  };
+  const existing = await prisma.simulationExample.findUnique({ where: { slug }, select: { id: true } });
+  if (existing) {
+    const example = await prisma.simulationExample.update({ where: { id: existing.id }, data: meta });
+    return NextResponse.json({ example, overwritten: true });
+  }
   const max = await prisma.simulationExample.aggregate({ _max: { sortOrder: true } });
-
   const example = await prisma.simulationExample.create({
-    data: {
-      slug, title,
-      concept: typeof body.concept === "string" ? body.concept : "",
-      description: typeof body.description === "string" ? body.description : "",
-      difficulty: DIFFICULTIES.has(body.difficulty) ? body.difficulty : "core",
-      sortOrder: (max._max.sortOrder ?? 0) + 1,
-      createdById: session?.user?.id ?? null,
-      published: false,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      package: pkg as any,
-    },
+    data: { slug, ...meta, sortOrder: (max._max.sortOrder ?? 0) + 1, createdById: session?.user?.id ?? null, published: false },
   });
   return NextResponse.json({ example }, { status: 201 });
 }
