@@ -558,6 +558,51 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 <Stat label="Dropped rows" value={selected.stats.unmappedRows} />
               )}
             </div>
+
+            {/* OCEL study overview — every object type's progress at a glance. */}
+            {selected.ocelGroupId && (() => {
+              const siblings = runs.filter((r) => r.ocelGroupId === selected.ocelGroupId);
+              const cell = "px-1.5 py-0.5";
+              return (
+                <div className="mt-3 rounded border border-emerald-500/30 bg-emerald-950/20 p-2.5">
+                  <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
+                    <span className="text-[11px] font-semibold text-emerald-200">OCEL study — {siblings.length} object type{siblings.length === 1 ? "" : "s"}</span>
+                    {selected.domainDiagramId && <a href={openDiagram(selected.domainDiagramId)} onClick={stashReturn} className="text-[11px] text-emerald-300 hover:text-emerald-200 underline">Open object model →</a>}
+                  </div>
+                  <p className="text-[10px] text-stone-400 mb-1.5">Each object type is analysed on its own — its <span className="text-stone-300">state machine is already discovered</span>. The BPMN process + conformance are optional per type; you don&rsquo;t need them all before analysing any one.</p>
+                  <div className="overflow-x-auto">
+                    <table className="text-[10px] w-full">
+                      <thead className="text-stone-500 uppercase tracking-wide">
+                        <tr>
+                          <th className={`${cell} text-left`}>Object type</th>
+                          <th className={`${cell} text-left`}>State machine</th>
+                          <th className={`${cell} text-left`}>Process</th>
+                          <th className={`${cell} text-left`}>Conformance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {siblings.map((r) => {
+                          const sel = r.id === selected.id;
+                          return (
+                            <tr key={r.id} className={sel ? "bg-emerald-800/30" : ""}>
+                              <td className={cell}>
+                                <button onClick={() => setSelectedId(r.id)} className={`text-left capitalize ${sel ? "text-emerald-200 font-semibold" : "text-stone-300 hover:text-stone-100"}`} title="Select this object type">
+                                  {sel ? "▸ " : ""}{r.objectType ?? r.name}
+                                </button>
+                              </td>
+                              <td className={cell}>{r.discoveredSmId ? <a href={openDiagram(r.discoveredSmId)} onClick={stashReturn} className="text-emerald-300 hover:text-emerald-200 underline">✓ open</a> : <span className="text-stone-600">—</span>}</td>
+                              <td className={cell}>{r.discoveredBpmnId ? <a href={openDiagram(r.discoveredBpmnId)} onClick={stashReturn} className="text-emerald-300 hover:text-emerald-200 underline">✓ open</a> : <span className="text-stone-500">not yet</span>}</td>
+                              <td className={cell}>{r.conformance ? <span className="text-emerald-300">{Math.round((r.conformance.fitness ?? 0) * 100)}%</span> : <span className="text-stone-600">—</span>}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Interchange export — round-trip with other process-mining tools. */}
             <div className="mt-3 flex items-center gap-2 text-[11px] text-stone-400">
               <span>Export log:</span>
