@@ -1,8 +1,9 @@
 /**
- * Parse any supported event-log text (CSV/TSV, IEEE XES, OCEL JSON) into the
- * uniform { headers, rows, mapping } table the mining pipeline consumes.
- * Factored from ProcessMiningConsole.onFile so both the interactive importer and
- * the server-side pull connectors (Azure Blob / SharePoint) share one parser.
+ * Parse any supported event-log text (CSV/TSV, IEEE XES, OCEL JSON or OCEL 2.0
+ * XML) into the uniform { headers, rows, mapping } table the mining pipeline
+ * consumes. Factored from ProcessMiningConsole.onFile so both the interactive
+ * importer and the server-side pull connectors (Azure Blob / SharePoint) share
+ * one parser.
  */
 import { parseCsv, guessMapping } from "./parseEventLog";
 import { parseXes } from "./formats/xes";
@@ -18,11 +19,14 @@ export interface ParsedAnyLog {
 
 export function parseAnyLog(text: string, filename = ""): ParsedAnyLog {
   const ext = filename.toLowerCase().split(".").pop() ?? "";
-  if (ext === "xes" || /^<\?xml|<log[\s>]/.test(text.trimStart())) {
+  // OCEL 2.0 XML and XES both look like <?xml/<log; distinguish by OCEL markers.
+  const isXml = /^<\?xml|^<log[\s>]/.test(text.trimStart());
+  const isOcelXml = isXml && /<object-types|<objects>/.test(text.slice(0, 30_000));
+  if (!isOcelXml && (ext === "xes" || isXml)) {
     const p = parseXes(text);
     return { headers: p.headers, rows: p.rows, mapping: p.mapping };
   }
-  if (ext === "json" || ext === "ocel" || ext === "jsonocel" || /^\s*\{/.test(text)) {
+  if (ext === "json" || ext === "ocel" || ext === "jsonocel" || ext === "xml" || isOcelXml || /^\s*\{/.test(text)) {
     const p = parseOcel(text);
     return {
       headers: p.headers, rows: p.rows, mapping: p.mapping,

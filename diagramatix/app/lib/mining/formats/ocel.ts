@@ -36,6 +36,40 @@ interface NormLog {
   objectTypeNames: string[];            // declared objectTypes[].name ∪ observed
 }
 
+function unescapeXml(s: string): string {
+  return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(parseInt(n, 10))).replace(/&amp;/g, "&");
+}
+
+/** OCEL 2.0 XML → the SAME doc shape as OCEL 2.0 JSON, so everything downstream
+ *  (normalise / ocelObjectTypes / parseOcel*) handles both formats. Hand-parsed
+ *  (no XML dependency), matching the &lt;log&gt; structure: &lt;object-types&gt;/&lt;event-types&gt;,
+ *  &lt;objects&gt; (each with time-stamped &lt;attribute&gt;s + O2O &lt;relationship&gt;s) and
+ *  &lt;events&gt; (id/type/time attrs + E2O &lt;relationship&gt;s). */
+function xmlToOcelDoc(xml: string): { objectTypes: unknown[]; eventTypes: unknown[]; objects: unknown[]; events: unknown[] } {
+  const parseAttrs = (s: string): Record<string, string> => { const m: Record<string, string> = {}; const re = /([\w:.-]+)\s*=\s*"([^"]*)"/g; let x; while ((x = re.exec(s))) m[x[1]] = unescapeXml(x[2]); return m; };
+  const section = (tag: string) => new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`).exec(xml)?.[1] ?? "";
+  const relsIn = (body: string) => { const out: unknown[] = []; const re = /<relationship\s+([^>/]*?)\/?>/g; let z; while ((z = re.exec(body))) { const a = parseAttrs(z[1]); out.push({ objectId: a["object-id"], qualifier: a.qualifier ?? "" }); } return out; };
+  const attrsIn = (body: string, withTime: boolean) => { const out: unknown[] = []; const re = /<attribute\s+([^>]*?)>([\s\S]*?)<\/attribute>/g; let y; while ((y = re.exec(body))) { const a = parseAttrs(y[1]); out.push(withTime ? { name: a.name, time: a.time, value: unescapeXml(y[2].trim()) } : { name: a.name, value: unescapeXml(y[2].trim()) }); } return out; };
+
+  const objectTypes: unknown[] = [];
+  { const re = /<object-type\s+name="([^"]+)"/g; let x; const s = section("object-types"); while ((x = re.exec(s))) objectTypes.push({ name: unescapeXml(x[1]) }); }
+  const eventTypes: unknown[] = [];
+  { const re = /<event-type\s+name="([^"]+)"/g; let x; const s = section("event-types"); while ((x = re.exec(s))) eventTypes.push({ name: unescapeXml(x[1]) }); }
+  const objects: unknown[] = [];
+  { const re = /<object\s+([^>]*?)>([\s\S]*?)<\/object>/g; let x; while ((x = re.exec(xml))) { const a = parseAttrs(x[1]); objects.push({ id: a.id, type: a.type, attributes: attrsIn(x[2], true), relationships: relsIn(x[2]) }); } }
+  const events: unknown[] = [];
+  { const re = /<event\s+([^>]*?)>([\s\S]*?)<\/event>/g; let x; while ((x = re.exec(xml))) { const a = parseAttrs(x[1]); events.push({ id: a.id, type: a.type, time: a.time, attributes: attrsIn(x[2], false), relationships: relsIn(x[2]) }); } }
+  return { objectTypes, eventTypes, objects, events };
+}
+
+/** Parse OCEL text — 2.0 XML (starts with `<`) or 1.0/2.0 JSON — to a doc object, or null. */
+function parseOcelDoc(text: string): any | null {
+  if ((text ?? "").trimStart().startsWith("<")) { try { return xmlToOcelDoc(text); } catch { return null; } }
+  try { return JSON.parse(text); } catch { return null; }
+}
+
 /** Normalise either OCEL dialect into a common shape. OCEL 2.0-compliant: reads
  *  event `attributes`/`relationships` (E2O) AND object `attributes`
  *  (time-varying) + `relationships` (O2O). */
@@ -87,7 +121,7 @@ function normalise(doc: any): NormLog {
 
 /** The object types present, most-referenced first (the case-type picker menu). */
 export function ocelObjectTypes(text: string): string[] {
-  let doc: any; try { doc = JSON.parse(text); } catch { return []; }
+  const doc = parseOcelDoc(text); if (!doc) return [];
   const log = normalise(doc);
   const count = new Map<string, number>();
   for (const e of log.events) for (const oid of e.objects) { const t = log.objectType[oid]; if (t) count.set(t, (count.get(t) ?? 0) + 1); }
@@ -97,7 +131,7 @@ export function ocelObjectTypes(text: string): string[] {
 /** Parse OCEL JSON → a normalised table, using `objectType` as the case (defaults
  *  to the most-referenced type). One row per (event, related object of that type). */
 export function parseOcel(text: string, objectType?: string): ParsedLog & { objectTypes: string[]; chosenType: string } {
-  let doc: any; try { doc = JSON.parse(text); } catch { return { headers: [], rows: [], mapping: {}, objectTypes: [], chosenType: "" }; }
+  const doc = parseOcelDoc(text); if (!doc) return { headers: [], rows: [], mapping: {}, objectTypes: [], chosenType: "" };
   const log = normalise(doc);
   const objectTypes = ocelObjectTypes(text);
   const chosen = objectType || objectTypes[0] || "";
@@ -185,7 +219,7 @@ const STATUS_RE = /^(state|status|stage|phase)$/i;
  *  activity→state table). Also returns the object-to-object relationship edges so
  *  the object model can be drawn as a Domain Diagram. Pure. */
 export function parseOcelObjectCentric(text: string): OcelObjectCentric {
-  let doc: any; try { doc = JSON.parse(text); } catch { return { objectTypes: [], perType: {}, o2o: [], interactions: [], activityTypes: {} }; }
+  const doc = parseOcelDoc(text); if (!doc) return { objectTypes: [], perType: {}, o2o: [], interactions: [], activityTypes: {} };
   const log = normalise(doc);
   const byFreq = ocelObjectTypes(text);
   const objectTypes = [...byFreq, ...log.objectTypeNames.filter((t) => !byFreq.includes(t))];

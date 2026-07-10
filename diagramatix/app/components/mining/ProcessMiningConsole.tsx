@@ -199,9 +199,13 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     // table CSV produces, then flow through the identical import pipeline.
     setOcelText(null); setOcelTypes([]);
     let h: string[], r: string[][], map: Partial<LogMapping>;
-    if (ext === "xes" || /^<\?xml|<log[\s>]/.test(text.trimStart())) {
+    // OCEL 2.0 XML and XES both start with <?xml/<log — tell them apart by the
+    // OCEL object-model markers so an OCEL .xml isn't mistaken for XES.
+    const isXml = /^<\?xml|^<log[\s>]/.test(text.trimStart());
+    const isOcelXml = isXml && /<object-types|<objects>/.test(text.slice(0, 30_000));
+    if (!isOcelXml && (ext === "xes" || isXml)) {
       const parsed = parseXes(text); h = parsed.headers; r = parsed.rows; map = parsed.mapping;
-    } else if (ext === "json" || ext === "ocel" || ext === "jsonocel" || /^\s*\{/.test(text)) {
+    } else if (ext === "json" || ext === "ocel" || ext === "jsonocel" || ext === "xml" || isOcelXml || /^\s*\{/.test(text)) {
       const parsed = parseOcel(text); h = parsed.headers; r = parsed.rows; map = parsed.mapping;
       // Object-centric: offer an OCEL 2.0 STUDY (one lifecycle per object type +
       // a Domain Diagram). The single-object flatten stays as an advanced fallback.
@@ -387,7 +391,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
 
           <label className="inline-block cursor-pointer text-xs bg-amber-700 hover:bg-amber-600 text-white rounded px-3 py-1.5">
             {fileName ? `↻ ${fileName}` : "⭱ Choose file…"}
-            <input type="file" accept=".csv,.tsv,.txt,text/csv,.xes,.json,.ocel,.jsonocel,application/xml,application/json" onChange={onFile} className="hidden" />
+            <input type="file" accept=".csv,.tsv,.txt,text/csv,.xes,.json,.ocel,.jsonocel,.xml,application/xml,application/json" onChange={onFile} className="hidden" />
           </label>
 
           {/* OCEL 2.0 object-centric study — one lifecycle per object type + a Domain Diagram. */}
