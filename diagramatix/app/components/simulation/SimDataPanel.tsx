@@ -254,12 +254,12 @@ const inp = "bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-
 
 /** Fixed per-column widths, shared by the header + every data cell so the column
  *  names sit left-justified directly over their column. Dist columns are wide
- *  enough for a triangular (select + 3 inputs); `team` fits the longest team /
- *  lane name. */
+ *  enough for a triangular (select + 3 inputs) WITHOUT the last input bleeding
+ *  into the next column; `team` fits the longest team / lane name. */
 const W = {
   flag: "w-4 shrink-0",
   name: "w-40 shrink-0",
-  dist: "w-60 shrink-0",
+  dist: "w-72 shrink-0",
   team: "w-44 shrink-0",
   units: "w-12 shrink-0",
   maxArr: "w-24 shrink-0",
@@ -274,10 +274,17 @@ function Section({ title, cols, children }: { title: string; cols: { label: stri
   return (
     <div>
       <p className="text-green-400/70 uppercase tracking-widest text-[10px] mb-1">{title}</p>
-      <div className="flex items-center gap-2 text-green-400/40 pb-0.5 border-b border-green-500/20">
-        {cols.map((c, i) => <span key={i} className={`${c.w} text-left`}>{c.label}</span>)}
+      {/* Header + rows share one horizontal-scroll container at their natural
+          (min-w-max) width, so wide dist columns scroll together in step
+          rather than overflowing the panel or overlapping the next column. */}
+      <div className="overflow-x-auto">
+        <div className="min-w-max">
+          <div className="flex items-center gap-2 text-green-400/40 pb-0.5 border-b border-green-500/20">
+            {cols.map((c, i) => <span key={i} className={`${c.w} text-left`}>{c.label}</span>)}
+          </div>
+          {children}
+        </div>
       </div>
-      {children}
     </div>
   );
 }
