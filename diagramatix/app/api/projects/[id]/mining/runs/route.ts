@@ -26,6 +26,7 @@ export async function GET(_req: Request, { params }: Params) {
       id: true, name: true, stats: true, mapping: true,
       discoveredBpmnId: true, discoveredSmId: true, referenceSmId: true,
       conformance: true, studyId: true, createdAt: true, excludeFromCompliance: true,
+      ocelGroupId: true, objectType: true, domainDiagramId: true,
     },
   });
   return NextResponse.json({ runs });

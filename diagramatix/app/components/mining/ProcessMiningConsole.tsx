@@ -23,6 +23,7 @@ interface RunRow {
   discoveredBpmnId: string | null; discoveredSmId: string | null; referenceSmId: string | null;
   conformance: ConformanceResult | null;
   studyId: string | null; createdAt: string; excludeFromCompliance?: boolean;
+  ocelGroupId?: string | null; objectType?: string | null; domainDiagramId?: string | null;
 }
 
 /** A choosable raw sample log handed over from an adopted example. */
@@ -64,6 +65,15 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   const [ocelTypes, setOcelTypes] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [ocelDomainId, setOcelDomainId] = useState<string | null>(null);
+  const [showJson, setShowJson] = useState(false);
+  // Pretty-printed OCEL for the inline "View JSON" panel (capped so a huge log
+  // can't freeze the render; the raw file is unchanged on import).
+  const ocelPretty = useMemo(() => {
+    if (!ocelText) return "";
+    let s: string;
+    try { s = JSON.stringify(JSON.parse(ocelText), null, 2); } catch { s = ocelText; }
+    return s.length > 200_000 ? s.slice(0, 200_000) + "\n… (truncated for display)" : s;
+  }, [ocelText]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [discovering, setDiscovering] = useState(false); // any discovery in flight (disables all buttons)
@@ -398,8 +408,14 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 <button onClick={importOcelStudy} disabled={busy || selectedTypes.length === 0} className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
                   {busy ? "Importing…" : `Import OCEL study (${selectedTypes.length})`}
                 </button>
+                <button onClick={() => setShowJson((v) => !v)} className="text-[11px] text-emerald-300 hover:text-emerald-200 underline">
+                  {showJson ? "Hide JSON ▾" : "View JSON ▸"}
+                </button>
                 <span className="text-[10px] text-stone-500">or map columns below to flatten onto a single object (advanced).</span>
               </div>
+              {showJson && (
+                <pre className="mt-1 max-h-72 overflow-auto rounded bg-stone-950/70 border border-stone-700 p-2 text-[10px] leading-snug text-stone-300 font-mono whitespace-pre">{ocelPretty}</pre>
+              )}
             </div>
           )}
           {ocelDomainId && (
@@ -516,7 +532,16 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
         {/* Selected run summary */}
         {selected && (
           <section className="md:col-span-3 bg-stone-900 border border-stone-700 rounded-lg p-4">
-            <h2 className="text-sm font-semibold text-amber-200 mb-2">{selected.name}</h2>
+            {selected.objectType ? (
+              <h2 className="mb-2 flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-[11px] text-amber-200/60">
+                  {(() => { const i = selected.name.lastIndexOf(" — "); return i >= 0 ? selected.name.slice(0, i) : selected.name; })()} —
+                </span>
+                <span className="text-xl font-bold text-amber-100 capitalize leading-none" title={`OCEL object type: ${selected.objectType}`}>{selected.objectType}</span>
+              </h2>
+            ) : (
+              <h2 className="text-sm font-semibold text-amber-200 mb-2">{selected.name}</h2>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
               <Stat label="Cases" value={selected.stats?.cases} />
               <Stat label="Events" value={selected.stats?.events} />
