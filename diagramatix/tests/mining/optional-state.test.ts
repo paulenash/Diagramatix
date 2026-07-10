@@ -1,7 +1,8 @@
 /**
  * Change A — a log with NO state column still mines: buildEventLog derives each
- * event's state from the Activity→State table (defaulting to the activity name),
- * so classic 3-column logs and the State Machine both work.
+ * event's state from the Activity→State table, defaulting to the activity's PAST
+ * PARTICIPLE ("Resolve" → "Resolved") so inferred states read as conditions, not
+ * commands. Classic 3-column logs and the State Machine both work.
  */
 import { describe, it, expect } from "vitest";
 import { buildEventLog, distinctActivities } from "@/app/lib/mining/parseEventLog";
@@ -16,16 +17,16 @@ const ROWS = [
 ];
 
 describe("optional state (Change A)", () => {
-  it("T0639 — no state column → state defaults to the activity name", () => {
+  it("T0639 — no state column → state defaults to the activity's past participle", () => {
     const mapping: LogMapping = { caseId: "case", activity: "activity", timestamp: "ts" };
     const log = buildEventLog(HEADERS, ROWS, mapping);
     expect(log.stats.cases).toBe(2);
-    // each event's state mirrors its activity
-    expect(log.traces[0].events.map((e) => e.state)).toEqual(["Log Ticket", "Resolve"]);
-    expect(log.stats.states).toEqual(["Log Ticket", "Resolve"]);
+    // each event's state = the past participle of its activity's leading verb
+    expect(log.traces[0].events.map((e) => e.state)).toEqual(["Logged Ticket", "Resolved"]);
+    expect(log.stats.states).toEqual(["Logged Ticket", "Resolved"]);
     // one variant (both cases identical), states in lockstep with events
     expect(log.variants).toHaveLength(1);
-    expect(log.variants[0].states).toEqual(["Log Ticket", "Resolve"]);
+    expect(log.variants[0].states).toEqual(["Logged Ticket", "Resolved"]);
   });
 
   it("T0640 — Activity→State table supplies the lifecycle + distinctActivities seeds it", () => {

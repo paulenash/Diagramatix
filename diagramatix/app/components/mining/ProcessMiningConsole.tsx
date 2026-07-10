@@ -9,6 +9,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { parseCsv, guessMapping, distinctActivities } from "@/app/lib/mining/parseEventLog";
+import { activityToState } from "@/app/lib/mining/stateNaming";
 import { parseXes } from "@/app/lib/mining/formats/xes";
 import { parseOcel } from "@/app/lib/mining/formats/ocel";
 import { validateEventLogMapping } from "@/app/lib/mining/validateLog";
@@ -237,7 +238,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     [headers, rows, mapping.activity],
   );
   const needsStateTable = !mapping.state && activities.length > 0;
-  const stateFor = (a: string) => mapping.activityState?.[a] ?? a;
+  const stateFor = (a: string) => mapping.activityState?.[a] ?? activityToState(a);
   const setActivityState = (a: string, s: string) =>
     setMapping((m) => ({ ...m, activityState: { ...(m.activityState ?? {}), [a]: s } }));
   // Advisory pre-import validation off the already-parsed rows — confirm the

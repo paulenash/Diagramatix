@@ -4,6 +4,7 @@
  * (No CSV library exists in the repo, so this is net-new but deliberately small.)
  */
 import type { LogMapping, LogEvent, CaseTrace, Variant, MiningStats, EventLog } from "./types";
+import { activityToState } from "./stateNaming";
 
 // ── CSV ────────────────────────────────────────────────────────────────────
 
@@ -127,15 +128,15 @@ export function buildEventLog(headers: string[], rows: string[][], mapping: LogM
   const idx = (col: string | undefined) => (col ? headers.indexOf(col) : -1);
   const ci = idx(mapping.caseId), ai = idx(mapping.activity), ti = idx(mapping.timestamp), si = idx(mapping.state), ri = idx(mapping.resource);
   const cti = idx(mapping.controlId), rki = idx(mapping.riskId), pli = idx(mapping.policyId);
-  // No state column? Derive each event's state from the Activity→State table
-  // (defaulting an activity to a same-named state) so the lifecycle is complete.
-  // State names are Capitalised (S1.06) so a discovered state machine reads
-  // consistently and lines up with a conventionally-capitalised reference —
-  // e.g. an OCEL status attribute "placed" becomes "Placed".
+  // No state column? Derive each event's state from the Activity→State table,
+  // else from the activity's PAST PARTICIPLE ("Ship" → "Shipped") so an inferred
+  // state reads as a condition, not a command. State names are Capitalised
+  // (S1.06) so a discovered SM reads consistently and lines up with a
+  // conventionally-capitalised reference — e.g. an OCEL status "placed" → "Placed".
   const stateMap = mapping.activityState ?? {};
   const cap = (s: string): string => { const t = (s ?? "").trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; };
   const stateFor = (activity: string, raw: string): string =>
-    cap(si >= 0 ? raw : (stateMap[activity] ?? activity));
+    cap(si >= 0 ? raw : (stateMap[activity] ?? activityToState(activity)));
 
   const events: LogEvent[] = [];
   let unmapped = 0;
