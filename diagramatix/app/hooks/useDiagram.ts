@@ -383,6 +383,7 @@ export type Action =
   | { type: "SET_DESCRIPTION_FONT_SIZE"; payload: number }
   | { type: "SET_DATABASE"; payload: string }
   | { type: "SET_PROCESS_OWNER"; payload: { name?: string; email?: string } }
+  | { type: "SET_PROCEDURE_DOC"; payload: { url?: string; name?: string } | undefined }
   | { type: "SET_PCF"; payload: PcfClassification | undefined }
   | { type: "SET_AI_FEEDBACK"; payload: AiFeedback | undefined }
   | { type: "CORRECT_ALL_CONNECTORS" }
@@ -6941,6 +6942,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       };
     }
 
+    case "SET_PROCEDURE_DOC": {
+      const url = action.payload?.url?.trim();
+      return {
+        ...state,
+        procedureDoc: url ? { url, name: action.payload?.name?.trim() || undefined } : undefined,
+      };
+    }
+
     case "SET_PCF":
       return { ...state, pcf: action.payload };
 
@@ -8931,6 +8940,12 @@ export function useDiagram(initialData: DiagramData) {
       (owner: { name?: string; email?: string }) => {
         pushHistory(snapshotData());
         dispatch({ type: "SET_PROCESS_OWNER", payload: owner });
+      }, []
+    ),
+    setProcedureDoc: useCallback(
+      (doc: { url?: string; name?: string } | undefined) => {
+        pushHistory(snapshotData());
+        dispatch({ type: "SET_PROCEDURE_DOC", payload: doc });
       }, []
     ),
     setPcf: useCallback(

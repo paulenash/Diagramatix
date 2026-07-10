@@ -9,6 +9,7 @@ import {
   requireProjectAccess,
   OrgContextError,
 } from "@/app/lib/auth/orgContext";
+import { deriveDiagramDenorm } from "@/app/lib/diagram/denorm";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -156,6 +157,9 @@ export async function PUT(req: Request, { params }: Params) {
           ...(name !== undefined && { name }),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(data !== undefined && { data: data as any }),
+          // Keep the Portal's browse/governance columns in step with the
+          // diagram's classification + procedure-doc link on every data save.
+          ...(data !== undefined && deriveDiagramDenorm(data)),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(colorConfig !== undefined && { colorConfig: colorConfig as any }),
           ...(projectId !== undefined && { projectId }),

@@ -1505,6 +1505,17 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 }}
               />
 
+              {/* Process Portal — org-wide read-only browse + search of the
+                  published processes this user can access. Prominent (blue)
+                  because it's the primary consumption entry point. */}
+              <a
+                href="/portal"
+                className="text-xs font-semibold rounded px-2.5 py-1 border text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100"
+                title="Browse & search all published processes you can access"
+              >
+                📚 Portal
+              </a>
+
               {/* SuperAdmin shortcut — leftmost item in the header menu
                   cluster, SuperAdmin-only. Same destination as the entry
                   that used to live inside the System menu (now removed). */}

@@ -256,6 +256,17 @@ export function ProcessView({
           <span className="text-[11px] text-gray-700 truncate" title="Diagram Owner (accountable user)">
             <span className="text-gray-500">Diagram Owner:</span> {ownerLabel}
           </span>
+          {data.procedureDoc?.url && (
+            <a
+              href={data.procedureDoc.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-blue-700 border border-blue-300 rounded px-1.5 py-0.5 hover:bg-blue-50 shrink-0"
+              title={data.procedureDoc.name ? `Procedure: ${data.procedureDoc.name}` : "Open the procedure document"}
+            >
+              📄 Procedure
+            </a>
+          )}
         </div>
         <button
           type="button"

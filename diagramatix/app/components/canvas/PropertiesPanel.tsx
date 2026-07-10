@@ -106,6 +106,10 @@ interface Props {
    *  sub-section. Both name + email are optional free-text. */
   processOwner?: { name?: string; email?: string };
   onSetProcessOwner?: (owner: { name?: string; email?: string }) => void;
+  /** Per-diagram primary procedure document (the written SOP), surfaced in the
+   *  Portal + the read-only viewer. URL + optional display name. */
+  procedureDoc?: { url?: string; name?: string };
+  onSetProcedureDoc?: (doc: { url?: string; name?: string } | undefined) => void;
   /** APQC PCF classification for this diagram (diagram-level). `projectId` powers
    *  the picker's framework/search fetch. */
   projectId?: string;
@@ -746,6 +750,8 @@ export function PropertiesPanel({
   forceCollapseTitle,
   processOwner,
   onSetProcessOwner,
+  procedureDoc,
+  onSetProcedureDoc,
   projectId,
   pcf,
   onSetPcf,
@@ -802,6 +808,7 @@ export function PropertiesPanel({
   const [databaseSubOpen, setDatabaseSubOpen] = useState(true);
   const [diagramOwnerSubOpen, setDiagramOwnerSubOpen] = useState(true);
   const [processOwnerSubOpen, setProcessOwnerSubOpen] = useState(true);
+  const [procedureDocSubOpen, setProcedureDocSubOpen] = useState(true);
   const [pcfSubOpen, setPcfSubOpen] = useState(true);
 
 
@@ -1078,6 +1085,26 @@ export function PropertiesPanel({
               <input type="text" className="w-full text-[9px] border border-gray-300 rounded px-1 py-0"
                 defaultValue={processOwner?.email ?? ""} key={`po-email-${diagramName}`}
                 onBlur={(e) => onSetProcessOwner({ name: processOwner?.name, email: e.target.value })}
+                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+            </InlineField>
+          </>)}
+        </>)}
+
+        {/* Primary procedure document (the written SOP) — surfaced in the
+            Portal + the read-only viewer. Every diagram type. */}
+        {onSetProcedureDoc && (<>
+          <SubHeader label="Procedure Document" open={procedureDocSubOpen} onToggle={() => setProcedureDocSubOpen(o => !o)} />
+          {procedureDocSubOpen && (<>
+            <InlineField label="Link">
+              <input type="text" placeholder="https://…" className="w-full text-[9px] border border-gray-300 rounded px-1 py-0"
+                defaultValue={procedureDoc?.url ?? ""} key={`pd-url-${diagramName}`}
+                onBlur={(e) => { const url = e.target.value.trim(); onSetProcedureDoc(url ? { url, name: procedureDoc?.name } : undefined); }}
+                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+            </InlineField>
+            <InlineField label="Name">
+              <input type="text" placeholder="e.g. AP Procedure v3" className="w-full text-[9px] border border-gray-300 rounded px-1 py-0"
+                defaultValue={procedureDoc?.name ?? ""} key={`pd-name-${diagramName}`}
+                onBlur={(e) => { const name = e.target.value.trim(); if (procedureDoc?.url) onSetProcedureDoc({ url: procedureDoc.url, name: name || undefined }); }}
                 onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
             </InlineField>
           </>)}

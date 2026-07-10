@@ -347,12 +347,26 @@ model Diagram {
   nextReviewDate                DateTime?
   reviewCadenceMonths           Int?
   lastReviewDueNotifiedAt       DateTime?
+  // ── Process Portal ───────────────────────────────────────────────────
+  // "Primary procedure document" — the written SOP that accompanies this
+  // process. A URL (SharePoint webUrl or any link) + a display name. Set in
+  // Diagram Properties; surfaced read-only in the Portal + /processes viewer.
+  procedureDocUrl               String?
+  procedureDocName              String?
+  // Denormalised from DiagramData.pcf (the diagram-level APQC classification)
+  // so the Portal's category facet + search are DB-native — no need to load
+  // every diagram's `data` JSON. Synced by the diagram save/publish path;
+  // backfilled by scripts/backfill-diagram-pcf.ts.
+  pcfId                         Int?
+  pcfHierarchyId                String?
+  pcfName                       String?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
   @@index([orgId])
   @@index([diagramOwnerId])
   @@index([lifecycle])
+  @@index([orgId, lifecycle])
 }
 
 model DiagramHistory {

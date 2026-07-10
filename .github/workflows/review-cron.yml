@@ -1,0 +1,34 @@
+name: Review-due reminders
+
+# Daily scan for published diagrams / bundles whose review date has passed,
+# firing a `review-due` in-app notification to the accountable owner. The app
+# has no in-process scheduler (App Service recycles), so this GitHub Actions
+# cron is the trigger.
+#
+# Required repository secrets:
+#   APP_BASE_URL  — the deployed app origin, e.g. https://diagramatix.azurewebsites.net
+#   CRON_SECRET   — must match the CRON_SECRET env var set on the App Service
+#
+# The endpoint is a no-op (503) until CRON_SECRET is configured on the app, so
+# this schedule is safe to leave enabled. NOTE: setting CRON_SECRET here does
+# NOT resume mining polling — mining-poll.yml's schedule stays commented out.
+
+on:
+  schedule:
+    - cron: "0 7 * * *"     # daily at 07:00 UTC
+  workflow_dispatch: {}      # manual runs allowed
+
+jobs:
+  review-due:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger review-due scan
+        run: |
+          if [ -z "${{ secrets.APP_BASE_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "APP_BASE_URL / CRON_SECRET not set — skipping."; exit 0
+          fi
+          code=$(curl -s -o /tmp/out.json -w "%{http_code}" -X POST \
+            -H "X-Cron-Key: ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_BASE_URL }}/api/cron/review-due")
+          echo "HTTP $code"; cat /tmp/out.json || true
+          if [ "$code" = "401" ]; then echo "::error::CRON_SECRET mismatch"; exit 1; fi

@@ -285,6 +285,11 @@ export interface DiagramData {
    *  model represents. Keyed on the stable `pcfId` so it survives PCF version
    *  bumps; `nodeId`/`hierarchyId`/`name`/`variant` are cached for display. */
   pcf?: PcfClassification;
+  /** The "primary procedure document" — the written SOP that accompanies this
+   *  process. Set in Diagram Properties (a URL + display name; can be filled
+   *  from the SharePoint picker). Rides autosave + is snapshotted at publish;
+   *  denormalised to Diagram.procedureDoc* columns for the Portal. */
+  procedureDoc?: ProcedureDoc;
   /** AI-generated feedback for this diagram — the "open questions" the AI
    *  raised while building it (e.g. from a recorded meeting / transcript via
    *  the AI-tidy pass). Preserved so the user can revisit and answer them
@@ -295,6 +300,12 @@ export interface DiagramData {
 export interface ProcessOwner {
   name?: string;
   email?: string;
+}
+
+/** The written procedure/SOP linked to a process (Portal governance). */
+export interface ProcedureDoc {
+  url: string;
+  name?: string;
 }
 
 /** APQC PCF classification reference on a diagram (cached from the catalog). */
