@@ -557,7 +557,15 @@ export function layoutGenericDiagram(
   let curX = START_X;
   let curY = startY;
   let rowH = 0;
-  const MAX_COLS = diagramType === "value-chain" ? 8 : 4;
+  // Domain (object model) diagrams: a near-SQUARE grid with WIDE clearance so
+  // associations have clear routing channels between rows/columns and fewer are
+  // forced across an entity box (which the editor flags red). Shorter rows also
+  // mean fewer same-row entities sit between two connected ones.
+  const MAX_COLS = diagramType === "value-chain" ? 8
+    : diagramType === "domain" ? Math.max(2, Math.ceil(Math.sqrt(Math.max(1, unplaced.length))))
+    : 4;
+  const gapX = diagramType === "domain" ? 130 : GRID_GAP_X;
+  const gapY = diagramType === "domain" ? 110 : GRID_GAP_Y;
 
   // For value chain uncontained, pre-check if width expansion needed
   let unplacedChevronW = getSymbolDefinition("chevron").defaultWidth;
@@ -575,7 +583,7 @@ export function layoutGenericDiagram(
   }
 
   for (const ai of unplaced) {
-    if (col >= MAX_COLS) { col = 0; curX = START_X; curY += rowH + GRID_GAP_Y; rowH = 0; }
+    if (col >= MAX_COLS) { col = 0; curX = START_X; curY += rowH + gapY; rowH = 0; }
     const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
     let label = ai.label ?? ai.name ?? ai.type;
     const props = buildProperties(ai, diagramType);
@@ -603,7 +611,7 @@ export function layoutGenericDiagram(
     if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
       curX += elW - CHEVRON_OVERLAP;
     } else {
-      curX += elW + GRID_GAP_X;
+      curX += elW + gapX;
     }
     col++;
   }

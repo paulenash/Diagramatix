@@ -56,6 +56,16 @@ describe("OCEL interaction weighting (T0689)", () => {
     expect(typeof structural[0].weight).toBe("number");
   });
 
+  it("T0692 — domain entities lay out in a compact multi-row grid (routing clearance)", () => {
+    // 3 object types → a near-square 2-column grid (2 rows), not a flat row of 3,
+    // so associations have clearer channels and fewer cross an entity box (red).
+    const data = buildDomainFromOcel(oc);
+    const cls = data.elements.filter((e) => e.type === "uml-class");
+    expect(cls).toHaveLength(3);
+    const rows = new Set(cls.map((e) => Math.round(e.y)));
+    expect(rows.size).toBeGreaterThanOrEqual(2);
+  });
+
   it("tags a state-machine transition with the other types its activity touches", () => {
     const plan = buildOcelStudy(OCEL2, { selectedTypes: ["order"] });
     const order = plan.types.find((t) => t.objectType === "order")!;
