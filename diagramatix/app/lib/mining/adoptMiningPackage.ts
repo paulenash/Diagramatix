@@ -61,6 +61,26 @@ export async function adoptMiningPackage(
       });
     }
 
+    // OCEL study — recreate every per-object-type run, cross-linked to the shared
+    // Domain Diagram + each run's discovered/reference state machine (all freshly
+    // minted above). A new ocelGroupId ties the adopted study together.
+    if (pkg.runs?.length) {
+      const domainDiagramId = pkg.domainDiagramKey ? keyToDiagramId.get(pkg.domainDiagramKey) ?? null : null;
+      const ocelGroupId = crypto.randomUUID();
+      let firstRunId: string | null = null;
+      for (const r of pkg.runs) {
+        const refId = r.referenceSmKey ? keyToDiagramId.get(r.referenceSmKey) ?? null : null;
+        const smId = r.discoveredSmKey ? keyToDiagramId.get(r.discoveredSmKey) ?? null : null;
+        const run = await tx.processMiningRun.create({
+          data: { name: r.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId: refId, discoveredSmId: smId, ocelGroupId, objectType: r.objectType ?? null, domainDiagramId },
+        });
+        await tx.$executeRaw`UPDATE "ProcessMiningRun" SET mapping = ${JSON.stringify(r.mapping)}::jsonb, stats = ${JSON.stringify(r.stats)}::jsonb, variants = ${JSON.stringify(r.variants)}::jsonb, performance = ${JSON.stringify(r.performance)}::jsonb, governance = ${r.governance ? JSON.stringify(r.governance) : null}::jsonb, "updatedAt" = NOW() WHERE id = ${run.id}`;
+        firstRunId ??= run.id;
+      }
+      // Open the object model (Domain Diagram) — the study's home.
+      return { projectId: project.id, projectName: project.name, runId: firstRunId, openDiagramId: domainDiagramId ?? keyToDiagramId.values().next().value ?? null };
+    }
+
     const referenceSmId = pkg.run.referenceSmKey ? keyToDiagramId.get(pkg.run.referenceSmKey) ?? null : null;
     const openDiagramId = referenceSmId ?? keyToDiagramId.values().next().value ?? null;
 

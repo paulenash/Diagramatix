@@ -47,6 +47,25 @@ describe("mining example package", () => {
     const s = summarizeMiningPackage(STARTER_MINING_EXAMPLES[0].package);
     expect(s).toEqual({ references: 2, cases: 200, variants: 10, states: 7 });
   });
+
+  it("T0693 — an OCEL study package (runs[] + domain + discovered/reference SMs) validates; dangling keys are flagged", () => {
+    const diag = (key: string, type = "state-machine") => ({ key, name: key, type, data: { elements: [], connectors: [] } });
+    const mkRun = (objectType: string, discoveredSmKey?: string, referenceSmKey?: string): MiningExamplePackage["run"] => ({
+      name: `study — ${objectType}`, objectType, discoveredSmKey, referenceSmKey,
+      mapping: { caseId: "case", activity: "activity", timestamp: "timestamp" },
+      stats: { cases: 1, events: 1, activities: [], states: [], variants: 1 },
+      variants: [{ states: ["Placed"], events: ["place order"], count: 1 }],
+      performance: { clockUnit: "hour", activityDurations: {}, interArrival: [], activityResource: {}, resourceConcurrency: {}, activeHours: new Array(168).fill(0) },
+    });
+    const runs = [mkRun("order", "sm-order", "ref-order"), mkRun("item", "sm-item")];
+    const ok: MiningExamplePackage = { version: 1, diagrams: [diag("sm-order"), diag("ref-order"), diag("sm-item"), diag("dom", "domain")], run: runs[0], runs, domainDiagramKey: "dom" };
+    expect(validateMiningExamplePackage(ok)).toEqual([]);
+
+    const bad: unknown = { ...ok, runs: [mkRun("order", "missing-sm")], domainDiagramKey: "missing-dom" };
+    const errs = validateMiningExamplePackage(bad);
+    expect(errs.some((e) => e.includes('discoveredSmKey "missing-sm"'))).toBe(true);
+    expect(errs.some((e) => e.includes('domainDiagramKey "missing-dom"'))).toBe(true);
+  });
 });
 
 describe("the shipped Accounts Payable starter example", () => {

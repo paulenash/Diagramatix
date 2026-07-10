@@ -14,47 +14,73 @@ import {
   type MiningExamplePackage,
   type MiningExampleDiagram,
 } from "./examplePackage";
+import type { MiningExampleRun } from "./examplePackage";
 import type { LogMapping, MiningStats, Variant, Performance, GovernanceStats } from "./types";
 
 export interface CaptureMiningResult { pkg: MiningExamplePackage; runName: string }
 
-/** Build the portable package for one mining run in a project. Throws on a
- *  missing run, a run with no reference SM, or a package that fails validation. */
+/** The ProcessMiningRun fields capture reads (a structural subset of the model). */
+type DbRun = {
+  name: string; mapping: unknown; stats: unknown; variants: unknown; performance: unknown; governance: unknown;
+  referenceSmId: string | null; discoveredSmId: string | null; objectType: string | null;
+};
+
+/** Build the portable package for a mining run — or, when the run is part of an
+ *  OCEL study (has an ocelGroupId), the WHOLE study: every object type's run +
+ *  its discovered + reference state machines + the shared Domain Diagram. Throws
+ *  on a missing/empty run or a package that fails validation. */
 export async function captureMiningPackage(projectId: string, runId: string): Promise<CaptureMiningResult> {
-  const run = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId } });
-  if (!run) throw new Error("Run not found in project");
+  const primary = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId } });
+  if (!primary) throw new Error("Run not found in project");
 
-  const variants = (run.variants ?? []) as unknown as Variant[];
-  if (!Array.isArray(variants) || variants.length === 0) throw new Error("Run has no variants to capture");
-  const performance = (run.performance ?? null) as unknown as Performance | null;
-  if (!performance?.clockUnit) throw new Error("Run has no performance data — re-import the log");
-  const governance = (run.governance ?? null) as unknown as GovernanceStats | null;
-
-  // Carry the reference SM diagram (id = package key) when one is set.
   const diagrams: MiningExampleDiagram[] = [];
-  let referenceSmKey: string | undefined;
-  if (run.referenceSmId) {
-    const ref = await prisma.diagram.findFirst({ where: { id: run.referenceSmId, projectId }, select: { id: true, name: true, type: true, data: true } });
-    if (ref) {
-      diagrams.push({ key: ref.id, name: ref.name, type: ref.type || "state-machine", data: (ref.data ?? {}) as unknown as DiagramData });
-      referenceSmKey = ref.id;
-    }
-  }
+  const seen = new Set<string>();
+  // Capture a diagram by id (dedup); returns its package key (= the id) or undefined.
+  const capture = async (id: string | null | undefined): Promise<string | undefined> => {
+    if (!id) return undefined;
+    if (seen.has(id)) return id;
+    const d = await prisma.diagram.findFirst({ where: { id, projectId }, select: { id: true, name: true, type: true, data: true } });
+    if (!d) return undefined;
+    seen.add(d.id);
+    diagrams.push({ key: d.id, name: d.name, type: d.type || "state-machine", data: (d.data ?? {}) as unknown as DiagramData });
+    return d.id;
+  };
 
-  const pkg: MiningExamplePackage = {
-    version: 1,
-    diagrams,
-    run: {
-      name: run.name,
-      mapping: (run.mapping ?? {}) as unknown as LogMapping,
-      stats: (run.stats ?? {}) as unknown as MiningStats,
+  const toRun = async (r: DbRun): Promise<MiningExampleRun> => {
+    const variants = (r.variants ?? []) as unknown as Variant[];
+    if (!Array.isArray(variants) || variants.length === 0) throw new Error(`Run "${r.name}" has no variants to capture`);
+    const performance = (r.performance ?? null) as unknown as Performance | null;
+    if (!performance?.clockUnit) throw new Error(`Run "${r.name}" has no performance data — re-import the log`);
+    const governance = (r.governance ?? null) as unknown as GovernanceStats | null;
+    const referenceSmKey = await capture(r.referenceSmId);
+    const discoveredSmKey = await capture(r.discoveredSmId);
+    return {
+      name: r.name,
+      mapping: (r.mapping ?? {}) as unknown as LogMapping,
+      stats: (r.stats ?? {}) as unknown as MiningStats,
       variants,
       performance,
       ...(governance && Object.keys(governance.controls ?? {}).length ? { governance } : {}),
       ...(referenceSmKey ? { referenceSmKey } : {}),
-    },
+      ...(r.objectType ? { objectType: r.objectType } : {}),
+      ...(discoveredSmKey ? { discoveredSmKey } : {}),
+    };
   };
+
+  let pkg: MiningExamplePackage;
+  if (primary.ocelGroupId) {
+    // OCEL study — capture the Domain Diagram + every sibling run (sequentially,
+    // so the shared diagrams array isn't raced).
+    const siblings = await prisma.processMiningRun.findMany({ where: { projectId, ocelGroupId: primary.ocelGroupId }, orderBy: { createdAt: "asc" } });
+    const domainDiagramKey = await capture(primary.domainDiagramId);
+    const runs: MiningExampleRun[] = [];
+    for (const s of siblings) runs.push(await toRun(s));
+    pkg = { version: 1, diagrams, run: runs[0], runs, ...(domainDiagramKey ? { domainDiagramKey } : {}) };
+  } else {
+    pkg = { version: 1, diagrams, run: await toRun(primary) };
+  }
+
   const errs = validateMiningExamplePackage(pkg);
   if (errs.length) throw new Error(`Captured package invalid: ${errs.join("; ")}`);
-  return { pkg, runName: run.name };
+  return { pkg, runName: primary.name };
 }

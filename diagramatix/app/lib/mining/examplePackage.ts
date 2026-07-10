@@ -39,6 +39,10 @@ export interface MiningExampleRun {
   governance?: GovernanceStats;
   /** Which package diagram (by key) the run should adopt as its reference SM. */
   referenceSmKey?: string;
+  /** OCEL study — the object type this run's lifecycle is for. */
+  objectType?: string;
+  /** OCEL study — this run's discovered state-machine diagram (by package key). */
+  discoveredSmKey?: string;
 }
 
 /** The raw sample event log carried in the bundle. When present, adopt does NOT
@@ -58,9 +62,17 @@ export interface MiningExampleSampleLog {
 
 export interface MiningExamplePackage {
   version: 1;
-  /** Reference state-machine diagrams (the single source of truth for states). */
+  /** All carried diagrams by key: reference SMs, and (for an OCEL study) the
+   *  Domain Diagram + each object type's discovered state machine. */
   diagrams: MiningExampleDiagram[];
+  /** The primary run. For a single-object example this IS the run; for an OCEL
+   *  study it is the first of `runs` (kept so legacy consumers still work). */
   run: MiningExampleRun;
+  /** OCEL study — one run per object type (the whole grouped study). When present,
+   *  adopt recreates all of them + the Domain Diagram, cross-linked. */
+  runs?: MiningExampleRun[];
+  /** OCEL study — the Domain Diagram (object model), by package key. */
+  domainDiagramKey?: string;
   /** Optional raw log for the "confirm the CSV analysis, then import" flow.
    *  When several scenarios ship, this is the recommended/default one (also the
    *  last entry of `sampleLogs`). */
@@ -103,15 +115,24 @@ export function validateMiningExamplePackage(pkg: unknown): string[] {
     if (!d?.data || typeof d.data !== "object") errs.push(`Diagram ${d?.key ?? "?"} has no data`);
   }
 
-  const r = p.run;
-  if (!r || typeof r !== "object") { errs.push("`run` is required"); return errs; }
-  if (typeof r.name !== "string" || !r.name) errs.push("`run.name` is required");
-  if (!r.mapping || !r.mapping.caseId || !r.mapping.activity || !r.mapping.timestamp) {
-    errs.push("`run.mapping` must map caseId, activity and timestamp");
+  const validateRun = (r: MiningExampleRun | undefined, label: string) => {
+    if (!r || typeof r !== "object") { errs.push(`\`${label}\` is required`); return; }
+    if (typeof r.name !== "string" || !r.name) errs.push(`\`${label}.name\` is required`);
+    if (!r.mapping || !r.mapping.caseId || !r.mapping.activity || !r.mapping.timestamp) {
+      errs.push(`\`${label}.mapping\` must map caseId, activity and timestamp`);
+    }
+    if (!Array.isArray(r.variants) || r.variants.length === 0) errs.push(`\`${label}.variants\` must be a non-empty array`);
+    if (!r.performance || typeof r.performance.clockUnit !== "string") errs.push(`\`${label}.performance\` is required (with a clockUnit)`);
+    if (r.referenceSmKey && !keys.has(r.referenceSmKey)) errs.push(`${label}.referenceSmKey "${r.referenceSmKey}" does not match any diagram key`);
+    if (r.discoveredSmKey && !keys.has(r.discoveredSmKey)) errs.push(`${label}.discoveredSmKey "${r.discoveredSmKey}" does not match any diagram key`);
+  };
+  validateRun(p.run, "run");
+  // OCEL study — validate each per-type run + the domain diagram key.
+  if (p.runs !== undefined) {
+    if (!Array.isArray(p.runs) || p.runs.length === 0) errs.push("`runs` must be a non-empty array when present");
+    else p.runs.forEach((r, i) => validateRun(r, `runs[${i}]`));
   }
-  if (!Array.isArray(r.variants) || r.variants.length === 0) errs.push("`run.variants` must be a non-empty array");
-  if (!r.performance || typeof r.performance.clockUnit !== "string") errs.push("`run.performance` is required (with a clockUnit)");
-  if (r.referenceSmKey && !keys.has(r.referenceSmKey)) errs.push(`run.referenceSmKey "${r.referenceSmKey}" does not match any diagram key`);
+  if (p.domainDiagramKey && !keys.has(p.domainDiagramKey)) errs.push(`domainDiagramKey "${p.domainDiagramKey}" does not match any diagram key`);
 
   const validateLog = (sl: MiningExampleSampleLog, label: string) => {
     if (!Array.isArray(sl.headers) || sl.headers.length === 0) errs.push(`\`${label}.headers\` must be a non-empty array`);
