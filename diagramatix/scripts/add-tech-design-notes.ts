@@ -179,6 +179,30 @@ const CHAPTERS: Chapter[] = [
       { heading: "Notifications & feedback", body: [
         "System events (reviews, publishing, feedback) raise `Notification`s surfaced in a per-user feed; a SuperAdmin/OrgAdmin can inspect any user's feed filtered by org and user.",
       ].join("\n") },
+      { heading: "Review-due reminders", body: [
+        "A daily GitHub-Actions cron POSTs `app/api/cron/review-due` (guarded by `X-Cron-Key: CRON_SECRET`, mirroring the mining poller — the app has no in-process scheduler). The pure `app/lib/diagram/reviewDue.ts` selects published diagrams/bundles whose `nextReviewDate` has passed and that haven't been notified for the current window (`lastReviewDueNotifiedAt`), fires the pre-existing `review-due` `Notification` to the Diagram Owner / bundle publisher, and stamps the guard so re-runs are idempotent. Setting `CRON_SECRET` for this does **not** resume mining polling (that workflow's schedule stays commented).",
+      ].join("\n") },
+    ],
+  },
+  {
+    slug: "process-portal",
+    title: "Process Portal & Entity Discovery",
+    sections: [
+      { heading: "What the Portal adds", body: [
+        "The publish→version→viewer chain (previous chapter) is push-only: a reader finds a process only if a bundle was pushed to them. The **Process Portal** (`/portal`) adds the missing **pull** side — an org-wide, **access-scoped** search/browse over *published* processes — without a new visibility model. It reuses the existing read-only viewer (`app/(dashboard)/processes/[id]`); it only adds discovery.",
+      ].join("\n") },
+      { heading: "Access-scoped resolver", body: [
+        "`app/lib/portal/accessiblePublished.ts` batches the same rules as `orgContext` (project ownership + `ProjectShare` + silent org-admin elevation, plus the active-`PublicationBundleAudience` path) into a handful of queries — the union of published diagrams (`lifecycle=PUBLISHED`, `currentPublishedVersionId` set) a caller can already open, deduped. No per-diagram N+1 checks. Sets are modest, so the server ships the slim index and the client searches/facets in memory (`app/lib/portal/facets.ts`).",
+      ].join("\n") },
+      { heading: "Denormalised browse columns", body: [
+        "Faceting/search must be cheap, so `app/lib/diagram/denorm.ts` (`deriveDiagramDenorm`) mirrors browse/governance fields out of the diagram `data` JSON onto flat `Diagram` columns on **every save** (and a one-off backfill, `scripts/backfill-diagram-pcf.ts`): `pcfId`/`pcfHierarchyId`/`pcfName` (APQC facet), `procedureDocUrl`/`procedureDocName` (the linked SOP), and `entityRefs` (the pools/lanes/systems the diagram references, extracted by `extractEntities.ts`). These are query caches derived from `data` — not part of the diagram export.",
+      ].join("\n") },
+      { heading: "Entity where-used & canonicalisation", body: [
+        "`extractEntities.ts` classifies pools/lanes/system shapes into raw `{kind,name}` refs (systems = black-box `isSystem` pools + data-stores; teams/roles = white-box pools + lanes/sublanes; external participants). At read time `app/lib/portal/entityIndex.ts` canonicalises those labels against the **org-master Entity Lists** with **normalized-exact** matching (no fuzzy — never mis-attributes), rolling org refs **up** to their ancestors so a Team facet also matches its child-Role diagrams. Unmatched labels survive as flagged \"uncatalogued\" entries (a coverage signal), never dropped.",
+      ].join("\n") },
+      { heading: "My Teams & \"Involving me\"", body: [
+        "There is no `User`↔team link in the base model, so an admin-managed join table **`OrgMemberTeam`** (`{orgId,userId,entityNodeId}`, unique per triple) records membership. It's written only via `app/api/orgs/[id]/member-teams` (gated by `requireOrgAdminFor` — OrgAdmin own org, SuperAdmin any) from the Team Membership admin panel. The Portal's \"Involving me\" toggle filters to diagrams whose (rolled-up) team refs intersect the reader's assigned nodes. `OrgMemberTeam` is a grant table: carried by the full SuperAdmin backup, omitted from scoped org/user backups like `ProjectShare` (pinned in `tests/backup/coverage.test.ts`).",
+      ].join("\n") },
     ],
   },
   {

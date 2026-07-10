@@ -396,6 +396,14 @@
     classification and element.properties.pcfHierarchyId/pcfId (open PropertiesType,
     unchanged). New runtime tables PcfFramework + PcfNode and a Project.pcf column
     are not part of the diagram export.
+
+  v1.36 — Primary procedure document. SHAPE CHANGE: a new OPTIONAL <procedureDoc>
+    element on DiagramDataType (after <processOwner>) — the written SOP linked to a
+    process, with a required url and an optional name. Runtime-only (NOT in the
+    export): the Process Portal (org-wide search/browse of published processes,
+    entity where-used search, admin-managed "My Teams") and the review-due reminder
+    cron; their Diagram denorm columns (procedureDoc*/pcf*/entityRefs) are derived
+    from data and are not part of the diagram export.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -510,6 +518,8 @@
       <xs:element name="title"        type="dgx:DiagramTitleType"  minOccurs="0"/>
       <!-- schema 1.14 — per-diagram process owner (name + email). -->
       <xs:element name="processOwner" type="dgx:ProcessOwnerType"  minOccurs="0"/>
+      <!-- schema 1.36 — primary procedure document (linked SOP): url + name. -->
+      <xs:element name="procedureDoc" type="dgx:ProcedureDocType"  minOccurs="0"/>
     </xs:sequence>
     <xs:attribute name="fontSize"          type="xs:decimal" use="optional"/>
     <xs:attribute name="connectorFontSize" type="xs:decimal" use="optional"/>
@@ -541,6 +551,14 @@
   <xs:complexType name="ProcessOwnerType">
     <xs:attribute name="name"  type="xs:string" use="optional"/>
     <xs:attribute name="email" type="xs:string" use="optional"/>
+  </xs:complexType>
+
+  <!-- ============================================================ -->
+  <!-- ProcedureDoc — schema 1.36 (the linked written SOP)          -->
+  <!-- ============================================================ -->
+  <xs:complexType name="ProcedureDocType">
+    <xs:attribute name="url"  type="xs:string" use="required"/>
+    <xs:attribute name="name" type="xs:string" use="optional"/>
   </xs:complexType>
 
   <xs:simpleType name="DiagramStatusEnum">

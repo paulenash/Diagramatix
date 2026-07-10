@@ -104,6 +104,11 @@ export function diagramDataXml(dd: DiagramData, ind: string): string {
     x += `${ind}  <dgx:processOwner${attr("name", dd.processOwner.name)}${attr("email", dd.processOwner.email)}/>\n`;
   }
 
+  // Primary procedure document — schema v1.36. Optional; omit when no URL.
+  if (dd.procedureDoc && dd.procedureDoc.url) {
+    x += `${ind}  <dgx:procedureDoc${attr("url", dd.procedureDoc.url)}${attr("name", dd.procedureDoc.name)}/>\n`;
+  }
+
   x += `${ind}</dgx:data>\n`;
   return x;
 }
@@ -441,6 +446,16 @@ export function parseDiagramatixXml(xmlText: string): any {
           name: name || undefined,
           email: email || undefined,
         };
+      }
+    }
+
+    // Primary procedure document — schema v1.36. Optional; missing on pre-1.36
+    // exports. Requires a url; the name is optional.
+    const pdEl = getChild(dataEl, "procedureDoc");
+    if (pdEl) {
+      const url = pdEl.getAttribute("url") ?? "";
+      if (url) {
+        data.procedureDoc = { url, name: pdEl.getAttribute("name") || undefined };
       }
     }
 

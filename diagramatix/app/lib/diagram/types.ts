@@ -861,5 +861,17 @@ export interface TemplateData {
  *             Project gains a `pcf` JSON column. Reference frameworks import from
  *             APQC .xlsx; tailoring/versioning/divisions + coverage + by-category
  *             compliance are runtime/app, not part of the diagram export.
+ *
+ *  v1.36 (2026-07-10): Primary procedure document. Diagrams carry an OPTIONAL
+ *             `DiagramData.procedureDoc` ({ url, name? }) — the written SOP linked
+ *             to a process, surfaced read-only in the Process Portal + viewer. The
+ *             ONE XSD shape change: a new OPTIONAL `<procedureDoc>` element on
+ *             DiagramDataType (ProcedureDocType), mirroring `<processOwner>`.
+ *             Runtime-only (NOT part of the diagram export): the Process Portal
+ *             (org-wide search/browse of published processes, entity where-used
+ *             search by IT-system/team, admin-managed "My Teams" → OrgMemberTeam
+ *             table + Diagram denorm columns procedureDoc/pcf/entityRefs) and
+ *             the review-due reminder cron. The denorm columns are a query
+ *             optimisation derived from `data`, so they are NOT in the export.
  */
-export const SCHEMA_VERSION = "1.35";
+export const SCHEMA_VERSION = "1.36";

@@ -222,6 +222,11 @@ jobs:
           npx --yes tsx@4 scripts/add-tech-design-notes.ts || echo "add-tech-design-notes skipped"
           npx --yes tsx@4 scripts/add-guide-tech-design-notes.ts || echo "add-guide-tech-design-notes skipped"
           npx --yes tsx@4 scripts/add-guide-ddl.ts || echo "add-guide-ddl skipped"
+          npx --yes tsx@4 scripts/add-features-process-portal.ts || echo "add-features-process-portal skipped"
+          npx --yes tsx@4 scripts/add-guide-process-portal.ts || echo "add-guide-process-portal skipped"
+          # Populate the Portal's denormalised Diagram columns (pcf*/procedureDoc*/
+          # entityRefs) for diagrams last saved before those columns existed. Idempotent.
+          npx --yes tsx@4 scripts/backfill-diagram-pcf.ts || echo "backfill-diagram-pcf skipped"
 
       - name: Update App Service container image
         # `az webapp config container set` rewrites the container

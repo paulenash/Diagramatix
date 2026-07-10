@@ -177,3 +177,26 @@ describe("Diagramatix XML export → import round-trip", () => {
     }
   });
 });
+
+describe("Diagramatix XML — procedureDoc, schema 1.36 (T0703)", () => {
+  const withDoc: DiagramData = { ...build(SCENARIOS[0]), procedureDoc: { url: "https://sp/ap.docx", name: "AP Procedure v3" } };
+  const xml = exportXml("with procedure", withDoc);
+
+  it("emits <dgx:procedureDoc> and stays XSD-valid", async () => {
+    expect(xml).toContain("<dgx:procedureDoc");
+    const res = await validateAgainstXsd(xml);
+    expect(res.errors.map((e) => e.message)).toEqual([]);
+    expect(res.valid).toBe(true);
+  });
+
+  it("round-trips url + name", () => {
+    const back = parseDiagramatixXml(xml).diagrams[0].data as DiagramData;
+    expect(back.procedureDoc).toEqual({ url: "https://sp/ap.docx", name: "AP Procedure v3" });
+  });
+
+  it("omits the element (and stays valid) when there is no procedure doc", async () => {
+    const plain = exportXml("no procedure", build(SCENARIOS[0]));
+    expect(plain).not.toContain("procedureDoc");
+    expect((await validateAgainstXsd(plain)).valid).toBe(true);
+  });
+});

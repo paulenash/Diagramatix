@@ -292,6 +292,21 @@ const entityTables: Table[] = [
     c("sort_order", T.int, { nn: true, default: { postgres: "0", mysql: "0", mssql: "0" } }),
     c("created_at", T.ts, nn), c("updated_at", T.ts, nn),
   ], indexes: [{ name: "idx_entity_node_list", columns: ["list_id", "parent_id", "sort_order"] }] },
+  // Process Portal (schema 1.36) — admin-managed team membership: which
+  // org-structure entity_node (Team/Role) a member belongs to. Drives the
+  // Portal's "Involving me" view. (The Portal's Diagram denorm columns —
+  // procedure_doc_*/pcf_*/entity_refs — are query caches derived from the
+  // diagram JSON, so like `data`/`color_config` they are not in this logical
+  // model.)
+  { name: "org_member_team", columns: [
+    c("id", T.text, pk),
+    c("org_id", T.text, { nn: true, fk: fk("org", "id", "CASCADE") }),
+    c("user_id", T.text, { nn: true, fk: fk("app_user", "id", "CASCADE") }),
+    c("entity_node_id", T.text, { nn: true, fk: fk("entity_node", "id", "CASCADE") }),
+    c("created_at", T.ts, nn),
+    c("created_by_id", T.text, { fk: fk("app_user", "id", "SET NULL") }),
+  ], uniqueConstraints: [["org_id", "user_id", "entity_node_id"]],
+    indexes: [{ name: "idx_org_member_team", columns: ["org_id", "user_id"] }] },
 ];
 
 // ── DDL Generator ───────────────────────────────────────────────────

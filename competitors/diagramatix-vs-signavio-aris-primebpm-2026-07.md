@@ -1,9 +1,23 @@
-# Diagramatix Feature Comparison — July 2026 (rev 4)
+# Diagramatix Feature Comparison — July 2026 (rev 5)
 ## Diagramatix vs SAP Signavio, ARIS, and PRIME BPM
 
-**Prepared:** 8 July 2026
-**Supersedes:** the 7 July 2026 edition (rev 3) — which superseded the 5 July (rev 2), 4 July refresh and 21 June editions
+**Prepared:** 10 July 2026
+**Supersedes:** the 8 July 2026 edition (rev 4) — which superseded the 7 July (rev 3), 5 July (rev 2), 4 July refresh and 21 June editions
 **Scope:** The current Diagramatix feature catalogue compared against publicly described capabilities of SAP Signavio, Software AG **ARIS**, and **PRIME BPM**. Celonis is referenced as the process-mining benchmark where relevant.
+
+---
+
+## Update — 10 July 2026 (rev 5): the Process Portal & entity "where-used" search
+
+Since rev 4, Diagramatix added a **consumption layer** on top of the publishing engine — turning the authored process estate into something the *whole organisation* can find and self-serve, and adding the cross-model **"where-used"** query that has historically been an enterprise-repository differentiator (ARIS, Signavio Collaboration Hub):
+
+- **Process Portal.** A **search-first**, org-wide surface where any member browses and finds the published processes they can access — without knowing which project a process lives in. Facets for **APQC category, diagram type, owner and review status**, each with live combining counts, plus recently-viewed/updated shortcuts, opening straight into the read-only viewer. Crucially it is **access-scoped**: it adds discovery, never new exposure.
+- **Entity "where-used" search.** Every published process is mapped to the **IT systems** and **teams/roles** it references (read off its pools/lanes/system shapes), matched to the organisation's **Entity Lists**. Readers filter by *"which processes use System X?"* or *"which involve Team Y?"* — with **team→role roll-up** (a team surfaces its child-role processes) and **uncatalogued labels flagged** as a catalogue-coverage signal.
+- **"Involving me" + admin-managed team membership.** A one-click personal view of every process that references a team/role you belong to. Membership is **governed** (OrgAdmin for their org, SuperAdmin for all), not self-declared.
+- **Primary procedure document.** Each model can carry its written **SOP** link, surfaced beside the diagram in the Portal and viewer — the diagram and the words together.
+- **Review-due reminders.** The publish lifecycle's scheduled re-review now actively **fires a "review due" notification** to the accountable owner, and the Portal badges overdue/ due-soon processes.
+
+**Net effect:** Diagramatix moves from *"author and publish"* to *"author → publish → **discover / self-serve / govern usage**."* The **Process Portal** answers the enterprise "process handbook / repository portal" need (Signavio Collaboration Hub, ARIS repository) but scoped to a lean single product, and the **entity where-used** query — *which processes touch this system or this team* — is a genuine **impact-analysis / cross-model** capability normally reserved for the enterprise repositories. Positioned against Celonis specifically: Diagramatix keeps its state-machine/BPMN modelling stance and consumes the *authored* estate, rather than chasing object-centric mining visuals.
 
 ---
 
@@ -104,8 +118,12 @@ The Diagramatix side is grounded in the shipped feature catalogue. The comparato
 | Cross-functional pools / lanes / sub-lanes | **Strong** | **Strong** | **Strong** | **Strong** |
 | Diagram health check & connector scan | **Strong** | Partial | Partial | Not found |
 | Automatic sub-process linking / drill-down | **Strong** | **Strong** (repository) | **Strong** (repository) | Partial |
-| Publishing & review lifecycle (versioned, re-review reminders) | **Strong** | **Strong** (Collaboration Hub) | **Strong** | **Strong** (publication) |
+| Publishing & review lifecycle (versioned, re-review reminders fire) | **Strong** | **Strong** (Collaboration Hub) | **Strong** | **Strong** (publication) |
 | Collaboration, comments & sign-off | **Strong** | **Strong** | **Strong** | **Strong** |
+| **Process portal — org-wide search/browse of published processes** | **Strong** (Process Portal, access-scoped) | **Strong** (Collaboration Hub) | **Strong** (ARIS repository/portal) | Partial (published viewer) |
+| **Entity where-used / cross-model impact search** (which processes use system/team) | **Strong** (matched to Entity Lists, team→role roll-up) | Partial (dictionary/where-used in repository) | **Strong** (repository object usage) | Not found |
+| **Personal "processes involving me" view** | **Strong** (admin-managed team membership) | Partial | Partial | Not found |
+| Linked procedure/SOP document per model | **Strong** (Portal + viewer) | **Strong** (attachments/links) | **Strong** | Partial |
 | Governed naming from org/entity lists | **Strong** | Partial (dictionary/glossary) | **Strong** (repository objects) | Partial |
 | **Process discovery from event logs (→ BPMN)** | **Strong** (DiagramatixMINER) | **Strong** (Process Intelligence) | **Strong** (ARIS Mining) | Not found |
 | **Entity state-machine lifecycle mining** | **Strong** (distinctive) | Partial | Partial | Not found |
