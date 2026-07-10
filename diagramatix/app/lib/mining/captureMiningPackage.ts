@@ -13,9 +13,13 @@ import {
   validateMiningExamplePackage,
   type MiningExamplePackage,
   type MiningExampleDiagram,
+  type MiningExampleTwin,
 } from "./examplePackage";
 import type { MiningExampleRun } from "./examplePackage";
 import type { LogMapping, MiningStats, Variant, Performance, GovernanceStats } from "./types";
+import type { ExampleTeam, ExampleCalendar, ExampleScenario } from "../simulation/examplePackage";
+import type { ScenarioRunConfig, WorkCalendar } from "../simulation/types";
+import type { OverrideSet } from "../simulation/overrides";
 
 export interface CaptureMiningResult { pkg: MiningExamplePackage; runName: string }
 
@@ -23,7 +27,11 @@ export interface CaptureMiningResult { pkg: MiningExamplePackage; runName: strin
 type DbRun = {
   name: string; mapping: unknown; stats: unknown; variants: unknown; performance: unknown; governance: unknown;
   referenceSmId: string | null; discoveredSmId: string | null; objectType: string | null;
+  discoveredBpmnId: string | null; studyId: string | null;
 };
+
+const variantIdsOf = (id: unknown): string[] =>
+  Array.isArray(id) ? (id as unknown[]).filter((x): x is string => typeof x === "string") : [];
 
 /** Build the portable package for a mining run — or, when the run is part of an
  *  OCEL study (has an ocelGroupId), the WHOLE study: every object type's run +
@@ -54,6 +62,34 @@ export async function captureMiningPackage(projectId: string, runId: string): Pr
     const governance = (r.governance ?? null) as unknown as GovernanceStats | null;
     const referenceSmKey = await capture(r.referenceSmId);
     const discoveredSmKey = await capture(r.discoveredSmId);
+    // Calibrated twin: the discovered BPMN (study root) + the SimulationStudy's
+    // scenarios. The team/calendar library is captured once at package level.
+    const discoveredBpmnKey = await capture(r.discoveredBpmnId);
+    let twin: MiningExampleTwin | undefined;
+    if (r.studyId && discoveredBpmnKey) {
+      const study = await prisma.simulationStudy.findFirst({
+        where: { id: r.studyId, projectId },
+        include: { scenarios: { orderBy: { createdAt: "asc" } } },
+      });
+      if (study?.scenarios.length) {
+        const scenarios: ExampleScenario[] = [];
+        for (const sc of study.scenarios) {
+          const variantRootKeys: string[] = [];
+          for (const vid of variantIdsOf(sc.variantRootIds)) {
+            const k = await capture(vid);
+            if (k) variantRootKeys.push(k);
+          }
+          scenarios.push({
+            name: sc.name,
+            isBaseline: sc.isBaseline,
+            runConfig: (sc.runConfig ?? {}) as unknown as ScenarioRunConfig,
+            overrides: (sc.overrides ?? {}) as unknown as OverrideSet,
+            ...(variantRootKeys.length ? { variantRootKeys } : {}),
+          });
+        }
+        twin = { studyName: study.name, scenarios };
+      }
+    }
     return {
       name: r.name,
       mapping: (r.mapping ?? {}) as unknown as LogMapping,
@@ -64,6 +100,8 @@ export async function captureMiningPackage(projectId: string, runId: string): Pr
       ...(referenceSmKey ? { referenceSmKey } : {}),
       ...(r.objectType ? { objectType: r.objectType } : {}),
       ...(discoveredSmKey ? { discoveredSmKey } : {}),
+      ...(discoveredBpmnKey ? { discoveredBpmnKey } : {}),
+      ...(twin ? { twin } : {}),
     };
   };
 
@@ -78,6 +116,21 @@ export async function captureMiningPackage(projectId: string, runId: string): Pr
     pkg = { version: 1, diagrams, run: runs[0], runs, ...(domainDiagramKey ? { domainDiagramKey } : {}) };
   } else {
     pkg = { version: 1, diagrams, run: await toRun(primary) };
+  }
+
+  // Twin team/calendar library — project-scoped (shared across the study's
+  // per-object-type twins), so carried once. Mirrors captureProjectPackage.
+  if ((pkg.runs ?? [pkg.run]).some((r) => r.twin)) {
+    const teamRows = await prisma.simulationTeam.findMany({ where: { projectId }, select: { name: true, capacity: true, costPerHour: true, efficiency: true, calendarId: true } });
+    const calendarRows = await prisma.simulationCalendar.findMany({ where: { projectId }, select: { id: true, name: true, pattern: true } });
+    const calIdToName = new Map(calendarRows.map((c) => [c.id, c.name]));
+    const calendars: ExampleCalendar[] = calendarRows.map((c) => ({ name: c.name, pattern: (c.pattern ?? { intervals: [] }) as unknown as WorkCalendar }));
+    const teams: ExampleTeam[] = teamRows.map((t) => ({
+      name: t.name, capacity: t.capacity, costPerHour: t.costPerHour, efficiency: t.efficiency,
+      ...(t.calendarId && calIdToName.has(t.calendarId) ? { calendarName: calIdToName.get(t.calendarId)! } : {}),
+    }));
+    pkg.teams = teams;
+    if (calendars.length) pkg.calendars = calendars;
   }
 
   const errs = validateMiningExamplePackage(pkg);

@@ -9,14 +9,21 @@
  * adopt can mint new diagram ids and point the run's `referenceSmId` at the
  * fresh id without the example carrying stale ids. Internal element/connector
  * ids are preserved on adopt, so conformance (which matches by label) and any
- * connector overlay ids stay valid. The BPMN is discovered live after adopt, so
- * it is NOT carried here — the run's variants are enough to (re)discover it.
+ * connector overlay ids stay valid. For an uncalibrated run the BPMN is
+ * discovered live after adopt (the run's variants are enough to re-discover it);
+ * a CALIBRATED run additionally carries its discovered BPMN + simulation twin
+ * (the SimulationStudy + scenarios, and a project-scoped team/calendar library)
+ * so the mined digital twin adopts ready to run.
  *
  * Mirrors app/lib/simulation/examplePackage.ts for the mining domain.
  */
 
 import type { DiagramData } from "../diagram/types";
 import type { LogMapping, MiningStats, Variant, Performance, GovernanceStats } from "./types";
+// The simulation twin embedded in a mining run reuses the simulator's portable
+// shapes verbatim (team + calendar library, scenario config) so capture/adopt
+// stay symmetric with app/lib/simulation.
+import type { ExampleTeam, ExampleCalendar, ExampleScenario } from "../simulation/examplePackage";
 
 /** A reference state-machine diagram carried in the bundle. */
 export interface MiningExampleDiagram {
@@ -43,6 +50,21 @@ export interface MiningExampleRun {
   objectType?: string;
   /** OCEL study — this run's discovered state-machine diagram (by package key). */
   discoveredSmKey?: string;
+  /** Calibrated simulation twin: the run's discovered BPMN (by package key) that
+   *  the twin study runs as its root. Present only for a calibrated run. */
+  discoveredBpmnKey?: string;
+  /** Calibrated simulation twin: the SimulationStudy + scenarios mined for this
+   *  run. Root = `discoveredBpmnKey`; teams/calendars live at package level
+   *  (project-scoped, shared across the study's runs). */
+  twin?: MiningExampleTwin;
+}
+
+/** The calibrated digital-twin carried with a run: its study name + scenarios.
+ *  The study's single root is the run's `discoveredBpmnKey`; the team/calendar
+ *  library it references is package-level (`MiningExamplePackage.teams/calendars`). */
+export interface MiningExampleTwin {
+  studyName: string;
+  scenarios: ExampleScenario[];
 }
 
 /** The raw sample event log carried in the bundle. When present, adopt does NOT
@@ -73,6 +95,11 @@ export interface MiningExamplePackage {
   runs?: MiningExampleRun[];
   /** OCEL study — the Domain Diagram (object model), by package key. */
   domainDiagramKey?: string;
+  /** Simulation-twin team library (project-scoped, shared across the study's
+   *  per-object-type twins). Present only when a run carries a `twin`. */
+  teams?: ExampleTeam[];
+  /** Simulation-twin working-calendar library (referenced by teams by name). */
+  calendars?: ExampleCalendar[];
   /** Optional raw log for the "confirm the CSV analysis, then import" flow.
    *  When several scenarios ship, this is the recommended/default one (also the
    *  last entry of `sampleLogs`). */
@@ -125,6 +152,12 @@ export function validateMiningExamplePackage(pkg: unknown): string[] {
     if (!r.performance || typeof r.performance.clockUnit !== "string") errs.push(`\`${label}.performance\` is required (with a clockUnit)`);
     if (r.referenceSmKey && !keys.has(r.referenceSmKey)) errs.push(`${label}.referenceSmKey "${r.referenceSmKey}" does not match any diagram key`);
     if (r.discoveredSmKey && !keys.has(r.discoveredSmKey)) errs.push(`${label}.discoveredSmKey "${r.discoveredSmKey}" does not match any diagram key`);
+    if (r.discoveredBpmnKey && !keys.has(r.discoveredBpmnKey)) errs.push(`${label}.discoveredBpmnKey "${r.discoveredBpmnKey}" does not match any diagram key`);
+    if (r.twin) {
+      if (typeof r.twin.studyName !== "string" || !r.twin.studyName) errs.push(`${label}.twin.studyName is required`);
+      if (!Array.isArray(r.twin.scenarios) || r.twin.scenarios.length === 0) errs.push(`${label}.twin.scenarios must be a non-empty array`);
+      if (!r.discoveredBpmnKey) errs.push(`${label}.twin requires a discoveredBpmnKey (the study root)`);
+    }
   };
   validateRun(p.run, "run");
   // OCEL study — validate each per-type run + the domain diagram key.
@@ -133,6 +166,22 @@ export function validateMiningExamplePackage(pkg: unknown): string[] {
     else p.runs.forEach((r, i) => validateRun(r, `runs[${i}]`));
   }
   if (p.domainDiagramKey && !keys.has(p.domainDiagramKey)) errs.push(`domainDiagramKey "${p.domainDiagramKey}" does not match any diagram key`);
+
+  // Simulation-twin team/calendar library (optional): unique names + resolvable
+  // calendar refs. Mirrors app/lib/simulation/examplePackage validation.
+  const calendarNames = new Set<string>();
+  for (const c of p.calendars ?? []) {
+    if (!c || typeof c.name !== "string" || !c.name) errs.push("A twin calendar is missing a name");
+    else if (calendarNames.has(c.name)) errs.push(`Duplicate twin calendar name: ${c.name}`);
+    else calendarNames.add(c.name);
+  }
+  const teamNames = new Set<string>();
+  for (const t of p.teams ?? []) {
+    if (!t || typeof t.name !== "string" || !t.name) errs.push("A twin team is missing a name");
+    else if (teamNames.has(t.name)) errs.push(`Duplicate twin team name: ${t.name}`);
+    else teamNames.add(t.name);
+    if (t?.calendarName && !calendarNames.has(t.calendarName)) errs.push(`Twin team "${t.name}" references calendar "${t.calendarName}", which is not in the package`);
+  }
 
   const validateLog = (sl: MiningExampleSampleLog, label: string) => {
     if (!Array.isArray(sl.headers) || sl.headers.length === 0) errs.push(`\`${label}.headers\` must be a non-empty array`);

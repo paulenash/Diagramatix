@@ -66,6 +66,45 @@ describe("mining example package", () => {
     expect(errs.some((e) => e.includes('discoveredSmKey "missing-sm"'))).toBe(true);
     expect(errs.some((e) => e.includes('domainDiagramKey "missing-dom"'))).toBe(true);
   });
+
+  it("T0696 — a calibrated run carrying a simulation twin (BPMN + study + team/calendar library) validates; broken twin refs are flagged", () => {
+    const diag = (key: string, type = "state-machine") => ({ key, name: key, type, data: { elements: [], connectors: [] } });
+    const baseRun = {
+      name: "study — order", objectType: "order",
+      mapping: { caseId: "case", activity: "activity", timestamp: "timestamp" },
+      stats: { cases: 1, events: 1, activities: [], states: [], variants: 1 },
+      variants: [{ states: ["Placed"], events: ["place order"], count: 1 }],
+      performance: { clockUnit: "hour", activityDurations: {}, interArrival: [], activityResource: {}, resourceConcurrency: {}, activeHours: new Array(168).fill(0) },
+    };
+    const twinRun = {
+      ...baseRun, discoveredSmKey: "sm-order", discoveredBpmnKey: "bpmn-order",
+      twin: { studyName: "order (mined twin)", scenarios: [{ name: "As-mined baseline", isBaseline: true, runConfig: { clockUnit: "hour", horizon: 480 } }] },
+    };
+    const ok: MiningExamplePackage = {
+      version: 1,
+      diagrams: [diag("sm-order"), diag("bpmn-order", "bpmn"), diag("dom", "domain")],
+      run: twinRun as unknown as MiningExamplePackage["run"], runs: [twinRun as unknown as MiningExamplePackage["run"]], domainDiagramKey: "dom",
+      calendars: [{ name: "Working hours (mined)", pattern: { intervals: [] } }],
+      teams: [{ name: "Finance", capacity: 3, calendarName: "Working hours (mined)" }],
+    };
+    expect(validateMiningExamplePackage(ok)).toEqual([]);
+
+    // A dangling discoveredBpmnKey, a twin missing its BPMN root, and a team
+    // pointing at a missing calendar are all caught.
+    const danglingBpmnRun = { ...baseRun, discoveredBpmnKey: "gone" };
+    const rootlessTwinRun = { ...baseRun, twin: { studyName: "x", scenarios: [{ name: "s", runConfig: {} }] } };
+    const bad: unknown = {
+      version: 1,
+      diagrams: [diag("dom", "domain")],
+      run: danglingBpmnRun, runs: [danglingBpmnRun, rootlessTwinRun], domainDiagramKey: "dom",
+      teams: [{ name: "Finance", capacity: 1, calendarName: "no-such-calendar" }],
+      calendars: [],
+    };
+    const errs = validateMiningExamplePackage(bad);
+    expect(errs.some((e) => e.includes('discoveredBpmnKey "gone"'))).toBe(true);
+    expect(errs.some((e) => e.includes("twin requires a discoveredBpmnKey"))).toBe(true);
+    expect(errs.some((e) => e.includes("no-such-calendar"))).toBe(true);
+  });
 });
 
 describe("the shipped Accounts Payable starter example", () => {

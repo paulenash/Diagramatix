@@ -10,7 +10,7 @@
  * Mirrors app/lib/simulation/adoptPackage.ts.
  */
 import { prisma } from "@/app/lib/db";
-import type { MiningExamplePackage } from "./examplePackage";
+import type { MiningExamplePackage, MiningExampleRun } from "./examplePackage";
 
 export interface AdoptMiningCtx {
   userId: string;
@@ -51,6 +51,13 @@ export async function adoptMiningPackage(
     for (const d of pkg.diagrams) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = JSON.parse(JSON.stringify(d.data)) as any;
+      // Remap element links (the Domain Diagram's entity → discovered-state-machine
+      // links, and any subprocess link) from captured ids to the freshly-minted ids.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const el of (data.elements ?? []) as any[]) {
+        const linked = el.properties?.linkedDiagramId as string | undefined;
+        if (linked && keyToDiagramId.has(linked)) el.properties.linkedDiagramId = keyToDiagramId.get(linked);
+      }
       await tx.diagram.create({
         data: {
           id: keyToDiagramId.get(d.key)!, name: d.name, type: d.type || "state-machine",
@@ -60,6 +67,51 @@ export async function adoptMiningPackage(
         },
       });
     }
+
+    // Simulation-twin library — project-scoped calendars then teams (created
+    // once, shared across every per-object-type twin). Mirrors adoptPackage.
+    const calendarNameToId = new Map<string, string>();
+    for (const c of pkg.calendars ?? []) {
+      const cal = await tx.simulationCalendar.create({ data: { name: c.name, projectId: project.id } });
+      calendarNameToId.set(c.name, cal.id);
+      await tx.$executeRaw`UPDATE "SimulationCalendar" SET pattern = ${JSON.stringify(c.pattern ?? { intervals: [] })}::jsonb WHERE id = ${cal.id}`;
+    }
+    for (const t of pkg.teams ?? []) {
+      await tx.simulationTeam.create({
+        data: {
+          name: t.name, projectId: project.id,
+          capacity: Math.max(1, Math.round(t.capacity ?? 1)),
+          costPerHour: t.costPerHour ?? null,
+          efficiency: t.efficiency && t.efficiency > 0 ? t.efficiency : 1,
+          calendarId: t.calendarName ? calendarNameToId.get(t.calendarName) ?? null : null,
+        },
+      });
+    }
+
+    // Recreate a run's calibrated twin: the SimulationStudy rooted at the run's
+    // freshly-minted discovered BPMN + its scenarios, then link the run to it.
+    const createTwin = async (r: MiningExampleRun, runId: string) => {
+      if (!r.twin || !r.discoveredBpmnKey) return;
+      const bpmnId = keyToDiagramId.get(r.discoveredBpmnKey);
+      if (!bpmnId) return;
+      const study = await tx.simulationStudy.create({ data: { name: r.twin.studyName, projectId: project.id, createdById: ctx.userId } });
+      await tx.simulationStudyRoot.create({ data: { studyId: study.id, diagramId: bpmnId } });
+      for (const sc of r.twin.scenarios) {
+        const variantRootIds = (sc.variantRootKeys ?? []).map((k) => keyToDiagramId.get(k)).filter((x): x is string => !!x);
+        await tx.simulationScenario.create({
+          data: {
+            name: sc.name, studyId: study.id, isBaseline: !!sc.isBaseline,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            runConfig: (sc.runConfig ?? {}) as any,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            overrides: (sc.overrides ?? {}) as any,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ...(variantRootIds.length ? { variantRootIds: variantRootIds as any } : {}),
+          },
+        });
+      }
+      await tx.processMiningRun.update({ where: { id: runId }, data: { discoveredBpmnId: bpmnId, studyId: study.id } });
+    };
 
     // OCEL study — recreate every per-object-type run, cross-linked to the shared
     // Domain Diagram + each run's discovered/reference state machine (all freshly
@@ -75,6 +127,7 @@ export async function adoptMiningPackage(
           data: { name: r.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId: refId, discoveredSmId: smId, ocelGroupId, objectType: r.objectType ?? null, domainDiagramId },
         });
         await tx.$executeRaw`UPDATE "ProcessMiningRun" SET mapping = ${JSON.stringify(r.mapping)}::jsonb, stats = ${JSON.stringify(r.stats)}::jsonb, variants = ${JSON.stringify(r.variants)}::jsonb, performance = ${JSON.stringify(r.performance)}::jsonb, governance = ${r.governance ? JSON.stringify(r.governance) : null}::jsonb, "updatedAt" = NOW() WHERE id = ${run.id}`;
+        await createTwin(r, run.id);
         firstRunId ??= run.id;
       }
       // Open the object model (Domain Diagram) — the study's home.
@@ -97,6 +150,7 @@ export async function adoptMiningPackage(
       data: { name: r.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId },
     });
     await tx.$executeRaw`UPDATE "ProcessMiningRun" SET mapping = ${JSON.stringify(r.mapping)}::jsonb, stats = ${JSON.stringify(r.stats)}::jsonb, variants = ${JSON.stringify(r.variants)}::jsonb, performance = ${JSON.stringify(r.performance)}::jsonb, governance = ${r.governance ? JSON.stringify(r.governance) : null}::jsonb, "updatedAt" = NOW() WHERE id = ${run.id}`;
+    await createTwin(r, run.id);
 
     return { projectId: project.id, projectName: project.name, runId: run.id, openDiagramId };
   });

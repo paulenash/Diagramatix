@@ -1,4 +1,4 @@
-import type { Bounds, Connector, DiagramElement, Point, RoutingType, Side } from "./types";
+import type { Bounds, Connector, DiagramData, DiagramElement, Point, RoutingType, Side } from "./types";
 
 function getBounds(el: DiagramElement): Bounds {
   return { x: el.x, y: el.y, width: el.width, height: el.height };
@@ -447,6 +447,48 @@ function buildOrthogonalPath(
   }
 
   return ordered[0].path;
+}
+
+/**
+ * Post-layout obstacle avoidance for a generated diagram (used by the OCEL
+ * Domain Diagram). Any connector whose VISIBLE path crosses a non-endpoint
+ * element box — exactly what the editor flags red (Canvas `segCrossesRect`) —
+ * is re-routed around the offending boxes via `buildOrthogonalPath`, keeping
+ * its invisible centre leaders so the arrowhead still lands on the element
+ * edge. A connector that is already clear is left untouched. Mutates
+ * `data.connectors` in place. Pure w.r.t. the DOM (no window use on this path).
+ */
+export function avoidObstaclesPostLayout(data: DiagramData): void {
+  const elMap = new Map(data.elements.map((e) => [e.id, e] as const));
+  // Boxes an association must not cross: real shapes, not backgrounds/notes.
+  const boxes = data.elements.filter(
+    (e) => e.type !== "pool" && e.type !== "lane" && e.type !== "text-annotation" && e.type !== "group",
+  );
+  for (const c of data.connectors) {
+    const wps = c.waypoints;
+    if (!Array.isArray(wps) || wps.length < 2) continue;
+    if (!elMap.has(c.sourceId) || !elMap.has(c.targetId)) continue;
+    const obstacles: Bounds[] = boxes
+      .filter((e) => e.id !== c.sourceId && e.id !== c.targetId)
+      .map(getBounds);
+    if (obstacles.length === 0) continue;
+
+    // Visible slice = drop the invisible centre leaders at each end; those are
+    // what Canvas trims before its red-crossing test, so match it exactly.
+    const s = c.sourceInvisibleLeader ? 1 : 0;
+    const e = c.targetInvisibleLeader ? wps.length - 2 : wps.length - 1;
+    if (e <= s) continue;
+    const visible = wps.slice(s, e + 1);
+    // Only reroute what would actually turn red (zero-margin crossing).
+    if (!pathHitsObstacles(visible, obstacles, 0)) continue;
+
+    const detour = buildOrthogonalPath(visible[0], visible[visible.length - 1], obstacles);
+    c.waypoints = [
+      ...(c.sourceInvisibleLeader ? [wps[0]] : []),
+      ...detour,
+      ...(c.targetInvisibleLeader ? [wps[wps.length - 1]] : []),
+    ];
+  }
 }
 
 const PERP_OFFSET = 24;

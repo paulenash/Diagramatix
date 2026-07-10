@@ -11,6 +11,7 @@
  */
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { layoutGenericDiagram } from "@/app/lib/diagram/genericLayout";
+import { avoidObstaclesPostLayout } from "@/app/lib/diagram/routing";
 import type { OcelObjectCentric, OcelInteraction } from "./formats/ocel";
 
 // Explains the domain diagram's visual language + the editor's red obstacle flag.
@@ -62,6 +63,9 @@ export function buildDomainFromOcel(oc: OcelObjectCentric, opts: { linkedByType?
   const connections = meta.map((m) => ({ sourceId: idByType.get(m.fromType)!, targetId: idByType.get(m.toType)!, type: "uml-association", label: m.label }));
 
   const data = layoutGenericDiagram({ elements, connections }, "domain");
+  // Detour any association the grid layout routed across an entity box, so the
+  // editor's red obstacle flag stays quiet on a freshly-generated model.
+  avoidObstaclesPostLayout(data);
 
   // Apply weight (thickness) + multiplicity + dashed by matching connectors to
   // meta in order (per source→target), and link entities to their state machines.
