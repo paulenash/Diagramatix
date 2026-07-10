@@ -106,10 +106,15 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       });
     } catch { load(); }
   }, [projectId, load]);
-  const loadReferenceSms = useCallback(async () => {
-    try { const r = await fetch(`/api/projects/${projectId}/mining/reference-sms`); if (r.ok) { const j = await r.json(); if (j?.diagrams) setReferenceSms(j.diagrams); } } catch { /* ignore */ }
+  // The reference picker is SCOPED to the selected run (its entity's lifecycle),
+  // so cross-entity state machines + the run's own discovered mirror are excluded.
+  const loadReferenceSms = useCallback(async (runId?: string | null) => {
+    try {
+      const q = runId ? `?runId=${encodeURIComponent(runId)}` : "";
+      const r = await fetch(`/api/projects/${projectId}/mining/reference-sms${q}`);
+      if (r.ok) { const j = await r.json(); if (j?.diagrams) setReferenceSms(j.diagrams); }
+    } catch { /* ignore */ }
   }, [projectId]);
-  useEffect(() => { loadReferenceSms(); }, [loadReferenceSms]);
   // Restore the run that was open before viewing a diagram (return-to-exact-screen).
   useEffect(() => {
     try {
@@ -148,7 +153,20 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     setRefSmId(s?.referenceSmId ?? "");
     setConformance(s?.conformance ?? null);
     setExplanation(null);
-  }, [selectedId, runs]);
+    loadReferenceSms(selectedId);   // scope the picker to this run's entity
+  }, [selectedId, runs, loadReferenceSms]);
+
+  // Choose a run's conformance reference — persisted immediately so the choice
+  // survives navigating away to edit the reference and back (not just after a run).
+  async function selectReference(runId: string, refId: string) {
+    setRefSmId(refId);
+    setRuns((rs) => rs.map((r) => (r.id === runId ? { ...r, referenceSmId: refId || null } : r)));
+    try {
+      await fetch(`/api/projects/${projectId}/mining/runs/${runId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ referenceSmId: refId || null }),
+      });
+    } catch { /* best-effort */ }
+  }
 
   const [calibrating, setCalibrating] = useState(false);
   async function calibrate(runId: string) {
@@ -322,17 +340,18 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "State-machine discovery failed"); return null; }
       await load();
-      await loadReferenceSms();       // so the new diagram appears in the conformance picker
+      await loadReferenceSms(runId);   // refresh the (scoped) conformance picker
       return (json.diagramId as string) ?? null;
     } finally { setDiscovering(false); setAiSm(false); setSmBusy(false); }
   }
 
-  // Create the governed REFERENCE — a SEPARATE, AI-curated state machine (its own
-  // diagram, stored in referenceSmId) that discovery + refresh never overwrite —
-  // and select it. The user then prunes it into their rulebook (source of truth).
-  async function createReference(runId: string) {
-    const id = await discoverSm(runId, { ai: true, as: "reference" });
-    if (id) setRefSmId(id);
+  // Create the governed REFERENCE — a SEPARATE state machine (its own diagram,
+  // stored in referenceSmId) that discovery + refresh never overwrite, so editing
+  // it never touches the discovered mirror. Deterministic by default (a copy of
+  // the mined lifecycle, no AI credits); `ai:true` AI-curates a cleaner one.
+  async function createReference(runId: string, ai = false) {
+    const id = await discoverSm(runId, { ai, as: "reference" });
+    if (id) await selectReference(runId, id);
   }
 
   const selected = runs.find((r) => r.id === selectedId) ?? null;
@@ -661,7 +680,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
               <h3 className="text-xs font-semibold text-amber-200 mb-1">Conformance vs the reference</h3>
               <p className="text-[11px] text-stone-400 mb-2">Replay the real state changes against your single source of truth and see where reality deviates.</p>
               <div className="flex items-center gap-2 flex-wrap">
-                <select value={refSmId} onChange={(e) => setRefSmId(e.target.value)} className={`${inp} min-w-[12rem]`} title="The reference State-Machine diagram">
+                <select value={refSmId} onChange={(e) => selectReference(selected.id, e.target.value)} className={`${inp} min-w-[12rem]`} title="The reference State-Machine diagram (this entity's lifecycle)">
                   <option value="">— pick a reference state machine —</option>
                   {referenceSms.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
@@ -672,11 +691,14 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
               </div>
               {!selected.referenceSmId && (
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <button onClick={() => createReference(selected.id)} disabled={discovering} className="text-xs bg-amber-800 hover:bg-amber-700 disabled:opacity-40 text-white rounded px-3 py-1.5" title="AI-curate a clean, governable reference — a SEPARATE diagram (tidy labels, merged states, noise dropped) that discovery and refresh never overwrite">
-                    {aiSm ? "✨ Creating…" : "✨ Create AI reference"}
+                  <button onClick={() => createReference(selected.id, false)} disabled={discovering} className="text-xs bg-amber-800 hover:bg-amber-700 disabled:opacity-40 text-white rounded px-3 py-1.5" title="Create a SEPARATE reference (a copy of the mined lifecycle) that discovery + refresh never overwrite — no AI needed. Then edit it into your rulebook.">
+                    {smBusy ? "Creating…" : "＋ Create reference"}
                   </button>
-                  {aiSm && <DiagramatixThrobber size={18} tone="amber" />}
-                  <span className="text-[10px] text-stone-400">No reference yet — AI-curate a <span className="text-stone-300">separate</span> governed state machine, then <span className="text-stone-300">edit it into your rulebook</span> (prune the moves that shouldn&rsquo;t be allowed). It stays independent of the discovered mirror above.</span>
+                  <button onClick={() => createReference(selected.id, true)} disabled={discovering} className="text-xs bg-amber-900/60 hover:bg-amber-800 disabled:opacity-40 text-amber-100 rounded px-2.5 py-1.5" title="AI-curate a cleaner reference (tidy labels, merged states, noise dropped) — needs API credits">
+                    {aiSm ? "✨ Curating…" : "✨ AI-curate"}
+                  </button>
+                  {(smBusy || aiSm) && <DiagramatixThrobber size={18} tone="amber" />}
+                  <span className="text-[10px] text-stone-400">No reference yet — create a <span className="text-stone-300">separate</span> governed state machine, then <span className="text-stone-300">edit it into your rulebook</span> (prune the moves that shouldn&rsquo;t be allowed). It stays independent of the discovered mirror above, so editing it turns the discovered transitions <span className="text-rose-300">red</span> where they deviate.</span>
                 </div>
               )}
 

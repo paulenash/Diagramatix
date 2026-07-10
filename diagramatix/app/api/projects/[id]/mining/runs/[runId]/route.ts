@@ -43,11 +43,16 @@ export async function PATCH(req: Request, { params }: Params) {
   const existing = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const body = await req.json().catch(() => ({}));
-  if (typeof body?.excludeFromCompliance !== "boolean") {
-    return NextResponse.json({ error: "excludeFromCompliance (boolean) required" }, { status: 400 });
+  const data: Record<string, unknown> = {};
+  if (typeof body?.excludeFromCompliance === "boolean") data.excludeFromCompliance = body.excludeFromCompliance;
+  // Persist the chosen conformance reference so selecting one survives navigating
+  // away to edit it (and back) — not just after a conformance run.
+  if ("referenceSmId" in (body ?? {})) data.referenceSmId = typeof body.referenceSmId === "string" && body.referenceSmId ? body.referenceSmId : null;
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "Nothing to update (excludeFromCompliance or referenceSmId)" }, { status: 400 });
   }
-  await prisma.processMiningRun.update({ where: { id: runId }, data: { excludeFromCompliance: body.excludeFromCompliance } });
-  return NextResponse.json({ ok: true, id: runId, excludeFromCompliance: body.excludeFromCompliance });
+  await prisma.processMiningRun.update({ where: { id: runId }, data });
+  return NextResponse.json({ ok: true, id: runId, ...data });
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
