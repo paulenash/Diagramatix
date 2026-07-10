@@ -80,6 +80,7 @@ model Org {
   allowCrossOrgSharing Boolean @default(false)
 
   members             OrgMember[]
+  memberTeams         OrgMemberTeam[]
   projects            Project[]
   diagrams            Diagram[]
   prompts             Prompt[]
@@ -111,6 +112,27 @@ model OrgMember {
   @@index([userId])
 }
 
+// Admin-managed team/role membership: which Org-Structure EntityNode(s) a user
+// belongs to. Assigned by an OrgAdmin (own org) or SuperAdmin (any org) — never
+// self-service. Powers the Process Portal's "Involving me" view (processes that
+// reference my team, or any role beneath it). `entityNodeId` points at an
+// org-master OrgStructure EntityNode; plain id (no FK) so re-seeding the Entity
+// List doesn't cascade-delete memberships — the Portal tolerates a stale id.
+model OrgMemberTeam {
+  id           String   @id @default(cuid())
+  orgId        String
+  org          Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entityNodeId String
+  createdAt    DateTime @default(now())
+  createdById  String?
+
+  @@unique([orgId, userId, entityNodeId])
+  @@index([orgId, userId])
+  @@index([entityNodeId])
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Existing models — Org back-relations and orgId added
 // ────────────────────────────────────────────────────────────────────────────
@@ -126,6 +148,7 @@ model User {
   projects                      Project[]
   templates                     DiagramTemplate[]
   orgMembers                    OrgMember[]
+  orgMemberTeams                OrgMemberTeam[]
   prompts                       Prompt[]
   diagramRules                  DiagramRules[]
   // Subscription tier. Nullable for migration safety; the seed script
@@ -360,6 +383,11 @@ model Diagram {
   pcfId                         Int?
   pcfHierarchyId                String?
   pcfName                       String?
+  // Denormalised entity references used by this diagram (pools/lanes/systems),
+  // extracted from `data` on every save — an array of { kind, name } (raw
+  // labels). The Portal canonicalises these against the Org Entity Lists at
+  // read time to power "which processes use System X / involve Team Y".
+  entityRefs                    Json               @default("[]")
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 

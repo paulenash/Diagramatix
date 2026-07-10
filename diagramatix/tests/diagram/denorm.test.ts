@@ -15,7 +15,7 @@ describe("diagram denorm (T0700)", () => {
       procedureDoc: { url: "https://sp/ap.docx", name: "AP Procedure v3" },
     })).toEqual({
       pcfId: 17040, pcfHierarchyId: "8.5.2", pcfName: "Process AP",
-      procedureDocUrl: "https://sp/ap.docx", procedureDocName: "AP Procedure v3",
+      procedureDocUrl: "https://sp/ap.docx", procedureDocName: "AP Procedure v3", entityRefs: [],
     });
   });
 
@@ -27,10 +27,10 @@ describe("diagram denorm (T0700)", () => {
 
   it("returns all-null for a diagram with no classification or procedure", () => {
     expect(deriveDiagramDenorm({})).toEqual({
-      pcfId: null, pcfHierarchyId: null, pcfName: null, procedureDocUrl: null, procedureDocName: null,
+      pcfId: null, pcfHierarchyId: null, pcfName: null, procedureDocUrl: null, procedureDocName: null, entityRefs: [],
     });
     expect(deriveDiagramDenorm(null)).toEqual({
-      pcfId: null, pcfHierarchyId: null, pcfName: null, procedureDocUrl: null, procedureDocName: null,
+      pcfId: null, pcfHierarchyId: null, pcfName: null, procedureDocUrl: null, procedureDocName: null, entityRefs: [],
     });
   });
 

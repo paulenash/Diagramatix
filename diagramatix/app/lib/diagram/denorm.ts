@@ -7,6 +7,7 @@
  * `DiagramData.procedureDoc`.
  */
 import type { DiagramData } from "./types";
+import { extractDiagramEntities, type EntityRef } from "./extractEntities";
 
 export interface DiagramDenorm {
   pcfId: number | null;
@@ -14,6 +15,9 @@ export interface DiagramDenorm {
   pcfName: string | null;
   procedureDocUrl: string | null;
   procedureDocName: string | null;
+  /** Raw org entities (pools/lanes/systems) referenced by the diagram — the
+   *  Portal canonicalises these against the Org Entity Lists at read time. */
+  entityRefs: EntityRef[];
 }
 
 export function deriveDiagramDenorm(data: unknown): DiagramDenorm {
@@ -29,5 +33,6 @@ export function deriveDiagramDenorm(data: unknown): DiagramDenorm {
     // Fall back to the URL as the display name so a link without a label still
     // shows something clickable in the Portal.
     procedureDocName: url ? (proc?.name?.trim() || url) : null,
+    entityRefs: extractDiagramEntities(data),
   };
 }

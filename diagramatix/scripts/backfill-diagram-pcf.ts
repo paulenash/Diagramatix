@@ -19,7 +19,8 @@ async function main() {
     let changed = 0;
     for (const d of diagrams) {
       const denorm = deriveDiagramDenorm(d.data);
-      await prisma.diagram.update({ where: { id: d.id }, data: denorm });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await prisma.diagram.update({ where: { id: d.id }, data: denorm as any });
       if (denorm.pcfHierarchyId || denorm.procedureDocUrl) changed++;
     }
     console.log(`Backfilled ${diagrams.length} diagrams (${changed} carry a PCF classification or procedure doc).`);

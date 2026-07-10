@@ -758,6 +758,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "ai-plan", title: "AI Plan Formats", description: "Saved AI two-phase plan format templates.", href: "/dashboard/admin/ai-plan-format" },
   { id: "org-settings", title: "Org Settings", description: "Manage Orgs, OrgAdmins, and cross-Org sharing.", href: "/dashboard/admin/org-settings" },
   { id: "entity-lists", title: "Entity Lists", description: "Org structures, external participants and IT systems for BPMN pool/lane naming.", href: "/dashboard/admin/entity-lists" },
+  { id: "team-membership", title: "Team Membership", description: "Assign Org members to teams / roles (Org-Structure Entity List) — powers the Process Portal's “Involving me” view. Applies to the currently-active Org.", href: "/dashboard/org-admin/team-membership" },
   { id: "risk-controls", title: "Risk & Control Catalog", description: "Master library of Risks and Controls; projects adopt a copy, attach them to steps and export a Risk-Control Matrix.", href: "/dashboard/admin/risk-controls" },
   { id: "compliance", title: "Compliance Monitoring", description: "Org-wide control operating-effectiveness over time — trends + alerts from DiagramatixMINER runs across every project.", href: "/dashboard/compliance?from=/dashboard/admin" },
   { id: "pcf", title: "Process Classification (APQC PCF)", description: "Browse the APQC Process Classification Framework® — Cross-Industry + industry variants — the reference taxonomy for classifying processes.", href: "/dashboard/admin/pcf?from=/dashboard/admin" },

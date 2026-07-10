@@ -10,7 +10,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getEffectiveUserId } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
-import { listAccessiblePublishedDiagrams, categoryLabelsFor } from "@/app/lib/portal/accessiblePublished";
+import { listAccessiblePublishedDiagrams, categoryLabelsFor, loadOrgEntityCatalog, loadMyTeamNodeIds } from "@/app/lib/portal/accessiblePublished";
 import { buildFacets } from "@/app/lib/portal/facets";
 import { PortalClient } from "./PortalClient";
 
@@ -24,9 +24,15 @@ export default async function PortalPage() {
   if (!userId) redirect("/login");
 
   const orgId = await tryGetCurrentOrgId(session, cookieStore);
-  const rows = orgId ? await listAccessiblePublishedDiagrams(userId, orgId) : [];
+  const [rows, catalog, myTeamIds] = orgId
+    ? await Promise.all([
+        listAccessiblePublishedDiagrams(userId, orgId),
+        loadOrgEntityCatalog(orgId),
+        loadMyTeamNodeIds(userId, orgId),
+      ])
+    : [[], [], []];
   const categoryLabels = await categoryLabelsFor(rows.map((r) => r.pcfHierarchyId));
   const facets = buildFacets(rows, Date.now(), categoryLabels);
 
-  return <PortalClient rows={rows} facets={facets} />;
+  return <PortalClient rows={rows} facets={facets} catalog={catalog} myTeamIds={myTeamIds} />;
 }

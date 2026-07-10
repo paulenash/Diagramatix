@@ -14,6 +14,10 @@ import {
   filterRows, reviewStatusOf, pcfTopCategory,
   type PortalRow, type PortalFacets, type PortalFilter, type ReviewStatus, type FacetValue,
 } from "@/app/lib/portal/facets";
+import {
+  buildEntityCatalog, resolveEntities, buildEntityFacets, matchesEntityValue, involvesMe,
+  type CatalogNodeInput,
+} from "@/app/lib/portal/entityIndex";
 
 const REVIEW_PILL: Record<ReviewStatus, { label: string; cls: string } | null> = {
   overdue: { label: "Review overdue", cls: "bg-red-50 text-red-700 border-red-300" },
@@ -32,7 +36,9 @@ function rememberViewed(id: string) {
   } catch { /* ignore */ }
 }
 
-export function PortalClient({ rows, facets }: { rows: PortalRow[]; facets: PortalFacets }) {
+export function PortalClient({ rows, facets, catalog, myTeamIds }: {
+  rows: PortalRow[]; facets: PortalFacets; catalog: CatalogNodeInput[]; myTeamIds: string[];
+}) {
   const [now] = useState(() => Date.now());
   const [filter, setFilter] = useState<PortalFilter>({ sort: "name" });
   const [recentIds, setRecentIds] = useState<string[]>([]);
@@ -41,8 +47,32 @@ export function PortalClient({ rows, facets }: { rows: PortalRow[]; facets: Port
     try { setRecentIds(JSON.parse(localStorage.getItem(RECENT_KEY) || "[]")); } catch { /* ignore */ }
   }, []);
 
-  const results = useMemo(() => filterRows(rows, filter, now), [rows, filter, now]);
-  const hasQueryOrFacet = !!(filter.q || filter.type || filter.ownerId || filter.category || filter.review);
+  // Canonicalise each row's raw entity labels against the Org Entity Lists once.
+  const cat = useMemo(() => buildEntityCatalog(catalog), [catalog]);
+  const resolvedById = useMemo(
+    () => new Map(rows.map((r) => [r.id, resolveEntities(r.entityRefs, cat)])),
+    [rows, cat],
+  );
+  const entityFacets = useMemo(
+    () => buildEntityFacets([...resolvedById.values()], cat),
+    [resolvedById, cat],
+  );
+
+  const results = useMemo(() => {
+    const base = filterRows(rows, filter, now);
+    if (!filter.system && !filter.team && !filter.participant && !filter.involvingMe) return base;
+    return base.filter((r) => {
+      const res = resolvedById.get(r.id)!;
+      if (!matchesEntityValue(res, "system", filter.system)) return false;
+      if (!matchesEntityValue(res, "team", filter.team)) return false;
+      if (!matchesEntityValue(res, "participant", filter.participant)) return false;
+      if (filter.involvingMe && !involvesMe(res, myTeamIds)) return false;
+      return true;
+    });
+  }, [rows, filter, now, resolvedById, myTeamIds]);
+
+  const hasQueryOrFacet = !!(filter.q || filter.type || filter.ownerId || filter.category || filter.review
+    || filter.system || filter.team || filter.participant || filter.involvingMe);
 
   const byId = useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
   const recent = recentIds.map((id) => byId.get(id)).filter((r): r is PortalRow => !!r).slice(0, 4);
@@ -76,7 +106,7 @@ export function PortalClient({ rows, facets }: { rows: PortalRow[]; facets: Port
               autoFocus
               value={filter.q ?? ""}
               onChange={(e) => setFilter((f) => ({ ...f, q: e.target.value }))}
-              placeholder="Search processes by name, owner or APQC category…"
+              placeholder="Search processes — name, owner, APQC, system or team…"
               className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-800 shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none"
             />
           </div>
@@ -91,6 +121,24 @@ export function PortalClient({ rows, facets }: { rows: PortalRow[]; facets: Port
           <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
             {/* Facet rail */}
             <aside className="space-y-5">
+              {myTeamIds.length > 0 && (
+                <button
+                  onClick={() => setFilter((f) => ({ ...f, involvingMe: !f.involvingMe }))}
+                  className={`w-full text-left text-sm font-medium rounded px-3 py-2 border ${filter.involvingMe ? "bg-blue-600 text-white border-blue-600" : "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"}`}
+                  title="Processes that reference a team or role you belong to"
+                >
+                  👤 Involving me
+                </button>
+              )}
+              {entityFacets.system.length > 0 && (
+                <FacetGroup title="IT System" values={entityFacets.system} active={filter.system} onPick={(v) => toggle("system", v)} />
+              )}
+              {entityFacets.team.length > 0 && (
+                <FacetGroup title="Team / Role" values={entityFacets.team} active={filter.team} onPick={(v) => toggle("team", v)} />
+              )}
+              {entityFacets.participant.length > 0 && (
+                <FacetGroup title="External Participant" values={entityFacets.participant} active={filter.participant} onPick={(v) => toggle("participant", v)} />
+              )}
               <FacetGroup title="Type" values={facets.type} active={filter.type} onPick={(v) => toggle("type", v)} />
               <FacetGroup title="Owner" values={facets.owner} active={filter.ownerId} onPick={(v) => toggle("ownerId", v)} />
               {facets.category.length > 0 && (
@@ -151,9 +199,10 @@ function FacetGroup<V extends string>({ title, values, active, onPick }: {
           <button
             key={v.value}
             onClick={() => onPick(v.value)}
+            title={v.uncatalogued ? `"${v.label}" is not in your Entity Lists` : undefined}
             className={`w-full flex items-center justify-between text-left text-sm px-2 py-1 rounded ${active === v.value ? "bg-blue-100 text-blue-800 font-medium" : "text-gray-700 hover:bg-gray-100"}`}
           >
-            <span className="truncate">{v.label}</span>
+            <span className={`truncate ${v.uncatalogued ? "italic text-gray-400" : ""}`}>{v.label}{v.uncatalogued && <span className="ml-1 not-italic">•</span>}</span>
             <span className={`ml-2 text-xs ${active === v.value ? "text-blue-600" : "text-gray-400"}`}>{v.count}</span>
           </button>
         ))}

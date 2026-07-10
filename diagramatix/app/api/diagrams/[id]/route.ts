@@ -158,8 +158,10 @@ export async function PUT(req: Request, { params }: Params) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(data !== undefined && { data: data as any }),
           // Keep the Portal's browse/governance columns in step with the
-          // diagram's classification + procedure-doc link on every data save.
-          ...(data !== undefined && deriveDiagramDenorm(data)),
+          // diagram's classification + procedure-doc link + entity refs on
+          // every data save (entityRefs is a JSON column — hence the cast).
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...(data !== undefined && (deriveDiagramDenorm(data) as any)),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(colorConfig !== undefined && { colorConfig: colorConfig as any }),
           ...(projectId !== undefined && { projectId }),

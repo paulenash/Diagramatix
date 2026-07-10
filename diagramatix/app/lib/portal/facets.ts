@@ -6,6 +6,8 @@
  * usable on either side of the wire.
  */
 
+import type { EntityRef } from "@/app/lib/diagram/extractEntities";
+
 /** One published process in the Portal index (slim, client-safe). */
 export interface PortalRow {
   id: string;
@@ -22,6 +24,9 @@ export interface PortalRow {
   procedureDocName: string | null;
   pcfHierarchyId: string | null;    // e.g. "8.5.2"
   pcfName: string | null;           // the diagram's own APQC node name
+  /** Raw org entities (pools/lanes/systems) this process references; the client
+   *  canonicalises these against the Org Entity Lists for the entity facets. */
+  entityRefs: EntityRef[];
   /** How the caller can see it — for a small provenance chip. */
   via: "project" | "bundle";
 }
@@ -58,12 +63,21 @@ export interface PortalFilter {
   ownerId?: string;
   category?: string;               // top-category code, e.g. "8.0"
   review?: ReviewStatus;
+  // Entity facets (applied client-side against the resolved entity index —
+  // filterRows ignores these; see entityIndex.matchesEntityValue/involvesMe).
+  system?: string;                 // node id, or `uncat:${norm}`
+  team?: string;
+  participant?: string;
+  involvingMe?: boolean;
   sort?: "name" | "recent";
 }
 
-/** Case-insensitive text match across the fields a reader would search by. */
+/** Case-insensitive text match across the fields a reader would search by —
+ *  including the entity labels (system/team/role names) so "SAP"/"Marketing"
+ *  finds a process without opening a facet. */
 function matchesQuery(r: PortalRow, q: string): boolean {
-  const hay = `${r.name}${r.ownerName ?? ""}${r.pcfName ?? ""}${r.type}`.toLowerCase();
+  const entityNames = r.entityRefs.map((e) => e.name).join(" ");
+  const hay = [r.name, r.ownerName ?? "", r.pcfName ?? "", r.type, entityNames].join(" ").toLowerCase();
   // Every whitespace-separated term must appear (AND semantics).
   return q.toLowerCase().split(/\s+/).filter(Boolean).every((t) => hay.includes(t));
 }
@@ -86,7 +100,7 @@ export function filterRows(rows: PortalRow[], f: PortalFilter, now: number): Por
   return out;
 }
 
-export interface FacetValue<V = string> { value: V; label: string; count: number }
+export interface FacetValue<V = string> { value: V; label: string; count: number; uncatalogued?: boolean }
 export interface PortalFacets {
   type: FacetValue[];
   owner: FacetValue[];          // value = ownerId

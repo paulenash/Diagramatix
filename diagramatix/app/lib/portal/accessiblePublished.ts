@@ -11,6 +11,7 @@
 import { prisma } from "@/app/lib/db";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import type { PortalRow } from "./facets";
+import type { CatalogNodeInput } from "./entityIndex";
 
 /** Build the caller's accessible published index for the given org. */
 export async function listAccessiblePublishedDiagrams(userId: string, orgId: string): Promise<PortalRow[]> {
@@ -52,7 +53,7 @@ export async function listAccessiblePublishedDiagrams(userId: string, orgId: str
       id: true, name: true, type: true, projectId: true, updatedAt: true,
       diagramOwnerId: true, diagramOwner: { select: { name: true } },
       nextReviewDate: true, procedureDocUrl: true, procedureDocName: true,
-      pcfHierarchyId: true, pcfName: true,
+      pcfHierarchyId: true, pcfName: true, entityRefs: true,
       currentPublishedVersion: { select: { versionNumber: true, publishedAt: true } },
     },
     orderBy: { name: "asc" },
@@ -73,10 +74,33 @@ export async function listAccessiblePublishedDiagrams(userId: string, orgId: str
     procedureDocName: d.procedureDocName,
     pcfHierarchyId: d.pcfHierarchyId,
     pcfName: d.pcfName,
+    entityRefs: Array.isArray(d.entityRefs) ? (d.entityRefs as unknown as PortalRow["entityRefs"]) : [],
     // Provenance: a diagram in an accessible project reads as "project", else
     // it's visible only through a bundle grant.
     via: d.projectId && projectIdSet.has(d.projectId) ? "project" : "bundle",
   }));
+}
+
+/** The org-master Entity Lists (OrgStructure / System / Participant) as a flat
+ *  node list — the canonical vocabulary the Portal matches diagram labels
+ *  against for the entity facets + "Involving me". */
+export async function loadOrgEntityCatalog(orgId: string): Promise<CatalogNodeInput[]> {
+  const lists = await prisma.entityList.findMany({
+    where: { orgId, kind: { in: ["OrgStructure", "System", "Participant"] } },
+    select: { kind: true, nodes: { select: { id: true, name: true, parentId: true } } },
+  });
+  const out: CatalogNodeInput[] = [];
+  for (const l of lists) {
+    for (const n of l.nodes) out.push({ id: n.id, name: n.name, parentId: n.parentId ?? null, listKind: l.kind as CatalogNodeInput["listKind"] });
+  }
+  return out;
+}
+
+/** The OrgStructure EntityNode ids the caller has been assigned to (admin-managed
+ *  team membership) — powers the "Involving me" toggle. */
+export async function loadMyTeamNodeIds(userId: string, orgId: string): Promise<string[]> {
+  const rows = await prisma.orgMemberTeam.findMany({ where: { userId, orgId }, select: { entityNodeId: true } });
+  return rows.map((r) => r.entityNodeId);
 }
 
 /**

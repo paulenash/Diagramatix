@@ -56,7 +56,11 @@ const PCF_TABLES = ["PcfFramework", "PcfNode"] as const;
 // Simulator. Only the SuperAdmin full backup carries these. A new table lands
 // here only as a conscious decision.
 const SCOPED_OMITTED = new Set<string>([
-  "ProjectShare", "PublishedVersion", "PublicationBundle", "PublicationBundleDiagram",
+  // Grant/membership tables (like ProjectShare + the bundle audiences, and now
+  // admin-managed team membership) — carried by the full SuperAdmin backup only,
+  // deliberately not in the scoped org/user backups.
+  "ProjectShare", "OrgMemberTeam",
+  "PublishedVersion", "PublicationBundle", "PublicationBundleDiagram",
   "PublicationBundleAudience", "PendingBundleAudience", "DiagramFeedback", "Notification",
   "CollaborationGroup", "CollaborationGroupMember", "DiagramReview", "DiagramReviewer",
   "OwnershipTransfer", "ScannerRule", "SubscriptionLevel", "Feature", "BubbleHelp",

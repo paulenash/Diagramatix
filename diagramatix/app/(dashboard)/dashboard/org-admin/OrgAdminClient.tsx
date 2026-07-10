@@ -34,6 +34,12 @@ const CARDS: MenuCard[] = [
       "Inspect any Org member's notification feed — reviews, publishing, feedback. Filter by user.",
   },
   {
+    href: "/dashboard/org-admin/team-membership",
+    title: "Team Membership",
+    description:
+      "Assign Org members to teams / roles (from your Org-Structure Entity List). Powers the Process Portal's “Involving me” view.",
+  },
+  {
     href: "/dashboard/org-admin/backup",
     title: "Backup & Restore",
     description:

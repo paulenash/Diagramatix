@@ -18,7 +18,7 @@ const row = (over: Partial<PortalRow>): PortalRow => ({
   id: "d", name: "Diagram", type: "bpmn", ownerId: "u1", ownerName: "Paul Nash",
   projectId: "p1", updatedAt: iso(2026, 6, 1), publishedAt: iso(2026, 6, 1), versionNumber: 1,
   nextReviewDate: null, procedureDocUrl: null, procedureDocName: null,
-  pcfHierarchyId: null, pcfName: null, via: "project", ...over,
+  pcfHierarchyId: null, pcfName: null, entityRefs: [], via: "project", ...over,
 });
 
 describe("portal review status (T0698)", () => {
@@ -53,6 +53,15 @@ describe("portal search + filter + sort (T0698)", () => {
     expect(filterRows(rows, { q: "process ap" }, NOW).map((r) => r.id)).toEqual(["a"]); // name + pcfName
     expect(filterRows(rows, { q: "paul state" }, NOW).map((r) => r.id)).toEqual(["c"]); // owner + type
     expect(filterRows(rows, { q: "nope" }, NOW)).toHaveLength(0);
+  });
+
+  it("search also matches entity labels (system / team names)", () => {
+    const withEntities = [
+      row({ id: "x", name: "Billing", entityRefs: [{ kind: "system", name: "SAP ERP" }, { kind: "org", name: "Marketing" }] }),
+      row({ id: "y", name: "Onboarding", entityRefs: [{ kind: "org", name: "HR" }] }),
+    ];
+    expect(filterRows(withEntities, { q: "sap" }, NOW).map((r) => r.id)).toEqual(["x"]);
+    expect(filterRows(withEntities, { q: "marketing" }, NOW).map((r) => r.id)).toEqual(["x"]);
   });
 
   it("facet filters narrow by type / owner / category / review", () => {
