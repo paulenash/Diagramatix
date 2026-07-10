@@ -542,6 +542,11 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
             ) : (
               <h2 className="text-sm font-semibold text-amber-200 mb-2">{selected.name}</h2>
             )}
+            {selected.domainDiagramId && (
+              <a href={openDiagram(selected.domainDiagramId)} onClick={stashReturn} className="inline-block mb-2 text-[11px] text-emerald-300 hover:text-emerald-200 underline" title="The OCEL object model — object types, relationships, and links to each type's state machine">
+                Open the object model (Domain Diagram) →
+              </a>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
               <Stat label="Cases" value={selected.stats?.cases} />
               <Stat label="Events" value={selected.stats?.events} />

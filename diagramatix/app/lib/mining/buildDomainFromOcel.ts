@@ -9,9 +9,16 @@
  * to its discovered state machine (`linkedByType`). Laid out by the shared
  * `layoutGenericDiagram`. Pure.
  */
-import type { DiagramData } from "@/app/lib/diagram/types";
+import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { layoutGenericDiagram } from "@/app/lib/diagram/genericLayout";
 import type { OcelObjectCentric, OcelInteraction } from "./formats/ocel";
+
+// Explains the domain diagram's visual language + the editor's red obstacle flag.
+const LEGEND =
+  "LEGEND — Solid line: a structural relationship (labelled with its qualifier). " +
+  "Dashed line: a behavioural link — two object types bound by shared events, with no declared relationship. " +
+  "Line thickness and the number near an association end show the interaction strength (how many events touch both types). " +
+  "A RED line, or a red-highlighted entity, is not part of the model — it just means the auto-layout routed an association across an entity; drag the entity or the line to clear it.";
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "t";
 const pairKey = (a: string, b: string) => (a < b ? `${a}${b}` : `${b}${a}`);
@@ -78,6 +85,21 @@ export function buildDomainFromOcel(oc: OcelObjectCentric, opts: { linkedByType?
     const t = typeById.get(el.id);
     const smId = t ? linked[t] : undefined;
     if (smId) el.properties = { ...el.properties, linkedDiagramId: smId };
+  }
+
+  // Boxed legend, top-left above the entities, explaining the visual language.
+  const cls = data.elements.filter((e) => e.type === "uml-class");
+  if (cls.length) {
+    const minX = Math.min(...cls.map((e) => e.x));
+    const minY = Math.min(...cls.map((e) => e.y));
+    const w = 360;
+    const lines = Math.max(1, Math.ceil(LEGEND.length / 50));
+    const h = Math.min(340, lines * 15 + 16);
+    data.elements.push({
+      id: "domain-legend", type: "text-annotation",
+      x: minX, y: minY - h - 36, width: w, height: h,
+      label: LEGEND, properties: { boxed: true },
+    } as DiagramElement);
   }
   return data;
 }
