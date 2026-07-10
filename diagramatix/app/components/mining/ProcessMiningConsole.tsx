@@ -50,6 +50,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<RunRow | null>(null);
+  const [deletingStudy, setDeletingStudy] = useState<{ groupId: string; name: string; count: number } | null>(null);
 
   // Import staging
   const [fileName, setFileName] = useState<string | null>(null);
@@ -315,6 +316,15 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     await load();
   }
 
+  // Delete a whole OCEL import (every object-type run in the study).
+  async function removeStudy(groupId: string) {
+    const ids = runs.filter((r) => r.ocelGroupId === groupId).map((r) => r.id);
+    setDeletingStudy(null);
+    for (const id of ids) await fetch(`/api/projects/${projectId}/mining/runs/${id}`, { method: "DELETE" }).catch(() => {});
+    if (selectedId && ids.includes(selectedId)) setSelectedId(null);
+    await load();
+  }
+
   async function discover(runId: string, ai = false) {
     setDiscovering(true); if (ai) setAiBpmn(true); else setBpmnBusy(true); setErr(null);
     try {
@@ -540,17 +550,43 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
 
         {/* Runs */}
         <section className="bg-stone-900 border border-stone-700 rounded-lg p-4">
-          <h2 className="text-sm font-semibold text-amber-200 mb-2">Mining runs</h2>
-          {runs.length === 0 && <p className="text-xs text-stone-400">No runs yet — import a log.</p>}
-          <div className="flex flex-col gap-1">
-            {runs.map((r) => (
-              <div key={r.id} className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${selectedId === r.id ? "bg-amber-600/15" : "hover:bg-stone-800"}`}>
-                <button onClick={() => setSelectedId(selectedId === r.id ? null : r.id)} className="flex-1 text-left truncate text-stone-200" title={r.name}>{r.name}</button>
-                <span className="text-stone-400">{r.stats?.cases ?? 0}c</span>
-                <button onClick={() => setDeleting(r)} className="text-rose-400/70 hover:text-rose-300 px-1" title="Delete run">✕</button>
+          <h2 className="text-sm font-semibold text-amber-200 mb-2">Imports</h2>
+          <p className="text-[10px] text-stone-500 mb-2">Every import you run is kept here. An OCEL import is grouped as one study with a run per object type.</p>
+          {runs.length === 0 && <p className="text-xs text-stone-400">No imports yet — import a log.</p>}
+          {(() => {
+            // Group OCEL studies (by ocelGroupId); other imports are single runs.
+            const byGroup = new Map<string, RunRow[]>();
+            const standalone: RunRow[] = [];
+            for (const r of runs) { if (r.ocelGroupId) { const g = byGroup.get(r.ocelGroupId) ?? []; g.push(r); byGroup.set(r.ocelGroupId, g); } else standalone.push(r); }
+            const studyName = (rs: RunRow[]) => { const n = rs[0]?.name ?? ""; const i = n.lastIndexOf(" — "); return i >= 0 ? n.slice(0, i) : n; };
+            return (
+              <div className="flex flex-col gap-2">
+                {[...byGroup.entries()].map(([gid, rs]) => (
+                  <div key={gid} className="rounded border border-emerald-500/25 overflow-hidden">
+                    <div className="flex items-center gap-2 px-2 py-1 bg-emerald-950/25">
+                      <span className="flex-1 truncate text-[11px] font-semibold text-emerald-200" title={studyName(rs)}>{studyName(rs)}</span>
+                      <span className="text-[10px] text-stone-400">{rs.length} entit{rs.length === 1 ? "y" : "ies"}</span>
+                      <button onClick={() => setDeletingStudy({ groupId: gid, name: studyName(rs), count: rs.length })} className="text-rose-400/70 hover:text-rose-300 px-1" title="Delete this whole import (all its entity runs)">✕</button>
+                    </div>
+                    {rs.map((r) => (
+                      <div key={r.id} className={`flex items-center gap-2 px-2 py-1 text-xs ${selectedId === r.id ? "bg-amber-600/15" : "hover:bg-stone-800"}`}>
+                        <button onClick={() => setSelectedId(selectedId === r.id ? null : r.id)} className="flex-1 text-left truncate capitalize text-stone-200" title={r.name}>{r.objectType ?? r.name}</button>
+                        <span className="text-stone-400">{r.stats?.cases ?? 0}c</span>
+                        <button onClick={() => setDeleting(r)} className="text-rose-400/70 hover:text-rose-300 px-1" title="Delete this entity's run">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                {standalone.map((r) => (
+                  <div key={r.id} className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${selectedId === r.id ? "bg-amber-600/15" : "hover:bg-stone-800"}`}>
+                    <button onClick={() => setSelectedId(selectedId === r.id ? null : r.id)} className="flex-1 text-left truncate text-stone-200" title={r.name}>{r.name}</button>
+                    <span className="text-stone-400">{r.stats?.cases ?? 0}c</span>
+                    <button onClick={() => setDeleting(r)} className="text-rose-400/70 hover:text-rose-300 px-1" title="Delete run">✕</button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </section>
 
         {/* Selected run summary */}
@@ -795,6 +831,10 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       {deleting && (
         <ConfirmDialog title="Delete mining run" message={`Delete "${deleting.name}"? (Discovered diagrams are kept.)`} destructive
           onConfirm={() => remove(deleting.id)} onCancel={() => setDeleting(null)} />
+      )}
+      {deletingStudy && (
+        <ConfirmDialog title="Delete import" message={`Delete the whole "${deletingStudy.name}" import — all ${deletingStudy.count} object-type run${deletingStudy.count === 1 ? "" : "s"}? (Discovered diagrams are kept.)`} destructive
+          onConfirm={() => removeStudy(deletingStudy.groupId)} onCancel={() => setDeletingStudy(null)} />
       )}
     </div>
   );
