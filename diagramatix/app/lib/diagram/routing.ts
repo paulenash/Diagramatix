@@ -783,7 +783,10 @@ export function computeWaypoints(
   // them; they may visually overlap a route without forcing a detour.
   const SEQ_OBSTACLE_TYPES = new Set<string>([
     "task", "subprocess", "subprocess-expanded",
-    "start-event", "intermediate-event", "end-event",
+    // Intermediate events are NOT obstacles (like gateways) — they sit ON the
+    // flow (e.g. when a connector is split by dropping an event on it), so a
+    // sequence flow must pass through / attach to them, never detour around.
+    "start-event", "end-event",
     // ArchiMate elements are obstacles for archi-* relationship routing so
     // connectors route AROUND elements (rule A4.07). Only present in
     // archimate diagrams, so this never affects BPMN sequence routing.
@@ -1481,7 +1484,8 @@ export function recomputeAllConnectors(
         // and EPs containing source or target at any depth are excluded.
         const SEQ_OBS = new Set<string>([
           "task", "subprocess", "subprocess-expanded",
-          "start-event", "intermediate-event", "end-event",
+          // Intermediate events excluded (like gateways) — they sit ON the flow.
+          "start-event", "end-event",
           "data-object", "data-store",
         ]);
         function ancestorsOfPreserve(elementId: string): Set<string> {
