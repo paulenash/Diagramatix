@@ -2840,14 +2840,17 @@ export function PropertiesPanel({
         // visually next to a host edge — far-away events stay free.
         const SNAP_THRESHOLD = 15;
         const HOST_TYPES = new Set(["task", "subprocess", "subprocess-expanded"]);
-        // Find nearest valid host within snap range — used when the
-        // user re-checks the box on a free-floating event.
-        function nearestHostId(): string | null {
+        // Find the nearest valid host (Task / Subprocess / EP). Pass a cap to
+        // limit the range: SNAP_THRESHOLD for the "already adjacent" case, or
+        // Infinity so explicitly CHECKING the box always attaches an existing
+        // event to the nearest Activity (the reducer then snaps it onto that
+        // host's boundary).
+        function nearestHostId(cap = SNAP_THRESHOLD): string | null {
           if (!allElements || !element) return null;
           const cx = element.x + element.width / 2;
           const cy = element.y + element.height / 2;
           let bestId: string | null = null;
-          let bestDist = SNAP_THRESHOLD;
+          let bestDist = cap;
           for (const h of allElements) {
             if (!HOST_TYPES.has(h.type)) continue;
             // closest point on the host's bounding rect
@@ -2867,10 +2870,14 @@ export function PropertiesPanel({
                 checked={isMounted}
                 onChange={(e) => {
                   if (e.target.checked) {
-                    const hid = nearestHostId();
+                    // Prefer an adjacent host; otherwise attach to the nearest
+                    // Activity anywhere on the diagram (existing intermediate
+                    // events can always be edge-mounted this way). The reducer
+                    // snaps the event onto the chosen host's boundary.
+                    const hid = nearestHostId() ?? nearestHostId(Infinity);
                     if (hid) onSetEventBoundary(element.id, hid);
-                    // No nearby host → no-op; the controlled checkbox
-                    // will revert on the next render.
+                    // No valid host anywhere → no-op; the controlled checkbox
+                    // reverts on the next render.
                   } else {
                     onSetEventBoundary(element.id, null);
                   }
@@ -2880,8 +2887,8 @@ export function PropertiesPanel({
             </label>
             {!isMounted && (
               <p className="text-[10px] text-gray-500 mt-0.5">
-                Drag the event onto the edge of a Task, Subprocess, or
-                Expanded Subprocess to mount it (auto-checks the box).
+                Check the box to mount it on the nearest Task / Subprocess /
+                Expanded Subprocess, or drag it onto an activity edge.
               </p>
             )}
           </div>

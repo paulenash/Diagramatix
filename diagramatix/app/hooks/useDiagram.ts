@@ -5622,17 +5622,24 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (!evt) return state;
       if (!BOUNDARY_EVENT_TYPES.has(evt.type)) return state;
       if (hostId === null) {
-        // Detach: clear boundaryHostId AND nudge the event 30 px outward
-        // from the boundary it was sitting on (the side closest to the
-        // event's centre on the previous host's rect). 30 px > the
-        // 25 px MOVE_ELEMENT auto-snap threshold, so the next drag
-        // won't immediately re-mount. parentId is left intact (the
-        // event still belongs to the same lane / pool / EP container).
+        // Detach: clear boundaryHostId and reposition off the boundary.
+        // Direction depends on the event kind + host (Paul's 2026-07-11 rule):
+        //   • Start / End mounted on an Expanded Subprocess → move INSIDE the
+        //     EP and re-parent to it (they become the EP's own interface
+        //     start/end, sitting in its body).
+        //   • Intermediate events (and any event on a plain Activity) → move to
+        //     the OUTSIDE of the host, staying in the host's own container.
+        // The nudge (30 px) clears the 25 px MOVE auto-snap so the next drag
+        // won't immediately re-mount.
         const oldHost = evt.boundaryHostId
           ? state.elements.find((e) => e.id === evt.boundaryHostId)
           : null;
-        let nudgeDx = 0;
-        let nudgeDy = 0;
+        const isStartEnd = evt.type === "start-event" || evt.type === "end-event";
+        const hostIsEP = oldHost?.type === "subprocess-expanded";
+        const moveInside = isStartEnd && hostIsEP;
+        let newX = evt.x;
+        let newY = evt.y;
+        let newParentId = evt.parentId;
         if (oldHost) {
           const NUDGE = 30;
           const ecx = evt.x + evt.width / 2;
@@ -5642,14 +5649,29 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const distTop    = Math.abs(ecy - oldHost.y);
           const distBottom = Math.abs(ecy - (oldHost.y + oldHost.height));
           const min = Math.min(distLeft, distRight, distTop, distBottom);
-          if (min === distLeft)        nudgeDx = -NUDGE;
-          else if (min === distRight)  nudgeDx =  NUDGE;
-          else if (min === distTop)    nudgeDy = -NUDGE;
-          else                         nudgeDy =  NUDGE;
+          // Outward direction from the nearest edge.
+          let outDx = 0, outDy = 0;
+          if (min === distLeft)        outDx = -NUDGE;
+          else if (min === distRight)  outDx =  NUDGE;
+          else if (min === distTop)    outDy = -NUDGE;
+          else                         outDy =  NUDGE;
+          if (moveInside) {
+            // Inward = opposite of outward; re-parent to the EP and clamp so
+            // the event lands inside the EP body near that edge.
+            newX = Math.max(oldHost.x + 2, Math.min(oldHost.x + oldHost.width - evt.width - 2, evt.x - outDx));
+            newY = Math.max(oldHost.y + 2, Math.min(oldHost.y + oldHost.height - evt.height - 2, evt.y - outDy));
+            newParentId = oldHost.id;
+          } else {
+            newX = evt.x + outDx;
+            newY = evt.y + outDy;
+            // Sit in the host's own container (the EP's parent lane/pool), not
+            // inside the host — so the event is genuinely outside the EP.
+            newParentId = oldHost.parentId ?? evt.parentId;
+          }
         }
         const elements = state.elements.map((e) =>
           e.id === id
-            ? { ...e, x: e.x + nudgeDx, y: e.y + nudgeDy, boundaryHostId: undefined }
+            ? { ...e, x: newX, y: newY, boundaryHostId: undefined, parentId: newParentId }
             : e,
         );
         const connectors = state.connectors.map((conn) => {
