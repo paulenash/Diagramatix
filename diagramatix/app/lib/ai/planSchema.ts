@@ -55,6 +55,10 @@ export const AiElementSchema = z.object({
   boundarySide: z.enum(BOUNDARY_SIDES).optional(),
   parentPool: z.string().optional(),
   subprocessType: z.string().optional(),
+  // Activity marker (task / subprocess): "loop" = Standard Loop marker,
+  // "mi-parallel"/"mi-sequential" = Multi-Instance. Ad-hoc is set via
+  // properties.adHoc = true (an Ad-Hoc Sub-Process).
+  repeatType: z.enum(["none", "loop", "mi-parallel", "mi-sequential"]).optional(),
   properties: z.record(z.string(), z.unknown()).optional(),
   /** Normalised drawn position from an imported image (captureGeometry only). */
   bounds: BoundsSchema,

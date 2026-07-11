@@ -69,7 +69,8 @@ export interface AiElement {
   boundarySide?: "left" | "right" | "top" | "bottom"; // where on the host boundary
   parentPool?: string;        // for lanes — the pool they belong to
   subprocessType?: string;    // "normal" | "event" | "transaction" | "call"
-  properties?: Record<string, unknown>; // additional properties pass-through
+  repeatType?: string;        // activity marker: "loop" (standard loop) | "mi-parallel" | "mi-sequential" | "none"
+  properties?: Record<string, unknown>; // additional properties pass-through (incl. adHoc: true for an ad-hoc Sub-Process)
   /** Normalised drawn bounding box (0..1 of the whole source image; x,y =
    *  top-left corner). Present only for image imports with captureGeometry.
    *  Consumed by layoutBpmnPreserved to reproduce the vendor's positions. */
@@ -102,10 +103,27 @@ const START_Y = 50;
 
 // Build properties object for a DiagramElement from an AiElement.
 // Merges ai.properties pass-through with specific fields like subprocessType.
+// (ad-hoc rides ai.properties.adHoc through the spread — no special handling.)
 function buildProps(ai: AiElement): Record<string, unknown> {
   const props: Record<string, unknown> = { ...(ai.properties ?? {}) };
   if (ai.subprocessType) props.subprocessType = ai.subprocessType;
   return props;
+}
+
+/** Copy the AI-supplied activity marker (Standard Loop / Multi-Instance) from
+ *  the plan onto the built element. Applies to tasks + sub-processes only; the
+ *  renderer draws the marker from `element.repeatType`. Ad-hoc is separate (it
+ *  rides `properties.adHoc`, carried by buildProps). Run once before returning. */
+const REPEAT_MARKER_TYPES = new Set(["task", "subprocess", "subprocess-expanded"]);
+function applyRepeatMarkers(elements: DiagramElement[], aiElements: AiElement[]): void {
+  const byId = new Map(
+    aiElements.filter((a) => a.repeatType && a.repeatType !== "none").map((a) => [a.id, a.repeatType as string]),
+  );
+  if (byId.size === 0) return;
+  for (const el of elements) {
+    const rt = byId.get(el.id);
+    if (rt && REPEAT_MARKER_TYPES.has(el.type)) el.repeatType = rt as DiagramElement["repeatType"];
+  }
 }
 
 /** Fixed-size BPMN symbols: keep the catalogue size (centred on the imported
@@ -365,6 +383,7 @@ function layoutBpmnPreserved(
   // are rectilinear — leaves them moveable/reshapeable in the editor.
   const connectors = recomputeAllConnectors(built, elements, true);
 
+  applyRepeatMarkers(elements, aiElements);
   return {
     elements,
     connectors,
@@ -3585,6 +3604,7 @@ export function layoutBpmnDiagram(
     }
   }
 
+  applyRepeatMarkers(elements, aiElements);
   return {
     elements,
     connectors: finalConnectors,
@@ -3677,6 +3697,7 @@ function layoutFlat(
     } catch { return conn; }
   });
 
+  applyRepeatMarkers(elements, aiElements);
   return {
     elements, connectors: computed,
     viewport: { x: 0, y: 0, zoom: 0.8 },

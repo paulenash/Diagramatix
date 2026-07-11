@@ -9,7 +9,8 @@
 import { describe, it, expect } from "vitest";
 import { hardWrapProcessName } from "@/app/lib/diagram/textMetrics";
 import { normaliseAiPlan } from "@/app/lib/ai/planBpmn";
-import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
+import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
+import { validatePlan } from "@/app/lib/ai/planSchema";
 
 describe("hardWrapProcessName (T0717)", () => {
   it("leaves 1-2 word names unchanged", () => {
@@ -66,6 +67,29 @@ describe("normaliseAiPlan generation rules (T0718)", () => {
     expect(plan.elements.find((e) => e.id === "l1")!.parentPool).toBe(pool!.id);
     expect(plan.elements.find((e) => e.id === "l2")!.parentPool).toBe(pool!.id);
     expect(plan.elements.find((e) => e.id === "t")!.pool).toBe(pool!.id);
+  });
+
+  it("carries Loop + Ad-Hoc Expanded-Subprocess markers from the plan to the diagram (T0720)", () => {
+    const els: AiElement[] = [
+      { id: "p", type: "pool", label: "Ops", poolType: "white-box" },
+      // A repeating group → Expanded Subprocess with the Standard Loop marker.
+      { id: "ep", type: "subprocess-expanded", label: "Do Until Approved", pool: "p", repeatType: "loop" },
+      { id: "t", type: "task", label: "Review", pool: "p", parentSubprocess: "ep" },
+      // An any-order group → Ad-Hoc Expanded Subprocess (no start/end, no sequence).
+      { id: "ah", type: "subprocess-expanded", label: "Prepare Docs", pool: "p", properties: { adHoc: true } },
+      { id: "a1", type: "task", label: "Draft", pool: "p", parentSubprocess: "ah" },
+      { id: "a2", type: "task", label: "Attach", pool: "p", parentSubprocess: "ah" },
+    ];
+    // The plan schema accepts the new marker field.
+    expect(validatePlan({ elements: els, connections: [] }).ok).toBe(true);
+    const d = layoutBpmnDiagram(els, []);
+    const ep = d.elements.find((e) => e.id === "ep")!;
+    expect(ep.repeatType).toBe("loop"); // Standard Loop marker set on the EP
+    const ah = d.elements.find((e) => e.id === "ah")!;
+    expect(ah.properties?.adHoc).toBe(true); // Ad-Hoc marker set on the EP
+    // The ad-hoc EP is NOT given injected start/end events (only event subs are).
+    expect(d.elements.some((e) => e.type === "start-event" && e.parentId === "ah")).toBe(false);
+    expect(d.elements.some((e) => e.type === "end-event" && e.parentId === "ah")).toBe(false);
   });
 
   it("does NOT inject a pool when lanes already have one", () => {
