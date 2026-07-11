@@ -126,7 +126,8 @@ export function PlanPanel({
    *  Four live calls — slow (2-3 min). */
   async function handleCompare() {
     const effPrompt = prompt.trim();
-    if (!effPrompt || !diagramId) return;
+    // Compare is a complete alternative to Plan — a prompt OR an attachment.
+    if ((!effPrompt && !attachment) || !diagramId) return;
     setComparing(true);
     setBusy("compare"); // drives the red full-canvas throbber overlay
     setError(null);
@@ -135,7 +136,15 @@ export function PlanPanel({
       const res = await fetch("/api/ai/generate-bpmn/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: effPrompt, diagramId }),
+        body: JSON.stringify({
+          prompt: effPrompt,
+          diagramId,
+          attachment: attachment ?? undefined,
+          // Reproduce original layout is BPMN image-only, same as the Plan flow.
+          captureGeometry: !isFlowchart && attachment?.type === "image" ? preserveLayout : false,
+          imageAspect: !isFlowchart && attachment?.type === "image" ? imageDimsRef.current ?? undefined : undefined,
+          pcfNodeId: pcf?.nodeId,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Failed" }));
@@ -798,9 +807,9 @@ export function PlanPanel({
           )}
           {isSuperuser && !superAdminHidden && diagramType === "bpmn" && (
             <div className="mt-1 shrink-0">
-              <button onClick={() => handleCompare()} disabled={comparing || !prompt.trim() || !diagramId}
+              <button onClick={() => handleCompare()} disabled={comparing || (!prompt.trim() && !attachment) || !diagramId}
                 className="w-full px-2 py-1 text-[11px] text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
-                title="SuperAdmin: generate with Fable 5, Opus 4.8, Sonnet 5 and Haiku 4.5, fill this diagram with the best result, and save one diagram per model">
+                title="SuperAdmin: generate with Fable 5, Opus 4.8, Sonnet 5 and Haiku 4.5 from the prompt and/or attachment, fill this diagram with the best result, and save one diagram per model">
                 {comparing && (<svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>)}
                 {comparing ? "Comparing models…" : "Compare all models (SuperAdmin)"}
               </button>

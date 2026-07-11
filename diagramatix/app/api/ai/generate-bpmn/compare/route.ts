@@ -50,8 +50,29 @@ export async function POST(req: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "AI service not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 503 });
 
-  const { prompt, diagramId } = (await req.json().catch(() => ({}))) as { prompt?: string; diagramId?: string };
-  if (!prompt?.trim() || !diagramId) return NextResponse.json({ error: "prompt and diagramId are required" }, { status: 400 });
+  // Accept every input the two-phase "Plan" flow accepts, so Compare is a
+  // complete alternative: a text prompt AND/OR an attachment (PDF / text / image),
+  // with image geometry-capture for the "reproduce original layout" mode.
+  const body = (await req.json().catch(() => ({}))) as {
+    prompt?: string;
+    diagramId?: string;
+    attachment?: import("@/app/lib/ai/planBpmn").Attachment;
+    captureGeometry?: boolean;
+    imageAspect?: { w: number; h: number };
+    pcfNodeId?: string;
+  };
+  const { prompt, diagramId, attachment, captureGeometry, imageAspect } = body;
+  // Need a diagram to fill, plus SOME input (a prompt or an attachment).
+  if (!diagramId || (!prompt?.trim() && !attachment)) {
+    return NextResponse.json({ error: "diagramId and at least a prompt or an attachment are required" }, { status: 400 });
+  }
+  // planBpmn always needs prompt text — synthesise one when only a file is given.
+  const effPrompt = prompt?.trim()
+    || (attachment?.type === "image"
+        ? `Reverse-engineer the BPMN diagram from the attached image (${attachment.name ?? "diagram"}).`
+        : `Create a BPMN diagram from the attached file${attachment?.name ? ` (${attachment.name})` : ""}.`);
+  const aspect = imageAspect && imageAspect.w > 0 && imageAspect.h > 0 ? imageAspect : undefined;
+  const wantGeometry = captureGeometry === true && attachment?.type === "image";
 
   const current = await prisma.diagram.findUnique({
     where: { id: diagramId },
@@ -69,9 +90,9 @@ export async function POST(req: Request) {
     }
   } catch { /* proceed without rules */ }
   const { aiRules } = splitRulesByEnforcement(rules);
-  // Ground on the diagram's own APQC PCF classification, if any.
+  // Ground on the caller-supplied PCF node, else the diagram's own classification.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pcfNodeId = (current.data as any)?.pcf?.nodeId as string | undefined;
+  const pcfNodeId = body.pcfNodeId ?? ((current.data as any)?.pcf?.nodeId as string | undefined);
   const grounded = await groundRulesWithPcf(prisma, aiRules, pcfNodeId);
 
   const results: ModelResult[] = [];
@@ -82,10 +103,15 @@ export async function POST(req: Request) {
   for (const m of MODELS) {
     const t0 = Date.now();
     try {
-      const res = await planBpmn({ apiKey, prompt, rules: grounded, model: m.id });
+      const res = await planBpmn({ apiKey, prompt: effPrompt, attachment, rules: grounded, model: m.id, captureGeometry: wantGeometry });
       const ms = Date.now() - t0;
       if (!res.ok) { results.push({ model: m.id, label: m.label, ok: false, ms, error: res.error }); continue; }
-      const data = layoutBpmnDiagram(res.plan.elements, res.plan.connections);
+      // Reproduce the imported image's layout when geometry was captured and the
+      // model returned per-shape bounds; otherwise the normal auto-stack layout.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const preserve = wantGeometry && res.plan.elements.some((e: any) => e.bounds);
+      const data = layoutBpmnDiagram(res.plan.elements, res.plan.connections,
+        { preservePositions: preserve, imageAspect: aspect });
       const issues = findConnectorConformance(data);
       const flag = issues.length ? ` (!${issues.length})` : "";
       const saved = await prisma.diagram.create({
@@ -117,7 +143,8 @@ export async function POST(req: Request) {
 
   const comparison = {
     generatedAt: new Date().toISOString(),
-    prompt,
+    prompt: effPrompt,
+    attachment: attachment ? { name: attachment.name ?? null, type: attachment.type } : null,
     chosenModel: best?.label ?? null,
     chosenModelId: best?.model ?? null,
     models: results,
