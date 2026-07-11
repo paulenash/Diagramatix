@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
+import { arrayBufferToBase64 } from "@/app/lib/base64";
 import type { DiagramData, DiagramElement, Connector, DiagramType, AiFeedback } from "@/app/lib/diagram/types";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
@@ -103,7 +104,7 @@ export function AiPanel({
     if (file.type === "application/pdf") {
       // Send as base64 for Claude's native PDF support
       const buffer = await file.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      const base64 = arrayBufferToBase64(buffer);
       setAttachment({ name: file.name, type: "pdf", data: base64 });
     } else {
       // Read as text for .txt, .md, .csv, .doc, .rtf, etc.

@@ -14,6 +14,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
+import { arrayBufferToBase64 } from "@/app/lib/base64";
 import type { Connector, DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
 import type { DiagramType } from "@/app/lib/diagram/types";
@@ -197,7 +198,7 @@ export function PlanPanel({
     if (file.size > MAX_SIZE) { setError("File too large (max 10MB)"); return; }
     if (file.type === "application/pdf") {
       const buffer = await file.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      const base64 = arrayBufferToBase64(buffer);
       setAttachment({ name: file.name, type: "pdf", data: base64 });
       setPrompt(prev => prev.trim().length > 0
         ? prev : `I have attached a document, ${file.name}`);
@@ -206,7 +207,7 @@ export function PlanPanel({
       // API so it can reverse-engineer the process. The system prompt
       // teaches the shape-to-BPMN mapping.
       const buffer = await file.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      const base64 = arrayBufferToBase64(buffer);
       setAttachment({ name: file.name, type: "image", data: base64, mediaType: IMAGE_TYPES[file.type] });
       setPrompt(prev => prev.trim().length > 0
         ? prev
