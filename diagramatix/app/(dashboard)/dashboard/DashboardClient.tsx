@@ -1240,6 +1240,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         if (orphanedDiagrams.length > 0) {
           setUnorganized((prev) => [...orphanedDiagrams, ...prev]);
         }
+        // Invalidate the App-Router cache for /dashboard so leaving and
+        // returning re-fetches from the server (the deleted project is gone),
+        // rather than re-showing the stale cached page.
+        router.refresh();
       },
     });
   }
@@ -1292,6 +1296,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             setProjects((prev) => prev.filter((p) => p.id !== id));
             if (selectedProjectId === id) setSelectedProjectId(null);
             // No diagrams come back to Unorganised — they're gone.
+            // Invalidate the App-Router cache so a return to /dashboard re-fetches.
+            router.refresh();
           },
         });
       },
@@ -1324,6 +1330,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         setProjects((prev) => prev.filter((p) => p.id !== id));
         if (selectedProjectId === id) setSelectedProjectId(null);
         // Diagrams went to the archive — they don't reappear in Unorganised.
+        // Invalidate the App-Router cache so a return to /dashboard re-fetches.
+        router.refresh();
       },
     });
   }
