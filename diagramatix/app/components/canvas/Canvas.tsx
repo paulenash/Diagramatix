@@ -4510,12 +4510,18 @@ export function Canvas({
                   .filter((e) => e.type === "lane" && e.parentId === cursorLane.id)
                   .sort((a, b) => a.y - b.y);
                 if (sublanes.length === 0) {
-                  // No sublanes: middle ⅓ → split (blue), else fallback bottom of lane (green).
+                  // No sublanes: middle ⅓ → split (blue), else a green LANE line.
                   if (wp.y >= cursorLane.y + cursorLane.height / 3 && wp.y <= cursorLane.y + (cursorLane.height * 2) / 3) {
                     const midY = cursorLane.y + cursorLane.height / 2;
                     preview = { x1: cursorLane.x, y1: midY, x2: cursorLane.x + cursorLane.width, y2: midY, kind: "sublane" };
                   } else {
-                    const insertY = cursorLane.y + cursorLane.height;
+                    // Single-lane pool → upper region shows the green line at the
+                    // pool TOP (lane above), lower region at the pool BOTTOM (lane
+                    // below); multi-lane keeps the lane-bottom line. Mirrors the
+                    // reducer's ADD_ELEMENT single-lane 3-zone insert.
+                    const insertY = lanes.length === 1
+                      ? (wp.y < cursorLane.y + cursorLane.height / 2 ? cursorLane.y : cursorLane.y + cursorLane.height)
+                      : cursorLane.y + cursorLane.height;
                     preview = { x1: target.x, y1: insertY, x2: target.x + target.width, y2: insertY, kind: "lane" };
                   }
                 } else {

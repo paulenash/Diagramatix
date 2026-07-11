@@ -1248,31 +1248,12 @@ export function checkDuplicateContainerName(d: DiagramLike): Violation[] {
   return out;
 }
 
-/** A Pool with exactly one child Lane — usually an import remnant; the lane
- *  should be absorbed into the pool. */
-export function checkSingleLanePool(d: DiagramLike): Violation[] {
-  const byId = new Map(d.elements.map((e) => [e.id, e]));
-  const lanesByPool = new Map<string, DiagramElement[]>();
-  for (const e of d.elements) {
-    if (e.type !== "lane" || !e.parentId) continue;
-    const parent = byId.get(e.parentId);
-    if (!parent || parent.type !== "pool") continue;
-    (lanesByPool.get(parent.id) ?? lanesByPool.set(parent.id, []).get(parent.id)!).push(e);
-  }
-  const out: Violation[] = [];
-  for (const [poolId, lanes] of lanesByPool) {
-    if (lanes.length !== 1) continue;
-    const pool = byId.get(poolId);
-    if (!pool) continue;
-    out.push({
-      rule: "single-lane-pool",
-      severity: "error",
-      ids: [poolId, lanes[0].id],
-      message: `pool "${nameOf(pool)}" contains a single lane "${nameOf(lanes[0])}"`,
-      data: { poolId, poolName: pool.label ?? "", laneId: lanes[0].id, laneName: lanes[0].label ?? "" },
-    });
-  }
-  return out;
+/** RETIRED. A Pool with exactly one child Lane is now a deliberate, valid state
+ *  (you can build a single-lane pool and grow/shrink it lane-by-lane), so this
+ *  no longer flags anything. Kept as a no-op so its registration + any callers
+ *  still resolve. */
+export function checkSingleLanePool(_d: DiagramLike): Violation[] {
+  return [];
 }
 
 /** Hanging messages — messageBPMN connectors that render badly: attached to an

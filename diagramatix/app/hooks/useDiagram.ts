@@ -3187,15 +3187,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       //   1) Drop into empty space  → create a new Pool. If other pools
       //      already exist on the diagram, match the nearest pool's x +
       //      width; else use 80% of the catalogue default width.
-      //   2) Drop on an existing Pool that has NO Lanes → behave as
-      //      "+ Add Lane" (split the pool into 2 lanes).
+      //   2) Drop on an existing Pool that has NO Lanes → add a SINGLE lane
+      //      filling the pool body (a single-lane pool is a valid state).
       //   3) Drop on an existing Pool with ≥1 Lane → insert a new lane
       //      based on cursor position:
       //         · within 20px of pool top      → above all lanes
       //         · within 20px of pool bottom   → below all lanes
       //         · within 15px of a lane separator → between adjacent lanes
       //         · within the middle third of a lane → split into 2 sublanes
-      //         · else                          → below the lane the cursor sits in
+      //         · else, SINGLE-lane pool        → lane above (upper ½) / below (lower ½)
+      //         · else, multi-lane pool         → below the lane the cursor sits in
       // In every "add lane" case the pool grows downwards and any pools
       // below get pushed by the same growth amount.
       if (action.payload.symbolType === "pool") {
@@ -3219,36 +3220,18 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const TOP_BOTTOM_THRESHOLD = 20;
           const SEPARATOR_THRESHOLD = 15;
 
-          // Case A: pool with no lanes — same as ADD_LANE first-lane path
-          // (split the pool into 2 lanes).
+          // Case A: pool with no lanes → add a SINGLE lane filling the pool
+          // body. A single-lane pool is a valid state; grow it later by
+          // dragging another lane above/below, or split it into sublanes.
           if (lanes.length === 0) {
-            const MIN_LANE_H = 80;
-            const topH = Math.max(MIN_LANE_H, Math.floor(targetPool.height / 2));
-            const botH = Math.max(MIN_LANE_H, targetPool.height - topH);
-            const poolH = topH + botH;
             const lane1: DiagramElement = {
               id: nanoid(), type: "lane",
               x: targetPool.x + POOL_LW, y: targetPool.y,
-              width: targetPool.width - POOL_LW, height: topH,
+              width: targetPool.width - POOL_LW, height: targetPool.height,
               label: `Lane ${totalLaneCount + 1}`, properties: {}, parentId: targetPool.id,
             };
-            const lane2: DiagramElement = {
-              id: nanoid(), type: "lane",
-              x: targetPool.x + POOL_LW, y: targetPool.y + topH,
-              width: targetPool.width - POOL_LW, height: botH,
-              label: `Lane ${totalLaneCount + 2}`, properties: {}, parentId: targetPool.id,
-            };
-            const updated = state.elements.map((e) =>
-              e.id === targetPool.id ? { ...e, height: poolH } : e,
-            );
-            let next = { elements: updatePoolTypes([...updated, lane1, lane2]), connectors: state.connectors };
+            let next = { elements: updatePoolTypes([...state.elements, lane1]), connectors: state.connectors };
             next = resizeLaneForLabel(next.elements, next.connectors, lane1.id, laneFs);
-            next = resizeLaneForLabel(next.elements, next.connectors, lane2.id, laneFs);
-            const finalPool = next.elements.find(e => e.id === targetPool.id);
-            if (finalPool) {
-              const growth = finalPool.height - oldPoolHeight;
-              next = applyPoolBelowShift(next.elements, next.connectors, targetPool.id, oldPoolBottom, growth);
-            }
             next.elements = ensureContainersEncloseChildren(next.elements);
             return { ...state, ...next };
           }
@@ -3443,7 +3426,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
                 const enclosed = ensureContainersEncloseChildren(next.elements);
                 return { ...state, elements: updatePoolTypes(enclosed), connectors: next.connectors };
               }
-              // Otherwise: append a sibling LANE below this one.
+              // Otherwise (not the middle third): insert a sibling LANE.
+              // Single-lane pool → clean 3-zone: the upper region adds a lane
+              // ABOVE, the lower region adds one BELOW (green at pool top /
+              // bottom, blue split in the middle). Multi-lane pools keep the
+              // original "append below" behaviour.
+              if (lanes.length === 1) {
+                return dropPos.y < cursorLane.y + cursorLane.height / 2
+                  ? insertLaneAt(cursorLane.y, totalLaneCount + 1)                      // lane above
+                  : insertLaneAt(cursorLane.y + cursorLane.height, totalLaneCount + 1); // lane below
+              }
               return insertLaneAt(cursorLane.y + cursorLane.height, totalLaneCount + 1);
             }
 
@@ -5909,6 +5901,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             elementsArr: DiagramElement[],
             par: DiagramElement,
           ): DiagramElement[] => {
+            // A pool's LAST lane is now a valid, stable state — do not collapse
+            // it into the pool. (A lone SUBLANE still dissolves into its lane;
+            // that only happens when `par` is a lane.) Removing that final lane
+            // needs a further, deliberate delete (handled by the useCascade
+            // branch when the lane has no lane siblings).
+            if (par.type === "pool") return elementsArr;
             let result = elementsArr;
             for (let iter = 0; iter < 10; iter++) {
               const remaining = result.filter(
@@ -7676,28 +7674,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       let next: { elements: DiagramElement[]; connectors: Connector[] };
       if (existingLanes.length === 0) {
-        // First lane: split pool into two lanes
-        const topH = Math.max(MIN_LANE_H, Math.floor(pool.height / 2));
-        const botH = Math.max(MIN_LANE_H, pool.height - topH);
-        const poolH = topH + botH;
+        // First lane: a SINGLE lane filling the pool body (single-lane pools
+        // are valid — add more above/below or split into sublanes later).
         const lane1: DiagramElement = {
           id: nanoid(), type: "lane",
           x: pool.x + POOL_LABEL_W_DYN, y: pool.y,
-          width: pool.width - POOL_LABEL_W_DYN, height: topH,
+          width: pool.width - POOL_LABEL_W_DYN, height: pool.height,
           label: `Lane ${laneCount + 1}`, properties: {}, parentId: poolId,
         };
-        const lane2: DiagramElement = {
-          id: nanoid(), type: "lane",
-          x: pool.x + POOL_LABEL_W_DYN, y: pool.y + topH,
-          width: pool.width - POOL_LABEL_W_DYN, height: botH,
-          label: `Lane ${laneCount + 2}`, properties: {}, parentId: poolId,
-        };
-        const elements = state.elements.map((e) =>
-          e.id === poolId ? { ...e, height: poolH } : e
-        );
-        next = { elements: updatePoolTypes([...elements, lane1, lane2]), connectors: state.connectors };
+        next = { elements: updatePoolTypes([...state.elements, lane1]), connectors: state.connectors };
         next = resizeLaneForLabel(next.elements, next.connectors, lane1.id, laneFs);
-        next = resizeLaneForLabel(next.elements, next.connectors, lane2.id, laneFs);
       } else {
         // Additional lane: add at bottom, grow pool
         const lastLane = existingLanes[existingLanes.length - 1];
