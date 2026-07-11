@@ -1079,9 +1079,9 @@ export function DiagramEditor({
 
   // Template state (BPMN only)
   const isAdmin = userEmail?.toLowerCase() === "paul@nashcc.com.au";
-  // SuperAdmin "presentation mode" (Ctrl+Shift+B) — hides the SuperAdmin chip.
-  // No-op for non-SuperAdmins.
-  const superAdminHidden = useSuperAdminChrome(isAdmin);
+  // SuperAdmin "presentation mode" — double-click the logo to hide the SuperAdmin
+  // chip + the SuperAdmin AI options. No-op for non-SuperAdmins.
+  const { hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(isAdmin);
   type TemplateRow = { id: string; name: string; group: string | null };
   const [userTemplates, setUserTemplates] = useState<TemplateRow[]>([]);
   const [builtInTemplates, setBuiltInTemplates] = useState<TemplateRow[]>([]);
@@ -2452,7 +2452,7 @@ export function DiagramEditor({
         {/* Brand icon: sits just right of the back link as a permanent
             "you're inside Diagramatix" cue. h-5 keeps it inside the h-9 bar. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-5 h-5" />
+        <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-5 h-5 select-none" onDoubleClick={toggleSuperAdminChrome} draggable={false} />
 
         <div className="flex items-center gap-1.5">
           <span className="font-semibold text-gray-900 text-xs">{diagramName}</span>

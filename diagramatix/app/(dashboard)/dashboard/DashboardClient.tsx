@@ -326,9 +326,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [simProject, setSimProject] = useState<{ id: string; name: string } | null>(null);
   // Project-level Process Mining — opened from a project's menu.
   const [miningProject, setMiningProject] = useState<{ id: string; name: string } | null>(null);
-  // SuperAdmin "presentation mode" (Ctrl+Shift+B) — hides SuperAdmin chrome and
-  // relabels the subscription tier to Expert. No-op for non-SuperAdmins.
-  const superAdminHidden = useSuperAdminChrome(!!isSu);
+  // SuperAdmin "presentation mode" — double-click the logo to hide SuperAdmin
+  // chrome and relabel the subscription tier to Expert. No-op for non-SuperAdmins.
+  const { hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(!!isSu);
   // Skip the intro when RETURNING to the console (e.g. back from a discovered
   // diagram, ?pmnoi=1) — the intro is only for a fresh entry.
   const [skipMiningIntro, setSkipMiningIntro] = useState(false);
@@ -1414,7 +1414,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           <img
             src="/logos/diagramatix-logo.svg"
             alt="Diagramatix"
-            className="h-8 w-auto"
+            className="h-8 w-auto select-none"
+            onDoubleClick={toggleSuperAdminChrome}
+            draggable={false}
           />
           {version ? <span className="text-xs text-gray-900 ml-1">v{SCHEMA_VERSION}.{version}</span> : null}
           {usageSnapshot && (

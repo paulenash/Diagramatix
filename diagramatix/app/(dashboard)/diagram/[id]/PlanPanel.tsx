@@ -13,6 +13,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
+import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
 import type { Connector, DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
 import type { DiagramType } from "@/app/lib/diagram/types";
@@ -99,6 +100,9 @@ export function PlanPanel({
   const { data: authSession } = useSession();
   const isSuperuser = !!authSession?.user?.email
     && SUPERUSER_EMAILS.has(authSession.user.email.toLowerCase());
+  // SuperAdmin "presentation mode" (toggled by double-clicking the logo) — hides
+  // the SuperAdmin-only AI options. No-op for non-SuperAdmins.
+  const { hidden: superAdminHidden } = useSuperAdminChrome(isSuperuser || !!isAdmin);
   const [comparing, setComparing] = useState(false);
   const [compareStatus, setCompareStatus] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
@@ -754,7 +758,7 @@ export function PlanPanel({
               ◎ Aligning to APQC PCF: <span className="font-mono">{pcf.hierarchyId}</span> {pcf.name}
             </p>
           )}
-          {isSuperuser && diagramType === "bpmn" && (
+          {isSuperuser && !superAdminHidden && diagramType === "bpmn" && (
             <div className="mt-1 shrink-0">
               <button onClick={() => handleCompare()} disabled={comparing || !prompt.trim() || !diagramId}
                 className="w-full px-2 py-1 text-[11px] text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
@@ -883,7 +887,7 @@ export function PlanPanel({
           <AttachmentPreviewDialog attachment={attachment} onClose={() => setShowAttachPreview(false)} />
         )}
 
-        {isAdmin && (
+        {isAdmin && !superAdminHidden && (
           <div className="shrink-0 mb-2">
             {/* Admin-only red banner + two reverse-engineering options.
                 Red picks them out from the regular blue/grey controls

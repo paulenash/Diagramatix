@@ -378,9 +378,9 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
 export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft }: Props) {
   const router = useRouter();
   const pcfColors = usePcfLevelColors();
-  // SuperAdmin "presentation mode" (Ctrl+Shift+B) — hides the SuperAdmin chip +
-  // the Org reassign dropdown. No-op for non-SuperAdmins.
-  const superAdminHidden = useSuperAdminChrome(!!isAdmin);
+  // SuperAdmin "presentation mode" — double-click the logo to hide the SuperAdmin
+  // chip + the Org reassign dropdown. No-op for non-SuperAdmins.
+  const { hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(!!isAdmin);
   const [diagrams, setDiagrams] = useState(project.diagrams);
   const [projectName, setProjectName] = useState(project.name);
   // "Org Owner": the owning Org drives org-wide RCM numbering. Read-only for
@@ -2154,7 +2154,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           {/* Brand icon: sits just right of the back link as a permanent
               "you're inside Diagramatix" cue. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-6 h-6" />
+          <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-6 h-6 select-none" onDoubleClick={toggleSuperAdminChrome} draggable={false} />
           {/* Project name — editable only when not readOnly */}
           {!readOnly && editingProjectName ? (
             <input autoFocus type="text" value={projectName}
