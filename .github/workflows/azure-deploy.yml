@@ -217,7 +217,12 @@ jobs:
           npx --yes tsx@4 scripts/add-guide-risk-controls.ts || echo "add-guide-risk-controls skipped"
           npx --yes tsx@4 scripts/seed-risk-controls-o2c.ts || echo "seed-risk-controls-o2c skipped"
           npx --yes tsx@4 scripts/seed-risk-control-examples.ts || echo "seed-risk-control-examples skipped"
-          npx --yes tsx@4 scripts/seed-o2c-demo.ts || echo "seed-o2c-demo skipped"
+          # NOTE: seed-o2c-demo.ts (which pre-created the "Order-to-Cash — GRC Demo"
+          # PROJECT in Paul's org on every deploy) is intentionally NOT run — it
+          # re-appeared after being deleted. The same content stays available as
+          # an adoptable entry in the Risk & Control Examples gallery
+          # (seed-risk-control-examples.ts above). Run the script by hand if the
+          # pre-built demo project is ever wanted again.
           npx --yes tsx@4 scripts/backfill-example-types.ts || echo "backfill-example-types skipped"
           npx --yes tsx@4 scripts/add-tech-design-notes.ts || echo "add-tech-design-notes skipped"
           npx --yes tsx@4 scripts/add-guide-tech-design-notes.ts || echo "add-guide-tech-design-notes skipped"
