@@ -12,6 +12,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { renderFlowchartMappingForPrompt } from "@/app/lib/diagram/translate/flowchartBpmnMap";
+import { hardWrapProcessName } from "@/app/lib/diagram/textMetrics";
 
 export type Attachment =
   | { type: "pdf"; data: string; name?: string }
@@ -206,6 +207,12 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
     if (el.type === "lane" && !el.pool && (el as unknown as Record<string, unknown>).parentPool) {
       el.pool = (el as unknown as Record<string, unknown>).parentPool as string;
     }
+    // Task / Subprocess name hard-wrapping — multi-word names read as several
+    // lines (break after word 2 / word 3 / every 3 words by length). Applies to
+    // every generated BPMN task + collapsed subprocess. Idempotent.
+    if ((el.type === "task" || el.type === "subprocess") && el.label) {
+      el.label = hardWrapProcessName(el.label);
+    }
     // R46: any event whose label mentions "non-interrupting" gets its
     // interruptionType attribute set to "non-interrupting" (the renderer
     // reads this property to draw the dashed circle). Handles the common
@@ -215,6 +222,37 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
       if (/non[-\s]?interrupting/.test(label)) {
         el.properties = { ...(el.properties ?? {}), interruptionType: "non-interrupting" };
       }
+    }
+  }
+
+  // Every set of Lanes must have a containing Pool. A lane with NO pool
+  // reference at all (neither parentPool nor pool — the pool wasn't present in
+  // the original) is wrapped, with its siblings, in a single white-box pool
+  // named "Process" (Paul 2026-07-12). Lanes that reference a pool id are left
+  // alone (the back-fill above handles them). Idempotent: once the lanes point
+  // at the pool it won't fire again (the plan → apply-layout double-pass is safe).
+  const orphanLanes = parsed.elements.filter((e) =>
+    e.type === "lane" && !e.parentPool && !e.pool);
+  if (orphanLanes.length > 0) {
+    const POOL_ID = "auto-process-pool";
+    const orphanIds = new Set(orphanLanes.map((l) => l.id));
+    // If every orphan lane carries drawn geometry (image import), give the pool
+    // the union box so the preserved layout has a pool to place the lanes in.
+    const boxes = orphanLanes.map((l) => l.bounds).filter(Boolean) as { x: number; y: number; w: number; h: number }[];
+    let bounds: { x: number; y: number; w: number; h: number } | undefined;
+    if (boxes.length === orphanLanes.length) {
+      const x = Math.min(...boxes.map((b) => b.x));
+      const y = Math.min(...boxes.map((b) => b.y));
+      const r = Math.max(...boxes.map((b) => b.x + b.w));
+      const btm = Math.max(...boxes.map((b) => b.y + b.h));
+      bounds = { x, y, w: r - x, h: btm - y };
+    }
+    const pool: AiElement = { id: POOL_ID, type: "pool", label: "Process", poolType: "white-box", ...(bounds ? { bounds } : {}) };
+    parsed.elements.unshift(pool);
+    for (const l of orphanLanes) l.parentPool = POOL_ID;
+    // Flow elements that live in an orphan lane now belong to the new pool.
+    for (const e of parsed.elements) {
+      if (e.lane && orphanIds.has(e.lane)) e.pool = POOL_ID;
     }
   }
 }

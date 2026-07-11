@@ -26,6 +26,29 @@ export const SUBPROCESS_MARKER_BOTTOM_OFFSET = 3;
 export const SUBPROCESS_BOTTOM_RESERVE =
   SUBPROCESS_MARKER_BOTTOM_OFFSET + MARKER_SIZE + 2; // 19
 
+/**
+ * Insert HARD line breaks into a generated Task / Subprocess name so multi-word
+ * names read as several lines instead of one long line (Paul 2026-07-12). Word
+ * count decides the break points:
+ *   • ≤ 2 words         → unchanged
+ *   • 3 or 4 words      → break after the 2nd word
+ *   • 5 or 6 words      → break after the 3rd word
+ *   • more than 6 words → break after every 3rd word
+ * Idempotent: `\n` counts as whitespace when splitting, so re-running produces
+ * the same result (the normaliser can run more than once).
+ */
+export function hardWrapProcessName(name: string): string {
+  if (!name) return name;
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const n = words.length;
+  if (n <= 2) return name;
+  if (n <= 4) return words.slice(0, 2).join(" ") + "\n" + words.slice(2).join(" ");
+  if (n <= 6) return words.slice(0, 3).join(" ") + "\n" + words.slice(3).join(" ");
+  const lines: string[] = [];
+  for (let i = 0; i < n; i += 3) lines.push(words.slice(i, i + 3).join(" "));
+  return lines.join("\n");
+}
+
 /** Word-wrap a label to fit a given pixel width, using a fixed-pitch
  *  character-width estimate (avgCharWidth = fontSize * AVG_CHAR_W_FACTOR).
  *  Splits on '\n' first so explicit Shift+Enter breaks are preserved.

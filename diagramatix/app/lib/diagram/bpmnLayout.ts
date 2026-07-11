@@ -6,7 +6,7 @@
 import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints, recomputeAllConnectors } from "./routing";
-import { autoSizeForType, wrapText, type AutosizeType } from "./textMetrics";
+import { autoSizeForType, wrapText, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
 import { snapImportedBounds, type Box } from "./importGeometry";
 
 /** Word-wrap a black-box pool name into multiple lines, then size the pool
@@ -180,7 +180,11 @@ function layoutBpmnPreserved(
         x = cx - width / 2; y = cy - height / 2;
       } else {
         width = Math.max(width, def.defaultWidth * 0.6);
-        height = Math.max(height, def.defaultHeight * 0.6);
+        // A hard-wrapped task/subprocess name needs enough height for its lines.
+        const lineCount = (ai.type === "task" || ai.type === "subprocess")
+          ? (ai.label ?? "").split("\n").length : 1;
+        const minH = lineCount * LINE_HEIGHT + 2 * PAD + 6;
+        height = Math.max(height, def.defaultHeight * 0.6, minH);
       }
     }
 
