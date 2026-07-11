@@ -378,7 +378,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
 export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft }: Props) {
   const router = useRouter();
   const pcfColors = usePcfLevelColors();
-  // SuperAdmin "presentation mode" (Ctrl+Shift+S) — hides the SuperAdmin chip +
+  // SuperAdmin "presentation mode" (Ctrl+Shift+B) — hides the SuperAdmin chip +
   // the Org reassign dropdown. No-op for non-SuperAdmins.
   const superAdminHidden = useSuperAdminChrome(!!isAdmin);
   const [diagrams, setDiagrams] = useState(project.diagrams);

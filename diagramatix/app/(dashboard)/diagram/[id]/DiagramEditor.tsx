@@ -1079,7 +1079,7 @@ export function DiagramEditor({
 
   // Template state (BPMN only)
   const isAdmin = userEmail?.toLowerCase() === "paul@nashcc.com.au";
-  // SuperAdmin "presentation mode" (Ctrl+Shift+S) — hides the SuperAdmin chip.
+  // SuperAdmin "presentation mode" (Ctrl+Shift+B) — hides the SuperAdmin chip.
   // No-op for non-SuperAdmins.
   const superAdminHidden = useSuperAdminChrome(isAdmin);
   type TemplateRow = { id: string; name: string; group: string | null };

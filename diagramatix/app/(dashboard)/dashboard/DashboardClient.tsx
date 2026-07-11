@@ -326,7 +326,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [simProject, setSimProject] = useState<{ id: string; name: string } | null>(null);
   // Project-level Process Mining — opened from a project's menu.
   const [miningProject, setMiningProject] = useState<{ id: string; name: string } | null>(null);
-  // SuperAdmin "presentation mode" (Ctrl+Shift+S) — hides SuperAdmin chrome and
+  // SuperAdmin "presentation mode" (Ctrl+Shift+B) — hides SuperAdmin chrome and
   // relabels the subscription tier to Expert. No-op for non-SuperAdmins.
   const superAdminHidden = useSuperAdminChrome(!!isSu);
   // Skip the intro when RETURNING to the console (e.g. back from a discovered
