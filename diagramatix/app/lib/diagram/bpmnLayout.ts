@@ -3226,6 +3226,16 @@ export function layoutBpmnDiagram(
       const el = elMap.get(key.slice(0, bar));
       const side = key.slice(bar + 1);
       if (!el) continue;
+      // A gateway is a DIAMOND — its only valid attachment points are its four
+      // vertices (offset 0.5 on each side). Never spread gateway ends off the
+      // vertex: any other offset lands mid-edge on the sloped diamond, which
+      // reads as "the connector isn't joined to the vertex, just near it"
+      // (Paul 2026-07-12). Multiple flows on the same face share the vertex —
+      // BPMN-correct, they fan out from it.
+      if (el.type === "gateway") {
+        for (const e of ends) { if (e.isSource) e.c.sourceOffsetAlong = 0.5; else e.c.targetOffsetAlong = 0.5; }
+        continue;
+      }
       const faceLen = (side === "top" || side === "bottom") ? el.width : el.height;
       if (faceLen <= 1) continue;
       const occupied = msgPts.get(key) ?? [];

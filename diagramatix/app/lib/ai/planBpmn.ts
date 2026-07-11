@@ -93,6 +93,7 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 - Gateways should have: gatewayType ("exclusive", "parallel", "inclusive", "event-based"). Use "event-based" ONLY when the prompt describes one of several alternative EVENTS racing to occur (whichever happens first) — see the USER RULES for the exact trigger and wiring. The matching merge gateway MUST use the same gatewayType.
 - Expanded subprocesses use type "subprocess-expanded". They CAN contain child elements: set their "parentSubprocess" property to the subprocess id instead of "lane"
   * An expanded subprocess's OWN start and end events are INTERNAL flow nodes: give them parentSubprocess = the subprocess id. NEVER give a start-event or end-event a boundaryHost — start/end events can never be boundary (edge-mounted) events. boundaryHost is ONLY for intermediate (interrupting / non-interrupting) events mounted on an activity's edge.
+  * NEVER label an Expanded Subprocess's INTERNAL start or end events — leave their "label" empty (""). (Process-level start/end events at pool/lane level MAY be labelled; only the events INSIDE an EP are unlabelled.)
   * EVERY Expanded Subprocess has its OWN internal Start event and internal End event — the ONLY exception is an Ad-Hoc Sub-Process (see below), which has NO start or end events (neither inside nor on the boundary).
 - ACTIVITY MARKERS — a task or subprocess-expanded can carry ONE of these markers:
   * LOOP: the activity (or the group of activities in an Expanded Subprocess) repeats. Set "repeatType": "loop" (top level, NOT under properties) to draw the Standard Loop marker (↻). Use this for a repeating group of activities: put them inside an Expanded Subprocess, name it with the loop condition (e.g. "Do Until Info Complete", "Repeat Until Approved", "Do While Stock Low"), set repeatType "loop", and do NOT add a gateway for the loop test or a sequence connector going back to the first activity — the loop is shown by the marker alone. For a time limit add a Timer intermediate event edge-mounted on the Subprocess boundary (boundaryHost = the subprocess id, eventType "timer"), labelled with the limit; for cancellation/errors add edge-mounted intermediate events with eventType "cancel" / "error".
@@ -227,6 +228,11 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
       if (/non[-\s]?interrupting/.test(label)) {
         el.properties = { ...(el.properties ?? {}), interruptionType: "non-interrupting" };
       }
+    }
+    // An Expanded Subprocess's INTERNAL start/end events are never labelled —
+    // strip any label the model added. (Process-level start/end may keep theirs.)
+    if ((el.type === "start-event" || el.type === "end-event") && el.parentSubprocess) {
+      el.label = "";
     }
   }
 

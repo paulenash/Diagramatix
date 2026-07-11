@@ -69,6 +69,30 @@ describe("normaliseAiPlan generation rules (T0718)", () => {
     expect(plan.elements.find((e) => e.id === "t")!.pool).toBe(pool!.id);
   });
 
+  it("gateway connectors attach at a diamond VERTEX (offset 0.5), even when a face is shared (T0721)", () => {
+    // 4 branches force two flows onto one face — they must both sit ON the
+    // vertex (0.5), NOT be spread mid-edge (0.333/0.667), which on a diamond
+    // reads as "not connected to the vertex, just near it".
+    const els: AiElement[] = [
+      { id: "g", type: "gateway", gatewayType: "exclusive", label: "?" },
+      { id: "a", type: "task", label: "A" },
+      { id: "b", type: "task", label: "B" },
+      { id: "c", type: "task", label: "C" },
+      { id: "d", type: "task", label: "D" },
+    ];
+    const conns: AiConnection[] = [
+      { sourceId: "g", targetId: "a" }, { sourceId: "g", targetId: "b" },
+      { sourceId: "g", targetId: "c" }, { sourceId: "g", targetId: "d" },
+    ];
+    const d = layoutBpmnDiagram(els, conns);
+    const gwEnds = d.connectors.filter((c) => c.sourceId === "g" || c.targetId === "g");
+    expect(gwEnds.length).toBeGreaterThan(0);
+    for (const c of gwEnds) {
+      const off = c.sourceId === "g" ? (c.sourceOffsetAlong ?? 0.5) : (c.targetOffsetAlong ?? 0.5);
+      expect(off, `${c.sourceId}->${c.targetId} attaches at the gateway vertex`).toBeCloseTo(0.5, 5);
+    }
+  });
+
   it("carries Loop + Ad-Hoc Expanded-Subprocess markers from the plan to the diagram (T0720)", () => {
     const els: AiElement[] = [
       { id: "p", type: "pool", label: "Ops", poolType: "white-box" },
@@ -90,6 +114,22 @@ describe("normaliseAiPlan generation rules (T0718)", () => {
     // The ad-hoc EP is NOT given injected start/end events (only event subs are).
     expect(d.elements.some((e) => e.type === "start-event" && e.parentId === "ah")).toBe(false);
     expect(d.elements.some((e) => e.type === "end-event" && e.parentId === "ah")).toBe(false);
+  });
+
+  it("strips labels from an EP's internal start/end events but keeps process-level ones (T0722)", () => {
+    const plan = {
+      elements: [
+        { id: "ep", type: "subprocess-expanded", label: "Handle" },
+        { id: "is", type: "start-event", label: "Begin", parentSubprocess: "ep" }, // internal → stripped
+        { id: "ie", type: "end-event", label: "Finish", parentSubprocess: "ep" },   // internal → stripped
+        { id: "ps", type: "start-event", label: "Order Received" },                  // process-level → kept
+      ] as AiElement[],
+      connections: [] as AiConnection[],
+    };
+    normaliseAiPlan(plan);
+    expect(plan.elements.find((e) => e.id === "is")!.label).toBe("");
+    expect(plan.elements.find((e) => e.id === "ie")!.label).toBe("");
+    expect(plan.elements.find((e) => e.id === "ps")!.label).toBe("Order Received");
   });
 
   it("does NOT inject a pool when lanes already have one", () => {
