@@ -3655,9 +3655,11 @@ export function DiagramEditor({
                 elements: aiData.elements,
                 connectors: aiData.connectors,
                 viewport: aiData.viewport ?? data.viewport,
-                // An image import that reproduced the vendor's layout sets this
-                // so the editor/validation don't re-impose Diagramatix rules.
-                relaxedLayout: aiData.relaxedLayout ?? data.relaxedLayout,
+                // Take the flag from the GENERATED result only — an image import
+                // that reproduced the vendor's layout sets it true; a normal
+                // (auto-stack) generation clears it, so regenerating over a
+                // previously-imported diagram doesn't inherit free-form mode.
+                relaxedLayout: aiData.relaxedLayout,
               });
               requestAnimationFrame(() => {
                 window.dispatchEvent(new CustomEvent("dgx:fitToContent"));
@@ -3722,9 +3724,11 @@ export function DiagramEditor({
                 elements: aiData.elements,
                 connectors: aiData.connectors,
                 viewport: aiData.viewport ?? data.viewport,
-                // An image import that reproduced the vendor's layout sets this
-                // so the editor/validation don't re-impose Diagramatix rules.
-                relaxedLayout: aiData.relaxedLayout ?? data.relaxedLayout,
+                // Take the flag from the GENERATED result only — an image import
+                // that reproduced the vendor's layout sets it true; a normal
+                // (auto-stack) generation clears it, so regenerating over a
+                // previously-imported diagram doesn't inherit free-form mode.
+                relaxedLayout: aiData.relaxedLayout,
               });
               // Wide AI-generated diagrams (especially BPMN with many
               // columns) extend well past the current viewport — ask the

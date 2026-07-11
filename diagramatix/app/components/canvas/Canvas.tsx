@@ -5153,6 +5153,7 @@ export function Canvas({
                 hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
                 highlight={assocHighlightConnIds.has(conn.id)}
                 faded={isAssocFadedConn(conn)}
+                relaxedLayout={data.relaxedLayout}
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
                 onLabelFocusEditEnd={exitFocusMode}
               />
@@ -5788,6 +5789,7 @@ export function Canvas({
                 hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
                 highlight={assocHighlightConnIds.has(conn.id)}
                 faded={isAssocFadedConn(conn)}
+                relaxedLayout={data.relaxedLayout}
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
                 onLabelFocusEditEnd={exitFocusMode}
               />
@@ -5816,6 +5818,7 @@ export function Canvas({
               hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
               highlight={assocHighlightConnIds.has(conn.id)}
               faded={isAssocFadedConn(conn)}
+                relaxedLayout={data.relaxedLayout}
               onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
               onLabelFocusEditEnd={exitFocusMode}
             />
@@ -5861,6 +5864,7 @@ export function Canvas({
                 hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
                 highlight={assocHighlightConnIds.has(conn.id)}
                 faded={isAssocFadedConn(conn)}
+                relaxedLayout={data.relaxedLayout}
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
                 onLabelFocusEditEnd={exitFocusMode}
               />

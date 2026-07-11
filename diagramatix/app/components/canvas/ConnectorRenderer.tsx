@@ -27,6 +27,11 @@ interface Props {
   /** Process-Context: dim this connector — not part of the selection's
    *  associations. */
   faded?: boolean;
+  /** The diagram is in free-form / imported-layout mode. Only then is a
+   *  messageBPMN a rectilinear, segment-editable connector; a NORMAL message
+   *  also stores routingType "rectilinear" but must keep its vertical-spine
+   *  drag, so we key message editability off the diagram flag, not routingType. */
+  relaxedLayout?: boolean;
   /** Source/target element bounds — used to mask out the click hit area for
    *  associationBPMN connectors so a click inside an endpoint element selects
    *  the element rather than the connector. */
@@ -530,7 +535,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
@@ -560,11 +565,11 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const isAssocBPMN = connector.type === "associationBPMN";
   const isFlowchartAssoc = connector.type === "flowchart-association";
   const isMessageBPMN = connector.type === "messageBPMN";
-  // Free-form / imported diagrams route message flows as rectilinear connectors
-  // (routingType "rectilinear"). Such a message is edited exactly like a
-  // rectilinear connector — moveable segments — NOT the vertical-spine ew-resize
-  // drag of a normal (forced-vertical) message.
-  const isRectilinearMessage = isMessageBPMN && connector.routingType === "rectilinear";
+  // Only on a free-form / imported diagram is a message a rectilinear,
+  // segment-editable connector. A NORMAL message also stores routingType
+  // "rectilinear" but must keep its vertical-spine drag — so gate on the
+  // DIAGRAM flag, not the connector's routingType.
+  const isRectilinearMessage = isMessageBPMN && !!relaxedLayout;
   const isReviewLink = connector.type === "review-comment-link";
   const isBottleneck = connector.type === "sequence" && !!connector.bottleneck && !!showBottleneck;
   const strokeColor = selected ? "#2563eb"

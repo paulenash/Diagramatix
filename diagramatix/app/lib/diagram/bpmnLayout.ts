@@ -172,7 +172,12 @@ function layoutBpmnPreserved(
     } else if (s.type === "lane") {
       parentId = s.parentPoolId;
     } else {
-      parentId = s.laneId ?? s.poolId;
+      // An element inside an Expanded Subprocess must be parented to the EP (not
+      // its lane/pool) so connector routing treats the EP as a containment box —
+      // otherwise flows between EP children detour AROUND the EP boundary.
+      const epParent = ai.parentSubprocess && aiById.get(ai.parentSubprocess)?.type === "subprocess-expanded"
+        ? ai.parentSubprocess : undefined;
+      parentId = epParent ?? s.laneId ?? s.poolId;
       const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
       if (FIXED_SYMBOL_TYPES.has(ai.type)) {
         const cx = x + width / 2, cy = y + height / 2;
@@ -241,6 +246,47 @@ function layoutBpmnPreserved(
       boundaryHostId: host.id,
       ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
     });
+  }
+
+  // ── Expanded Subprocess tidy-up ── the vendor may draw an EP too small to
+  // enclose all its children, or an intermediate event sitting on its edge.
+  const taskDefH = getSymbolDefinition("task").defaultHeight;
+  for (const ep of elements) {
+    if (ep.type !== "subprocess-expanded") continue;
+    // (a) Edge-mount an intermediate event sitting on / just outside the EP edge
+    //     that isn't already a child of it — it becomes a boundary event.
+    for (const ev of elements) {
+      if (ev.type !== "intermediate-event" || ev.boundaryHostId || ev.parentId === ep.id) continue;
+      const ecx = ev.x + ev.width / 2, ecy = ev.y + ev.height / 2;
+      // nearest distance from the event centre to the EP rectangle boundary
+      const nx = Math.max(ep.x, Math.min(ep.x + ep.width, ecx));
+      const ny = Math.max(ep.y, Math.min(ep.y + ep.height, ecy));
+      if (Math.hypot(nx - ecx, ny - ecy) > taskDefH) continue; // too far → not a boundary event
+      const dl = Math.abs(ecx - ep.x), dr = Math.abs(ecx - (ep.x + ep.width));
+      const dt = Math.abs(ecy - ep.y), db = Math.abs(ecy - (ep.y + ep.height));
+      const side = ([["left", dl], ["right", dr], ["top", dt], ["bottom", db]]
+        .sort((a, b) => (a[1] as number) - (b[1] as number))[0][0]) as "left" | "right" | "top" | "bottom";
+      if (side === "left" || side === "right") {
+        ev.x = (side === "left" ? ep.x : ep.x + ep.width) - ev.width / 2;
+        ev.y = Math.max(ep.y, Math.min(ep.y + ep.height - ev.height, ev.y));
+      } else {
+        ev.y = (side === "top" ? ep.y : ep.y + ep.height) - ev.height / 2;
+        ev.x = Math.max(ep.x, Math.min(ep.x + ep.width - ev.width, ev.x));
+      }
+      ev.boundaryHostId = ep.id;
+      ev.parentId = ep.parentId; // boundary events belong to the EP's container
+      ev.properties = { ...ev.properties, boundarySide: side };
+    }
+    // (b) Grow the EP so it encloses all its (non-boundary) children with padding.
+    const kids = elements.filter((e) => e.parentId === ep.id && !e.boundaryHostId);
+    if (kids.length) {
+      const PAD = 20, HEADER = 28;
+      const left = Math.min(ep.x, ...kids.map((k) => k.x - PAD));
+      const top = Math.min(ep.y, ...kids.map((k) => k.y - HEADER));
+      const right = Math.max(ep.x + ep.width, ...kids.map((k) => k.x + k.width + PAD));
+      const bottom = Math.max(ep.y + ep.height, ...kids.map((k) => k.y + k.height + PAD));
+      ep.x = left; ep.y = top; ep.width = right - left; ep.height = bottom - top;
+    }
   }
 
   // ── Connectors ── honour imported sides + routing where present.

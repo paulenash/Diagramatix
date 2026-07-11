@@ -98,6 +98,34 @@ describe("layoutBpmnPreserved message rules (T0716)", () => {
   });
 });
 
+describe("layoutBpmnPreserved Expanded Subprocess containment (T0719)", () => {
+  const epScene: AiElement[] = [
+    { id: "p", type: "pool", label: "Customer", poolType: "white-box", bounds: { x: 0.02, y: 0.10, w: 0.96, h: 0.60 } },
+    { id: "ep", type: "subprocess-expanded", label: "Checkout", pool: "p", bounds: { x: 0.10, y: 0.20, w: 0.28, h: 0.34 } },
+    { id: "a", type: "task", label: "Pick", pool: "p", parentSubprocess: "ep", bounds: { x: 0.14, y: 0.30, w: 0.09, h: 0.09 } },
+    // End event drawn OUTSIDE the EP's (too-narrow) right edge — should be enclosed.
+    { id: "fin", type: "end-event", label: "Done", pool: "p", parentSubprocess: "ep", bounds: { x: 0.40, y: 0.32, w: 0.03, h: 0.05 } },
+    // Intermediate event sitting on the EP's right edge, NOT a child — edge-mount it.
+    { id: "ie", type: "intermediate-event", label: "Timer", pool: "p", bounds: { x: 0.385, y: 0.34, w: 0.03, h: 0.04 } },
+  ];
+
+  it("parents EP children to the EP, grows the EP to enclose them, and edge-mounts a boundary event", () => {
+    const d = layoutBpmnDiagram(epScene, [], { preservePositions: true });
+    const ep = d.elements.find((e) => e.id === "ep")!;
+    const a = d.elements.find((e) => e.id === "a")!;
+    const fin = d.elements.find((e) => e.id === "fin")!;
+    const ie = d.elements.find((e) => e.id === "ie")!;
+    // Containment: children point at the EP (so routing treats it as a box, not obstacle).
+    expect(a.parentId).toBe("ep");
+    expect(fin.parentId).toBe("ep");
+    // The EP grew to fully enclose its children (the End event is now inside).
+    expect(fin.x + fin.width).toBeLessThanOrEqual(ep.x + ep.width + 0.5);
+    expect(fin.x).toBeGreaterThanOrEqual(ep.x - 0.5);
+    // The intermediate event on the edge became a boundary event.
+    expect(ie.boundaryHostId).toBe("ep");
+  });
+});
+
 describe("layoutBpmnPreserved mounts edge events on their host (T0713)", () => {
   it("sets boundaryHostId and snaps the event centre onto a host edge", () => {
     const d = layoutBpmnDiagram(withBoundary, [], { preservePositions: true });
