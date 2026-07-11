@@ -873,12 +873,14 @@ export function layoutBpmnDiagram(
 
     // R6.02: Compute lane heights — each lane needs room for its elements + vertical padding
     const taskDef = getSymbolDefinition("task");
-    // R6.02c (routing clearance): a Pool/Lane carrying process flow reserves 2×
-    // Task-height of vertical clearance above the topmost and below the bottommost
-    // element it contains — since elements are vertically CENTRED in the band, a
-    // symmetric buffer of 2× Task-height delivers that both sides — so connector
-    // routing is never pinched against the Pool/Lane boundary.
-    const VCLEAR = 2 * taskDef.defaultHeight;
+    // R6.02c (routing clearance): a Pool/Lane carrying process flow reserves
+    // 1/2 Task-height of vertical clearance above the topmost and below the
+    // bottommost element it contains (Paul 2026-07-12 — was 2× Task-height, which
+    // left lanes very tall with elements floating in the middle). Elements are
+    // vertically CENTRED in the band, so this symmetric buffer lands equally top
+    // + bottom; the lane hugs its content. Must match VPAD in the overflow-grow
+    // pass below (expandContainerToFitChildren) or the lane re-grows asymmetrically.
+    const VCLEAR = Math.round(0.5 * taskDef.defaultHeight);
     const laneHeights: number[] = [];
     for (const lane of pLanes) {
       const els = laneElements.get(lane.id) ?? [];
@@ -1576,10 +1578,10 @@ export function layoutBpmnDiagram(
       maxBottom = Math.max(maxBottom, child.y + child.height);
     }
     const PAD = 30;
-    // R6.02c: keep 2× Task-height of clearance below the lowest child (matching the
-    // top clearance built into lane sizing) so overflow growth doesn't pinch routing
-    // against the boundary.
-    const VPAD = 2 * getSymbolDefinition("task").defaultHeight;
+    // R6.02c: keep 1/2 Task-height of clearance below the lowest child (matching
+    // the top clearance built into lane sizing / VCLEAR) so overflow growth stays
+    // symmetric and the lane hugs its content.
+    const VPAD = Math.round(0.5 * getSymbolDefinition("task").defaultHeight);
     const neededW = maxRight - container.x + PAD;
     const neededH = maxBottom - container.y + VPAD;
     if (neededW > container.width) container.width = neededW;

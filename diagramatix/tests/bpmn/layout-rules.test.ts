@@ -51,7 +51,7 @@ const BPMN_LAYOUT_RULES: LayoutRule[] = [
   },
   {
     id: "R6.02c",
-    title: "a Pool/Lane reserves ≥ 2× Task-height of clearance above the top element and below the bottom element (routing clearance)",
+    title: "a Pool/Lane hugs its content — ~1/2 Task-height of clearance above the top element and below the bottom element (was 2×; elements no longer float in a tall, mostly-empty lane)",
     check: () => {
       const TASK_H = 65; // symbols/definitions.ts: task defaultHeight
       const out = layout(
@@ -70,8 +70,12 @@ const BPMN_LAYOUT_RULES: LayoutRule[] = [
       const bottomMost = Math.max(...laneEls.map((e) => e.y + e.height));
       const topClearance = topMost - lane.y;
       const bottomClearance = lane.y + lane.height - bottomMost;
-      expect(topClearance, `top clearance ${topClearance} < 2× task height`).toBeGreaterThanOrEqual(2 * TASK_H);
-      expect(bottomClearance, `bottom clearance ${bottomClearance} < 2× task height`).toBeGreaterThanOrEqual(2 * TASK_H);
+      // Compact: some clearance each side, but STRICTLY under the old 2× floor
+      // (the whole point of the change — lanes hug their content now).
+      expect(topClearance, `top clearance ${topClearance}`).toBeGreaterThanOrEqual(0.2 * TASK_H);
+      expect(topClearance, `top clearance ${topClearance} must be under the old 2× buffer`).toBeLessThan(2 * TASK_H);
+      expect(bottomClearance, `bottom clearance ${bottomClearance}`).toBeGreaterThanOrEqual(0.2 * TASK_H);
+      expect(bottomClearance, `bottom clearance ${bottomClearance} must be under the old 2× buffer`).toBeLessThan(2 * TASK_H);
     },
   },
   {
