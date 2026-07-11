@@ -2438,9 +2438,27 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               >
                 ◎ Create APQC Process
               </button>
-              {/* Simulator / Process Mining / Risk & Controls moved to the
-                  Dashboard's selected-project panel. The overlays below still
-                  open here via deep-links (?rcm=1) + the mining↔sim cross-launch. */}
+              <button
+                onClick={() => setShowSim(true)}
+                className="px-3 py-1 text-xs font-medium rounded-md border text-green-700 border-green-400 hover:bg-green-50"
+                title="Simulate + compare the processes in this project (As-is / To-be)"
+              >
+                {"◈"} Simulator
+              </button>
+              <button
+                onClick={() => setShowMining(true)}
+                className="px-3 py-1 text-xs font-medium rounded-md border text-amber-700 border-amber-400 hover:bg-amber-50"
+                title="Process Mining - discover the real process from event logs + check conformance"
+              >
+                {"⛏"} Process Mining
+              </button>
+              <button
+                onClick={() => setShowRcm(true)}
+                className="px-3 py-1 text-xs font-medium rounded-md border text-blue-700 border-blue-400 hover:bg-blue-50"
+                title="Risk & Controls - maintain the risk/control catalog + Risk-Control Matrix"
+              >
+                {"◆"} Risk & Controls
+              </button>
             </>
           )}
           <a href="/help" className="text-xs text-blue-600 hover:underline ml-1" title="User Guide">User Guide</a>
