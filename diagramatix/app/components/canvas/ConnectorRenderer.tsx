@@ -560,6 +560,11 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const isAssocBPMN = connector.type === "associationBPMN";
   const isFlowchartAssoc = connector.type === "flowchart-association";
   const isMessageBPMN = connector.type === "messageBPMN";
+  // Free-form / imported diagrams route message flows as rectilinear connectors
+  // (routingType "rectilinear"). Such a message is edited exactly like a
+  // rectilinear connector — moveable segments — NOT the vertical-spine ew-resize
+  // drag of a normal (forced-vertical) message.
+  const isRectilinearMessage = isMessageBPMN && connector.routingType === "rectilinear";
   const isReviewLink = connector.type === "review-comment-link";
   const isBottleneck = connector.type === "sequence" && !!connector.bottleneck && !!showBottleneck;
   const strokeColor = selected ? "#2563eb"
@@ -722,7 +727,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   function handleMessageBPMNBodyMouseDown(e: React.MouseEvent) {
     e.stopPropagation();
     if (!svgToWorld || !onUpdateWaypoints) return;
-    if (!isMessageBPMN || connector.waypoints.length < 4) return;
+    if (!isMessageBPMN || isRectilinearMessage || connector.waypoints.length < 4) return;
     const startWorld = svgToWorld(e.clientX, e.clientY);
     const startX = connector.waypoints[1].x;
     const initialWaypoints = connector.waypoints.map(p => ({ ...p }));
@@ -828,10 +833,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         fill="none"
         stroke="transparent"
         strokeWidth={12}
-        style={{ cursor: isMessageBPMN ? "ew-resize" : "pointer" }}
+        style={{ cursor: isMessageBPMN && !isRectilinearMessage ? "ew-resize" : "pointer" }}
         mask={isAssocBPMN && (sourceBounds || targetBounds) ? `url(#assoc-hit-mask-${connector.id})` : undefined}
         onMouseDown={(e) => {
-          if (isMessageBPMN && selected) {
+          if (isMessageBPMN && !isRectilinearMessage && selected) {
             handleMessageBPMNBodyMouseDown(e);
             return;
           }
@@ -1430,9 +1435,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
       })()}
 
       {/* Segment drag handles (rectilinear, selected, interior segments only).
-          Suppressed for messageBPMN — the entire highlighted body is the
-          drag surface for those (see handleMessageBPMNBodyMouseDown). */}
-      {selected && !isMessageBPMN && draggableSegments.map((segIdx) => {
+          Suppressed for a normal (forced-vertical) messageBPMN — its whole body
+          is the ew-resize spine drag. A free-form/imported message is rectilinear
+          and gets the same moveable segment handles as any rectilinear connector. */}
+      {selected && (!isMessageBPMN || isRectilinearMessage) && draggableSegments.map((segIdx) => {
         const p1 = visibleWaypoints[segIdx];
         const p2 = visibleWaypoints[segIdx + 1];
         const isHorizontal = Math.abs(p1.y - p2.y) < 1;

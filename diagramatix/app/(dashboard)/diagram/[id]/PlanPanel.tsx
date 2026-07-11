@@ -217,16 +217,19 @@ export function PlanPanel({
       const base64 = arrayBufferToBase64(buffer);
       setAttachment({ name: file.name, type: "image", data: base64, mediaType: IMAGE_TYPES[file.type] });
       // Capture natural dimensions so an imported layout keeps the image aspect.
+      // BPMN-only — the flowchart image path is left exactly as it was.
       imageDimsRef.current = null;
-      try {
-        const dims = await new Promise<{ w: number; h: number } | null>((resolve) => {
-          const img = new window.Image();
-          img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-          img.onerror = () => resolve(null);
-          img.src = `data:${IMAGE_TYPES[file.type]};base64,${base64}`;
-        });
-        imageDimsRef.current = dims;
-      } catch { imageDimsRef.current = null; }
+      if (!isFlowchart) {
+        try {
+          const dims = await new Promise<{ w: number; h: number } | null>((resolve) => {
+            const img = new window.Image();
+            img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+            img.onerror = () => resolve(null);
+            img.src = `data:${IMAGE_TYPES[file.type]};base64,${base64}`;
+          });
+          imageDimsRef.current = dims;
+        } catch { imageDimsRef.current = null; }
+      }
       setPrompt(prev => prev.trim().length > 0
         ? prev
         : `I have attached an image of a process diagram (${file.name}). Reverse-engineer the BPMN from it.`);
@@ -544,8 +547,9 @@ export function PlanPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: effPrompt, attachment: attachment ?? undefined, pcfNodeId: pcf?.nodeId,
-          // Reproduce original layout: only for an image attachment.
-          captureGeometry: attachment?.type === "image" ? preserveLayout : false,
+          // Reproduce original layout is a BPMN-only capability — never sent for
+          // flowcharts (leave non-BPMN image ingestion exactly as it was).
+          captureGeometry: !isFlowchart && attachment?.type === "image" ? preserveLayout : false,
         }),
       });
       const json = await res.json();
@@ -645,7 +649,8 @@ export function PlanPanel({
       // survives JSON edits and doesn't depend on the attachment still being set.
       const planHasBounds = Array.isArray(plan?.elements)
         && plan.elements.some((e: { bounds?: unknown }) => e.bounds);
-      const preservePositions = preserveLayout && planHasBounds;
+      // BPMN-only — flowchart apply-layout must be sent exactly as before.
+      const preservePositions = !isFlowchart && preserveLayout && planHasBounds;
       const res = await fetch(`${apiBase}/apply-layout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -914,7 +919,7 @@ export function PlanPanel({
               </div>
             )}
           </div>
-          {attachment?.type === "image" && (
+          {!isFlowchart && attachment?.type === "image" && (
             <label className="flex items-center gap-1 mt-1 cursor-pointer select-none" title="Rebuild the diagram at the positions drawn in the image (pools any size/placement, rectilinear messages) instead of Diagramatix's auto-layout.">
               <input type="checkbox" className="cursor-pointer" checked={preserveLayout}
                 onChange={e => setPreserveLayout(e.target.checked)} />

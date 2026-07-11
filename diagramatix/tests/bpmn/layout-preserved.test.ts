@@ -48,4 +48,40 @@ describe("layoutBpmnPreserved reproduces drawn positions (T0711)", () => {
     // Still produced a valid diagram via the normal engine.
     expect(d.elements.length).toBeGreaterThan(0);
   });
+
+  it("routes connectors so their visible endpoints attach to the source & target (T0712)", () => {
+    const d = layoutBpmnDiagram(withBounds, conns, { preservePositions: true, imageAspect: { w: 1000, h: 600 } });
+    const a = d.elements.find((e) => e.id === "a")!;
+    const b = d.elements.find((e) => e.id === "b")!;
+    const c = d.connectors.find((x) => x.sourceId === "a" && x.targetId === "b")!;
+    const wp = c.waypoints;
+    // With invisible centre leaders: waypoints[1] = the attachment point on the
+    // source boundary, waypoints[len-2] = the attachment point on the target.
+    const srcEdge = wp[1];
+    const tgtEdge = wp[wp.length - 2];
+    const onRect = (p: { x: number; y: number }, e: { x: number; y: number; width: number; height: number }) =>
+      p.x >= e.x - 1 && p.x <= e.x + e.width + 1 && p.y >= e.y - 1 && p.y <= e.y + e.height + 1;
+    expect(onRect(srcEdge, a)).toBe(true); // touches source — not floating (regression: it used to float)
+    expect(onRect(tgtEdge, b)).toBe(true); // touches target
+  });
+});
+
+const withBoundary: AiElement[] = [
+  { id: "p", type: "pool", label: "P", poolType: "white-box", bounds: { x: 0.05, y: 0.10, w: 0.90, h: 0.50 } },
+  { id: "t", type: "task", label: "T", pool: "p", bounds: { x: 0.30, y: 0.25, w: 0.15, h: 0.12 } },
+  // Drawn straddling the task's BOTTOM edge → an edge-mounted (boundary) event.
+  { id: "be", type: "intermediate-event", label: "timer", pool: "p", boundaryHost: "t", bounds: { x: 0.36, y: 0.35, w: 0.03, h: 0.04 } },
+];
+
+describe("layoutBpmnPreserved mounts edge events on their host (T0713)", () => {
+  it("sets boundaryHostId and snaps the event centre onto a host edge", () => {
+    const d = layoutBpmnDiagram(withBoundary, [], { preservePositions: true });
+    const be = d.elements.find((e) => e.id === "be")!;
+    const t = d.elements.find((e) => e.id === "t")!;
+    expect(be.boundaryHostId).toBe("t");
+    const cx = be.x + be.width / 2, cy = be.y + be.height / 2;
+    const onEdge = Math.abs(cx - t.x) < 2 || Math.abs(cx - (t.x + t.width)) < 2
+      || Math.abs(cy - t.y) < 2 || Math.abs(cy - (t.y + t.height)) < 2;
+    expect(onEdge).toBe(true);
+  });
 });

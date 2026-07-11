@@ -3953,7 +3953,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // is now BELOW it), flip sourceSide ↔ targetSide so the connector still
         // exits the nearer face of each element instead of going "through" them.
         const connectors = state.connectors.map(conn => {
-          if (conn.type !== "messageBPMN") return conn;
+          // Free-form / imported: messages route as rectilinear connectors, done
+          // by the relaxed recompute at the end of this branch — skip the
+          // vertical-specific pool-move handling here.
+          if (conn.type !== "messageBPMN" || state.relaxedLayout) return conn;
           const isSrc = conn.sourceId === id;
           const isTgt = conn.targetId === id;
           if (!isSrc && !isTgt) return conn;
@@ -4047,7 +4050,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             sourceInvisibleLeader: wp.sourceInvisibleLeader,
             targetInvisibleLeader: wp.targetInvisibleLeader, ...labelAdj };
         });
-        return { ...state, elements: updatePoolTypes(elements), connectors };
+        // Free-form / imported: re-route every connector (incl. messages, which
+        // were skipped above) rectilinearly so they follow the moved pool and
+        // stay attached to their real element sides.
+        const finalConnectors = state.relaxedLayout
+          ? recomputeAllConnectors(connectors, elements, true)
+          : connectors;
+        return { ...state, elements: updatePoolTypes(elements), connectors: finalConnectors };
       }
 
       // CASE B + C: Normal move (host elements also carry their boundary events)
@@ -4228,7 +4237,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           // endpoint is the moving one. recomputeAllConnectors's messageBPMN
           // branch derives x purely from sourceOffsetAlong, which leaves the
           // target's attachment drifting when the target is what moved.
-          if (conn.type === "messageBPMN") {
+          if (conn.type === "messageBPMN" && !state.relaxedLayout) {
             const source = elements.find(e => e.id === conn.sourceId);
             const target = elements.find(e => e.id === conn.targetId);
             if (source && target) {
@@ -4758,7 +4767,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           return { ...conn, waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })) };
         }
         if (!srcIn && !tgtIn) return conn;
-        if (conn.type === "messageBPMN") {
+        if (conn.type === "messageBPMN" && !state.relaxedLayout) {
           const source = elements.find(e => e.id === conn.sourceId);
           const target = elements.find(e => e.id === conn.targetId);
           if (source && target) {
@@ -6367,7 +6376,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         targetOffsetAlong,
         type: connectorType,
         directionType,
-        routingType,
+        // Free-form / imported: a new message flow is a rectilinear connector
+        // (attaches to real sides, segments moveable) — mark it so.
+        routingType: isMsgBpmn && state.relaxedLayout ? "rectilinear" : routingType,
         sourceInvisibleLeader,
         targetInvisibleLeader,
         waypoints,
@@ -6581,7 +6592,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const target = state.elements.find((el) => el.id === updated.targetId);
         if (!source || !target) return conn;
         const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
-          updated.type === "messageBPMN"
+          updated.type === "messageBPMN" && !state.relaxedLayout
             ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
@@ -6636,7 +6647,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           targetConstraintOffset: undefined, targetUniqueOffset: undefined,
           associationNameOffset: undefined };
         const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
-          updated.type === "messageBPMN"
+          updated.type === "messageBPMN" && !state.relaxedLayout
             ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
@@ -6794,7 +6805,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const target = state.elements.find((el) => el.id === updated.targetId);
         if (!source || !target) return conn;
         const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
-          updated.type === "messageBPMN"
+          updated.type === "messageBPMN" && !state.relaxedLayout
             ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
@@ -6814,7 +6825,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // user-initiated horizontal drag of the connector visibly moves
         // the label with it, instead of pinning the label in place
         // while the connector slides underneath.
-        if (c.type === "messageBPMN") {
+        if (c.type === "messageBPMN" && !state.relaxedLayout) {
           // Persist the new shared X as sourceOffsetAlong so subsequent
           // recomputes (e.g. element move, validate pass) preserve the
           // user's body drag instead of snapping the connector back to
@@ -6827,6 +6838,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           }
           return { ...c, waypoints: newWaypoints };
         }
+        // Free-form / imported message: a rectilinear connector — preserve the
+        // dragged segments like any other, keeping its routingType so the
+        // renderer + recompute keep treating it as rectilinear (not vertical).
         // R6.18: preserve label world position across the waypoint change
         const labelAdj = preserveLabelWorldPos(c, newWaypoints);
         return { ...c, waypoints: newWaypoints, ...labelAdj };

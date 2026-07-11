@@ -65,4 +65,20 @@ describe("relaxedLayout routes messages rectilinearly (T0709)", () => {
     // single shared x, so a message can connect non-aligned elements.
     expect(srcEdge.x).not.toBe(tgtEdge.x);
   });
+
+  it("coerces the message to a rectilinear connector so it stays editable, not vertical", () => {
+    // The renderer + reducer key a message's editability off routingType
+    // "rectilinear" — this is what makes segments moveable and stops it
+    // reverting to the forced-vertical dogleg when moved.
+    const [c] = recomputeAllConnectors([msg], els, true);
+    expect(c.routingType).toBe("rectilinear");
+    // Endpoints attach to the two elements (not floating).
+    const src = els[0], tgt = els[1];
+    const srcEdge = c.waypoints[1];
+    const tgtEdge = c.waypoints[c.waypoints.length - 2];
+    const onRect = (p: { x: number; y: number }, e: { x: number; y: number; width: number; height: number }) =>
+      p.x >= e.x - 1 && p.x <= e.x + e.width + 1 && p.y >= e.y - 1 && p.y <= e.y + e.height + 1;
+    expect(onRect(srcEdge, src)).toBe(true);
+    expect(onRect(tgtEdge, tgt)).toBe(true);
+  });
 });

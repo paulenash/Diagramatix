@@ -146,15 +146,22 @@ function layoutBpmnPreserved(
     width: b.w * TARGET_W,
     height: b.h * TARGET_H,
   });
-  const nx = (v: number) => START_X + v * TARGET_W;
-  const ny = (v: number) => START_Y + v * TARGET_H;
-
   const aiById = new Map(aiElements.map((a) => [a.id, a]));
   const elements: DiagramElement[] = [];
+  // Edge-mounted (boundary) events reference a host activity; defer them until
+  // the host is placed, then snap them onto its boundary.
+  const boundaryDefer: typeof snap.shapes = [];
 
   for (const s of snap.shapes) {
     const ai = aiById.get(s.id);
     if (!ai) continue;
+    // Boundary intermediate event → mount on the host edge in a later pass.
+    const hostAi = ai.boundaryHost ? aiById.get(ai.boundaryHost) : undefined;
+    if (hostAi && hostAi.type !== "pool" && hostAi.type !== "lane"
+        && (ai.type === "intermediate-event" || ai.type === "start-event")) {
+      boundaryDefer.push(s);
+      continue;
+    }
     const px = toPx(s.box);
     let { x, y, width, height } = px;
     let parentId: string | undefined;
@@ -188,6 +195,50 @@ function layoutBpmnPreserved(
     });
   }
 
+  // ── Boundary events ── snap each deferred event onto its host's nearest edge
+  // so it renders mounted on the activity boundary (not floating in the lane).
+  const placedById = new Map(elements.map((e) => [e.id, e]));
+  for (const s of boundaryDefer) {
+    const ai = aiById.get(s.id)!;
+    const host = placedById.get(ai.boundaryHost!);
+    const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+    const W = def.defaultWidth, H = def.defaultHeight;
+    if (!host) {
+      // Host wasn't placed — fall back to a plain node at the drawn position.
+      const px = toPx(s.box);
+      elements.push({ id: s.id, type: ai.type as DiagramElement["type"],
+        x: px.x + px.width / 2 - W / 2, y: px.y + px.height / 2 - H / 2, width: W, height: H,
+        label: ai.label, properties: buildProps(ai),
+        ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}) });
+      continue;
+    }
+    // Determine which host edge the drawn event centre is nearest to.
+    const px = toPx(s.box);
+    const cx = px.x + px.width / 2, cy = px.y + px.height / 2;
+    const dl = Math.abs(cx - host.x), dr = Math.abs(cx - (host.x + host.width));
+    const dt = Math.abs(cy - host.y), db = Math.abs(cy - (host.y + host.height));
+    const side = ((ai.boundarySide as string | undefined)
+      ?? [["left", dl], ["right", dr], ["top", dt], ["bottom", db]]
+        .sort((a, b) => (a[1] as number) - (b[1] as number))[0][0]) as "left" | "right" | "top" | "bottom";
+    // Centre the event ON the chosen edge, at the drawn along-edge position.
+    let ex: number, ey: number;
+    if (side === "left" || side === "right") {
+      ex = (side === "left" ? host.x : host.x + host.width) - W / 2;
+      ey = Math.max(host.y, Math.min(host.y + host.height - H, cy - H / 2));
+    } else {
+      ey = (side === "top" ? host.y : host.y + host.height) - H / 2;
+      ex = Math.max(host.x, Math.min(host.x + host.width - W, cx - W / 2));
+    }
+    elements.push({
+      id: s.id, type: ai.type as DiagramElement["type"],
+      x: ex, y: ey, width: W, height: H,
+      label: ai.label,
+      properties: { ...buildProps(ai), boundarySide: side },
+      boundaryHostId: host.id,
+      ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
+    });
+  }
+
   // ── Connectors ── honour imported sides + routing where present.
   const elMap = new Map(elements.map((e) => [e.id, e]));
   const built: Connector[] = [];
@@ -207,38 +258,29 @@ function layoutBpmnPreserved(
     const defSrcSide = horiz ? (dx >= 0 ? "right" : "left") : (dy >= 0 ? "bottom" : "top");
     const defTgtSide = horiz ? (dx >= 0 ? "left" : "right") : (dy >= 0 ? "top" : "bottom");
 
-    const conn = {
+    built.push({
       id: `conn-${c.sourceId}-${c.targetId}`,
       sourceId: c.sourceId, targetId: c.targetId,
+      // Honour the drawn LOGICAL attachment side (middle of that boundary /
+      // vertex of a gateway); the actual endpoint is computed on the real
+      // element boundary by the router below, so the connector always CONNECTS.
+      // The raw imported waypoint polyline is NOT used as the path — its
+      // coordinates are in image space and would float off the placed elements.
       sourceSide: c.sourceSide ?? defSrcSide,
       targetSide: c.targetSide ?? defTgtSide,
+      sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
       type, directionType: "directed", routingType: "rectilinear",
       sourceInvisibleLeader: false, targetInvisibleLeader: false,
       waypoints: [] as Point[],
       label: c.label ?? "",
-    } as Connector;
-
-    // Honour the imported routing polyline when the model drew one — denormalise
-    // and wrap with invisible centre leaders so it renders like a normal route.
-    if (c.waypoints && c.waypoints.length >= 2) {
-      const pts = c.waypoints.map((p) => ({ x: nx(p.x), y: ny(p.y) }));
-      conn.waypoints = [
-        { x: src.x + src.width / 2, y: src.y + src.height / 2 },
-        ...pts,
-        { x: tgt.x + tgt.width / 2, y: tgt.y + tgt.height / 2 },
-      ];
-      conn.sourceInvisibleLeader = true;
-      conn.targetInvisibleLeader = true;
-    }
-    built.push(conn);
+    } as Connector);
   }
 
-  // Route the connectors that don't carry an imported polyline (relaxed router
-  // → rectilinear messages between non-aligned elements, honouring the sides).
-  const needRouting = built.filter((c) => c.waypoints.length < 2);
-  const routed = recomputeAllConnectors(needRouting, elements, true);
-  const routedById = new Map(routed.map((c) => [c.id, c]));
-  const connectors = built.map((c) => routedById.get(c.id) ?? c);
+  // Route every connector so its endpoints attach to the real element sides
+  // (relaxed router → rectilinear messages between non-aligned elements). This
+  // is what makes the visible line touch its source/target, and — because the
+  // messages are rectilinear — leaves them moveable/reshapeable in the editor.
+  const connectors = recomputeAllConnectors(built, elements, true);
 
   return {
     elements,

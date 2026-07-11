@@ -1253,40 +1253,24 @@ export function recomputeAllConnectors(
   relaxedLayout = false,
 ): Connector[] {
   const elementMap = new Map(elements.map((el) => [el.id, el]));
-  return connectors.map((conn) => {
-    const source = elementMap.get(conn.sourceId);
-    const target = elementMap.get(conn.targetId);
-    if (!source || !target) return conn;
+  return connectors.map((rawConn) => {
+    const source = elementMap.get(rawConn.sourceId);
+    const target = elementMap.get(rawConn.targetId);
+    if (!source || !target) return rawConn;
 
-    // Free-form / imported message flow: route rectilinearly between the sides
-    // that face each other (re-pick a side that points away), exactly like the
-    // archi-connector path below. This lets a message connect two elements that
-    // are not vertically aligned without the forced shared-x vertical dogleg.
-    if (conn.type === "messageBPMN" && relaxedLayout) {
-      const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
-      const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
-      let mSrcSide = conn.sourceSide, mTgtSide = conn.targetSide;
-      let mSrcOff = conn.sourceOffsetAlong ?? 0.5, mTgtOff = conn.targetOffsetAlong ?? 0.5;
-      const sN = sideNormalDir(mSrcSide), tN = sideNormalDir(mTgtSide);
-      if (sN.dx * (tgtCx - srcCx) + sN.dy * (tgtCy - srcCy) < 0) {
-        mSrcSide = getClosestSideOfElement(tgtCx, tgtCy, source);
-        mSrcOff = getOffsetAlong(source, mSrcSide, { x: tgtCx, y: tgtCy });
-      }
-      if (tN.dx * (srcCx - tgtCx) + tN.dy * (srcCy - tgtCy) < 0) {
-        mTgtSide = getClosestSideOfElement(srcCx, srcCy, target);
-        mTgtOff = getOffsetAlong(target, mTgtSide, { x: srcCx, y: srcCy });
-      }
-      const mRes = computeWaypoints(source, target, elements,
-        mSrcSide, mTgtSide, "rectilinear", mSrcOff, mTgtOff);
-      return { ...conn, waypoints: mRes.waypoints,
-        sourceInvisibleLeader: mRes.sourceInvisibleLeader,
-        targetInvisibleLeader: mRes.targetInvisibleLeader,
-        sourceSide: mSrcSide, targetSide: mTgtSide,
-        sourceOffsetAlong: mSrcOff, targetOffsetAlong: mTgtOff };
-    }
+    // Free-form / imported layout: a message flow behaves like a rectilinear
+    // connector — it attaches to the chosen sides, its segments are moveable,
+    // and it can connect non-vertically-aligned elements. Only the markers/style
+    // differ. Coerce its routingType so the ordinary rectilinear path below
+    // handles it (attachment, user-waypoint preservation, full recompute); the
+    // forced shared-x vertical dogleg is skipped.
+    const conn = (relaxedLayout && rawConn.type === "messageBPMN" && rawConn.routingType !== "rectilinear")
+      ? { ...rawConn, routingType: "rectilinear" as Connector["routingType"] }
+      : rawConn;
 
-    // messageBPMN: always vertical when possible — single shared x for both edges
-    if (conn.type === "messageBPMN") {
+    // messageBPMN: always vertical when possible — single shared x for both
+    // edges. NOT for free-form/imported diagrams (handled as rectilinear above).
+    if (conn.type === "messageBPMN" && !relaxedLayout) {
       const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
       const srcIsEvent = BPMN_EVENT_TYPES.has(source.type);
       const tgtIsEvent = target.type === "start-event" || target.type === "intermediate-event";
