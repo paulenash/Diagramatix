@@ -533,6 +533,10 @@
     <xs:attribute name="processFontSize"   type="xs:decimal" use="optional"/>
     <!-- schema 1.9 — domain diagram database backend: "none" | "postgres" -->
     <xs:attribute name="database"          type="xs:string"  use="optional"/>
+    <!-- schema 1.37 — BPMN "free-form / imported layout": pools any size/placement,
+         rectilinear messages between non-aligned elements, geometry validation relaxed.
+         Set when a competitor diagram is imported from an image and reproduced as drawn. -->
+    <xs:attribute name="relaxedLayout"     type="xs:boolean" use="optional"/>
   </xs:complexType>
 
   <!-- ============================================================ -->

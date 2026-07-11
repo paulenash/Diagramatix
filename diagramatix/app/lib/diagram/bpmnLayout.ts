@@ -5,8 +5,9 @@
 
 import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
-import { computeWaypoints } from "./routing";
+import { computeWaypoints, recomputeAllConnectors } from "./routing";
 import { autoSizeForType, wrapText, type AutosizeType } from "./textMetrics";
+import { snapImportedBounds, type Box } from "./importGeometry";
 
 /** Word-wrap a black-box pool name into multiple lines, then size the pool
  *  FROM the wrapped result: the rotated label runs along the pool HEIGHT, so
@@ -69,6 +70,10 @@ export interface AiElement {
   parentPool?: string;        // for lanes — the pool they belong to
   subprocessType?: string;    // "normal" | "event" | "transaction" | "call"
   properties?: Record<string, unknown>; // additional properties pass-through
+  /** Normalised drawn bounding box (0..1 of the whole source image; x,y =
+   *  top-left corner). Present only for image imports with captureGeometry.
+   *  Consumed by layoutBpmnPreserved to reproduce the vendor's positions. */
+  bounds?: { x: number; y: number; w: number; h: number };
 }
 
 export interface AiConnection {
@@ -76,6 +81,12 @@ export interface AiConnection {
   targetId: string;
   label?: string;
   type?: string; // "sequence" | "message"
+  /** Imported-layout connector geometry (captureGeometry only): the side each
+   *  end attaches to and the normalised (0..1) waypoint polyline as drawn, so
+   *  imported connectors honour the vendor's attachment points + routing. */
+  sourceSide?: "left" | "right" | "top" | "bottom";
+  targetSide?: "left" | "right" | "top" | "bottom";
+  waypoints?: { x: number; y: number }[];
 }
 
 // Layout constants
@@ -97,11 +108,170 @@ function buildProps(ai: AiElement): Record<string, unknown> {
   return props;
 }
 
+/** Fixed-size BPMN symbols: keep the catalogue size (centred on the imported
+ *  box) rather than stretching a circle/diamond to the drawn box. */
+const FIXED_SYMBOL_TYPES = new Set(["start-event", "end-event", "intermediate-event", "gateway"]);
+const DATA_ASSOC_TYPES_PRESERVE = new Set(["data-store", "data-object", "text-annotation"]);
+
+/**
+ * Image-import layout: reproduce the vendor's DRAWN positions rather than
+ * auto-stacking. Consumes the normalised `bounds` on each AiElement, cleans
+ * them with `snapImportedBounds`, scales to canvas pixels (preserving the
+ * image's aspect ratio), and builds elements with absolute geometry +
+ * parent-child nesting. Connectors honour the imported attachment sides and
+ * routing where present, otherwise route rectilinearly (relaxed router).
+ *
+ * Returns null when the geometry is unusable so the caller falls through to the
+ * validated auto-stack layout. The result carries `relaxedLayout: true` so the
+ * editor/validation know not to re-impose Diagramatix conventions.
+ */
+function layoutBpmnPreserved(
+  aiElements: AiElement[],
+  aiConnections: AiConnection[],
+  imageAspect?: { w: number; h: number },
+): DiagramData | null {
+  const snap = snapImportedBounds(
+    aiElements.map((a) => ({
+      id: a.id, type: a.type, bounds: a.bounds,
+      pool: a.pool, lane: a.lane, parentPool: a.parentPool,
+    })),
+  );
+  if (!snap.ok) return null;
+
+  const TARGET_W = 1600;
+  const TARGET_H = TARGET_W * (imageAspect && imageAspect.w > 0 ? imageAspect.h / imageAspect.w : 0.66);
+  const toPx = (b: Box) => ({
+    x: START_X + b.x * TARGET_W,
+    y: START_Y + b.y * TARGET_H,
+    width: b.w * TARGET_W,
+    height: b.h * TARGET_H,
+  });
+  const nx = (v: number) => START_X + v * TARGET_W;
+  const ny = (v: number) => START_Y + v * TARGET_H;
+
+  const aiById = new Map(aiElements.map((a) => [a.id, a]));
+  const elements: DiagramElement[] = [];
+
+  for (const s of snap.shapes) {
+    const ai = aiById.get(s.id);
+    if (!ai) continue;
+    const px = toPx(s.box);
+    let { x, y, width, height } = px;
+    let parentId: string | undefined;
+    const props = buildProps(ai);
+
+    if (s.type === "pool") {
+      props.poolType = (ai.poolType as string | undefined) ?? "white-box";
+    } else if (s.type === "lane") {
+      parentId = s.parentPoolId;
+    } else {
+      parentId = s.laneId ?? s.poolId;
+      const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+      if (FIXED_SYMBOL_TYPES.has(ai.type)) {
+        const cx = x + width / 2, cy = y + height / 2;
+        width = def.defaultWidth; height = def.defaultHeight;
+        x = cx - width / 2; y = cy - height / 2;
+      } else {
+        width = Math.max(width, def.defaultWidth * 0.6);
+        height = Math.max(height, def.defaultHeight * 0.6);
+      }
+    }
+
+    elements.push({
+      id: s.id, type: ai.type as DiagramElement["type"],
+      x, y, width, height,
+      label: ai.label, properties: props,
+      ...(parentId ? { parentId } : {}),
+      ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
+      ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
+      ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
+    });
+  }
+
+  // ── Connectors ── honour imported sides + routing where present.
+  const elMap = new Map(elements.map((e) => [e.id, e]));
+  const built: Connector[] = [];
+  for (const c of aiConnections) {
+    const src = elMap.get(c.sourceId);
+    const tgt = elMap.get(c.targetId);
+    if (!src || !tgt) continue;
+    const isAssoc = DATA_ASSOC_TYPES_PRESERVE.has(src.type) || DATA_ASSOC_TYPES_PRESERVE.has(tgt.type);
+    const isMsg = !isAssoc && (c.type === "message" || src.type === "pool" || tgt.type === "pool");
+    const type = isAssoc ? "associationBPMN" : isMsg ? "messageBPMN" : "sequence";
+
+    // Default attachment sides from the centre-to-centre delta; honour the
+    // imported sides when the model reported them.
+    const dx = (tgt.x + tgt.width / 2) - (src.x + src.width / 2);
+    const dy = (tgt.y + tgt.height / 2) - (src.y + src.height / 2);
+    const horiz = Math.abs(dx) >= Math.abs(dy);
+    const defSrcSide = horiz ? (dx >= 0 ? "right" : "left") : (dy >= 0 ? "bottom" : "top");
+    const defTgtSide = horiz ? (dx >= 0 ? "left" : "right") : (dy >= 0 ? "top" : "bottom");
+
+    const conn = {
+      id: `conn-${c.sourceId}-${c.targetId}`,
+      sourceId: c.sourceId, targetId: c.targetId,
+      sourceSide: c.sourceSide ?? defSrcSide,
+      targetSide: c.targetSide ?? defTgtSide,
+      type, directionType: "directed", routingType: "rectilinear",
+      sourceInvisibleLeader: false, targetInvisibleLeader: false,
+      waypoints: [] as Point[],
+      label: c.label ?? "",
+    } as Connector;
+
+    // Honour the imported routing polyline when the model drew one — denormalise
+    // and wrap with invisible centre leaders so it renders like a normal route.
+    if (c.waypoints && c.waypoints.length >= 2) {
+      const pts = c.waypoints.map((p) => ({ x: nx(p.x), y: ny(p.y) }));
+      conn.waypoints = [
+        { x: src.x + src.width / 2, y: src.y + src.height / 2 },
+        ...pts,
+        { x: tgt.x + tgt.width / 2, y: tgt.y + tgt.height / 2 },
+      ];
+      conn.sourceInvisibleLeader = true;
+      conn.targetInvisibleLeader = true;
+    }
+    built.push(conn);
+  }
+
+  // Route the connectors that don't carry an imported polyline (relaxed router
+  // → rectilinear messages between non-aligned elements, honouring the sides).
+  const needRouting = built.filter((c) => c.waypoints.length < 2);
+  const routed = recomputeAllConnectors(needRouting, elements, true);
+  const routedById = new Map(routed.map((c) => [c.id, c]));
+  const connectors = built.map((c) => routedById.get(c.id) ?? c);
+
+  return {
+    elements,
+    connectors,
+    viewport: { x: 0, y: 0, zoom: 0.6 },
+    fontSize: 12,
+    connectorFontSize: 10,
+    relaxedLayout: true,
+  };
+}
+
 export function layoutBpmnDiagram(
   aiElements: AiElement[],
   aiConnections: AiConnection[],
-  opts?: { promptLabel?: string },
+  opts?: {
+    promptLabel?: string;
+    /** Image import: reproduce the vendor's drawn positions instead of
+     *  auto-stacking. Requires usable `bounds` on pools/lanes/nodes; falls
+     *  back to the normal auto-stack layout if the geometry is unusable. */
+    preservePositions?: boolean;
+    /** Natural pixel dimensions of the imported image, so normalised bounds
+     *  keep the vendor's aspect ratio when scaled to the canvas. */
+    imageAspect?: { w: number; h: number };
+  },
 ): DiagramData {
+  // Image import with usable geometry → reproduce the drawn layout. Returns
+  // null when the geometry is missing/degenerate so we drop through to the
+  // normal auto-stack engine below (always a valid, validated fallback).
+  if (opts?.preservePositions) {
+    const preserved = layoutBpmnPreserved(aiElements, aiConnections, opts.imageAspect);
+    if (preserved) return preserved;
+  }
+
   const elements: DiagramElement[] = [];
   const connectors: Connector[] = [];
 

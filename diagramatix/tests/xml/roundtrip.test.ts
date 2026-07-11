@@ -112,6 +112,29 @@ describe("Diagramatix XML — XSD validation (xmllint-wasm)", () => {
   });
 });
 
+describe("XML export — relaxedLayout attribute (schema 1.37)", () => {
+  it("round-trips the free-form/imported-layout flag and stays XSD-valid", async () => {
+    const data = { ...build(SCENARIOS[0]), relaxedLayout: true };
+    const xml = exportXml("imported layout", data);
+    // Emitted as an attribute on <dgx:data>.
+    expect(xml).toMatch(/<dgx:data[^>]*relaxedLayout="true"/);
+    // Still valid against the real XSD.
+    const res = await validateAgainstXsd(xml);
+    expect(res.errors.map((e) => e.message)).toEqual([]);
+    expect(res.valid).toBe(true);
+    // Survives export → parse.
+    const parsed = parseDiagramatixXml(xml);
+    expect(parsed.diagrams[0].data.relaxedLayout).toBe(true);
+  });
+
+  it("omits the attribute (and stays valid) when the flag is absent", () => {
+    const xml = exportXml("normal layout", build(SCENARIOS[0]));
+    expect(xml).not.toContain("relaxedLayout=");
+    const parsed = parseDiagramatixXml(xml);
+    expect(parsed.diagrams[0].data.relaxedLayout).toBeUndefined();
+  });
+});
+
 describe("Diagramatix XML — every exported scenario validates against the XSD", () => {
   for (const sc of SCENARIOS) {
     it(`${sc.name} — exported XML is XSD-valid`, async () => {

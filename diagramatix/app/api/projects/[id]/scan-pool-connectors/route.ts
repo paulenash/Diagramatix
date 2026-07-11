@@ -138,6 +138,9 @@ export async function GET(_req: Request, { params }: Params) {
       // unknown to read them from the Prisma JSON payload.
       poolFontSize: (data as unknown as { poolFontSize?: number }).poolFontSize,
       laneFontSize: (data as unknown as { laneFontSize?: number }).laneFontSize,
+      // Imported / free-form diagrams: skip the pure-geometry pool + message
+      // rules so a faithful foreign layout isn't reported project-wide.
+      relaxedLayout: (data as unknown as { relaxedLayout?: boolean }).relaxedLayout,
     })) {
       switch (RULE_CATEGORY.get(v.rule)) {
         case "pool-lane-connector": badConnectors.push(v.data as unknown as ConnectorIssue); break;

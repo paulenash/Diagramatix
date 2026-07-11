@@ -382,6 +382,7 @@ export type Action =
   | { type: "SET_VALUE_CHAIN_FONT_SIZE"; payload: number }
   | { type: "SET_DESCRIPTION_FONT_SIZE"; payload: number }
   | { type: "SET_DATABASE"; payload: string }
+  | { type: "SET_RELAXED_LAYOUT"; payload: boolean }
   | { type: "SET_PROCESS_OWNER"; payload: { name?: string; email?: string } }
   | { type: "SET_PROCEDURE_DOC"; payload: { url?: string; name?: string } | undefined }
   | { type: "SET_PCF"; payload: PcfClassification | undefined }
@@ -3864,7 +3865,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const elements = state.elements.map((e) => e.id === id ? { ...e, x: nx, y: ny } : e);
           const connectors = state.connectors.map(conn => {
             if (conn.sourceId !== id && conn.targetId !== id) return conn;
-            return recomputeAllConnectors([conn], elements)[0] ?? conn;
+            return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
           });
           return { ...state, elements, connectors };
         }
@@ -3881,7 +3882,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const elements = state.elements.map((e) => e.id === id ? { ...e, x, y } : e);
         const connectors = state.connectors.map((conn) => {
           if (conn.sourceId !== id && conn.targetId !== id) return conn;
-          return recomputeAllConnectors([conn], elements)[0] ?? conn;
+          return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
         });
         return { ...state, elements, connectors };
       }
@@ -3903,7 +3904,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         );
         const connectors = state.connectors.map((conn) =>
           moveIds.has(conn.sourceId) || moveIds.has(conn.targetId)
-            ? (recomputeAllConnectors([conn], elements)[0] ?? conn)
+            ? (recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn)
             : conn,
         );
         return { ...state, elements, connectors };
@@ -4240,7 +4241,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
                 sourceInvisibleLeader: wp.sourceInvisibleLeader, targetInvisibleLeader: wp.targetInvisibleLeader, ...labelAdj };
             }
           }
-          const recomputed = recomputeAllConnectors([conn], elements)[0] ?? conn;
+          const recomputed = recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
           if (trace && (conn.type === "messageBPMN" || conn.type === "associationBPMN")) {
             console.log(`  recomputed ${conn.type} ${conn.id} src=${recomputed.sourceId}(${recomputed.sourceSide}@${recomputed.sourceOffsetAlong}) tgt=${recomputed.targetId}(${recomputed.targetSide}@${recomputed.targetOffsetAlong}) wp=${JSON.stringify(recomputed.waypoints)}`);
           }
@@ -4391,6 +4392,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const pushed = pushPastLaneGrowth(elementsBefore, elements, connectors);
         elements = pushed.elements;
         connectors = pushed.connectors;
+        // Free-form / imported diagrams keep pools at independent sizes and
+        // positions (may sit side-by-side), so the vertical-stack + full-width
+        // cross-pool cascades below are suppressed — each pool only re-fits its
+        // own children, and other pools stay put.
+        if (!state.relaxedLayout) {
         // Cascade pool-below if any pool's bottom moved down because of
         // the lane growth chain.
         for (const oldEl of elementsBefore) {
@@ -4429,10 +4435,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             elements = r.elements; connectors = r.connectors;
           }
         }
+        } // end !state.relaxedLayout cross-pool cascade
         // Snap every pool's child lanes to the pool's current L/R.
-        for (const el of elements) {
-          if (el.type === "pool") {
-            elements = syncLanesToPool(elements, el.id);
+        if (!state.relaxedLayout) {
+          for (const el of elements) {
+            if (el.type === "pool") {
+              elements = syncLanesToPool(elements, el.id);
+            }
           }
         }
         // Only recompute connectors whose source or target's rect
@@ -4453,7 +4462,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         if (changedElIds.size > 0) {
           connectors = connectors.map((conn) => {
             if (!changedElIds.has(conn.sourceId) && !changedElIds.has(conn.targetId)) return conn;
-            return recomputeAllConnectors([conn], elements)[0] ?? conn;
+            return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
           });
         }
       }
@@ -4688,7 +4697,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           }
         }
         reroutedIds.add(conn.id);
-        return recomputeAllConnectors([candidate], elements)[0] ?? candidate;
+        return recomputeAllConnectors([candidate], elements, state.relaxedLayout)[0] ?? candidate;
       });
 
       // Second-pass obstacle validation on the rerouted set. If any
@@ -4762,7 +4771,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
               sourceInvisibleLeader: wp.sourceInvisibleLeader, targetInvisibleLeader: wp.targetInvisibleLeader, ...labelAdj };
           }
         }
-        return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
       });
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
@@ -4794,7 +4803,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         return converted;
       });
       // Recompute connectors since element type changed (shape may differ)
-      const connectors = recomputeAllConnectors(state.connectors, elements);
+      const connectors = recomputeAllConnectors(state.connectors, elements, state.relaxedLayout);
       return { ...state, elements, connectors };
     }
 
@@ -4897,7 +4906,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         })
         // A re-point that collapsed both ends onto the subprocess is a no-op.
         .filter(c => c.sourceId !== c.targetId);
-      connectors = recomputeAllConnectors(connectors, elements);
+      connectors = recomputeAllConnectors(connectors, elements, state.relaxedLayout);
       return { ...state, elements, connectors };
     }
 
@@ -4928,7 +4937,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
         return { ...e, type: newEventType as SymbolType, width: def.defaultWidth, height: def.defaultHeight, properties: props };
       });
-      const connectors = recomputeAllConnectors(state.connectors, elements);
+      const connectors = recomputeAllConnectors(state.connectors, elements, state.relaxedLayout);
       return { ...state, elements, connectors };
     }
 
@@ -5078,7 +5087,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         );
         const connectors = state.connectors.map((conn) => {
           if (conn.sourceId !== id && conn.targetId !== id) return conn;
-          return recomputeAllConnectors([conn], elements)[0] ?? conn;
+          return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
         });
         return { ...state, elements, connectors };
       }
@@ -5213,7 +5222,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const dLeft  = newX - target.x;
         const dRight = (newX + newW) - (target.x + target.width);
         let connectors = state.connectors;
-        if (wasWhiteBox && (dLeft !== 0 || dRight !== 0)) {
+        // Suppressed on free-form / imported diagrams — pools resize
+        // independently there (no full-width lockstep).
+        if (!state.relaxedLayout && wasWhiteBox && (dLeft !== 0 || dRight !== 0)) {
           const r = applyPoolBoundaryShift(elements, connectors, id, dLeft, dRight);
           elements = r.elements; connectors = r.connectors;
         }
@@ -5267,7 +5278,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
               ? { ...working, sourceOffsetAlong: f }
               : { ...working, targetOffsetAlong: f };
           }
-          const recomputed = recomputeAllConnectors([working], elements)[0] ?? working;
+          const recomputed = recomputeAllConnectors([working], elements, state.relaxedLayout)[0] ?? working;
           const orig = orig0;
           if (!orig) return recomputed;
           const labelAdj = recomputed.type === "messageBPMN"
@@ -5343,7 +5354,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // Only recompute connectors attached to the resized element or its boundary events
       let connectors = state.connectors.map(conn => {
         if (!movedIds.has(conn.sourceId) && !movedIds.has(conn.targetId)) return conn;
-        return recomputeAllConnectors([conn], finalElements)[0] ?? conn;
+        return recomputeAllConnectors([conn], finalElements, state.relaxedLayout)[0] ?? conn;
       });
       // Validate ALL connectors against ALL elements
       connectors = validateConnectorsAgainstObstacles(connectors, finalElements);
@@ -5456,7 +5467,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         );
         const connectors = state.connectors.map(conn => {
           if (conn.sourceId !== action.payload.id && conn.targetId !== action.payload.id) return conn;
-          return recomputeAllConnectors([conn], resizedElements)[0] ?? conn;
+          return recomputeAllConnectors([conn], resizedElements, state.relaxedLayout)[0] ?? conn;
         });
         return { ...state, elements: resizedElements, connectors };
       }
@@ -5467,7 +5478,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         );
         const connectors = state.connectors.map(conn => {
           if (conn.sourceId !== action.payload.id && conn.targetId !== action.payload.id) return conn;
-          return recomputeAllConnectors([conn], resizedElements)[0] ?? conn;
+          return recomputeAllConnectors([conn], resizedElements, state.relaxedLayout)[0] ?? conn;
         });
         return { ...state, elements: resizedElements, connectors };
       }
@@ -5501,7 +5512,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const finalElements = ensureContainersEncloseChildren(resizedElements);
         const connectors = state.connectors.map((conn) => {
           if (conn.sourceId !== labelEl.id && conn.targetId !== labelEl.id) return conn;
-          return recomputeAllConnectors([conn], finalElements)[0] ?? conn;
+          return recomputeAllConnectors([conn], finalElements, state.relaxedLayout)[0] ?? conn;
         });
         return { ...state, elements: finalElements, connectors };
       }
@@ -5567,7 +5578,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         );
         const connectors = state.connectors.map(conn => {
           if (conn.sourceId !== action.payload.id && conn.targetId !== action.payload.id) return conn;
-          return recomputeAllConnectors([conn], resizedElements)[0] ?? conn;
+          return recomputeAllConnectors([conn], resizedElements, state.relaxedLayout)[0] ?? conn;
         });
         return { ...state, elements: resizedElements, connectors };
       }
@@ -5588,7 +5599,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const finalElements = ensureContainersEncloseChildren(resizedElements);
           const connectors = state.connectors.map((conn) => {
             if (conn.sourceId !== el.id && conn.targetId !== el.id) return conn;
-            return recomputeAllConnectors([conn], finalElements)[0] ?? conn;
+            return recomputeAllConnectors([conn], finalElements, state.relaxedLayout)[0] ?? conn;
           });
           return { ...state, elements: finalElements, connectors };
         }
@@ -5634,7 +5645,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         );
         const connectors = state.connectors.map((conn) => {
           if (conn.sourceId !== id && conn.targetId !== id) return conn;
-          return recomputeAllConnectors([conn], elements)[0] ?? conn;
+          return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
         });
         return { ...state, elements, connectors };
       }
@@ -5651,7 +5662,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       );
       const connectors = state.connectors.map((conn) => {
         if (conn.sourceId !== id && conn.targetId !== id) return conn;
-        return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
       });
       return { ...state, elements, connectors };
     }
@@ -6272,7 +6283,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
         connectorType === "messageBPMN"
-          ? messageBpmnWaypoints(source, target, sourceSide, targetSide, sourceOffsetAlong ?? 0.5, targetOffsetAlong)
+          ? (state.relaxedLayout
+              // Free-form / imported: a new message routes rectilinearly between
+              // the chosen sides, so it can connect non-vertically-aligned
+              // elements instead of being forced onto a shared vertical x.
+              ? computeWaypoints(source, target, state.elements, sourceSide, targetSide, "rectilinear", sourceOffsetAlong ?? 0.5, targetOffsetAlong ?? 0.5)
+              : messageBpmnWaypoints(source, target, sourceSide, targetSide, sourceOffsetAlong ?? 0.5, targetOffsetAlong))
           : computeWaypoints(source, target, state.elements, sourceSide, targetSide, routingType, sourceOffsetAlong, targetOffsetAlong);
 
       const isMsgBpmn = connectorType === "messageBPMN";
@@ -6931,6 +6947,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "SET_DATABASE":
       return { ...state, database: action.payload || undefined };
 
+    case "SET_RELAXED_LAYOUT":
+      return { ...state, relaxedLayout: action.payload || undefined };
+
     case "SET_PROCESS_OWNER": {
       const { name, email } = action.payload;
       const hasContent = (name && name.trim().length > 0) || (email && email.trim().length > 0);
@@ -7087,7 +7106,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       });
 
       // Recompute all connectors after space insertion, adjusting messageBPMN labels
-      const recomputed = recomputeAllConnectors(state.connectors, finalElements);
+      const recomputed = recomputeAllConnectors(state.connectors, finalElements, state.relaxedLayout);
       const connectors = recomputed.map((conn, i) => {
         const old = state.connectors[i];
         if (!old || old.id !== conn.id) return conn;
@@ -7354,7 +7373,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const survivingConnectors = state.connectors.filter((c) =>
         !deleteIds.has(c.sourceId) && !deleteIds.has(c.targetId),
       );
-      const recomputed = recomputeAllConnectors(survivingConnectors, finalElements);
+      const recomputed = recomputeAllConnectors(survivingConnectors, finalElements, state.relaxedLayout);
       const enclosed = ensureContainersEncloseChildren(finalElements);
       return {
         ...state,
@@ -7407,7 +7426,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           } : e);
           const reconns = state.connectors.map(conn =>
             (conn.sourceId === id || conn.targetId === id)
-              ? recomputeAllConnectors([conn], attachedEls)[0] ?? conn
+              ? recomputeAllConnectors([conn], attachedEls, state.relaxedLayout)[0] ?? conn
               : conn);
           return { ...state, elements: updatePoolTypes(attachedEls), connectors: reconns };
         }
@@ -7894,10 +7913,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           if (srcDelta === tgtDelta) {
             return { ...conn, waypoints: conn.waypoints.map(pt => ({ x: pt.x, y: pt.y + srcDelta })) };
           }
-          return { ...conn, waypoints: recomputeAllConnectors([conn], elements)[0]?.waypoints ?? conn.waypoints };
+          return { ...conn, waypoints: recomputeAllConnectors([conn], elements, state.relaxedLayout)[0]?.waypoints ?? conn.waypoints };
         }
         if (srcIn || tgtIn) {
-          const recomputed = recomputeAllConnectors([conn], elements)[0];
+          const recomputed = recomputeAllConnectors([conn], elements, state.relaxedLayout)[0];
           return recomputed ?? conn;
         }
         return conn;
@@ -7980,7 +7999,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       }
       connectors = connectors.map((conn) => {
         if (movedIds.has(conn.sourceId) || movedIds.has(conn.targetId)) {
-          return recomputeAllConnectors([conn], elements)[0] ?? conn;
+          return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
         }
         return conn;
       });
@@ -8282,7 +8301,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
         // Otherwise: full recompute via the same helper used for normal moves.
         // This sets sourceInvisibleLeader/targetInvisibleLeader correctly.
-        return recomputeAllConnectors([c], newElements)[0] ?? c;
+        return recomputeAllConnectors([c], newElements, state.relaxedLayout)[0] ?? c;
       });
 
       return { ...state, elements: newElements, connectors: newConnectors };
@@ -8806,9 +8825,9 @@ export function useDiagram(initialData: DiagramData) {
 
   // Snapshots carry only { elements, connectors }. Spread the LIVE data
   // first so the fields that are never snapshotted — title, all font
-  // sizes, database, processOwner, parentDiagramIds, displayMode — survive
-  // an undo/redo instead of being wiped to undefined and then persisted by
-  // the editor's whole-`data` auto-save (audit ENG-01).
+  // sizes, database, relaxedLayout, processOwner, parentDiagramIds,
+  // displayMode — survive an undo/redo instead of being wiped to undefined
+  // and then persisted by the editor's whole-`data` auto-save (audit ENG-01).
   const undo = useCallback(() => {
     if (pastRef.current.length === 0) return;
     const snap = pastRef.current.pop()!;
@@ -8920,6 +8939,12 @@ export function useDiagram(initialData: DiagramData) {
       (db: string) => {
         invalidateRedo();
         dispatch({ type: "SET_DATABASE", payload: db });
+      }, []
+    ),
+    setRelaxedLayout: useCallback(
+      (on: boolean) => {
+        invalidateRedo();
+        dispatch({ type: "SET_RELAXED_LAYOUT", payload: on });
       }, []
     ),
     setProcessOwner: useCallback(

@@ -38,6 +38,14 @@ export async function POST(req: Request) {
   const promptLabel = typeof promptLabelRaw === "string" && promptLabelRaw.trim().length > 0
     ? promptLabelRaw.trim().slice(0, 100)
     : undefined;
+  // Image import "reproduce original layout" — preserve the drawn positions
+  // rather than auto-stacking. `imageAspect` keeps the vendor's proportions.
+  const preservePositions = (body as { preservePositions?: unknown } | null)?.preservePositions === true;
+  const aspectRaw = (body as { imageAspect?: unknown } | null)?.imageAspect as { w?: unknown; h?: unknown } | undefined;
+  const imageAspect = aspectRaw && typeof aspectRaw.w === "number" && typeof aspectRaw.h === "number"
+    && aspectRaw.w > 0 && aspectRaw.h > 0
+    ? { w: aspectRaw.w, h: aspectRaw.h }
+    : undefined;
   if (plan == null) {
     return NextResponse.json({ error: "Missing 'plan' in request body" }, { status: 400 });
   }
@@ -63,7 +71,7 @@ export async function POST(req: Request) {
 
   try {
     const diagramData = layoutBpmnDiagram(normalised.elements, normalised.connections,
-      promptLabel ? { promptLabel } : undefined);
+      { promptLabel, preservePositions, imageAspect });
     trace(`[apply-layout] ok in ${Date.now() - t0}ms: ${diagramData.elements.length} rendered elements, ${diagramData.connectors.length} connectors`);
     return NextResponse.json({
       diagramData,

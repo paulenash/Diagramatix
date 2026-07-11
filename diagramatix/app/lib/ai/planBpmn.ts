@@ -32,6 +32,11 @@ export interface PlanBpmnOptions {
   rules: string;
   /** Override the default model for testing. */
   model?: string;
+  /** Image import "reproduce original layout": ask the model to additionally
+   *  report each shape's normalised `bounds` and each connector's attachment
+   *  sides + drawn waypoints, so `layoutBpmnPreserved` can rebuild the vendor's
+   *  actual layout instead of auto-stacking. */
+  captureGeometry?: boolean;
 }
 
 export type PlanBpmnResult =
@@ -45,11 +50,18 @@ const DEFAULT_MODEL = "claude-haiku-4-5-20251001"; // AI Generate default (see a
  * Keep this identical to the previous single-file implementation so the
  * generate-bpmn refactor is a no-behaviour-change swap.
  */
-export function buildSystemPrompt(rules: string): string {
+export function buildSystemPrompt(rules: string, captureGeometry = false): string {
   return `You are a BPMN process modelling expert. Given a description of a business process, output a valid JSON object that defines the process as BPMN elements and connections.
 
 IMAGE INPUT — when an image of an existing diagram is attached:
-- Treat the image as the source of truth. Reverse-engineer the process from what is drawn, then express it in the BPMN JSON format below.
+- Treat the image as the source of truth. Reverse-engineer the process from what is drawn, then express it in the BPMN JSON format below.${captureGeometry ? `
+
+GEOMETRY CAPTURE — for THIS request, reproduce the DRAWN layout exactly as it appears (this diagram is being imported from another tool and must not be re-flowed):
+- For EVERY element (pool, lane, task, gateway, event, subprocess, data object, annotation) add a "bounds" object: { "x": <left>, "y": <top>, "w": <width>, "h": <height> }, where each value is a number 0..1 expressed as a fraction of the WHOLE image (x,y = the shape's top-left corner; origin at the image's top-left). Use 2-3 decimal places.
+- Pools may be ANY size and may sit side-by-side or at any position — report their real boxes; do NOT force them to full width or vertical stacking. Order pools top-to-bottom by their "y".
+- A lane's box must lie inside its pool's box; a node's box must lie inside its lane/pool box.
+- For EVERY connection also report how it was drawn: "sourceSide" and "targetSide" (one of "left"/"right"/"top"/"bottom" — the side of each element the line attaches to), and "waypoints": an array of { "x", "y" } normalised 0..1 points tracing the line's route as drawn (corners of the polyline, in order from source to target). Message flows between pools are often rectilinear and connect elements that are NOT vertically aligned — capture them as drawn.
+- Keep boxes tight to the drawn shape. If you genuinely cannot see a shape's box, omit "bounds" for that element only (do NOT guess a filler box). Never invent elements to fill empty space.` : ""}
 - If the image is already a BPMN diagram: copy the structure faithfully. Read pool names, lane names, task labels, gateway labels and event labels off the image. Map every shape to its hyphenated type: rounded rectangle → "task" (or "subprocess" / "subprocess-expanded" if it contains its own sub-flow), diamond → "gateway", circle with thin border → "start-event", circle with thick border → "end-event", circle with double border → "intermediate-event", parallel horizontal lines → "pool" / "lane", dashed-rectangle around tasks → "group", document icon → "data-object", cylinder → "data-store", sticky-note → "text-annotation".
 - ${renderFlowchartMappingForPrompt()}
 - Read labels with OCR. Do NOT invent tasks, branches or roles that are not visible in the image. If a label is unreadable, use a short descriptive placeholder rather than guessing.
@@ -212,9 +224,11 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
  * the JSON response, and return the plan. Does not run the layout engine.
  */
 export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
-  const { apiKey, prompt, attachment, rules, model = DEFAULT_MODEL } = opts;
+  const { apiKey, prompt, attachment, rules, model = DEFAULT_MODEL, captureGeometry = false } = opts;
   const client = new Anthropic({ apiKey });
-  const systemPrompt = buildSystemPrompt(rules);
+  // Geometry capture only makes sense with an image to measure.
+  const wantGeometry = captureGeometry && attachment?.type === "image";
+  const systemPrompt = buildSystemPrompt(rules, wantGeometry);
 
   const userContent: Anthropic.Messages.ContentBlockParam[] = [];
   if (attachment?.type === "pdf" && attachment.data) {
@@ -243,7 +257,7 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
     } as Anthropic.Messages.ContentBlockParam);
     userContent.push({
       type: "text",
-      text: `An image of an existing process diagram is attached above (${attachment.name ?? "diagram.png"}). Treat the image as the source of truth and reverse-engineer the BPMN plan from it. If the text prompt below adds or contradicts anything visible in the image, prefer what the image shows.`,
+      text: `An image of an existing process diagram is attached above (${attachment.name ?? "diagram.png"}). Treat the image as the source of truth and reverse-engineer the BPMN plan from it. If the text prompt below adds or contradicts anything visible in the image, prefer what the image shows.${wantGeometry ? " Also report each shape's `bounds` (normalised 0..1) and each connector's `sourceSide`/`targetSide` + `waypoints` exactly as drawn — we are reproducing the original layout, not re-flowing it." : ""}`,
     });
   }
   // Append a final, extremely explicit "JSON only" instruction to the

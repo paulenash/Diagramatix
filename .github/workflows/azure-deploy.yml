@@ -229,6 +229,10 @@ jobs:
           npx --yes tsx@4 scripts/add-guide-ddl.ts || echo "add-guide-ddl skipped"
           npx --yes tsx@4 scripts/add-features-process-portal.ts || echo "add-features-process-portal skipped"
           npx --yes tsx@4 scripts/add-guide-process-portal.ts || echo "add-guide-process-portal skipped"
+          # Import competitor BPMN diagrams (free-form / imported layout + AI image reproduction)
+          npx --yes tsx@4 scripts/add-features-import-competitor-bpmn.ts || echo "add-features-import-competitor-bpmn skipped"
+          npx --yes tsx@4 scripts/add-guide-import-competitor-bpmn.ts || echo "add-guide-import-competitor-bpmn skipped"
+          npx --yes tsx@4 scripts/add-tech-design-import-competitor-bpmn.ts || echo "add-tech-design-import-competitor-bpmn skipped"
           # Populate the Portal's denormalised Diagram columns (pcf*/procedureDoc*/
           # entityRefs) for diagrams last saved before those columns existed. Idempotent.
           npx --yes tsx@4 scripts/backfill-diagram-pcf.ts || echo "backfill-diagram-pcf skipped"

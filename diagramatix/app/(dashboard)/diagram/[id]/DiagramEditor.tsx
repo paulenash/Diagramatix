@@ -807,6 +807,7 @@ export function DiagramEditor({
     setValueChainFontSize,
     setDescriptionFontSize,
     setDatabase,
+    setRelaxedLayout,
     setProcessOwner,
     setProcedureDoc,
     setPcf,
@@ -3612,6 +3613,8 @@ export function DiagramEditor({
             diagramTitle={data.title}
             database={data.database}
             onSetDatabase={diagramType === "domain" ? setDatabase : undefined}
+            relaxedLayout={data.relaxedLayout}
+            onSetRelaxedLayout={diagramType === "bpmn" ? setRelaxedLayout : undefined}
             onUpdateDiagramTitle={updateDiagramTitle}
             processOwner={data.processOwner}
             onSetProcessOwner={setProcessOwner}
@@ -3652,6 +3655,9 @@ export function DiagramEditor({
                 elements: aiData.elements,
                 connectors: aiData.connectors,
                 viewport: aiData.viewport ?? data.viewport,
+                // An image import that reproduced the vendor's layout sets this
+                // so the editor/validation don't re-impose Diagramatix rules.
+                relaxedLayout: aiData.relaxedLayout ?? data.relaxedLayout,
               });
               requestAnimationFrame(() => {
                 window.dispatchEvent(new CustomEvent("dgx:fitToContent"));
@@ -3716,6 +3722,9 @@ export function DiagramEditor({
                 elements: aiData.elements,
                 connectors: aiData.connectors,
                 viewport: aiData.viewport ?? data.viewport,
+                // An image import that reproduced the vendor's layout sets this
+                // so the editor/validation don't re-impose Diagramatix rules.
+                relaxedLayout: aiData.relaxedLayout ?? data.relaxedLayout,
               });
               // Wide AI-generated diagrams (especially BPMN with many
               // columns) extend well past the current viewport — ask the

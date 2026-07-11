@@ -184,6 +184,13 @@ export function PlanPanel({
   >(null);
   const [showAttachPreview, setShowAttachPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Image import "reproduce original layout": when on, the plan is generated
+  // with per-shape bounds + connector routing, and the layout engine rebuilds
+  // the vendor's actual positions instead of auto-stacking. Only meaningful
+  // when an image is attached. Natural image dimensions (for aspect ratio) are
+  // captured on attach and kept until the image is replaced.
+  const [preserveLayout, setPreserveLayout] = useState(true);
+  const imageDimsRef = useRef<{ w: number; h: number } | null>(null);
 
   const IMAGE_TYPES: Record<string, string> = {
     "image/png": "image/png",
@@ -209,6 +216,17 @@ export function PlanPanel({
       const buffer = await file.arrayBuffer();
       const base64 = arrayBufferToBase64(buffer);
       setAttachment({ name: file.name, type: "image", data: base64, mediaType: IMAGE_TYPES[file.type] });
+      // Capture natural dimensions so an imported layout keeps the image aspect.
+      imageDimsRef.current = null;
+      try {
+        const dims = await new Promise<{ w: number; h: number } | null>((resolve) => {
+          const img = new window.Image();
+          img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+          img.onerror = () => resolve(null);
+          img.src = `data:${IMAGE_TYPES[file.type]};base64,${base64}`;
+        });
+        imageDimsRef.current = dims;
+      } catch { imageDimsRef.current = null; }
       setPrompt(prev => prev.trim().length > 0
         ? prev
         : `I have attached an image of a process diagram (${file.name}). Reverse-engineer the BPMN from it.`);
@@ -524,7 +542,11 @@ export function PlanPanel({
       const res = await fetch(`${apiBase}/plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: effPrompt, attachment: attachment ?? undefined, pcfNodeId: pcf?.nodeId }),
+        body: JSON.stringify({
+          prompt: effPrompt, attachment: attachment ?? undefined, pcfNodeId: pcf?.nodeId,
+          // Reproduce original layout: only for an image attachment.
+          captureGeometry: attachment?.type === "image" ? preserveLayout : false,
+        }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -542,7 +564,7 @@ export function PlanPanel({
     } finally {
       setBusy(null);
     }
-  }, [prompt, setPlan, attachment, apiBase]);
+  }, [prompt, setPlan, attachment, apiBase, preserveLayout, pcf?.nodeId]);
 
   const callPlan = useCallback(async () => {
     if (!prompt.trim() || busy) return;
@@ -618,10 +640,20 @@ export function PlanPanel({
         : undefined;
       const promptLabel = (savedName?.trim().length ? savedName.trim() : prompt.trim().slice(0, 100))
         || undefined;
+      // Reproduce original layout when the plan carries drawn geometry (the
+      // model returned per-shape bounds). Derived from the plan itself so it
+      // survives JSON edits and doesn't depend on the attachment still being set.
+      const planHasBounds = Array.isArray(plan?.elements)
+        && plan.elements.some((e: { bounds?: unknown }) => e.bounds);
+      const preservePositions = preserveLayout && planHasBounds;
       const res = await fetch(`${apiBase}/apply-layout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, promptLabel }),
+        body: JSON.stringify({
+          plan, promptLabel,
+          preservePositions,
+          imageAspect: preservePositions ? imageDimsRef.current ?? undefined : undefined,
+        }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -648,7 +680,7 @@ export function PlanPanel({
     } finally {
       setBusy(null);
     }
-  }, [plan, hasPlan, busy, onApplyDiagram, activeTab, jsonDraft, asJson, commitJson, apiBase, isFlowchart]);
+  }, [plan, hasPlan, busy, onApplyDiagram, activeTab, jsonDraft, asJson, commitJson, apiBase, isFlowchart, preserveLayout, prompt, editingPromptId, savedPrompts]);
 
   return (
     <div className="w-96 border-l border-gray-200 bg-white flex flex-col shrink-0 overflow-hidden">
@@ -882,6 +914,13 @@ export function PlanPanel({
               </div>
             )}
           </div>
+          {attachment?.type === "image" && (
+            <label className="flex items-center gap-1 mt-1 cursor-pointer select-none" title="Rebuild the diagram at the positions drawn in the image (pools any size/placement, rectilinear messages) instead of Diagramatix's auto-layout.">
+              <input type="checkbox" className="cursor-pointer" checked={preserveLayout}
+                onChange={e => setPreserveLayout(e.target.checked)} />
+              <span className="text-[10px] text-gray-600">Reproduce original layout</span>
+            </label>
+          )}
         </div>
 
         {showAttachPreview && attachment && (

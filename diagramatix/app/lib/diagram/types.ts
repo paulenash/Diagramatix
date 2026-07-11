@@ -271,6 +271,15 @@ export interface DiagramData {
   valueChainFontSize?: number; // Value Chain element (process-group) name font size — Value Chain only (default 16)
   descriptionFontSize?: number; // Process description box font size — Value Chain only (default 14)
   database?: string; // domain diagram database type: "none" | "postgres" (default "none")
+  /** BPMN "free-form / imported layout" mode. When true this diagram was
+   *  imported from another vendor (typically an image) and must be shown
+   *  exactly as drawn: pools may be any size / side-by-side (not stacked
+   *  full-width), and message flows may be rectilinear between non-aligned
+   *  elements. It relaxes the geometry validation rules and disables the
+   *  editor's pool-stacking + message-vertical enforcement. Set automatically
+   *  when the AI reproduces an imported image's positions; also toggleable in
+   *  Diagram Properties. Optional — absent/false means normal Diagramatix rules. */
+  relaxedLayout?: boolean;
   /** Diagram-level list of all parent diagrams that currently link TO
    *  this diagram (managed by the project-wide "Scan Diagrams for Links"
    *  feature). A diagram can be linked from many parents — every one of
@@ -873,5 +882,18 @@ export interface TemplateData {
  *             table + Diagram denorm columns procedureDoc/pcf/entityRefs) and
  *             the review-due reminder cron. The denorm columns are a query
  *             optimisation derived from `data`, so they are NOT in the export.
+ *
+ *  v1.37 (2026-07-11): Import competitor BPMN diagrams as-is. Diagrams carry an
+ *             OPTIONAL `DiagramData.relaxedLayout` boolean ("free-form / imported
+ *             layout"): pools any size/placement (not stacked full-width),
+ *             rectilinear message flows between non-aligned elements, and the
+ *             pure-geometry validation rules suppressed. The ONE XSD shape change:
+ *             a new OPTIONAL boolean `relaxedLayout` attribute on `<dgx:data>`,
+ *             emitted only when true. AI image import can reproduce a vendor's
+ *             drawn positions + connector attachment/routing (normalised `bounds`
+ *             captured by the vision plan, honoured by a preserved-layout engine
+ *             path that falls back to auto-stack when the geometry is unusable);
+ *             those AiElement/AiConnection `bounds`/`waypoints` are plan-only and
+ *             NOT part of the diagram export.
  */
-export const SCHEMA_VERSION = "1.36";
+export const SCHEMA_VERSION = "1.37";

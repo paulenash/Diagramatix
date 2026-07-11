@@ -32,6 +32,12 @@ export interface DiagramLike {
    *  every other rule ignores them. Defaults: poolFontSize 16, laneFontSize 14. */
   poolFontSize?: number;
   laneFontSize?: number;
+  /** "Free-form / imported layout" — when true, the diagram was imported from
+   *  another vendor and the pure-geometry rules (pool/lane containment, tiling,
+   *  overlap, header overrun, message alignment, container connectors) are
+   *  suppressed so the foreign layout isn't red-flagged. Semantic rules
+   *  (missing start/end, etc.) still run. See RELAXED_SUPPRESSED_RULES below. */
+  relaxedLayout?: boolean;
 }
 
 export type Severity = "error" | "warning";
@@ -2043,9 +2049,30 @@ export function checkSegregationOfDuties(d: DiagramLike): Violation[] {
   return out;
 }
 
-/** Run every rule and return the combined violation list. */
+/** Pure-geometry rules suppressed on a "free-form / imported layout" diagram.
+ *  These all assume Diagramatix conventions (pools stacked full-width, lanes
+ *  tiling contiguously, messages vertical between aligned elements). An
+ *  imported foreign diagram legitimately violates them, so we skip them rather
+ *  than red-flag a faithful reproduction. Semantic rules (missing start/end,
+ *  gateway wiring, etc.) still run. Keyed on rule `id`. */
+export const RELAXED_SUPPRESSED_RULES: ReadonlySet<string> = new Set([
+  "containment",
+  "lane-tiling",
+  "element-overlap",
+  "pool-header-overrun",
+  "connector-on-container",
+  "duplicate-container-name",
+  "hanging-message",
+  "message-not-moveable",
+]);
+
+/** Run every rule and return the combined violation list. On a `relaxedLayout`
+ *  diagram the pure-geometry rules above are skipped. */
 export function checkDiagram(d: DiagramLike): Violation[] {
-  return RULES.flatMap((rule) => rule.check(d));
+  const rules = d.relaxedLayout
+    ? RULES.filter((rule) => !RELAXED_SUPPRESSED_RULES.has(rule.id))
+    : RULES;
+  return rules.flatMap((rule) => rule.check(d));
 }
 
 /** Rule metadata for the admin viewer (no check functions). */

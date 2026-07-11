@@ -4173,7 +4173,9 @@ export function Canvas({
   const isWhiteBoxPool = (el: DiagramElement | undefined): boolean =>
     !!el && el.type === "pool"
       && ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-  data.connectors
+  // Free-form / imported diagrams legitimately have rectilinear messages between
+  // non-aligned elements — skip the misalignment red flag entirely.
+  (data.relaxedLayout ? [] : data.connectors)
     .filter((c) => c.type === "messageBPMN")
     .forEach((c) => {
       const src = data.elements.find((e) => e.id === c.sourceId);

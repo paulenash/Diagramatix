@@ -27,6 +27,17 @@ export const ELEMENT_TYPES = [
 
 const BOUNDARY_SIDES = ["left", "right", "top", "bottom"] as const;
 
+/** Normalised bounding box (0..1 of the whole source image; x,y = top-left
+ *  corner). Emitted only when the model is asked to reproduce an imported
+ *  diagram's layout (captureGeometry). Values outside [0,1] / degenerate boxes
+ *  are clamped or dropped by snapImportedBounds before layout. */
+export const BoundsSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+}).optional();
+
 export const AiElementSchema = z.object({
   id: z.string().min(1),
   type: z.enum(ELEMENT_TYPES),
@@ -45,6 +56,8 @@ export const AiElementSchema = z.object({
   parentPool: z.string().optional(),
   subprocessType: z.string().optional(),
   properties: z.record(z.string(), z.unknown()).optional(),
+  /** Normalised drawn position from an imported image (captureGeometry only). */
+  bounds: BoundsSchema,
 }).passthrough();
 
 export const AiConnectionSchema = z.object({
@@ -52,6 +65,13 @@ export const AiConnectionSchema = z.object({
   targetId: z.string().min(1),
   label: z.string().optional(),
   type: z.string().optional(),
+  /** Imported-layout connector geometry (captureGeometry only) — the side each
+   *  end attaches to and the normalised waypoint polyline as drawn, so an
+   *  imported connector reproduces the vendor's attachment points + routing
+   *  rather than being re-routed from scratch. Points are 0..1 of the image. */
+  sourceSide: z.enum(BOUNDARY_SIDES).optional(),
+  targetSide: z.enum(BOUNDARY_SIDES).optional(),
+  waypoints: z.array(z.object({ x: z.number(), y: z.number() })).optional(),
 }).passthrough();
 
 export const AiPlanSchema = z.object({

@@ -101,6 +101,11 @@ interface Props {
   onConvertEventType?: (id: string, newEventType: "start-event" | "intermediate-event" | "end-event") => void;
   database?: string;
   onSetDatabase?: (db: string) => void;
+  /** BPMN "free-form / imported layout" — when set, pools may sit anywhere at
+   *  any size and message flows may be rectilinear between non-aligned
+   *  elements, with the geometry validation rules suppressed. */
+  relaxedLayout?: boolean;
+  onSetRelaxedLayout?: (on: boolean) => void;
   forceCollapseTitle?: boolean;
   /** Per-diagram process owner — surfaced in the new Process Owner
    *  sub-section. Both name + email are optional free-text. */
@@ -747,6 +752,8 @@ export function PropertiesPanel({
   onConvertEventType,
   database,
   onSetDatabase,
+  relaxedLayout,
+  onSetRelaxedLayout,
   forceCollapseTitle,
   processOwner,
   onSetProcessOwner,
@@ -1007,6 +1014,20 @@ export function PropertiesPanel({
             </div>
           )}
         </>)}
+
+        {/* Free-form / imported layout \u2014 BPMN only. Relaxes pool placement +
+            message-connector rules so an imported foreign diagram shows as drawn. */}
+        {onSetRelaxedLayout && (
+          <label className="flex items-start gap-1.5 mb-0.5 cursor-pointer select-none" title="Show pools at any size / position and allow rectilinear message flows between non-aligned elements. Suppresses the layout validation warnings for imported diagrams.">
+            <input type="checkbox" className="mt-[2px] cursor-pointer"
+              checked={!!relaxedLayout}
+              onChange={e => onSetRelaxedLayout(e.target.checked)} />
+            <span className="text-[9px] text-gray-600 leading-tight">
+              Free-form / imported layout
+              <span className="block text-[8px] text-gray-400">Pools any size/position; rectilinear messages; no layout warnings</span>
+            </span>
+          </label>
+        )}
 
         {/* Diagram Owner sub-section \u2014 hard FK to a registered user,
             sits directly above Process Owner. The display vs picker

@@ -67,7 +67,7 @@ export function diagramDataXml(dd: DiagramData, ind: string): string {
   // out. Emit them now so XML round-trip preserves them.
   // v1.17 — processFontSize attribute carries the independent
   // Context-Diagram "Process Names" font size.
-  let x = `${ind}<dgx:data${attr("fontSize", dd.fontSize)}${attr("connectorFontSize", dd.connectorFontSize)}${attr("titleFontSize", dd.titleFontSize)}${attr("poolFontSize", dd.poolFontSize)}${attr("laneFontSize", dd.laneFontSize)}${attr("processFontSize", dd.processFontSize)}${attr("valueChainFontSize", dd.valueChainFontSize)}${attr("descriptionFontSize", dd.descriptionFontSize)}${attr("database", dd.database)}>\n`;
+  let x = `${ind}<dgx:data${attr("fontSize", dd.fontSize)}${attr("connectorFontSize", dd.connectorFontSize)}${attr("titleFontSize", dd.titleFontSize)}${attr("poolFontSize", dd.poolFontSize)}${attr("laneFontSize", dd.laneFontSize)}${attr("processFontSize", dd.processFontSize)}${attr("valueChainFontSize", dd.valueChainFontSize)}${attr("descriptionFontSize", dd.descriptionFontSize)}${attr("database", dd.database)}${attr("relaxedLayout", dd.relaxedLayout)}>\n`;
 
   // Elements
   x += `${ind}  <dgx:elements>\n`;
@@ -370,6 +370,7 @@ export function parseDiagramatixXml(xmlText: string): any {
     const valueChainFontSize = num(dataEl.getAttribute("valueChainFontSize"));
     const descriptionFontSize = num(dataEl.getAttribute("descriptionFontSize"));
     const database = dataEl.getAttribute("database");
+    const relaxedLayout = dataEl.getAttribute("relaxedLayout");
     if (fontSize !== undefined) data.fontSize = fontSize;
     if (connectorFontSize !== undefined) data.connectorFontSize = connectorFontSize;
     if (titleFontSize !== undefined) data.titleFontSize = titleFontSize;
@@ -379,6 +380,7 @@ export function parseDiagramatixXml(xmlText: string): any {
     if (valueChainFontSize !== undefined) data.valueChainFontSize = valueChainFontSize;
     if (descriptionFontSize !== undefined) data.descriptionFontSize = descriptionFontSize;
     if (database != null && database !== "") data.database = database;
+    if (relaxedLayout === "true") data.relaxedLayout = true;
 
     // Elements
     const elementsEl = getChild(dataEl, "elements");

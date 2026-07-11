@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "AI service not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 503 });
   }
 
-  const { prompt, attachment, pcfNodeId } = await req.json();
+  const { prompt, attachment, pcfNodeId, captureGeometry } = await req.json();
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
   console.log("[AI plan] full:", fullRules.length, "chars → green-only:", aiRules.length, "chars", pcfNodeId ? "+ PCF grounding" : "");
 
   try {
-    const result = await planBpmn({ apiKey, prompt, attachment, rules: grounded, model: await getAiGenerateModel() });
+    const result = await planBpmn({ apiKey, prompt, attachment, rules: grounded, model: await getAiGenerateModel(), captureGeometry: captureGeometry === true });
     if (!result.ok) {
       return NextResponse.json({ error: result.error, raw: result.raw }, { status: result.status });
     }
