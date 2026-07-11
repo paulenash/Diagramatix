@@ -23,6 +23,7 @@ import { ProjectStructureSection } from "@/app/components/entityLists/ProjectStr
 import { RiskControlConsole } from "@/app/components/riskControls/RiskControlConsole";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
+import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
@@ -377,6 +378,9 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
 export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft }: Props) {
   const router = useRouter();
   const pcfColors = usePcfLevelColors();
+  // SuperAdmin "presentation mode" (Ctrl+Shift+S) — hides the SuperAdmin chip +
+  // the Org reassign dropdown. No-op for non-SuperAdmins.
+  const superAdminHidden = useSuperAdminChrome(!!isAdmin);
   const [diagrams, setDiagrams] = useState(project.diagrams);
   const [projectName, setProjectName] = useState(project.name);
   // "Org Owner": the owning Org drives org-wide RCM numbering. Read-only for
@@ -2174,7 +2178,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           {(orgOwnerName || isAdmin) && (
             <span className="shrink-0 inline-flex items-center gap-1 text-[11px]" title="Org Owner — drives org-wide Risk & Control numbering (SuperAdmin can reassign)">
               <span className="text-gray-400">Org&nbsp;Owner:</span>
-              {isAdmin && allOrgs && allOrgs.length > 0 ? (
+              {isAdmin && !superAdminHidden && allOrgs && allOrgs.length > 0 ? (
                 <select
                   value={orgOwnerId}
                   disabled={orgOwnerBusy}
@@ -2192,7 +2196,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               cluster, SuperAdmin-only. `?from=` carries this project's
               URL so the admin's Back link returns here. Mirrors the
               Dashboard placement. */}
-          {isAdmin && (
+          {isAdmin && !superAdminHidden && (
             <a
               href={`/dashboard/admin?from=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname + window.location.search : `/dashboard/projects/${project.id}`)}`}
               className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"

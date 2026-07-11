@@ -37,6 +37,7 @@ import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { InfoDialog } from "@/app/components/InfoDialog";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
+import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { AiPanel } from "./AiPanel";
 import { AiComparisonModal, type AiComparison } from "@/app/components/AiComparisonModal";
@@ -1078,6 +1079,9 @@ export function DiagramEditor({
 
   // Template state (BPMN only)
   const isAdmin = userEmail?.toLowerCase() === "paul@nashcc.com.au";
+  // SuperAdmin "presentation mode" (Ctrl+Shift+S) — hides the SuperAdmin chip.
+  // No-op for non-SuperAdmins.
+  const superAdminHidden = useSuperAdminChrome(isAdmin);
   type TemplateRow = { id: string; name: string; group: string | null };
   const [userTemplates, setUserTemplates] = useState<TemplateRow[]>([]);
   const [builtInTemplates, setBuiltInTemplates] = useState<TemplateRow[]>([]);
@@ -2462,7 +2466,7 @@ export function DiagramEditor({
             SuperAdmin-only. `?from=` lets the SuperAdmin page return the
             user to this diagram on Back. Mirrors the Dashboard / Project
             placement. */}
-        {isAdmin && (
+        {isAdmin && !superAdminHidden && (
           <button
             type="button"
             onClick={async () => {

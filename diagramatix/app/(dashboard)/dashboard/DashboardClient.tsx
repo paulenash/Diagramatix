@@ -23,6 +23,7 @@ import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { BackupProgressModal } from "@/app/components/BackupProgressModal";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
+import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
 
 interface DiagramSummary {
   id: string;
@@ -325,6 +326,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [simProject, setSimProject] = useState<{ id: string; name: string } | null>(null);
   // Project-level Process Mining — opened from a project's menu.
   const [miningProject, setMiningProject] = useState<{ id: string; name: string } | null>(null);
+  // SuperAdmin "presentation mode" (Ctrl+Shift+S) — hides SuperAdmin chrome and
+  // relabels the subscription tier to Expert. No-op for non-SuperAdmins.
+  const superAdminHidden = useSuperAdminChrome(!!isSu);
   // Skip the intro when RETURNING to the console (e.g. back from a discovered
   // diagram, ?pmnoi=1) — the intro is only for a fresh entry.
   const [skipMiningIntro, setSkipMiningIntro] = useState(false);
@@ -1417,16 +1421,16 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             <button
               onClick={() => setShowUsagePopover(true)}
               className={`inline-flex items-center gap-2 text-sm font-medium border rounded-md px-3 py-1.5 ml-3 transition-colors ${
-                usageSnapshot.isAdmin
+                usageSnapshot.isAdmin && !superAdminHidden
                   ? "text-orange-700 border-orange-300 bg-orange-50 hover:bg-orange-100"
-                  : usageSnapshot.trial.expired
+                  : usageSnapshot.trial.expired && !superAdminHidden
                   ? "text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
                   : "text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100"
               }`}
               title={
-                usageSnapshot.isAdmin
+                usageSnapshot.isAdmin && !superAdminHidden
                   ? "SuperAdmin — bypasses all limits. Click for usage details."
-                  : usageSnapshot.trial.expired
+                  : usageSnapshot.trial.expired && !superAdminHidden
                   ? "Trial expired — click for details and upgrade"
                   : "View subscription usage and limits"
               }
@@ -1437,13 +1441,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 <path d="M5 11h3" />
               </svg>
               <span>Subscription:</span>
-              {usageSnapshot.underlyingTier && (
+              {usageSnapshot.underlyingTier && !superAdminHidden && (
                 <>
                   <span className="text-xs opacity-70 line-through">{usageSnapshot.underlyingTier.name}</span>
                   <span className="text-xs opacity-70">→</span>
                 </>
               )}
-              <strong className="font-semibold">{usageSnapshot.tier.name}</strong>
+              <strong className="font-semibold">{superAdminHidden ? "Expert" : usageSnapshot.tier.name}</strong>
               {usageSnapshot.comp && (
                 <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-purple-200 text-purple-800 font-medium">
                   comp · {Math.max(0, Math.ceil((new Date(usageSnapshot.comp.expiresAt).getTime() - Date.now()) / 86400000))}d
@@ -1519,7 +1523,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               {/* SuperAdmin shortcut — leftmost item in the header menu
                   cluster, SuperAdmin-only. Same destination as the entry
                   that used to live inside the System menu (now removed). */}
-              {isSu && (
+              {isSu && !superAdminHidden && (
                 <a
                   href="/dashboard/admin?from=/dashboard"
                   className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
