@@ -81,4 +81,17 @@ describe("relaxedLayout routes messages rectilinearly (T0709)", () => {
     expect(onRect(srcEdge, src)).toBe(true);
     expect(onRect(tgtEdge, tgt)).toBe(true);
   });
+
+  it("attaches messages ONLY to the top or bottom, even for side-by-side elements (T0715)", () => {
+    // Two elements at the SAME y, horizontally offset — a plain rectilinear
+    // connector would attach left/right, but a message must use top/bottom.
+    const sideBySide = [
+      { id: "t1", type: "task", x: 100, y: 200, width: 80, height: 50, label: "T1", properties: {} },
+      { id: "t2", type: "task", x: 400, y: 200, width: 80, height: 50, label: "T2", properties: {} },
+    ] as DiagramElement[];
+    const m = { ...msg } as Connector;
+    const [c] = recomputeAllConnectors([m], sideBySide, true);
+    expect(["top", "bottom"]).toContain(c.sourceSide);
+    expect(["top", "bottom"]).toContain(c.targetSide);
+  });
 });

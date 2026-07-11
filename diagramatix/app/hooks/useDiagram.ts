@@ -6165,6 +6165,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         [targetSide, targetOffsetAlong] = clampParallelFace(target, source, targetSide, targetOffsetAlong);
       }
 
+      // Rule 1/2: on a free-form/imported diagram a NEW message flow attaches
+      // ONLY to the TOP or BOTTOM of its endpoints (chosen by relative vertical
+      // position), never left/right.
+      if (state.relaxedLayout && connectorType === "messageBPMN") {
+        const sCy = source.y + source.height / 2;
+        const tCy = target.y + target.height / 2;
+        sourceSide = sCy <= tCy ? "bottom" : "top";
+        targetSide = sCy <= tCy ? "top" : "bottom";
+      }
+
       // ── Review Comments ────────────────────────────────────────────────
       // A connector from OR to a Review Comment is ALWAYS a non-directed
       // review-comment-link, in EVERY diagram type and regardless of the
@@ -6316,9 +6326,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         connectorType === "messageBPMN"
           ? (state.relaxedLayout
               // Free-form / imported: a new message routes rectilinearly between
-              // the chosen sides, so it can connect non-vertically-aligned
-              // elements instead of being forced onto a shared vertical x.
-              ? computeWaypoints(source, target, state.elements, sourceSide, targetSide, "rectilinear", sourceOffsetAlong ?? 0.5, targetOffsetAlong ?? 0.5)
+              // the top/bottom sides (set above) so it can connect non-aligned
+              // elements; pass NO elements → obstacle-free (Rule 3).
+              ? computeWaypoints(source, target, [], sourceSide, targetSide, "rectilinear", sourceOffsetAlong ?? 0.5, targetOffsetAlong ?? 0.5)
               : messageBpmnWaypoints(source, target, sourceSide, targetSide, sourceOffsetAlong ?? 0.5, targetOffsetAlong))
           : computeWaypoints(source, target, state.elements, sourceSide, targetSide, routingType, sourceOffsetAlong, targetOffsetAlong);
 

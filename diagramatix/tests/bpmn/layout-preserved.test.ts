@@ -73,6 +73,31 @@ const withBoundary: AiElement[] = [
   { id: "be", type: "intermediate-event", label: "timer", pool: "p", boundaryHost: "t", bounds: { x: 0.36, y: 0.35, w: 0.03, h: 0.04 } },
 ];
 
+const msgShare: AiElement[] = [
+  { id: "sys", type: "pool", label: "System", poolType: "black-box", isSystem: true, bounds: { x: 0.05, y: 0.05, w: 0.90, h: 0.10 } },
+  { id: "main", type: "pool", label: "Process", poolType: "white-box", bounds: { x: 0.05, y: 0.40, w: 0.90, h: 0.30 } },
+  { id: "a", type: "task", label: "A", pool: "main", bounds: { x: 0.15, y: 0.50, w: 0.12, h: 0.08 } },
+  { id: "b", type: "task", label: "B", pool: "main", bounds: { x: 0.55, y: 0.50, w: 0.12, h: 0.08 } },
+];
+const msgConns: AiConnection[] = [
+  { sourceId: "a", targetId: "sys", type: "message" },
+  { sourceId: "b", targetId: "sys", type: "message" },
+];
+
+describe("layoutBpmnPreserved message rules (T0716)", () => {
+  it("two messages sharing a target element do NOT share an attachment point (Rule 4)", () => {
+    const d = layoutBpmnDiagram(msgShare, msgConns, { preservePositions: true });
+    const ca = d.connectors.find((c) => c.sourceId === "a" && c.targetId === "sys")!;
+    const cb = d.connectors.find((c) => c.sourceId === "b" && c.targetId === "sys")!;
+    expect(ca.type).toBe("messageBPMN");
+    // Both attach to the shared pool's top or bottom …
+    expect(["top", "bottom"]).toContain(ca.targetSide);
+    expect(ca.targetSide).toBe(cb.targetSide);
+    // … but at DIFFERENT offsets along that side (Rule 4).
+    expect(ca.targetOffsetAlong).not.toBe(cb.targetOffsetAlong);
+  });
+});
+
 describe("layoutBpmnPreserved mounts edge events on their host (T0713)", () => {
   it("sets boundaryHostId and snaps the event centre onto a host edge", () => {
     const d = layoutBpmnDiagram(withBoundary, [], { preservePositions: true });

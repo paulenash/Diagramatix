@@ -1258,15 +1258,51 @@ export function recomputeAllConnectors(
     const target = elementMap.get(rawConn.targetId);
     if (!source || !target) return rawConn;
 
-    // Free-form / imported layout: a message flow behaves like a rectilinear
-    // connector — it attaches to the chosen sides, its segments are moveable,
-    // and it can connect non-vertically-aligned elements. Only the markers/style
-    // differ. Coerce its routingType so the ordinary rectilinear path below
-    // handles it (attachment, user-waypoint preservation, full recompute); the
-    // forced shared-x vertical dogleg is skipped.
-    const conn = (relaxedLayout && rawConn.type === "messageBPMN" && rawConn.routingType !== "rectilinear")
-      ? { ...rawConn, routingType: "rectilinear" as Connector["routingType"] }
-      : rawConn;
+    // Free-form / imported message flow — dedicated rules (Paul 2026-07-12):
+    //  1/2. Attaches ONLY to the TOP or BOTTOM of its endpoints (activities,
+    //       pools, intermediate events) — never left/right. The pair is chosen
+    //       by relative vertical position (upper element bottom → lower top).
+    //  3.   Routes a rectilinear dogleg and NEVER avoids other elements (it is
+    //       rendered on top of everything). It stays segment-moveable: a
+    //       user-reshaped interior (>=9 waypoints) is preserved, only the
+    //       top/bottom endpoints are re-fitted on recompute.
+    if (relaxedLayout && rawConn.type === "messageBPMN") {
+      const conn = rawConn;
+      const srcCy = source.y + source.height / 2;
+      const tgtCy = target.y + target.height / 2;
+      const srcSide: Side = srcCy <= tgtCy ? "bottom" : "top";
+      const tgtSide: Side = srcCy <= tgtCy ? "top" : "bottom";
+      const srcOff = conn.sourceOffsetAlong ?? 0.5;
+      const tgtOff = conn.targetOffsetAlong ?? 0.5;
+      // Rule 3: pass NO elements → the router does zero obstacle avoidance.
+      let waypoints = computeWaypoints(source, target, [], srcSide, tgtSide, "rectilinear", srcOff, tgtOff).waypoints;
+      const wp = conn.waypoints;
+      if (wp.length >= 9) {
+        // Preserve the user's reshaped interior; re-fit only the endpoints.
+        const newSrcCenter = getConnectionPointBySide(source, srcSide);
+        const newTgtCenter = getConnectionPointBySide(target, tgtSide);
+        const newSrcEdge = sidePoint(source, srcSide, srcOff);
+        const newTgtEdge = sidePoint(target, tgtSide, tgtOff);
+        const perpOff = adaptedPerpOffset(newSrcEdge, srcSide, newTgtEdge, tgtSide);
+        const newExitPt = perpendicularExitScaled(newSrcEdge, srcSide, perpOff);
+        const newApproachPt = perpendicularExitScaled(newTgtEdge, tgtSide, perpOff);
+        const interior = wp.slice(3, wp.length - 3);
+        const candidate = consolidateWaypoints(
+          rectifyWaypoints([newSrcCenter, newSrcEdge, newExitPt, ...interior, newApproachPt, newTgtEdge, newTgtCenter], srcSide),
+        );
+        let ortho = true;
+        for (let i = 1; i < candidate.length; i++) {
+          if (Math.abs(candidate[i].x - candidate[i - 1].x) > 0.5 && Math.abs(candidate[i].y - candidate[i - 1].y) > 0.5) { ortho = false; break; }
+        }
+        if (ortho) waypoints = candidate;
+      }
+      return { ...conn, routingType: "rectilinear", waypoints,
+        sourceInvisibleLeader: true, targetInvisibleLeader: true,
+        sourceSide: srcSide, targetSide: tgtSide,
+        sourceOffsetAlong: srcOff, targetOffsetAlong: tgtOff };
+    }
+
+    const conn = rawConn;
 
     // messageBPMN: always vertical when possible — single shared x for both
     // edges. NOT for free-form/imported diagrams (handled as rectilinear above).
