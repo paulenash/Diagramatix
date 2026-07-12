@@ -201,11 +201,21 @@ function layoutBpmnPreserved(
         const cx = x + width / 2, cy = y + height / 2;
         width = def.defaultWidth; height = def.defaultHeight;
         x = cx - width / 2; y = cy - height / 2;
+      } else if (ai.type === "task" || ai.type === "subprocess") {
+        // Size a task / collapsed subprocess to fit its TEXT — grow only if the
+        // label needs it. Vendor boxes are often drawn much larger than the
+        // text warrants; using them made every task oversized. Keep the drawn
+        // box CENTRE so the element stays where it was on the page.
+        const cx = x + width / 2, cy = y + height / 2;
+        const hasMarker = ai.type === "task" && !!ai.taskType && ai.taskType !== "none";
+        const fit = autoSizeForType(ai.type as AutosizeType, ai.label ?? "", 12, hasMarker);
+        width = fit.w; height = fit.h;
+        x = cx - width / 2; y = cy - height / 2;
       } else {
+        // Containers (subprocess-expanded) + artifacts: keep the drawn box but
+        // don't let it collapse below the catalogue floor.
         width = Math.max(width, def.defaultWidth * 0.6);
-        // A hard-wrapped task/subprocess name needs enough height for its lines.
-        const lineCount = (ai.type === "task" || ai.type === "subprocess")
-          ? (ai.label ?? "").split("\n").length : 1;
+        const lineCount = (ai.label ?? "").split("\n").length;
         const minH = lineCount * LINE_HEIGHT + 2 * PAD + 6;
         height = Math.max(height, def.defaultHeight * 0.6, minH);
       }
@@ -335,6 +345,45 @@ function layoutBpmnPreserved(
     pool.width = lMaxX - pool.x;
     pool.height = lMaxY - pool.y;
     pool.properties = { ...pool.properties, poolHeaderWidth: headerW };
+  }
+
+  // ── Keep each lane's elements INSIDE its lane ── the drawn position can
+  // straddle a lane boundary (e.g. a task whose top pokes into the lane above),
+  // which is a lane assignment the plan is authoritative about. Clamp every
+  // lane-assigned flow element fully within its lane. Only grow the lane (and
+  // shift the lanes below it + the pool) when an element genuinely won't fit —
+  // rare now that tasks are sized to their text.
+  const LANE_MARGIN = 6;
+  for (const pool of elements) {
+    if (pool.type !== "pool") continue;
+    const lanes = elements.filter((e) => e.type === "lane" && e.parentId === pool.id).sort((a, b) => a.y - b.y);
+    if (lanes.length === 0) continue;
+    for (let li = 0; li < lanes.length; li++) {
+      const lane = lanes[li];
+      const kids = elements.filter((e) => e.parentId === lane.id && e.type !== "lane");
+      // Grow the lane only if a child is taller than it can hold; push the
+      // lanes below (and their absolute-positioned children move with the
+      // clamp when we process them next).
+      for (const k of kids) {
+        const need = k.height + 2 * LANE_MARGIN;
+        if (lane.height < need) {
+          const delta = need - lane.height;
+          lane.height += delta;
+          for (let lj = li + 1; lj < lanes.length; lj++) lanes[lj].y += delta;
+        }
+      }
+      // Clamp each child fully inside the (final) lane band.
+      for (const k of kids) {
+        const minY = lane.y + LANE_MARGIN;
+        const maxY = lane.y + lane.height - k.height - LANE_MARGIN;
+        if (maxY >= minY) k.y = Math.max(minY, Math.min(maxY, k.y));
+      }
+    }
+    // Re-grow the pool to enclose the (possibly shifted) lane stack.
+    const pMinY = Math.min(...lanes.map((l) => l.y));
+    const pMaxY = Math.max(...lanes.map((l) => l.y + l.height));
+    pool.y = Math.min(pool.y, pMinY);
+    pool.height = pMaxY - pool.y;
   }
 
   // ── Connectors ── honour imported sides + routing where present.
