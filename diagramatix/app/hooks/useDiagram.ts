@@ -7598,11 +7598,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // accepted (element dropped straight onto an already-straight connector).
       const obstacleFreeEls = elements.filter(e => e.id !== finalEl.id);
       const ofMap = new Map(obstacleFreeEls.map(e => [e.id, e]));
-      const rectHit = (wps: Point[]): boolean => {
+      const fRect = { x: finalEl.x, y: finalEl.y, w: finalEl.width, h: finalEl.height };
+      const segHit = (p1: Point, p2: Point): boolean =>
+        segmentIntersectsRect(p1, p2, fRect.x, fRect.y, fRect.w, fRect.h);
+      const pathHit = (wps: Point[]): boolean => {
         const pts = wps.slice(1, -1); // skip invisible leader endpoints
-        for (let i = 0; i < pts.length - 1; i++) {
-          if (segmentIntersectsRect(pts[i], pts[i + 1], finalEl.x, finalEl.y, finalEl.width, finalEl.height)) return true;
-        }
+        for (let i = 0; i < pts.length - 1; i++) if (segHit(pts[i], pts[i + 1])) return true;
         return false;
       };
       let orig: Connector | null = null;
@@ -7617,7 +7618,17 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           s, t, obstacleFreeEls, c.sourceSide, c.targetSide, c.routingType,
           c.sourceOffsetAlong ?? 0.5, c.targetOffsetAlong ?? 0.5,
         ).waypoints;
-        if (rectHit(clean) || rectHit(c.waypoints)) { orig = c; cleanWps = clean; break; }
+        // Three nets, ORed: (a) the element sits on the FRESH obstacle-free route
+        // (handles the connector the router bent around the element); (b) the
+        // element sits on the LIVE route (already-straight connector); (c) the
+        // element straddles the straight source-centre→target-centre "flow line".
+        // (c) is routing-independent — obstacle avoidance can re-pick a bent
+        // connector's sides/offsets so even the fresh route (which reuses the
+        // stored sides) detours, but the centre-to-centre line still passes
+        // through an element dropped on the flow between the two endpoints.
+        const srcC = { x: s.x + s.width / 2, y: s.y + s.height / 2 };
+        const tgtC = { x: t.x + t.width / 2, y: t.y + t.height / 2 };
+        if (pathHit(clean) || pathHit(c.waypoints) || segHit(srcC, tgtC)) { orig = c; cleanWps = clean; break; }
       }
       if (!orig || !cleanWps) {
         return { ...state, elements: updatePoolTypes(elements), connectors };
@@ -7641,10 +7652,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // element dropped slightly off the line.
       const dropCentre = { x: finalEl.x + finalEl.width / 2, y: finalEl.y + finalEl.height / 2 };
       let snapPt = dropCentre, snapBest = Infinity;
-      // Snap onto the CLEAN (obstacle-free) route — the live `orig.waypoints`
-      // may still be bent around the element from the drag.
-      for (let i = 0; i < cleanWps.length - 1; i++) {
-        const np = nearestOnSeg(dropCentre, cleanWps[i], cleanWps[i + 1]);
+      // Snap onto the nearest point of the CLEAN (obstacle-free) route OR the
+      // straight source-centre→target-centre flow line — the live route may be
+      // bent, and a re-picked-sides clean route may also detour, so include the
+      // flow line so the element lands on the real flow.
+      const srcAC = { x: srcA.x + srcA.width / 2, y: srcA.y + srcA.height / 2 };
+      const tgtBC = { x: tgtB.x + tgtB.width / 2, y: tgtB.y + tgtB.height / 2 };
+      const snapSegs: Array<[Point, Point]> = [[srcAC, tgtBC]];
+      for (let i = 0; i < cleanWps.length - 1; i++) snapSegs.push([cleanWps[i], cleanWps[i + 1]]);
+      for (const [p1, p2] of snapSegs) {
+        const np = nearestOnSeg(dropCentre, p1, p2);
         const dd = Math.hypot(dropCentre.x - np.x, dropCentre.y - np.y);
         if (dd < snapBest) { snapBest = dd; snapPt = np; }
       }

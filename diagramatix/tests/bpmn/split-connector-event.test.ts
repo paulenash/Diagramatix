@@ -192,4 +192,37 @@ describe("insert an existing activity onto a connector, halves parallel (T0725)"
     expect(d.connectors.some((c) => c.sourceId === "a" && c.targetId === "f")).toBe(true);
     expect(d.connectors.some((c) => c.sourceId === "f" && c.targetId === "b")).toBe(true);
   });
+
+  it("splits via the source→target flow line even when obstacle avoidance re-picked the connector's sides (T0729)", () => {
+    // Tasks are obstacles; while dragging a task onto a connector the router can
+    // re-pick the connector's sides/offsets to route around it. Then BOTH the
+    // live route AND a fresh route computed from the (re-picked) stored sides
+    // detour away from the task, and only the routing-independent
+    // source-centre→target-centre "flow line" still passes through it.
+    const d0 = {
+      elements: [
+        { id: "a", type: "task", x: 100, y: 300, width: 100, height: 60, label: "A", properties: {} },
+        { id: "b", type: "task", x: 500, y: 300, width: 100, height: 60, label: "B", properties: {} },
+        // F sits on the A→B flow line (centres at y 330).
+        { id: "f", type: "task", x: 250, y: 300, width: 100, height: 60, label: "F", properties: {} },
+      ],
+      connectors: [{
+        id: "ab", type: "sequence", sourceId: "a", targetId: "b",
+        // Re-picked sides: both exit the TOP, so any route from the stored sides
+        // arches ABOVE the line, away from F.
+        sourceSide: "top", targetSide: "top",
+        directionType: "directed", routingType: "rectilinear",
+        waypoints: [
+          { x: 150, y: 330 }, { x: 150, y: 300 }, { x: 150, y: 200 },
+          { x: 550, y: 200 }, { x: 550, y: 300 }, { x: 550, y: 330 },
+        ],
+      }],
+    } as unknown as DiagramData;
+
+    const d = reducer(d0, { type: "MOVE_END", payload: { id: "f" } });
+
+    expect(d.connectors.some((c) => c.id === "ab")).toBe(false);
+    expect(d.connectors.some((c) => c.sourceId === "a" && c.targetId === "f")).toBe(true);
+    expect(d.connectors.some((c) => c.sourceId === "f" && c.targetId === "b")).toBe(true);
+  });
 });
