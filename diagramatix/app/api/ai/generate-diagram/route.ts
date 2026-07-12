@@ -54,6 +54,19 @@ export async function POST(req: Request) {
       } as Anthropic.Messages.ContentBlockParam);
     } else if (attachment?.type === "text" && attachment.data) {
       userContent.push({ type: "text", text: `--- ATTACHED DOCUMENT: ${attachment.name ?? "document"} ---\n${attachment.data}\n--- END DOCUMENT ---` });
+    } else if (attachment?.type === "image" && attachment.data) {
+      // Vision input — a photo/screenshot of an existing diagram. Read it as
+      // the source of truth (mirrors the BPMN image-to-diagram flow).
+      const ALLOWED = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+      const mediaType = ALLOWED.includes(attachment.mediaType) ? attachment.mediaType : "image/png";
+      userContent.push({
+        type: "image",
+        source: { type: "base64", media_type: mediaType, data: attachment.data },
+      } as Anthropic.Messages.ContentBlockParam);
+      userContent.push({
+        type: "text",
+        text: "The attached image is a diagram to reproduce. Treat it as the SOURCE OF TRUTH: transcribe every shape (mapping it to the correct element type) and its label exactly as drawn (OCR the text), and every arrow/line as a connection between the right elements. Do NOT invent elements that aren't in the image. When the image and the text prompt conflict, the image wins.",
+      });
     }
     userContent.push({ type: "text", text: prompt.trim() });
 

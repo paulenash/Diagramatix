@@ -63,7 +63,18 @@ Output format:
     { "sourceId": "e2", "targetId": "e3", "label": "start / begin processing" },
     { "sourceId": "e3", "targetId": "e4", "label": "complete" }
   ]
-}`,
+}
+
+IMAGE INPUT — when an image of a state machine is attached, reproduce it exactly. Map the shapes:
+- a small SOLID / filled circle → "initial-state" (label "")
+- a circle with a ring around it (bullseye) → "final-state" (label "")
+- a rounded rectangle → "state" (label = the text inside)
+- a rounded rectangle divided into internal regions / containing nested states → "composite-state"
+- a state marked as calling another machine (e.g. "include / ref") → "submachine"
+- a diamond → "gateway" (a choice pseudostate)
+- a thick solid bar (splitting to / joining from several transitions) → "fork-join"
+- every arrow → a "transition" from the shape at its tail to the shape at its head; put the arrow's text (event [guard] / action) in the transition "label"
+OCR every label verbatim. Do not invent states or transitions that aren't drawn. If the image and the prompt disagree, follow the image.`,
 
   "value-chain": `You are a Value Chain diagram expert. Output ONLY valid JSON with elements.
 

@@ -93,9 +93,18 @@ export function AiPanel({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // File attachment
-  const [attachment, setAttachment] = useState<{ name: string; type: string; data: string } | null>(null);
+  const [attachment, setAttachment] = useState<{ name: string; type: string; data: string; mediaType?: string } | null>(null);
   const [showAttachPreview, setShowAttachPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Image MIME types accepted for vision input (reproduce a diagram from a photo/screenshot).
+  const IMAGE_TYPES: Record<string, string> = {
+    "image/png": "image/png",
+    "image/jpeg": "image/jpeg",
+    "image/jpg": "image/jpeg",
+    "image/webp": "image/webp",
+    "image/gif": "image/gif",
+  };
 
   async function handleFileAttach(file: File) {
     const MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -106,16 +115,24 @@ export function AiPanel({
       const buffer = await file.arrayBuffer();
       const base64 = arrayBufferToBase64(buffer);
       setAttachment({ name: file.name, type: "pdf", data: base64 });
+      setError(null);
+      setPrompt(prev => prev.trim().length > 0 ? prev : `I have attached a document, ${file.name}`);
+    } else if (IMAGE_TYPES[file.type]) {
+      // Vision input — a photo/screenshot of a diagram to reproduce.
+      const buffer = await file.arrayBuffer();
+      const base64 = arrayBufferToBase64(buffer);
+      setAttachment({ name: file.name, type: "image", data: base64, mediaType: IMAGE_TYPES[file.type] });
+      setError(null);
+      setPrompt(prev => prev.trim().length > 0
+        ? prev
+        : `Reproduce the diagram in the attached image (${file.name}) exactly — every shape, label and transition.`);
     } else {
       // Read as text for .txt, .md, .csv, .doc, .rtf, etc.
       const text = await file.text();
       setAttachment({ name: file.name, type: "text", data: text });
+      setError(null);
+      setPrompt(prev => prev.trim().length > 0 ? prev : `I have attached a document, ${file.name}`);
     }
-    setError(null);
-    // Seed the prompt only if the user hasn't typed anything yet.
-    setPrompt(prev => prev.trim().length > 0
-      ? prev
-      : `I have attached a document, ${file.name}`);
   }
 
   // Speech-to-text dictation — Deepgram streaming (with browser fallback),
@@ -477,11 +494,11 @@ export function AiPanel({
           {/* File attachment */}
           <div className="flex items-center gap-1.5 mt-1">
             <input ref={fileInputRef} type="file" className="hidden"
-              accept=".pdf,.txt,.md,.csv,.rtf,.doc,.docx"
+              accept=".pdf,.txt,.md,.csv,.rtf,.doc,.docx,.png,.jpg,.jpeg,.webp,.gif,image/*"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileAttach(f); e.target.value = ""; }} />
             <button onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-1 text-[10px] text-gray-500 border border-gray-300 rounded px-1.5 py-0.5 hover:bg-gray-50"
-              title="Attach a document (PDF, TXT, MD, CSV)">
+              title="Attach a document (PDF, TXT, MD, CSV) or an image of a diagram to reproduce (PNG, JPG, WEBP, GIF)">
               <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor">
                 <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 0 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 0 1-7 0V3z" />
               </svg>
