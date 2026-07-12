@@ -7582,9 +7582,18 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const SPLITTABLE_TYPES = new Set([
         "gateway", "intermediate-event", "task", "subprocess",
       ]);
+      // Optional diagnostics: enable in the browser console with
+      //   window.__DIAG_SPLIT = true
+      // then drag an element onto a connector. Logs why the drop-on-connector
+      // split did or didn't fire (per-candidate net hits + the final decision).
+      const splitTrace = typeof window !== "undefined"
+        && (window as unknown as { __DIAG_SPLIT?: boolean }).__DIAG_SPLIT === true;
+      const dlog = (...a: unknown[]) => { if (splitTrace) console.log("[__DIAG_SPLIT]", ...a); };
       if (!SPLITTABLE_TYPES.has(finalEl.type)) {
+        dlog(`skip: dropped element "${finalEl.label ?? finalEl.id}" type=${finalEl.type} is not a splittable type`);
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
+      dlog(`drop: "${finalEl.label ?? finalEl.id}" type=${finalEl.type} rect=(${Math.round(finalEl.x)},${Math.round(finalEl.y)},${finalEl.width},${finalEl.height}) parent=${finalEl.parentId ?? "-"}; scanning ${connectors.filter(c => c.type === "sequence").length} sequence connector(s)`);
       // Detect the connector to split. Tasks are routing obstacles, so while the
       // element was being dragged onto a connector the router bent that connector
       // AROUND it — by drop time its LIVE path no longer overlaps the element and
@@ -7628,11 +7637,17 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // through an element dropped on the flow between the two endpoints.
         const srcC = { x: s.x + s.width / 2, y: s.y + s.height / 2 };
         const tgtC = { x: t.x + t.width / 2, y: t.y + t.height / 2 };
-        if (pathHit(clean) || pathHit(c.waypoints) || segHit(srcC, tgtC)) { orig = c; cleanWps = clean; break; }
+        const hClean = pathHit(clean), hLive = pathHit(c.waypoints), hFlow = segHit(srcC, tgtC);
+        if (splitTrace) {
+          dlog(`  candidate ${c.id} ${c.sourceId}->${c.targetId} side=${c.sourceSide}/${c.targetSide} off=${(c.sourceOffsetAlong ?? 0.5).toFixed(2)}/${(c.targetOffsetAlong ?? 0.5).toFixed(2)} liveWp=${c.waypoints.length} cleanWp=${clean.length} :: freshRoute=${hClean} liveRoute=${hLive} flowLine=${hFlow}`);
+        }
+        if (hClean || hLive || hFlow) { orig = c; cleanWps = clean; break; }
       }
       if (!orig || !cleanWps) {
+        dlog(`RESULT: no split — the dropped element overlapped none of the sequence connectors (by fresh route, live route, or flow line)`);
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
+      dlog(`RESULT: SPLIT ${orig.id} (${orig.sourceId}->${orig.targetId}) into ${orig.sourceId}->${id} and ${id}->${orig.targetId}`);
 
       const oppSide = (s: Side): Side =>
         ({ left: "right", right: "left", top: "bottom", bottom: "top" } as const)[s];
