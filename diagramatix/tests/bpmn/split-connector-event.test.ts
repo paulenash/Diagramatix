@@ -80,3 +80,48 @@ describe("intermediate events don't force sequence flows to detour (T0706)", () 
     expect(bows(mid("task")), "tasks remain obstacles").toBe(true);
   });
 });
+
+/**
+ * Drop an EXISTING Activity onto a connector to INSERT it into the flow, with
+ * PARALLEL halves (T0725). An existing task dropped so it overlaps A→B divides
+ * the connector into A→task and task→B; the task is SNAPPED onto the connector
+ * line so the incoming and outgoing halves run in the same direction (left in /
+ * right out) instead of doglegging around an element dropped slightly off-line.
+ */
+describe("insert an existing activity onto a connector, halves parallel (T0725)", () => {
+  it("snaps the dropped task onto the line so A→F and F→B are parallel", () => {
+    const d0 = {
+      elements: [
+        { id: "a", type: "task", x: 100, y: 200, width: 100, height: 60, label: "A", properties: {} },
+        { id: "b", type: "task", x: 500, y: 200, width: 100, height: 60, label: "B", properties: {} },
+        // Dropped OVERLAPPING the A→B line (y 230) but with its centre BELOW it
+        // (centre y 245) — the split must pull it back onto the line.
+        { id: "f", type: "task", x: 300, y: 215, width: 100, height: 60, label: "F", properties: {} },
+      ],
+      connectors: [{
+        id: "ab", type: "sequence", sourceId: "a", targetId: "b", sourceSide: "right", targetSide: "left",
+        directionType: "directed", routingType: "rectilinear",
+        waypoints: [{ x: 150, y: 230 }, { x: 200, y: 230 }, { x: 500, y: 230 }, { x: 550, y: 230 }],
+      }],
+    } as unknown as DiagramData;
+
+    const d = reducer(d0, { type: "MOVE_END", payload: { id: "f" } });
+
+    // Original connector gone; two new halves bridge A→F→B.
+    expect(d.connectors.some((c) => c.id === "ab")).toBe(false);
+    const af = d.connectors.find((c) => c.sourceId === "a" && c.targetId === "f");
+    const fb = d.connectors.find((c) => c.sourceId === "f" && c.targetId === "b");
+    expect(af).toBeTruthy();
+    expect(fb).toBeTruthy();
+
+    // Parallel halves: F's incoming side faces A (left), outgoing faces B (right)
+    // — opposite sides ⇒ the two straight segments are collinear/parallel.
+    expect(af!.targetSide).toBe("left");
+    expect(fb!.sourceSide).toBe("right");
+    expect(af!.targetSide).toBe(({ left: "right", right: "left", top: "bottom", bottom: "top" } as const)[fb!.sourceSide]);
+
+    // F was snapped onto the connector line (centre y pulled from 245 back to 230).
+    const f = d.elements.find((e) => e.id === "f")!;
+    expect(f.y + f.height / 2).toBeCloseTo(230, 5);
+  });
+});

@@ -137,6 +137,16 @@ function messageBpmnWaypoints(
   };
 }
 
+/** Nearest point on segment a→b to p. Used to snap an element dropped on a
+ *  connector onto the connector line so the split halves stay parallel. */
+function nearestOnSeg(p: Point, a: Point, b: Point): Point {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 > 0 ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return { x: a.x + t * dx, y: a.y + t * dy };
+}
+
 /**
  * When messageBPMN waypoints change (endpoint move, space insertion, etc.),
  * adjust labelOffsetY so the label stays at the same signed distance from
@@ -7592,18 +7602,32 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const cASide = oppSide(orig.sourceSide);
       const cBSide = oppSide(orig.targetSide);
 
+      // Snap the element's centre onto the connector line so the two halves stay
+      // PARALLEL (collinear through the element) — the incoming and outgoing
+      // connectors run in the same direction rather than doglegging around an
+      // element dropped slightly off the line.
+      const dropCentre = { x: finalEl.x + finalEl.width / 2, y: finalEl.y + finalEl.height / 2 };
+      let snapPt = dropCentre, snapBest = Infinity;
+      for (let i = 0; i < orig.waypoints.length - 1; i++) {
+        const np = nearestOnSeg(dropCentre, orig.waypoints[i], orig.waypoints[i + 1]);
+        const dd = Math.hypot(dropCentre.x - np.x, dropCentre.y - np.y);
+        if (dd < snapBest) { snapBest = dd; snapPt = np; }
+      }
+      const snappedEl = { ...finalEl, x: snapPt.x - finalEl.width / 2, y: snapPt.y - finalEl.height / 2 };
+      const snapElements = elements.map(e => e.id === id ? snappedEl : e);
+
       const { waypoints: wA, sourceInvisibleLeader: sIA, targetInvisibleLeader: tIA } =
-        computeWaypoints(srcA, finalEl, elements, orig.sourceSide, cASide, orig.routingType,
+        computeWaypoints(srcA, snappedEl, snapElements, orig.sourceSide, cASide, orig.routingType,
           orig.sourceOffsetAlong ?? 0.5, 0.5);
 
       const { waypoints: wB, sourceInvisibleLeader: sIB, targetInvisibleLeader: tIB } =
-        computeWaypoints(finalEl, tgtB, elements, cBSide, orig.targetSide, orig.routingType,
+        computeWaypoints(snappedEl, tgtB, snapElements, cBSide, orig.targetSide, orig.routingType,
           0.5, orig.targetOffsetAlong ?? 0.5);
 
       const filtered = connectors.filter(c => c.id !== orig.id);
       return {
         ...state,
-        elements: updatePoolTypes(elements),
+        elements: updatePoolTypes(ensureContainersEncloseChildren(snapElements)),
         connectors: [
           ...filtered,
           { id: nanoid(), type: orig.type, sourceId: orig.sourceId, targetId: finalEl.id,
