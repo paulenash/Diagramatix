@@ -69,6 +69,33 @@ describe("normaliseAiPlan generation rules (T0718)", () => {
     expect(plan.elements.find((e) => e.id === "t")!.pool).toBe(pool!.id);
   });
 
+  it("data associations do NOT affect flow column placement (T0724)", () => {
+    // A Data Object / Store link is an association, not sequence flow — it must
+    // not pull a consumer into a new column (leaving a gap around the artifact)
+    // nor shove elements out of topological order.
+    const base: AiElement[] = [
+      { id: "s", type: "start-event", label: "S" },
+      { id: "a", type: "task", label: "A" },
+      { id: "b", type: "task", label: "B" },
+      { id: "c", type: "task", label: "C" },
+      { id: "e", type: "end-event", label: "E" },
+    ];
+    const flow: AiConnection[] = [
+      { sourceId: "s", targetId: "a" }, { sourceId: "a", targetId: "b" },
+      { sourceId: "b", targetId: "c" }, { sourceId: "c", targetId: "e" },
+    ];
+    const noData = layoutBpmnDiagram(base, flow);
+    // "C" reads a Data Store (an INPUT association) and "A" writes a Data Object.
+    const withData = layoutBpmnDiagram(
+      [...base, { id: "ds", type: "data-store", label: "Policy" }, { id: "do", type: "data-object", label: "Draft" }],
+      [...flow, { sourceId: "ds", targetId: "c" }, { sourceId: "a", targetId: "do" }],
+    );
+    const xOf = (d: ReturnType<typeof layoutBpmnDiagram>, id: string) => Math.round(d.elements.find((e) => e.id === id)!.x);
+    for (const id of ["s", "a", "b", "c", "e"]) {
+      expect(xOf(withData, id), `${id} column unchanged by the data association`).toBe(xOf(noData, id));
+    }
+  });
+
   it("a data object stays adjacent to its associated activity after cross-lane placement (T0723)", () => {
     // A gateway fanning across lanes moves activities during layout; a data
     // object (parented to the lane, not the activity) must be re-hugged to its

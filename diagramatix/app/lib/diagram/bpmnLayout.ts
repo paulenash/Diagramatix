@@ -746,8 +746,20 @@ export function layoutBpmnDiagram(
   // Compute column positions for elements using BFS
   const outgoing = new Map<string, AiConnection[]>();
   const incoming = new Map<string, AiConnection[]>();
+  // A connector touching a Data Object / Data Store / Text Annotation is an
+  // ASSOCIATION, not sequence flow — it must NOT influence column order (the AI
+  // emits data links as "sequence", so they'd otherwise pull consumers to a new
+  // column and leave a gap around the artifact, and can shove a gateway out of
+  // topological order relative to its targets). Data artifacts are positioned by
+  // R8.02/R8.03 instead. Skip these here, exactly like message flows.
+  const DATA_ARTIFACT_TYPES = new Set(["data-object", "data-store", "text-annotation"]);
+  const typeById = new Map(aiElements.map((e) => [e.id, e.type]));
+  const isDataLink = (c: AiConnection) =>
+    DATA_ARTIFACT_TYPES.has(typeById.get(c.sourceId) ?? "") ||
+    DATA_ARTIFACT_TYPES.has(typeById.get(c.targetId) ?? "");
   for (const c of aiConnections) {
     if (c.type === "message") continue; // skip message flows for column layout
+    if (isDataLink(c)) continue;        // skip data associations for column layout
     if (!outgoing.has(c.sourceId)) outgoing.set(c.sourceId, []);
     outgoing.get(c.sourceId)!.push(c);
     if (!incoming.has(c.targetId)) incoming.set(c.targetId, []);
