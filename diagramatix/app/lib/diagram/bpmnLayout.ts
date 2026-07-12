@@ -307,6 +307,36 @@ function layoutBpmnPreserved(
     }
   }
 
+  // ── Pool + lane tidy-up ── snapImportedBounds snaps each lane's x/width to
+  // its parent pool's box, so the lanes end up COINCIDING with the pool and the
+  // pool (with its name) is hidden BEHIND them — the lanes have the pool as a
+  // formal parent but the pool isn't visible as a container. Rebuild proper
+  // BPMN geometry: give the pool a left HEADER strip (so its name shows and it
+  // visibly encloses the lanes) and inset every lane to the right of it. Content
+  // (flow elements) keeps its absolute position — only the pool grows leftward,
+  // so nothing shifts and the header simply appears.
+  for (const pool of elements) {
+    if (pool.type !== "pool") continue;
+    const lanes = elements.filter((e) => e.type === "lane" && e.parentId === pool.id);
+    if (lanes.length === 0) continue;
+    const headerW = wrapPoolName(pool.label ?? "").headerWidth;
+    const lMinX = Math.min(...lanes.map((l) => l.x));
+    const lMinY = Math.min(...lanes.map((l) => l.y));
+    const lMaxX = Math.max(...lanes.map((l) => l.x + l.width));
+    const lMaxY = Math.max(...lanes.map((l) => l.y + l.height));
+    // Normalise the lanes to a single content column (they already tile
+    // vertically from snapImportedBounds) so their left edges line up flush
+    // against the pool header.
+    for (const lane of lanes) { lane.x = lMinX; lane.width = lMaxX - lMinX; }
+    // Pool = header strip (headerW) to the LEFT of the lane column, enclosing
+    // the full lane stack. Growing left keeps all lanes + content in place.
+    pool.x = lMinX - headerW;
+    pool.y = Math.min(pool.y, lMinY);
+    pool.width = lMaxX - pool.x;
+    pool.height = lMaxY - pool.y;
+    pool.properties = { ...pool.properties, poolHeaderWidth: headerW };
+  }
+
   // ── Connectors ── honour imported sides + routing where present.
   const elMap = new Map(elements.map((e) => [e.id, e]));
   const built: Connector[] = [];
