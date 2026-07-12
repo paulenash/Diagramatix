@@ -124,4 +124,37 @@ describe("insert an existing activity onto a connector, halves parallel (T0725)"
     const f = d.elements.find((e) => e.id === "f")!;
     expect(f.y + f.height / 2).toBeCloseTo(230, 5);
   });
+
+  it("still splits when obstacle avoidance has bent the live connector AROUND the element (T0726)", () => {
+    // While dragging a task onto a connector the router (tasks are obstacles)
+    // bends that connector AROUND the task, so by drop time its LIVE waypoints
+    // detour above the element and no longer overlap it. The split must detect
+    // the connector against its obstacle-FREE route (straight A→B), not the
+    // bent live path.
+    const d0 = {
+      elements: [
+        { id: "a", type: "task", x: 100, y: 200, width: 100, height: 60, label: "A", properties: {} },
+        { id: "b", type: "task", x: 500, y: 200, width: 100, height: 60, label: "B", properties: {} },
+        // F is centred on the straight A→B line (y 230) at x 300–400.
+        { id: "f", type: "task", x: 300, y: 200, width: 100, height: 60, label: "F", properties: {} },
+      ],
+      connectors: [{
+        id: "ab", type: "sequence", sourceId: "a", targetId: "b", sourceSide: "right", targetSide: "left",
+        directionType: "directed", routingType: "rectilinear",
+        // Detour ABOVE F (y 150) — does NOT intersect F's box (y 200–260), so a
+        // naive live-waypoint test would find no overlap and skip the split.
+        waypoints: [
+          { x: 150, y: 230 }, { x: 200, y: 230 }, { x: 250, y: 230 }, { x: 250, y: 150 },
+          { x: 450, y: 150 }, { x: 450, y: 230 }, { x: 500, y: 230 }, { x: 550, y: 230 },
+        ],
+      }],
+    } as unknown as DiagramData;
+
+    const d = reducer(d0, { type: "MOVE_END", payload: { id: "f" } });
+
+    // The bent connector is gone; A→F and F→B bridge the flow through F.
+    expect(d.connectors.some((c) => c.id === "ab")).toBe(false);
+    expect(d.connectors.some((c) => c.sourceId === "a" && c.targetId === "f")).toBe(true);
+    expect(d.connectors.some((c) => c.sourceId === "f" && c.targetId === "b")).toBe(true);
+  });
 });

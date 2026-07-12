@@ -7585,8 +7585,19 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (!SPLITTABLE_TYPES.has(finalEl.type)) {
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
-      const orig = findConnectorOverlappingElement(connectors, finalEl);
-      if (!orig) {
+      // Detect the connector to split against its OBSTACLE-FREE route, not its
+      // live waypoints. Tasks are routing obstacles, so while the element was
+      // being dragged onto a connector the router bent that connector AROUND it
+      // — by drop time the live path no longer overlaps the element and a naive
+      // waypoint test finds nothing. Recompute every connector as if the dragged
+      // element weren't present (it's removed from the obstacle set) so the
+      // connector snaps back to the straight/orthogonal route it WANTS, then the
+      // dropped element sits on that route and the split is detected.
+      const obstacleFreeEls = elements.filter(e => e.id !== finalEl.id);
+      const cleanConns = recomputeAllConnectors(connectors, obstacleFreeEls, state.relaxedLayout);
+      const hitClean = findConnectorOverlappingElement(cleanConns, finalEl);
+      const orig = hitClean ? connectors.find(c => c.id === hitClean.id) : null;
+      if (!orig || !hitClean) {
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
 
@@ -7608,8 +7619,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // element dropped slightly off the line.
       const dropCentre = { x: finalEl.x + finalEl.width / 2, y: finalEl.y + finalEl.height / 2 };
       let snapPt = dropCentre, snapBest = Infinity;
-      for (let i = 0; i < orig.waypoints.length - 1; i++) {
-        const np = nearestOnSeg(dropCentre, orig.waypoints[i], orig.waypoints[i + 1]);
+      // Snap onto the CLEAN (obstacle-free) route — the live `orig.waypoints`
+      // may still be bent around the element from the drag.
+      for (let i = 0; i < hitClean.waypoints.length - 1; i++) {
+        const np = nearestOnSeg(dropCentre, hitClean.waypoints[i], hitClean.waypoints[i + 1]);
         const dd = Math.hypot(dropCentre.x - np.x, dropCentre.y - np.y);
         if (dd < snapBest) { snapBest = dd; snapPt = np; }
       }

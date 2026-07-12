@@ -6630,6 +6630,46 @@ export function Canvas({
             />
           );
         }
+        // Text annotations render LEFT-aligned (textAnchor="start") and wrap at
+        // `el.width - PAD - 4`. The edit overlay must match: left-aligned (not
+        // centred) and sized to exactly that wrap width so the box hugs the text
+        // rather than sitting much wider than where the text wraps. `box-sizing:
+        // border-box` keeps the border/padding INSIDE editingLabel.width (which
+        // is already the wrap-width region set in startEditingLabel).
+        if (editingEl?.type === "text-annotation") {
+          return (
+            <textarea
+              autoFocus
+              value={editingLabel.value}
+              onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
+              onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
+              onBlur={commitLabel}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitLabel(); }
+                if (e.key === "Escape") { onCancelLabelEdit?.(); setEditingLabel(null); }
+              }}
+              style={{
+                position: "absolute",
+                left: editingLabel.x,
+                top: editingLabel.y,
+                width: editingLabel.width,
+                height: editingLabel.height,
+                fontSize: 12 * zoom,
+                lineHeight: `${14 * zoom}px`,
+                textAlign: "left",
+                boxSizing: "border-box",
+                background: "white",
+                border: "2px solid #7c3a2a",
+                borderRadius: 4,
+                outline: "none",
+                padding: "1px 2px",
+                resize: "none",
+                overflow: "hidden",
+              }}
+              placeholder="Enter annotation text"
+            />
+          );
+        }
         const isUmlEl = editingEl?.type === "uml-class" || editingEl?.type === "uml-enumeration";
         const editLines = editingLabel.value.split("\n").length;
         // For task/subprocess, read live element dims so the overlay
