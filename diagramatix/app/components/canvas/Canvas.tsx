@@ -2921,11 +2921,9 @@ export function Canvas({
     const SPLITTABLE_DROPS = diagramType === "state-machine" ? SM_SPLITTABLE : BPMN_SPLITTABLE;
     if ((diagramType === "bpmn" || diagramType === "state-machine") && onSplitConnector && SPLITTABLE_DROPS.has(pendingDragSymbol)) {
       const hit = findConnectorNearPoint(data.connectors, worldPos);
-      if (typeof window !== "undefined" && (window as unknown as { __DIAG_SPLIT?: boolean }).__DIAG_SPLIT === true) {
-        console.log(`[__DIAG_SPLIT] PALETTE drop symbol=${pendingDragSymbol} at (${Math.round(worldPos.x)},${Math.round(worldPos.y)}) → nearConnector=${hit ? hit.id : "NONE (within 15px)"}`);
-      }
       if (hit) {
         if (pendingDragSymbol === "gateway" || pendingDragSymbol === "task" || pendingDragSymbol === "subprocess"
+            || pendingDragSymbol === "subprocess-expanded"
             || pendingDragSymbol === "state" || pendingDragSymbol === "submachine" || pendingDragSymbol === "composite-state" || pendingDragSymbol === "fork-join") {
           // These have no type picker — split immediately
           onSplitConnector(pendingDragSymbol, worldPos, hit.id);

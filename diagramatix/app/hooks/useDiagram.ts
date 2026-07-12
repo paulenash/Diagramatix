@@ -7456,9 +7456,6 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "MOVE_END": {
       const { id } = action.payload;
       const initialEl = state.elements.find(e => e.id === id);
-      if (typeof window !== "undefined" && (window as unknown as { __DIAG_SPLIT?: boolean }).__DIAG_SPLIT === true) {
-        console.log(`[__DIAG_SPLIT] MOVE_END fired id=${id} type=${initialEl?.type ?? "?"} label="${initialEl?.label ?? ""}"`);
-      }
       if (!initialEl) return state;
 
       // Boundary-event attach happens at DROP only (mid-drag attach was
@@ -7580,23 +7577,23 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (!finalEl) {
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
-      // EPs deliberately excluded: they're large enough to overlap connectors
-      // on routine moves and would silently split whichever one we hit first.
       const SPLITTABLE_TYPES = new Set([
-        "gateway", "intermediate-event", "task", "subprocess",
+        "gateway", "intermediate-event", "task", "subprocess", "subprocess-expanded",
       ]);
-      // Optional diagnostics: enable in the browser console with
-      //   window.__DIAG_SPLIT = true
-      // then drag an element onto a connector. Logs why the drop-on-connector
-      // split did or didn't fire (per-candidate net hits + the final decision).
-      const splitTrace = typeof window !== "undefined"
-        && (window as unknown as { __DIAG_SPLIT?: boolean }).__DIAG_SPLIT === true;
-      const dlog = (...a: unknown[]) => { if (splitTrace) console.log("[__DIAG_SPLIT]", ...a); };
       if (!SPLITTABLE_TYPES.has(finalEl.type)) {
-        dlog(`skip: dropped element "${finalEl.label ?? finalEl.id}" type=${finalEl.type} is not a splittable type`);
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
-      dlog(`drop: "${finalEl.label ?? finalEl.id}" type=${finalEl.type} rect=(${Math.round(finalEl.x)},${Math.round(finalEl.y)},${finalEl.width},${finalEl.height}) parent=${finalEl.parentId ?? "-"}; scanning ${connectors.filter(c => c.type === "sequence").length} sequence connector(s)`);
+      // An Expanded Subprocess is a large CONTAINER. Splitting rules for it:
+      //  • never split a connector that belongs to its OWN internal flow — skip
+      //    any connector touching the EP or one of its descendants;
+      //  • don't use the routing-independent flow-line net (its big rect would
+      //    straddle distant connectors' centre lines) — require the connector to
+      //    visibly cross the EP (live or fresh route);
+      //  • don't snap the EP onto the line (that would move the box but leave its
+      //    children behind) — split at the EP's dropped position.
+      const isContainerDrop = isContainerType(finalEl.type);
+      const selfIds = new Set<string>([finalEl.id]);
+      if (isContainerDrop) for (const d of getAllDescendantIds(elements, finalEl.id)) selfIds.add(d);
       // Detect the connector to split. Tasks are routing obstacles, so while the
       // element was being dragged onto a connector the router bent that connector
       // AROUND it — by drop time its LIVE path no longer overlaps the element and
@@ -7618,36 +7615,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         for (let i = 0; i < pts.length - 1; i++) if (segHit(pts[i], pts[i + 1])) return true;
         return false;
       };
-      // Diagnostics: distance from the dropped element's CENTRE to each live
-      // route, to reveal which connector the user aimed at and how far it ended
-      // up (obstacle avoidance may have pushed it out of reach).
-      const fCx = fRect.x + fRect.w / 2, fCy = fRect.y + fRect.h / 2;
-      const distToSegPt = (p1: Point, p2: Point): number => {
-        const dx = p2.x - p1.x, dy = p2.y - p1.y;
-        const len2 = dx * dx + dy * dy;
-        let tt = len2 > 0 ? ((fCx - p1.x) * dx + (fCy - p1.y) * dy) / len2 : 0;
-        tt = Math.max(0, Math.min(1, tt));
-        return Math.hypot(fCx - (p1.x + tt * dx), fCy - (p1.y + tt * dy));
-      };
-      const distToPath = (wps: Point[]): number => {
-        let best = Infinity;
-        const pts = wps.slice(1, -1);
-        for (let i = 0; i < pts.length - 1; i++) best = Math.min(best, distToSegPt(pts[i], pts[i + 1]));
-        return best;
-      };
-      let closest: { id: string; d: number; wps: Point[] } | null = null;
       let orig: Connector | null = null;
       let cleanWps: Point[] | null = null;
       for (const c of connectors) {
         if (c.type !== "sequence") continue;
-        if (c.sourceId === finalEl.id || c.targetId === finalEl.id) continue;
+        // Skip the element's own connectors and (for a container) its internal flow.
+        if (selfIds.has(c.sourceId) || selfIds.has(c.targetId)) continue;
         const s = ofMap.get(c.sourceId);
         const t = ofMap.get(c.targetId);
         if (!s || !t) continue;
-        if (splitTrace) {
-          const dLive = distToPath(c.waypoints);
-          if (!closest || dLive < closest.d) closest = { id: c.id, d: dLive, wps: c.waypoints };
-        }
         const clean = computeWaypoints(
           s, t, obstacleFreeEls, c.sourceSide, c.targetSide, c.routingType,
           c.sourceOffsetAlong ?? 0.5, c.targetOffsetAlong ?? 0.5,
@@ -7660,19 +7636,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // connector's sides/offsets so even the fresh route (which reuses the
         // stored sides) detours, but the centre-to-centre line still passes
         // through an element dropped on the flow between the two endpoints.
+        // The flow-line net is skipped for a large container (EP) to avoid
+        // straddling distant connectors' centre lines.
         const srcC = { x: s.x + s.width / 2, y: s.y + s.height / 2 };
         const tgtC = { x: t.x + t.width / 2, y: t.y + t.height / 2 };
-        const hClean = pathHit(clean), hLive = pathHit(c.waypoints), hFlow = segHit(srcC, tgtC);
-        if (splitTrace) {
-          dlog(`  candidate ${c.id} ${c.sourceId}->${c.targetId} side=${c.sourceSide}/${c.targetSide} off=${(c.sourceOffsetAlong ?? 0.5).toFixed(2)}/${(c.targetOffsetAlong ?? 0.5).toFixed(2)} liveWp=${c.waypoints.length} cleanWp=${clean.length} :: freshRoute=${hClean} liveRoute=${hLive} flowLine=${hFlow}`);
-        }
-        if (hClean || hLive || hFlow) { orig = c; cleanWps = clean; break; }
+        const hFlow = !isContainerDrop && segHit(srcC, tgtC);
+        if (pathHit(clean) || pathHit(c.waypoints) || hFlow) { orig = c; cleanWps = clean; break; }
       }
       if (!orig || !cleanWps) {
-        if (closest) {
-          dlog(`  CLOSEST live route: ${closest.id} at ${Math.round(closest.d)}px from the drop centre (${Math.round(fCx)},${Math.round(fCy)}); its waypoints=${JSON.stringify(closest.wps.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) })))}`);
-        }
-        dlog(`RESULT: no split — the dropped element overlapped none of the sequence connectors (by fresh route, live route, or flow line)`);
         // Re-settle obstacle routing ONCE, now that the drag has ended. Mid-drag
         // obstacle avoidance is suppressed (so connectors don't flee the dragged
         // element), so at drop we let detached connectors route around the
@@ -7683,7 +7654,6 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           : validateConnectorsAgainstObstacles(connectors, elements);
         return { ...state, elements: updatePoolTypes(elements), connectors: settled };
       }
-      dlog(`RESULT: SPLIT ${orig.id} (${orig.sourceId}->${orig.targetId}) into ${orig.sourceId}->${id} and ${id}->${orig.targetId}`);
 
       const oppSide = (s: Side): Side =>
         ({ left: "right", right: "left", top: "bottom", bottom: "top" } as const)[s];
@@ -7700,21 +7670,25 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // Snap the element's centre onto the connector line so the two halves stay
       // PARALLEL (collinear through the element) — the incoming and outgoing
       // connectors run in the same direction rather than doglegging around an
-      // element dropped slightly off the line.
+      // element dropped slightly off the line. NOT for a container (EP): moving
+      // the box would leave its children behind, so an EP splits at its dropped
+      // position.
       const dropCentre = { x: finalEl.x + finalEl.width / 2, y: finalEl.y + finalEl.height / 2 };
       let snapPt = dropCentre, snapBest = Infinity;
-      // Snap onto the nearest point of the CLEAN (obstacle-free) route OR the
-      // straight source-centre→target-centre flow line — the live route may be
-      // bent, and a re-picked-sides clean route may also detour, so include the
-      // flow line so the element lands on the real flow.
-      const srcAC = { x: srcA.x + srcA.width / 2, y: srcA.y + srcA.height / 2 };
-      const tgtBC = { x: tgtB.x + tgtB.width / 2, y: tgtB.y + tgtB.height / 2 };
-      const snapSegs: Array<[Point, Point]> = [[srcAC, tgtBC]];
-      for (let i = 0; i < cleanWps.length - 1; i++) snapSegs.push([cleanWps[i], cleanWps[i + 1]]);
-      for (const [p1, p2] of snapSegs) {
-        const np = nearestOnSeg(dropCentre, p1, p2);
-        const dd = Math.hypot(dropCentre.x - np.x, dropCentre.y - np.y);
-        if (dd < snapBest) { snapBest = dd; snapPt = np; }
+      if (!isContainerDrop) {
+        // Snap onto the nearest point of the CLEAN (obstacle-free) route OR the
+        // straight source-centre→target-centre flow line — the live route may be
+        // bent, and a re-picked-sides clean route may also detour, so include the
+        // flow line so the element lands on the real flow.
+        const srcAC = { x: srcA.x + srcA.width / 2, y: srcA.y + srcA.height / 2 };
+        const tgtBC = { x: tgtB.x + tgtB.width / 2, y: tgtB.y + tgtB.height / 2 };
+        const snapSegs: Array<[Point, Point]> = [[srcAC, tgtBC]];
+        for (let i = 0; i < cleanWps.length - 1; i++) snapSegs.push([cleanWps[i], cleanWps[i + 1]]);
+        for (const [p1, p2] of snapSegs) {
+          const np = nearestOnSeg(dropCentre, p1, p2);
+          const dd = Math.hypot(dropCentre.x - np.x, dropCentre.y - np.y);
+          if (dd < snapBest) { snapBest = dd; snapPt = np; }
+        }
       }
       const snappedEl = { ...finalEl, x: snapPt.x - finalEl.width / 2, y: snapPt.y - finalEl.height / 2 };
       const snapElements = elements.map(e => e.id === id ? snappedEl : e);

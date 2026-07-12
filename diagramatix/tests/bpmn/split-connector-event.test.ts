@@ -193,6 +193,69 @@ describe("insert an existing activity onto a connector, halves parallel (T0725)"
     expect(d.connectors.some((c) => c.sourceId === "f" && c.targetId === "b")).toBe(true);
   });
 
+  it("dropping an existing Expanded Subprocess on a connector splits it, without moving the EP or touching its internal flow (T0731)", () => {
+    // An EP is a large container. Dropping it on A→B must: split A→B into A→EP
+    // and EP→B; NOT snap-move the EP (its children would be left behind); and
+    // NOT split the EP's OWN internal connector.
+    const d0 = {
+      elements: [
+        { id: "a", type: "task", x: 100, y: 200, width: 100, height: 60, label: "A", properties: {} },
+        { id: "b", type: "task", x: 600, y: 200, width: 100, height: 60, label: "B", properties: {} },
+        // EP straddling the A→B line (y 230), with two children + an internal flow.
+        { id: "ep", type: "subprocess-expanded", x: 300, y: 180, width: 200, height: 120, label: "EP", properties: {} },
+        { id: "c1", type: "task", x: 320, y: 210, width: 60, height: 40, label: "C1", parentId: "ep", properties: {} },
+        { id: "c2", type: "task", x: 420, y: 210, width: 60, height: 40, label: "C2", parentId: "ep", properties: {} },
+      ],
+      connectors: [
+        { id: "ab", type: "sequence", sourceId: "a", targetId: "b", sourceSide: "right", targetSide: "left",
+          directionType: "directed", routingType: "rectilinear",
+          waypoints: [{ x: 150, y: 230 }, { x: 200, y: 230 }, { x: 600, y: 230 }, { x: 650, y: 230 }] },
+        { id: "ic", type: "sequence", sourceId: "c1", targetId: "c2", sourceSide: "right", targetSide: "left",
+          directionType: "directed", routingType: "rectilinear",
+          waypoints: [{ x: 380, y: 230 }, { x: 420, y: 230 }] },
+      ],
+    } as unknown as DiagramData;
+
+    const epBefore = d0.elements.find((e) => e.id === "ep")!;
+    const out = reducer(d0, { type: "MOVE_END", payload: { id: "ep" } });
+
+    // A→B split into A→EP and EP→B.
+    expect(out.connectors.some((c) => c.id === "ab")).toBe(false);
+    expect(out.connectors.some((c) => c.sourceId === "a" && c.targetId === "ep")).toBe(true);
+    expect(out.connectors.some((c) => c.sourceId === "ep" && c.targetId === "b")).toBe(true);
+    // The EP's internal connector is untouched.
+    expect(out.connectors.some((c) => c.id === "ic")).toBe(true);
+    // The EP was NOT snap-moved (children would be stranded).
+    const epAfter = out.elements.find((e) => e.id === "ep")!;
+    expect(epAfter.x).toBe(epBefore.x);
+    expect(epAfter.y).toBe(epBefore.y);
+  });
+
+  it("palette drop of a new Expanded Subprocess on a connector splits it (T0732)", () => {
+    const d0 = {
+      elements: [
+        { id: "a", type: "task", x: 100, y: 200, width: 100, height: 60, label: "A", properties: {} },
+        { id: "b", type: "task", x: 600, y: 200, width: 100, height: 60, label: "B", properties: {} },
+      ],
+      connectors: [{
+        id: "ab", type: "sequence", sourceId: "a", targetId: "b", sourceSide: "right", targetSide: "left",
+        directionType: "directed", routingType: "rectilinear",
+        waypoints: [{ x: 150, y: 230 }, { x: 200, y: 230 }, { x: 600, y: 230 }, { x: 650, y: 230 }],
+      }],
+    } as unknown as DiagramData;
+
+    const out = reducer(d0, {
+      type: "SPLIT_CONNECTOR",
+      payload: { symbolType: "subprocess-expanded", position: { x: 400, y: 230 }, connectorId: "ab" },
+    });
+
+    const ep = out.elements.find((e) => e.type === "subprocess-expanded");
+    expect(ep).toBeTruthy();
+    expect(out.connectors.some((c) => c.id === "ab")).toBe(false);
+    expect(out.connectors.some((c) => c.sourceId === "a" && c.targetId === ep!.id)).toBe(true);
+    expect(out.connectors.some((c) => c.sourceId === ep!.id && c.targetId === "b")).toBe(true);
+  });
+
   it("dragging an element does NOT re-route detached connectors mid-drag; the full drop then splits (T0730)", () => {
     // Root cause of "obstacle avoidance prevents dropping a task on a connector":
     // mid-drag the router bent every connector the (obstacle) task passed over
