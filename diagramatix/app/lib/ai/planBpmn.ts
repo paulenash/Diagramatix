@@ -81,14 +81,15 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 - Lanes MUST have: parentPool (the pool id they belong to)
 - Flow elements (tasks, gateways, events) MUST have: pool (pool id). Include "lane" ONLY if the prompt mentions specific roles, teams, or performers responsible for elements.
 - DO NOT create default/placeholder lanes (e.g. "Team", "Process Team", "Main Lane"). Only create lanes when the prompt implies multiple performers/roles. If no roles are mentioned, elements go directly in the pool with NO lane.
-- Tasks should have: taskType ("user", "service", "send", "receive", "manual", "none")
-- TASKTYPE RULES FOR TASKS WITH BLACK-BOX MESSAGE FLOWS:
-  * Task with messages BOTH TO AND FROM an EXTERNAL ENTITY (isSystem=false): default "none"; never use "send", "receive", or "user".
-  * Task with messages BOTH TO AND FROM an IT SYSTEM (isSystem=true): default "user"; never use "send", "receive", or "manual".
-  * Task that only RECEIVES a message from an EXTERNAL ENTITY: default "receive"; never use "send".
-  * Task that only SENDS a message to an EXTERNAL ENTITY: default "send"; never use "receive" or "user".
-  * Task with messages to/from an IT SYSTEM in only one direction: default "user"; never use "send", "receive", or "manual".
-  * Send and Receive each represent ONE direction of a message exchange — never use them on a task that has messages in BOTH directions.
+- Tasks should have: taskType ("user", "service", "send", "receive", "manual", "none"). The DEFAULT marker is "none".
+- TASK MARKERS:
+  * MESSAGE-DRIVEN markers are assigned AUTOMATICALLY from the message flows — you do NOT need to compute them. Just draw the message connectors between the task and the black-box pool and set that pool's isSystem correctly. (For reference, the automatic result is: a message to/from an IT-SYSTEM pool, isSystem=true, either direction → "user"; a task that only SENDS to an external-entity pool, isSystem=false → "send"; only RECEIVES from an external entity → "receive"; both directions with an external entity → "none".)
+  * For a task with NO message flow to a black-box pool, choose the marker from the task WORDING:
+    – "user" when a PERSON carries out the step using a software system: keying into / updating / retrieving from a system, approving, deciding or reviewing WITHIN a system, OR receiving information FROM an IT SYSTEM — even when that IT system is not drawn as a pool (e.g. "Key into AP System", "Approve Request", "Look up in SAP", "Get status from ERP").
+    – "service" when the step is fully AUTOMATED, executed BY a system with NO human (e.g. "Auto-generate invoice", "System sends reminder").
+    – "send" when a PERSON sends something OUT to an external NON-system party (customer, client, supplier) that isn't drawn as a pool (e.g. "Email the customer", "Post the notice").
+    – "receive" when a PERSON receives or awaits something FROM an external NON-system party (customer, client, supplier) that isn't drawn as a pool (e.g. "Receive order from customer").
+    – "none" only when the step fits none of the above — a plain manual step with no system and no external party (e.g. "Sign the form by hand", "File the paper copy").
   * ABSOLUTE RULE: a Manual task must NEVER exchange messages with an IT-system pool (isSystem=true) in any direction.
 - Gateways should have: gatewayType ("exclusive", "parallel", "inclusive", "event-based"). Use "event-based" ONLY when the prompt describes one of several alternative EVENTS racing to occur (whichever happens first) — see the USER RULES for the exact trigger and wiring. The matching merge gateway MUST use the same gatewayType.
 - Expanded subprocesses use type "subprocess-expanded". They CAN contain child elements: set their "parentSubprocess" property to the subprocess id instead of "lane"
@@ -279,6 +280,49 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
       if ((e.lane && orphanLaneIds.has(e.lane)) || (e.pool && danglingPoolIds.has(e.pool))) {
         e.pool = POOL_ID;
       }
+    }
+  }
+
+  // ── Task markers ── The MESSAGE-driven markers are fully determined by the
+  // plan (message connectors + the partner pool's isSystem flag), so assign
+  // them in code — deterministic and reliable — rather than trusting the model.
+  // For a task that exchanges messages with a BLACK-BOX pool:
+  //   • any message (either direction) with an IT-SYSTEM pool (isSystem=true) → "user"
+  //   • both SENDS and RECEIVES with a non-system (external-entity) pool      → "none"
+  //   • only SENDS to a non-system pool                                       → "send"
+  //   • only RECEIVES from a non-system pool                                  → "receive"
+  // A task with NO black-box-pool messages keeps the model's WORDING-based
+  // choice (service = automated, or send/receive/user inferred from the verb),
+  // defaulting to "none". Default marker is always "none".
+  const poolType = (e: AiElement) =>
+    e.poolType ?? (e.properties as { poolType?: string } | undefined)?.poolType;
+  const blackBoxById = new Map(
+    parsed.elements.filter((e) => e.type === "pool" && poolType(e) === "black-box").map((e) => [e.id, e]),
+  );
+  const isSysPool = (p: AiElement) =>
+    typeof p.isSystem === "boolean" ? p.isSystem
+      : (p.properties as { isSystem?: unknown } | undefined)?.isSystem === true;
+  for (const t of parsed.elements) {
+    if (t.type !== "task") continue;
+    let sysMsg = false, sendEntity = false, recvEntity = false, anyBlackBoxMsg = false;
+    for (const c of parsed.connections) {
+      if (c.type !== "message") continue;
+      const asSrc = c.sourceId === t.id, asTgt = c.targetId === t.id;
+      if (!asSrc && !asTgt) continue;
+      const partner = blackBoxById.get(asSrc ? c.targetId : c.sourceId);
+      if (!partner) continue;
+      anyBlackBoxMsg = true;
+      if (isSysPool(partner)) sysMsg = true;
+      else { if (asSrc) sendEntity = true; if (asTgt) recvEntity = true; }
+    }
+    if (anyBlackBoxMsg) {
+      t.taskType = sysMsg ? "user"
+        : (sendEntity && recvEntity) ? "none"
+        : sendEntity ? "send"
+        : recvEntity ? "receive"
+        : "none";
+    } else if (!t.taskType) {
+      t.taskType = "none";
     }
   }
 }
