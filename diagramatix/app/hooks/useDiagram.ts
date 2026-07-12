@@ -4280,19 +4280,19 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // may technically lie inside elements without the visible curve passing
       // through, and rerouting them destroys the user's carefully shaped curves.
       //
-      // When the moving element is an Expanded Subprocess, ALSO skip
-      // obstacle validation for any connector not attached to the EP.
-      // Paul's spec: an EP must be movable across sequence connectors
-      // without disrupting them, mirroring the resize/boundary path which
-      // already leaves connectors alone. Without this skip, every connector
-      // whose bbox intersects the EP's new position re-routes mid-drag,
-      // making the EP feel like it "interacts with" connectors as it passes.
-      const isMovingEp = el.type === "subprocess-expanded";
+      // Do NOT re-route connectors that aren't attached to the moved element
+      // WHILE the drag is in progress. Obstacle avoidance mid-drag makes every
+      // connector the element passes over flee out of the way — which both looks
+      // like the connector is "dodging" the element and makes it impossible to
+      // drop an element ONTO a connector to split it (the connector runs away
+      // before the drop lands). Detached connectors re-settle around the final
+      // position once, at drop (MOVE_END), not on every drag tick. (Previously
+      // this skip was limited to Expanded Subprocesses; it now applies to every
+      // element move.) Connectors ATTACHED to the moved element still track it.
       const unaffectedSkip = new Set<string>();
       for (const c of connectors) {
         const detached = !affectedIds.has(c.sourceId) && !affectedIds.has(c.targetId);
-        if (!detached) continue;
-        if (c.routingType === "curvilinear" || isMovingEp) unaffectedSkip.add(c.id);
+        if (detached) unaffectedSkip.add(c.id);
       }
       if (unaffectedSkip.size > 0) {
         const toValidate = connectors.filter(c => !unaffectedSkip.has(c.id));
@@ -7673,7 +7673,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           dlog(`  CLOSEST live route: ${closest.id} at ${Math.round(closest.d)}px from the drop centre (${Math.round(fCx)},${Math.round(fCy)}); its waypoints=${JSON.stringify(closest.wps.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) })))}`);
         }
         dlog(`RESULT: no split — the dropped element overlapped none of the sequence connectors (by fresh route, live route, or flow line)`);
-        return { ...state, elements: updatePoolTypes(elements), connectors };
+        // Re-settle obstacle routing ONCE, now that the drag has ended. Mid-drag
+        // obstacle avoidance is suppressed (so connectors don't flee the dragged
+        // element), so at drop we let detached connectors route around the
+        // element's FINAL position — the smart-routing end-state, minus the
+        // fleeing. Skipped in relaxed/free-form layout, which owns its own routing.
+        const settled = state.relaxedLayout
+          ? connectors
+          : validateConnectorsAgainstObstacles(connectors, elements);
+        return { ...state, elements: updatePoolTypes(elements), connectors: settled };
       }
       dlog(`RESULT: SPLIT ${orig.id} (${orig.sourceId}->${orig.targetId}) into ${orig.sourceId}->${id} and ${id}->${orig.targetId}`);
 

@@ -82,7 +82,10 @@ describe("editor routing — obstacle-avoidance sweep", () => {
         for (const dx of offsets) for (const dy of offsets) {
           const moved = { ...el, x: el.x + dx, y: el.y + dy };
           if (flow.some((o) => o.id !== el.id && overlaps(moved, o))) continue; // bad user move, skip
-          const out = reducer(base, { type: "MOVE_ELEMENT", payload: { id: el.id, x: moved.x, y: moved.y } } satisfies Action);
+          // Full drag + drop: obstacle re-routing now re-settles at drop
+          // (MOVE_END), not on every mid-drag tick, so simulate both.
+          const mid = reducer(base, { type: "MOVE_ELEMENT", payload: { id: el.id, x: moved.x, y: moved.y } } satisfies Action);
+          const out = reducer(mid, { type: "MOVE_END", payload: { id: el.id } } satisfies Action);
           for (const v of findRoutingViolations(out)) {
             if (v.includes("crosses")) crossings++;
             else otherViolations.push(v);

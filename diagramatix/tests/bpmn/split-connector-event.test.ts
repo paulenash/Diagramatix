@@ -193,6 +193,38 @@ describe("insert an existing activity onto a connector, halves parallel (T0725)"
     expect(d.connectors.some((c) => c.sourceId === "f" && c.targetId === "b")).toBe(true);
   });
 
+  it("dragging an element does NOT re-route detached connectors mid-drag; the full drop then splits (T0730)", () => {
+    // Root cause of "obstacle avoidance prevents dropping a task on a connector":
+    // mid-drag the router bent every connector the (obstacle) task passed over
+    // AROUND it, so it fled before the drop landed. Mid-drag re-routing of
+    // connectors NOT attached to the moved element is now suppressed — the
+    // connector stays put, so the task lands ON it and the drop splits it.
+    const straight = () => ({
+      elements: [
+        { id: "a", type: "task", x: 100, y: 200, width: 100, height: 60, label: "A", properties: {} },
+        { id: "b", type: "task", x: 600, y: 200, width: 100, height: 60, label: "B", properties: {} },
+        { id: "f", type: "task", x: 350, y: 500, width: 100, height: 60, label: "F", properties: {} },
+      ],
+      connectors: [{
+        id: "ab", type: "sequence", sourceId: "a", targetId: "b", sourceSide: "right", targetSide: "left",
+        directionType: "directed", routingType: "rectilinear",
+        waypoints: [{ x: 150, y: 230 }, { x: 200, y: 230 }, { x: 600, y: 230 }, { x: 650, y: 230 }],
+      }],
+    } as unknown as DiagramData);
+
+    // Mid-drag: move the free task onto the A→B line.
+    const mid = reducer(straight(), { type: "MOVE_ELEMENT", payload: { id: "f", x: 350, y: 200 } } as never);
+    const abMid = mid.connectors.find((c) => c.id === "ab")!;
+    const ySpread = Math.max(...abMid.waypoints.map((p) => p.y)) - Math.min(...abMid.waypoints.map((p) => p.y));
+    expect(ySpread, "the detached connector must NOT flee (bend) around the dragged task mid-drag").toBeLessThanOrEqual(2);
+
+    // Drop: the connector was still straight under the task, so it splits.
+    const out = reducer(mid, { type: "MOVE_END", payload: { id: "f" } } as never);
+    expect(out.connectors.some((c) => c.id === "ab")).toBe(false);
+    expect(out.connectors.some((c) => c.sourceId === "a" && c.targetId === "f")).toBe(true);
+    expect(out.connectors.some((c) => c.sourceId === "f" && c.targetId === "b")).toBe(true);
+  });
+
   it("splits via the source→target flow line even when obstacle avoidance re-picked the connector's sides (T0729)", () => {
     // Tasks are obstacles; while dragging a task onto a connector the router can
     // re-pick the connector's sides/offsets to route around it. Then BOTH the
