@@ -2144,6 +2144,13 @@ export function layoutBpmnDiagram(
   const DATA_VGAP = 20; // vertical gap when above/below the element
   // Track occupied quadrants per associated element so two data objects
   // sharing the same task don't stack on top of each other.
+  // Run TWICE: here (so R57 / R6.05 grow the lane to fit the data object) and
+  // AGAIN after the element-movement passes below — a data object is parented to
+  // the LANE, not to its activity, so when the activity is later shifted the
+  // data object wouldn't follow and would strand far from its element. The
+  // second pass re-hugs each data object to its associated element's FINAL
+  // position (Paul 2026-07-12).
+  function positionDataObjectsR802() {
   const usedQuadrants = new Map<string, Set<"UL" | "LL" | "UR" | "LR">>();
   for (const el of elements) {
     if (el.type !== "data-object") continue;
@@ -2190,6 +2197,8 @@ export function layoutBpmnDiagram(
       el.y = associated.y + associated.height + DATA_VGAP;
     }
   }
+  }
+  positionDataObjectsR802();
 
   // R8.03: Auto-position Data Stores near the elements they're connected
   // to. Different geometry from R8.02 because data stores frequently
@@ -3423,6 +3432,12 @@ export function layoutBpmnDiagram(
       placed.push(labelRect(e, chosen[0], chosen[1], lw, lh));
     }
   }
+
+  // Re-hug data objects to their associated element's FINAL position (activities
+  // may have moved during the gateway / start-end tightening passes above), then
+  // re-fit the lanes so any nudged data object is still enclosed.
+  positionDataObjectsR802();
+  fitLanesToChildren();
 
   phase(`connectors built (${connectors.length})`);
 

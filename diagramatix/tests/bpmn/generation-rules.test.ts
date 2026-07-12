@@ -69,6 +69,36 @@ describe("normaliseAiPlan generation rules (T0718)", () => {
     expect(plan.elements.find((e) => e.id === "t")!.pool).toBe(pool!.id);
   });
 
+  it("a data object stays adjacent to its associated activity after cross-lane placement (T0723)", () => {
+    // A gateway fanning across lanes moves activities during layout; a data
+    // object (parented to the lane, not the activity) must be re-hugged to its
+    // activity's FINAL position, not left stranded far away.
+    const els: AiElement[] = [
+      { id: "p", type: "pool", label: "P", poolType: "white-box" },
+      { id: "LA", type: "lane", label: "A", parentPool: "p" },
+      { id: "LB", type: "lane", label: "B", parentPool: "p" },
+      { id: "LC", type: "lane", label: "C", parentPool: "p" },
+      { id: "s", type: "start-event", label: "S", pool: "p", lane: "LA" },
+      { id: "g", type: "gateway", gatewayType: "exclusive", label: "?", pool: "p", lane: "LA" },
+      { id: "tb", type: "task", label: "B path", pool: "p", lane: "LB" },
+      { id: "tc", type: "task", label: "C path", pool: "p", lane: "LC" },
+      { id: "m", type: "gateway", gatewayType: "exclusive", label: "M", pool: "p", lane: "LA" },
+      { id: "tf", type: "task", label: "Finalise", pool: "p", lane: "LA" },
+      { id: "e", type: "end-event", label: "E", pool: "p", lane: "LA" },
+      { id: "do", type: "data-object", label: "Result", pool: "p", lane: "LA" },
+    ];
+    const conns: AiConnection[] = [
+      { sourceId: "s", targetId: "g" }, { sourceId: "g", targetId: "tb" }, { sourceId: "g", targetId: "tc" },
+      { sourceId: "tb", targetId: "m" }, { sourceId: "tc", targetId: "m" }, { sourceId: "m", targetId: "tf" },
+      { sourceId: "tf", targetId: "e" }, { sourceId: "tf", targetId: "do" }, // "Finalise" outputs "Result"
+    ];
+    const d = layoutBpmnDiagram(els, conns);
+    const dObj = d.elements.find((e) => e.id === "do")!;
+    const tf = d.elements.find((e) => e.id === "tf")!;
+    const dist = Math.hypot((dObj.x + dObj.width / 2) - (tf.x + tf.width / 2), (dObj.y + dObj.height / 2) - (tf.y + tf.height / 2));
+    expect(dist, `data object is ${Math.round(dist)}px from its activity (should hug it)`).toBeLessThan(170);
+  });
+
   it("gateway connectors attach at a diamond VERTEX (offset 0.5), even when a face is shared (T0721)", () => {
     // 4 branches force two flows onto one face — they must both sit ON the
     // vertex (0.5), NOT be spread mid-edge (0.333/0.667), which on a diamond
