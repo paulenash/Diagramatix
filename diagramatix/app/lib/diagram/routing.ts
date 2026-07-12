@@ -1531,14 +1531,17 @@ export function recomputeAllConnectors(
           if ((tgtNorm.dx !== 0 && appDx * (-tgtNorm.dx) <= 0) || (tgtNorm.dy !== 0 && appDy * (-tgtNorm.dy) <= 0)) outwardOk = false;
         }
         // Check if preserved interior routing passes through any obstacle.
-        // Same set as the main routing pass: only BPMN flow-node types are
-        // obstacles for sequence flow, edge-mounted events are excluded,
-        // and EPs containing source or target at any depth are excluded.
+        // MUST match the main routing pass (SEQ_OBSTACLE_TYPES): only BPMN
+        // flow-node types are obstacles for sequence flow; edge-mounted events
+        // are excluded, and EPs containing source or target at any depth are
+        // excluded. Data Objects and Data Stores are NOT obstacles (Paul's
+        // 2026-06-10 rule) — a route may pass a data artifact without detouring;
+        // including them here (a prior inconsistency) rejected valid routes and
+        // left a gap around data stores.
         const SEQ_OBS = new Set<string>([
           "task", "subprocess", "subprocess-expanded",
           // Intermediate events excluded (like gateways) — they sit ON the flow.
           "start-event", "end-event",
-          "data-object", "data-store",
         ]);
         function ancestorsOfPreserve(elementId: string): Set<string> {
           const result = new Set<string>();
