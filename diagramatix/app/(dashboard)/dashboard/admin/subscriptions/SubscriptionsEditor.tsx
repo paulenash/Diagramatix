@@ -218,9 +218,9 @@ export function SubscriptionsEditor({ initialTiers }: { initialTiers: TierRow[] 
           the user, the matching OrgAdmin tile is greyed out, and its entry API
           routes return 403. The <strong>Stripe Price ID</strong> row links each
           paid tier to its recurring price in Stripe (paste the <code>price_…</code>
-          id from the Stripe dashboard); prices/limits/features are re-seeded on
-          every deploy from <code>scripts/seed-subscriptions.ts</code>, but the
-          Stripe Price IDs you set here are preserved.
+          id from the Stripe dashboard). Everything on this page is the single
+          source of truth — your saved values persist across releases (they are
+          NOT reset on deploy).
         </p>
 
         <div className="bg-white rounded-md border border-gray-200 overflow-x-auto">
