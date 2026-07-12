@@ -7618,6 +7618,24 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         for (let i = 0; i < pts.length - 1; i++) if (segHit(pts[i], pts[i + 1])) return true;
         return false;
       };
+      // Diagnostics: distance from the dropped element's CENTRE to each live
+      // route, to reveal which connector the user aimed at and how far it ended
+      // up (obstacle avoidance may have pushed it out of reach).
+      const fCx = fRect.x + fRect.w / 2, fCy = fRect.y + fRect.h / 2;
+      const distToSegPt = (p1: Point, p2: Point): number => {
+        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+        const len2 = dx * dx + dy * dy;
+        let tt = len2 > 0 ? ((fCx - p1.x) * dx + (fCy - p1.y) * dy) / len2 : 0;
+        tt = Math.max(0, Math.min(1, tt));
+        return Math.hypot(fCx - (p1.x + tt * dx), fCy - (p1.y + tt * dy));
+      };
+      const distToPath = (wps: Point[]): number => {
+        let best = Infinity;
+        const pts = wps.slice(1, -1);
+        for (let i = 0; i < pts.length - 1; i++) best = Math.min(best, distToSegPt(pts[i], pts[i + 1]));
+        return best;
+      };
+      let closest: { id: string; d: number; wps: Point[] } | null = null;
       let orig: Connector | null = null;
       let cleanWps: Point[] | null = null;
       for (const c of connectors) {
@@ -7626,6 +7644,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const s = ofMap.get(c.sourceId);
         const t = ofMap.get(c.targetId);
         if (!s || !t) continue;
+        if (splitTrace) {
+          const dLive = distToPath(c.waypoints);
+          if (!closest || dLive < closest.d) closest = { id: c.id, d: dLive, wps: c.waypoints };
+        }
         const clean = computeWaypoints(
           s, t, obstacleFreeEls, c.sourceSide, c.targetSide, c.routingType,
           c.sourceOffsetAlong ?? 0.5, c.targetOffsetAlong ?? 0.5,
@@ -7647,6 +7669,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         if (hClean || hLive || hFlow) { orig = c; cleanWps = clean; break; }
       }
       if (!orig || !cleanWps) {
+        if (closest) {
+          dlog(`  CLOSEST live route: ${closest.id} at ${Math.round(closest.d)}px from the drop centre (${Math.round(fCx)},${Math.round(fCy)}); its waypoints=${JSON.stringify(closest.wps.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) })))}`);
+        }
         dlog(`RESULT: no split — the dropped element overlapped none of the sequence connectors (by fresh route, live route, or flow line)`);
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
