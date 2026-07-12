@@ -165,6 +165,19 @@ jobs:
         # is swapped — preventing the "new code, old schema" failure.
         run: npx prisma db push --accept-data-loss --url "$DATABASE_URL"
 
+      - name: Seed subscription tiers (prices, limits, feature access)
+        working-directory: ./diagramatix
+        # Idempotent upsert of the four canonical tiers — declares the prices,
+        # numeric limits, and per-tier FEATURE ACCESS (Simulator / Process
+        # Mining / Risk-Control+Compliance / APQC) as source-of-truth so the
+        # marketing pricing page + entitlement gates match on every release.
+        # Does NOT touch stripePriceId (SuperAdmin sets those in the editor and
+        # they survive re-seeds). Non-blocking so a hiccup can't abort deploy.
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+        run: npx --yes tsx@4 scripts/seed-subscriptions.ts
+
       - name: Seed simulator example catalog
         working-directory: ./diagramatix
         # Non-blocking: the catalog is nice-to-have content, never a release

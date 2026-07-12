@@ -42,6 +42,12 @@ type TierSeed = {
   maxBulkExports: number | null;
   maxBulkImports: number | null;
   trialDays: number | null;
+  // Feature entitlements (SuperAdmin-allocatable per tier). riskControl covers
+  // Risk-Control Matrix AND Compliance Monitoring.
+  hasSimulator: boolean;
+  hasProcessMining: boolean;
+  hasRiskControl: boolean;
+  hasApqc: boolean;
 };
 
 const TIERS: TierSeed[] = [
@@ -61,9 +67,10 @@ const TIERS: TierSeed[] = [
     maxBulkExports: 0,
     maxBulkImports: 0,
     trialDays: 30,                          // Free is time-limited to 30 days from signup
+    hasSimulator: false, hasProcessMining: false, hasRiskControl: false, hasApqc: false,
   },
   {
-    id: "introductory", name: "Introductory", priceMonthly: 7000, sortOrder: 1,
+    id: "introductory", name: "Introductory", priceMonthly: 5000, sortOrder: 1,
     maxProjects: 5,
     maxDiagramsPerTypePerProject: 10,
     maxArchimateDiagramsTotal: 2,
@@ -75,6 +82,7 @@ const TIERS: TierSeed[] = [
     maxBulkExports: 2,
     maxBulkImports: 2,
     trialDays: null,
+    hasSimulator: false, hasProcessMining: false, hasRiskControl: false, hasApqc: false,
   },
   {
     id: "professional", name: "Professional", priceMonthly: 15000, sortOrder: 2,
@@ -89,6 +97,7 @@ const TIERS: TierSeed[] = [
     maxBulkExports: null,
     maxBulkImports: null,
     trialDays: null,
+    hasSimulator: false, hasProcessMining: false, hasRiskControl: false, hasApqc: true,
   },
   {
     id: "expert", name: "Expert", priceMonthly: 27000, sortOrder: 3,
@@ -103,6 +112,7 @@ const TIERS: TierSeed[] = [
     maxBulkExports: null,
     maxBulkImports: null,
     trialDays: null,
+    hasSimulator: true, hasProcessMining: true, hasRiskControl: true, hasApqc: true,
   },
 ];
 

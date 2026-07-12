@@ -209,6 +209,19 @@ export function SubscriptionsEditor({ initialTiers }: { initialTiers: TierRow[] 
           lifetime totals). SuperAdmin users (per <code>SUPERUSER_EMAILS</code>)
           are never enforced, regardless of these values.
         </p>
+        <p className="text-xs text-gray-500 mb-4 max-w-3xl">
+          <strong>Feature access</strong> (bottom rows) allocates the four major
+          features to each tier: <em>Simulator</em>, <em>Process Mining</em>,
+          <em>Risk &amp; Control + Compliance</em> (one toggle covers both), and
+          the <em>APQC Catalog</em>. When a tier doesn&apos;t include a feature,
+          that feature&apos;s launch buttons and example galleries are hidden for
+          the user, the matching OrgAdmin tile is greyed out, and its entry API
+          routes return 403. The <strong>Stripe Price ID</strong> row links each
+          paid tier to its recurring price in Stripe (paste the <code>price_…</code>
+          id from the Stripe dashboard); prices/limits/features are re-seeded on
+          every deploy from <code>scripts/seed-subscriptions.ts</code>, but the
+          Stripe Price IDs you set here are preserved.
+        </p>
 
         <div className="bg-white rounded-md border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm">
