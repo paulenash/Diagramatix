@@ -12,7 +12,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       },
       "id": "_default_pool",
       "master": "300",
-      "nameU": "Process",
+      "nameU": "Company",
       "type": "pool",
     },
     {
@@ -166,7 +166,7 @@ exports[`Visio export — golden structural snapshots > linear flow 1`] = `
       },
       "id": "_default_pool",
       "master": "300",
-      "nameU": "Process",
+      "nameU": "Company",
       "type": "pool",
     },
     {

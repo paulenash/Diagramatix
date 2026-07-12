@@ -50,7 +50,7 @@ describe("normaliseAiPlan generation rules (T0718)", () => {
     expect(plan.elements.find((e) => e.id === "e")!.label).toBe("Application Received Today Now"); // unchanged
   });
 
-  it("wraps orphan lanes in a 'Process' pool and re-parents their elements", () => {
+  it("wraps orphan lanes in a 'Company' pool and re-parents their elements", () => {
     const plan = {
       elements: [
         { id: "l1", type: "lane", label: "Sales" },
@@ -62,11 +62,56 @@ describe("normaliseAiPlan generation rules (T0718)", () => {
     normaliseAiPlan(plan);
     const pool = plan.elements.find((e) => e.type === "pool");
     expect(pool).toBeTruthy();
-    expect(pool!.label).toBe("Process");
+    expect(pool!.label).toBe("Company");
     expect(pool!.poolType).toBe("white-box");
     expect(plan.elements.find((e) => e.id === "l1")!.parentPool).toBe(pool!.id);
     expect(plan.elements.find((e) => e.id === "l2")!.parentPool).toBe(pool!.id);
     expect(plan.elements.find((e) => e.id === "t")!.pool).toBe(pool!.id);
+  });
+
+  it("injects a Company pool when lanes reference a pool the AI never emitted (dangling parentPool) (T0736)", () => {
+    // The AI generated lanes with parentPool: "p1" but forgot to include the p1
+    // pool element — the old rule (which only caught lanes with NO reference)
+    // missed this, leaving the lanes with a dangling pool. Every lane must still
+    // end up inside a real pool.
+    const plan = {
+      elements: [
+        { id: "l1", type: "lane", label: "Any Employee", parentPool: "p1" },
+        { id: "l2", type: "lane", label: "Manager", parentPool: "p1" },
+        { id: "t1", type: "task", label: "Submit", pool: "p1", lane: "l1" },
+        { id: "t2", type: "task", label: "Approve", pool: "p1", lane: "l2" },
+      ] as AiElement[],
+      connections: [] as AiConnection[],
+    };
+    normaliseAiPlan(plan);
+    const pools = plan.elements.filter((e) => e.type === "pool");
+    expect(pools).toHaveLength(1);
+    const pool = pools[0];
+    expect(pool.label).toBe("Company");
+    expect(pool.poolType).toBe("white-box");
+    // Both lanes now belong to the injected pool (not the missing "p1").
+    for (const id of ["l1", "l2"]) {
+      expect(plan.elements.find((e) => e.id === id)!.parentPool).toBe(pool.id);
+    }
+    // Flow elements that pointed at the missing pool are re-homed.
+    for (const id of ["t1", "t2"]) {
+      expect(plan.elements.find((e) => e.id === id)!.pool).toBe(pool.id);
+    }
+  });
+
+  it("leaves lanes alone when their pool DOES exist (no spurious injection)", () => {
+    const plan = {
+      elements: [
+        { id: "p1", type: "pool", label: "Acme", poolType: "white-box" },
+        { id: "l1", type: "lane", label: "Sales", parentPool: "p1" },
+        { id: "t", type: "task", label: "Do", pool: "p1", lane: "l1" },
+      ] as AiElement[],
+      connections: [] as AiConnection[],
+    };
+    normaliseAiPlan(plan);
+    expect(plan.elements.filter((e) => e.type === "pool")).toHaveLength(1);
+    expect(plan.elements.find((e) => e.type === "pool")!.id).toBe("p1");
+    expect(plan.elements.find((e) => e.id === "l1")!.parentPool).toBe("p1");
   });
 
   it("data associations do NOT affect flow column placement (T0724)", () => {

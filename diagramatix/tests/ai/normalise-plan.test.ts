@@ -98,15 +98,22 @@ describe("normaliseAiPlan — field back-filling", () => {
   });
 
   it("back-fills a lane's pool from parentPool", () => {
-    const p = plan([{ id: "l1", type: "lane", label: "Sales", parentPool: "p1" }]);
+    // Pool present so this exercises the back-fill, not the orphan-lane injection.
+    const p = plan([
+      { id: "p1", type: "pool", label: "Acme", poolType: "white-box" },
+      { id: "l1", type: "lane", label: "Sales", parentPool: "p1" },
+    ]);
     normaliseAiPlan(p);
-    expect(p.elements[0].pool).toBe("p1");
+    expect(p.elements.find((e) => e.id === "l1")!.pool).toBe("p1");
   });
 
   it("does not overwrite an existing pool on a lane", () => {
-    const p = plan([{ id: "l1", type: "lane", label: "Sales", pool: "px", parentPool: "p1" }]);
+    const p = plan([
+      { id: "p1", type: "pool", label: "Acme", poolType: "white-box" },
+      { id: "l1", type: "lane", label: "Sales", pool: "px", parentPool: "p1" },
+    ]);
     normaliseAiPlan(p);
-    expect(p.elements[0].pool).toBe("px");
+    expect(p.elements.find((e) => e.id === "l1")!.pool).toBe("px");
   });
 });
 

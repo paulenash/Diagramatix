@@ -236,17 +236,28 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
     }
   }
 
-  // Every set of Lanes must have a containing Pool. A lane with NO pool
-  // reference at all (neither parentPool nor pool — the pool wasn't present in
-  // the original) is wrapped, with its siblings, in a single white-box pool
-  // named "Process" (Paul 2026-07-12). Lanes that reference a pool id are left
-  // alone (the back-fill above handles them). Idempotent: once the lanes point
-  // at the pool it won't fire again (the plan → apply-layout double-pass is safe).
-  const orphanLanes = parsed.elements.filter((e) =>
-    e.type === "lane" && !e.parentPool && !e.pool);
+  // Every set of Lanes MUST have a containing Pool. A lane is an "orphan" when
+  // it has NO pool reference at all OR its parentPool/pool points at a pool the
+  // AI never actually emitted (a dangling reference — the AI generated lanes for
+  // a pool it forgot to include). Both cases leave the lanes with no real pool,
+  // so we wrap all orphan lanes in a single white-box pool named "Company"
+  // (Paul 2026-07-12). Idempotent: once the lanes point at the injected pool it
+  // won't fire again (the plan → apply-layout double-pass is safe).
+  const poolIds = new Set(parsed.elements.filter((e) => e.type === "pool").map((e) => e.id));
+  const laneRef = (e: AiElement) => e.parentPool ?? e.pool;
+  const orphanLanes = parsed.elements.filter((e) => {
+    if (e.type !== "lane") return false;
+    const ref = laneRef(e);
+    return !ref || !poolIds.has(ref);
+  });
   if (orphanLanes.length > 0) {
     const POOL_ID = "auto-process-pool";
-    const orphanIds = new Set(orphanLanes.map((l) => l.id));
+    const orphanLaneIds = new Set(orphanLanes.map((l) => l.id));
+    // Any pool id the orphan lanes were pointing at doesn't exist — flow
+    // elements referencing the same missing pool must be re-homed too.
+    const danglingPoolIds = new Set(
+      orphanLanes.map(laneRef).filter((r): r is string => !!r && !poolIds.has(r)),
+    );
     // If every orphan lane carries drawn geometry (image import), give the pool
     // the union box so the preserved layout has a pool to place the lanes in.
     const boxes = orphanLanes.map((l) => l.bounds).filter(Boolean) as { x: number; y: number; w: number; h: number }[];
@@ -258,12 +269,16 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
       const btm = Math.max(...boxes.map((b) => b.y + b.h));
       bounds = { x, y, w: r - x, h: btm - y };
     }
-    const pool: AiElement = { id: POOL_ID, type: "pool", label: "Process", poolType: "white-box", ...(bounds ? { bounds } : {}) };
+    const pool: AiElement = { id: POOL_ID, type: "pool", label: "Company", poolType: "white-box", ...(bounds ? { bounds } : {}) };
     parsed.elements.unshift(pool);
-    for (const l of orphanLanes) l.parentPool = POOL_ID;
-    // Flow elements that live in an orphan lane now belong to the new pool.
+    for (const l of orphanLanes) { l.parentPool = POOL_ID; l.pool = POOL_ID; }
+    // Re-home flow elements: those in an orphan lane, or those directly pointing
+    // at a missing pool id, now belong to the injected pool.
     for (const e of parsed.elements) {
-      if (e.lane && orphanIds.has(e.lane)) e.pool = POOL_ID;
+      if (e.type === "pool" || e.type === "lane") continue;
+      if ((e.lane && orphanLaneIds.has(e.lane)) || (e.pool && danglingPoolIds.has(e.pool))) {
+        e.pool = POOL_ID;
+      }
     }
   }
 }

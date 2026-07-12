@@ -615,7 +615,7 @@ export function layoutBpmnDiagram(
   if (pools.length === 0) {
     const defaultPoolId = "_default_pool";
     const defaultPool: AiElement = {
-      id: defaultPoolId, type: "pool", label: "Process", poolType: "white-box",
+      id: defaultPoolId, type: "pool", label: "Company", poolType: "white-box",
     };
     aiElements = [defaultPool, ...aiElements];
     for (const el of aiElements) {
