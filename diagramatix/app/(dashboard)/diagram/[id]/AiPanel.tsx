@@ -123,17 +123,24 @@ export function AiPanel({
   const [listening, setListening] = useState(false);
   const [dictEngine, setDictEngine] = useState<"deepgram" | "browser" | null>(null);
   const dictRef = useRef<DictationHandle | null>(null);
+  // startDictation is async (token fetch + getUserMedia permission prompt).
+  // If the user clicks Stop DURING that window, dictRef is still null so the
+  // stop is a no-op and the resolving handle would leave an orphaned live mic.
+  // This flag records the pending Stop so we tear the handle down on arrival.
+  const stopRequestedRef = useRef(false);
   const speechSupported = typeof window !== "undefined"
     && (!!navigator.mediaDevices?.getUserMedia || !!(window.SpeechRecognition || window.webkitSpeechRecognition));
 
   async function toggleDictation() {
     if (listening) {
+      stopRequestedRef.current = true;
       dictRef.current?.stop();
       dictRef.current = null;
       setListening(false);
       setDictEngine(null);
       return;
     }
+    stopRequestedRef.current = false;
     setListening(true);
     setError(null);
     const handle = await startDictation({
@@ -146,6 +153,14 @@ export function AiPanel({
       onEnd: () => { dictRef.current = null; setListening(false); setDictEngine(null); },
     });
     if (!handle) { setListening(false); setDictEngine(null); return; }
+    // Stop was pressed while we were still starting → don't leave it running.
+    if (stopRequestedRef.current) {
+      stopRequestedRef.current = false;
+      handle.stop();
+      setListening(false);
+      setDictEngine(null);
+      return;
+    }
     dictRef.current = handle;
   }
 

@@ -53,6 +53,9 @@ export function GuideEditor({ value, onChange }: { value: string; onChange: (md:
   const [dictEngine, setDictEngine] = useState<"deepgram" | "browser" | null>(null);
   const [showMicTest, setShowMicTest] = useState(false);
   const dictRef = useRef<DictationHandle | null>(null);
+  // startDictation is async; a Stop pressed before the handle resolves would
+  // otherwise leave an orphaned live mic (see toggleDictation).
+  const stopRequestedRef = useRef(false);
   const mic = useMicTest();
 
   const editor = useEditor({
@@ -106,7 +109,15 @@ export function GuideEditor({ value, onChange }: { value: string; onChange: (md:
 
   async function toggleDictation() {
     if (!editor) return;
-    if (listening) { dictRef.current?.stop(); return; }
+    if (listening) {
+      stopRequestedRef.current = true;
+      dictRef.current?.stop();
+      dictRef.current = null;
+      setListening(false);
+      setDictEngine(null);
+      return;
+    }
+    stopRequestedRef.current = false;
     setListening(true);
     const h = await startDictation({
       onText: (t) => editor.chain().focus().insertContent(`${t} `).run(),
@@ -114,6 +125,14 @@ export function GuideEditor({ value, onChange }: { value: string; onChange: (md:
       onEnd: () => { dictRef.current = null; setListening(false); setDictEngine(null); },
     });
     if (!h) { setListening(false); setDictEngine(null); return; }
+    // Stop was pressed while we were still starting → don't leave it running.
+    if (stopRequestedRef.current) {
+      stopRequestedRef.current = false;
+      h.stop();
+      setListening(false);
+      setDictEngine(null);
+      return;
+    }
     dictRef.current = h;
   }
 

@@ -258,11 +258,17 @@ export function PlanPanel({
   const [dictateMsg, setDictateMsg] = useState<string | null>(null);
   const [audioPhase, setAudioPhase] = useState<null | "transcribing" | "reading" | "tidying">(null);
   const dictRef = useRef<DictationHandle | null>(null);
+  // startDictation is async (token fetch + getUserMedia permission prompt).
+  // If the user clicks Stop DURING that window, dictRef is still null so the
+  // stop is a no-op and the resolving handle would leave an orphaned live mic.
+  // This flag records the pending Stop so we tear the handle down on arrival.
+  const stopRequestedRef = useRef(false);
   const speechSupported = typeof window !== "undefined"
     && (!!navigator.mediaDevices?.getUserMedia || !!(window.SpeechRecognition || window.webkitSpeechRecognition));
 
   async function toggleDictation() {
     if (listening) {
+      stopRequestedRef.current = true;
       dictRef.current?.stop();
       dictRef.current = null;
       setListening(false);
@@ -270,6 +276,7 @@ export function PlanPanel({
       return;
     }
     if (!speechSupported) return;
+    stopRequestedRef.current = false;
     setDictateMsg(null);
     setListening(true);
     const handle = await startDictation({
@@ -282,6 +289,14 @@ export function PlanPanel({
       onEnd: () => { dictRef.current = null; setListening(false); setDictEngine(null); },
     });
     if (!handle) { setListening(false); setDictEngine(null); return; }
+    // Stop was pressed while we were still starting → don't leave it running.
+    if (stopRequestedRef.current) {
+      stopRequestedRef.current = false;
+      handle.stop();
+      setListening(false);
+      setDictEngine(null);
+      return;
+    }
     dictRef.current = handle;
   }
 
