@@ -96,6 +96,9 @@ export function AiPanel({
   const [attachment, setAttachment] = useState<{ name: string; type: string; data: string; mediaType?: string } | null>(null);
   const [showAttachPreview, setShowAttachPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Natural pixel dimensions of an attached image — lets the preserved layout
+  // (reproduce a diagram from an image) keep the source's proportions.
+  const imageDimsRef = useRef<{ w: number; h: number } | null>(null);
 
   // Image MIME types accepted for vision input (reproduce a diagram from a photo/screenshot).
   const IMAGE_TYPES: Record<string, string> = {
@@ -121,11 +124,19 @@ export function AiPanel({
       // Vision input — a photo/screenshot of a diagram to reproduce.
       const buffer = await file.arrayBuffer();
       const base64 = arrayBufferToBase64(buffer);
-      setAttachment({ name: file.name, type: "image", data: base64, mediaType: IMAGE_TYPES[file.type] });
+      const mediaType = IMAGE_TYPES[file.type];
+      setAttachment({ name: file.name, type: "image", data: base64, mediaType });
+      // Capture natural dimensions for aspect-preserving reproduction.
+      imageDimsRef.current = null;
+      try {
+        const img = new window.Image();
+        img.onload = () => { imageDimsRef.current = { w: img.naturalWidth, h: img.naturalHeight }; };
+        img.src = `data:${mediaType};base64,${base64}`;
+      } catch { /* dims optional */ }
       setError(null);
       setPrompt(prev => prev.trim().length > 0
         ? prev
-        : `Reproduce the diagram in the attached image (${file.name}) exactly — every shape, label and transition.`);
+        : `Reproduce the diagram in the attached image (${file.name}) exactly — every shape, label and transition, in its original layout.`);
     } else {
       // Read as text for .txt, .md, .csv, .doc, .rtf, etc.
       const text = await file.text();
@@ -297,9 +308,13 @@ export function AiPanel({
         }
         setStatus(`Generated ${result.elementCount} elements, ${result.connectionCount} connections`);
       } else {
-        // Generic: apply simple layout to parsed elements
+        // Generic: apply simple layout to parsed elements. Pass the attached
+        // image's aspect so a state machine reproduced from an image keeps the
+        // source proportions (preserved-layout path in layoutGenericDiagram).
         const { layoutGenericDiagram } = await import("@/app/lib/diagram/genericLayout");
-        const diagramData = layoutGenericDiagram(result.parsed, diagramType);
+        const diagramData = layoutGenericDiagram(result.parsed, diagramType, {
+          imageAspect: attachment?.type === "image" ? imageDimsRef.current ?? undefined : undefined,
+        });
         result.diagramData = diagramData;
         result.elementCount = diagramData.elements.length;
         result.connectionCount = diagramData.connectors.length;

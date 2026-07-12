@@ -7,7 +7,7 @@ import type { DiagramData, DiagramElement, Connector, Point, Side } from "./type
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
 import { CHEVRON_THEMES } from "./chevronThemes";
-import { layoutStateMachine } from "./stateMachineLayout";
+import { layoutStateMachine, layoutStateMachinePreserved } from "./stateMachineLayout";
 
 // Value chain AI rule: when a Value Chain contains collapsed
 // processes, pick a random Colour Theme from the catalogue and apply
@@ -182,9 +182,22 @@ interface AiParsed {
 export function layoutGenericDiagram(
   parsed: AiParsed,
   diagramType: string,
+  opts?: { imageAspect?: { w: number; h: number } },
 ): DiagramData {
   const aiElements = parsed.elements ?? [];
   const aiConnections = parsed.connections ?? [];
+
+  // State machine reproduced FROM AN IMAGE: when the AI emitted per-element
+  // `bounds`, honour the original placement, Composite-State nesting and
+  // connector faces instead of re-flowing. Falls through to auto-layout when
+  // the geometry is missing/unusable.
+  if (diagramType === "state-machine"
+      && aiElements.some((e) => e.bounds && typeof e.bounds === "object")) {
+    const preserved = layoutStateMachinePreserved(
+      aiElements as never, aiConnections as never, opts?.imageAspect,
+    );
+    if (preserved) return preserved;
+  }
 
   // Context diagrams: special circular layout
   if (diagramType === "context" || diagramType === "basic") {
