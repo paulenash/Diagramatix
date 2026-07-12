@@ -7456,6 +7456,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "MOVE_END": {
       const { id } = action.payload;
       const initialEl = state.elements.find(e => e.id === id);
+      if (typeof window !== "undefined" && (window as unknown as { __DIAG_SPLIT?: boolean }).__DIAG_SPLIT === true) {
+        console.log(`[__DIAG_SPLIT] MOVE_END fired id=${id} type=${initialEl?.type ?? "?"} label="${initialEl?.label ?? ""}"`);
+      }
       if (!initialEl) return state;
 
       // Boundary-event attach happens at DROP only (mid-drag attach was

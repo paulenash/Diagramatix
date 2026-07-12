@@ -2120,6 +2120,9 @@ export function SymbolRenderer({
         if (dragStartedFlag) return;
         window.removeEventListener("mousemove", onPreMove);
         window.removeEventListener("mouseup", onPreUp);
+        if (typeof window !== "undefined" && (window as unknown as { __DIAG_SPLIT?: boolean }).__DIAG_SPLIT === true) {
+          console.log(`[__DIAG_SPLIT] pointer UP without drag (moved <4px) type=${element.type} → ${wasSelected ? "connection mode" : "select only"} (no move, no split)`);
+        }
         if (wasSelected && onEnterConnectionMode) onEnterConnectionMode();
       };
       window.addEventListener("mousemove", onPreMove);
@@ -2185,6 +2188,9 @@ export function SymbolRenderer({
         stopAutoScroll();
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
+        if (typeof window !== "undefined" && (window as unknown as { __DIAG_SPLIT?: boolean }).__DIAG_SPLIT === true) {
+          console.log(`[__DIAG_SPLIT] drag END (GROUP) type=${element.type} → onGroupMoveEnd() (group path never splits a connector)`);
+        }
         onGroupMoveEnd?.();
       }
 
@@ -2224,7 +2230,11 @@ export function SymbolRenderer({
       window.removeEventListener("mouseup", onMouseUp);
       window.removeEventListener("keydown", onKeyDown);
       setShiftEscaping(false);
-      if (shouldSnapBack?.(lastX, lastY)) {
+      const snapBack = shouldSnapBack?.(lastX, lastY);
+      if (typeof window !== "undefined" && (window as unknown as { __DIAG_SPLIT?: boolean }).__DIAG_SPLIT === true) {
+        console.log(`[__DIAG_SPLIT] drag END (single) type=${element.type} label="${element.label ?? ""}" droppedAt=(${Math.round(lastX)},${Math.round(lastY)}) snapBack=${!!snapBack} → ${snapBack ? "onMove(revert), NO onMoveEnd" : "onMoveEnd()"}`);
+      }
+      if (snapBack) {
         onMove(origX, origY);
       } else {
         onMoveEnd?.();
