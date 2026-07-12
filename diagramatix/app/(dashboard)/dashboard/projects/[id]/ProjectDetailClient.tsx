@@ -362,6 +362,7 @@ interface Props {
   impersonationMode?: "view" | "edit";
   isAdmin?: boolean;
   hasMicrosoft?: boolean;
+  entitlements?: import("@/app/lib/subscription").Entitlements;
 }
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[] = [
@@ -375,8 +376,11 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "flowchart", label: "Standard Flowchart", description: "Classic black-and-white flowchart with terminators, processes, decisions, and flowlines" },
 ];
 
-export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft }: Props) {
+export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft, entitlements }: Props) {
   const router = useRouter();
+  // Per-tier feature access (SuperAdmin → all true). Absent → all-on so nothing
+  // is hidden by accident on a legacy/unseeded profile.
+  const ent = entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true };
   const pcfColors = usePcfLevelColors();
   // SuperAdmin "presentation mode" — double-click the logo to hide the SuperAdmin
   // chip + the Org reassign dropdown. No-op for non-SuperAdmins.
@@ -454,7 +458,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   // opens the Risk & Control console straight away rather than the bare project.
   useEffect(() => {
     try {
-      if (new URLSearchParams(window.location.search).get("rcm") === "1") setShowRcm(true);
+      if (ent.riskControl && new URLSearchParams(window.location.search).get("rcm") === "1") setShowRcm(true);
     } catch { /* ignore */ }
   }, []);
   // When the Simulator was launched from the MINER, exiting it returns to the
@@ -2435,6 +2439,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               >
                 + New Diagram
               </button>
+              {ent.apqc && (
               <button
                 onClick={() => setShowPcfCreate(true)}
                 className="px-3 py-1 text-xs font-medium rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50"
@@ -2442,6 +2447,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               >
                 ◎ Create APQC Process
               </button>
+              )}
+              {ent.simulator && (
               <button
                 onClick={() => setShowSim(true)}
                 className="px-3 py-1 text-xs font-medium rounded-md border text-green-700 border-green-400 hover:bg-green-50"
@@ -2449,6 +2456,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               >
                 {"◈"} Simulator
               </button>
+              )}
+              {ent.processMining && (
               <button
                 onClick={() => setShowMining(true)}
                 className="px-3 py-1 text-xs font-medium rounded-md border text-amber-700 border-amber-400 hover:bg-amber-50"
@@ -2456,6 +2465,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               >
                 {"⛏"} Process Mining
               </button>
+              )}
+              {ent.riskControl && (
               <button
                 onClick={() => setShowRcm(true)}
                 className="px-3 py-1 text-xs font-medium rounded-md border text-blue-700 border-blue-400 hover:bg-blue-50"
@@ -2463,6 +2474,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               >
                 {"◆"} Risk & Controls
               </button>
+              )}
             </>
           )}
           <a href="/help" className="text-xs text-blue-600 hover:underline ml-1" title="User Guide">User Guide</a>
@@ -2505,11 +2517,13 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             </select>
           </div>
           <ProjectStructureSection projectId={project.id} canEdit={!readOnly} />
+          {ent.riskControl && (
           <button onClick={() => setShowRcm(true)}
             className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-medium text-blue-800 hover:bg-blue-50 border-b border-gray-100">
             <span>◆ Risk &amp; Controls <span className="text-gray-400 ml-1">— catalog + Risk-Control Matrix</span></span>
             <span className="text-blue-500">open ⤢</span>
           </button>
+          )}
           <div className="overflow-y-auto p-2 flex-1">
             {renderFolder(ROOT_ID, 0)}
           </div>

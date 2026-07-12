@@ -1,11 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import type { Entitlements, FeatureKey } from "@/app/lib/subscription";
 
 interface MenuCard {
   href: string;
   title: string;
   description: string;
+  /** When set, the tile is greyed + non-clickable unless the Org's
+   *  subscription includes this feature. */
+  featureKey?: FeatureKey;
 }
 
 const CARDS: MenuCard[] = [
@@ -62,18 +66,21 @@ const CARDS: MenuCard[] = [
     title: "Risk & Control Catalog",
     description:
       "Master library of Risks and Controls that projects adopt, attach to process steps and export as a Risk-Control Matrix.",
+    featureKey: "riskControl",
   },
   {
     href: "/dashboard/compliance?from=/dashboard/org-admin",
     title: "Compliance Monitoring",
     description:
       "How well your controls are operating over time — effectiveness trends and alerts assembled from DiagramatixMINER runs across every project.",
+    featureKey: "riskControl",
   },
   {
     href: "/dashboard/admin/pcf?from=/dashboard/org-admin",
     title: "Process Classification (APQC PCF)",
     description:
       "Browse the APQC Process Classification Framework — the Cross-Industry standard and industry variants — to classify and structure your processes.",
+    featureKey: "apqc",
   },
   {
     href: "/dashboard/diagram-type-sort-order?from=/dashboard/org-admin",
@@ -87,8 +94,9 @@ const CARDS: MenuCard[] = [
  * Pure presentation. The page-level server component handles auth +
  * role gating; this just renders the menu and the back link.
  */
-export function OrgAdminClient({ orgName }: { orgName: string }) {
+export function OrgAdminClient({ orgName, entitlements }: { orgName: string; entitlements?: Entitlements }) {
   const router = useRouter();
+  const ent: Entitlements = entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true };
 
   return (
     <div className="h-screen dgx-dashboard-bg flex flex-col overflow-hidden">
@@ -114,20 +122,42 @@ export function OrgAdminClient({ orgName }: { orgName: string }) {
           back link there returns you here.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {CARDS.map((card) => (
-            <a
-              key={card.href}
-              href={card.href}
-              className="block bg-white border border-orange-300 rounded-md p-4 hover:bg-orange-50 hover:border-orange-400 transition-colors"
-            >
-              <h2 className="text-sm font-semibold text-orange-700">
-                {card.title}
-              </h2>
-              <p className="text-xs text-gray-600 mt-1.5 leading-snug">
-                {card.description}
-              </p>
-            </a>
-          ))}
+          {CARDS.map((card) => {
+            // Grey + disable a tile whose feature isn't in the Org's subscription.
+            const locked = card.featureKey ? !ent[card.featureKey] : false;
+            if (locked) {
+              return (
+                <div
+                  key={card.href}
+                  className="block bg-gray-50 border border-gray-200 rounded-md p-4 opacity-60 cursor-not-allowed select-none"
+                  title="Not included in your subscription"
+                  aria-disabled="true"
+                >
+                  <h2 className="text-sm font-semibold text-gray-500">
+                    {card.title}
+                  </h2>
+                  <p className="text-xs text-gray-400 mt-1.5 leading-snug">
+                    {card.description}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-2 italic">Not included in your subscription</p>
+                </div>
+              );
+            }
+            return (
+              <a
+                key={card.href}
+                href={card.href}
+                className="block bg-white border border-orange-300 rounded-md p-4 hover:bg-orange-50 hover:border-orange-400 transition-colors"
+              >
+                <h2 className="text-sm font-semibold text-orange-700">
+                  {card.title}
+                </h2>
+                <p className="text-xs text-gray-600 mt-1.5 leading-snug">
+                  {card.description}
+                </p>
+              </a>
+            );
+          })}
         </div>
       </main>
     </div>

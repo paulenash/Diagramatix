@@ -12,11 +12,39 @@
 import { NextResponse } from "next/server";
 import {
   checkLimit,
+  hasFeatureAccess,
   recordUsage as recordUsageLib,
+  FEATURE_LABELS,
   type CheckContext,
   type EventMetric,
+  type FeatureKey,
   type LimitMetric,
 } from "./subscription";
+
+/**
+ * Feature entitlement gate. Returns null when the user's tier includes the
+ * feature (SuperAdmins always pass). Returns a 403 NextResponse otherwise, with
+ * `metric: "feature"` and the offending feature key so the UI can distinguish a
+ * "not in your subscription" block from a usage-cap block.
+ *
+ * Use at the ENTRY route(s) of each gated feature (Simulator, Process Mining,
+ * Risk & Control / Compliance, APQC) so a locked feature can't be reached by
+ * calling the API directly.
+ */
+export async function gateFeature(
+  userId: string,
+  feature: FeatureKey,
+): Promise<NextResponse | null> {
+  if (await hasFeatureAccess(userId, feature)) return null;
+  return NextResponse.json(
+    {
+      error: `${FEATURE_LABELS[feature]} is not included in your subscription.`,
+      metric: "feature",
+      feature,
+    },
+    { status: 403 },
+  );
+}
 
 /**
  * Returns null when the user is permitted to proceed. Returns a

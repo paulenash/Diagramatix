@@ -53,6 +53,10 @@ interface TierInput {
   maxBulkImports?: number | null;
   trialDays?: number | null;
   stripePriceId?: string | null;
+  hasSimulator?: boolean;
+  hasProcessMining?: boolean;
+  hasRiskControl?: boolean;
+  hasApqc?: boolean;
 }
 
 export async function PUT(req: Request) {
@@ -110,6 +114,10 @@ export async function PUT(req: Request) {
       copy("maxBulkImports");
       copy("trialDays");
       copy("stripePriceId");
+      copy("hasSimulator");
+      copy("hasProcessMining");
+      copy("hasRiskControl");
+      copy("hasApqc");
 
       const row = await tx.subscriptionLevel.update({
         where: { id: t.id },

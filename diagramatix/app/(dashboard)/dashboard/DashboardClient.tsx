@@ -251,6 +251,12 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("dgx_hide_examples") === "1";
   });
+  // Per-tier feature entitlements (SuperAdmin → all true). When the snapshot is
+  // absent (legacy/unseeded) default to all-on so nothing is hidden by accident.
+  const ent = usageSnapshot?.entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true };
+  // The Hide-Examples toggle only makes sense if the profile includes at least
+  // one feature that HAS an examples gallery (Simulator / Mining / Risk-Control).
+  const hasAnyExampleFeature = ent.simulator || ent.processMining || ent.riskControl;
   const hasExamples = projects.some((p) => p.exampleType);
   const visibleProjects = hideExamples && hasExamples ? projects.filter((p) => !p.exampleType) : projects;
   const toggleHideExamples = () => setHideExamples((v) => {
@@ -1662,6 +1668,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       Deleted Diagrams
                     </a>
+                    {ent.simulator && (
                     <a
                       href="/dashboard/simulator-examples"
                       onClick={() => setFileMenuOpen(false)}
@@ -1670,6 +1677,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       Simulator Examples
                     </a>
+                    )}
+                    {ent.processMining && (
                     <a
                       href="/dashboard/mining-examples"
                       onClick={() => setFileMenuOpen(false)}
@@ -1678,6 +1687,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       Process Mining Examples
                     </a>
+                    )}
+                    {ent.riskControl && (
                     <a
                       href="/dashboard/risk-control-examples"
                       onClick={() => setFileMenuOpen(false)}
@@ -1686,6 +1697,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       Risk &amp; Control Examples
                     </a>
+                    )}
                     <div className="border-t border-gray-100" />
                     <button
                       onClick={() => { setFileMenuOpen(false); handleBackupDownload(); }}
@@ -1795,6 +1807,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           title="Projects"
           count={visibleProjects.length}
           titleAction={
+            // Hidden entirely when the profile has no examples-bearing feature.
+            hasAnyExampleFeature ? (
             <button
               onClick={toggleHideExamples}
               disabled={!hasExamples}
@@ -1805,6 +1819,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             >
               {hasExamples && hideExamples ? "Show Examples" : "Hide Examples"}
             </button>
+            ) : undefined
           }
           action={!readOnly ? (
             <div className="flex items-center gap-2">
@@ -1814,6 +1829,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               >
                 + New Project
               </button>
+              {ent.apqc && (
               <button
                 onClick={() => setShowPcfProject(true)}
                 className="px-3 py-1.5 rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs font-medium"
@@ -1821,6 +1837,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               >
                 ◎ Create APQC Project
               </button>
+              )}
             </div>
           ) : undefined}
         >
@@ -3116,6 +3133,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             >
               Open
             </button>
+            {ent.processMining && (
             <button
               onClick={() => { close(); setSkipMiningIntro(false); setMiningProject({ id: p.id, name: p.name }); }}
               className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
@@ -3123,6 +3141,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             >
               ⛏ Process Mining
             </button>
+            )}
             <button
               onClick={(e) => { close(); handleCloneProject(p.id, e); }}
               className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"

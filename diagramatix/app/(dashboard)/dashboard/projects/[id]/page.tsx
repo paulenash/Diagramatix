@@ -5,6 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { ProjectDetailClient } from "./ProjectDetailClient";
 import { getEffectiveUserId, isImpersonating, getImpersonationMode, isSuperuser } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId, getProjectAccess } from "@/app/lib/auth/orgContext";
+import { getEntitlements } from "@/app/lib/subscription";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -97,6 +98,10 @@ export default async function ProjectPage({ params }: Props) {
     ? await prisma.org.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
     : [];
 
+  // Feature entitlements for the effective user — gate the Simulator / Mining /
+  // Risk-Control / APQC launch buttons on this screen.
+  const entitlements = await getEntitlements(effectiveUserId);
+
   return (
     <ProjectDetailClient
       project={project}
@@ -110,6 +115,7 @@ export default async function ProjectPage({ params }: Props) {
       impersonationMode={impersonationMode}
       isAdmin={isSuperuser(session)}
       hasMicrosoft={!!(session as unknown as { hasMicrosoft?: boolean }).hasMicrosoft}
+      entitlements={entitlements}
     />
   );
 }

@@ -11,6 +11,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 import { validateRiskControlExamplePackage, type RiskControlExamplePackage } from "@/app/lib/riskControls/examplePackage";
 import { adoptRiskControlExample } from "@/app/lib/riskControls/adoptRiskControlExample";
 import { purgePriorExampleCopies } from "@/app/lib/examples/singleCopy";
@@ -20,6 +21,8 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(_req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const featureGate = await gateFeature(session.user.id, "riskControl");
+  if (featureGate) return featureGate;
   try {
     if (isReadOnlyImpersonation(session, await cookies())) {
       return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });

@@ -711,6 +711,17 @@ model SubscriptionLevel {
   // tier ID and refuses to start if it's missing for a paid tier.
   stripePriceId String?
 
+  // Per-tier feature entitlements — SuperAdmin allocates which major features
+  // a tier includes (dashboard/admin/subscriptions editor). When false, the
+  // feature's launch buttons + example galleries are hidden, the OrgAdmin tile
+  // is greyed, and the entry API routes return 403. Default true so no existing
+  // user loses access on migration; SuperAdmin then restricts per tier.
+  // riskControl covers BOTH the Risk-Control Matrix and Compliance Monitoring.
+  hasSimulator     Boolean @default(true)
+  hasProcessMining Boolean @default(true)
+  hasRiskControl   Boolean @default(true)
+  hasApqc          Boolean @default(true)
+
   users     User[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

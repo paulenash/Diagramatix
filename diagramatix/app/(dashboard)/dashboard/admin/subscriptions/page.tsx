@@ -36,6 +36,10 @@ export default async function SubscriptionsPage() {
     maxBulkImports: t.maxBulkImports,
     trialDays: t.trialDays,
     stripePriceId: t.stripePriceId,
+    hasSimulator: t.hasSimulator,
+    hasProcessMining: t.hasProcessMining,
+    hasRiskControl: t.hasRiskControl,
+    hasApqc: t.hasApqc,
   }));
 
   return <SubscriptionsEditor initialTiers={serialised} />;

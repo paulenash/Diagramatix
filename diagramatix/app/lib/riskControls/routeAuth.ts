@@ -7,6 +7,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireOrgAdminFor, requireProjectAccess, OrgContextError, type ProjectAccessRole } from "@/app/lib/auth/orgContext";
+import { gateFeature } from "@/app/lib/subscription-route";
 
 type Guard<T> = { error: NextResponse; ctx: null } | { error: null; ctx: T };
 
@@ -16,12 +17,25 @@ const fromErr = (err: unknown) => {
   throw err;
 };
 
+/** riskControl feature gate for a mutating Risk & Control / Compliance action.
+ *  Returns a 403 Guard when the caller's tier doesn't include the feature.
+ *  Applied on mutate only so passive loads (e.g. the diagram editor reading
+ *  element attachments) still work for users whose tier lacks the feature. */
+async function gateRiskControl(userId: string | undefined): Promise<{ error: NextResponse; ctx: null } | null> {
+  const fg = await gateFeature(userId ?? "", "riskControl");
+  return fg ? { error: fg, ctx: null } : null;
+}
+
 /** SuperAdmin OR Owner/Admin of the org. `mutate` blocks read-only impersonation. */
 export async function guardOrg(orgId: string, mutate: boolean): Promise<Guard<Record<string, never>>> {
   const session = await auth();
   const jar = await cookies();
   if (mutate && isReadOnlyImpersonation(session, jar)) return readonly();
-  try { await requireOrgAdminFor(session, jar, orgId); return { error: null, ctx: {} }; }
+  try {
+    await requireOrgAdminFor(session, jar, orgId);
+    if (mutate) { const g = await gateRiskControl(session?.user?.id); if (g) return g; }
+    return { error: null, ctx: {} };
+  }
   catch (err) { return fromErr(err); }
 }
 
@@ -30,7 +44,11 @@ export async function guardProject(projectId: string, role: ProjectAccessRole, m
   const session = await auth();
   const jar = await cookies();
   if (mutate && isReadOnlyImpersonation(session, jar)) return readonly();
-  try { const access = await requireProjectAccess(session, jar, projectId, role); return { error: null, ctx: { projectOrgId: access.projectOrgId } }; }
+  try {
+    const access = await requireProjectAccess(session, jar, projectId, role);
+    if (mutate) { const g = await gateRiskControl(session?.user?.id); if (g) return g; }
+    return { error: null, ctx: { projectOrgId: access.projectOrgId } };
+  }
   catch (err) { return fromErr(err); }
 }
 

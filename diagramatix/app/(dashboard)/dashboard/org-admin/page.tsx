@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
+import { getEntitlements } from "@/app/lib/subscription";
 import { OrgAdminClient } from "./OrgAdminClient";
 
 /**
@@ -31,5 +32,9 @@ export default async function OrgAdminPage() {
   const isOrgAdmin = membership?.role === "Owner" || membership?.role === "Admin";
   if (!isOrgAdmin) redirect("/dashboard");
 
-  return <OrgAdminClient orgName={membership?.org.name ?? "Your Org"} />;
+  // Feature entitlements for THIS OrgAdmin's own subscription — tiles whose
+  // feature isn't included are greyed out (non-clickable).
+  const entitlements = await getEntitlements(session.user.id);
+
+  return <OrgAdminClient orgName={membership?.org.name ?? "Your Org"} entitlements={entitlements} />;
 }

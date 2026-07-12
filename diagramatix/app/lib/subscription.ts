@@ -53,6 +53,56 @@ export type EventMetric = Extract<
   "aiAttempts" | "individualExports" | "individualImports" | "bulkExports" | "bulkImports"
 >;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-tier feature entitlements (SuperAdmin allocates which features a tier gets)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Major features that can be allocated per subscription tier. `riskControl`
+ *  covers BOTH the Risk-Control Matrix and Compliance Monitoring. */
+export type FeatureKey = "simulator" | "processMining" | "riskControl" | "apqc";
+
+export const FEATURE_KEYS: FeatureKey[] = ["simulator", "processMining", "riskControl", "apqc"];
+
+/** Human labels for the admin allocation matrix / messages. */
+export const FEATURE_LABELS: Record<FeatureKey, string> = {
+  simulator: "Simulator",
+  processMining: "Process Mining",
+  riskControl: "Risk & Control + Compliance",
+  apqc: "APQC Catalog",
+};
+
+/** Feature keys that have an Examples gallery (drives the Hide-Examples button). */
+export const EXAMPLE_FEATURE_KEYS: FeatureKey[] = ["simulator", "processMining", "riskControl"];
+
+export type Entitlements = Record<FeatureKey, boolean>;
+
+/** The column on SubscriptionLevel that backs each feature key. */
+const FEATURE_COLUMN: Record<FeatureKey, "hasSimulator" | "hasProcessMining" | "hasRiskControl" | "hasApqc"> = {
+  simulator: "hasSimulator",
+  processMining: "hasProcessMining",
+  riskControl: "hasRiskControl",
+  apqc: "hasApqc",
+};
+
+const ALL_FEATURES_ON: Entitlements = { simulator: true, processMining: true, riskControl: true, apqc: true };
+const ALL_FEATURES_OFF: Entitlements = { simulator: false, processMining: false, riskControl: false, apqc: false };
+
+/** Pure: derive entitlements from a tier level row. SuperAdmins get everything.
+ *  A missing level (shouldn't happen post-seed) is treated as no access. */
+export function entitlementsForLevel(
+  level: { hasSimulator: boolean; hasProcessMining: boolean; hasRiskControl: boolean; hasApqc: boolean } | null,
+  isAdmin = false,
+): Entitlements {
+  if (isAdmin) return { ...ALL_FEATURES_ON };
+  if (!level) return { ...ALL_FEATURES_OFF };
+  return {
+    simulator: level[FEATURE_COLUMN.simulator],
+    processMining: level[FEATURE_COLUMN.processMining],
+    riskControl: level[FEATURE_COLUMN.riskControl],
+    apqc: level[FEATURE_COLUMN.apqc],
+  };
+}
+
 export type EnforcementOk = { ok: true };
 export type EnforcementBlocked = {
   ok: false;
@@ -366,6 +416,19 @@ function isAdminEmail(email: string): boolean {
   return SUPERUSER_EMAILS.has(email);
 }
 
+/** Resolve a user's feature entitlements from their EFFECTIVE tier (comp /
+ *  grace-period aware). SuperAdmins get everything. */
+export async function getEntitlements(userId: string): Promise<Entitlements> {
+  const user = await loadUserWithTier(userId);
+  if (!user) return { ...ALL_FEATURES_OFF };
+  return entitlementsForLevel(user.subscriptionLevel, isAdminEmail(user.email));
+}
+
+/** Single-feature check used by API-route gates. */
+export async function hasFeatureAccess(userId: string, key: FeatureKey): Promise<boolean> {
+  return (await getEntitlements(userId))[key];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Current-usage computation
 // ─────────────────────────────────────────────────────────────────────────────
@@ -608,6 +671,10 @@ export interface UsageSnapshot {
     grantedAt: string | null;
   } | null;
   metrics: UsageMetricRow[];
+  /** Per-tier feature access for the effective tier (SuperAdmin → all true).
+   *  Drives hiding of feature launch buttons / example galleries and greying
+   *  of OrgAdmin tiles. */
+  entitlements: Entitlements;
 }
 
 const ALL_METRICS: LimitMetric[] = [
@@ -730,6 +797,7 @@ export async function getUsageSnapshot(
         }
       : null,
     metrics: rows,
+    entitlements: entitlementsForLevel(tier, admin),
   };
 }
 

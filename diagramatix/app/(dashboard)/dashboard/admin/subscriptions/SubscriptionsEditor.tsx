@@ -31,6 +31,12 @@ export interface TierRow {
    *  tiers before Checkout can use them. Created in the Stripe
    *  dashboard, then pasted here. */
   stripePriceId: string | null;
+  /** Feature entitlements — which major features this tier includes.
+   *  riskControl covers Risk-Control Matrix AND Compliance Monitoring. */
+  hasSimulator: boolean;
+  hasProcessMining: boolean;
+  hasRiskControl: boolean;
+  hasApqc: boolean;
 }
 
 /** Limit-row metadata. `kind` decides the input type and validation. */
@@ -68,6 +74,16 @@ type LimitRow =
       kind: "stringNullable";
       label: string;
       key: "stripePriceId";
+    }
+  | {
+      kind: "feature";                  // per-tier feature entitlement checkbox
+      label: string;
+      key: "hasSimulator" | "hasProcessMining" | "hasRiskControl" | "hasApqc";
+    }
+  | {
+      kind: "sectionHeader";            // non-editable divider row
+      label: string;
+      key: string;
     };
 
 const ROWS: LimitRow[] = [
@@ -87,6 +103,11 @@ const ROWS: LimitRow[] = [
   { kind: "intNullable", label: "Bulk exports", key: "maxBulkExports" },
   { kind: "intNullable", label: "Bulk imports", key: "maxBulkImports" },
   { kind: "intNullable", label: "Trial days (null = no expiry)", key: "trialDays" },
+  { kind: "sectionHeader", label: "Feature access", key: "__features" },
+  { kind: "feature", label: "Simulator", key: "hasSimulator" },
+  { kind: "feature", label: "Process Mining", key: "hasProcessMining" },
+  { kind: "feature", label: "Risk & Control + Compliance", key: "hasRiskControl" },
+  { kind: "feature", label: "APQC Catalog", key: "hasApqc" },
 ];
 
 export function SubscriptionsEditor({ initialTiers }: { initialTiers: TierRow[] }) {
@@ -210,16 +231,27 @@ export function SubscriptionsEditor({ initialTiers }: { initialTiers: TierRow[] 
             </thead>
             <tbody>
               {ROWS.map((row) => (
-                <tr key={row.key} className="border-b border-gray-100 last:border-b-0">
-                  <td className="text-xs text-gray-700 px-4 py-1.5 sticky left-0 bg-white font-medium">
-                    {row.label}
-                  </td>
-                  {tiers.map((t) => (
-                    <td key={t.id} className="px-4 py-1.5">
-                      <Cell row={row} tier={t} onPatch={patch} />
+                row.kind === "sectionHeader" ? (
+                  <tr key={row.key} className="border-b border-gray-200 bg-gray-50">
+                    <td
+                      colSpan={tiers.length + 1}
+                      className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold px-4 py-1.5 sticky left-0 bg-gray-50"
+                    >
+                      {row.label}
                     </td>
-                  ))}
-                </tr>
+                  </tr>
+                ) : (
+                  <tr key={row.key} className="border-b border-gray-100 last:border-b-0">
+                    <td className="text-xs text-gray-700 px-4 py-1.5 sticky left-0 bg-white font-medium">
+                      {row.label}
+                    </td>
+                    {tiers.map((t) => (
+                      <td key={t.id} className="px-4 py-1.5">
+                        <Cell row={row} tier={t} onPatch={patch} />
+                      </td>
+                    ))}
+                  </tr>
+                )
               ))}
             </tbody>
           </table>
@@ -238,7 +270,9 @@ function Cell({
   tier: TierRow;
   onPatch: (id: string, updates: Partial<TierRow>) => void;
 }) {
-  if (row.kind === "bool") {
+  if (row.kind === "sectionHeader") return null;
+
+  if (row.kind === "bool" || row.kind === "feature") {
     const checked = tier[row.key];
     return (
       <input
