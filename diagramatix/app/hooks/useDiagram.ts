@@ -7585,19 +7585,41 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (!SPLITTABLE_TYPES.has(finalEl.type)) {
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
-      // Detect the connector to split against its OBSTACLE-FREE route, not its
-      // live waypoints. Tasks are routing obstacles, so while the element was
-      // being dragged onto a connector the router bent that connector AROUND it
-      // — by drop time the live path no longer overlaps the element and a naive
-      // waypoint test finds nothing. Recompute every connector as if the dragged
-      // element weren't present (it's removed from the obstacle set) so the
-      // connector snaps back to the straight/orthogonal route it WANTS, then the
-      // dropped element sits on that route and the split is detected.
+      // Detect the connector to split. Tasks are routing obstacles, so while the
+      // element was being dragged onto a connector the router bent that connector
+      // AROUND it — by drop time its LIVE path no longer overlaps the element and
+      // a naive waypoint test finds nothing. So test each candidate against a
+      // FRESH obstacle-free route: compute it directly with `computeWaypoints`
+      // (the dragged element removed from the obstacle set) so the connector
+      // follows the straight/orthogonal path it WANTS. This is computed per
+      // connector rather than via `recomputeAllConnectors`, whose "preserve a
+      // hand-routed interior" rule (>=9 waypoints) would otherwise KEEP the
+      // obstacle detour and defeat detection. A direct live-waypoint hit is also
+      // accepted (element dropped straight onto an already-straight connector).
       const obstacleFreeEls = elements.filter(e => e.id !== finalEl.id);
-      const cleanConns = recomputeAllConnectors(connectors, obstacleFreeEls, state.relaxedLayout);
-      const hitClean = findConnectorOverlappingElement(cleanConns, finalEl);
-      const orig = hitClean ? connectors.find(c => c.id === hitClean.id) : null;
-      if (!orig || !hitClean) {
+      const ofMap = new Map(obstacleFreeEls.map(e => [e.id, e]));
+      const rectHit = (wps: Point[]): boolean => {
+        const pts = wps.slice(1, -1); // skip invisible leader endpoints
+        for (let i = 0; i < pts.length - 1; i++) {
+          if (segmentIntersectsRect(pts[i], pts[i + 1], finalEl.x, finalEl.y, finalEl.width, finalEl.height)) return true;
+        }
+        return false;
+      };
+      let orig: Connector | null = null;
+      let cleanWps: Point[] | null = null;
+      for (const c of connectors) {
+        if (c.type !== "sequence") continue;
+        if (c.sourceId === finalEl.id || c.targetId === finalEl.id) continue;
+        const s = ofMap.get(c.sourceId);
+        const t = ofMap.get(c.targetId);
+        if (!s || !t) continue;
+        const clean = computeWaypoints(
+          s, t, obstacleFreeEls, c.sourceSide, c.targetSide, c.routingType,
+          c.sourceOffsetAlong ?? 0.5, c.targetOffsetAlong ?? 0.5,
+        ).waypoints;
+        if (rectHit(clean) || rectHit(c.waypoints)) { orig = c; cleanWps = clean; break; }
+      }
+      if (!orig || !cleanWps) {
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
 
@@ -7621,8 +7643,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       let snapPt = dropCentre, snapBest = Infinity;
       // Snap onto the CLEAN (obstacle-free) route — the live `orig.waypoints`
       // may still be bent around the element from the drag.
-      for (let i = 0; i < hitClean.waypoints.length - 1; i++) {
-        const np = nearestOnSeg(dropCentre, hitClean.waypoints[i], hitClean.waypoints[i + 1]);
+      for (let i = 0; i < cleanWps.length - 1; i++) {
+        const np = nearestOnSeg(dropCentre, cleanWps[i], cleanWps[i + 1]);
         const dd = Math.hypot(dropCentre.x - np.x, dropCentre.y - np.y);
         if (dd < snapBest) { snapBest = dd; snapPt = np; }
       }

@@ -157,4 +157,39 @@ describe("insert an existing activity onto a connector, halves parallel (T0725)"
     expect(d.connectors.some((c) => c.sourceId === "a" && c.targetId === "f")).toBe(true);
     expect(d.connectors.some((c) => c.sourceId === "f" && c.targetId === "b")).toBe(true);
   });
+
+  it("splits even when the bent connector has >=9 waypoints (router preserves those interiors) (T0728)", () => {
+    // THE real-world failure. A longer / cross-lane connector that obstacle
+    // avoidance bent around the task can have >=9 waypoints. recomputeAllConnectors
+    // treats a >=9-waypoint rectilinear route as a hand-customised route and
+    // PRESERVES its interior — so recomputing "as if the task weren't there" does
+    // NOT straighten it, and a detection that leans on that recompute never finds
+    // the task (this is exactly what users saw: "obstacle avoidance prevents it").
+    // Detection instead computes a FRESH obstacle-free route per candidate, which
+    // ignores the preservation rule, so the split fires.
+    const d0 = {
+      elements: [
+        { id: "a", type: "task", x: 100, y: 200, width: 100, height: 60, label: "A", properties: {} },
+        { id: "b", type: "task", x: 600, y: 200, width: 100, height: 60, label: "B", properties: {} },
+        // F sits ON the straight A→B line (y 230); the live route detours around it.
+        { id: "f", type: "task", x: 350, y: 200, width: 100, height: 60, label: "F", properties: {} },
+      ],
+      connectors: [{
+        id: "ab", type: "sequence", sourceId: "a", targetId: "b", sourceSide: "right", targetSide: "left",
+        directionType: "directed", routingType: "rectilinear",
+        // 9-waypoint route detouring BELOW F — does not overlap F, and because
+        // N>=9 the router would preserve this exact interior on recompute.
+        waypoints: [
+          { x: 150, y: 230 }, { x: 200, y: 230 }, { x: 300, y: 230 }, { x: 300, y: 300 },
+          { x: 500, y: 300 }, { x: 500, y: 230 }, { x: 560, y: 230 }, { x: 600, y: 230 }, { x: 650, y: 230 },
+        ],
+      }],
+    } as unknown as DiagramData;
+
+    const d = reducer(d0, { type: "MOVE_END", payload: { id: "f" } });
+
+    expect(d.connectors.some((c) => c.id === "ab")).toBe(false);
+    expect(d.connectors.some((c) => c.sourceId === "a" && c.targetId === "f")).toBe(true);
+    expect(d.connectors.some((c) => c.sourceId === "f" && c.targetId === "b")).toBe(true);
+  });
 });
