@@ -1189,25 +1189,19 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
-        heading: "Three-state toggle",
+        heading: "Two-state toggle",
         body: (
           <>
             <p>
-              The pill in the bottom-right corner of the canvas cycles
-              through three modes on each click:
+              The pill in the bottom-right corner of the canvas toggles
+              between two states on each click:
             </p>
             <ul className="list-disc list-inside space-y-1 mt-2">
               <li>
-                <strong className="text-blue-700">ON</strong> — both sides
-                are auto-connected. The nearest left / above neighbour is
-                wired INTO the new element, and any candidate to the right
-                is wired FROM the new element.
-              </li>
-              <li>
-                <strong className="text-amber-700">TO ONLY</strong> — only
-                an incoming connector is created (existing → new). No
-                outgoing connector from the new element. Useful when you
-                want to extend a flow without picking a downstream target.
+                <strong className="text-blue-700">ON</strong> — a new element
+                is auto-connected FROM the nearest LOCAL element (incoming
+                only: existing → new). No outgoing connector is created from
+                the new element.
               </li>
               <li>
                 <strong className="text-gray-700">OFF</strong> — no auto-
@@ -1216,8 +1210,8 @@ export const CHAPTERS: HelpChapter[] = [
               </li>
             </ul>
             <p className="mt-2">
-              The selected mode is saved in your browser and survives
-              page reloads.
+              The selected state is saved in your browser and survives page
+              reloads.
             </p>
           </>
         ),
@@ -1245,6 +1239,33 @@ export const CHAPTERS: HelpChapter[] = [
                 a horizontal connector is created.
               </li>
             </ol>
+            <p className="mt-3">A candidate source is only used when it passes these checks:</p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                <strong>Local only:</strong> the resulting connector must be
+                shorter than <strong>3&times; a Task width</strong> — distant
+                elements are never auto-connected.
+              </li>
+              <li>
+                <strong>Not already flowing on:</strong> an Activity (Task /
+                Sub-Process / Expanded Sub-Process), an Intermediate Event, or
+                a Start Event that <em>already</em> has an outgoing sequence
+                connector is skipped (each has one outgoing flow only).
+              </li>
+              <li>
+                <strong>New element inside an Expanded Sub-Process:</strong> it
+                is only connected FROM an element inside that same EP — a Start
+                Event edge-mounted on the EP, a Start Event inside it, or
+                another element inside it — never from outside the EP and never
+                from an End Event.
+              </li>
+              <li>
+                <strong>New element in a Pool / Lane / Sub-Lane:</strong> it is
+                only connected FROM an element in the <strong>same Pool</strong>
+                {" "}— never from anything outside its Pool (cross-pool links
+                must be message connectors, dragged manually).
+              </li>
+            </ul>
           </>
         ),
       },

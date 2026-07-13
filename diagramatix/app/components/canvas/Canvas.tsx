@@ -745,18 +745,21 @@ export function Canvas({
   // new lane will be inserted on release. `kind` controls the colour:
   //   "boundary" → bright green (above-all, between, below-all)
   //   "split"    → light green (split a lane into 2 sublanes)
-  // Auto-connect 3-state toggle. Modes:
-  //   "on"      — full auto-connect: pick a FROM source AND a TO target.
-  //   "to-only" — only auto-connect TO the new element; never source FROM.
+  // Auto-connect toggle. The USER-FACING pill is 2-state — "On" (= TO-ONLY:
+  // only auto-connect an incoming connector, existing→new) or "Off". The
+  // internal "on" (both-directions: also source a connector FROM the new
+  // element) is retired from the toggle but its code path is kept for possible
+  // future use — the pill just never selects it.
+  //   "on"      — full auto-connect: pick a FROM source AND a TO target (unused by the pill).
+  //   "to-only" — only auto-connect TO the new element; never source FROM.  ← the "On" state
   //   "off"     — no auto-connect (gateway-merge group connect still runs).
-  // Persisted in localStorage so the choice survives reloads. Reads the
-  // legacy "0" / "1" values from the binary toggle for backwards compat.
+  // Persisted in localStorage. Legacy "on"/"1"/"to-only" all migrate to the
+  // single On state (TO-ONLY); "off"/"0" → Off.
   const [autoConnectMode, setAutoConnectMode] = useState<"on" | "to-only" | "off">(() => {
-    if (typeof window === "undefined") return "on";
+    if (typeof window === "undefined") return "to-only";
     const v = window.localStorage.getItem("diagramatix.autoConnect");
     if (v === "off" || v === "0") return "off";
-    if (v === "to-only") return "to-only";
-    return "on";
+    return "to-only";
   });
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -2373,11 +2376,38 @@ export function Canvas({
       ((el.properties.subprocessType as string | undefined) === "event" ||
        (el.properties.subprocessType as string | undefined) === "transaction");
 
+    // Rule 2 — locality cap: reject a source whose connector to the new element
+    // would run longer than 3× the default Task width (keeps auto-connect to
+    // LOCAL elements). Uses the rect-to-rect gap as the connector-length proxy.
+    const LOCAL_CAP = 3 * getSymbolDefinition("task").defaultWidth;
+    const rectGap = (e: DiagramElement) => {
+      const dx = Math.max(0, newX - (e.x + e.width), e.x - newRight2);
+      const dy = Math.max(0, newY - (e.y + e.height), e.y - newBottom2);
+      return Math.hypot(dx, dy);
+    };
+    // Rule 5 — a "spent" flow node already has its (single) outgoing sequence
+    // flow: an Activity (task / subprocess / EP), an Intermediate Event, or a
+    // Start Event. Don't source a second outgoing sequence connector from it.
+    const SPENT_SOURCE_TYPES = new Set<SymbolType>([
+      "task", "subprocess", "subprocess-expanded", "intermediate-event", "start-event",
+    ]);
+    const hasOutgoingSequence = (id: string) =>
+      data.connectors.some((c) => c.sourceId === id && c.type === "sequence");
+
     const candidates = data.elements.filter((e) => {
       if (!AUTO_CONNECT_TYPES.has(e.type)) return false;
-      // Per spec: never auto-connect from/to ANY edge-mounted (boundary)
-      // event — they are always manually wired by the user.
-      if (e.boundaryHostId) return false;
+      // Never auto-connect from/to an edge-mounted (boundary) event — EXCEPT
+      // (Rule 3a) an edge-mounted Start Event on the new element's own Expanded
+      // Subprocess, which IS a valid source for elements placed inside that EP.
+      const isEdgeStartOnScope =
+        e.type === "start-event" && !!e.boundaryHostId &&
+        newExpandedScope != null && e.boundaryHostId === newExpandedScope;
+      if (e.boundaryHostId && !isEdgeStartOnScope) return false;
+      // Rule 2: locality cap.
+      if (rectGap(e) >= LOCAL_CAP) return false;
+      // Rule 5: never source from an Activity / Intermediate Event / Start Event
+      // that already has an outgoing sequence connector (one outgoing only).
+      if (isBpmn && SPENT_SOURCE_TYPES.has(e.type) && hasOutgoingSequence(e.id)) return false;
       // BPMN: never auto-connect FROM an end event (end events have no outgoing)
       if (isBpmn && e.type === "end-event") return false;
       // BPMN: never auto-connect TO a start event
@@ -2421,8 +2451,11 @@ export function Canvas({
           newY >= e.y && newBottom2 <= e.y + e.height) {
         return false;
       }
-      // Both must share the same container scope (or both have none).
+      // Both must share the same container scope (or both have none). An
+      // edge-mounted Start Event on the new element's EP counts as IN scope
+      // (Rule 3a) even though it's structurally parented outside the EP.
       if (e.id === newExpandedScope) return false;
+      if (isEdgeStartOnScope) return true;
       const candScope = expandedParentOf(e);
       return candScope === newExpandedScope;
     });
@@ -7115,20 +7148,16 @@ export function Canvas({
           in the read-only published viewer. */}
       {!readOnly && (
       <button
-        onClick={() => setAutoConnectMode((m) => m === "off" ? "to-only" : m === "to-only" ? "on" : "off")}
+        onClick={() => setAutoConnectMode((m) => m === "off" ? "to-only" : "off")}
         className={`absolute bottom-2 right-2 flex items-center gap-1 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none border text-[11px] font-medium transition-colors ${
-          autoConnectMode === "on"
-            ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-            : autoConnectMode === "to-only"
-              ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
-              : "bg-white/90 text-gray-600 border-gray-300 hover:bg-gray-50"
+          autoConnectMode === "off"
+            ? "bg-white/90 text-gray-600 border-gray-300 hover:bg-gray-50"
+            : "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
         }`}
         title={
-          autoConnectMode === "on"
-            ? "Auto-connect ON — both incoming and outgoing connectors are auto-created. Click to switch to TO ONLY."
-            : autoConnectMode === "to-only"
-              ? "Auto-connect TO ONLY — only incoming connectors (existing → new) are auto-created. Click to switch to OFF."
-              : "Auto-connect OFF — dropped shapes are placed without auto-connectors (gateway-merge group connect still runs). Click to switch to TO ONLY."
+          autoConnectMode === "off"
+            ? "Auto-connect OFF — dropped shapes are placed without auto-connectors (gateway-merge group connect still runs). Click to switch ON."
+            : "Auto-connect ON — a new element is auto-connected FROM the nearest LOCAL element (incoming only). Click to switch OFF."
         }
       >
         <svg
@@ -7145,7 +7174,7 @@ export function Canvas({
           <circle cx="13" cy="8" r="2" />
           <line x1="5" y1="8" x2="11" y2="8" />
         </svg>
-        Auto-connect: {autoConnectMode === "on" ? "ON" : autoConnectMode === "to-only" ? "TO ONLY" : "OFF"}
+        Auto-connect: {autoConnectMode === "off" ? "OFF" : "ON"}
       </button>
       )}
 
