@@ -1,5 +1,16 @@
 import type { Bounds, Connector, DiagramData, DiagramElement, Point, RoutingType, Side } from "./types";
 
+/* ── UML (Domain-diagram) connector routing mode ─────────────────────────
+ * Live-toggleable from the editor (bottom-centre switch on Domain diagrams).
+ * OFF (default) = the original "always re-pick the closest faces" behaviour —
+ * BPMN and all non-UML connectors are NEVER affected by this flag. ON = the
+ * experimental "sticky endpoints" mode: UML endpoints stay fixed on their face
+ * until a large move makes a different face closest. Only the `isUmlConn`
+ * branch of `recomputeAllConnectors` reads this. */
+let _umlStickyRouting = false;
+export function setUmlStickyRouting(on: boolean): void { _umlStickyRouting = on; }
+export function getUmlStickyRouting(): boolean { return _umlStickyRouting; }
+
 function getBounds(el: DiagramElement): Bounds {
   return { x: el.x, y: el.y, width: el.width, height: el.height };
 }
@@ -1431,9 +1442,20 @@ export function recomputeAllConnectors(
       return { ...conn, waypoints: [startPt, srcEdge, cp1, cp2, tgtEdge, endPt] };
     }
 
-    // UML connectors: always optimize attachment points to closest positions
+    // UML connectors (Domain diagrams — associations/aggregations/etc. between
+    // classes, enumerations, packages). Two selectable modes:
+    //  • OPTIMAL (default): always re-pick the closest faces + project the
+    //    other element's centre onto them. Great for large moves / routing
+    //    around obstacles, but the endpoints "slide" on both elements as either
+    //    end moves.
+    //  • STICKY (umlStickyRouting on): each endpoint stays FIXED on its stored
+    //    face at its stored offset (so it rides rigidly with its own element)
+    //    UNTIL a move is large enough that a DIFFERENT face becomes closest —
+    //    then only that end jumps to the new optimal face. Small moves leave
+    //    both connection points fixed.
     const isUmlConn = conn.type === "uml-association" || conn.type === "uml-aggregation"
-      || conn.type === "uml-composition" || conn.type === "uml-generalisation";
+      || conn.type === "uml-composition" || conn.type === "uml-generalisation"
+      || conn.type === "uml-dependency" || conn.type === "uml-realisation";
     if (isUmlConn) {
       const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
       const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
@@ -1441,13 +1463,31 @@ export function recomputeAllConnectors(
       const optTgtSide = getClosestSideOfElement(srcCx, srcCy, target);
       const optSrcOffset = getOffsetAlong(source, optSrcSide, { x: tgtCx, y: tgtCy });
       const optTgtOffset = getOffsetAlong(target, optTgtSide, { x: srcCx, y: srcCy });
+
+      // Resolve the side + offset to actually use for each end.
+      let useSrcSide = optSrcSide, useSrcOffset = optSrcOffset;
+      let useTgtSide = optTgtSide, useTgtOffset = optTgtOffset;
+      if (_umlStickyRouting) {
+        // Keep the stored offset while the closest side is unchanged (fixed
+        // point on the same face); jump to the new optimal side + offset only
+        // when the closest face changes.
+        if (conn.sourceSide === optSrcSide && conn.sourceOffsetAlong != null) useSrcOffset = conn.sourceOffsetAlong;
+        if (conn.targetSide === optTgtSide && conn.targetOffsetAlong != null) useTgtOffset = conn.targetOffsetAlong;
+      }
+
       const umlResult = computeWaypoints(source, target, elements,
-        optSrcSide, optTgtSide, conn.routingType, optSrcOffset, optTgtOffset);
-      return { ...conn, waypoints: umlResult.waypoints,
+        useSrcSide, useTgtSide, conn.routingType, useSrcOffset, useTgtOffset);
+      const routed = { ...conn, waypoints: umlResult.waypoints,
         sourceInvisibleLeader: umlResult.sourceInvisibleLeader,
         targetInvisibleLeader: umlResult.targetInvisibleLeader,
-        sourceSide: optSrcSide, targetSide: optTgtSide,
-        sourceOffsetAlong: optSrcOffset, targetOffsetAlong: optTgtOffset,
+        sourceSide: useSrcSide, targetSide: useTgtSide,
+        sourceOffsetAlong: useSrcOffset, targetOffsetAlong: useTgtOffset,
+      };
+      // Sticky mode keeps the connector's positioning stable, so keep any
+      // user-dragged label offsets too. Optimal mode resets them (endpoints
+      // moved, so the old label positions no longer make sense).
+      if (_umlStickyRouting) return routed;
+      return { ...routed,
         associationNameOffset: undefined,
         sourceRoleOffset: undefined, sourceMultOffset: undefined,
         sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,

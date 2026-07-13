@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { uploadSizeError } from "@/app/lib/uploadLimit";
 import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
+import { importVisioDomainV3, isDomainVisio } from "@/app/lib/diagram/v3/importVisioDomainV3";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import {
@@ -109,11 +110,19 @@ export async function POST(request: Request) {
   if (limitBlock) return limitBlock;
 
   let parsed: Awaited<ReturnType<typeof importVisioV3>>;
+  // Standard-UML domain diagrams use a separate importer + a "domain" type.
+  // Detected up front so the BPMN path is entirely untouched for BPMN files.
+  let resolvedType: "bpmn" | "domain" = "bpmn";
   try {
     const sizeErr = uploadSizeError(upload); // IO-01
     if (sizeErr) return NextResponse.json({ error: sizeErr }, { status: 413 });
     const buf = await upload.arrayBuffer();
-    parsed = await importVisioV3(buf);
+    if (await isDomainVisio(buf)) {
+      resolvedType = "domain";
+      parsed = await importVisioDomainV3(buf);
+    } else {
+      parsed = await importVisioV3(buf);
+    }
   } catch (err) {
     return NextResponse.json(
       {
@@ -127,7 +136,7 @@ export async function POST(request: Request) {
 
   // Element-count gate on the parsed diagram. Reject BEFORE we touch
   // the DB so the import counter isn't spent on an over-cap result.
-  const elementBlock = await gateElementCount(session.user.id, "bpmn", parsed.data);
+  const elementBlock = await gateElementCount(session.user.id, resolvedType, parsed.data);
   if (elementBlock) return elementBlock;
 
   // ── Overwrite path ──
@@ -174,7 +183,7 @@ export async function POST(request: Request) {
   const diagram = await prisma.diagram.create({
     data: {
       name: finalName,
-      type: "bpmn",
+      type: resolvedType,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: parsed.data as any,
       userId: session.user.id,

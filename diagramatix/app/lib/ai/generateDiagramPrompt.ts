@@ -102,8 +102,9 @@ Output format:
 
   domain: `You are a UML Domain Model expert. Output ONLY valid JSON with elements and connections.
 
-Element types: "uml-class" (entity), "uml-enumeration" (lookup)
-Connection types: "uml-association", "uml-aggregation", "uml-composition", "uml-generalisation"
+Element types: "uml-class" (entity), "uml-enumeration" (lookup), "uml-package" (a resizeable container grouping related elements), "uml-note" (a free-text comment), "uml-pain-point"
+Connection types: "uml-association", "uml-aggregation", "uml-composition", "uml-generalisation", "uml-dependency", "uml-realisation"
+Note: only "uml-dependency" connectors may connect to a "uml-package".
 
 Output format:
 {
@@ -117,7 +118,18 @@ Output format:
   "connections": [
     { "sourceId": "e1", "targetId": "e2", "type": "uml-association", "sourceMultiplicity": "1", "targetMultiplicity": "*" }
   ]
-}`,
+}
+
+IMAGE INPUT — when an image of a UML class / domain diagram is attached, reproduce it exactly. Map the shapes:
+- a rectangle divided into compartments (name / attributes / operations) → "uml-class"; put the class name in "label"; transcribe each attribute row into "attributes" as { "visibility": "+|-|#", "name", "type", "multiplicity" } (parse "- name : Type [0..1]"), and each operation row (e.g. "+ doThing()") into "operations" as { "visibility", "name" }. Set the compartments you see.
+- a box headed «enumeration» (or a plain list of literals) → "uml-enumeration"; put the literals in "values".
+- a folder-tab / package shape → "uml-package"; classes drawn inside it are that package's members (still list them as separate elements — grouping is by geometry).
+- a folded-corner box of free text → "uml-note".
+- a plain line, or a line with an open arrowhead + role/multiplicity labels → "uml-association" (put multiplicities in "sourceMultiplicity"/"targetMultiplicity").
+- a hollow diamond at one end → "uml-aggregation"; a filled diamond → "uml-composition" (diamond end = source).
+- a hollow triangle on a SOLID line → "uml-generalisation" (triangle end = the parent/superclass = target); a hollow triangle on a DASHED line → "uml-realisation".
+- an open arrow on a DASHED line → "uml-dependency".
+OCR every label verbatim. Don't invent classes, members or relationships that aren't drawn. If the image and the prompt disagree, follow the image.`,
 
   context: `You are a Context Diagram expert. Output ONLY valid JSON with elements and connections.
 

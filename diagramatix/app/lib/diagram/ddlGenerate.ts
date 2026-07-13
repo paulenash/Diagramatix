@@ -58,7 +58,7 @@ const refs: RefTable[] = [
   { name: "ref_event_type", values: ["none","message","timer","error","signal","terminate","conditional","escalation","cancel","compensation","link"] },
   { name: "ref_repeat_type", values: ["none","loop","mi-sequential","mi-parallel"] },
   { name: "ref_flow_type", values: ["none","catching","throwing"] },
-  { name: "ref_connector_type", values: ["sequence","message","association","transition","associationBPMN","messageBPMN","flow","uml-association","uml-aggregation","uml-composition","uml-generalisation","review-comment-link","flowline"] },
+  { name: "ref_connector_type", values: ["sequence","message","association","transition","associationBPMN","messageBPMN","flow","uml-association","uml-aggregation","uml-composition","uml-generalisation","uml-dependency","uml-realisation","review-comment-link","flowline"] },
   { name: "ref_side", values: ["top","right","bottom","left"] },
   { name: "ref_direction_type", values: ["directed","non-directed","open-directed","both"] },
   { name: "ref_routing_type", values: ["direct","rectilinear","curvilinear"] },

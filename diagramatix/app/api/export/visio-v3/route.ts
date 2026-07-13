@@ -5,7 +5,8 @@ import { prisma } from "@/app/lib/db";
 import * as fs from "fs";
 import * as path from "path";
 import { exportVisioV3 } from "@/app/lib/diagram/v3/exportVisioV3";
-import { profileByName } from "@/app/lib/diagram/v3/stencilProfile";
+import { exportVisioDomainV3 } from "@/app/lib/diagram/v3/exportVisioDomainV3";
+import { profileByName, domainProfile } from "@/app/lib/diagram/v3/stencilProfile";
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/colors";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext";
@@ -49,6 +50,23 @@ export async function GET(request: Request) {
   if (limitBlock) return limitBlock;
 
   try {
+    // Domain (UML class) diagrams use a completely separate stencil + emitter.
+    if (diagram.type === "domain") {
+      const templateBuf = fs.readFileSync(path.join(process.cwd(), "public", domainProfile.templateFile));
+      const result = await exportVisioDomainV3(
+        diagram.data as any,
+        diagram.name,
+        templateBuf.buffer,
+      );
+      await recordUsage(session.user.id, "individualExports");
+      return new NextResponse(result as any, {
+        headers: {
+          "Content-Type": "application/vnd.ms-visio.drawing",
+          "Content-Disposition": `attachment; filename="${diagram.name} (Domain).vsdx"`,
+        },
+      });
+    }
+
     // Profile selects which stencil flavour to emit. `?profile=` accepts
     // "bpmn-m" (default) or "diagramatix-v1.4" / "v1.4" / "v14".
     const profile = profileByName(searchParams.get("profile"));

@@ -1537,7 +1537,15 @@ export function Canvas({
               connType = "flowline"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
             }
           } else if (diagramType === "domain") {
-            connType = "uml-association"; connRouting = defaultRoutingType; connDirection = "non-directed";
+            // A UML package accepts only dependency connectors (this stage) —
+            // force the type when either end is a package, and give it a
+            // direction so the open arrow renders toward the target.
+            const pkgInvolved = sourceEl?.type === "uml-package" || targetEl.type === "uml-package";
+            if (pkgInvolved) {
+              connType = "uml-dependency"; connRouting = defaultRoutingType; connDirection = "open-directed";
+            } else {
+              connType = "uml-association"; connRouting = defaultRoutingType; connDirection = "non-directed";
+            }
           } else if ((diagramType === "context" || diagramType === "basic") && defaultRoutingType === "curvilinear") {
             connType = "flow"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
             // Precise boundary attachment for flow connectors
@@ -1902,7 +1910,7 @@ export function Canvas({
 
     const isContainer = el.type === "system-boundary" || el.type === "composite-state"
       || el.type === "pool" || el.type === "subprocess-expanded" || el.type === "group"
-      || el.type === "uml-class" || el.type === "uml-enumeration";
+      || el.type === "uml-class" || el.type === "uml-enumeration" || el.type === "uml-package";
     const ar = el.width / el.height;
     const minW = isContainer ? MIN_BOUNDARY_W : 20;
     const minH = isContainer ? MIN_BOUNDARY_H : 20;
@@ -1960,6 +1968,8 @@ export function Canvas({
         || elType === "subprocess-expanded" || elType === "state"
         || elType === "submachine" || elType === "composite-state"
         || elType === "chevron" || elType === "chevron-collapsed" || elType === "process-group"
+        || elType === "uml-note"
+        || elType === "uml-pain-point"
         || elType === "archimate-shape"; // all ArchiMate shapes resize freely (incl. icon-only)
       if (!isContainer && !freeResize && ar > 0) {
         if (handle.includes("e") || handle.includes("w")) {

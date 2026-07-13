@@ -255,6 +255,27 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     description: "A UML enumeration in a domain diagram",
   },
   {
+    type: "uml-package",
+    label: "Package",
+    defaultWidth: 220,
+    defaultHeight: 160,
+    description: "A UML package — a resizeable container that groups elements on a domain diagram",
+  },
+  {
+    type: "uml-note",
+    label: "Note",
+    defaultWidth: 140,
+    defaultHeight: 70,
+    description: "A UML note — a folded-corner comment carrying free text",
+  },
+  {
+    type: "uml-pain-point",
+    label: "Pain Point",
+    defaultWidth: 60,
+    defaultHeight: 60,
+    description: "A pain-point marker highlighting a problem area on a domain diagram",
+  },
+  {
     type: "archimate-shape",
     label: "ArchiMate Shape",
     defaultWidth: 120,
@@ -309,7 +330,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
     "text-annotation",
     "group",
   ],
-  domain: ["uml-class", "uml-enumeration"],
+  domain: ["uml-package", "uml-class", "uml-enumeration", "uml-note", "uml-pain-point"],
   "value-chain": ["chevron", "chevron-collapsed", "process-group"],
   // ArchiMate shapes are driven by the runtime catalogue (see
   // app/lib/archimate/catalogue.ts). The palette renders category accordions
@@ -348,7 +369,7 @@ export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = 
     "text-annotation",
     "group",
   ],
-  domain: ["uml-class", "uml-enumeration"],
+  domain: ["uml-package", "uml-class", "uml-enumeration", "uml-note"],
   "value-chain": ["chevron", "chevron-collapsed", "process-group"],
   archimate: ["archimate-shape"],
   // Flowcharts are strictly monochrome — no per-symbol colour customisation.

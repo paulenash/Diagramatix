@@ -209,6 +209,30 @@ export const diagramatixV16Profile: StencilProfile = {
   disableBodyColourBake: true,
 };
 
+// ── Domain (UML class diagram) profile ─────────────────────────────────
+// The domain emitter (exportVisioDomainV3) targets Microsoft's STANDARD Visio
+// UML Class stencil, embedded in the base template `domain-template-uml.vsdx`
+// (derived from a real standard-UML .vsdx so the theme, styles and masters are
+// exactly what those masters were authored against). No master merging is
+// needed — every master already lives in the template. The emitter reads the
+// NameU→ID map from the template's masters.xml at export time (robust to
+// Visio's renumbering), so these ids are documentation of the expected set:
+//
+//   Class=8, Member=9, Separator=10, Association=15, Aggregation=11,
+//   Composition=18, Composite=5, "Rounded Rectangle"=28, "Dynamic connector"=3
+//
+// Kept distinct from the BPMN pipeline so neither path constrains the other.
+
+export interface DomainStencilProfile {
+  name: "domain";
+  templateFile: string;
+}
+
+export const domainProfile: DomainStencilProfile = {
+  name: "domain",
+  templateFile: "domain-template-uml.vsdx",
+};
+
 export const DEFAULT_PROFILE = bpmnMProfile;
 
 /** Look up a profile by its `name`. Returns `DEFAULT_PROFILE` if the name

@@ -250,6 +250,32 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
           <text x={15} y={8} textAnchor="middle" fontSize={5} fill="#6b7280" fontStyle="italic">{"\u00ABE\u00BB"}</text>
         </svg>
       );
+    case "uml-package":
+      return (
+        <svg width={36} height={28} viewBox="0 0 48 36">
+          <rect x={2} y={2} width={20} height={8} fill={resolveColor("uml-package", colorConfig)} stroke="#374151" strokeWidth={1.5} />
+          <rect x={2} y={10} width={44} height={24} fill={resolveColor("uml-package", colorConfig)} fillOpacity={0.4} stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+    case "uml-note":
+      return (
+        <svg width={30} height={24} viewBox="0 0 40 32">
+          <path d="M 2 2 L 30 2 L 38 10 L 38 30 L 2 30 Z" fill={resolveColor("uml-note", colorConfig)} stroke="#374151" strokeWidth={1.5} />
+          <path d="M 30 2 L 30 10 L 38 10" fill="none" stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+    case "uml-pain-point": {
+      const cx = 15, cy = 15, spikes = 12; const pts: string[] = [];
+      for (let i = 0; i < spikes * 2; i++) {
+        const ang = (Math.PI * i) / spikes - Math.PI / 2; const r = i % 2 === 0 ? 13 : 8;
+        pts.push(`${cx + Math.cos(ang) * r},${cy + Math.sin(ang) * r}`);
+      }
+      return (
+        <svg width={24} height={24} viewBox="0 0 30 30">
+          <polygon points={pts.join(" ")} fill={resolveColor("uml-pain-point", colorConfig)} stroke="#b91c1c" strokeWidth={1.5} strokeLinejoin="round" />
+        </svg>
+      );
+    }
     case "external-entity":
       return (
         <svg width={28} height={28} viewBox="0 0 36 36">

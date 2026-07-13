@@ -393,6 +393,7 @@ export type Action =
   | { type: "SET_DESCRIPTION_FONT_SIZE"; payload: number }
   | { type: "SET_DATABASE"; payload: string }
   | { type: "SET_RELAXED_LAYOUT"; payload: boolean }
+  | { type: "REROUTE_ALL" }
   | { type: "SET_PROCESS_OWNER"; payload: { name?: string; email?: string } }
   | { type: "SET_PROCEDURE_DOC"; payload: { url?: string; name?: string } | undefined }
   | { type: "SET_PCF"; payload: PcfClassification | undefined }
@@ -433,11 +434,17 @@ function isContainerType(type: SymbolType): boolean {
   return type === "system-boundary" || type === "composite-state"
       || type === "pool" || type === "lane" || type === "subprocess-expanded"
       || type === "process-group"
+      || type === "uml-package"
       || type === "archimate-shape"
       || type === "flowchart-vswimlane";
 }
 
 const PROCESS_GROUP_CHILDREN = new Set<SymbolType>(["chevron", "chevron-collapsed", "process-group"]);
+
+// A UML package groups any domain-diagram element (including nested packages).
+const UML_PACKAGE_CHILDREN = new Set<SymbolType>([
+  "uml-class", "uml-enumeration", "uml-package", "uml-note", "uml-pain-point",
+]);
 
 function containerAccepts(containerType: SymbolType, childType: SymbolType): boolean {
   if (containerType === "system-boundary") return childType === "use-case" || childType === "hourglass";
@@ -446,6 +453,7 @@ function containerAccepts(containerType: SymbolType, childType: SymbolType): boo
   if (containerType === "lane") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "subprocess-expanded") return BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "process-group") return PROCESS_GROUP_CHILDREN.has(childType);
+  if (containerType === "uml-package") return UML_PACKAGE_CHILDREN.has(childType);
   if (containerType === "archimate-shape") return childType === "archimate-shape";
   // A vertical swimlane column holds any flowchart symbol except another column.
   if (containerType === "flowchart-vswimlane") return childType.startsWith("flowchart-") && childType !== "flowchart-vswimlane";
@@ -3621,6 +3629,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "uml-enumeration") {
         const count = state.elements.filter((e) => e.type === "uml-enumeration").length;
         label = `Enumeration ${count + 1}`;
+      } else if (action.payload.symbolType === "uml-package") {
+        const count = state.elements.filter((e) => e.type === "uml-package").length;
+        label = `Package ${count + 1}`;
+      } else if (action.payload.symbolType === "uml-note") {
+        label = "Note";
+      } else if (action.payload.symbolType === "uml-pain-point") {
+        label = "";
       } else if (action.payload.symbolType === "external-entity") {
         const count = state.elements.filter((e) => e.type === "external-entity").length;
         label = `Entity ${count + 1}`;
@@ -5356,12 +5371,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
         return el;
       });
-      // When a process-group is resized, adopt/release children
+      // When a process-group or UML package is resized, adopt/release children
       let finalElements = elements;
-      if (target?.type === "process-group") {
+      if (target?.type === "process-group" || target?.type === "uml-package") {
+        const containerType = target.type;
         finalElements = elements.map(el => {
           if (el.id === id) return el;
-          if (!containerAccepts("process-group", el.type)) return el;
+          if (!containerAccepts(containerType, el.type)) return el;
           const cx = el.x + el.width / 2;
           const cy = el.y + el.height / 2;
           const inside = cx >= newX && cx <= newX + newW && cy >= newY && cy <= newY + newH;
@@ -6226,6 +6242,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (target.type === "initial-state") return state;
 
       if (isDataConn && connectorType !== "associationBPMN") return state;
+
+      // UML package rule (this stage): a package may only be an endpoint of a
+      // dependency connector. Any other relationship touching a package is rejected.
+      const isPackageConn = source.type === "uml-package" || target.type === "uml-package";
+      if (isPackageConn && connectorType !== "uml-dependency") return state;
+
       // Allow associationBPMN between event elements (child/boundary event connections)
       const EVENT_CONN_TYPES = new Set<SymbolType>(["start-event", "intermediate-event", "end-event"]);
       const isEventToEvent = EVENT_CONN_TYPES.has(source.type) && EVENT_CONN_TYPES.has(target.type);
@@ -7009,6 +7031,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
     case "SET_RELAXED_LAYOUT":
       return { ...state, relaxedLayout: action.payload || undefined };
+
+    // Recompute every connector's route — used to apply a live routing-mode
+    // switch (e.g. the Domain UML sticky/optimal toggle) to the current diagram.
+    case "REROUTE_ALL":
+      return { ...state, connectors: recomputeAllConnectors(state.connectors, state.elements, state.relaxedLayout) };
 
     case "SET_PROCESS_OWNER": {
       const { name, email } = action.payload;
@@ -9096,6 +9123,12 @@ export function useDiagram(initialData: DiagramData) {
       (on: boolean) => {
         invalidateRedo();
         dispatch({ type: "SET_RELAXED_LAYOUT", payload: on });
+      }, []
+    ),
+    rerouteAll: useCallback(
+      () => {
+        pushHistory(snapshotData());
+        dispatch({ type: "REROUTE_ALL" });
       }, []
     ),
     setProcessOwner: useCallback(

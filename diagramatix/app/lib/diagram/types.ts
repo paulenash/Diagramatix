@@ -30,6 +30,9 @@ export type SymbolType =
   | "process-system"
   | "uml-class"
   | "uml-enumeration"
+  | "uml-package"
+  | "uml-note"
+  | "uml-pain-point"
   | "sublane"
   | "fork-join"
   | "submachine"
@@ -102,6 +105,7 @@ export type ConnectorType =
   | "sequence" | "message" | "association" | "transition"
   | "associationBPMN" | "messageBPMN" | "flow" | "flowline" | "flowchart-association"
   | "uml-association" | "uml-aggregation" | "uml-composition" | "uml-generalisation"
+  | "uml-dependency" | "uml-realisation"
   | "review-comment-link"
   | ArchimateConnectorType;
 

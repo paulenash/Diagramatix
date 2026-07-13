@@ -1235,7 +1235,8 @@ export function PropertiesPanel({
             (classEnumTypes.has(srcEl.type) && classEnumTypes.has(tgtEl.type)) &&
             (srcEl.type !== tgtEl.type); // one is class, other is enumeration
           const isUmlConn = connector.type === "uml-association" || connector.type === "uml-aggregation" ||
-            connector.type === "uml-composition" || connector.type === "uml-generalisation";
+            connector.type === "uml-composition" || connector.type === "uml-generalisation" ||
+            connector.type === "uml-dependency" || connector.type === "uml-realisation";
           // Process-context generalisation: only available between actor-type
           // participants (actor / team / system). When this case applies,
           // suppress the full 4-option UML dropdown below and show a
@@ -1269,6 +1270,8 @@ export function PropertiesPanel({
                   { value: "uml-aggregation" as ConnectorType, label: "Aggregation" },
                   { value: "uml-composition" as ConnectorType, label: "Composition" },
                   { value: "uml-generalisation" as ConnectorType, label: "Generalisation" },
+                  { value: "uml-dependency" as ConnectorType, label: "Dependency" },
+                  { value: "uml-realisation" as ConnectorType, label: "Realisation" },
                 ];
                 const labelCls = "text-[10px] font-medium text-gray-500 w-20 shrink-0";
                 const selectCls = "text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium flex-1 min-w-0";
@@ -2946,14 +2949,14 @@ export function PropertiesPanel({
         );
       })()}
 
-      {/* Stereotype for UML Class and Enumeration */}
-      {(element.type === "uml-class" || element.type === "uml-enumeration") && onUpdateProperties && (
+      {/* Stereotype for UML Class, Enumeration, Package and Composite */}
+      {(element.type === "uml-class" || element.type === "uml-enumeration" || element.type === "uml-package") && onUpdateProperties && (
         <div className="space-y-1">
           <div className="flex items-center gap-1.5">
             <label className="text-[10px] text-gray-500 w-16 shrink-0">Stereotype</label>
             <input type="text"
               className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
-              defaultValue={(element.properties.stereotype as string | undefined) ?? (element.type === "uml-class" ? "entity" : "enumeration")}
+              defaultValue={(element.properties.stereotype as string | undefined) ?? (element.type === "uml-class" ? "entity" : element.type === "uml-enumeration" ? "enumeration" : "")}
               key={`stereo-${element.id}`}
               onBlur={e => onUpdateProperties(element.id, { stereotype: e.target.value })}
               onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}

@@ -18,6 +18,7 @@ import {
 import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { setCurrentDiagramName } from "@/app/lib/help/currentDiagram";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
+import { setUmlStickyRouting, getUmlStickyRouting } from "@/app/lib/diagram/routing";
 import { DiagramColorModal } from "./DiagramColorModal";
 import { TemplateNameModal } from "./TemplateNameModal";
 import { TemplateThumbnail } from "./TemplateThumbnail";
@@ -808,6 +809,7 @@ export function DiagramEditor({
     setDescriptionFontSize,
     setDatabase,
     setRelaxedLayout,
+    rerouteAll,
     setProcessOwner,
     setProcedureDoc,
     setPcf,
@@ -930,6 +932,9 @@ export function DiagramEditor({
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig | undefined>(undefined);
   const [diagramColorConfig, setDiagramColorConfig] = useState<SymbolColorConfig>(initialDiagramColorConfig ?? {});
   const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
+  // Domain UML connector routing mode — experimental live A/B switch (see the
+  // bottom-centre toggle). Default = the original "optimal" behaviour.
+  const [umlSticky, setUmlSticky] = useState<boolean>(getUmlStickyRouting());
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   // SuperAdmin model-comparison matrix for this diagram — seeded from the saved
@@ -3228,6 +3233,9 @@ export function DiagramEditor({
                                     <a href="/BPMN%20Diagramatix%20Shapes%20v1.6.vssx" download onClick={closeFm} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download the BPMN Diagramatix v1.6 stencil (.vssx) to use in Visio">Visio Stencil</a>
                                   </>
                                 )}
+                                {diagramType === "domain" && (
+                                  <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}`; a.rel = "noopener"; a.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Export this UML domain diagram as a standard Visio UML .vsdx — opens in any Visio with the built-in UML shapes.">Visio (UML)</button>
+                                )}
                                 {(diagramType === "bpmn" || diagramType === "archimate") && (
                                   <button disabled={diagramType === "archimate"} onClick={() => { if (isAdmin) { setTemplateExportPrompt(true); } else { handleExportTemplates("user"); closeFm(); } }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent" title={diagramType === "archimate" ? "ArchiMate templates aren't available yet" : "Export your templates as a .diag_tems file"}>Templates</button>
                                 )}
@@ -3907,6 +3915,40 @@ export function DiagramEditor({
                         ? "Generating the staff narrative — this usually takes 15–30 seconds…"
                         : "Generating your diagram — this usually takes 15–30 seconds…"}
             </p>
+          </div>
+        )}
+
+        {/* Domain UML connector re-routing — experimental live A/B switch.
+            Domain diagrams only. "Optimal" (default) always re-picks the
+            closest faces on both ends; "Sticky" keeps each endpoint fixed on
+            its face while it stays closest, so the moving entity carries its
+            point and the stationary one keeps its point — only jumping when a
+            different face pair becomes genuinely closest. Flipping the switch
+            re-routes every connector so the change is visible immediately. */}
+        {diagramType === "domain" && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
+            <div className="flex items-center gap-2 rounded-full border border-gray-300 bg-white/95 px-3 py-1.5 shadow-lg backdrop-blur">
+              <span className="text-xs font-medium text-gray-500">Connector routing</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !umlSticky;
+                  setUmlStickyRouting(next);
+                  setUmlSticky(next);
+                  rerouteAll();
+                }}
+                className={`relative inline-flex h-6 w-32 items-center rounded-full text-[11px] font-semibold transition-colors ${
+                  umlSticky ? "bg-emerald-500 text-white" : "bg-gray-200 text-gray-700"
+                }`}
+                title={
+                  umlSticky
+                    ? "Sticky: endpoints stay fixed on their face; the moving entity carries its point, jumping only when a different face becomes closest."
+                    : "Optimal (current): both endpoints always snap to the closest faces."
+                }
+              >
+                <span className="w-full text-center">{umlSticky ? "Sticky (new)" : "Optimal (current)"}</span>
+              </button>
+            </div>
           </div>
         )}
 

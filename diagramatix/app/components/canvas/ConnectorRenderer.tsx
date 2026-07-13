@@ -582,7 +582,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     : isReviewLink ? "#ec4899"   // pink-500, matches the note
     : "#6b7280";
   const isUmlConn = connector.type === "uml-association" || connector.type === "uml-aggregation"
-    || connector.type === "uml-composition" || connector.type === "uml-generalisation";
+    || connector.type === "uml-composition" || connector.type === "uml-generalisation"
+    || connector.type === "uml-dependency" || connector.type === "uml-realisation";
   const markerId = `arrow-${connector.id}`;
   const openMarkerId = `arrow-open-${connector.id}`;
   const openStartMarkerId = `arrow-open-start-${connector.id}`;
@@ -779,6 +780,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           {connector.type === "uml-aggregation" && <UmlDiamondOpen id={umlDiamondId} color={strokeColor} />}
           {connector.type === "uml-composition" && <UmlDiamondFilled id={umlDiamondId} color={strokeColor} />}
           {connector.type === "uml-generalisation" && <UmlTriangleOpen id={umlTriangleId} color={strokeColor} />}
+          {connector.type === "uml-dependency" && showArrow && <OpenArrowMarker id={openMarkerId} color={strokeColor} />}
+          {connector.type === "uml-realisation" && <UmlTriangleOpen id={umlTriangleId} color={strokeColor} />}
         </defs>
       ) : showArrow && (
         <defs>
@@ -857,12 +860,12 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         fill="none"
         stroke={strokeColor}
         strokeWidth={connector.type === "uml-association" && connector.weight ? (selected ? connector.weight + 0.5 : connector.weight) : (highlight && !selected ? 2.5 : isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5))}
-        strokeDasharray={connector.type === "uml-association" && connector.dashed ? "6 4" : isMessageBPMN ? "10 5" : isAssocBPMN ? "0.5 3" : isFlowchartAssoc ? "1 3" : isReviewLink ? "4 3" : (isMessage ? "6 3" : undefined)}
+        strokeDasharray={(connector.type === "uml-dependency" || connector.type === "uml-realisation") ? "6 4" : connector.type === "uml-association" && connector.dashed ? "6 4" : isMessageBPMN ? "10 5" : isAssocBPMN ? "0.5 3" : isFlowchartAssoc ? "1 3" : isReviewLink ? "4 3" : (isMessage ? "6 3" : undefined)}
         strokeLinecap={isAssocBPMN || isFlowchartAssoc ? "round" : undefined}
         markerStart={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-start-${connector.id})`
           : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
-          : connector.type === "uml-generalisation" ? `url(#${umlTriangleId})`
+          : (connector.type === "uml-generalisation" || connector.type === "uml-realisation") ? `url(#${umlTriangleId})`
           : connector.type === "uml-association" && showArrow && connector.arrowAtSource ? `url(#${openMarkerId}-src)`
           : isBothArrow ? `url(#${openStartMarkerId})`
           : undefined
@@ -870,6 +873,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         markerEnd={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-end-${connector.id})`
           : connector.type === "uml-association" && showArrow && !connector.arrowAtSource ? `url(#${openMarkerId})`
+          : connector.type === "uml-dependency" && showArrow ? `url(#${openMarkerId})`
           : showArrow && !isUmlConn ? `url(#${isOpenArrow ? openMarkerId : markerId})`
           : undefined
         }
@@ -886,7 +890,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           markerStart={
             isMessageBPMN ? `url(#msg-start-${connector.id})`
             : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
-            : connector.type === "uml-generalisation" ? `url(#${umlTriangleId})`
+            : (connector.type === "uml-generalisation" || connector.type === "uml-realisation") ? `url(#${umlTriangleId})`
             : connector.type === "uml-association" && showArrow && connector.arrowAtSource ? `url(#${openMarkerId}-src)`
             : isBothArrow ? `url(#${openStartMarkerId})`
             : undefined
@@ -894,6 +898,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           markerEnd={
             isMessageBPMN ? `url(#msg-end-${connector.id})`
             : connector.type === "uml-association" && showArrow && !connector.arrowAtSource ? `url(#${openMarkerId})`
+            : connector.type === "uml-dependency" && showArrow ? `url(#${openMarkerId})`
             : showArrow && !isUmlConn ? `url(#${isOpenArrow ? openMarkerId : markerId})`
             : undefined
           }

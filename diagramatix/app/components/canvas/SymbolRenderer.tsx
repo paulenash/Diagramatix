@@ -1427,6 +1427,77 @@ function UmlEnumerationShape({ el }: { el: DiagramElement }) {
   );
 }
 
+// UML Package — a folder-tab container (top-left tab + body). Resizeable; the
+// name sits in the tab. Body is translucent so members drawn over it read.
+function UmlPackageShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const fsc = useContext(FontScaleCtx);
+  const fill = resolveColor("uml-package", colors);
+  const labelFontSize = Math.round(12 * fsc * 10) / 10;
+  // Tab sized to the label but clamped to a fraction of the width.
+  const tabH = Math.min(24, el.height * 0.22);
+  const tabW = Math.min(Math.max(60, (el.label?.length ?? 4) * 7 + 16), el.width * 0.6);
+  return (
+    <g>
+      {/* Tab */}
+      <rect x={el.x} y={el.y} width={tabW} height={tabH}
+        fill={fill} stroke="#374151" strokeWidth={1.5} />
+      {/* Body */}
+      <rect x={el.x} y={el.y + tabH} width={el.width} height={el.height - tabH}
+        fill={fill} fillOpacity={0.35} stroke="#374151" strokeWidth={1.5} />
+      <text x={el.x + 8} y={el.y + tabH / 2} textAnchor="start" dominantBaseline="middle"
+        fontSize={labelFontSize} fill="#111827" fontWeight="bold"
+        style={{ pointerEvents: "none", userSelect: "none" }}>
+        {el.label}
+      </text>
+    </g>
+  );
+}
+
+// UML Note — folded-corner comment box carrying free text.
+function UmlNoteShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const fill = resolveColor("uml-note", colors);
+  const fold = Math.min(16, el.width * 0.25, el.height * 0.4);
+  const x = el.x, y = el.y, w = el.width, h = el.height;
+  // Body path with a folded top-right corner.
+  const bodyPath = `M ${x} ${y} L ${x + w - fold} ${y} L ${x + w} ${y + fold} L ${x + w} ${y + h} L ${x} ${y + h} Z`;
+  const foldPath = `M ${x + w - fold} ${y} L ${x + w - fold} ${y + fold} L ${x + w} ${y + fold}`;
+  return (
+    <g>
+      <path d={bodyPath} fill={fill} stroke="#374151" strokeWidth={1.5} />
+      <path d={foldPath} fill="none" stroke="#374151" strokeWidth={1.5} />
+    </g>
+  );
+}
+
+// Pain Point — a jagged "explosion" marker highlighting a problem area.
+function UmlPainPointShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const fsc = useContext(FontScaleCtx);
+  const fill = resolveColor("uml-pain-point", colors);
+  const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+  const rx = el.width / 2, ry = el.height / 2;
+  // 12-point starburst.
+  const pts: string[] = [];
+  const spikes = 12;
+  for (let i = 0; i < spikes * 2; i++) {
+    const ang = (Math.PI * i) / spikes - Math.PI / 2;
+    const r = i % 2 === 0 ? 1 : 0.62;
+    pts.push(`${cx + Math.cos(ang) * rx * r},${cy + Math.sin(ang) * ry * r}`);
+  }
+  return (
+    <g>
+      <polygon points={pts.join(" ")} fill={fill} stroke="#b91c1c" strokeWidth={1.5} strokeLinejoin="round" />
+      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
+        fontSize={Math.round(10 * fsc * 10) / 10} fill="#7f1d1d" fontWeight="bold"
+        style={{ pointerEvents: "none", userSelect: "none" }}>
+        {el.label}
+      </text>
+    </g>
+  );
+}
+
 function ExternalEntityShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   return (
@@ -1755,6 +1826,9 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "subprocess-expanded": return <ExpandedSubprocessShape el={el} />;
       case "uml-class":             return <UmlClassShape el={el} />;
       case "uml-enumeration":       return <UmlEnumerationShape el={el} />;
+      case "uml-package":           return <UmlPackageShape el={el} />;
+      case "uml-note":              return <UmlNoteShape el={el} />;
+      case "uml-pain-point":        return <UmlPainPointShape el={el} />;
       case "external-entity":     return <ExternalEntityShape el={el} />;
       case "process-system":      return <ProcessSystemShape el={el} />;
       case "archimate-shape":     return <ArchimateShape el={el} />;
@@ -2821,7 +2895,9 @@ export function SymbolRenderer({
         element.type === 'pool' ||
         element.type === 'lane' ||
         element.type === 'uml-class' ||
-        element.type === 'uml-enumeration'
+        element.type === 'uml-enumeration' ||
+        element.type === 'uml-package' ||
+        element.type === 'uml-pain-point'
       ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge') && (() => {
         const isChevron = element.type === 'chevron' || element.type === 'chevron-collapsed';
         const isArchi = element.type === 'archimate-shape';
