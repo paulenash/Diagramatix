@@ -14,7 +14,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { recomputeAllConnectors, setUmlStickyRouting } from "@/app/lib/diagram/routing";
 import type { Connector, DiagramElement } from "@/app/lib/diagram/types";
 
-afterEach(() => setUmlStickyRouting(false)); // never leak the flag between tests
+afterEach(() => setUmlStickyRouting(true)); // reset to the app default (sticky), never leak
 
 const cls = (id: string, x: number, y: number): DiagramElement =>
   ({ id, type: "uml-class", x, y, width: 100, height: 60, label: id, properties: {} });
@@ -29,7 +29,8 @@ const assoc = (): Connector => ({
 const recompute = (conn: Connector, els: DiagramElement[]) => recomputeAllConnectors([conn], els)[0];
 
 describe("UML sticky routing", () => {
-  it("OPTIMAL (default): a small upward move of the right entity slides BOTH endpoints", () => {
+  it("OPTIMAL (legacy, flag off): a small upward move of the right entity slides BOTH endpoints", () => {
+    setUmlStickyRouting(false);
     const els = [cls("L", 0, 0), cls("R", 200, -20)]; // right moved up 20px
     const r = recompute(assoc(), els);
     expect(r.sourceSide).toBe("right");
@@ -68,6 +69,7 @@ describe("UML sticky routing", () => {
     const seq: Connector = { id: "c", sourceId: "s", targetId: "t", type: "sequence",
       sourceSide: "right", targetSide: "left", directionType: "directed", routingType: "rectilinear",
       sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [] };
+    setUmlStickyRouting(false);
     const off = recompute(seq, els);
     setUmlStickyRouting(true);
     const on = recompute(seq, els);

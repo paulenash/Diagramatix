@@ -7,7 +7,7 @@ import type { Bounds, Connector, DiagramData, DiagramElement, Point, RoutingType
  * experimental "sticky endpoints" mode: UML endpoints stay fixed on their face
  * until a large move makes a different face closest. Only the `isUmlConn`
  * branch of `recomputeAllConnectors` reads this. */
-let _umlStickyRouting = false;
+let _umlStickyRouting = true;
 export function setUmlStickyRouting(on: boolean): void { _umlStickyRouting = on; }
 export function getUmlStickyRouting(): boolean { return _umlStickyRouting; }
 

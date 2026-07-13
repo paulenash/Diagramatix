@@ -3925,7 +3925,7 @@ export function DiagramEditor({
             point and the stationary one keeps its point — only jumping when a
             different face pair becomes genuinely closest. Flipping the switch
             re-routes every connector so the change is visible immediately. */}
-        {diagramType === "domain" && (
+        {diagramType === "domain" && isAdmin && !superAdminHidden && (
           <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
             <div className="flex items-center gap-2 rounded-full border border-gray-300 bg-white/95 px-3 py-1.5 shadow-lg backdrop-blur">
               <span className="text-xs font-medium text-gray-500">Connector routing</span>
@@ -3942,11 +3942,11 @@ export function DiagramEditor({
                 }`}
                 title={
                   umlSticky
-                    ? "Sticky: endpoints stay fixed on their face; the moving entity carries its point, jumping only when a different face becomes closest."
-                    : "Optimal (current): both endpoints always snap to the closest faces."
+                    ? "Sticky (default): endpoints stay fixed on their face; the moving entity carries its point, jumping only when a different face becomes closest."
+                    : "Optimal (legacy): both endpoints always snap to the closest faces."
                 }
               >
-                <span className="w-full text-center">{umlSticky ? "Sticky (new)" : "Optimal (current)"}</span>
+                <span className="w-full text-center">{umlSticky ? "Sticky (default)" : "Optimal (legacy)"}</span>
               </button>
             </div>
           </div>
