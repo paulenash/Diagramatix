@@ -82,6 +82,21 @@ describe("task markers — deterministic message rules (T0739)", () => {
     expect(tt("plain")).toBe("none");   // plain human step, no marker → default none
   });
 
+  it("SERVICE guard — an automated task stays 'service' even with a black-box message (T0740)", () => {
+    const tt = run(
+      [
+        { id: "svcSys", type: "task", label: "Auto-post to ledger", pool: "p1", taskType: "service" },
+        { id: "svcEnt", type: "task", label: "System emails customer", pool: "p1", taskType: "service" },
+      ] as AiElement[],
+      [
+        { sourceId: "svcSys", targetId: "pSys", type: "message" },   // → would be "user" without the guard
+        { sourceId: "svcEnt", targetId: "pCust", type: "message" },  // → would be "send" without the guard
+      ] as AiConnection[],
+    );
+    expect(tt("svcSys")).toBe("service");
+    expect(tt("svcEnt")).toBe("service");
+  });
+
   it("a sequence flow (not a message) does not drive a marker", () => {
     const tt = run(
       [{ id: "x", type: "task", label: "Do", pool: "p1" }] as AiElement[],

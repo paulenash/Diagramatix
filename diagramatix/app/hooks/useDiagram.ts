@@ -6470,6 +6470,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           // For tasks: system pool → "user", non-system pool → "send"/"receive"
           if (el.id === sourceId) {
             if (el.type === "task") {
+              // SERVICE GUARD — an automated (Service) task stays Service even
+              // when it exchanges messages; don't rewrite its marker.
+              if (el.taskType === "service") return el;
               const otherIsSystem = isSystemPool(target);
               return { ...el, taskType: (otherIsSystem ? "user" : "send") as BpmnTaskType };
             }
@@ -6478,6 +6481,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           }
           if (el.id === targetId) {
             if (el.type === "task") {
+              if (el.taskType === "service") return el; // SERVICE GUARD (see above)
               const otherIsSystem = isSystemPool(source);
               return { ...el, taskType: (otherIsSystem ? "user" : "receive") as BpmnTaskType };
             }

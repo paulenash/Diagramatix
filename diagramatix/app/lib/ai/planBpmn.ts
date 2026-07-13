@@ -304,6 +304,12 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
       : (p.properties as { isSystem?: unknown } | undefined)?.isSystem === true;
   for (const t of parsed.elements) {
     if (t.type !== "task") continue;
+    // SERVICE GUARD — an automated (Service) task stays Service even when it
+    // exchanges messages. "No human" is orthogonal to messaging, so the
+    // message-driven markers must NOT clobber a deliberate "service" marker
+    // (this also honours green rule R2.03, which allows "service" for a
+    // system-interacting task).
+    if (t.taskType === "service") continue;
     let sysMsg = false, sendEntity = false, recvEntity = false, anyBlackBoxMsg = false;
     for (const c of parsed.connections) {
       if (c.type !== "message") continue;
