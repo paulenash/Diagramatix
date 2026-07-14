@@ -809,6 +809,7 @@ export function DiagramEditor({
     setDescriptionFontSize,
     setDatabase,
     setRelaxedLayout,
+    setShowPainPointDescriptions,
     rerouteAll,
     setProcessOwner,
     setProcedureDoc,
@@ -3625,6 +3626,9 @@ export function DiagramEditor({
             onSetRelaxedLayout={diagramType === "bpmn" ? setRelaxedLayout : undefined}
             umlSticky={umlSticky}
             onSetUmlSticky={diagramType === "domain" && isAdmin && !superAdminHidden ? ((v: boolean) => { setUmlStickyRouting(v); setUmlSticky(v); rerouteAll(); }) : undefined}
+            painPoints={data.elements.filter(e => e.type === "uml-pain-point")}
+            showPainPointDescriptions={data.showPainPointDescriptions}
+            onSetShowPainPointDescriptions={setShowPainPointDescriptions}
             onUpdateDiagramTitle={updateDiagramTitle}
             processOwner={data.processOwner}
             onSetProcessOwner={diagramType === "bpmn" ? setProcessOwner : undefined}

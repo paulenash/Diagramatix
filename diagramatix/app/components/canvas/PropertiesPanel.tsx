@@ -111,6 +111,10 @@ interface Props {
   // for domain diagrams; when the handler is undefined the option is hidden.
   umlSticky?: boolean;
   onSetUmlSticky?: (on: boolean) => void;
+  // Pain Point list (all pain-point elements on the diagram) + the display flag.
+  painPoints?: DiagramElement[];
+  showPainPointDescriptions?: boolean;
+  onSetShowPainPointDescriptions?: (on: boolean) => void;
   forceCollapseTitle?: boolean;
   /** Per-diagram process owner — surfaced in the new Process Owner
    *  sub-section. Both name + email are optional free-text. */
@@ -761,6 +765,9 @@ export function PropertiesPanel({
   onSetRelaxedLayout,
   umlSticky,
   onSetUmlSticky,
+  painPoints,
+  showPainPointDescriptions,
+  onSetShowPainPointDescriptions,
   forceCollapseTitle,
   processOwner,
   onSetProcessOwner,
@@ -1049,6 +1056,39 @@ export function PropertiesPanel({
               <span className="block text-[8px] text-red-400">SuperAdmin · uncheck for legacy Optimal routing</span>
             </span>
           </label>
+        )}
+
+        {/* Pain Point list — editable descriptions + on-diagram display toggle
+            (issues #3b/#3d/#3g). Shown for any diagram type that has pain points. */}
+        {painPoints && painPoints.length > 0 && (
+          <div className="mt-1 mb-1">
+            <div className="text-[9px] font-semibold text-gray-500 mb-0.5">Pain Points</div>
+            {onSetShowPainPointDescriptions && (
+              <label className="flex items-start gap-1.5 mb-1 cursor-pointer select-none" title="Show each pain point's description as a caption under its icon on the diagram">
+                <input type="checkbox" className="mt-[2px] cursor-pointer"
+                  checked={!!showPainPointDescriptions}
+                  onChange={e => onSetShowPainPointDescriptions(e.target.checked)} />
+                <span className="text-[9px] text-gray-600 leading-tight">Show descriptions on diagram</span>
+              </label>
+            )}
+            <div className="space-y-1">
+              {[...painPoints]
+                .sort((a, b) => (parseInt(a.label || "0", 10) || 0) - (parseInt(b.label || "0", 10) || 0))
+                .map(pp => (
+                  <div key={pp.id} className="flex items-start gap-1">
+                    <span className="text-[10px] font-bold text-red-700 w-4 shrink-0 text-center mt-0.5">{pp.label}</span>
+                    <textarea
+                      key={`ppdesc-${pp.id}`}
+                      defaultValue={(pp.properties.description as string | undefined) ?? ""}
+                      onBlur={e => onUpdateProperties?.(pp.id, { description: e.target.value })}
+                      rows={2}
+                      placeholder="Description…"
+                      className="flex-1 text-[9px] border border-gray-300 rounded px-1 py-0.5 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                ))}
+            </div>
+          </div>
         )}
 
         {/* Diagram Owner sub-section \u2014 hard FK to a registered user,

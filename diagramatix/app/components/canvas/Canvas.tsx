@@ -21,7 +21,7 @@ import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
 import { BubbleHelp } from "./BubbleHelp";
 import { EntityNameInput } from "./EntityNameInput";
 import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
-import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointDescCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { parseUmlAttribute, parseUmlOperation } from "@/app/lib/diagram/umlParse";
@@ -623,6 +623,8 @@ export function Canvas({
   // Multiplicity custom "n..m" entry buffer for the assist popup.
   const [umlMultCustom, setUmlMultCustom] = useState("");
   const umlRowInputRef = useRef<HTMLInputElement | null>(null);
+  // Pain Point multi-line description editor (double-click the icon).
+  const [painDescEdit, setPainDescEdit] = useState<{ elementId: string; value: string } | null>(null);
   // Focus-edit zoom: when an inline label edit begins we snap the canvas
   // so the edited target is centred and its width is ~30% of the screen,
   // then restore the pre-edit zoom/pan when the edit ends. `null` = not
@@ -3114,7 +3116,8 @@ export function Canvas({
       return false;
     }
 
-    const supportsAutoConnect = diagramType === "bpmn" || diagramType === "state-machine" || diagramType === "flowchart";
+    // Auto-connect is BPMN + flowchart only (issue #1) — state-machine dropped.
+    const supportsAutoConnect = diagramType === "bpmn" || diagramType === "flowchart";
     // State-machine rules: never auto-connect TO an initial-state or final-state
     const skipAutoConnect = diagramType === "state-machine" && (symbolType === "initial-state" || symbolType === "final-state");
     if (supportsAutoConnect && AUTO_CONNECT_TYPES.has(symbolType) && !willBeBoundaryEvent() && !skipAutoConnect) {
@@ -3180,7 +3183,7 @@ export function Canvas({
         onAddElement(symbolType, alignedPos, taskType, eventType, newId);
         // Two connectors at once — skip the flash to avoid juggling two
         // independent timers, and dispatch immediately.
-        const autoConnType: ConnectorType = diagramType === "state-machine" ? "transition" : "sequence";
+        const autoConnType: ConnectorType = diagramType === "flowchart" ? "flowline" : "sequence";
         onAddConnector(
           srcFound.source.id, newId,
           autoConnType, defaultDirectionType, defaultRoutingType,
@@ -4732,6 +4735,7 @@ export function Canvas({
       <SublaneIdsCtx.Provider value={sublaneIds}>
       <ProcessGroupDepthCtx.Provider value={processGroupDepthMap}>
       <UmlPackageDepthCtx.Provider value={umlPackageDepthMap}>
+      <ShowPainPointDescCtx.Provider value={!!data.showPainPointDescriptions}>
       <LaneDepthCtx.Provider value={laneDepthMap}>
       <ArchimateDepthCtx.Provider value={archimateDepthMap}>
       <DatabaseCtx.Provider value={data.database}>
@@ -4759,17 +4763,23 @@ export function Canvas({
         onMouseDown={handleBackgroundMouseDown}
         onMouseMove={handleUmlQuickAddMove}
         onDoubleClickCapture={(e) => {
-          // Double-click on a class attribute/operation row (or enum value)
-          // opens the inline row editor instead of the class-name label edit
-          // (issue #14). Runs in capture so it pre-empts the element's own
-          // double-click; only consumes the event when a row is actually hit.
-          if (diagramType !== "domain") return;
+          // Runs in capture so it pre-empts the element's own double-click.
+          // Pain points (any diagram type): double-click edits the multi-line
+          // description. Class/enum rows (domain only): inline row editor (#14).
           const rect = svgRef.current?.getBoundingClientRect();
           if (!rect) return;
           const w = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
           for (const el of data.elements) {
-            if (el.type !== "uml-class" && el.type !== "uml-enumeration") continue;
-            if (w.x >= el.x && w.x <= el.x + el.width && w.y >= el.y && w.y <= el.y + el.height) {
+            const hit = w.x >= el.x && w.x <= el.x + el.width && w.y >= el.y && w.y <= el.y + el.height;
+            if (!hit) continue;
+            // Pain point: edit its description (not the number) — leaving the icon
+            // size + numbering unchanged (issue #3a/e). Works on every type.
+            if (el.type === "uml-pain-point") {
+              setPainDescEdit({ elementId: el.id, value: (el.properties.description as string | undefined) ?? "" });
+              e.stopPropagation(); e.preventDefault();
+              return;
+            }
+            if (diagramType === "domain" && (el.type === "uml-class" || el.type === "uml-enumeration")) {
               if (tryStartUmlRowEditAt(el, w.y)) { e.stopPropagation(); e.preventDefault(); }
               return;
             }
@@ -6818,6 +6828,7 @@ export function Canvas({
       </DatabaseCtx.Provider>
       </ArchimateDepthCtx.Provider>
       </LaneDepthCtx.Provider>
+      </ShowPainPointDescCtx.Provider>
       </UmlPackageDepthCtx.Provider>
       </ProcessGroupDepthCtx.Provider>
       </SublaneIdsCtx.Provider>
@@ -7477,6 +7488,40 @@ export function Canvas({
         );
       })()}
 
+      {/* Pain Point description editor — multi-line, immediately under the icon
+          (issue #3a). Enter = newline; Esc / click-away commits. */}
+      {painDescEdit && (() => {
+        const el = data.elements.find((x) => x.id === painDescEdit.elementId);
+        if (!el) return null;
+        const commit = () => {
+          setPainDescEdit((cur) => {
+            if (cur) onUpdateProperties?.(cur.elementId, { description: cur.value });
+            return null;
+          });
+        };
+        const w = Math.max(el.width * zoom, 150);
+        const left = (el.x + el.width / 2) * zoom + pan.x - w / 2;
+        const top = (el.y + el.height) * zoom + pan.y + 2;
+        return (
+          <textarea
+            autoFocus
+            value={painDescEdit.value}
+            onChange={(e) => setPainDescEdit((cur) => (cur ? { ...cur, value: e.target.value } : cur))}
+            onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); commit(); } }}
+            onBlur={commit}
+            onMouseDown={(e) => e.stopPropagation()}
+            placeholder="Pain point description (Enter for a new line, Esc to finish)"
+            rows={Math.max(2, painDescEdit.value.split("\n").length)}
+            style={{
+              position: "absolute", left, top, width: w,
+              fontSize: Math.max(9, 11 * zoom), zIndex: 60,
+              border: "2px solid #b91c1c", borderRadius: 4, padding: "2px 4px",
+              background: "white", color: "#7f1d1d", textAlign: "center", resize: "none",
+            }}
+          />
+        );
+      })()}
+
       {/* Force-connect mode indicator */}
       {forceConnect?.dragging && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-[10px] font-medium px-3 py-1 rounded-full shadow-sm z-30 select-none animate-pulse">
@@ -7540,10 +7585,9 @@ export function Canvas({
         );
       })()}
 
-      {/* Auto-connect 3-state cyclic toggle (off → to-only → on → off).
-          Persists across reloads via localStorage. Editing-only — hidden
-          in the read-only published viewer. */}
-      {!readOnly && (
+      {/* Auto-connect toggle — BPMN + flowchart only (issue #1). Persists across
+          reloads via localStorage. Editing-only — hidden in the read-only viewer. */}
+      {!readOnly && (diagramType === "bpmn" || diagramType === "flowchart") && (
       <button
         onClick={() => setAutoConnectMode((m) => m === "off" ? "to-only" : "off")}
         className={`absolute bottom-2 right-2 flex items-center gap-1 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none border text-[11px] font-medium transition-colors ${

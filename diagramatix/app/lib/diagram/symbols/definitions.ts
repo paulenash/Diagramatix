@@ -271,8 +271,8 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   {
     type: "uml-pain-point",
     label: "Pain Point",
-    defaultWidth: 60,
-    defaultHeight: 60,
+    defaultWidth: 72,
+    defaultHeight: 54,
     description: "A pain-point marker highlighting a problem area on a domain diagram",
   },
   {

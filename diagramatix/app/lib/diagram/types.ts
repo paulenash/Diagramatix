@@ -305,6 +305,10 @@ export interface DiagramData {
    *  when the AI reproduces an imported image's positions; also toggleable in
    *  Diagram Properties. Optional — absent/false means normal Diagramatix rules. */
   relaxedLayout?: boolean;
+  /** Domain diagrams: show each Pain Point's multi-line description caption
+   *  under its icon on the canvas. Auto-enabled when the first Pain Point is
+   *  added; toggleable in Diagram Properties. Absent/false = icons only. */
+  showPainPointDescriptions?: boolean;
   /** Diagram-level list of all parent diagrams that currently link TO
    *  this diagram (managed by the project-wide "Scan Diagrams for Links"
    *  feature). A diagram can be linked from many parents — every one of
@@ -928,5 +932,12 @@ export interface TemplateData {
  *             (dashed direct arrowhead-less line from a Note to any element bar
  *             Pain Points / other Notes). Both reuse the existing `direct`
  *             `routingType`; no new connector fields beyond `containmentSwapEnd`.
+ *
+ *  v1.39 (2026-07-14): Pain Points. `uml-pain-point` elements are auto-numbered
+ *             (the number is the `label`, shown large in the icon) and carry an
+ *             OPTIONAL multi-line `properties.description`. A new OPTIONAL
+ *             diagram-level boolean `showPainPointDescriptions` renders those
+ *             descriptions as captions under the icons (auto-enabled on the
+ *             first Pain Point). No new element/connector types.
  */
-export const SCHEMA_VERSION = "1.38";
+export const SCHEMA_VERSION = "1.39";

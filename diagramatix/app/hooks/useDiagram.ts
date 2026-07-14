@@ -393,6 +393,7 @@ export type Action =
   | { type: "SET_DESCRIPTION_FONT_SIZE"; payload: number }
   | { type: "SET_DATABASE"; payload: string }
   | { type: "SET_RELAXED_LAYOUT"; payload: boolean }
+  | { type: "SET_SHOW_PAIN_POINT_DESC"; payload: boolean }
   | { type: "REROUTE_ALL" }
   | { type: "SET_PROCESS_OWNER"; payload: { name?: string; email?: string } }
   | { type: "SET_PROCEDURE_DOC"; payload: { url?: string; name?: string } | undefined }
@@ -445,6 +446,19 @@ const PROCESS_GROUP_CHILDREN = new Set<SymbolType>(["chevron", "chevron-collapse
 const UML_PACKAGE_CHILDREN = new Set<SymbolType>([
   "uml-class", "uml-enumeration", "uml-package", "uml-note", "uml-pain-point",
 ]);
+
+/** Re-number every pain point 1..N (ordered by their current number) so a
+ *  deletion closes the gap (issue #3c). The number lives in `label`. */
+function renumberPainPoints(elements: DiagramElement[]): DiagramElement[] {
+  const pps = elements.filter((e) => e.type === "uml-pain-point");
+  if (pps.length === 0) return elements;
+  const ordered = [...pps].sort(
+    (a, b) => (parseInt(a.label || "0", 10) || 0) - (parseInt(b.label || "0", 10) || 0),
+  );
+  const next = new Map<string, string>();
+  ordered.forEach((e, i) => next.set(e.id, String(i + 1)));
+  return elements.map((e) => (next.has(e.id) ? { ...e, label: next.get(e.id)! } : e));
+}
 
 function containerAccepts(containerType: SymbolType, childType: SymbolType): boolean {
   if (containerType === "system-boundary") return childType === "use-case" || childType === "hourglass";
@@ -3635,7 +3649,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "uml-note") {
         label = "Note";
       } else if (action.payload.symbolType === "uml-pain-point") {
-        label = "";
+        // Auto-number pain points; the number is the label (shown large in the
+        // icon). The multi-line text lives in properties.description.
+        const count = state.elements.filter((e) => e.type === "uml-pain-point").length;
+        label = String(count + 1);
       } else if (action.payload.symbolType === "external-entity") {
         const count = state.elements.filter((e) => e.type === "external-entity").length;
         label = `Entity ${count + 1}`;
@@ -3710,6 +3727,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         taskType:  action.payload.taskType,
         eventType: action.payload.eventType,
       };
+      // Adding the FIRST pain point auto-enables the description display (issue #3g).
+      const enablePainDesc = newEl.type === "uml-pain-point"
+        && !state.elements.some((e) => e.type === "uml-pain-point")
+        ? { showPainPointDescriptions: true } : {};
       // Snap event to host boundary on drop
       if (BOUNDARY_EVENT_TYPES.has(newEl.type)) {
         const centre = { x: newEl.x + newEl.width / 2, y: newEl.y + newEl.height / 2 };
@@ -3817,7 +3838,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             if (newEl.type === "text-annotation") {
               newEl = autoResizeTextAnnotation(newEl);
             }
-            return { ...state, elements: [...elements, newEl] };
+            return { ...state, ...enablePainDesc, elements: [...elements, newEl] };
           }
         }
       }
@@ -3859,7 +3880,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // double-shift pools and desync messageBPMN labels.
       const elementsWithNew = ensureContainersEncloseChildren([...workingElements, newEl]);
 
-      return { ...state, elements: elementsWithNew, connectors: workingConnectors };
+      return { ...state, ...enablePainDesc, elements: elementsWithNew, connectors: workingConnectors };
     }
 
     case "MOVE_ELEMENT": {
@@ -6224,7 +6245,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
       }
 
-      return { ...state, elements: updatePoolTypes(elements), connectors };
+      // A deleted pain point closes the numbering gap (issue #3c).
+      const afterDelete = el?.type === "uml-pain-point" ? renumberPainPoints(elements) : elements;
+      return { ...state, elements: updatePoolTypes(afterDelete), connectors };
     }
 
     case "ADD_CONNECTOR": {
@@ -7120,6 +7143,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
     case "SET_RELAXED_LAYOUT":
       return { ...state, relaxedLayout: action.payload || undefined };
+
+    case "SET_SHOW_PAIN_POINT_DESC":
+      return { ...state, showPainPointDescriptions: action.payload || undefined };
 
     // Recompute every connector's route — used to apply a live routing-mode
     // switch (e.g. the Domain UML sticky/optimal toggle) to the current diagram.
@@ -9232,6 +9258,12 @@ export function useDiagram(initialData: DiagramData) {
       (on: boolean) => {
         invalidateRedo();
         dispatch({ type: "SET_RELAXED_LAYOUT", payload: on });
+      }, []
+    ),
+    setShowPainPointDescriptions: useCallback(
+      (on: boolean) => {
+        invalidateRedo();
+        dispatch({ type: "SET_SHOW_PAIN_POINT_DESC", payload: on });
       }, []
     ),
     rerouteAll: useCallback(
