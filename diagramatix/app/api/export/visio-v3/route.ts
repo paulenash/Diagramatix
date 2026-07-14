@@ -11,6 +11,7 @@ import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/color
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 
 /**
  * GET /api/export/visio-v3?diagramId=<id>
@@ -52,6 +53,12 @@ export async function GET(request: Request) {
   try {
     // Domain (UML class) diagrams use a completely separate stencil + emitter.
     if (diagram.type === "domain") {
+      // SuperAdmin-only for now — the domain Visio export still needs work
+      // (connector first-paint visibility) before general release.
+      const email = session.user.email?.toLowerCase();
+      if (!email || !SUPERUSER_EMAILS.has(email)) {
+        return NextResponse.json({ error: "UML domain Visio export is not yet available." }, { status: 403 });
+      }
       const templateBuf = fs.readFileSync(path.join(process.cwd(), "public", domainProfile.templateFile));
       const result = await exportVisioDomainV3(
         diagram.data as any,
