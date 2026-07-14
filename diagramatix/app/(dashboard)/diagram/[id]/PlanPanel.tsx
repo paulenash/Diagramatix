@@ -29,6 +29,7 @@ import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialo
 import { AudioToProcessButton } from "@/app/components/AudioToProcessButton";
 import { ClarificationDialog } from "@/app/components/ClarificationDialog";
 import { RefineQuestionsDialog } from "@/app/components/RefineQuestionsDialog";
+import { SaveChangesDialog } from "@/app/components/SaveChangesDialog";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { appendClarifications, appendRefinements } from "@/app/lib/diagram/clarifications";
 import type { RefineQuestion } from "@/app/lib/ai/refineQuestions";
@@ -113,6 +114,9 @@ export function PlanPanel({
   // "Refine" — AI-generated clarifying questions that enrich the prompt before Plan.
   const [refineQs, setRefineQs] = useState<RefineQuestion[] | null>(null);
   const [refineMsg, setRefineMsg] = useState<string | null>(null);
+  // "New" — start a fresh prompt, guarding the current one against loss.
+  const [newGuardOpen, setNewGuardOpen] = useState(false);
+  const pendingClearRef = useRef(false); // set when a save must clear afterwards
   // Flowcharts use their own 2-phase endpoints + a deterministic top-down
   // layout. The structured Pools/Elements/Connectors tabs are BPMN-plan
   // shaped, so flowcharts edit the plan via the generic Raw JSON tab.
@@ -546,6 +550,25 @@ export function PlanPanel({
   // Save the current prompt text + plan JSON. Creates a new prompt or updates
   // the existing one based on editingPromptId. planJson is sent as-is (can be
   // null for a prompt with no plan yet).
+  /** Reset the panel to a blank slate for a new prompt. */
+  const clearForNew = useCallback(() => {
+    setPrompt("");
+    setEditingPromptId(null);
+    setSaveName("");
+    setShowSave(false);
+    setPlan({ elements: [], connections: [] });
+    setAttachment(null);
+    imageDimsRef.current = null;
+    setRefineQs(null);
+    setRefineMsg(null);
+    setClarifyOpen(false);
+    onAiFeedback?.(undefined);
+    lastSonnetResponseRef.current = null;
+    setError(null);
+    setStatus(null);
+    setNewGuardOpen(false);
+  }, [onAiFeedback, setPlan]);
+
   const savePrompt = useCallback(async () => {
     if (!saveName.trim() || !prompt.trim() || busy) return;
     setBusy("save");
@@ -576,12 +599,14 @@ export function PlanPanel({
       setShowSave(false);
       setStatus(`Saved "${saveName.trim()}"`);
       await loadPromptList();
+      // If this save was triggered by "New → Save…", clear afterwards.
+      if (pendingClearRef.current) { pendingClearRef.current = false; clearForNew(); }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setBusy(null);
     }
-  }, [saveName, prompt, busy, editingPromptId, diagramType, hasPlan, plan, loadPromptList]);
+  }, [saveName, prompt, busy, editingPromptId, diagramType, hasPlan, plan, loadPromptList, clearForNew]);
 
   const deletePrompt = useCallback(async (id: string) => {
     try {
@@ -1093,7 +1118,33 @@ export function PlanPanel({
           >
             {busy === "save" ? "Saving…" : editingPromptId ? "Update" : "Save…"}
           </button>
+          <button
+            onClick={() => {
+              // Nothing worth guarding → clear straight away.
+              if (!prompt.trim() && !hasPlan) { clearForNew(); return; }
+              setNewGuardOpen(true);
+            }}
+            disabled={busy !== null}
+            className="px-2 py-1 text-[11px] font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+            title="Start a new prompt (you'll be asked whether to save the current one first)"
+          >
+            New
+          </button>
         </div>
+
+        {newGuardOpen && (
+          <SaveChangesDialog
+            message="Save the current prompt before starting a new one?"
+            onCancel={() => setNewGuardOpen(false)}
+            onDiscard={() => clearForNew()}
+            onSave={() => {
+              setNewGuardOpen(false);
+              pendingClearRef.current = true; // savePrompt clears on success
+              if (editingPromptId) void savePrompt(); // already named → update + clear
+              else setShowSave(true);                  // needs a name → inline row, then clear
+            }}
+          />
+        )}
 
         {showSave && (
           <div className="shrink-0 flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded px-2 py-1.5 mb-2">
@@ -1101,7 +1152,7 @@ export function PlanPanel({
               autoFocus
               value={saveName}
               onChange={e => setSaveName(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") savePrompt(); if (e.key === "Escape") { setShowSave(false); setSaveName(""); } }}
+              onKeyDown={e => { if (e.key === "Enter") savePrompt(); if (e.key === "Escape") { setShowSave(false); setSaveName(""); pendingClearRef.current = false; } }}
               placeholder="Name for saved prompt"
               className="flex-1 px-2 py-1 text-[11px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
@@ -1109,7 +1160,7 @@ export function PlanPanel({
               className="px-2 py-1 text-[11px] font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
               Save
             </button>
-            <button onClick={() => { setShowSave(false); setSaveName(""); }}
+            <button onClick={() => { setShowSave(false); setSaveName(""); pendingClearRef.current = false; }}
               className="px-2 py-1 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50">
               Cancel
             </button>

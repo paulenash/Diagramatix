@@ -9,6 +9,7 @@ import type { DiagramData, DiagramElement, Connector, DiagramType, AiFeedback } 
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
 import { ClarificationDialog } from "@/app/components/ClarificationDialog";
+import { SaveChangesDialog } from "@/app/components/SaveChangesDialog";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { AudioToProcessButton } from "@/app/components/AudioToProcessButton";
 import { appendClarifications } from "@/app/lib/diagram/clarifications";
@@ -91,6 +92,9 @@ export function AiPanel({
   const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  // "New" — start a fresh prompt, guarding the current one against loss.
+  const [newGuardOpen, setNewGuardOpen] = useState(false);
+  const pendingClearRef = useRef(false);
 
   // File attachment
   const [attachment, setAttachment] = useState<{ name: string; type: string; data: string; mediaType?: string } | null>(null);
@@ -373,6 +377,19 @@ export function AiPanel({
     }
   }
 
+  /** Reset the panel to a blank slate for a new prompt. */
+  function clearForNew() {
+    setPrompt("");
+    setEditingPromptId(null);
+    setSaveName("");
+    setShowSave(false);
+    setAttachment(null);
+    imageDimsRef.current = null;
+    setError(null);
+    setStatus(null);
+    setNewGuardOpen(false);
+  }
+
   async function handleSavePrompt() {
     if (!saveName.trim() || !prompt.trim()) return;
     try {
@@ -393,6 +410,8 @@ export function AiPanel({
         });
         if (res.ok) { setShowSave(false); setSaveName(""); loadPrompts(); }
       }
+      // If this save was triggered by "New → Save…", clear afterwards.
+      if (pendingClearRef.current) { pendingClearRef.current = false; clearForNew(); }
     } catch { /* ignore */ }
   }
 
@@ -634,16 +653,37 @@ export function AiPanel({
                 disabled={!prompt.trim()}
                 className="px-2 py-1.5 text-xs text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
                 title="Update saved prompt">Update</button>
-              <button onClick={() => { setEditingPromptId(null); setSaveName(""); setShowSave(false); }}
+              <button onClick={() => { setEditingPromptId(null); setSaveName(""); setShowSave(true); }}
                 className="px-2 py-1.5 text-xs text-gray-500 border border-gray-300 rounded hover:bg-gray-50"
-                title="Stop editing, save as new instead">New</button>
+                title="Stop editing this saved prompt and save the text as a new one">Save as new</button>
             </>
           ) : (
             <button onClick={() => { setShowSave(!showSave); setEditingPromptId(null); }} disabled={!prompt.trim()}
               className="px-2 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
               title="Save this prompt">Save</button>
           )}
+          <button
+            onClick={() => {
+              if (!prompt.trim()) { clearForNew(); return; }
+              setNewGuardOpen(true);
+            }}
+            className="px-2 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+            title="Start a new prompt (you'll be asked whether to save the current one first)"
+          >New</button>
         </div>
+
+        {newGuardOpen && (
+          <SaveChangesDialog
+            message="Save the current prompt before starting a new one?"
+            onCancel={() => setNewGuardOpen(false)}
+            onDiscard={() => clearForNew()}
+            onSave={() => {
+              setNewGuardOpen(false);
+              pendingClearRef.current = true; // handleSavePrompt clears on success
+              setShowSave(true);              // name + save via the inline row, then clear
+            }}
+          />
+        )}
 
         {isSuperuser && !superAdminHidden && diagramType === "bpmn" && (
           <button onClick={() => handleCompare()}
@@ -668,7 +708,7 @@ export function AiPanel({
             <button onClick={handleSavePrompt} disabled={!saveName.trim()}
               className="px-2 py-1 text-xs text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50">
               {editingPromptId ? "Update" : "\u2713"}</button>
-            <button onClick={() => { setShowSave(false); setSaveName(""); setEditingPromptId(null); }}
+            <button onClick={() => { setShowSave(false); setSaveName(""); setEditingPromptId(null); pendingClearRef.current = false; }}
               className="px-2 py-1 text-xs text-gray-500 border border-gray-300 rounded hover:bg-gray-50">{"\u2715"}</button>
           </div>
         )}
