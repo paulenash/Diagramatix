@@ -1313,8 +1313,11 @@ function UmlClassShape({ el }: { el: DiagramElement }) {
   const fill = resolveColor("uml-class", colors);
   const db = useContext(DatabaseCtx);
   const isDbDiagram = db && db !== "none";
-  const showStereotype = (el.properties.showStereotype as boolean | undefined) ?? !!isDbDiagram;
-  const stereotype = isDbDiagram ? "table" : ((el.properties.stereotype as string | undefined) ?? "entity");
+  const explicitStereotype = el.properties.stereotype as string | undefined;
+  // If a class carries an explicit stereotype, show the header by default (a
+  // stereotype exists to be seen) — still overridable by an explicit flag.
+  const showStereotype = (el.properties.showStereotype as boolean | undefined) ?? (!!explicitStereotype || !!isDbDiagram);
+  const stereotype = isDbDiagram ? "table" : (explicitStereotype ?? "entity");
   const labelLines = (el.label ?? "").split("\n");
   const lineH = Math.round(14 * fsc);
   const labelFontSize = Math.round(12 * fsc * 10) / 10;

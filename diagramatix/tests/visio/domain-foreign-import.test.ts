@@ -44,6 +44,37 @@ describe("foreign UML import — package fixture", () => {
   });
 });
 
+describe("foreign UML import — aggregation direction + multiplicities/roles + stereotype", () => {
+  it("swaps the aggregation diamond to the correct end, reconstructs multiplicities/roles, and shows «Class»", async () => {
+    const { data } = await importVisioDomainV3(load("domain-agg-multiplicity.vsdx"));
+    const byLabel = Object.fromEntries(data.elements.map(e => [e.label, e]));
+
+    // Visio draws the aggregation diamond at the BEGIN end (OrderLine); Diagramatix
+    // renders the shared-diamond at the TARGET, so import swaps begin↔end — the
+    // connector must end (diamond) on OrderLine, not Person.
+    const agg = data.connectors.find(c => c.type === "uml-aggregation")!;
+    expect(agg).toBeTruthy();
+    expect(agg.sourceId).toBe(byLabel.Person.id);
+    expect(agg.targetId).toBe(byLabel.OrderLine.id);
+    // Multiplicities + role reconstructed from the connector's text sub-shapes.
+    expect(agg.sourceMultiplicity).toBe("1..*");
+    expect(agg.targetMultiplicity).toBe("1");
+    expect(agg.sourceRole).toBe("person");
+
+    const assoc = data.connectors.find(c => c.type === "uml-association")!;
+    expect(assoc.sourceId).toBe(byLabel.OrderStatus.id);
+    expect(assoc.targetId).toBe(byLabel.Order.id);
+    expect(assoc.sourceMultiplicity).toBe("1");
+    expect(assoc.targetMultiplicity).toBe("0..*");
+
+    // Every imported class shows the «Class» stereotype header.
+    for (const c of data.elements.filter(e => e.type === "uml-class")) {
+      expect(c.properties.stereotype).toBe("Class");
+      expect(c.properties.showStereotype).toBe(true);
+    }
+  });
+});
+
 describe("foreign UML import — plain classes fixture", () => {
   it("reconstructs 4 classes with members + agg/comp/assoc connectors", async () => {
     const { data } = await importVisioDomainV3(load("foreign-uml-classes.vsdx"));

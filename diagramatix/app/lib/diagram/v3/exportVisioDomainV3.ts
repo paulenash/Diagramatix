@@ -338,10 +338,16 @@ export async function exportVisioDomainV3(
     "uml-containment": "Dependency", "uml-note-anchor": "Dependency",
   };
   for (const conn of data.connectors) {
-    const srcSheet = elIdToSheet.get(conn.sourceId), tgtSheet = elIdToSheet.get(conn.targetId);
+    // Visio's Aggregation/Composition masters draw the diamond at the BEGIN end,
+    // whereas Diagramatix renders that shared-diamond at the TARGET. For those two
+    // types glue Begin to the Diagramatix TARGET so the diamond appears on the
+    // correct element in Visio (the mirror of the import-side swap). DgxUmlRel
+    // still records the true source/target, so a re-import round-trips losslessly.
+    const diamondSwap = conn.type === "uml-aggregation" || conn.type === "uml-composition";
+    const beginId = diamondSwap ? conn.targetId : conn.sourceId;
+    const endId = diamondSwap ? conn.sourceId : conn.targetId;
+    const srcSheet = elIdToSheet.get(beginId), tgtSheet = elIdToSheet.get(endId);
     if (srcSheet === undefined || tgtSheet === undefined) continue;
-    const src = data.elements.find(e => e.id === conn.sourceId)!;
-    const tgt = data.elements.find(e => e.id === conn.targetId)!;
     const masterName = CONN_MASTER[conn.type] ?? "Association";
     const master = M[masterName];
     if (master === undefined) continue;
@@ -350,7 +356,7 @@ export async function exportVisioDomainV3(
     // Cache Begin/End on the shape EDGES facing each other (Visio re-routes via
     // _WALKGLUE on recalc, but the cached endpoints must already sit on the
     // real shape boundaries or the connector floats until moved).
-    const s = elIdToBox.get(conn.sourceId), t = elIdToBox.get(conn.targetId);
+    const s = elIdToBox.get(beginId), t = elIdToBox.get(endId);
     if (!s || !t) continue;
     const be = edgePoint(s, t.cx, t.cy), en = edgePoint(t, s.cx, s.cy);
     const bx = be.x, by = be.y, ex = en.x, ey = en.y;

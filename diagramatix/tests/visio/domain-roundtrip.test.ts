@@ -99,6 +99,39 @@ describe("domain Visio round-trip (lossless via DgxUml)", () => {
     expect(r1.targetMultiplicity).toBe("0..*");
   });
 
+  it("aggregation/composition survive the begin↔end diamond swap (export glue ↔ import un-swap)", async () => {
+    // Aggregation/composition draw the diamond at the Visio BEGIN end but at the
+    // Diagramatix TARGET; export glues Begin→target and import swaps back. The
+    // net round-trip must preserve the original source/target AND multiplicities.
+    const diamonds: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "whole", type: "uml-class", x: 40, y: 40, width: 200, height: 80, label: "Whole", properties: {} },
+        { id: "part", type: "uml-class", x: 400, y: 40, width: 200, height: 80, label: "Part", properties: {} },
+        { id: "sub", type: "uml-class", x: 400, y: 260, width: 200, height: 80, label: "Sub", properties: {} },
+      ],
+      connectors: [
+        { id: "agg", sourceId: "whole", targetId: "part", sourceSide: "right", targetSide: "left",
+          type: "uml-aggregation", directionType: "non-directed", routingType: "rectilinear",
+          sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
+          sourceMultiplicity: "1", targetMultiplicity: "0..*", sourceRole: "owner", targetRole: "line" },
+        { id: "comp", sourceId: "whole", targetId: "sub", sourceSide: "bottom", targetSide: "top",
+          type: "uml-composition", directionType: "non-directed", routingType: "rectilinear",
+          sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [] },
+      ],
+    };
+    const out = await exportVisioDomainV3(diamonds, "RTD", tmpl());
+    const { data } = await importVisioDomainV3(out.buffer as ArrayBuffer);
+    const agg = byId(data.connectors, "agg");
+    expect(agg.type).toBe("uml-aggregation");
+    expect(agg.sourceId).toBe("whole"); expect(agg.targetId).toBe("part");
+    expect(agg.sourceMultiplicity).toBe("1"); expect(agg.targetMultiplicity).toBe("0..*");
+    expect(agg.sourceRole).toBe("owner"); expect(agg.targetRole).toBe("line");
+    const comp = byId(data.connectors, "comp");
+    expect(comp.type).toBe("uml-composition");
+    expect(comp.sourceId).toBe("whole"); expect(comp.targetId).toBe("sub");
+  });
+
   it("foreign path (blobs stripped) reconstructs from Member rows + master NameU", async () => {
     const out = await exportVisioDomainV3(DATA, "RT", tmpl());
     // Strip the DgxUml/DgxUmlRel + BpmnId blobs to simulate a non-Diagramatix file.

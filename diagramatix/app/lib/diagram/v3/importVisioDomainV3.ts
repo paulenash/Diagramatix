@@ -69,6 +69,43 @@ function baseNameU(n: string): string {
   return n.replace(/\.\d+$/, "");
 }
 
+/** A multiplicity token (`1`, `*`, `0..1`, `1..*`, `0..n`) as opposed to a role
+ *  name — used to tell the two label sub-shapes at each connector end apart. */
+const MULT_RE = /^\s*(\*|\d+|\d+\.\.(\d+|\*|n)|n)\s*$/;
+const isMult = (t: string) => MULT_RE.test(t);
+
+/** Foreign standard-UML connectors (no DgxUmlRel blob) carry their multiplicities
+ *  and role names as text sub-shapes inside the connector group — two per end
+ *  (multiplicity first in document order, role second). Assign each to the begin
+ *  or end endpoint by comparing its page-space Y to the connector's Begin/End
+ *  anchors, then split multiplicity (regex) from role (a non-multiplicity name).
+ *  Blank/duplicate-multiplicity slots are dropped rather than imported as junk. */
+function foreignRelLabels(groupXml: string): {
+  begin: { mult?: string; role?: string };
+  end: { mult?: string; role?: string };
+} {
+  const beginY = cellV(groupXml, "BeginY") ?? 0;
+  const endY = cellV(groupXml, "EndY") ?? 0;
+  const originY = (cellV(groupXml, "PinY") ?? 0) - (cellV(groupXml, "LocPinY") ?? 0);
+  const beginLbls: string[] = [], endLbls: string[] = [];
+  const re = /<Shape\b/g;
+  let m: RegExpExecArray | null; let first = true;
+  while ((m = re.exec(groupXml)) !== null) {
+    if (first) { first = false; continue; } // the connector group shape itself
+    const scope = groupXml.slice(m.index);
+    const txt = firstText(scope);
+    const py = parseFloat((scope.match(/<Cell N='PinY' V='([^']*)'/) || [])[1] ?? "NaN");
+    if (Number.isNaN(py)) continue;
+    const pageY = originY + py;
+    (Math.abs(pageY - beginY) <= Math.abs(pageY - endY) ? beginLbls : endLbls).push(txt);
+  }
+  const pick = (arr: string[]) => ({
+    mult: arr.find(t => isMult(t)),
+    role: arr.find(t => t.trim() && !isMult(t)),
+  });
+  return { begin: pick(beginLbls), end: pick(endLbls) };
+}
+
 /** Rows nested INSIDE a class/enum group (Microsoft standard-UML stencil stores
  *  attribute/operation/value rows as child sub-shapes, unlike our export which
  *  uses top-level Member shapes glued via DEPENDSON). Reads each row's INLINE
@@ -192,6 +229,14 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
       (properties as any).__nrows = nestedRows(s);
     }
 
+    // Every imported class shows its stereotype header (Diagramatix hides it on
+    // non-DB diagrams by default, and neither the DgxUml blob nor a foreign file
+    // records visibility) — defaulting a plain class to «Class».
+    if (type === "uml-class") {
+      if (!properties.stereotype) properties.stereotype = "Class";
+      properties.showStereotype = true;
+    }
+
     const el: DiagramElement = { id, type, x, y, width: w, height: h, label, properties };
     sheetToElId.set(sheetId!, id);
     // Stash the sheet id so the member pass can fill foreign rows.
@@ -280,17 +325,41 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
     let routingType: Connector["routingType"] = (d.routingType as Connector["routingType"]) ?? "rectilinear";
     // Containment / note-anchor are always direct even if the blob lacked it.
     if (type === "uml-containment" || type === "uml-note-anchor") routingType = "direct";
+
+    // Endpoint + multiplicity/role resolution. Aggregation/composition draw the
+    // shared-diamond at the Visio BEGIN end (both foreign files AND our own
+    // exports, which glue Begin→target to render the diamond correctly), whereas
+    // Diagramatix renders it at the TARGET — so we swap begin↔end for those two
+    // types in BOTH paths (source = Visio end, target = Visio begin/diamond).
+    // Blob multiplicities are already in Diagramatix source/target terms and
+    // must NOT be re-swapped; foreign labels are in Visio begin/end terms and are
+    // swapped alongside the endpoints.
+    const diamondSwap = type === "uml-aggregation" || type === "uml-composition";
+    let srcId = srcEl, tgtId = tgtEl;
+    let sMult = d.sourceMultiplicity as string | undefined;
+    let tMult = d.targetMultiplicity as string | undefined;
+    let sRole = d.sourceRole as string | undefined;
+    let tRole = d.targetRole as string | undefined;
+    if (!blob) {
+      const L = foreignRelLabels(s);
+      sMult = L.begin.mult; tMult = L.end.mult; sRole = L.begin.role; tRole = L.end.role;
+      if (diamondSwap) {
+        [sMult, tMult] = [tMult, sMult];
+        [sRole, tRole] = [tRole, sRole];
+      }
+    }
+    if (diamondSwap) [srcId, tgtId] = [tgtId, srcId];
     connectors.push({
       id: propVal(s, "BpmnId") ?? `conn-${sheetId}`,
-      sourceId: srcEl, targetId: tgtEl, sourceSide: "right", targetSide: "left",
+      sourceId: srcId, targetId: tgtId, sourceSide: "right", targetSide: "left",
       type,
       directionType: (d.directionType as Connector["directionType"]) ?? "non-directed",
       routingType,
       sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
-      sourceMultiplicity: d.sourceMultiplicity as string | undefined,
-      targetMultiplicity: d.targetMultiplicity as string | undefined,
-      sourceRole: d.sourceRole as string | undefined,
-      targetRole: d.targetRole as string | undefined,
+      sourceMultiplicity: sMult,
+      targetMultiplicity: tMult,
+      sourceRole: sRole,
+      targetRole: tRole,
       label: d.associationName as string | undefined,
       ...(d.arrowAtSource ? { arrowAtSource: true } : {}),
       ...(d.readingDirection ? { readingDirection: d.readingDirection as Connector["readingDirection"] } : {}),
