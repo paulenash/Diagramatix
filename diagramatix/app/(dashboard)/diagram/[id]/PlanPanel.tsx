@@ -28,8 +28,10 @@ import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
 import { AudioToProcessButton } from "@/app/components/AudioToProcessButton";
 import { ClarificationDialog } from "@/app/components/ClarificationDialog";
+import { RefineQuestionsDialog } from "@/app/components/RefineQuestionsDialog";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
-import { appendClarifications } from "@/app/lib/diagram/clarifications";
+import { appendClarifications, appendRefinements } from "@/app/lib/diagram/clarifications";
+import type { RefineQuestion } from "@/app/lib/ai/refineQuestions";
 import type { AiFeedback } from "@/app/lib/diagram/types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -61,7 +63,7 @@ interface Props {
    *  parent (DiagramEditor) overlay a wait indicator on the canvas
    *  itself — the sidebar banner alone is easy to miss while the
    *  user's eyes are on the diagram. */
-  onBusyChange?: (busy: "plan" | "apply" | "save" | "load" | "narrative" | "compare" | null) => void;
+  onBusyChange?: (busy: "plan" | "apply" | "save" | "load" | "narrative" | "compare" | "refine" | null) => void;
   /** Reports the audio/transcript acquisition phase so the parent can show
    *  the big canvas throbber overlay (same as plan generation). */
   onAudioPhaseChange?: (phase: null | "transcribing" | "reading" | "tidying") => void;
@@ -108,6 +110,9 @@ export function PlanPanel({
   const [compareStatus, setCompareStatus] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [clarifyOpen, setClarifyOpen] = useState(false);
+  // "Refine" — AI-generated clarifying questions that enrich the prompt before Plan.
+  const [refineQs, setRefineQs] = useState<RefineQuestion[] | null>(null);
+  const [refineMsg, setRefineMsg] = useState<string | null>(null);
   // Flowcharts use their own 2-phase endpoints + a deterministic top-down
   // layout. The structured Pools/Elements/Connectors tabs are BPMN-plan
   // shaped, so flowcharts edit the plan via the generic Raw JSON tab.
@@ -115,7 +120,7 @@ export function PlanPanel({
   const apiBase = isFlowchart ? "/api/ai/flowchart" : "/api/ai/bpmn";
   const { plan, setPlan, updateElement, deleteElement, updateConnection, deleteConnection, moveElementRelativeTo, asJson } = usePlanState();
   const [activeTab, setActiveTab] = useState<Tab>(isFlowchart ? "json" : "pools");
-  const [busy, setBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | "compare" | null>(null);
+  const [busy, setBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | "compare" | "refine" | null>(null);
   // Propagate busy transitions up so DiagramEditor can overlay a wait
   // indicator on the canvas.
   useEffect(() => { onBusyChange?.(busy); }, [busy, onBusyChange]);
@@ -166,6 +171,37 @@ export function PlanPanel({
       setBusy(null);
     }
   }
+
+  /** Refine — ask the AI for clarifying questions about the prompt's gaps, then
+   *  open the answers dialog. Stops there: the answers are appended to the
+   *  prompt and the user presses Plan themselves (never auto-generates). */
+  async function handleRefine() {
+    if (!prompt.trim() || busy !== null) return;
+    setBusy("refine");
+    setError(null);
+    setRefineMsg(null);
+    try {
+      const res = await fetch("/api/ai/bpmn/refine-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, pcfNodeId: pcf?.nodeId }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setRefineMsg(null); setError(json.error ?? "Refine failed"); return; }
+      const qs: RefineQuestion[] = Array.isArray(json.questions) ? json.questions : [];
+      if (qs.length === 0) {
+        setRefineMsg("Prompt looks complete — ready to Plan.");
+      } else {
+        setRefineQs(qs);
+      }
+    } catch {
+      // Refine is always optional — fail quietly, change nothing.
+      setRefineMsg("Couldn't generate questions — edit the prompt or press Plan.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const [issues, setIssues] = useState<string[] | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -819,6 +855,33 @@ export function PlanPanel({
             <p className="mt-1 shrink-0 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1" title="The plan is aligned to this APQC PCF standard process's decomposition">
               ◎ Aligning to APQC PCF: <span className="font-mono">{pcf.hierarchyId}</span> {pcf.name}
             </p>
+          )}
+          {/* Refine — AI asks clarifying questions to enrich the prompt before Plan (BPMN only). */}
+          {diagramType === "bpmn" && (
+            <div className="mt-1 shrink-0">
+              <button onClick={() => handleRefine()} disabled={!prompt.trim() || busy !== null}
+                className="w-full px-2 py-1 text-[11px] font-medium text-indigo-700 border border-indigo-300 bg-indigo-50 rounded hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+                title="Ask the AI a few clarifying questions and fold your answers into the prompt before you Plan">
+                {busy === "refine" && <Spinner />}
+                {busy === "refine" ? "Refining…" : "✨ Refine prompt"}
+              </button>
+              {refineMsg && (
+                <p className="text-[10px] text-gray-600 mt-0.5 flex items-start gap-1">
+                  <span className="flex-1">{refineMsg}</span>
+                  <button onClick={() => setRefineMsg(null)} className="text-gray-400 hover:text-gray-700 shrink-0" title="Dismiss" aria-label="Dismiss">&times;</button>
+                </p>
+              )}
+            </div>
+          )}
+          {refineQs && (
+            <RefineQuestionsDialog
+              questions={refineQs}
+              onCancel={() => setRefineQs(null)}
+              onSubmit={(answers) => {
+                setPrompt((prev) => appendRefinements(prev, answers));
+                setRefineQs(null);
+              }}
+            />
           )}
           {isSuperuser && !superAdminHidden && diagramType === "bpmn" && (
             <div className="mt-1 shrink-0">

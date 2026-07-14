@@ -1064,7 +1064,7 @@ export function DiagramEditor({
   // Mirror of PlanPanel's `busy` state so we can overlay a centred
   // wait indicator on the canvas while Sonnet plans. Sidebar banner
   // alone is easy to miss when the user's eyes are on the diagram.
-  const [aiBusy, setAiBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | "compare" | null>(null);
+  const [aiBusy, setAiBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | "compare" | "refine" | null>(null);
   // Audio / transcript acquisition phase (from either AI panel) — drives the
   // same big canvas throbber overlay as plan generation, so the wait cue is
   // just as visible while a recording / file is transcribed or tidied.

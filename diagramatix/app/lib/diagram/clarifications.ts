@@ -15,3 +15,29 @@ export function appendClarifications(prompt: string, feedback: AiFeedback): stri
   ].join("\n");
   return prompt.trim() ? `${prompt.trimEnd()}\n\n${block}` : block;
 }
+
+const REFINE_HEADER = "CLARIFICATIONS (answers to open questions — incorporate these):";
+
+/**
+ * Append answered "Refine" questions to a generation prompt as deterministic
+ * labelled lines (`- <label>: <value>`), inside the shared CLARIFICATIONS block.
+ * Skipped/empty answers are omitted. Across multiple Refine rounds the new lines
+ * MERGE into the single existing block (they don't stack duplicate headers),
+ * since Refine always appends at the end of the prompt.
+ */
+export function appendRefinements(
+  prompt: string,
+  items: { label: string; answer: string }[],
+): string {
+  const lines = items
+    .filter((x) => (x.answer ?? "").trim().length > 0)
+    .map((x) => `- ${x.label.trim()}: ${x.answer.trim()}`);
+  if (lines.length === 0) return prompt;
+  // A CLARIFICATIONS block already exists (prior round) → just add the new
+  // bullets to the end; the block is always the last thing in the prompt.
+  if (prompt.includes(REFINE_HEADER)) {
+    return `${prompt.trimEnd()}\n${lines.join("\n")}`;
+  }
+  const block = [REFINE_HEADER, ...lines].join("\n");
+  return prompt.trim() ? `${prompt.trimEnd()}\n\n${block}` : block;
+}
