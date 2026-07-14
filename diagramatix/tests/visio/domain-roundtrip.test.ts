@@ -147,10 +147,9 @@ describe("domain Visio round-trip (lossless via DgxUml)", () => {
       ],
     };
     const out = await exportVisioDomainV3(named, "RTN", tmpl());
-    // Export carries the name in User.RelationshipName with a ▶ reading glyph.
+    // Export carries the name in the connector's own <Text> with a ▶ glyph.
     const page = await (await JSZip.loadAsync(out)).file("visio/pages/page1.xml")!.async("string");
-    expect(page).toContain("<Row N='RelationshipName'>");
-    expect(page).toContain("Owns ▶");
+    expect(page).toContain("<Text>Owns ▶</Text>");
 
     // Strip blobs → foreign path must recover a clean name + the direction flag.
     const zip = await JSZip.loadAsync(out);

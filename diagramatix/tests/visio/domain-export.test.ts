@@ -76,20 +76,18 @@ describe("domain → Visio v3 export (standard UML, structural)", () => {
     expect(page).toContain("<Connects>");
     expect((page.match(/<Connect /g) ?? []).length).toBe(2);
 
-    // Connector renders via the proven BPMN recipe: ObjType=2 + explicit
-    // Geometry visibility cells (NoFill/NoLine/NoShow) + MoveTo/LineTo, plus the
-    // UML User (angles + ShowMulti + DX/DY), Connection, Actions sections that
-    // drive the arrowheads + multiplicity sub-shapes.
+    // Connector renders via the proven BPMN recipe: a self-contained 1-D Shape
+    // (Type='Shape', ObjType=2, explicit LineWeight + Geometry visibility cells +
+    // MoveTo/LineTo). Arrowheads are inline (BeginArrow/EndArrow).
+    expect(page).toMatch(/NameU='Association' Name='Association' Type='Shape'/);
     expect(page).toContain("<Cell N='ObjType' V='2'/>");
+    expect(page).toContain("<Cell N='LineWeight' V='0.01041666666666667'/>");
+    expect(page).toContain("<Cell N='BeginArrow' V='0'/><Cell N='EndArrow' V='0'/>");
     expect(page).toMatch(/<Section N='Geometry' IX='0'><Cell N='NoFill' V='1'\/><Cell N='NoLine' V='0'\/><Cell N='NoShow' V='0'\//);
     expect(page).toContain("<Row T='MoveTo' IX='1'>");
-    expect(page).toContain("<Row N='ShowMulti'><Cell N='Value' V='1' U='BOOL'/></Row>");
-    expect(page).toContain("<Row N='DXBegin'>");
-    expect(page).toContain("<Section N='Connection'>");
-    expect(page).toContain("<Section N='Actions'>");
-    // Multiplicities emitted as child sub-shapes (MasterShape 6=begin, 8=end).
-    expect(page).toMatch(/MasterShape='6'><Cell N='HideText' V='0'\/><Text>1<\/Text>/);
-    expect(page).toMatch(/MasterShape='8'><Cell N='HideText' V='0'\/><Text>\*<\/Text>/);
+    // Multiplicities emitted as separate borderless label Shapes near each end.
+    expect(page).toMatch(/NameU='UmlLabel' Type='Shape'>[^]*?<Text>1<\/Text>/);
+    expect(page).toMatch(/NameU='UmlLabel' Type='Shape'>[^]*?<Text>\*<\/Text>/);
 
     // Document infrastructure preserved from the standard-UML template.
     expect(zip.file("visio/theme/theme1.xml")).toBeTruthy();

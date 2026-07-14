@@ -351,10 +351,16 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
       const L = foreignRelLabels(s);
       sMult = L.begin.mult; tMult = L.end.mult; sRole = L.begin.role; tRole = L.end.role;
       // The Microsoft UML Association master stores the relationship name in a
-      // User cell (`User.RelationshipName`), NOT a text sub-shape. Prefer it;
-      // fall back to a centred text label for stencils that draw one instead.
+      // User cell (`User.RelationshipName`). Our own export (a self-contained
+      // Type='Shape' connector) instead puts it in the connector's OWN <Text>.
+      // Prefer RelationshipName, then a centred text sub-shape, then the
+      // connector's own text — the latter only if it isn't a multiplicity token
+      // (a foreign MS connector's own text is often a stray "1").
       const relName = propVal(s, "RelationshipName");
-      const rawName = (relName && relName.trim()) ? relName.trim() : L.name;
+      const ownText = firstText(s);
+      const ownName = ownText.trim() && !isMult(ownText.replace(/\s*[▶◀]$/, "").trim())
+        ? ownText.trim() : undefined;
+      const rawName = (relName && relName.trim()) ? relName.trim() : (L.name || ownName);
       if (rawName) {
         // We export reading direction as a ▶/◀ glyph appended to the name
         // (option 1). Strip it back into readingDirection on re-import.

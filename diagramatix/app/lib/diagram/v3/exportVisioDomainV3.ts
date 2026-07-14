@@ -340,6 +340,19 @@ export async function exportVisioDomainV3(
   // Connectors whose masters carry the 4 multiplicity/role sub-shapes (6/7/8/9)
   // and a ShowMulti toggle. Others (dependency/realisation/generalisation) don't.
   const ASSOC_FAMILY = new Set<Connector["type"]>(["uml-association", "uml-aggregation", "uml-composition"]);
+  // Per-type arrowheads (Visio arrow indices from the UML masters) + dashed flag,
+  // rendered inline on a self-contained connector Shape. begin/end already align
+  // with the diamond-swap so the diamond/triangle lands on the right element.
+  const CONN_ARROWS: Record<string, { begin: number; end: number; dash: boolean }> = {
+    "uml-association": { begin: 0, end: 0, dash: false },
+    "uml-aggregation": { begin: 22, end: 0, dash: false },   // hollow diamond
+    "uml-composition": { begin: 254, end: 0, dash: false },  // filled diamond
+    "uml-generalisation": { begin: 0, end: 14, dash: false },// hollow triangle
+    "uml-realisation": { begin: 0, end: 14, dash: true },    // hollow triangle, dashed
+    "uml-dependency": { begin: 0, end: 12, dash: true },     // open arrow, dashed
+    "uml-containment": { begin: 0, end: 0, dash: false },
+    "uml-note-anchor": { begin: 0, end: 0, dash: true },
+  };
   for (const conn of data.connectors) {
     // Visio's Aggregation/Composition masters draw the diamond at the BEGIN end,
     // whereas Diagramatix renders that shared-diamond at the TARGET. For those two
@@ -364,37 +377,8 @@ export async function exportVisioDomainV3(
     const be = edgePoint(s, t.cx, t.cy), en = edgePoint(t, s.cx, s.cy);
     const bx = be.x, by = be.y, ex = en.x, ey = en.y;
     const dx = ex - bx, dy = ey - by;
-    // Connector authoring frame: local origin at Begin, LocPin at the centre, so
-    // local (0,0)=Begin and (Width,Height)=End. Angles orient the master's
-    // arrowheads/diamond/triangle (End points forward along the line, Begin back
-    // out of the source) and drive the multiplicity sub-shapes' placement.
     const pinx = (bx + ex) / 2, piny = (by + ey) / 2, locx = dx / 2, locy = dy / 2;
-    const endAngle = Math.atan2(dy, dx);
-    const beginAngle = Math.atan2(-dy, -dx);
-
-    // Glue Begin/End to a fixed connection point via PAR(PNT(...)) so the line
-    // EVALUATES AND RENDERS on first open. `_WALKGLUE` (dynamic-connector
-    // routing) only recomputes on an interaction event, leaving the line blank
-    // until nudged — that was the invisible-connector bug. Class/enum shapes
-    // expose 4 edge-centre points (Connections X1=left, X2=right, X3=bottom,
-    // X4=top); other shapes keep the centre glue + _WALKGLUE fallback.
-    const hasCP = (elId: string) => {
-      const e = data.elements.find(x => x.id === elId);
-      return e?.type === "uml-class" || e?.type === "uml-enumeration";
-    };
-    const connIdx = (fx: number, fy: number, tx2: number, ty2: number) => {
-      const ax = tx2 - fx, ay = ty2 - fy;
-      if (Math.abs(ax) >= Math.abs(ay)) return ax >= 0 ? 2 : 1; // right : left
-      return ay >= 0 ? 4 : 3;                                    // top : bottom (Visio Y-up)
-    };
-    const k1 = hasCP(beginId) ? connIdx(s.cx, s.cy, t.cx, t.cy) : 0;
-    const k2 = hasCP(endId) ? connIdx(t.cx, t.cy, s.cx, s.cy) : 0;
-    const beginGlue = k1
-      ? `PAR(PNT(Sheet.${srcSheet}!Connections.X${k1},Sheet.${srcSheet}!Connections.Y${k1}))`
-      : "_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)";
-    const endGlue = k2
-      ? `PAR(PNT(Sheet.${tgtSheet}!Connections.X${k2},Sheet.${tgtSheet}!Connections.Y${k2}))`
-      : "_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)";
+    const arrows = CONN_ARROWS[conn.type] ?? { begin: 0, end: 0, dash: false };
 
     // Multiplicities/roles + name. Map begin/end back to Diagramatix source/target
     // (diamondSwap already flipped begin↔end for aggregation/composition).
@@ -411,86 +395,71 @@ export async function exportVisioDomainV3(
       : conn.readingDirection === "to-source" ? " ◀" : "";
     const nameText = conn.label ? esc(conn.label + rd) : "";
 
-    // Multiplicity/role child sub-shapes (MasterShape 6=begin-mult, 7=begin-role,
-    // 8=end-mult, 9=end-role) — thin wrappers that inherit the master sub-shapes'
-    // self-positioning formulas (User.Con*/User.*Angle); we only unhide + set the
-    // text. Empty slots are omitted. Only the association family carries them.
-    const kids: Array<[number, string]> = [];
-    if (hasMult) {
-      if (beginMult) kids.push([6, beginMult]);
-      if (beginRole) kids.push([7, beginRole]);
-      if (endMult) kids.push([8, endMult]);
-      if (endRole) kids.push([9, endRole]);
-    }
-    const subShapesXml = kids
-      .map(([ms, txt]) => `<Shape ID='${allocId()}' Type='Shape' MasterShape='${ms}'><Cell N='HideText' V='0'/><Text>${esc(txt)}</Text></Shape>`)
-      .join("");
-
-    // Full User section like a real Visio UML relationship instance. The
-    // DX/DYBegin/End rows carry the master's own routing-offset formulas that the
-    // arrowheads + multiplicity sub-shapes depend on; angles are explicit.
-    const userRows =
-      (nameText ? `<Row N='RelationshipName'><Cell N='Value' V='${nameText}' U='STR'/></Row>` : "") +
-      (hasMult && (beginMult || endMult) ? `<Row N='ShowMulti'><Cell N='Value' V='1' U='BOOL'/></Row>` : "") +
-      `<Row N='DXBegin'><Cell N='Value' V='0' U='DL' F='(PinX-LocPinX+Connections.X1)-BeginX'/></Row>` +
-      `<Row N='DYBegin'><Cell N='Value' V='0' U='DL' F='(PinY-LocPinY+Connections.Y1)-BeginY'/></Row>` +
-      `<Row N='DXEnd'><Cell N='Value' V='0' U='DL' F='EndX-(PinX-LocPinX+Connections.X2)'/></Row>` +
-      `<Row N='DYEnd'><Cell N='Value' V='0' U='DL' F='EndY-(PinY-LocPinY+Connections.Y2)'/></Row>` +
-      `<Row N='BeginAngle'><Cell N='Value' V='${n(beginAngle)}' U='DA'/></Row>` +
-      `<Row N='EndAngle'><Cell N='Value' V='${n(endAngle)}' U='DA'/></Row>` +
-      `<Row N='visNavOrder'><Cell N='Value' V='24000'/></Row>`;
-
+    // Emit the connector as a self-contained 1-D Shape — the SAME recipe the BPMN
+    // export uses (ObjType=2 + explicit LineWeight + explicit Geometry visibility
+    // cells + _WALKGLUE + centre glue), which is proven to render on first open.
+    // The UML group masters only render in Visio-native re-saves, so we skip them
+    // and draw the arrowheads inline via BeginArrow/EndArrow. NameU keeps the type
+    // for foreign re-import; DgxUmlRel keeps everything for a lossless round-trip.
     shapes.push(
-      `<Shape ID='${id}' NameU='${masterName}' Name='${masterName}' Type='Group' Master='${master}'>` +
-      `<Cell N='PinX' V='${n(pinx)}' F='GUARD((BeginX+EndX)/2)'/><Cell N='PinY' V='${n(piny)}' F='GUARD((BeginY+EndY)/2)'/>` +
-      `<Cell N='Width' V='${n(dx)}' F='GUARD(EndX-BeginX)'/><Cell N='Height' V='${n(dy)}' F='GUARD(EndY-BeginY)'/>` +
-      `<Cell N='LocPinX' V='${n(locx)}' F='GUARD(Width*0.5)'/><Cell N='LocPinY' V='${n(locy)}' F='GUARD(Height*0.5)'/>` +
-      `<Cell N='BeginX' V='${n(bx)}' F='${beginGlue}'/>` +
-      `<Cell N='BeginY' V='${n(by)}' F='${beginGlue}'/>` +
-      `<Cell N='EndX' V='${n(ex)}' F='${endGlue}'/>` +
-      `<Cell N='EndY' V='${n(ey)}' F='${endGlue}'/>` +
-      `<Cell N='LayerMember' V='0'/>` +
-      // 1D-connector + explicit line rendering cells — copied from the BPMN
-      // export, whose connectors DO render. Without ObjType/LineWeight and the
-      // explicit Geometry visibility cells below, the UML connectors stayed blank.
+      `<Shape ID='${id}' NameU='${masterName}' Name='${masterName}' Type='Shape'>` +
+      `<Cell N='PinX' V='${n(pinx)}' F='GUARD((BeginX+EndX)/2)'/>` +
+      `<Cell N='PinY' V='${n(piny)}' F='GUARD((BeginY+EndY)/2)'/>` +
+      `<Cell N='Width' V='${n(dx)}' F='GUARD(EndX-BeginX)'/>` +
+      `<Cell N='Height' V='${n(dy)}' F='GUARD(EndY-BeginY)'/>` +
+      `<Cell N='LocPinX' V='${n(locx)}' F='GUARD(Width*0.5)'/>` +
+      `<Cell N='LocPinY' V='${n(locy)}' F='GUARD(Height*0.5)'/>` +
       `<Cell N='Angle' V='0' F='GUARD(0DA)'/><Cell N='FlipX' V='0' F='GUARD(FALSE)'/><Cell N='FlipY' V='0' F='GUARD(FALSE)'/>` +
-      `<Cell N='ObjType' V='2'/><Cell N='LineWeight' V='0.01041666666666667'/>` +
+      `<Cell N='BeginX' V='${n(bx)}' F='_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)'/>` +
+      `<Cell N='BeginY' V='${n(by)}' F='_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)'/>` +
+      `<Cell N='EndX' V='${n(ex)}' F='_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)'/>` +
+      `<Cell N='EndY' V='${n(ey)}' F='_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)'/>` +
+      `<Cell N='ObjType' V='2'/>` +
+      `<Cell N='LineWeight' V='0.01041666666666667'/>` +
+      `<Cell N='LinePattern' V='${arrows.dash ? 2 : 1}'/>` +
+      `<Cell N='BeginArrow' V='${arrows.begin}'/><Cell N='EndArrow' V='${arrows.end}'/>` +
+      `<Cell N='BeginArrowSize' V='2'/><Cell N='EndArrowSize' V='2'/>` +
       `<Cell N='BegTrigger' V='2' F='_XFTRIGGER(Sheet.${srcSheet}!EventXFMod)'/>` +
       `<Cell N='EndTrigger' V='2' F='_XFTRIGGER(Sheet.${tgtSheet}!EventXFMod)'/>` +
       `<Cell N='ConFixedCode' V='6'/>` +
-      `<Cell N='TxtPinX' V='${n(locx)}' F='Inh'/><Cell N='TxtPinY' V='${n(locy)}' F='Inh'/>` +
-      // Section order matches a real instance: Control, User, Actions, Connection,
-      // Character, Geometry.
-      `<Section N='Control'><Row N='TextPosition'>` +
-        `<Cell N='X' V='${n(locx)}'/><Cell N='Y' V='${n(locy)}'/>` +
-        `<Cell N='XDyn' V='${n(locx)}'/><Cell N='YDyn' V='${n(locy)}'/></Row></Section>` +
-      `<Section N='User'>${userRows}</Section>` +
-      `<Section N='Actions'><Row N='Row_1'><Cell N='Checked' V='1' F='Inh'/></Row></Section>` +
-      // Connection anchors (begin=local origin, end=local Width/Height) that the
-      // multiplicity sub-shapes + arrowheads reference.
-      `<Section N='Connection'>` +
-        `<Row T='Connection' IX='0'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-        `<Row T='Connection' IX='1'><Cell N='X' V='${n(dx)}'/><Cell N='Y' V='${n(dy)}'/></Row></Section>` +
-      `<Section N='Character'><Row IX='0'><Cell N='LangID' V='en-AU'/></Row></Section>` +
-      // Straight line Begin(0,0)→End with EXPLICIT visibility cells (as the BPMN
-      // export does) so the path paints without depending on master inheritance.
+      (nameText ? `<Cell N='TxtPinX' V='${n(locx)}'/><Cell N='TxtPinY' V='${n(locy + 0.12)}'/>` : "") +
+      propRows([["BpmnId", conn.id], ["DgxUmlRel", dgxUmlRel(conn)]]) +
       `<Section N='Geometry' IX='0'>` +
         `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
         `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
         `<Row T='LineTo' IX='2'><Cell N='X' V='${n(dx)}'/><Cell N='Y' V='${n(dy)}'/></Row>` +
-        `<Row T='LineTo' IX='3' Del='1'/></Section>` +
-      propRows([["BpmnId", conn.id], ["DgxUmlRel", dgxUmlRel(conn)]]) +
+      `</Section>` +
       (nameText ? `<Text>${nameText}</Text>` : "") +
-      (subShapesXml ? `<Shapes>${subShapesXml}</Shapes>` : "") +
       `</Shape>`
     );
+
+    // Multiplicities/roles = small borderless text Shapes near each endpoint
+    // (a Type='Shape' connector can't carry sub-shape labels like a group). The
+    // multiplicity sits one side of the line, the role the other. Round-trip is
+    // via the DgxUmlRel blob; foreign re-import ignores these NameU='UmlLabel's.
+    if (hasMult) {
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len, uy = dy / len, perpX = -uy, perpY = ux;
+      const along = Math.min(0.32, len * 0.3), perp = 0.13;
+      const label = (cx: number, cy: number, txt?: string) => {
+        if (!txt) return;
+        shapes.push(
+          `<Shape ID='${allocId()}' NameU='UmlLabel' Type='Shape'>` +
+          `<Cell N='PinX' V='${n(cx)}'/><Cell N='PinY' V='${n(cy)}'/>` +
+          `<Cell N='Width' V='0.5'/><Cell N='Height' V='0.18'/>` +
+          `<Cell N='LocPinX' V='0.25'/><Cell N='LocPinY' V='0.09'/>` +
+          `<Cell N='LinePattern' V='0'/><Cell N='FillPattern' V='0'/>` +
+          `<Text>${esc(txt)}</Text></Shape>`);
+      };
+      label(bx + along * ux + perp * perpX, by + along * uy + perp * perpY, beginMult);
+      label(bx + along * ux - perp * perpX, by + along * uy - perp * perpY, beginRole);
+      label(ex - along * ux + perp * perpX, ey - along * uy + perp * perpY, endMult);
+      label(ex - along * ux - perp * perpX, ey - along * uy - perp * perpY, endRole);
+    }
+
     connects.push(
-      (k1
-        ? `<Connect FromSheet='${id}' FromCell='BeginX' FromPart='9' ToSheet='${srcSheet}' ToCell='Connections.X${k1}' ToPart='${99 + k1}'/>`
-        : `<Connect FromSheet='${id}' FromCell='BeginX' FromPart='9' ToSheet='${srcSheet}' ToCell='PinX' ToPart='3'/>`) +
-      (k2
-        ? `<Connect FromSheet='${id}' FromCell='EndX' FromPart='12' ToSheet='${tgtSheet}' ToCell='Connections.X${k2}' ToPart='${99 + k2}'/>`
-        : `<Connect FromSheet='${id}' FromCell='EndX' FromPart='12' ToSheet='${tgtSheet}' ToCell='PinX' ToPart='3'/>`)
+      `<Connect FromSheet='${id}' FromCell='BeginX' FromPart='9' ToSheet='${srcSheet}' ToCell='PinX' ToPart='3'/>` +
+      `<Connect FromSheet='${id}' FromCell='EndX' FromPart='12' ToSheet='${tgtSheet}' ToCell='PinX' ToPart='3'/>`
     );
   }
 
