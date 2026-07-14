@@ -1137,6 +1137,14 @@
       <xs:enumeration value="uml-aggregation"/>
       <xs:enumeration value="uml-composition"/>
       <xs:enumeration value="uml-generalisation"/>
+      <xs:enumeration value="uml-dependency"/>
+      <xs:enumeration value="uml-realisation"/>
+      <!-- schema 1.38 — domain-diagram connectors: containment (solid direct
+           package-to-package line with a circle-with-cross marker) and note
+           anchor (dashed direct line from a Note to any non-note/non-pain-point
+           element). -->
+      <xs:enumeration value="uml-containment"/>
+      <xs:enumeration value="uml-note-anchor"/>
       <!-- schema 1.9 — ArchiMate relationship types. The specific
            relationship sub-flavour is stored in
            connector.properties.relationshipKey and resolved against

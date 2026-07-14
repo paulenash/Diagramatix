@@ -6243,10 +6243,25 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       if (isDataConn && connectorType !== "associationBPMN") return state;
 
-      // UML package rule (this stage): a package may only be an endpoint of a
-      // dependency connector. Any other relationship touching a package is rejected.
+      // UML package rule: a package may only be an endpoint of a dependency or a
+      // containment connector. Any other relationship touching a package is
+      // rejected. Containment is package-to-package ONLY.
       const isPackageConn = source.type === "uml-package" || target.type === "uml-package";
-      if (isPackageConn && connectorType !== "uml-dependency") return state;
+      if (isPackageConn && connectorType !== "uml-dependency" && connectorType !== "uml-containment") return state;
+      if (connectorType === "uml-containment"
+        && !(source.type === "uml-package" && target.type === "uml-package")) return state;
+
+      // UML note rule: a Note connects ONLY via a note anchor, and a note anchor
+      // must join a Note to a non-Note, non-Pain-Point element.
+      const isNoteConn = source.type === "uml-note" || target.type === "uml-note";
+      if (isNoteConn && connectorType !== "uml-note-anchor") return state;
+      if (connectorType === "uml-note-anchor") {
+        const srcNote = source.type === "uml-note";
+        const tgtNote = target.type === "uml-note";
+        if (srcNote === tgtNote) return state; // need EXACTLY one Note end
+        const other = srcNote ? target.type : source.type;
+        if (other === "uml-pain-point") return state; // notes never anchor to pain points
+      }
 
       // Allow associationBPMN between event elements (child/boundary event connections)
       const EVENT_CONN_TYPES = new Set<SymbolType>(["start-event", "intermediate-event", "end-event"]);
@@ -6603,15 +6618,23 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         ),
       };
 
-    case "UPDATE_CONNECTOR_TYPE":
+    case "UPDATE_CONNECTOR_TYPE": {
+      // Switching TO containment forces a solid direct (centre-to-centre) line —
+      // re-route it so the geometry + ⊕ marker show correctly.
+      const toContainment = action.payload.connectorType === "uml-containment";
       return {
         ...state,
-        connectors: state.connectors.map((c) =>
-          c.id === action.payload.id
-            ? { ...c, type: action.payload.connectorType }
-            : c
-        ),
+        connectors: state.connectors.map((c) => {
+          if (c.id !== action.payload.id) return c;
+          const next = toContainment
+            ? { ...c, type: action.payload.connectorType, routingType: "direct" as const, directionType: "non-directed" as const }
+            : { ...c, type: action.payload.connectorType };
+          return toContainment
+            ? recomputeAllConnectors([next], state.elements, state.relaxedLayout)[0] ?? next
+            : next;
+        }),
       };
+    }
 
     case "REVERSE_CONNECTOR": {
       const connectors = state.connectors.map((c) => {
@@ -6965,13 +6988,21 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         ),
       };
 
-    case "UPDATE_CONNECTOR_FIELDS":
+    case "UPDATE_CONNECTOR_FIELDS": {
+      // Changing routingType (e.g. a generalisation's "Direct" toggle) must
+      // re-route that connector so the new geometry shows immediately.
+      const reroute = "routingType" in action.payload.fields;
       return {
         ...state,
-        connectors: state.connectors.map((c) =>
-          c.id === action.payload.id ? { ...c, ...action.payload.fields } : c
-        ),
+        connectors: state.connectors.map((c) => {
+          if (c.id !== action.payload.id) return c;
+          const merged = { ...c, ...action.payload.fields };
+          return reroute
+            ? recomputeAllConnectors([merged], state.elements, state.relaxedLayout)[0] ?? merged
+            : merged;
+        }),
       };
+    }
 
     case "UPDATE_DIAGRAM_TITLE":
       return { ...state, title: action.payload };

@@ -88,10 +88,11 @@ function dgxUml(el: DiagramElement): string {
 }
 function dgxUmlRel(c: Connector): string {
   return JSON.stringify({
-    type: c.type, directionType: c.directionType,
+    type: c.type, directionType: c.directionType, routingType: c.routingType,
     sourceRole: c.sourceRole, sourceMultiplicity: c.sourceMultiplicity,
     targetRole: c.targetRole, targetMultiplicity: c.targetMultiplicity,
     associationName: c.label, arrowAtSource: c.arrowAtSource,
+    containmentSwapEnd: c.containmentSwapEnd,
   });
 }
 const propRows = (rows: Array<[string, string]>) =>
@@ -330,6 +331,10 @@ export async function exportVisioDomainV3(
     "uml-association": "Association", "uml-aggregation": "Aggregation", "uml-composition": "Composition",
     "uml-dependency": "Dependency", "uml-realisation": "Interface Realization",
     "uml-generalisation": "Inheritance",
+    // No standard-UML master for containment (⊕) or a note anchor — map both to
+    // the dashed Dependency master for foreign viewing. The DgxUmlRel blob
+    // restores the true Diagramatix type on re-import (lossless round-trip).
+    "uml-containment": "Dependency", "uml-note-anchor": "Dependency",
   };
   for (const conn of data.connectors) {
     const srcSheet = elIdToSheet.get(conn.sourceId), tgtSheet = elIdToSheet.get(conn.targetId);

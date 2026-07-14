@@ -103,8 +103,8 @@ Output format:
   domain: `You are a UML Domain Model expert. Output ONLY valid JSON with elements and connections.
 
 Element types: "uml-class" (entity), "uml-enumeration" (lookup), "uml-package" (a resizeable container grouping related elements), "uml-note" (a free-text comment), "uml-pain-point"
-Connection types: "uml-association", "uml-aggregation", "uml-composition", "uml-generalisation", "uml-dependency", "uml-realisation"
-Note: only "uml-dependency" connectors may connect to a "uml-package".
+Connection types: "uml-association", "uml-aggregation", "uml-composition", "uml-generalisation", "uml-dependency", "uml-realisation", "uml-containment", "uml-note-anchor"
+Note: a "uml-package" accepts only "uml-dependency" or "uml-containment" connectors; "uml-containment" is package-to-package ONLY (a solid straight line with a ⊕ at the containing package). A "uml-note" connects to any element (except a "uml-pain-point" or another note) ONLY via a "uml-note-anchor" (a dashed straight line, no arrowhead).
 
 Output format:
 {
@@ -129,6 +129,8 @@ IMAGE INPUT — when an image of a UML class / domain diagram is attached, repro
 - a hollow diamond at one end → "uml-aggregation"; a filled diamond → "uml-composition" (diamond end = source).
 - a hollow triangle on a SOLID line → "uml-generalisation" (triangle end = the parent/superclass = target); a hollow triangle on a DASHED line → "uml-realisation".
 - an open arrow on a DASHED line → "uml-dependency".
+- a solid line between two packages ending in a circle-with-a-cross ⊕ → "uml-containment" (the ⊕ marks the containing package = target).
+- a DASHED line (no arrowhead) from a folded-corner note to another shape → "uml-note-anchor".
 OCR every label verbatim. Don't invent classes, members or relationships that aren't drawn. If the image and the prompt disagree, follow the image.`,
 
   context: `You are a Context Diagram expert. Output ONLY valid JSON with elements and connections.

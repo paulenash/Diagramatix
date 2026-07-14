@@ -8,8 +8,9 @@
  * the Class list-container's Member/Separator child rows.
  */
 import JSZip from "jszip";
-import type { DiagramData, DiagramElement, Connector, ConnectorType, UmlAttribute, UmlOperation } from "../types";
+import type { DiagramData, DiagramElement, Connector, ConnectorType } from "../types";
 import type { ImportResult } from "./importVisioV3";
+import { parseUmlAttribute as parseAttribute, parseUmlOperation as parseOperation } from "../umlParse";
 
 const PX = 96;
 
@@ -58,23 +59,8 @@ function firstText(s: string): string {
   return m ? m[1].replace(/<[^>]+>/g, "").trim() : "";
 }
 
-/** Parse a Member row string back into a UML attribute/operation. */
-function parseAttribute(text: string): UmlAttribute {
-  const t = text.trim();
-  const vis = (["+", "-", "#"].includes(t[0]) ? t[0] : undefined) as UmlAttribute["visibility"];
-  let rest = vis ? t.slice(1).trim() : t;
-  const isDerived = rest.startsWith("/"); if (isDerived) rest = rest.slice(1);
-  const mult = (rest.match(/\[([^\]]*)\]/) || [])[1];
-  rest = rest.replace(/\s*\[[^\]]*\]/, "");
-  const [namePart, typePart] = rest.split(":").map(x => x.trim());
-  return { visibility: vis, name: namePart, type: typePart || undefined, multiplicity: mult, isDerived: isDerived || undefined };
-}
-function parseOperation(text: string): UmlOperation {
-  const t = text.trim();
-  const vis = (["+", "-", "#"].includes(t[0]) ? t[0] : undefined) as UmlOperation["visibility"];
-  const name = (vis ? t.slice(1) : t).replace(/\(\s*\)\s*$/, "").trim();
-  return { visibility: vis, name };
-}
+// Member-row parsing reuses the shared parser in `../umlParse`
+// (`parseUmlAttribute` / `parseUmlOperation`), aliased above.
 
 export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainImportResult> {
   const zip = await JSZip.loadAsync(buffer);
@@ -216,15 +202,26 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
     const blob = propVal(s, "DgxUmlRel");
     let type: ConnectorType = CONN_TYPE[nameU];
     let sourceMultiplicity: string | undefined, targetMultiplicity: string | undefined, label: string | undefined;
+    let routingType: Connector["routingType"] = "rectilinear";
+    let containmentSwapEnd: boolean | undefined;
     if (blob) {
-      try { const d = JSON.parse(blob); type = d.type ?? type; sourceMultiplicity = d.sourceMultiplicity; targetMultiplicity = d.targetMultiplicity; label = d.associationName; } catch { /* keep NameU type */ }
+      try {
+        const d = JSON.parse(blob);
+        type = d.type ?? type;
+        sourceMultiplicity = d.sourceMultiplicity; targetMultiplicity = d.targetMultiplicity; label = d.associationName;
+        if (d.routingType) routingType = d.routingType;
+        containmentSwapEnd = d.containmentSwapEnd;
+      } catch { /* keep NameU type */ }
     }
+    // Containment / note-anchor are always direct even if the blob lacked it.
+    if (type === "uml-containment" || type === "uml-note-anchor") routingType = "direct";
     connectors.push({
       id: propVal(s, "BpmnId") ?? `conn-${sheetId}`,
       sourceId: srcEl, targetId: tgtEl, sourceSide: "right", targetSide: "left",
-      type, directionType: "non-directed", routingType: "rectilinear",
+      type, directionType: "non-directed", routingType,
       sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
       sourceMultiplicity, targetMultiplicity, label,
+      ...(containmentSwapEnd ? { containmentSwapEnd } : {}),
     });
   }
 

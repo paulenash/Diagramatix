@@ -24,6 +24,7 @@ import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/
 import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, type ResizeHandle } from "./SymbolRenderer";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
+import { parseUmlAttribute, parseUmlOperation } from "@/app/lib/diagram/umlParse";
 import { PaletteSymbolPreview } from "./Palette";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
 import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
@@ -582,6 +583,12 @@ export function Canvas({
     baseZoomRef.current = Number.isFinite(stored) && stored > 0 ? stored : 0.7;
   }, []);
   const [editingLabel, setEditingLabel] = useState<EditingLabel | null>(null);
+  // Shift-near-boundary quick-add of UML class attributes/operations.
+  // `umlQuickAddMenu` = the small Add-Attribute/Add-Operation flyout (shown
+  // while Shift is held near a class's left/right/bottom edge). `umlRowEdit` =
+  // the single-line inline editor for the freshly-appended (placeholder) row.
+  const [umlQuickAddMenu, setUmlQuickAddMenu] = useState<{ elementId: string; screenX: number; screenY: number } | null>(null);
+  const [umlRowEdit, setUmlRowEdit] = useState<{ elementId: string; kind: "attribute" | "operation"; index: number; value: string } | null>(null);
   // Focus-edit zoom: when an inline label edit begins we snap the canvas
   // so the edited target is centred and its width is ~30% of the screen,
   // then restore the pre-edit zoom/pan when the edit ends. `null` = not
@@ -1537,11 +1544,15 @@ export function Canvas({
               connType = "flowline"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
             }
           } else if (diagramType === "domain") {
-            // A UML package accepts only dependency connectors (this stage) —
-            // force the type when either end is a package, and give it a
-            // direction so the open arrow renders toward the target.
+            // A connector from/to a Note is a dashed direct note anchor (no
+            // arrowhead). Packages accept dependency (default) or containment —
+            // default to dependency; the user switches to containment in the
+            // properties panel. Everything else is a plain association.
+            const noteInvolved = sourceEl?.type === "uml-note" || targetEl.type === "uml-note";
             const pkgInvolved = sourceEl?.type === "uml-package" || targetEl.type === "uml-package";
-            if (pkgInvolved) {
+            if (noteInvolved) {
+              connType = "uml-note-anchor"; connRouting = "direct"; connDirection = "non-directed";
+            } else if (pkgInvolved) {
               connType = "uml-dependency"; connRouting = defaultRoutingType; connDirection = "open-directed";
             } else {
               connType = "uml-association"; connRouting = defaultRoutingType; connDirection = "non-directed";
@@ -2078,6 +2089,10 @@ export function Canvas({
     }
     if (elementContextMenu) {
       setElementContextMenu(null);
+      return;
+    }
+    if (umlQuickAddMenu) {
+      setUmlQuickAddMenu(null);
       return;
     }
 
@@ -3811,6 +3826,95 @@ export function Canvas({
   const isDraggingConnector = draggingConnector !== null;
   const isDraggingEndpoint = draggingEndpoint !== null;
 
+  // ── Shift-near-boundary quick-add of UML class attributes/operations ──
+  // Font scale used by the UML class renderer (mirror of FontScaleCtx value at
+  // Canvas.tsx's provider) so the inline editor lands on the right compartment.
+  const umlFsc = ((data.fontSize ?? 12) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1);
+  // World rect (top-left + size) of a class attribute/operation row, mirroring
+  // the SymbolRenderer compartment layout.
+  const umlRowWorldRect = useCallback((el: DiagramElement, kind: "attribute" | "operation", index: number) => {
+    const lineH = Math.round(14 * umlFsc);
+    const extraLabelLines = Math.max(0, (el.label ?? "").split("\n").length - 1);
+    const showStereotype = (el.properties.showStereotype as boolean | undefined) ?? false;
+    const stereotypeH = showStereotype ? Math.round(9 * umlFsc * 10) / 10 + 2 : 0;
+    const headerH = 28 + extraLabelLines * lineH + stereotypeH;
+    const attrsY = el.y + headerH;
+    if (kind === "attribute") return { x: el.x, y: attrsY + index * lineH, w: el.width, h: lineH };
+    const attributes = (el.properties.attributes as unknown[] | undefined) ?? [];
+    const showAttrs = (el.properties.showAttributes as boolean | undefined) ?? false;
+    const SECTION_PAD = 8;
+    const attrsH = showAttrs ? attributes.length * lineH + (attributes.length > 0 ? SECTION_PAD : 0) : 0;
+    return { x: el.x, y: attrsY + attrsH + index * lineH, w: el.width, h: lineH };
+  }, [umlFsc]);
+
+  // Shift + move near a class's left/right/bottom edge → show the Add flyout.
+  // Once shown, the menu persists until an item is chosen, a background click,
+  // or Escape (moving the pointer toward the button must NOT dismiss it).
+  const handleUmlQuickAddMove = useCallback((e: React.MouseEvent) => {
+    if (diagramType !== "domain") return;
+    if (!e.shiftKey || umlRowEdit || umlQuickAddMenu || isDraggingConnector || isDraggingEndpoint) return;
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const w = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
+    const NEAR = 12;
+    for (const el of data.elements) {
+      if (el.type !== "uml-class") continue;
+      const inYspan = w.y >= el.y && w.y <= el.y + el.height;
+      const inXspan = w.x >= el.x && w.x <= el.x + el.width;
+      const nearLeft = inYspan && Math.abs(w.x - el.x) <= NEAR;
+      const nearRight = inYspan && Math.abs(w.x - (el.x + el.width)) <= NEAR;
+      const nearBottom = inXspan && Math.abs(w.y - (el.y + el.height)) <= NEAR;
+      if (nearLeft || nearRight || nearBottom) {
+        setUmlQuickAddMenu({ elementId: el.id, screenX: e.clientX - rect.left, screenY: e.clientY - rect.top });
+        return;
+      }
+    }
+  }, [diagramType, umlRowEdit, umlQuickAddMenu, isDraggingConnector, isDraggingEndpoint, svgToWorld, data.elements]);
+
+  // Append an empty placeholder row (creating the compartment if needed) and
+  // open the inline editor over it.
+  const startUmlRowAdd = useCallback((elementId: string, kind: "attribute" | "operation") => {
+    const el = data.elements.find((x) => x.id === elementId);
+    if (!el) return;
+    const key = kind === "attribute" ? "attributes" : "operations";
+    const showKey = kind === "attribute" ? "showAttributes" : "showOperations";
+    const existing = ((el.properties[key] as unknown[] | undefined) ?? []).slice();
+    const index = existing.length;
+    existing.push({ name: "" });
+    onUpdateProperties?.(elementId, { [showKey]: true, [key]: existing });
+    setUmlQuickAddMenu(null);
+    setUmlRowEdit({ elementId, kind, index, value: "" });
+  }, [data.elements, onUpdateProperties]);
+
+  const commitUmlRow = useCallback(() => {
+    setUmlRowEdit((cur) => {
+      if (!cur) return null;
+      const el = data.elements.find((x) => x.id === cur.elementId);
+      if (el) {
+        const key = cur.kind === "attribute" ? "attributes" : "operations";
+        const arr = ((el.properties[key] as unknown[] | undefined) ?? []).slice();
+        const text = cur.value.trim();
+        if (text) arr[cur.index] = cur.kind === "attribute" ? parseUmlAttribute(text) : parseUmlOperation(text);
+        else arr.splice(cur.index, 1); // drop the empty placeholder
+        onUpdateProperties?.(cur.elementId, { [key]: arr });
+      }
+      return null;
+    });
+  }, [data.elements, onUpdateProperties]);
+
+  const cancelUmlRow = useCallback(() => {
+    setUmlRowEdit((cur) => {
+      if (!cur) return null;
+      const el = data.elements.find((x) => x.id === cur.elementId);
+      if (el) {
+        const key = cur.kind === "attribute" ? "attributes" : "operations";
+        const arr = ((el.properties[key] as unknown[] | undefined) ?? []).slice();
+        if (cur.index < arr.length) { arr.splice(cur.index, 1); onUpdateProperties?.(cur.elementId, { [key]: arr }); }
+      }
+      return null;
+    });
+  }, [data.elements, onUpdateProperties]);
+
   // ── Correction #7 (2026-06-07) ──────────────────────────────────────────
   // Auto-scroll the canvas while the user is drawing a connector and their
   // cursor approaches the viewport edge. The connector's rubber-band line
@@ -4494,6 +4598,7 @@ export function Canvas({
           svgRef.current?.focus({ preventScroll: true });
         }}
         onMouseDown={handleBackgroundMouseDown}
+        onMouseMove={handleUmlQuickAddMove}
         onWheel={handleWheel}
         onDrop={(e) => { setPoolDropPreview(null); handleDrop(e); }}
         onDragOver={(e) => {
@@ -7089,6 +7194,63 @@ export function Canvas({
           </button>
         </div>
       )}
+
+      {/* UML class quick-add flyout (Shift + near a class edge) */}
+      {umlQuickAddMenu && (
+        <div
+          style={{ position: "absolute", left: umlQuickAddMenu.screenX, top: umlQuickAddMenu.screenY, zIndex: 55 }}
+          className="bg-white border border-gray-300 rounded shadow-lg p-1"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            onMouseDown={(e) => { e.preventDefault(); startUmlRowAdd(umlQuickAddMenu.elementId, "attribute"); }}
+            className="block px-3 py-1.5 text-xs hover:bg-gray-100 w-full text-left rounded whitespace-nowrap"
+          >
+            + Add Attribute
+          </button>
+          <button
+            onMouseDown={(e) => { e.preventDefault(); startUmlRowAdd(umlQuickAddMenu.elementId, "operation"); }}
+            className="block px-3 py-1.5 text-xs hover:bg-gray-100 w-full text-left rounded whitespace-nowrap"
+          >
+            + Add Operation
+          </button>
+        </div>
+      )}
+
+      {/* UML class inline row editor — single line, positioned over the new row */}
+      {umlRowEdit && (() => {
+        const el = data.elements.find((x) => x.id === umlRowEdit.elementId);
+        if (!el) return null;
+        const r = umlRowWorldRect(el, umlRowEdit.kind, umlRowEdit.index);
+        return (
+          <input
+            autoFocus
+            value={umlRowEdit.value}
+            onChange={(e) => setUmlRowEdit((cur) => (cur ? { ...cur, value: e.target.value } : cur))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); commitUmlRow(); }
+              else if (e.key === "Escape") { e.preventDefault(); cancelUmlRow(); }
+            }}
+            onBlur={commitUmlRow}
+            onMouseDown={(e) => e.stopPropagation()}
+            placeholder={umlRowEdit.kind === "attribute" ? "+ name : Type [0..*] = default" : "+ operationName()"}
+            style={{
+              position: "absolute",
+              left: r.x * zoom + pan.x,
+              top: r.y * zoom + pan.y,
+              width: Math.max(90, r.w * zoom),
+              height: Math.max(16, r.h * zoom),
+              fontSize: Math.max(9, 10 * zoom),
+              zIndex: 60,
+              border: "2px solid #2563eb",
+              borderRadius: 3,
+              padding: "0 2px",
+              background: "white",
+              color: "#111827",
+            }}
+          />
+        );
+      })()}
 
       {/* Force-connect mode indicator */}
       {forceConnect?.dragging && (

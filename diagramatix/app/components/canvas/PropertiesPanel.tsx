@@ -21,6 +21,7 @@ import { SimulationSection } from "./SimulationSection";
 import { RiskControlSection, type RiskCatalogItem } from "./RiskControlSection";
 import { PcfClassifySection } from "./PcfClassifySection";
 import type { PcfClassification } from "@/app/lib/diagram/types";
+import { isUmlConnType } from "@/app/lib/diagram/types";
 import { getCachedCatalogue, findShapeByKey, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
 
 // ArchiMate relationship metadata — maps the archi-* connector type to its
@@ -1234,9 +1235,7 @@ export function PropertiesPanel({
           const isClassEnumConn = srcEl && tgtEl &&
             (classEnumTypes.has(srcEl.type) && classEnumTypes.has(tgtEl.type)) &&
             (srcEl.type !== tgtEl.type); // one is class, other is enumeration
-          const isUmlConn = connector.type === "uml-association" || connector.type === "uml-aggregation" ||
-            connector.type === "uml-composition" || connector.type === "uml-generalisation" ||
-            connector.type === "uml-dependency" || connector.type === "uml-realisation";
+          const isUmlConn = isUmlConnType(connector.type);
           // Process-context generalisation: only available between actor-type
           // participants (actor / team / system). When this case applies,
           // suppress the full 4-option UML dropdown below and show a
@@ -1265,20 +1264,35 @@ export function PropertiesPanel({
               )}
               {/* Relationship, Name, Reading Direction, Navigability — compact group */}
               {isUmlConn && !isPCActorConn && (() => {
-                const relOpts = [
-                  { value: "uml-association" as ConnectorType, label: "Association" },
-                  { value: "uml-aggregation" as ConnectorType, label: "Aggregation" },
-                  { value: "uml-composition" as ConnectorType, label: "Composition" },
-                  { value: "uml-generalisation" as ConnectorType, label: "Generalisation" },
-                  { value: "uml-dependency" as ConnectorType, label: "Dependency" },
-                  { value: "uml-realisation" as ConnectorType, label: "Realisation" },
-                ];
+                // A note anchor is a fixed dashed link — no relationship choice.
+                const isNoteAnchor = connector.type === "uml-note-anchor";
+                // Package-to-package connectors accept only Dependency or
+                // Containment; every other pair uses the standard six.
+                const bothPackages = srcEl?.type === "uml-package" && tgtEl?.type === "uml-package";
+                const relOpts = bothPackages
+                  ? [
+                      { value: "uml-dependency" as ConnectorType, label: "Dependency" },
+                      { value: "uml-containment" as ConnectorType, label: "Containment" },
+                    ]
+                  : [
+                      { value: "uml-association" as ConnectorType, label: "Association" },
+                      { value: "uml-aggregation" as ConnectorType, label: "Aggregation" },
+                      { value: "uml-composition" as ConnectorType, label: "Composition" },
+                      { value: "uml-generalisation" as ConnectorType, label: "Generalisation" },
+                      { value: "uml-dependency" as ConnectorType, label: "Dependency" },
+                      { value: "uml-realisation" as ConnectorType, label: "Realisation" },
+                    ];
                 const labelCls = "text-[10px] font-medium text-gray-500 w-20 shrink-0";
                 const selectCls = "text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium flex-1 min-w-0";
                 return (
                   <div className="space-y-0.5">
                     {/* Relationship */}
-                    {isClassEnumConn ? (
+                    {isNoteAnchor ? (
+                      <div className="flex items-center gap-1">
+                        <span className={labelCls}>Relationship:</span>
+                        <span className="text-[10px] font-medium text-gray-700">Note link</span>
+                      </div>
+                    ) : isClassEnumConn ? (
                       <div className="flex items-center gap-1">
                         <span className={labelCls}>Relationship:</span>
                         <span className="text-[10px] font-medium text-gray-700">Association</span>
@@ -1292,6 +1306,25 @@ export function PropertiesPanel({
                           {relOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
                       </div>
+                    )}
+                    {/* Generalisation — Direct (straight line) toggle */}
+                    {connector.type === "uml-generalisation" && onUpdateConnectorFields && (
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <span className={labelCls}>Direct:</span>
+                        <input type="checkbox" className="cursor-pointer"
+                          checked={connector.routingType === "direct"}
+                          onChange={e => onUpdateConnectorFields(connector.id, { routingType: e.target.checked ? "direct" : "rectilinear" })} />
+                        <span className="text-[10px] text-gray-500">straight line</span>
+                      </label>
+                    )}
+                    {/* Containment — move the ⊕ from the target to the source end */}
+                    {connector.type === "uml-containment" && onUpdateConnectorFields && (
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <span className={labelCls}>Swap {"⊕"} end:</span>
+                        <input type="checkbox" className="cursor-pointer"
+                          checked={!!connector.containmentSwapEnd}
+                          onChange={e => onUpdateConnectorFields(connector.id, { containmentSwapEnd: e.target.checked })} />
+                      </label>
                     )}
                     {/* Name */}
                     {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||

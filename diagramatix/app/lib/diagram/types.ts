@@ -106,8 +106,26 @@ export type ConnectorType =
   | "associationBPMN" | "messageBPMN" | "flow" | "flowline" | "flowchart-association"
   | "uml-association" | "uml-aggregation" | "uml-composition" | "uml-generalisation"
   | "uml-dependency" | "uml-realisation"
+  | "uml-containment" | "uml-note-anchor"
   | "review-comment-link"
   | ArchimateConnectorType;
+
+/**
+ * The UML/domain connector types. These share the UML rendering branch
+ * (ConnectorRenderer), the UML routing branch (recomputeAllConnectors), and the
+ * UML relationship editor (PropertiesPanel). Kept as a single source of truth so
+ * a new UML connector type is registered in exactly one place rather than three
+ * copy-pasted OR-chains. NEVER includes BPMN or any other connector type.
+ */
+export const UML_CONNECTOR_TYPES = new Set<ConnectorType>([
+  "uml-association", "uml-aggregation", "uml-composition", "uml-generalisation",
+  "uml-dependency", "uml-realisation", "uml-containment", "uml-note-anchor",
+]);
+
+/** True for UML/domain connectors (see {@link UML_CONNECTOR_TYPES}). */
+export function isUmlConnType(type: ConnectorType): boolean {
+  return UML_CONNECTOR_TYPES.has(type);
+}
 
 export type Side = "top" | "right" | "bottom" | "left";
 
@@ -234,6 +252,9 @@ export interface Connector {
   readingDirection?: "none" | "to-source" | "to-target";
   associationNameOffset?: Point;
   arrowAtSource?: boolean; // if true, open-directed arrow is shown at source end instead of target
+  // uml-containment only: if true, the ⊕ circle-with-cross marker is drawn at the
+  // SOURCE end instead of its default TARGET end (the containing/parent package).
+  containmentSwapEnd?: boolean;
   // Bottleneck indicator (sequence connectors only)
   bottleneck?: boolean;
   // ── Simulation (schema 1.24) ──────────────────────────────────────────
@@ -899,5 +920,13 @@ export interface TemplateData {
  *             path that falls back to auto-stack when the geometry is unusable);
  *             those AiElement/AiConnection `bounds`/`waypoints` are plan-only and
  *             NOT part of the diagram export.
+ *
+ *  v1.38 (2026-07-14): Domain-diagram connectors. Two new `ConnectorType` values —
+ *             `uml-containment` (solid direct package-to-package line with a ⊕
+ *             circle-with-cross marker; OPTIONAL boolean `containmentSwapEnd`
+ *             moves the ⊕ from the target to the source end) and `uml-note-anchor`
+ *             (dashed direct arrowhead-less line from a Note to any element bar
+ *             Pain Points / other Notes). Both reuse the existing `direct`
+ *             `routingType`; no new connector fields beyond `containmentSwapEnd`.
  */
-export const SCHEMA_VERSION = "1.37";
+export const SCHEMA_VERSION = "1.38";

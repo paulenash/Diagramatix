@@ -1,4 +1,5 @@
 import type { Bounds, Connector, DiagramData, DiagramElement, Point, RoutingType, Side } from "./types";
+import { isUmlConnType } from "./types";
 
 /* ── UML (Domain-diagram) connector routing mode ─────────────────────────
  * Live-toggleable from the editor (bottom-centre switch on Domain diagrams).
@@ -1453,9 +1454,7 @@ export function recomputeAllConnectors(
     //    UNTIL a move is large enough that a DIFFERENT face becomes closest —
     //    then only that end jumps to the new optimal face. Small moves leave
     //    both connection points fixed.
-    const isUmlConn = conn.type === "uml-association" || conn.type === "uml-aggregation"
-      || conn.type === "uml-composition" || conn.type === "uml-generalisation"
-      || conn.type === "uml-dependency" || conn.type === "uml-realisation";
+    const isUmlConn = isUmlConnType(conn.type);
     if (isUmlConn) {
       const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
       const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
