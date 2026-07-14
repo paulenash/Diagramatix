@@ -5,7 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { uploadSizeError } from "@/app/lib/uploadLimit";
 import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
 import { importVisioDomainV3, isDomainVisio } from "@/app/lib/diagram/v3/importVisioDomainV3";
-import { isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { isReadOnlyImpersonation, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import {
   requireRole,
@@ -134,6 +134,15 @@ export async function POST(request: Request) {
     );
   }
 
+  // Domain (UML) import is SuperAdmin-only for now — it's still maturing,
+  // mirroring the gated domain export. BPMN import is unaffected.
+  if (resolvedType === "domain") {
+    const email = session.user.email?.toLowerCase();
+    if (!email || !SUPERUSER_EMAILS.has(email)) {
+      return NextResponse.json({ error: "UML domain Visio import is not yet available." }, { status: 403 });
+    }
+  }
+
   // Element-count gate on the parsed diagram. Reject BEFORE we touch
   // the DB so the import counter isn't spent on an over-cap result.
   const elementBlock = await gateElementCount(session.user.id, resolvedType, parsed.data);
@@ -152,8 +161,10 @@ export async function POST(request: Request) {
     }
     const updated = await prisma.diagram.update({
       where: { id: overwriteDiagramId },
+      // Also update the type — a domain .vsdx imported over a BPMN diagram must
+      // switch to "domain" or it renders under the wrong engine.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: { data: parsed.data as any },
+      data: { data: parsed.data as any, type: resolvedType },
     });
     return NextResponse.json(
       { diagram: updated, warnings: parsed.warnings, stats: parsed.stats, overwrote: true },

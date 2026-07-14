@@ -93,6 +93,7 @@ function dgxUmlRel(c: Connector): string {
     targetRole: c.targetRole, targetMultiplicity: c.targetMultiplicity,
     associationName: c.label, arrowAtSource: c.arrowAtSource,
     containmentSwapEnd: c.containmentSwapEnd,
+    readingDirection: c.readingDirection, weight: c.weight, dashed: c.dashed,
   });
 }
 const propRows = (rows: Array<[string, string]>) =>

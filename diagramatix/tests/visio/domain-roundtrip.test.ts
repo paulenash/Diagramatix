@@ -72,6 +72,33 @@ describe("domain Visio round-trip (lossless via DgxUml)", () => {
     expect(byId(data.connectors, "g1").type).toBe("uml-dependency");
   });
 
+  it("preserves connector direction, roles, arrowAtSource, readingDirection (Slice 2)", async () => {
+    const rich: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "x", type: "uml-class", x: 40, y: 40, width: 200, height: 80, label: "X", properties: {} },
+        { id: "y", type: "uml-class", x: 400, y: 40, width: 200, height: 80, label: "Y", properties: {} },
+      ],
+      connectors: [
+        { id: "r1", sourceId: "x", targetId: "y", sourceSide: "right", targetSide: "left",
+          type: "uml-association", directionType: "open-directed", routingType: "rectilinear",
+          sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
+          arrowAtSource: true, sourceRole: "owner", targetRole: "item",
+          readingDirection: "to-target", sourceMultiplicity: "1", targetMultiplicity: "0..*" },
+      ],
+    };
+    const out = await exportVisioDomainV3(rich, "RT2", tmpl());
+    const { data } = await importVisioDomainV3(out.buffer as ArrayBuffer);
+    const r1 = byId(data.connectors, "r1");
+    expect(r1.directionType).toBe("open-directed");
+    expect(r1.arrowAtSource).toBe(true);
+    expect(r1.sourceRole).toBe("owner");
+    expect(r1.targetRole).toBe("item");
+    expect(r1.readingDirection).toBe("to-target");
+    expect(r1.sourceMultiplicity).toBe("1");
+    expect(r1.targetMultiplicity).toBe("0..*");
+  });
+
   it("foreign path (blobs stripped) reconstructs from Member rows + master NameU", async () => {
     const out = await exportVisioDomainV3(DATA, "RT", tmpl());
     // Strip the DgxUml/DgxUmlRel + BpmnId blobs to simulate a non-Diagramatix file.

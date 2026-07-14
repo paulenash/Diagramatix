@@ -3257,6 +3257,9 @@ export function DiagramEditor({
                                     <button onClick={() => { closeFm(); importBpmnInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Import an OMG BPMN 2.0 .bpmn file as a new diagram">BPMN</button>
                                   </>
                                 )}
+                                {diagramType === "domain" && isAdmin && (
+                                  <button onClick={() => { closeFm(); importVisioInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="Admin only — import a Visio UML .vsdx as a new domain diagram (still maturing).">Visio (UML)</button>
+                                )}
                               </>
                             )}
                           </div>

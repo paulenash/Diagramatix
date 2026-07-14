@@ -11,6 +11,7 @@ import JSZip from "jszip";
 import type { DiagramData, DiagramElement, Connector, ConnectorType } from "../types";
 import type { ImportResult } from "./importVisioV3";
 import { parseUmlAttribute as parseAttribute, parseUmlOperation as parseOperation } from "../umlParse";
+import { recomputeAllConnectors } from "../routing";
 
 const PX = 96;
 
@@ -201,27 +202,31 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
 
     const blob = propVal(s, "DgxUmlRel");
     let type: ConnectorType = CONN_TYPE[nameU];
-    let sourceMultiplicity: string | undefined, targetMultiplicity: string | undefined, label: string | undefined;
-    let routingType: Connector["routingType"] = "rectilinear";
-    let containmentSwapEnd: boolean | undefined;
+    // Read back EVERY field the export blob carries (lossless round-trip).
+    let d: Record<string, unknown> = {};
     if (blob) {
-      try {
-        const d = JSON.parse(blob);
-        type = d.type ?? type;
-        sourceMultiplicity = d.sourceMultiplicity; targetMultiplicity = d.targetMultiplicity; label = d.associationName;
-        if (d.routingType) routingType = d.routingType;
-        containmentSwapEnd = d.containmentSwapEnd;
-      } catch { /* keep NameU type */ }
+      try { d = JSON.parse(blob); type = (d.type as ConnectorType) ?? type; } catch { /* keep NameU type */ }
     }
+    let routingType: Connector["routingType"] = (d.routingType as Connector["routingType"]) ?? "rectilinear";
     // Containment / note-anchor are always direct even if the blob lacked it.
     if (type === "uml-containment" || type === "uml-note-anchor") routingType = "direct";
     connectors.push({
       id: propVal(s, "BpmnId") ?? `conn-${sheetId}`,
       sourceId: srcEl, targetId: tgtEl, sourceSide: "right", targetSide: "left",
-      type, directionType: "non-directed", routingType,
+      type,
+      directionType: (d.directionType as Connector["directionType"]) ?? "non-directed",
+      routingType,
       sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
-      sourceMultiplicity, targetMultiplicity, label,
-      ...(containmentSwapEnd ? { containmentSwapEnd } : {}),
+      sourceMultiplicity: d.sourceMultiplicity as string | undefined,
+      targetMultiplicity: d.targetMultiplicity as string | undefined,
+      sourceRole: d.sourceRole as string | undefined,
+      targetRole: d.targetRole as string | undefined,
+      label: d.associationName as string | undefined,
+      ...(d.arrowAtSource ? { arrowAtSource: true } : {}),
+      ...(d.readingDirection ? { readingDirection: d.readingDirection as Connector["readingDirection"] } : {}),
+      ...(d.weight ? { weight: d.weight as number } : {}),
+      ...(d.dashed ? { dashed: true } : {}),
+      ...(d.containmentSwapEnd ? { containmentSwapEnd: true } : {}),
     });
   }
 
@@ -231,7 +236,10 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
     : (nameU === "Member" || nameU === "Separator") ? "member row"
     : "skipped";
 
-  const data: DiagramData = { elements, connectors, viewport: { x: 0, y: 0, zoom: 1 } };
+  // The connectors carry stub sides + empty waypoints — route them against the
+  // imported element bounds so they render correctly on first open.
+  const routedConnectors = recomputeAllConnectors(connectors, elements);
+  const data: DiagramData = { elements, connectors: routedConnectors, viewport: { x: 0, y: 0, zoom: 1 } };
   return {
     data, warnings,
     stats: {
