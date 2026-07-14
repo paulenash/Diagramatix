@@ -393,6 +393,7 @@ export type Action =
   | { type: "SET_DESCRIPTION_FONT_SIZE"; payload: number }
   | { type: "SET_DATABASE"; payload: string }
   | { type: "SET_RELAXED_LAYOUT"; payload: boolean }
+  | { type: "SET_SHOW_PAIN_POINTS"; payload: boolean }
   | { type: "SET_SHOW_PAIN_POINT_DESC"; payload: boolean }
   | { type: "REROUTE_ALL" }
   | { type: "SET_PROCESS_OWNER"; payload: { name?: string; email?: string } }
@@ -7144,6 +7145,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "SET_RELAXED_LAYOUT":
       return { ...state, relaxedLayout: action.payload || undefined };
 
+    case "SET_SHOW_PAIN_POINTS":
+      // Default is "shown", so persist only the explicit OFF (false).
+      return { ...state, showPainPoints: action.payload ? undefined : false };
+
     case "SET_SHOW_PAIN_POINT_DESC":
       return { ...state, showPainPointDescriptions: action.payload || undefined };
 
@@ -9258,6 +9263,12 @@ export function useDiagram(initialData: DiagramData) {
       (on: boolean) => {
         invalidateRedo();
         dispatch({ type: "SET_RELAXED_LAYOUT", payload: on });
+      }, []
+    ),
+    setShowPainPoints: useCallback(
+      (on: boolean) => {
+        invalidateRedo();
+        dispatch({ type: "SET_SHOW_PAIN_POINTS", payload: on });
       }, []
     ),
     setShowPainPointDescriptions: useCallback(

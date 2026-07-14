@@ -111,8 +111,10 @@ interface Props {
   // for domain diagrams; when the handler is undefined the option is hidden.
   umlSticky?: boolean;
   onSetUmlSticky?: (on: boolean) => void;
-  // Pain Point list (all pain-point elements on the diagram) + the display flag.
+  // Pain Point list (all pain-point elements on the diagram) + the display flags.
   painPoints?: DiagramElement[];
+  showPainPoints?: boolean;
+  onSetShowPainPoints?: (on: boolean) => void;
   showPainPointDescriptions?: boolean;
   onSetShowPainPointDescriptions?: (on: boolean) => void;
   forceCollapseTitle?: boolean;
@@ -766,6 +768,8 @@ export function PropertiesPanel({
   umlSticky,
   onSetUmlSticky,
   painPoints,
+  showPainPoints,
+  onSetShowPainPoints,
   showPainPointDescriptions,
   onSetShowPainPointDescriptions,
   forceCollapseTitle,
@@ -1063,8 +1067,18 @@ export function PropertiesPanel({
         {painPoints && painPoints.length > 0 && (
           <div className="mt-1 mb-1">
             <div className="text-[9px] font-semibold text-gray-500 mb-0.5">Pain Points</div>
-            {onSetShowPainPointDescriptions && (
-              <label className="flex items-start gap-1.5 mb-1 cursor-pointer select-none" title="Show each pain point's description as a caption under its icon on the diagram">
+            {/* Master toggle — when off, icons + descriptions are hidden on the
+                diagram and the description sub-toggle disappears (issue #4). */}
+            {onSetShowPainPoints && (
+              <label className="flex items-start gap-1.5 mb-1 cursor-pointer select-none" title="Show pain point icons on the diagram">
+                <input type="checkbox" className="mt-[2px] cursor-pointer"
+                  checked={showPainPoints !== false}
+                  onChange={e => onSetShowPainPoints(e.target.checked)} />
+                <span className="text-[9px] text-gray-600 leading-tight">Display Pain Points</span>
+              </label>
+            )}
+            {showPainPoints !== false && onSetShowPainPointDescriptions && (
+              <label className="flex items-start gap-1.5 mb-1 ml-4 cursor-pointer select-none" title="Show each pain point's description as a caption under its icon">
                 <input type="checkbox" className="mt-[2px] cursor-pointer"
                   checked={!!showPainPointDescriptions}
                   onChange={e => onSetShowPainPointDescriptions(e.target.checked)} />
@@ -1085,6 +1099,12 @@ export function PropertiesPanel({
                       placeholder="Description…"
                       className="flex-1 text-[9px] border border-gray-300 rounded px-1 py-0.5 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
+                    {/* Delete this pain point (the rest renumber) — issue #2. */}
+                    <button
+                      onClick={() => onDeleteElement(pp.id)}
+                      className="text-gray-400 hover:text-red-600 text-xs leading-none mt-0.5 shrink-0"
+                      title="Delete this pain point"
+                    >×</button>
                   </div>
                 ))}
             </div>
@@ -1974,6 +1994,9 @@ export function PropertiesPanel({
         return <PcfRefEditor key={element.id} element={element} onUpdateProperties={onUpdateProperties} />;
       })()}
 
+      {/* Pain points have no editable label — the number is auto-assigned and
+          the text lives in the Pain Point list description (issue #1). */}
+      {element.type !== "uml-pain-point" && (
       <div>
         <label className="block text-[10px] font-medium text-gray-500 mb-0.5">
           {element.type === "uml-class" || element.type === "uml-enumeration" ||
@@ -2117,6 +2140,7 @@ export function PropertiesPanel({
           />
         )}
       </div>
+      )}
 
       {element.type === "text-annotation" && (
         <div className="flex items-center gap-1">

@@ -7,6 +7,7 @@ import {
   PALETTE_BY_DIAGRAM_TYPE,
 } from "@/app/lib/diagram/symbols/definitions";
 import { resolveColor, type SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { painPointStarPoints } from "./SymbolRenderer";
 import { loadArchimateCatalogue, type ArchimateCatalogue, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
 import { getThemeFor } from "@/app/lib/archimate/themes";
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
@@ -264,18 +265,13 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
           <path d="M 30 2 L 30 10 L 38 10" fill="none" stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
-    case "uml-pain-point": {
-      const cx = 15, cy = 15, spikes = 12; const pts: string[] = [];
-      for (let i = 0; i < spikes * 2; i++) {
-        const ang = (Math.PI * i) / spikes - Math.PI / 2; const r = i % 2 === 0 ? 13 : 8;
-        pts.push(`${cx + Math.cos(ang) * r},${cy + Math.sin(ang) * r}`);
-      }
+    case "uml-pain-point":
+      // Flattened golden-ratio starburst — matches the canvas icon.
       return (
-        <svg width={24} height={24} viewBox="0 0 30 30">
-          <polygon points={pts.join(" ")} fill={resolveColor("uml-pain-point", colorConfig)} stroke="#b91c1c" strokeWidth={1.5} strokeLinejoin="round" />
+        <svg width={28} height={18} viewBox="0 0 36 22">
+          <polygon points={painPointStarPoints(18, 11, 17, 10.5)} fill={resolveColor("uml-pain-point", colorConfig)} stroke="#b91c1c" strokeWidth={1.5} strokeLinejoin="round" />
         </svg>
       );
-    }
     case "external-entity":
       return (
         <svg width={28} height={28} viewBox="0 0 36 36">

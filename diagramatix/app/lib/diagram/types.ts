@@ -305,9 +305,13 @@ export interface DiagramData {
    *  when the AI reproduces an imported image's positions; also toggleable in
    *  Diagram Properties. Optional — absent/false means normal Diagramatix rules. */
   relaxedLayout?: boolean;
-  /** Domain diagrams: show each Pain Point's multi-line description caption
-   *  under its icon on the canvas. Auto-enabled when the first Pain Point is
-   *  added; toggleable in Diagram Properties. Absent/false = icons only. */
+  /** "Display Pain Points" master toggle — render Pain Point icons on the
+   *  canvas. Absent/true = shown; explicit false = hidden. Toggleable in
+   *  Diagram Properties (the description toggle nests under it). */
+  showPainPoints?: boolean;
+  /** Show each Pain Point's multi-line description caption under its icon on
+   *  the canvas. Auto-enabled when the first Pain Point is added; only takes
+   *  effect while `showPainPoints` is on. Absent/false = icons only. */
   showPainPointDescriptions?: boolean;
   /** Diagram-level list of all parent diagrams that currently link TO
    *  this diagram (managed by the project-wide "Scan Diagrams for Links"
@@ -939,5 +943,10 @@ export interface TemplateData {
  *             diagram-level boolean `showPainPointDescriptions` renders those
  *             descriptions as captions under the icons (auto-enabled on the
  *             first Pain Point). No new element/connector types.
+ *
+ *  v1.40 (2026-07-14): Pain Point "Display Pain Points" master toggle — a new
+ *             OPTIONAL diagram-level boolean `showPainPoints` (absent/true =
+ *             icons shown; explicit false = hidden). The description toggle
+ *             nests under it.
  */
-export const SCHEMA_VERSION = "1.39";
+export const SCHEMA_VERSION = "1.40";

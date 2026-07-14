@@ -272,7 +272,7 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     type: "uml-pain-point",
     label: "Pain Point",
     defaultWidth: 72,
-    defaultHeight: 54,
+    defaultHeight: 44, // golden-ratio rectangle (72 / 1.618 ≈ 44)
     description: "A pain-point marker highlighting a problem area on a domain diagram",
   },
   {

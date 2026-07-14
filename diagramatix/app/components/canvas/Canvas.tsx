@@ -21,7 +21,7 @@ import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
 import { BubbleHelp } from "./BubbleHelp";
 import { EntityNameInput } from "./EntityNameInput";
 import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
-import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointDescCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { parseUmlAttribute, parseUmlOperation } from "@/app/lib/diagram/umlParse";
@@ -4740,6 +4740,7 @@ export function Canvas({
       <SublaneIdsCtx.Provider value={sublaneIds}>
       <ProcessGroupDepthCtx.Provider value={processGroupDepthMap}>
       <UmlPackageDepthCtx.Provider value={umlPackageDepthMap}>
+      <ShowPainPointsCtx.Provider value={data.showPainPoints !== false}>
       <ShowPainPointDescCtx.Provider value={!!data.showPainPointDescriptions}>
       <LaneDepthCtx.Provider value={laneDepthMap}>
       <ArchimateDepthCtx.Provider value={archimateDepthMap}>
@@ -6834,6 +6835,7 @@ export function Canvas({
       </ArchimateDepthCtx.Provider>
       </LaneDepthCtx.Provider>
       </ShowPainPointDescCtx.Provider>
+      </ShowPainPointsCtx.Provider>
       </UmlPackageDepthCtx.Provider>
       </ProcessGroupDepthCtx.Provider>
       </SublaneIdsCtx.Provider>

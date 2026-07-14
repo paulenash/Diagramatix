@@ -183,6 +183,9 @@ export const LaneDepthCtx = createContext<Map<string, number>>(new Map());
  *  grandchild, …). Drives per-level fill lightening for recursive package
  *  nesting (issue #13). Computed in Canvas.tsx. */
 export const UmlPackageDepthCtx = createContext<Map<string, number>>(new Map());
+/** Whether Pain Point icons render on the canvas at all (diagram-level
+ *  "Display Pain Points" master toggle). Defaults true. Provided by Canvas.tsx. */
+export const ShowPainPointsCtx = createContext<boolean>(true);
 /** Whether Pain Point descriptions render as captions under their icons
  *  (diagram-level `showPainPointDescriptions`). Provided by Canvas.tsx. */
 export const ShowPainPointDescCtx = createContext<boolean>(false);
@@ -1483,38 +1486,37 @@ function UmlNoteShape({ el }: { el: DiagramElement }) {
 }
 
 // Pain Point — a jagged "explosion" marker highlighting a problem area.
-// Deterministic per-point radii/jitter for the Visio-style irregular starburst
-// (flatter points, uneven radii — no per-render randomness).
-const PP_OUTER = [1.0, 0.9, 0.98, 0.86, 1.0, 0.92, 0.97, 0.88, 1.0, 0.9, 0.95];
-const PP_INNER = [0.8, 0.74, 0.82, 0.76, 0.8, 0.72, 0.82, 0.78, 0.8, 0.75, 0.8];
-const PP_JIT   = [0, 0.06, -0.04, 0.05, -0.03, 0.04, -0.05, 0.03, -0.04, 0.05, -0.02];
+/** The original 12-point starburst, on the element's (now golden-ratio) box.
+ *  Shared by the canvas shape and the palette preview so they match. */
+export function painPointStarPoints(cx: number, cy: number, rx: number, ry: number): string {
+  const spikes = 12;
+  const pts: string[] = [];
+  for (let i = 0; i < spikes * 2; i++) {
+    const ang = (Math.PI * i) / spikes - Math.PI / 2;
+    const r = i % 2 === 0 ? 1 : 0.62;
+    pts.push(`${cx + Math.cos(ang) * rx * r},${cy + Math.sin(ang) * ry * r}`);
+  }
+  return pts.join(" ");
+}
 
 function UmlPainPointShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
+  const showPoints = useContext(ShowPainPointsCtx);
   const showDesc = useContext(ShowPainPointDescCtx);
+  if (!showPoints) return null; // "Display Pain Points" off — hide on canvas
   const fill = resolveColor("uml-pain-point", colors);
   const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
   const rx = el.width / 2, ry = el.height / 2;
-  // Flatter, irregular star points around an elliptical envelope (Visio-style).
-  const spikes = PP_OUTER.length;
-  const pts: string[] = [];
-  for (let i = 0; i < spikes; i++) {
-    const base = (2 * Math.PI * i) / spikes - Math.PI / 2;
-    const ao = base + PP_JIT[i];
-    pts.push(`${cx + Math.cos(ao) * rx * PP_OUTER[i]},${cy + Math.sin(ao) * ry * PP_OUTER[i]}`);
-    const ai = base + Math.PI / spikes; // valley between this point and the next
-    pts.push(`${cx + Math.cos(ai) * rx * PP_INNER[i]},${cy + Math.sin(ai) * ry * PP_INNER[i]}`);
-  }
-  // Large auto-number, shrunk a little for 2+ digits so it stays inside.
+  // Slightly smaller auto-number, shrunk more for 2+ digits so it stays inside.
   const digits = (el.label ?? "").length;
-  const numberFont = Math.round(Math.min(rx, ry) * (digits >= 2 ? 0.75 : 0.95) * fsc * 10) / 10;
+  const numberFont = Math.round(Math.min(rx, ry) * (digits >= 2 ? 0.62 : 0.8) * fsc * 10) / 10;
   const descLines = ((el.properties.description as string | undefined) ?? "").split("\n");
   const descFont = Math.round(11 * fsc * 10) / 10;
   const descLineH = Math.round(13 * fsc);
   return (
     <g>
-      <polygon points={pts.join(" ")} fill={fill} stroke="#b91c1c" strokeWidth={1.5} strokeLinejoin="round" />
+      <polygon points={painPointStarPoints(cx, cy, rx, ry)} fill={fill} stroke="#b91c1c" strokeWidth={1.5} strokeLinejoin="round" />
       <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
         fontSize={numberFont} fill="#7f1d1d" fontWeight="bold"
         style={{ pointerEvents: "none", userSelect: "none" }}>

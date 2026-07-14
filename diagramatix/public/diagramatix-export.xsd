@@ -537,6 +537,9 @@
          rectilinear messages between non-aligned elements, geometry validation relaxed.
          Set when a competitor diagram is imported from an image and reproduced as drawn. -->
     <xs:attribute name="relaxedLayout"     type="xs:boolean" use="optional"/>
+    <!-- schema 1.40 — "Display Pain Points" master toggle (absent/true = shown;
+         explicit false = hidden). -->
+    <xs:attribute name="showPainPoints" type="xs:boolean" use="optional"/>
     <!-- schema 1.39 — render Pain Point descriptions as captions under their
          icons. Auto-enabled when the first Pain Point is added. -->
     <xs:attribute name="showPainPointDescriptions" type="xs:boolean" use="optional"/>
