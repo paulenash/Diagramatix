@@ -42,6 +42,19 @@ describe("parseUmlAttribute", () => {
       visibility: "-", name: "count", type: "Integer", defaultValue: "0",
     });
   });
+
+  it("parses DB constraints back {PK}/{FK → T.c}/{NOT NULL} (round-trip inverse)", () => {
+    expect(parseUmlAttribute("+ id : Integer {PK}")).toEqual({
+      visibility: "+", name: "id", type: "Integer", primaryKey: true,
+    });
+    expect(parseUmlAttribute("- customerId : Integer [1] {FK → Customer.id}")).toEqual({
+      visibility: "-", name: "customerId", type: "Integer", multiplicity: "1",
+      foreignKey: true, fkTable: "Customer", fkColumn: "id",
+    });
+    expect(parseUmlAttribute("email : String {NOT NULL}")).toEqual({
+      name: "email", type: "String", notNull: true,
+    });
+  });
 });
 
 describe("parseUmlOperation", () => {

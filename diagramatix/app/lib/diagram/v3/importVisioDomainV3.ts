@@ -63,6 +63,36 @@ function firstText(s: string): string {
 // Member-row parsing reuses the shared parser in `../umlParse`
 // (`parseUmlAttribute` / `parseUmlOperation`), aliased above.
 
+/** Strip Visio's per-instance ".NNN" master-clone suffix → base NameU
+ *  (e.g. "Attribute.328" → "Attribute", "Package.5" → "Package"). */
+function baseNameU(n: string): string {
+  return n.replace(/\.\d+$/, "");
+}
+
+/** Rows nested INSIDE a class/enum group (Microsoft standard-UML stencil stores
+ *  attribute/operation/value rows as child sub-shapes, unlike our export which
+ *  uses top-level Member shapes glued via DEPENDSON). Reads each row's INLINE
+ *  text (present when the user edited it; blank when purely inherited from the
+ *  master — those become placeholders/warnings, not real data). */
+function nestedRows(groupXml: string): { text: string; sep: boolean; py: number }[] {
+  const rows: { text: string; sep: boolean; py: number }[] = [];
+  const re = /<Shape\b([^>]*?)(\/?)>/g;
+  let m: RegExpExecArray | null; let first = true;
+  while ((m = re.exec(groupXml)) !== null) {
+    if (first) { first = false; continue; } // the outer group shape itself
+    const nu = baseNameU((m[1].match(/NameU='([^']*)'/) || [])[1] ?? "");
+    if (nu === "Attribute" || nu === "Member" || nu === "Operation" || nu === "Separator") {
+      const scope = groupXml.slice(m.index);
+      rows.push({
+        text: firstText(scope),
+        sep: nu === "Separator",
+        py: parseFloat((scope.match(/<Cell N='PinY' V='([^']*)'/) || [])[1] ?? "0"),
+      });
+    }
+  }
+  return rows;
+}
+
 export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainImportResult> {
   const zip = await JSZip.loadAsync(buffer);
   const page = await zip.file("visio/pages/page1.xml")!.async("string");
@@ -83,9 +113,17 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
   const sheetToElId = new Map<string, string>();     // Visio sheet ID → element id
   const membersByClassSheet = new Map<string, { text: string; sep: boolean; py: number }[]>();
 
-  const ELEMENT_NAMES = new Set(["Class", "Enumeration", "Package (expanded)", "Package (collapsed)", "Note", "Composite", "Interface"]);
+  // Keyed by BASE NameU (per-instance ".NNN" suffix stripped). Broadened to the
+  // Microsoft standard-UML masters (Class with Attributes/Operations, plain
+  // Package, Interface) as well as our own stencil.
+  const ELEMENT_NAMES = new Set([
+    "Class", "Class with Attributes", "Class with Operations",
+    "Enumeration", "Package", "Package (expanded)", "Package (collapsed)",
+    "Note", "Composite", "Interface",
+  ]);
   const CONN_TYPE: Record<string, ConnectorType> = {
     "Association": "uml-association", "Directed Association": "uml-association",
+    "Association with Name and Multipicities": "uml-association",
     "Aggregation": "uml-aggregation", "Composition": "uml-composition",
     "Dependency": "uml-dependency", "Interface Realization": "uml-realisation", "Inheritance": "uml-generalisation",
   };
@@ -96,14 +134,16 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
   for (const s of shapes) {
     const sheetId = attr(s, "ID");
     const masterId = attr(s, "Master");
-    const nameU = masterId ? (id2name[masterId] ?? attr(s, "NameU") ?? "") : (attr(s, "NameU") ?? "");
-    if (nameU) {
+    const rawNameU = masterId ? (id2name[masterId] ?? attr(s, "NameU") ?? "") : (attr(s, "NameU") ?? "");
+    const nameU = baseNameU(rawNameU);
+    if (rawNameU) {
       const agg = masterAgg.get(nameU) ?? { masterId: masterId ?? "", nameU, count: 0 };
       agg.count++; masterAgg.set(nameU, agg);
     }
 
     if (nameU === "Member" || nameU === "Separator") {
-      // Belongs to a Class/Enumeration via DEPENDSON(5,Sheet.<id>!...).
+      // Top-level Member/Separator glued to a Class/Enumeration via
+      // DEPENDSON(5,Sheet.<id>!...) — our own export's list-container layout.
       const owner = (s.match(/DEPENDSON\(5,Sheet\.(\d+)!/) || [])[1];
       if (owner) {
         const list = membersByClassSheet.get(owner) ?? [];
@@ -142,10 +182,14 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
         if (d.parentId) (properties as any).__parentId = d.parentId;
       } catch { warnings.push(`Bad DgxUml on shape ${sheetId}`); }
     } else {
-      // Foreign file — infer type from master, rows filled in the member pass below.
+      // Foreign file — infer type from the (base) master NameU.
       type = nameU === "Enumeration" ? "uml-enumeration"
         : nameU.startsWith("Package") ? "uml-package"
         : nameU === "Note" ? "uml-note" : "uml-class";
+      if (nameU === "Interface") properties.stereotype = "interface";
+      // Microsoft stencil nests attribute/operation rows inside the class group
+      // rather than gluing top-level Member shapes — collect them here.
+      (properties as any).__nrows = nestedRows(s);
     }
 
     const el: DiagramElement = { id, type, x, y, width: w, height: h, label, properties };
@@ -155,23 +199,49 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
     elements.push(el);
   }
 
-  // Foreign member rows → attributes/operations/values (only when no DgxUml blob filled them).
+  // Foreign rows → attributes/operations/values (only when no DgxUml blob filled
+  // them). Prefer top-level Member rows glued via DEPENDSON (our export); fall
+  // back to rows nested inside the group (Microsoft stencil).
   for (const el of elements) {
     const sheet = (el as any).__sheet as string | undefined;
-    const rows = sheet ? membersByClassSheet.get(sheet) : undefined;
-    if (rows && !el.properties.attributes && !el.properties.operations && !el.properties.values) {
+    const dependsRows = sheet ? membersByClassSheet.get(sheet) : undefined;
+    const nrows = (el.properties as any).__nrows as { text: string; sep: boolean; py: number }[] | undefined;
+    const rows = (dependsRows && dependsRows.length) ? dependsRows : nrows;
+    if (rows && rows.length && !el.properties.attributes && !el.properties.operations && !el.properties.values) {
       rows.sort((a, b) => b.py - a.py); // top → bottom (Visio Y-up)
+      // Rows with no inline text are unedited stencil placeholders (text lives
+      // only in the master) — note them so we don't silently import blanks.
+      const blank = rows.filter(r => !r.sep && !r.text.trim()).length;
+      if (blank) warnings.push(`${el.label || el.id}: ${blank} row(s) had no editable text (Visio stencil placeholders)`);
       if (el.type === "uml-enumeration") {
-        el.properties.values = rows.filter(r => !r.sep).map(r => r.text);
+        el.properties.values = rows.filter(r => !r.sep && r.text.trim()).map(r => r.text);
       } else {
         const sepIdx = rows.findIndex(r => r.sep);
-        const attrRows = (sepIdx >= 0 ? rows.slice(0, sepIdx) : rows).filter(r => !r.sep);
-        const opRows = sepIdx >= 0 ? rows.slice(sepIdx + 1).filter(r => !r.sep) : [];
+        const attrRows = (sepIdx >= 0 ? rows.slice(0, sepIdx) : rows).filter(r => !r.sep && r.text.trim());
+        const opRows = sepIdx >= 0 ? rows.slice(sepIdx + 1).filter(r => !r.sep && r.text.trim()) : [];
         if (attrRows.length) { el.properties.attributes = attrRows.map(r => parseAttribute(r.text)); el.properties.showAttributes = true; }
         if (opRows.length) { el.properties.operations = opRows.map(r => parseOperation(r.text)); el.properties.showOperations = true; }
       }
     }
     delete (el as any).__sheet;
+    delete (el.properties as any).__nrows;
+  }
+
+  // Package membership: round-trip `__parentId` first, else infer geometrically
+  // for foreign files (an element whose centre sits inside a package's bounds).
+  const packages = elements.filter(e => e.type === "uml-package");
+  for (const el of elements) {
+    if (el.type === "uml-package" || (el.properties as any).__parentId) continue;
+    const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+    let best: DiagramElement | undefined, bestArea = Infinity;
+    for (const p of packages) {
+      if (p.id === el.id) continue;
+      if (cx >= p.x && cx <= p.x + p.width && cy >= p.y && cy <= p.y + p.height) {
+        const area = p.width * p.height;
+        if (area < bestArea) { bestArea = area; best = p; } // innermost package wins
+      }
+    }
+    if (best) el.parentId = best.id;
   }
 
   // Resolve package membership from the round-trip parentId.
@@ -193,7 +263,7 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
   for (const s of shapes) {
     const sheetId = attr(s, "ID");
     const masterId = attr(s, "Master");
-    const nameU = masterId ? (id2name[masterId] ?? "") : "";
+    const nameU = baseNameU(masterId ? (id2name[masterId] ?? "") : (attr(s, "NameU") ?? ""));
     if (!CONN_TYPE[nameU]) continue;
     const ep = endpoints.get(sheetId!);
     const srcEl = ep?.begin ? sheetToElId.get(ep.begin) : undefined;
