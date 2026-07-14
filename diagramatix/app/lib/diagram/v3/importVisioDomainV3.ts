@@ -350,7 +350,12 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
     if (!blob) {
       const L = foreignRelLabels(s);
       sMult = L.begin.mult; tMult = L.end.mult; sRole = L.begin.role; tRole = L.end.role;
-      if (L.name) label = L.name; // association name, centred on the line
+      // The Microsoft UML Association master stores the relationship name in a
+      // User cell (`User.RelationshipName`), NOT a text sub-shape. Prefer it;
+      // fall back to a centred text label for stencils that draw one instead.
+      const relName = propVal(s, "RelationshipName");
+      if (relName && relName.trim()) label = relName.trim();
+      else if (L.name) label = L.name;
       if (diamondSwap) {
         [sMult, tMult] = [tMult, sMult];
         [sRole, tRole] = [tRole, sRole];

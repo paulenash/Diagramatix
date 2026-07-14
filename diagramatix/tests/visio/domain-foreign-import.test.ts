@@ -98,12 +98,26 @@ describe("foreign UML import — aggregation direction + multiplicities/roles + 
     }
   });
 
-  it("imports a centred association name (t≈0.5) as the connector label, not a role", async () => {
+  it("imports the association name from User.RelationshipName (real Visio file)", async () => {
+    // Real file drawn/edited in Visio: the UML Association master keeps its name
+    // in the User cell RelationshipName ("Has"), not a text sub-shape.
+    const { data } = await importVisioDomainV3(load("domain-named-association.vsdx"));
+    const assoc = data.connectors.find(c => c.type === "uml-association")!;
+    expect(assoc.label).toBe("Has");
+    expect(assoc.sourceMultiplicity).toBe("1");
+    expect(assoc.targetMultiplicity).toBe("0..*");
+    expect(assoc.sourceRole).toBeUndefined();
+    expect(assoc.targetRole).toBeUndefined();
+    // The unnamed aggregation/generalisation must not pick up a spurious label.
+    expect(data.connectors.find(c => c.type === "uml-aggregation")!.label).toBeUndefined();
+    expect(data.connectors.find(c => c.type === "uml-generalisation")!.label).toBeUndefined();
+  });
+
+  it("falls back to a centred text label (t≈0.5) for stencils that draw the name", async () => {
     const named = await withAssociationName("domain-agg-multiplicity.vsdx", "Has");
     const { data } = await importVisioDomainV3(named);
     const assoc = data.connectors.find(c => c.type === "uml-association")!;
     expect(assoc.label).toBe("Has");
-    // The name must NOT be mistaken for an end role, and multiplicities survive.
     expect(assoc.sourceRole).toBeUndefined();
     expect(assoc.targetRole).toBeUndefined();
     expect(assoc.sourceMultiplicity).toBe("1");
