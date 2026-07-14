@@ -136,7 +136,9 @@ describe("domain Visio geometry simulation", () => {
     const sheetByBpmn = new Map<string, string>();
     for (const sh of shapes) { const bp = (sh.match(/<Row N='BpmnId'><Cell N='Value' V='([^']*)'/) || [])[1]; if (bp) sheetByBpmn.set(bp, attr(sh, "ID")); }
 
-    const conns = shapes.filter(b => /_WALKGLUE/.test(b));
+    // Connectors carry a DgxUmlRel blob (class/enum endpoints now glue via
+    // PAR(PNT(...Connections)) rather than _WALKGLUE, so filter by the blob).
+    const conns = shapes.filter(b => /<Row N='DgxUmlRel'>/.test(b));
     expect(conns.length).toBe(2);
     const inside = (x: number, y: number, bx: ReturnType<typeof box>) =>
       x >= bx.left - APPROX && x <= bx.right + APPROX && y >= bx.bottom - APPROX && y <= bx.top + APPROX;

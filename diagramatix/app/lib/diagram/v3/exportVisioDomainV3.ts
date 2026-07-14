@@ -372,6 +372,30 @@ export async function exportVisioDomainV3(
     const endAngle = Math.atan2(dy, dx);
     const beginAngle = Math.atan2(-dy, -dx);
 
+    // Glue Begin/End to a fixed connection point via PAR(PNT(...)) so the line
+    // EVALUATES AND RENDERS on first open. `_WALKGLUE` (dynamic-connector
+    // routing) only recomputes on an interaction event, leaving the line blank
+    // until nudged — that was the invisible-connector bug. Class/enum shapes
+    // expose 4 edge-centre points (Connections X1=left, X2=right, X3=bottom,
+    // X4=top); other shapes keep the centre glue + _WALKGLUE fallback.
+    const hasCP = (elId: string) => {
+      const e = data.elements.find(x => x.id === elId);
+      return e?.type === "uml-class" || e?.type === "uml-enumeration";
+    };
+    const connIdx = (fx: number, fy: number, tx2: number, ty2: number) => {
+      const ax = tx2 - fx, ay = ty2 - fy;
+      if (Math.abs(ax) >= Math.abs(ay)) return ax >= 0 ? 2 : 1; // right : left
+      return ay >= 0 ? 4 : 3;                                    // top : bottom (Visio Y-up)
+    };
+    const k1 = hasCP(beginId) ? connIdx(s.cx, s.cy, t.cx, t.cy) : 0;
+    const k2 = hasCP(endId) ? connIdx(t.cx, t.cy, s.cx, s.cy) : 0;
+    const beginGlue = k1
+      ? `PAR(PNT(Sheet.${srcSheet}!Connections.X${k1},Sheet.${srcSheet}!Connections.Y${k1}))`
+      : "_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)";
+    const endGlue = k2
+      ? `PAR(PNT(Sheet.${tgtSheet}!Connections.X${k2},Sheet.${tgtSheet}!Connections.Y${k2}))`
+      : "_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)";
+
     // Multiplicities/roles + name. Map begin/end back to Diagramatix source/target
     // (diamondSwap already flipped begin↔end for aggregation/composition).
     const beginIsSource = !diamondSwap;
@@ -410,13 +434,13 @@ export async function exportVisioDomainV3(
 
     shapes.push(
       `<Shape ID='${id}' NameU='${masterName}' Name='${masterName}' Type='Group' Master='${master}'>` +
-      `<Cell N='PinX' V='${n(pinx)}' F='Inh'/><Cell N='PinY' V='${n(piny)}' F='Inh'/>` +
+      `<Cell N='PinX' V='${n(pinx)}' F='GUARD((BeginX+EndX)/2)'/><Cell N='PinY' V='${n(piny)}' F='GUARD((BeginY+EndY)/2)'/>` +
       `<Cell N='Width' V='${n(dx)}' F='GUARD(EndX-BeginX)'/><Cell N='Height' V='${n(dy)}' F='GUARD(EndY-BeginY)'/>` +
       `<Cell N='LocPinX' V='${n(locx)}' F='GUARD(Width*0.5)'/><Cell N='LocPinY' V='${n(locy)}' F='GUARD(Height*0.5)'/>` +
-      `<Cell N='BeginX' V='${n(bx)}' F='_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)'/>` +
-      `<Cell N='BeginY' V='${n(by)}' F='_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)'/>` +
-      `<Cell N='EndX' V='${n(ex)}' F='_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)'/>` +
-      `<Cell N='EndY' V='${n(ey)}' F='_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)'/>` +
+      `<Cell N='BeginX' V='${n(bx)}' F='${beginGlue}'/>` +
+      `<Cell N='BeginY' V='${n(by)}' F='${beginGlue}'/>` +
+      `<Cell N='EndX' V='${n(ex)}' F='${endGlue}'/>` +
+      `<Cell N='EndY' V='${n(ey)}' F='${endGlue}'/>` +
       `<Cell N='LayerMember' V='0'/>` +
       `<Cell N='BegTrigger' V='2' F='_XFTRIGGER(Sheet.${srcSheet}!EventXFMod)'/>` +
       `<Cell N='EndTrigger' V='2' F='_XFTRIGGER(Sheet.${tgtSheet}!EventXFMod)'/>` +
@@ -429,21 +453,26 @@ export async function exportVisioDomainV3(
       // multiplicity sub-shapes and arrowheads reference.
       `<Section N='Connection'>` +
         `<Row T='Connection' IX='0'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-        `<Row T='Connection' IX='1'><Cell N='X' V='${n(dx)}'/><Cell N='Y' V='${n(dy)}'/></Row></Section>` +
-      // Straight line Begin(0,0)→End(dx,dy). Includes the MoveTo IX=1 anchor and
-      // deletes any extra routed rows the master caches so nothing floats.
+        `<Row T='Connection' IX='1'><Cell N='X' V='${n(dx)}' F='Width'/><Cell N='Y' V='${n(dy)}' F='Height'/></Row></Section>` +
+      // Straight line Begin(0,0)→End. The endpoint TRACKS Width/Height (formula)
+      // so the line follows wherever the glue resolves Begin/End on open. Keeps
+      // the MoveTo IX=1 anchor and deletes the master's extra routed rows.
       `<Section N='Geometry' IX='0'>` +
         `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-        `<Row T='LineTo' IX='2'><Cell N='X' V='${n(dx)}'/><Cell N='Y' V='${n(dy)}'/></Row>` +
-        `<Row T='LineTo' IX='3' Del='1'/><Row T='LineTo' IX='4' Del='1'/></Section>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${n(dx)}' F='Width'/><Cell N='Y' V='${n(dy)}' F='Height'/></Row>` +
+        `<Row T='LineTo' IX='3' Del='1'/></Section>` +
       propRows([["BpmnId", conn.id], ["DgxUmlRel", dgxUmlRel(conn)]]) +
       (nameText ? `<Text>${nameText}</Text>` : "") +
       (subShapesXml ? `<Shapes>${subShapesXml}</Shapes>` : "") +
       `</Shape>`
     );
     connects.push(
-      `<Connect FromSheet='${id}' FromCell='BeginX' FromPart='9' ToSheet='${srcSheet}' ToCell='PinX' ToPart='3'/>` +
-      `<Connect FromSheet='${id}' FromCell='EndX' FromPart='12' ToSheet='${tgtSheet}' ToCell='PinX' ToPart='3'/>`
+      (k1
+        ? `<Connect FromSheet='${id}' FromCell='BeginX' FromPart='9' ToSheet='${srcSheet}' ToCell='Connections.X${k1}' ToPart='${99 + k1}'/>`
+        : `<Connect FromSheet='${id}' FromCell='BeginX' FromPart='9' ToSheet='${srcSheet}' ToCell='PinX' ToPart='3'/>`) +
+      (k2
+        ? `<Connect FromSheet='${id}' FromCell='EndX' FromPart='12' ToSheet='${tgtSheet}' ToCell='Connections.X${k2}' ToPart='${99 + k2}'/>`
+        : `<Connect FromSheet='${id}' FromCell='EndX' FromPart='12' ToSheet='${tgtSheet}' ToCell='PinX' ToPart='3'/>`)
     );
   }
 
