@@ -337,6 +337,9 @@ export async function exportVisioDomainV3(
     // restores the true Diagramatix type on re-import (lossless round-trip).
     "uml-containment": "Dependency", "uml-note-anchor": "Dependency",
   };
+  // Connectors whose masters carry the 4 multiplicity/role sub-shapes (6/7/8/9)
+  // and a ShowMulti toggle. Others (dependency/realisation/generalisation) don't.
+  const ASSOC_FAMILY = new Set<Connector["type"]>(["uml-association", "uml-aggregation", "uml-composition"]);
   for (const conn of data.connectors) {
     // Visio's Aggregation/Composition masters draw the diamond at the BEGIN end,
     // whereas Diagramatix renders that shared-diamond at the TARGET. For those two
@@ -361,44 +364,81 @@ export async function exportVisioDomainV3(
     const be = edgePoint(s, t.cx, t.cy), en = edgePoint(t, s.cx, s.cy);
     const bx = be.x, by = be.y, ex = en.x, ey = en.y;
     const dx = ex - bx, dy = ey - by;
-    const isRel = masterName !== "Dynamic connector";
+    // Connector authoring frame: local origin at Begin, LocPin at the centre, so
+    // local (0,0)=Begin and (Width,Height)=End. Angles orient the master's
+    // arrowheads/diamond/triangle (End points forward along the line, Begin back
+    // out of the source) and drive the multiplicity sub-shapes' placement.
+    const pinx = (bx + ex) / 2, piny = (by + ey) / 2, locx = dx / 2, locy = dy / 2;
+    const endAngle = Math.atan2(dy, dx);
+    const beginAngle = Math.atan2(-dy, -dx);
+
+    // Multiplicities/roles + name. Map begin/end back to Diagramatix source/target
+    // (diamondSwap already flipped begin↔end for aggregation/composition).
+    const beginIsSource = !diamondSwap;
+    const beginMult = beginIsSource ? conn.sourceMultiplicity : conn.targetMultiplicity;
+    const beginRole = beginIsSource ? conn.sourceRole : conn.targetRole;
+    const endMult = beginIsSource ? conn.targetMultiplicity : conn.sourceMultiplicity;
+    const endRole = beginIsSource ? conn.targetRole : conn.sourceRole;
+    const hasMult = ASSOC_FAMILY.has(conn.type);
+
+    // Reading direction shown as a glyph appended to the name (option 1 — no
+    // native Visio reading-direction arrow exists in this stencil).
+    const rd = conn.readingDirection === "to-target" ? " ▶"
+      : conn.readingDirection === "to-source" ? " ◀" : "";
+    const nameText = conn.label ? esc(conn.label + rd) : "";
+
+    // Multiplicity/role child sub-shapes (MasterShape 6=begin-mult, 7=begin-role,
+    // 8=end-mult, 9=end-role) — thin wrappers that inherit the master sub-shapes'
+    // self-positioning formulas (User.Con*/User.*Angle); we only unhide + set the
+    // text. Empty slots are omitted. Only the association family carries them.
+    const kids: Array<[number, string]> = [];
+    if (hasMult) {
+      if (beginMult) kids.push([6, beginMult]);
+      if (beginRole) kids.push([7, beginRole]);
+      if (endMult) kids.push([8, endMult]);
+      if (endRole) kids.push([9, endRole]);
+    }
+    const subShapesXml = kids
+      .map(([ms, txt]) => `<Shape ID='${allocId()}' Type='Shape' MasterShape='${ms}'><Cell N='HideText' V='0'/><Text>${esc(txt)}</Text></Shape>`)
+      .join("");
+
+    const userRows =
+      `<Row N='BeginAngle'><Cell N='Value' V='${n(beginAngle)}' U='DA'/></Row>` +
+      `<Row N='EndAngle'><Cell N='Value' V='${n(endAngle)}' U='DA'/></Row>` +
+      (hasMult && (beginMult || endMult) ? `<Row N='ShowMulti'><Cell N='Value' V='1' U='BOOL'/></Row>` : "") +
+      (nameText ? `<Row N='RelationshipName'><Cell N='Value' V='${nameText}' U='STR'/></Row>` : "");
 
     shapes.push(
-      `<Shape ID='${id}' NameU='${masterName}' Type='${isRel ? "Group" : "Shape"}' Master='${master}'>` +
-      `<Cell N='PinX' V='${n((bx + ex) / 2)}' F='GUARD((BeginX+EndX)/2)'/>` +
-      `<Cell N='PinY' V='${n((by + ey) / 2)}' F='GUARD((BeginY+EndY)/2)'/>` +
+      `<Shape ID='${id}' NameU='${masterName}' Name='${masterName}' Type='Group' Master='${master}'>` +
+      `<Cell N='PinX' V='${n(pinx)}' F='Inh'/><Cell N='PinY' V='${n(piny)}' F='Inh'/>` +
       `<Cell N='Width' V='${n(dx)}' F='GUARD(EndX-BeginX)'/><Cell N='Height' V='${n(dy)}' F='GUARD(EndY-BeginY)'/>` +
-      // Local pin at the connector's own centre (Width/2, Height/2) so its
-      // geometry is placed relative to Begin/End instead of floating.
-      `<Cell N='LocPinX' V='${n(dx / 2)}' F='GUARD(Width*0.5)'/><Cell N='LocPinY' V='${n(dy / 2)}' F='GUARD(Height*0.5)'/>` +
-      `<Cell N='LayerMember' V='0'/>` +
+      `<Cell N='LocPinX' V='${n(locx)}' F='GUARD(Width*0.5)'/><Cell N='LocPinY' V='${n(locy)}' F='GUARD(Height*0.5)'/>` +
       `<Cell N='BeginX' V='${n(bx)}' F='_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)'/>` +
-      `<Cell N='BeginY' V='${by}' F='_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)'/>` +
-      `<Cell N='EndX' V='${ex}' F='_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)'/>` +
-      `<Cell N='EndY' V='${ey}' F='_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)'/>` +
-      `<Cell N='ObjType' V='2'/>` +
+      `<Cell N='BeginY' V='${n(by)}' F='_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)'/>` +
+      `<Cell N='EndX' V='${n(ex)}' F='_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)'/>` +
+      `<Cell N='EndY' V='${n(ey)}' F='_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)'/>` +
+      `<Cell N='LayerMember' V='0'/>` +
       `<Cell N='BegTrigger' V='2' F='_XFTRIGGER(Sheet.${srcSheet}!EventXFMod)'/>` +
       `<Cell N='EndTrigger' V='2' F='_XFTRIGGER(Sheet.${tgtSheet}!EventXFMod)'/>` +
+      // Name text position (connector midpoint, local frame).
+      `<Section N='Control'><Row N='TextPosition'>` +
+        `<Cell N='X' V='${n(locx)}'/><Cell N='Y' V='${n(locy)}'/>` +
+        `<Cell N='XDyn' V='${n(locx)}'/><Cell N='YDyn' V='${n(locy)}'/></Row></Section>` +
+      `<Section N='User'>${userRows}</Section>` +
+      // Connection anchors (begin=local origin, end=local Width/Height) that the
+      // multiplicity sub-shapes and arrowheads reference.
+      `<Section N='Connection'>` +
+        `<Row T='Connection' IX='0'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+        `<Row T='Connection' IX='1'><Cell N='X' V='${n(dx)}'/><Cell N='Y' V='${n(dy)}'/></Row></Section>` +
+      // Straight line Begin(0,0)→End(dx,dy). Includes the MoveTo IX=1 anchor and
+      // deletes any extra routed rows the master caches so nothing floats.
+      `<Section N='Geometry' IX='0'>` +
+        `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${n(dx)}'/><Cell N='Y' V='${n(dy)}'/></Row>` +
+        `<Row T='LineTo' IX='3' Del='1'/><Row T='LineTo' IX='4' Del='1'/></Section>` +
       propRows([["BpmnId", conn.id], ["DgxUmlRel", dgxUmlRel(conn)]]) +
-      // Make the line visible on FIRST open. The master's group Geometry IX0
-      // draws a path cached at authoring size (hardcoded coords, not formula-
-      // driven), so we must override it to trace Begin(0,0)→End(dx,dy). The
-      // previous override supplied only LineTo rows and relied on INHERITING the
-      // master's MoveTo IX=1 + visibility cells + row count — which left the
-      // line blank until Visio re-routed on interaction. Make it SELF-CONTAINED:
-      // explicit MoveTo IX=1, exact LineTo IX=2/IX=3 overriding the master's two
-      // rows (no stray IX=4), and explicit NoShow=0/NoLine=0 so nothing is
-      // inherited. (Verify in Visio — this is the paused invisible-connector fix
-      // derived from comparing a real Microsoft-routed Association.)
-      (isRel
-        ? `<Section N='Geometry' IX='0'>` +
-            `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>` +
-            `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-            `<Row T='LineTo' IX='2'><Cell N='X' V='${n(dx / 2)}'/><Cell N='Y' V='${n(dy / 2)}'/></Row>` +
-            `<Row T='LineTo' IX='3'><Cell N='X' V='${n(dx)}'/><Cell N='Y' V='${n(dy)}'/></Row>` +
-          `</Section>`
-        : "") +
-      (conn.label ? `<Text>${esc(conn.label)}</Text>` : "") +
+      (nameText ? `<Text>${nameText}</Text>` : "") +
+      (subShapesXml ? `<Shapes>${subShapesXml}</Shapes>` : "") +
       `</Shape>`
     );
     connects.push(

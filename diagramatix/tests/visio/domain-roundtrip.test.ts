@@ -132,6 +132,38 @@ describe("domain Visio round-trip (lossless via DgxUml)", () => {
     expect(comp.sourceId).toBe("whole"); expect(comp.targetId).toBe("sub");
   });
 
+  it("exports the association name + reading-direction glyph, recovered on foreign re-import", async () => {
+    const named: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "a", type: "uml-class", x: 40, y: 40, width: 200, height: 80, label: "A", properties: {} },
+        { id: "b", type: "uml-class", x: 400, y: 40, width: 200, height: 80, label: "B", properties: {} },
+      ],
+      connectors: [
+        { id: "n1", sourceId: "a", targetId: "b", sourceSide: "right", targetSide: "left",
+          type: "uml-association", directionType: "non-directed", routingType: "rectilinear",
+          sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
+          label: "Owns", readingDirection: "to-target", sourceMultiplicity: "1", targetMultiplicity: "*" },
+      ],
+    };
+    const out = await exportVisioDomainV3(named, "RTN", tmpl());
+    // Export carries the name in User.RelationshipName with a ▶ reading glyph.
+    const page = await (await JSZip.loadAsync(out)).file("visio/pages/page1.xml")!.async("string");
+    expect(page).toContain("<Row N='RelationshipName'>");
+    expect(page).toContain("Owns ▶");
+
+    // Strip blobs → foreign path must recover a clean name + the direction flag.
+    const zip = await JSZip.loadAsync(out);
+    let p = await zip.file("visio/pages/page1.xml")!.async("string");
+    p = p.replace(/<Row N='(DgxUml|DgxUmlRel|BpmnId)'><Cell N='Value' V='[^']*'\/><\/Row>/g, "");
+    zip.file("visio/pages/page1.xml", p);
+    const stripped = await zip.generateAsync({ type: "uint8array" });
+    const { data } = await importVisioDomainV3(stripped.buffer as ArrayBuffer);
+    const n1 = data.connectors.find(c => c.type === "uml-association")!;
+    expect(n1.label).toBe("Owns");
+    expect(n1.readingDirection).toBe("to-target");
+  });
+
   it("foreign path (blobs stripped) reconstructs from Member rows + master NameU", async () => {
     const out = await exportVisioDomainV3(DATA, "RT", tmpl());
     // Strip the DgxUml/DgxUmlRel + BpmnId blobs to simulate a non-Diagramatix file.

@@ -76,11 +76,16 @@ describe("domain → Visio v3 export (standard UML, structural)", () => {
     expect(page).toContain("<Connects>");
     expect((page.match(/<Connect /g) ?? []).length).toBe(2);
 
-    // Connector geometry override is self-contained: an explicit MoveTo anchor
-    // + visibility cells so the line paints on first open (invisible-connector
-    // fix). Previously it supplied only LineTo rows and inherited the MoveTo.
+    // Connector is authored like a real Visio UML instance: explicit MoveTo IX=1
+    // anchor + straight LineTo, a User section (angles + ShowMulti) and a
+    // Connection section that drive the arrowheads and multiplicity sub-shapes.
     expect(page).toContain("<Row T='MoveTo' IX='1'>");
-    expect(page).toMatch(/<Section N='Geometry' IX='0'><Cell N='NoFill'[^>]*\/><Cell N='NoLine'[^>]*\/><Cell N='NoShow'/);
+    expect(page).toContain("<Section N='User'><Row N='BeginAngle'>");
+    expect(page).toContain("<Row N='ShowMulti'><Cell N='Value' V='1' U='BOOL'/></Row>");
+    expect(page).toContain("<Section N='Connection'>");
+    // Multiplicities emitted as child sub-shapes (MasterShape 6=begin, 8=end).
+    expect(page).toMatch(/MasterShape='6'><Cell N='HideText' V='0'\/><Text>1<\/Text>/);
+    expect(page).toMatch(/MasterShape='8'><Cell N='HideText' V='0'\/><Text>\*<\/Text>/);
 
     // Document infrastructure preserved from the standard-UML template.
     expect(zip.file("visio/theme/theme1.xml")).toBeTruthy();

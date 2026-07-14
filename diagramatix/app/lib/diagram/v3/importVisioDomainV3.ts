@@ -354,8 +354,14 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
       // User cell (`User.RelationshipName`), NOT a text sub-shape. Prefer it;
       // fall back to a centred text label for stencils that draw one instead.
       const relName = propVal(s, "RelationshipName");
-      if (relName && relName.trim()) label = relName.trim();
-      else if (L.name) label = L.name;
+      const rawName = (relName && relName.trim()) ? relName.trim() : L.name;
+      if (rawName) {
+        // We export reading direction as a ▶/◀ glyph appended to the name
+        // (option 1). Strip it back into readingDirection on re-import.
+        const rd = /\s*▶$/.test(rawName) ? "to-target" : /\s*◀$/.test(rawName) ? "to-source" : undefined;
+        label = rawName.replace(/\s*[▶◀]$/, "").trim() || undefined;
+        if (rd) (d as Record<string, unknown>).readingDirection = rd;
+      }
       if (diamondSwap) {
         [sMult, tMult] = [tMult, sMult];
         [sRole, tRole] = [tRole, sRole];
