@@ -4181,6 +4181,10 @@ export function Canvas({
   const otherContainersUnsorted = data.elements.filter(
     (el) => el.type === "system-boundary" || el.type === "composite-state"
          || el.type === "process-group"
+         // uml-package renders in this behind-children pass so its contents
+         // (classes/enums/notes/connectors) sit on top and receive clicks; an
+         // empty-body click still selects/grabs the package itself (issue).
+         || el.type === "uml-package"
   );
   // Sort containers by nesting depth so parents render before (behind) children
   const otherContainers = (() => {
@@ -4355,6 +4359,7 @@ export function Canvas({
                 && el.type !== "group"
                 && el.type !== "process-group"
                 && el.type !== "flowchart-vswimlane"
+                && el.type !== "uml-package" // now rendered in the container pass
                 && !el.boundaryHostId
     );
     function getParentDepth(el: DiagramElement): number {
