@@ -88,8 +88,9 @@ export function parseUmlOperation(text: string): UmlOperation {
     s = s.slice(1).trim();
   }
 
-  // Drop a trailing parameter list `( … )` — names/return not modelled yet.
-  s = s.replace(/\([^)]*\)\s*$/, "").trim();
+  // Drop any parentheses the user typed — the `()` is auto-added at display
+  // time, so the stored name never carries them (and can never be doubled).
+  s = s.replace(/\([^)]*\)/g, "").trim();
 
   const op: UmlOperation = { name: s };
   if (visibility) op.visibility = visibility;

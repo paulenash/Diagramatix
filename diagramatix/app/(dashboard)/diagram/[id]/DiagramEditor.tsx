@@ -3624,7 +3624,7 @@ export function DiagramEditor({
             relaxedLayout={data.relaxedLayout}
             onSetRelaxedLayout={diagramType === "bpmn" ? setRelaxedLayout : undefined}
             umlSticky={umlSticky}
-            onSetUmlSticky={diagramType === "domain" ? ((v: boolean) => { setUmlStickyRouting(v); setUmlSticky(v); rerouteAll(); }) : undefined}
+            onSetUmlSticky={diagramType === "domain" && isAdmin && !superAdminHidden ? ((v: boolean) => { setUmlStickyRouting(v); setUmlSticky(v); rerouteAll(); }) : undefined}
             onUpdateDiagramTitle={updateDiagramTitle}
             processOwner={data.processOwner}
             onSetProcessOwner={diagramType === "bpmn" ? setProcessOwner : undefined}

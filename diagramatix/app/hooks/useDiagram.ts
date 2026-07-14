@@ -7616,7 +7616,25 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // parentId so the EP-grow path below picks the right container.
       let elements = state.elements;
       let connectors = state.connectors;
-      if (
+      // Pain points attach to whatever element their boundary overlaps (any
+      // element, not just containers), so they can be dropped onto a class and
+      // move with it — and easily dragged onto another element (issue #4). This
+      // MUST run at drop too, else the generic container re-detection below
+      // (which only accepts packages for a pain-point) would wipe the host.
+      if (initialEl.type === "uml-pain-point") {
+        const px2 = initialEl.x + initialEl.width, py2 = initialEl.y + initialEl.height;
+        let hostId: string | undefined, bestArea = 0;
+        for (const b of elements) {
+          if (b.id === id || b.type === "uml-pain-point") continue;
+          const ox = Math.max(0, Math.min(px2, b.x + b.width) - Math.max(initialEl.x, b.x));
+          const oy = Math.max(0, Math.min(py2, b.y + b.height) - Math.max(initialEl.y, b.y));
+          const area = ox * oy;
+          if (area > bestArea) { bestArea = area; hostId = b.id; }
+        }
+        if (hostId !== initialEl.parentId) {
+          elements = elements.map(e => e.id === id ? { ...e, parentId: hostId } : e);
+        }
+      } else if (
         !initialEl.boundaryHostId &&
         !BOUNDARY_EVENT_TYPES.has(initialEl.type)
       ) {

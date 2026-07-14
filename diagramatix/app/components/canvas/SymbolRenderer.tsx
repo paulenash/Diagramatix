@@ -1271,7 +1271,7 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
   );
 }
 
-function formatUmlAttribute(attr: import("@/app/lib/diagram/types").UmlAttribute): string {
+export function formatUmlAttribute(attr: import("@/app/lib/diagram/types").UmlAttribute): string {
   let s = "";
   if (attr.visibility) s += attr.visibility + " ";
   if (attr.isDerived) s += "/";
@@ -1294,7 +1294,7 @@ function formatUmlAttribute(attr: import("@/app/lib/diagram/types").UmlAttribute
   return s;
 }
 
-function formatUmlOperation(op: import("@/app/lib/diagram/types").UmlOperation): string {
+export function formatUmlOperation(op: import("@/app/lib/diagram/types").UmlOperation): string {
   let s = "";
   if (op.visibility) s += op.visibility + " ";
   s += op.name + "()";

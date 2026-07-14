@@ -21,10 +21,41 @@ import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
 import { BubbleHelp } from "./BubbleHelp";
 import { EntityNameInput } from "./EntityNameInput";
 import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
-import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { parseUmlAttribute, parseUmlOperation } from "@/app/lib/diagram/umlParse";
+
+// ── UML inline-editor assist popups (issue #10) ──
+const UML_VIS_OPTS: { label: string; insert: string }[] = [
+  { label: "None", insert: "" },
+  { label: "+ public", insert: "+ " },
+  { label: "- private", insert: "- " },
+  { label: "# protected", insert: "# " },
+];
+const UML_TYPE_OPTS = ["String", "Integer", "Boolean", "Date", "DateTime", "Decimal", "Float", "Long", "Double", "UUID", "Text"];
+const UML_MULT_OPTS: { label: string; insert: string }[] = [
+  { label: "None", insert: "" },
+  { label: "1", insert: "[1]" },
+  { label: "0..1", insert: "[0..1]" },
+  { label: "0..*", insert: "[0..*]" },
+  { label: "1..*", insert: "[1..*]" },
+];
+/** Which assist popup an attribute editor should show for the current text. */
+function umlAttrAssistPhase(value: string): "visibility" | "type" | "multiplicity" | null {
+  if (!value.includes(":")) return /^[+\-#]?\s*$/.test(value) ? "visibility" : null;
+  if (value.includes("[") || value.includes("=")) return null; // multiplicity/default already present
+  const after = value.slice(value.indexOf(":") + 1);
+  const afterTrim = after.replace(/^\s+/, "");
+  if (afterTrim === "") return "type";           // right after the colon
+  if (/\s/.test(afterTrim)) return "multiplicity"; // a type word followed by a space
+  return "type";                                  // still typing the type
+}
+/** Operations only ever offer a visibility popup (until a name is typed). */
+function umlOpAssistPhase(value: string): "visibility" | null {
+  const rest = value.replace(/^[+\-#]\s*/, "").replace(/\([^)]*\)/g, "").trim();
+  return rest === "" ? "visibility" : null;
+}
 import { PaletteSymbolPreview } from "./Palette";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
 import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
@@ -588,7 +619,10 @@ export function Canvas({
   // while Shift is held near a class's left/right/bottom edge). `umlRowEdit` =
   // the single-line inline editor for the freshly-appended (placeholder) row.
   const [umlQuickAddMenu, setUmlQuickAddMenu] = useState<{ elementId: string; screenX: number; screenY: number } | null>(null);
-  const [umlRowEdit, setUmlRowEdit] = useState<{ elementId: string; kind: "attribute" | "operation" | "enum-value"; index: number; value: string } | null>(null);
+  const [umlRowEdit, setUmlRowEdit] = useState<{ elementId: string; kind: "attribute" | "operation" | "enum-value"; index: number; value: string; isEdit?: boolean } | null>(null);
+  // Multiplicity custom "n..m" entry buffer for the assist popup.
+  const [umlMultCustom, setUmlMultCustom] = useState("");
+  const umlRowInputRef = useRef<HTMLInputElement | null>(null);
   // Focus-edit zoom: when an inline label edit begins we snap the canvas
   // so the edited target is centred and its width is ~30% of the screen,
   // then restore the pre-edit zoom/pan when the edit ends. `null` = not
@@ -3931,39 +3965,92 @@ export function Canvas({
     });
   }, [data.elements, onUpdateProperties]);
 
-  // Enum-only: commit the current value and open the NEXT empty row below, so
-  // the user can keep adding values with Return (grows downward). An empty
-  // value ends the interaction.
-  const advanceEnumValue = useCallback(() => {
+  // Return commits the current row and opens the NEXT empty row below, so the
+  // user can keep adding attributes/operations/values (grows downward). An
+  // empty value ends the interaction. (Only in ADD mode — edit mode commits +
+  // closes instead.)
+  const advanceRow = useCallback(() => {
+    setUmlMultCustom("");
     setUmlRowEdit((cur) => {
-      if (!cur || cur.kind !== "enum-value") return cur;
+      if (!cur) return cur;
       const el = data.elements.find((x) => x.id === cur.elementId);
       if (!el) return null;
-      const arr = ((el.properties.values as string[] | undefined) ?? []).slice();
+      const key = umlEditKey(cur.kind);
+      const arr = ((el.properties[key] as unknown[] | undefined) ?? []).slice();
       const text = cur.value.trim();
       if (!text) { // empty → finish, drop the trailing placeholder
-        if (cur.index < arr.length) { arr.splice(cur.index, 1); onUpdateProperties?.(cur.elementId, { values: arr }); }
+        if (cur.index < arr.length) { arr.splice(cur.index, 1); onUpdateProperties?.(cur.elementId, { [key]: arr }); }
         return null;
       }
-      arr[cur.index] = text;
-      arr.push(""); // next placeholder row
-      onUpdateProperties?.(cur.elementId, { values: arr });
+      arr[cur.index] = cur.kind === "attribute" ? parseUmlAttribute(text)
+        : cur.kind === "operation" ? parseUmlOperation(text) : text;
+      arr.push(cur.kind === "enum-value" ? "" : { name: "" }); // next placeholder row
+      onUpdateProperties?.(cur.elementId, { [key]: arr });
       return { ...cur, index: cur.index + 1, value: "" };
     });
   }, [data.elements, onUpdateProperties]);
 
   const cancelUmlRow = useCallback(() => {
+    setUmlMultCustom("");
     setUmlRowEdit((cur) => {
       if (!cur) return null;
-      const el = data.elements.find((x) => x.id === cur.elementId);
-      if (el) {
-        const key = umlEditKey(cur.kind);
-        const arr = ((el.properties[key] as unknown[] | undefined) ?? []).slice();
-        if (cur.index < arr.length) { arr.splice(cur.index, 1); onUpdateProperties?.(cur.elementId, { [key]: arr }); }
+      // Edit mode (double-click) leaves the existing row untouched; add mode
+      // drops the empty placeholder.
+      if (!cur.isEdit) {
+        const el = data.elements.find((x) => x.id === cur.elementId);
+        if (el) {
+          const key = umlEditKey(cur.kind);
+          const arr = ((el.properties[key] as unknown[] | undefined) ?? []).slice();
+          if (cur.index < arr.length) { arr.splice(cur.index, 1); onUpdateProperties?.(cur.elementId, { [key]: arr }); }
+        }
       }
       return null;
     });
   }, [data.elements, onUpdateProperties]);
+
+  // Open the inline editor on an EXISTING row (double-click to edit — issue #14),
+  // pre-filled with its formatted text. Cancel leaves it unchanged.
+  const startUmlRowEdit = useCallback((elementId: string, kind: "attribute" | "operation" | "enum-value", index: number, value: string) => {
+    setUmlQuickAddMenu(null);
+    setUmlMultCustom("");
+    setUmlRowEdit({ elementId, kind, index, value, isEdit: true });
+  }, []);
+
+  // Double-click on a class attribute/operation row (or an enum value row) opens
+  // the inline editor on that row (issue #14). Returns true if a row was hit, so
+  // the caller can skip the class-name label edit.
+  const tryStartUmlRowEditAt = useCallback((el: DiagramElement, worldY: number): boolean => {
+    const lineH = Math.round(14 * umlFsc);
+    const extraLabelLines = Math.max(0, (el.label ?? "").split("\n").length - 1);
+    if (el.type === "uml-enumeration") {
+      const headerH = 28 + extraLabelLines * lineH;
+      const values = (el.properties.values as string[] | undefined) ?? [];
+      const idx = Math.floor((worldY - (el.y + headerH)) / lineH);
+      if (idx >= 0 && idx < values.length) { startUmlRowEdit(el.id, "enum-value", idx, values[idx]); return true; }
+      return false;
+    }
+    if (el.type !== "uml-class") return false;
+    const showStereotype = (el.properties.showStereotype as boolean | undefined) ?? false;
+    const stereotypeH = showStereotype ? Math.round(9 * umlFsc * 10) / 10 + 2 : 0;
+    const headerH = 28 + extraLabelLines * lineH + stereotypeH;
+    const attributes = (el.properties.attributes as import("@/app/lib/diagram/types").UmlAttribute[] | undefined) ?? [];
+    const operations = (el.properties.operations as import("@/app/lib/diagram/types").UmlOperation[] | undefined) ?? [];
+    const showAttrs = (el.properties.showAttributes as boolean | undefined) ?? false;
+    const showOps = (el.properties.showOperations as boolean | undefined) ?? false;
+    const attrsY = el.y + headerH;
+    if (showAttrs) {
+      const idx = Math.floor((worldY - attrsY) / lineH);
+      if (idx >= 0 && idx < attributes.length) { startUmlRowEdit(el.id, "attribute", idx, formatUmlAttribute(attributes[idx])); return true; }
+    }
+    const SECTION_PAD = 8;
+    const attrsH = showAttrs ? attributes.length * lineH + (attributes.length > 0 ? SECTION_PAD : 0) : 0;
+    const opsY = attrsY + attrsH;
+    if (showOps) {
+      const idx = Math.floor((worldY - opsY) / lineH);
+      if (idx >= 0 && idx < operations.length) { startUmlRowEdit(el.id, "operation", idx, formatUmlOperation(operations[idx])); return true; }
+    }
+    return false;
+  }, [umlFsc, startUmlRowEdit]);
 
   // ── Correction #7 (2026-06-07) ──────────────────────────────────────────
   // Auto-scroll the canvas while the user is drawing a connector and their
@@ -4671,6 +4758,23 @@ export function Canvas({
         }}
         onMouseDown={handleBackgroundMouseDown}
         onMouseMove={handleUmlQuickAddMove}
+        onDoubleClickCapture={(e) => {
+          // Double-click on a class attribute/operation row (or enum value)
+          // opens the inline row editor instead of the class-name label edit
+          // (issue #14). Runs in capture so it pre-empts the element's own
+          // double-click; only consumes the event when a row is actually hit.
+          if (diagramType !== "domain") return;
+          const rect = svgRef.current?.getBoundingClientRect();
+          if (!rect) return;
+          const w = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
+          for (const el of data.elements) {
+            if (el.type !== "uml-class" && el.type !== "uml-enumeration") continue;
+            if (w.x >= el.x && w.x <= el.x + el.width && w.y >= el.y && w.y <= el.y + el.height) {
+              if (tryStartUmlRowEditAt(el, w.y)) { e.stopPropagation(); e.preventDefault(); }
+              return;
+            }
+          }
+        }}
         onWheel={handleWheel}
         onDrop={(e) => { setPoolDropPreview(null); handleDrop(e); }}
         onDragOver={(e) => {
@@ -7268,23 +7372,23 @@ export function Canvas({
         </div>
       )}
 
-      {/* UML class quick-add flyout (Shift + near a class edge) — dark grey for
-          readability (issue #10). */}
+      {/* UML class quick-add flyout (Shift + near a class edge) — dark grey text
+          on a white background for readability (issue #10). */}
       {umlQuickAddMenu && (
         <div
           style={{ position: "absolute", left: umlQuickAddMenu.screenX, top: umlQuickAddMenu.screenY, zIndex: 55 }}
-          className="bg-gray-700 border border-gray-600 rounded shadow-lg p-1"
+          className="bg-white border border-gray-300 rounded shadow-lg p-1"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <button
             onMouseDown={(e) => { e.preventDefault(); startUmlRowAdd(umlQuickAddMenu.elementId, "attribute"); }}
-            className="block px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-600 w-full text-left rounded whitespace-nowrap"
+            className="block px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 w-full text-left rounded whitespace-nowrap"
           >
             + Add Attribute
           </button>
           <button
             onMouseDown={(e) => { e.preventDefault(); startUmlRowAdd(umlQuickAddMenu.elementId, "operation"); }}
-            className="block px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-600 w-full text-left rounded whitespace-nowrap"
+            className="block px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 w-full text-left rounded whitespace-nowrap"
           >
             + Add Operation
           </button>
@@ -7292,44 +7396,84 @@ export function Canvas({
       )}
 
       {/* UML class/enum inline row editor — single line, grows to the right as
-          the user types (issue #11/#12); left-anchored to the element edge. */}
+          the user types (issue #11/#12), with cascading assist popups (#10);
+          left-anchored to the element edge. */}
       {umlRowEdit && (() => {
         const el = data.elements.find((x) => x.id === umlRowEdit.elementId);
         if (!el) return null;
         const r = umlRowWorldRect(el, umlRowEdit.kind, umlRowEdit.index);
         const isEnum = umlRowEdit.kind === "enum-value";
-        // Grow-to-the-right: width tracks the typed text (~7px/char) but never
-        // shrinks below the element's own width.
-        const contentW = umlRowEdit.value.length * 7 + 24;
-        const width = Math.max(90, r.w * zoom, contentW * zoom);
+        const isEdit = !!umlRowEdit.isEdit;
+        // Grow-to-the-right, matching autoResizeUmlElement's width formula
+        // (CHAR_W 6.5 + PAD*2) so the editor width equals the compartment width
+        // the class will settle to on commit — same as the Properties Panel (#11).
+        const contentW = umlRowEdit.value.length * 6.5 + 8;
+        const inputW = Math.max(90, r.w * zoom, contentW * zoom);
+        const inputH = Math.max(16, r.h * zoom);
+        const left = r.x * zoom + pan.x;
+        const top = r.y * zoom + pan.y;
+
+        // Cascading assist: visibility → (after ":") type → (after a space)
+        // multiplicity. Operations only offer visibility. Enums have no assist.
+        const phase = umlRowEdit.kind === "attribute" ? umlAttrAssistPhase(umlRowEdit.value)
+          : umlRowEdit.kind === "operation" ? umlOpAssistPhase(umlRowEdit.value) : null;
+        const setValue = (v: string) => setUmlRowEdit((cur) => (cur ? { ...cur, value: v } : cur));
+        const applyVisibility = (insert: string) => setValue(insert + umlRowEdit.value.replace(/^[+\-#]\s*/, ""));
+        const applyType = (t: string) => { const ci = umlRowEdit.value.indexOf(":"); setValue(umlRowEdit.value.slice(0, ci) + ": " + t + " "); };
+        const applyMult = (insert: string) => { if (insert) setValue(umlRowEdit.value.replace(/\s+$/, "") + " " + insert); };
+        const chip = "text-[11px] text-gray-700 px-1.5 py-0.5 rounded hover:bg-gray-100 whitespace-nowrap cursor-pointer";
+
         return (
-          <input
-            autoFocus
-            value={umlRowEdit.value}
-            onChange={(e) => setUmlRowEdit((cur) => (cur ? { ...cur, value: e.target.value } : cur))}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.preventDefault(); if (isEnum) advanceEnumValue(); else commitUmlRow(); }
-              else if (e.key === "Escape") { e.preventDefault(); if (isEnum) commitUmlRow(); else cancelUmlRow(); }
-            }}
-            onBlur={commitUmlRow}
-            onMouseDown={(e) => e.stopPropagation()}
-            placeholder={isEnum ? "value (Return for next, Esc to finish)"
-              : umlRowEdit.kind === "attribute" ? "+ name : Type [0..*] = default" : "+ operationName()"}
-            style={{
-              position: "absolute",
-              left: r.x * zoom + pan.x,
-              top: r.y * zoom + pan.y,
-              width,
-              height: Math.max(16, r.h * zoom),
-              fontSize: Math.max(9, 10 * zoom),
-              zIndex: 60,
-              border: "2px solid #2563eb",
-              borderRadius: 3,
-              padding: "0 2px",
-              background: "white",
-              color: "#111827",
-            }}
-          />
+          <>
+            <input
+              ref={umlRowInputRef}
+              autoFocus
+              value={umlRowEdit.value}
+              onChange={(e) => setUmlRowEdit((cur) => (cur ? { ...cur, value: e.target.value } : cur))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); if (isEdit) commitUmlRow(); else advanceRow(); }
+                else if (e.key === "Escape") { e.preventDefault(); if (isEdit) cancelUmlRow(); else commitUmlRow(); }
+              }}
+              onBlur={(e) => { if ((e.relatedTarget as HTMLElement | null)?.closest?.("[data-uml-assist]")) return; commitUmlRow(); }}
+              onMouseDown={(e) => e.stopPropagation()}
+              placeholder={isEnum ? "value (Return for next, Esc to finish)"
+                : umlRowEdit.kind === "attribute" ? "+ name : Type [0..*] = default" : "+ operationName()"}
+              style={{
+                position: "absolute", left, top, width: inputW, height: inputH,
+                fontSize: Math.max(9, 10 * zoom), zIndex: 60,
+                border: "2px solid #2563eb", borderRadius: 3, padding: "0 2px",
+                background: "white", color: "#111827",
+              }}
+            />
+            {phase && (
+              <div
+                data-uml-assist
+                style={{ position: "absolute", left, top: top + inputH + 2, zIndex: 61, maxWidth: 260 }}
+                className="bg-white border border-gray-300 rounded shadow-lg p-1 flex flex-wrap gap-0.5"
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              >
+                {phase === "visibility" && UML_VIS_OPTS.map((o) => (
+                  <button key={o.label} className={chip} onMouseDown={(e) => { e.preventDefault(); applyVisibility(o.insert); }}>{o.label}</button>
+                ))}
+                {phase === "type" && UML_TYPE_OPTS.map((t) => (
+                  <button key={t} className={chip} onMouseDown={(e) => { e.preventDefault(); applyType(t); }}>{t}</button>
+                ))}
+                {phase === "multiplicity" && (<>
+                  {UML_MULT_OPTS.map((o) => (
+                    <button key={o.label} className={chip} onMouseDown={(e) => { e.preventDefault(); applyMult(o.insert); }}>{o.label}</button>
+                  ))}
+                  <input
+                    value={umlMultCustom}
+                    onChange={(e) => setUmlMultCustom(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (umlMultCustom.trim()) { applyMult(`[${umlMultCustom.trim()}]`); setUmlMultCustom(""); umlRowInputRef.current?.focus(); } } }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    placeholder="n..m"
+                    className="text-[11px] text-gray-700 border border-gray-300 rounded px-1 py-0 w-14"
+                  />
+                </>)}
+              </div>
+            )}
+          </>
         );
       })()}
 

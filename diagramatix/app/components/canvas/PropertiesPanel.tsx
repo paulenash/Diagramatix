@@ -1036,15 +1036,17 @@ export function PropertiesPanel({
           </label>
         )}
 
-        {/* Connector routing (Sticky vs Optimal) — domain diagrams only (#3). */}
+        {/* Connector routing (Sticky vs Optimal) — SuperAdmin-only control (#3).
+            Sticky is the standard for everyone; this red toggle lets a SuperAdmin
+            flip to legacy Optimal, and hides with the other SuperAdmin chrome. */}
         {onSetUmlSticky && (
-          <label className="flex items-start gap-1.5 mb-0.5 cursor-pointer select-none" title="Sticky: endpoints stay fixed on their face; the moving entity carries its point, only jumping when a different face becomes closest. Optimal: both endpoints always snap to the closest faces.">
-            <input type="checkbox" className="mt-[2px] cursor-pointer"
+          <label className="flex items-start gap-1.5 mb-0.5 cursor-pointer select-none" title="SuperAdmin: Sticky (standard) keeps endpoints fixed on their face; Optimal (legacy) always snaps both endpoints to the closest faces.">
+            <input type="checkbox" className="mt-[2px] cursor-pointer accent-red-600"
               checked={!!umlSticky}
               onChange={e => onSetUmlSticky(e.target.checked)} />
-            <span className="text-[9px] text-gray-600 leading-tight">
+            <span className="text-[9px] text-red-600 leading-tight">
               Sticky connector routing
-              <span className="block text-[8px] text-gray-400">Endpoints ride with their entity; uncheck for Optimal (always closest faces)</span>
+              <span className="block text-[8px] text-red-400">SuperAdmin · uncheck for legacy Optimal routing</span>
             </span>
           </label>
         )}
