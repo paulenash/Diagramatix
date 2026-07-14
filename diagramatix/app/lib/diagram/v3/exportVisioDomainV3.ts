@@ -426,11 +426,19 @@ export async function exportVisioDomainV3(
       .map(([ms, txt]) => `<Shape ID='${allocId()}' Type='Shape' MasterShape='${ms}'><Cell N='HideText' V='0'/><Text>${esc(txt)}</Text></Shape>`)
       .join("");
 
+    // Full User section like a real Visio UML relationship instance. The
+    // DX/DYBegin/End rows carry the master's own routing-offset formulas that the
+    // arrowheads + multiplicity sub-shapes depend on; angles are explicit.
     const userRows =
+      (nameText ? `<Row N='RelationshipName'><Cell N='Value' V='${nameText}' U='STR'/></Row>` : "") +
+      (hasMult && (beginMult || endMult) ? `<Row N='ShowMulti'><Cell N='Value' V='1' U='BOOL'/></Row>` : "") +
+      `<Row N='DXBegin'><Cell N='Value' V='0' U='DL' F='(PinX-LocPinX+Connections.X1)-BeginX'/></Row>` +
+      `<Row N='DYBegin'><Cell N='Value' V='0' U='DL' F='(PinY-LocPinY+Connections.Y1)-BeginY'/></Row>` +
+      `<Row N='DXEnd'><Cell N='Value' V='0' U='DL' F='EndX-(PinX-LocPinX+Connections.X2)'/></Row>` +
+      `<Row N='DYEnd'><Cell N='Value' V='0' U='DL' F='EndY-(PinY-LocPinY+Connections.Y2)'/></Row>` +
       `<Row N='BeginAngle'><Cell N='Value' V='${n(beginAngle)}' U='DA'/></Row>` +
       `<Row N='EndAngle'><Cell N='Value' V='${n(endAngle)}' U='DA'/></Row>` +
-      (hasMult && (beginMult || endMult) ? `<Row N='ShowMulti'><Cell N='Value' V='1' U='BOOL'/></Row>` : "") +
-      (nameText ? `<Row N='RelationshipName'><Cell N='Value' V='${nameText}' U='STR'/></Row>` : "");
+      `<Row N='visNavOrder'><Cell N='Value' V='24000'/></Row>`;
 
     shapes.push(
       `<Shape ID='${id}' NameU='${masterName}' Name='${masterName}' Type='Group' Master='${master}'>` +
@@ -442,24 +450,34 @@ export async function exportVisioDomainV3(
       `<Cell N='EndX' V='${n(ex)}' F='${endGlue}'/>` +
       `<Cell N='EndY' V='${n(ey)}' F='${endGlue}'/>` +
       `<Cell N='LayerMember' V='0'/>` +
+      // 1D-connector + explicit line rendering cells — copied from the BPMN
+      // export, whose connectors DO render. Without ObjType/LineWeight and the
+      // explicit Geometry visibility cells below, the UML connectors stayed blank.
+      `<Cell N='Angle' V='0' F='GUARD(0DA)'/><Cell N='FlipX' V='0' F='GUARD(FALSE)'/><Cell N='FlipY' V='0' F='GUARD(FALSE)'/>` +
+      `<Cell N='ObjType' V='2'/><Cell N='LineWeight' V='0.01041666666666667'/>` +
       `<Cell N='BegTrigger' V='2' F='_XFTRIGGER(Sheet.${srcSheet}!EventXFMod)'/>` +
       `<Cell N='EndTrigger' V='2' F='_XFTRIGGER(Sheet.${tgtSheet}!EventXFMod)'/>` +
-      // Name text position (connector midpoint, local frame).
+      `<Cell N='ConFixedCode' V='6'/>` +
+      `<Cell N='TxtPinX' V='${n(locx)}' F='Inh'/><Cell N='TxtPinY' V='${n(locy)}' F='Inh'/>` +
+      // Section order matches a real instance: Control, User, Actions, Connection,
+      // Character, Geometry.
       `<Section N='Control'><Row N='TextPosition'>` +
         `<Cell N='X' V='${n(locx)}'/><Cell N='Y' V='${n(locy)}'/>` +
         `<Cell N='XDyn' V='${n(locx)}'/><Cell N='YDyn' V='${n(locy)}'/></Row></Section>` +
       `<Section N='User'>${userRows}</Section>` +
+      `<Section N='Actions'><Row N='Row_1'><Cell N='Checked' V='1' F='Inh'/></Row></Section>` +
       // Connection anchors (begin=local origin, end=local Width/Height) that the
-      // multiplicity sub-shapes and arrowheads reference.
+      // multiplicity sub-shapes + arrowheads reference.
       `<Section N='Connection'>` +
         `<Row T='Connection' IX='0'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-        `<Row T='Connection' IX='1'><Cell N='X' V='${n(dx)}' F='Width'/><Cell N='Y' V='${n(dy)}' F='Height'/></Row></Section>` +
-      // Straight line Begin(0,0)→End. The endpoint TRACKS Width/Height (formula)
-      // so the line follows wherever the glue resolves Begin/End on open. Keeps
-      // the MoveTo IX=1 anchor and deletes the master's extra routed rows.
+        `<Row T='Connection' IX='1'><Cell N='X' V='${n(dx)}'/><Cell N='Y' V='${n(dy)}'/></Row></Section>` +
+      `<Section N='Character'><Row IX='0'><Cell N='LangID' V='en-AU'/></Row></Section>` +
+      // Straight line Begin(0,0)→End with EXPLICIT visibility cells (as the BPMN
+      // export does) so the path paints without depending on master inheritance.
       `<Section N='Geometry' IX='0'>` +
+        `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
         `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-        `<Row T='LineTo' IX='2'><Cell N='X' V='${n(dx)}' F='Width'/><Cell N='Y' V='${n(dy)}' F='Height'/></Row>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${n(dx)}'/><Cell N='Y' V='${n(dy)}'/></Row>` +
         `<Row T='LineTo' IX='3' Del='1'/></Section>` +
       propRows([["BpmnId", conn.id], ["DgxUmlRel", dgxUmlRel(conn)]]) +
       (nameText ? `<Text>${nameText}</Text>` : "") +
