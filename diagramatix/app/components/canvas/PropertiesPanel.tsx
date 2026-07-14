@@ -107,6 +107,10 @@ interface Props {
    *  elements, with the geometry validation rules suppressed. */
   relaxedLayout?: boolean;
   onSetRelaxedLayout?: (on: boolean) => void;
+  // Domain-only connector-routing A/B switch (Sticky vs Optimal). Present only
+  // for domain diagrams; when the handler is undefined the option is hidden.
+  umlSticky?: boolean;
+  onSetUmlSticky?: (on: boolean) => void;
   forceCollapseTitle?: boolean;
   /** Per-diagram process owner — surfaced in the new Process Owner
    *  sub-section. Both name + email are optional free-text. */
@@ -755,6 +759,8 @@ export function PropertiesPanel({
   onSetDatabase,
   relaxedLayout,
   onSetRelaxedLayout,
+  umlSticky,
+  onSetUmlSticky,
   forceCollapseTitle,
   processOwner,
   onSetProcessOwner,
@@ -1026,6 +1032,19 @@ export function PropertiesPanel({
             <span className="text-[9px] text-gray-600 leading-tight">
               Free-form / imported layout
               <span className="block text-[8px] text-gray-400">Pools any size/position; rectilinear messages; no layout warnings</span>
+            </span>
+          </label>
+        )}
+
+        {/* Connector routing (Sticky vs Optimal) — domain diagrams only (#3). */}
+        {onSetUmlSticky && (
+          <label className="flex items-start gap-1.5 mb-0.5 cursor-pointer select-none" title="Sticky: endpoints stay fixed on their face; the moving entity carries its point, only jumping when a different face becomes closest. Optimal: both endpoints always snap to the closest faces.">
+            <input type="checkbox" className="mt-[2px] cursor-pointer"
+              checked={!!umlSticky}
+              onChange={e => onSetUmlSticky(e.target.checked)} />
+            <span className="text-[9px] text-gray-600 leading-tight">
+              Sticky connector routing
+              <span className="block text-[8px] text-gray-400">Endpoints ride with their entity; uncheck for Optimal (always closest faces)</span>
             </span>
           </label>
         )}

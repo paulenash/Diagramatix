@@ -40,6 +40,27 @@ function closestEdgePoint(from: Point, b: Bounds): Point {
   };
 }
 
+// A uml-package's visible silhouette is a folder tab (top-left, sized to the
+// name) plus a full-width body below it — an L shape, not the plain bounding
+// rectangle. The bbox top edge to the RIGHT of the tab is empty, so a connector
+// attaching there floats above the body. Snap those hits down to the body's top
+// edge so connectors always meet the visible outline including the name
+// rectangle (issue #7). Tab dimensions mirror UmlPackageShape in SymbolRenderer.
+function closestPackageEdgePoint(from: Point, el: DiagramElement): Point {
+  const p = closestEdgePoint(from, getBounds(el));
+  const tabH = Math.min(24, el.height * 0.22);
+  const tabW = Math.min(Math.max(60, (el.label?.length ?? 4) * 7 + 16), el.width * 0.6);
+  if (Math.abs(p.y - el.y) < 0.5 && p.x > el.x + tabW) {
+    return { x: p.x, y: el.y + tabH };
+  }
+  return p;
+}
+
+/** Edge attachment point honouring per-type silhouettes (package L-shape, etc.). */
+function edgePointFor(from: Point, el: DiagramElement): Point {
+  return el.type === "uml-package" ? closestPackageEdgePoint(from, el) : closestEdgePoint(from, getBounds(el));
+}
+
 /** Given a point that lies on an element's rectangular boundary, return
  *  which side it's on. Picks whichever edge the point is closest to so it
  *  tolerates sub-pixel offsets from `closestEdgePoint`. */
@@ -473,8 +494,10 @@ function buildOrthogonalPath(
 export function avoidObstaclesPostLayout(data: DiagramData): void {
   const elMap = new Map(data.elements.map((e) => [e.id, e] as const));
   // Boxes an association must not cross: real shapes, not backgrounds/notes.
+  // Pain points are decorative overlays and are never obstacles (issue #4).
   const boxes = data.elements.filter(
-    (e) => e.type !== "pool" && e.type !== "lane" && e.type !== "text-annotation" && e.type !== "group",
+    (e) => e.type !== "pool" && e.type !== "lane" && e.type !== "text-annotation" && e.type !== "group"
+      && e.type !== "uml-pain-point",
   );
   for (const c of data.connectors) {
     const wps = c.waypoints;
@@ -743,10 +766,10 @@ export function computeWaypoints(
     const CIRCULAR_TYPES = new Set(["use-case", "process-system"]);
     const srcEdge = CIRCULAR_TYPES.has(source.type)
       ? ellipseEdgePoint(endPt, source)
-      : closestEdgePoint(endPt, getBounds(source));
+      : edgePointFor(endPt, source);
     const tgtEdge = CIRCULAR_TYPES.has(target.type)
       ? ellipseEdgePoint(startPt, target)
-      : closestEdgePoint(startPt, getBounds(target));
+      : edgePointFor(startPt, target);
     return {
       waypoints: [startPt, srcEdge, tgtEdge, endPt],
       sourceInvisibleLeader: true,

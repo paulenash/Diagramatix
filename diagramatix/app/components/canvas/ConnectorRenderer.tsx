@@ -263,29 +263,33 @@ function OpenArrowMarkerStartThin({ id, color }: { id: string; color: string }) 
   );
 }
 
-// UML diamond marker (open) — aggregation source end
+// UML diamond marker (open) — aggregation TARGET end. refX at the far (x=15)
+// tip so, as a markerEnd, that tip seats on the target boundary and the body
+// trails back toward the source.
 function UmlDiamondOpen({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={16} markerHeight={10} refX={1} refY={5} orient="auto" overflow="visible">
+    <marker id={id} markerWidth={16} markerHeight={10} refX={15} refY={5} orient="auto" overflow="visible">
       <polygon points="1,5 8,1 15,5 8,9" fill="white" stroke={color} strokeWidth={1.2} strokeLinejoin="miter" />
     </marker>
   );
 }
 
-// UML diamond marker (filled) — composition source end
+// UML diamond marker (filled) — composition TARGET end.
 function UmlDiamondFilled({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={16} markerHeight={10} refX={1} refY={5} orient="auto" overflow="visible">
+    <marker id={id} markerWidth={16} markerHeight={10} refX={15} refY={5} orient="auto" overflow="visible">
       <polygon points="1,5 8,1 15,5 8,9" fill={color} stroke={color} strokeWidth={1.2} strokeLinejoin="miter" />
     </marker>
   );
 }
 
-// UML open triangle — generalisation source end (points backward toward source element)
+// UML open triangle — generalisation/realisation TARGET end. Apex forward
+// (x=13) so, as a markerEnd, the apex points into the target (parent/superclass)
+// with the flat base facing back toward the source.
 function UmlTriangleOpen({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={14} markerHeight={10} refX={1} refY={5} orient="auto" overflow="visible">
-      <polygon points="13,0 1,5 13,10" fill="white" stroke={color} strokeWidth={1.2} strokeLinejoin="miter" />
+    <marker id={id} markerWidth={14} markerHeight={10} refX={13} refY={5} orient="auto" overflow="visible">
+      <polygon points="1,0 13,5 1,10" fill="white" stroke={color} strokeWidth={1.2} strokeLinejoin="miter" />
     </marker>
   );
 }
@@ -589,7 +593,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const isBottleneck = connector.type === "sequence" && !!connector.bottleneck && !!showBottleneck;
   const strokeColor = selected ? "#2563eb"
     : highlight ? "#16a34a"   // Process-Context association highlight (green)
-    : misaligned ? "#dc2626"
+    // NOTE: the red "misaligned/overlap" violation stroke was removed (issue #9);
+    // the `misaligned` prop is kept for compatibility but no longer colours the line.
     : isBottleneck ? "#9333ea"
     : isMessageBPMN ? "#b0b7c3"
     : isAssocBPMN ? "#9ca3af"
@@ -880,8 +885,6 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         strokeLinecap={isAssocBPMN || isFlowchartAssoc ? "round" : undefined}
         markerStart={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-start-${connector.id})`
-          : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
-          : (connector.type === "uml-generalisation" || connector.type === "uml-realisation") ? `url(#${umlTriangleId})`
           : connector.type === "uml-containment" && connector.containmentSwapEnd ? `url(#${umlContainmentId})`
           : connector.type === "uml-association" && showArrow && connector.arrowAtSource ? `url(#${openMarkerId}-src)`
           : isBothArrow ? `url(#${openStartMarkerId})`
@@ -889,6 +892,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         }
         markerEnd={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-end-${connector.id})`
+          : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
+          : (connector.type === "uml-generalisation" || connector.type === "uml-realisation") ? `url(#${umlTriangleId})`
           : connector.type === "uml-association" && showArrow && !connector.arrowAtSource ? `url(#${openMarkerId})`
           : connector.type === "uml-dependency" && showArrow ? `url(#${openMarkerId})`
           : connector.type === "uml-containment" && !connector.containmentSwapEnd ? `url(#${umlContainmentId})`
@@ -907,8 +912,6 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           strokeWidth={isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5)}
           markerStart={
             isMessageBPMN ? `url(#msg-start-${connector.id})`
-            : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
-            : (connector.type === "uml-generalisation" || connector.type === "uml-realisation") ? `url(#${umlTriangleId})`
             : connector.type === "uml-containment" && connector.containmentSwapEnd ? `url(#${umlContainmentId})`
             : connector.type === "uml-association" && showArrow && connector.arrowAtSource ? `url(#${openMarkerId}-src)`
             : isBothArrow ? `url(#${openStartMarkerId})`
@@ -916,6 +919,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           }
           markerEnd={
             isMessageBPMN ? `url(#msg-end-${connector.id})`
+            : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
+            : (connector.type === "uml-generalisation" || connector.type === "uml-realisation") ? `url(#${umlTriangleId})`
             : connector.type === "uml-association" && showArrow && !connector.arrowAtSource ? `url(#${openMarkerId})`
             : connector.type === "uml-dependency" && showArrow ? `url(#${openMarkerId})`
             : connector.type === "uml-containment" && !connector.containmentSwapEnd ? `url(#${umlContainmentId})`

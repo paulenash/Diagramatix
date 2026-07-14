@@ -4120,6 +4120,21 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       let elements = state.elements.map((e) => {
         if (e.id === id) {
+          // Pain points attach to whatever element they partially cover, so they
+          // move with it. Pick the best-overlap host (any non-pain-point element)
+          // — bypasses the container logic below (a class isn't a container).
+          if (e.type === "uml-pain-point" && !lockParentToEP) {
+            const px2 = effectiveX + e.width, py2 = effectiveY + e.height;
+            let hostId: string | undefined, bestArea = 0;
+            for (const b of state.elements) {
+              if (b.id === id || b.type === "uml-pain-point") continue;
+              const ox = Math.max(0, Math.min(px2, b.x + b.width) - Math.max(effectiveX, b.x));
+              const oy = Math.max(0, Math.min(py2, b.y + b.height) - Math.max(effectiveY, b.y));
+              const area = ox * oy;
+              if (area > bestArea) { bestArea = area; hostId = b.id; }
+            }
+            return { ...e, x: effectiveX, y: effectiveY, parentId: hostId };
+          }
           let parentId = e.parentId;
           if (!lockParentToEP) {
             const cx = effectiveX + e.width / 2;
@@ -4150,6 +4165,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
               // process-groups: pick smallest (innermost)
               (potentialParents.filter(b => b.type === "process-group")
                 .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
+              // uml-packages: pick smallest (innermost) so grandparent→parent→child
+              // recursive nesting reparents to the deepest package (issue #13).
+              (potentialParents.filter(b => b.type === "uml-package")
+                .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
               potentialParents[0];
             if (potentialParent !== undefined || state.elements.some(b => isContainerType(b.type) && containerAccepts(b.type, e.type))) {
               parentId = potentialParent?.id;
@@ -4159,6 +4178,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
         // If moving a container, move all descendants
         if (movingIsContainer && (e.parentId === id || descendantIds.has(e.id))) {
+          return { ...e, x: e.x + dx, y: e.y + dy };
+        }
+        // Pain points attached to a NON-container host follow it when it moves
+        // (container hosts are already covered by the descendant branch above).
+        if (e.type === "uml-pain-point" && e.parentId === id) {
           return { ...e, x: e.x + dx, y: e.y + dy };
         }
         // Carry boundary events when their host moves
@@ -4530,7 +4554,38 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
       }
 
-      return { ...state, elements: updatePoolTypes(elements), connectors };
+      // Package physical-containment ↔ containment-connector reconciliation
+      // (issues #5/#6). Fires on the single frame where a moved PACKAGE changes
+      // parent: nested INTO a package → drop its containment connectors
+      // (physical containment replaces the drawn one); pulled OUT of its package
+      // parent → add a containment connector child→former-parent (⊕ on parent).
+      let outConnectors = connectors;
+      if (el.type === "uml-package") {
+        const movedAfter = elements.find(e => e.id === id);
+        const newParentId = movedAfter?.parentId;
+        const oldParentId = el.parentId;
+        if (newParentId !== oldParentId) {
+          const newParentEl = elements.find(e => e.id === newParentId);
+          const oldParentEl = elements.find(e => e.id === oldParentId);
+          if (newParentEl?.type === "uml-package") {
+            outConnectors = outConnectors.filter(c => !(c.type === "uml-containment" && c.sourceId === id));
+          } else if (oldParentEl?.type === "uml-package") {
+            const exists = outConnectors.some(c => c.type === "uml-containment" && c.sourceId === id && c.targetId === oldParentId);
+            if (!exists) {
+              const containment: Connector = {
+                id: nanoid(),
+                sourceId: id, targetId: oldParentId!,
+                sourceSide: "top", targetSide: "bottom",
+                type: "uml-containment", directionType: "non-directed", routingType: "direct",
+                sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
+              };
+              outConnectors = [...outConnectors, recomputeAllConnectors([containment], elements, state.relaxedLayout)[0] ?? containment];
+            }
+          }
+        }
+      }
+
+      return { ...state, elements: updatePoolTypes(elements), connectors: outConnectors };
     }
 
     case "SWAP_LANES_VERTICAL": {
@@ -6243,6 +6298,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       if (isDataConn && connectorType !== "associationBPMN") return state;
 
+      // Pain points are decorative and non-interactive: they can never be a
+      // connector endpoint (issue #4).
+      if (source.type === "uml-pain-point" || target.type === "uml-pain-point") return state;
+
       // UML package rule: a package may only be an endpoint of a dependency or a
       // containment connector. Any other relationship touching a package is
       // rejected. Containment is package-to-package ONLY.
@@ -6259,8 +6318,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const srcNote = source.type === "uml-note";
         const tgtNote = target.type === "uml-note";
         if (srcNote === tgtNote) return state; // need EXACTLY one Note end
-        const other = srcNote ? target.type : source.type;
-        if (other === "uml-pain-point") return state; // notes never anchor to pain points
+        // (pain-point endpoints are already rejected above, issue #4)
       }
 
       // Allow associationBPMN between event elements (child/boundary event connections)
@@ -7584,6 +7642,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
           candidates.find(b => b.type === "pool") ??
           candidates.filter(b => b.type === "process-group")
+            .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
+          candidates.filter(b => b.type === "uml-package")
             .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
           candidates[0];
         const newParentId = newParent?.id;

@@ -179,6 +179,10 @@ const VALUE_COLORS: Record<string, string> = {
 const ShowValueDisplayCtx = createContext(false);
 export const ProcessGroupDepthCtx = createContext<Map<string, number>>(new Map());
 export const LaneDepthCtx = createContext<Map<string, number>>(new Map());
+/** Map from uml-package id → nesting depth (0 = top-level, 1 = child, 2 =
+ *  grandchild, …). Drives per-level fill lightening for recursive package
+ *  nesting (issue #13). Computed in Canvas.tsx. */
+export const UmlPackageDepthCtx = createContext<Map<string, number>>(new Map());
 export const DatabaseCtx = createContext<string | undefined>(undefined);
 /** Map from archimate-shape id → descendant depth (0 = leaf, 1 = parent of
  *  leaves, 2 = grandparent, …). Drives the per-level lightening of
@@ -1432,7 +1436,11 @@ function UmlEnumerationShape({ el }: { el: DiagramElement }) {
 function UmlPackageShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
-  const fill = resolveColor("uml-package", colors);
+  const depth = useContext(UmlPackageDepthCtx).get(el.id) ?? 0;
+  // Lighten each nesting level toward white so grandparent→parent→child reads
+  // as distinct shaded bands (issue #13). Cap so deep nests stay visible.
+  const baseFill = resolveColor("uml-package", colors);
+  const fill = depth > 0 ? lerpHex(baseFill, "#ffffff", Math.min(depth * 0.22, 0.8)) : baseFill;
   const labelFontSize = Math.round(12 * fsc * 10) / 10;
   // Tab sized to the label but clamped to a fraction of the width.
   const tabH = Math.min(24, el.height * 0.22);
@@ -3041,25 +3049,9 @@ export function SymbolRenderer({
         />
       )}
 
-      {/* Misaligned messageBPMN target highlight (red) */}
-      {isErrorTarget && (
-        <rect data-interactive
-          x={element.x - 4} y={element.y - 4}
-          width={element.width + 8} height={element.height + 8}
-          fill="none" stroke="#dc2626" strokeWidth={2} rx={6}
-          style={{ pointerEvents: "none" }}
-        />
-      )}
-
-      {/* Disallow highlight */}
-      {isDisallowedTarget && (
-        <rect data-interactive
-          x={element.x - 4} y={element.y - 4}
-          width={element.width + 8} height={element.height + 8}
-          fill="none" stroke="#dc2626" strokeWidth={2} strokeDasharray="4 2" rx={6}
-          style={{ pointerEvents: "none" }}
-        />
-      )}
+      {/* Red violation/overlap highlight rects removed (issue #9). The
+          isErrorTarget / isDisallowedTarget props are retained for
+          compatibility but no longer render an indicator. */}
 
       {/* Element drag target — orange when element being dragged will become a child */}
       {isElementDragTarget && (

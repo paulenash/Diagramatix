@@ -3623,14 +3623,16 @@ export function DiagramEditor({
             onSetDatabase={diagramType === "domain" ? setDatabase : undefined}
             relaxedLayout={data.relaxedLayout}
             onSetRelaxedLayout={diagramType === "bpmn" ? setRelaxedLayout : undefined}
+            umlSticky={umlSticky}
+            onSetUmlSticky={diagramType === "domain" ? ((v: boolean) => { setUmlStickyRouting(v); setUmlSticky(v); rerouteAll(); }) : undefined}
             onUpdateDiagramTitle={updateDiagramTitle}
             processOwner={data.processOwner}
-            onSetProcessOwner={setProcessOwner}
+            onSetProcessOwner={diagramType === "bpmn" ? setProcessOwner : undefined}
             procedureDoc={data.procedureDoc}
-            onSetProcedureDoc={setProcedureDoc}
+            onSetProcedureDoc={diagramType === "bpmn" ? setProcedureDoc : undefined}
             projectId={projectId ?? undefined}
             pcf={data.pcf}
-            onSetPcf={setPcf}
+            onSetPcf={diagramType === "bpmn" ? setPcf : undefined}
             diagramOwner={diagramOwner}
             diagramOwnerCandidates={diagramOwnerCandidates}
             canEditDiagramOwner={canEditDiagramOwner}
@@ -3918,39 +3920,8 @@ export function DiagramEditor({
           </div>
         )}
 
-        {/* Domain UML connector re-routing — experimental live A/B switch.
-            Domain diagrams only. "Optimal" (default) always re-picks the
-            closest faces on both ends; "Sticky" keeps each endpoint fixed on
-            its face while it stays closest, so the moving entity carries its
-            point and the stationary one keeps its point — only jumping when a
-            different face pair becomes genuinely closest. Flipping the switch
-            re-routes every connector so the change is visible immediately. */}
-        {diagramType === "domain" && isAdmin && !superAdminHidden && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
-            <div className="flex items-center gap-2 rounded-full border border-gray-300 bg-white/95 px-3 py-1.5 shadow-lg backdrop-blur">
-              <span className="text-xs font-medium text-gray-500">Connector routing</span>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !umlSticky;
-                  setUmlStickyRouting(next);
-                  setUmlSticky(next);
-                  rerouteAll();
-                }}
-                className={`relative inline-flex h-6 w-32 items-center rounded-full text-[11px] font-semibold transition-colors ${
-                  umlSticky ? "bg-emerald-500 text-white" : "bg-gray-200 text-gray-700"
-                }`}
-                title={
-                  umlSticky
-                    ? "Sticky (default): endpoints stay fixed on their face; the moving entity carries its point, jumping only when a different face becomes closest."
-                    : "Optimal (legacy): both endpoints always snap to the closest faces."
-                }
-              >
-                <span className="w-full text-center">{umlSticky ? "Sticky (default)" : "Optimal (legacy)"}</span>
-              </button>
-            </div>
-          </div>
-        )}
+        {/* (Domain connector-routing A/B switch moved into the Diagram
+            Properties panel — issue #3.) */}
 
         {/* Review Mode — footer banner that steps through the flagged elements
             one at a time. Outlines + selection persist until Exit. Accepting

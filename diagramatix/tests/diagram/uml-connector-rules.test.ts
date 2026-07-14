@@ -75,3 +75,53 @@ describe("uml-note-anchor", () => {
     expect(reducer(world(), add("n1", "c1", "uml-association")).connectors).toHaveLength(0);
   });
 });
+
+describe("pain points are non-interactive with connectors (issue #4)", () => {
+  it("rejects any connector with a pain-point endpoint", () => {
+    expect(reducer(world(), add("pp", "c1", "uml-association")).connectors).toHaveLength(0);
+    expect(reducer(world(), add("c1", "pp", "uml-dependency")).connectors).toHaveLength(0);
+  });
+});
+
+describe("package containment ↔ connector reconciliation (issues #5/#6)", () => {
+  // Two packages, the child (p2) currently top-level with a containment
+  // connector to p1. Moving p2's centre INTO p1 should drop that connector.
+  const nestIntoWorld = (): DiagramData => ({
+    elements: [
+      { id: "p1", type: "uml-package", x: 0, y: 0, width: 500, height: 400, label: "P1", properties: {} },
+      { id: "p2", type: "uml-package", x: 700, y: 0, width: 160, height: 120, label: "P2", properties: {} },
+    ],
+    connectors: [
+      { id: "cc", sourceId: "p2", targetId: "p1", type: "uml-containment",
+        sourceSide: "top", targetSide: "bottom", directionType: "non-directed", routingType: "direct",
+        sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [] },
+    ],
+    viewport: { x: 0, y: 0, zoom: 1 },
+  });
+
+  it("#5 removes the containment connector when p2 is nested into p1", () => {
+    // Move p2 so its centre lands inside p1.
+    const d = reducer(nestIntoWorld(), { type: "MOVE_ELEMENT", payload: { id: "p2", x: 150, y: 120 } });
+    expect(d.elements.find(e => e.id === "p2")?.parentId).toBe("p1");
+    expect(d.connectors.filter(c => c.type === "uml-containment")).toHaveLength(0);
+  });
+
+  it("#6 adds a containment connector (child→former parent) when p2 is pulled out of p1", () => {
+    // p2 starts physically nested inside p1 (parentId p1), no connector.
+    const start: DiagramData = {
+      elements: [
+        { id: "p1", type: "uml-package", x: 0, y: 0, width: 500, height: 400, label: "P1", properties: {} },
+        { id: "p2", type: "uml-package", x: 150, y: 120, width: 160, height: 120, label: "P2", properties: {}, parentId: "p1" },
+      ],
+      connectors: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    // Drag p2 far outside p1.
+    const d = reducer(start, { type: "MOVE_ELEMENT", payload: { id: "p2", x: 900, y: 600 } });
+    expect(d.elements.find(e => e.id === "p2")?.parentId).toBeUndefined();
+    const cc = d.connectors.filter(c => c.type === "uml-containment");
+    expect(cc).toHaveLength(1);
+    expect(cc[0].sourceId).toBe("p2"); // child = source, ⊕ sits on the target (former parent)
+    expect(cc[0].targetId).toBe("p1");
+  });
+});
