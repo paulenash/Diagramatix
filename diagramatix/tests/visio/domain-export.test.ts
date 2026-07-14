@@ -76,6 +76,12 @@ describe("domain → Visio v3 export (standard UML, structural)", () => {
     expect(page).toContain("<Connects>");
     expect((page.match(/<Connect /g) ?? []).length).toBe(2);
 
+    // Connector geometry override is self-contained: an explicit MoveTo anchor
+    // + visibility cells so the line paints on first open (invisible-connector
+    // fix). Previously it supplied only LineTo rows and inherited the MoveTo.
+    expect(page).toContain("<Row T='MoveTo' IX='1'>");
+    expect(page).toMatch(/<Section N='Geometry' IX='0'><Cell N='NoFill'[^>]*\/><Cell N='NoLine'[^>]*\/><Cell N='NoShow'/);
+
     // Document infrastructure preserved from the standard-UML template.
     expect(zip.file("visio/theme/theme1.xml")).toBeTruthy();
     expect(zip.file("visio/pages/pages.xml")).toBeTruthy();

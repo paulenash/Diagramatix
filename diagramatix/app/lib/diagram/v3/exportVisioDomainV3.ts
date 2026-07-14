@@ -374,16 +374,22 @@ export async function exportVisioDomainV3(
       `<Cell N='BegTrigger' V='2' F='_XFTRIGGER(Sheet.${srcSheet}!EventXFMod)'/>` +
       `<Cell N='EndTrigger' V='2' F='_XFTRIGGER(Sheet.${tgtSheet}!EventXFMod)'/>` +
       propRows([["BpmnId", conn.id], ["DgxUmlRel", dgxUmlRel(conn)]]) +
-      // Make the line visible on open: the master's group Geometry IX0 draws a
-      // multi-segment path cached at authoring size. Match how Visio SAVES a
-      // routed connector — override the LineTo ROWS (inherit NoFill/NoLine/
-      // MoveTo + line style) so they trace a STRAIGHT Begin(0,0)→End(dx,dy)
-      // line via collinear points (no Del — deleting rows kills the render).
+      // Make the line visible on FIRST open. The master's group Geometry IX0
+      // draws a path cached at authoring size (hardcoded coords, not formula-
+      // driven), so we must override it to trace Begin(0,0)→End(dx,dy). The
+      // previous override supplied only LineTo rows and relied on INHERITING the
+      // master's MoveTo IX=1 + visibility cells + row count — which left the
+      // line blank until Visio re-routed on interaction. Make it SELF-CONTAINED:
+      // explicit MoveTo IX=1, exact LineTo IX=2/IX=3 overriding the master's two
+      // rows (no stray IX=4), and explicit NoShow=0/NoLine=0 so nothing is
+      // inherited. (Verify in Visio — this is the paused invisible-connector fix
+      // derived from comparing a real Microsoft-routed Association.)
       (isRel
         ? `<Section N='Geometry' IX='0'>` +
-            `<Row T='LineTo' IX='2'><Cell N='X' V='${n(dx / 3)}'/><Cell N='Y' V='${n(dy / 3)}'/></Row>` +
-            `<Row T='LineTo' IX='3'><Cell N='X' V='${n(2 * dx / 3)}'/><Cell N='Y' V='${n(2 * dy / 3)}'/></Row>` +
-            `<Row T='LineTo' IX='4'><Cell N='X' V='${n(dx)}'/><Cell N='Y' V='${n(dy)}'/></Row>` +
+            `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>` +
+            `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+            `<Row T='LineTo' IX='2'><Cell N='X' V='${n(dx / 2)}'/><Cell N='Y' V='${n(dy / 2)}'/></Row>` +
+            `<Row T='LineTo' IX='3'><Cell N='X' V='${n(dx)}'/><Cell N='Y' V='${n(dy)}'/></Row>` +
           `</Section>`
         : "") +
       (conn.label ? `<Text>${esc(conn.label)}</Text>` : "") +
