@@ -6,11 +6,35 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
+import JSZip from "jszip";
 import { importVisioDomainV3, isDomainVisio } from "@/app/lib/diagram/v3/importVisioDomainV3";
 import type { UmlAttribute } from "@/app/lib/diagram/types";
 
 const load = (name: string) =>
   fs.readFileSync(path.join(process.cwd(), "tests", "visio", "fixtures", name)).buffer as ArrayBuffer;
+
+/** Inject a name label centred on the Association connector group (local mid =
+ *  Width/2, Height/2 → projection t≈0.5) to simulate a user-named association. */
+async function withAssociationName(fixture: string, name: string): Promise<ArrayBuffer> {
+  const zip = await JSZip.loadAsync(load(fixture));
+  let page = await zip.file("visio/pages/page1.xml")!.async("string");
+  // Locate the Association connector group and its Width/Height.
+  const open = page.indexOf("<Shape ID=");
+  const idx = page.indexOf("NameU='Association'");
+  const gStart = page.lastIndexOf("<Shape ID=", idx);
+  // Balanced end of the group.
+  const re = /<Shape\b|<\/Shape>/g; re.lastIndex = gStart;
+  let depth = 0, gEnd = -1, m: RegExpExecArray | null;
+  while ((m = re.exec(page)) !== null) { if (m[0] === "</Shape>") { if (--depth === 0) { gEnd = m.index; break; } } else depth++; }
+  const head = page.slice(gStart, gStart + 600);
+  const W = parseFloat((head.match(/<Cell N='Width' V='([^']*)'/) || [])[1]);
+  const H = parseFloat((head.match(/<Cell N='Height' V='([^']*)'/) || [])[1]);
+  const child = `<Shape ID='9001' Type='Shape'><Cell N='PinX' V='${W / 2}'/><Cell N='PinY' V='${H / 2}'/><Text>${name}</Text></Shape>`;
+  page = page.slice(0, gEnd) + child + page.slice(gEnd);
+  void open;
+  zip.file("visio/pages/page1.xml", page);
+  return (await zip.generateAsync({ type: "uint8array" })).buffer as ArrayBuffer;
+}
 
 describe("foreign UML import — package fixture", () => {
   it("is detected as a domain diagram", async () => {
@@ -72,6 +96,18 @@ describe("foreign UML import — aggregation direction + multiplicities/roles + 
       expect(c.properties.stereotype).toBe("Class");
       expect(c.properties.showStereotype).toBe(true);
     }
+  });
+
+  it("imports a centred association name (t≈0.5) as the connector label, not a role", async () => {
+    const named = await withAssociationName("domain-agg-multiplicity.vsdx", "Has");
+    const { data } = await importVisioDomainV3(named);
+    const assoc = data.connectors.find(c => c.type === "uml-association")!;
+    expect(assoc.label).toBe("Has");
+    // The name must NOT be mistaken for an end role, and multiplicities survive.
+    expect(assoc.sourceRole).toBeUndefined();
+    expect(assoc.targetRole).toBeUndefined();
+    expect(assoc.sourceMultiplicity).toBe("1");
+    expect(assoc.targetMultiplicity).toBe("0..*");
   });
 });
 

@@ -74,36 +74,42 @@ function baseNameU(n: string): string {
 const MULT_RE = /^\s*(\*|\d+|\d+\.\.(\d+|\*|n)|n)\s*$/;
 const isMult = (t: string) => MULT_RE.test(t);
 
-/** Foreign standard-UML connectors (no DgxUmlRel blob) carry their multiplicities
- *  and role names as text sub-shapes inside the connector group — two per end
- *  (multiplicity first in document order, role second). Assign each to the begin
- *  or end endpoint by comparing its page-space Y to the connector's Begin/End
- *  anchors, then split multiplicity (regex) from role (a non-multiplicity name).
- *  Blank/duplicate-multiplicity slots are dropped rather than imported as junk. */
+/** Foreign standard-UML connectors (no DgxUmlRel blob) carry their multiplicities,
+ *  role names and the association name as text sub-shapes inside the connector
+ *  group. Locate each along the Begin→End axis via the projection parameter
+ *  `t = (p·v)/|v|²` (v = End−Begin in the group's LOCAL frame, so no page/flip
+ *  transform is needed): t≈0 → begin end, t≈1 → far end, t≈0.5 → the association
+ *  name centred on the line. Within an end, split multiplicity (regex) from role
+ *  (a non-multiplicity name). Empty/duplicate-multiplicity slots are dropped. */
 function foreignRelLabels(groupXml: string): {
   begin: { mult?: string; role?: string };
   end: { mult?: string; role?: string };
+  name?: string;
 } {
-  const beginY = cellV(groupXml, "BeginY") ?? 0;
-  const endY = cellV(groupXml, "EndY") ?? 0;
-  const originY = (cellV(groupXml, "PinY") ?? 0) - (cellV(groupXml, "LocPinY") ?? 0);
-  const beginLbls: string[] = [], endLbls: string[] = [];
+  const W = cellV(groupXml, "Width") ?? 0;
+  const H = cellV(groupXml, "Height") ?? 0;
+  const v2 = W * W + H * H;
+  const beginLbls: string[] = [], endLbls: string[] = [], midLbls: string[] = [];
   const re = /<Shape\b/g;
   let m: RegExpExecArray | null; let first = true;
   while ((m = re.exec(groupXml)) !== null) {
     if (first) { first = false; continue; } // the connector group shape itself
     const scope = groupXml.slice(m.index);
     const txt = firstText(scope);
+    if (!txt.trim()) continue;
+    const px = parseFloat((scope.match(/<Cell N='PinX' V='([^']*)'/) || [])[1] ?? "NaN");
     const py = parseFloat((scope.match(/<Cell N='PinY' V='([^']*)'/) || [])[1] ?? "NaN");
-    if (Number.isNaN(py)) continue;
-    const pageY = originY + py;
-    (Math.abs(pageY - beginY) <= Math.abs(pageY - endY) ? beginLbls : endLbls).push(txt);
+    if (Number.isNaN(px) || Number.isNaN(py) || v2 === 0) continue;
+    const t = (px * W + py * H) / v2;
+    (t < 0.33 ? beginLbls : t > 0.66 ? endLbls : midLbls).push(txt);
   }
   const pick = (arr: string[]) => ({
     mult: arr.find(t => isMult(t)),
-    role: arr.find(t => t.trim() && !isMult(t)),
+    role: arr.find(t => !isMult(t)),
   });
-  return { begin: pick(beginLbls), end: pick(endLbls) };
+  // A centred label that isn't a multiplicity is the association name.
+  const name = midLbls.find(t => !isMult(t));
+  return { begin: pick(beginLbls), end: pick(endLbls), name };
 }
 
 /** Rows nested INSIDE a class/enum group (Microsoft standard-UML stencil stores
@@ -340,9 +346,11 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
     let tMult = d.targetMultiplicity as string | undefined;
     let sRole = d.sourceRole as string | undefined;
     let tRole = d.targetRole as string | undefined;
+    let label = d.associationName as string | undefined;
     if (!blob) {
       const L = foreignRelLabels(s);
       sMult = L.begin.mult; tMult = L.end.mult; sRole = L.begin.role; tRole = L.end.role;
+      if (L.name) label = L.name; // association name, centred on the line
       if (diamondSwap) {
         [sMult, tMult] = [tMult, sMult];
         [sRole, tRole] = [tRole, sRole];
@@ -360,7 +368,7 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
       targetMultiplicity: tMult,
       sourceRole: sRole,
       targetRole: tRole,
-      label: d.associationName as string | undefined,
+      label,
       ...(d.arrowAtSource ? { arrowAtSource: true } : {}),
       ...(d.readingDirection ? { readingDirection: d.readingDirection as Connector["readingDirection"] } : {}),
       ...(d.weight ? { weight: d.weight as number } : {}),
