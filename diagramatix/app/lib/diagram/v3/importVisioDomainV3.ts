@@ -392,6 +392,36 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
       }
     }
     if (diamondSwap) [srcId, tgtId] = [tgtId, srcId];
+
+    // Reading direction encoded as a leading/trailing directional char in the
+    // label (`< > ^ v` or the ◄►▲▼ variants), space-separated so real names
+    // aren't mis-parsed. Translate to readingDirection by which element the char
+    // points at, then strip it. (A blob-set direction already won.)
+    if (label && !(d as Record<string, unknown>).readingDirection) {
+      const t0 = label.trim();
+      let ch = "", clean = t0;
+      let mm = t0.match(/^([<>^v◄►▶▲▼])\s+(.+)$/i) || t0.match(/^([<>^v◄►▶▲▼])$/i);
+      if (mm) { ch = mm[1]; clean = mm[2] ?? ""; }
+      else if ((mm = t0.match(/^(.+?)\s+([<>^v◄►▶▲▼])$/i))) { ch = mm[2]; clean = mm[1]; }
+      if (ch) {
+        const DIRV: Record<string, { x: number; y: number }> = {
+          "<": { x: -1, y: 0 }, "◄": { x: -1, y: 0 },
+          ">": { x: 1, y: 0 }, "►": { x: 1, y: 0 }, "▶": { x: 1, y: 0 },
+          "^": { x: 0, y: -1 }, "▲": { x: 0, y: -1 },
+          "v": { x: 0, y: 1 }, "▼": { x: 0, y: 1 },
+        };
+        const v = DIRV[ch.toLowerCase()] ?? DIRV[ch];
+        const se = elements.find(e => e.id === srcId), te = elements.find(e => e.id === tgtId);
+        if (v && se && te) {
+          const mx = (se.x + se.width / 2 + te.x + te.width / 2) / 2;
+          const my = (se.y + se.height / 2 + te.y + te.height / 2) / 2;
+          const dotT = v.x * (te.x + te.width / 2 - mx) + v.y * (te.y + te.height / 2 - my);
+          const dotS = v.x * (se.x + se.width / 2 - mx) + v.y * (se.y + se.height / 2 - my);
+          (d as Record<string, unknown>).readingDirection = dotT >= dotS ? "to-target" : "to-source";
+          label = clean || undefined;
+        }
+      }
+    }
     connectors.push({
       id: propVal(s, "BpmnId") ?? `conn-${sheetId}`,
       sourceId: srcId, targetId: tgtId, sourceSide: "right", targetSide: "left",

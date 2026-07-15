@@ -147,11 +147,10 @@ describe("domain Visio round-trip (lossless via DgxUml)", () => {
       ],
     };
     const out = await exportVisioDomainV3(named, "RTN", tmpl());
-    // Export carries the name in the connector's own <Text> + a reading-direction
-    // triangle Shape (not a text glyph).
+    // Export encodes reading direction as a leading directional char on the name
+    // (target is to the right → "> Owns"), readable/editable in Visio.
     const page = await (await JSZip.loadAsync(out)).file("visio/pages/page1.xml")!.async("string");
-    expect(page).toContain("<Text>Owns</Text>");
-    expect(page).toContain("NameU='UmlReadingDir'");
+    expect(page).toContain("&gt; Owns");
 
     // Strip blobs → foreign path must recover a clean name + the direction flag.
     const zip = await JSZip.loadAsync(out);

@@ -437,7 +437,23 @@ export async function exportVisioDomainV3(
     const endRole = beginIsSource ? conn.targetRole : conn.sourceRole;
     const hasMult = ASSOC_FAMILY.has(conn.type);
 
-    const nameText = conn.label ? esc(conn.label) : "";
+    // Reading direction encoded as a leading directional char in the name
+    // (< > ^ v) — readable and editable in Visio, and it round-trips (import
+    // translates it back to readingDirection). Points toward the source/target
+    // element per readingDirection.
+    let dirPrefix = "";
+    if (conn.readingDirection === "to-target" || conn.readingDirection === "to-source") {
+      const toward = conn.readingDirection === "to-target"
+        ? elIdToBox.get(conn.targetId) : elIdToBox.get(conn.sourceId);
+      if (toward) {
+        const ddx = toward.cx - pinx, ddy = toward.cy - piny; // Visio Y-up
+        dirPrefix = Math.abs(ddx) >= Math.abs(ddy)
+          ? (ddx >= 0 ? "> " : "< ")
+          : (ddy >= 0 ? "^ " : "v ");                          // Y-up: +y = screen-up = ^
+      }
+    }
+    const nameCore = conn.label ?? "";
+    const nameText = (dirPrefix + nameCore).trim() ? esc((dirPrefix + nameCore).trim()) : "";
 
     // Emit the connector as a self-contained 1-D Shape — the SAME recipe the BPMN
     // export uses (ObjType=2 + explicit LineWeight + explicit Geometry visibility
@@ -517,38 +533,6 @@ export async function exportVisioDomainV3(
       label("Begin", bDir, -1, beginRole);
       label("End", eDir, +1, endMult);
       label("End", eDir, -1, endRole);
-    }
-
-    // Reading-direction arrowhead: a small filled triangle beside the name,
-    // pointing toward the source/target element (matching the Diagramatix
-    // original). Glued to the connector's PinX/PinY so it tracks the line.
-    if (conn.readingDirection === "to-target" || conn.readingDirection === "to-source") {
-      const toward = (conn.readingDirection === "to-target"
-        ? elIdToBox.get(conn.targetId) : elIdToBox.get(conn.sourceId));
-      if (toward) {
-        // Point ORTHOGONALLY (horizontal OR vertical) toward the element so the
-        // arrow aligns with a rectilinear segment and can be dragged onto one.
-        let tdx = toward.cx - pinx, tdy = toward.cy - piny;
-        if (Math.abs(tdx) >= Math.abs(tdy)) { tdx = Math.sign(tdx) || 1; tdy = 0; }
-        else { tdy = Math.sign(tdy) || 1; tdx = 0; }
-        const ang = Math.atan2(tdy, tdx);        // Visio Y-up, CCW radians
-        const offX = tdx * 0.3, offY = tdy * 0.3; // sit just ahead of the name
-        shapes.push(
-          `<Shape ID='${allocId()}' NameU='UmlReadingDir' Type='Shape'>` +
-          `<Cell N='PinX' V='${n(pinx + offX)}' F='Sheet.${id}!PinX+${n(offX)}'/>` +
-          `<Cell N='PinY' V='${n(piny + offY)}' F='Sheet.${id}!PinY+${n(offY)}'/>` +
-          `<Cell N='Width' V='0.13'/><Cell N='Height' V='0.1'/>` +
-          `<Cell N='LocPinX' V='0.065'/><Cell N='LocPinY' V='0.05'/>` +
-          `<Cell N='Angle' V='${n(ang)}'/>` +
-          `<Cell N='FillForegnd' V='#374151'/><Cell N='FillPattern' V='1'/><Cell N='LinePattern' V='0'/>` +
-          `<Section N='Geometry' IX='0'>` +
-            `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='1'/>` +
-            `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-            `<Row T='LineTo' IX='2'><Cell N='X' V='0.13'/><Cell N='Y' V='0.05'/></Row>` +
-            `<Row T='LineTo' IX='3'><Cell N='X' V='0'/><Cell N='Y' V='0.1'/></Row>` +
-            `<Row T='LineTo' IX='4'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-          `</Section></Shape>`);
-      }
     }
 
     connects.push(
