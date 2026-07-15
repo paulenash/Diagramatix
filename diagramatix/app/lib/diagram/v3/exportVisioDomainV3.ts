@@ -369,16 +369,64 @@ export async function exportVisioDomainV3(
     if (master === undefined) continue;
     const id = allocId();
 
-    // Cache Begin/End on the shape EDGES facing each other (Visio re-routes via
-    // _WALKGLUE on recalc, but the cached endpoints must already sit on the
-    // real shape boundaries or the connector floats until moved).
+    // Attach Begin/End to the SAME sides the Diagramatix diagram uses (so the
+    // connector meets the correct edges), then route an ORTHOGONAL path — like
+    // the original, not a diagonal. Visio re-routes on interaction; this fixes
+    // the FIRST-paint endpoints + rectilinear shape.
     const s = elIdToBox.get(beginId), t = elIdToBox.get(endId);
     if (!s || !t) continue;
-    const be = edgePoint(s, t.cx, t.cy), en = edgePoint(t, s.cx, s.cy);
+    const beginSide = diamondSwap ? conn.targetSide : conn.sourceSide;
+    const endSide = diamondSwap ? conn.sourceSide : conn.targetSide;
+    const sidePt = (b: { cx: number; cy: number; hw: number; hh: number }, side: string | undefined, ox: number, oy: number) => {
+      switch (side) {
+        case "right": return { x: b.cx + b.hw, y: b.cy };
+        case "left": return { x: b.cx - b.hw, y: b.cy };
+        case "top": return { x: b.cx, y: b.cy + b.hh };     // Visio Y-up: screen-top = higher Y
+        case "bottom": return { x: b.cx, y: b.cy - b.hh };
+        default: return edgePoint(b, ox, oy);
+      }
+    };
+    const be = sidePt(s, beginSide, t.cx, t.cy), en = sidePt(t, endSide, s.cx, s.cy);
     const bx = be.x, by = be.y, ex = en.x, ey = en.y;
     const dx = ex - bx, dy = ey - by;
     const pinx = (bx + ex) / 2, piny = (by + ey) / 2, locx = dx / 2, locy = dy / 2;
     const arrows = CONN_ARROWS[conn.type] ?? { begin: 0, end: 0, dash: false };
+
+    // Orthogonal route in LOCAL coords (origin=Begin). Prefer the Diagramatix
+    // waypoints (rectilinear, matching the original) with endpoints snapped to
+    // the rendered side-points; fall back to a simple Z/L path.
+    const bHoriz = beginSide === "left" || beginSide === "right";
+    const wpAll = conn.waypoints ?? [];
+    const vs = conn.sourceInvisibleLeader ? 1 : 0;
+    const ve = conn.targetInvisibleLeader ? wpAll.length - 2 : wpAll.length - 1;
+    const vis = wpAll.slice(vs, Math.max(vs, ve) + 1).map(p => ({ x: toX(p.x), y: toYtop(p.y) }));
+    if (diamondSwap) vis.reverse();
+    let pathLocal: Array<{ x: number; y: number }>;
+    if (vis.length >= 3) {
+      const m = vis.length;
+      const h01 = Math.abs(vis[1].y - vis[0].y) < Math.abs(vis[1].x - vis[0].x);
+      vis[1] = h01 ? { x: vis[1].x, y: by } : { x: bx, y: vis[1].y };
+      const hL = Math.abs(vis[m - 1].y - vis[m - 2].y) < Math.abs(vis[m - 1].x - vis[m - 2].x);
+      vis[m - 2] = hL ? { x: vis[m - 2].x, y: ey } : { x: ex, y: vis[m - 2].y };
+      vis[0] = { x: bx, y: by }; vis[m - 1] = { x: ex, y: ey };
+      pathLocal = vis.map(p => ({ x: p.x - bx, y: p.y - by }));
+    } else if (Math.abs(dx) < 0.03 || Math.abs(dy) < 0.03) {
+      pathLocal = [{ x: 0, y: 0 }, { x: dx, y: dy }];
+    } else {
+      pathLocal = bHoriz
+        ? [{ x: 0, y: 0 }, { x: dx / 2, y: 0 }, { x: dx / 2, y: dy }, { x: dx, y: dy }]
+        : [{ x: 0, y: 0 }, { x: 0, y: dy / 2 }, { x: dx, y: dy / 2 }, { x: dx, y: dy }];
+    }
+    const geomRows = pathLocal.map((p, i) =>
+      i === 0 ? `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>`
+        : `<Row T='LineTo' IX='${i + 1}'><Cell N='X' V='${n(p.x)}'/><Cell N='Y' V='${n(p.y)}'/></Row>`
+    ).join("");
+    const dir = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+      const ddx = b.x - a.x, ddy = b.y - a.y, l = Math.hypot(ddx, ddy) || 1;
+      return { ux: ddx / l, uy: ddy / l };
+    };
+    const bDir = dir(pathLocal[0], pathLocal[1]);                                   // into the path from Begin
+    const eDir = dir(pathLocal[pathLocal.length - 1], pathLocal[pathLocal.length - 2]); // into the path from End
 
     // Multiplicities/roles + name. Map begin/end back to Diagramatix source/target
     // (diamondSwap already flipped begin↔end for aggregation/composition).
@@ -418,51 +466,57 @@ export async function exportVisioDomainV3(
       `<Cell N='BegTrigger' V='2' F='_XFTRIGGER(Sheet.${srcSheet}!EventXFMod)'/>` +
       `<Cell N='EndTrigger' V='2' F='_XFTRIGGER(Sheet.${tgtSheet}!EventXFMod)'/>` +
       `<Cell N='ConFixedCode' V='6'/>` +
-      // Association name text box: pin just above the line midpoint and auto-size
-      // to the text (as the BPMN export does) so the label actually renders —
-      // TxtPin alone with a 0-width box leaves it invisible.
-      (nameText
-        ? `<Cell N='TxtPinX' V='${n(locx)}'/><Cell N='TxtPinY' V='${n(locy + 0.12)}'/>` +
-          `<Cell N='TxtWidth' V='0.9' F='MAX(TEXTWIDTH(TheText),5*Char.Size)'/>` +
-          `<Cell N='TxtHeight' V='0.2' F='TEXTHEIGHT(TheText,TxtWidth)'/>` +
-          `<Cell N='TxtLocPinX' V='0.45' F='TxtWidth*0.5'/>` +
-          `<Cell N='TxtLocPinY' V='0.1' F='TxtHeight*0.5'/>`
-        : "") +
+      // Association name = the connector's own text, made DRAGGABLE via a
+      // Controls.TextPosition handle (BPMN mechanism); TxtPin follows it and the
+      // box auto-sizes to the text. Emitted ALWAYS (even with no name) so that
+      // double-clicking to add a name gives a small, well-placed box rather than
+      // one spanning the whole diagonal.
+      `<Section N='Controls'><Row N='TextPosition'>` +
+        `<Cell N='X' V='${n(locx)}' F='Controls.TextPosition.XDyn'/>` +
+        `<Cell N='Y' V='${n(locy + 0.14)}' F='Controls.TextPosition.YDyn'/>` +
+        `<Cell N='XDyn' V='${n(locx)}'/><Cell N='YDyn' V='${n(locy + 0.14)}'/>` +
+        `<Cell N='XCon' V='0'/><Cell N='YCon' V='0'/><Cell N='CanGlue' V='0'/>` +
+      `</Row></Section>` +
+      `<Cell N='TxtPinX' V='${n(locx)}' F='SETATREF(Controls.TextPosition)'/>` +
+      `<Cell N='TxtPinY' V='${n(locy + 0.14)}' F='SETATREF(Controls.TextPosition.Y)'/>` +
+      `<Cell N='TxtWidth' V='0.6' F='MAX(TEXTWIDTH(TheText),2*Char.Size)'/>` +
+      `<Cell N='TxtHeight' V='0.2' F='TEXTHEIGHT(TheText,TxtWidth)'/>` +
+      `<Cell N='TxtLocPinX' V='0.3' F='TxtWidth*0.5'/>` +
+      `<Cell N='TxtLocPinY' V='0.1' F='TxtHeight*0.5'/>` +
       propRows([["BpmnId", conn.id], ["DgxUmlRel", dgxUmlRel(conn)]]) +
       `<Section N='Geometry' IX='0'>` +
         `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
-        `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-        `<Row T='LineTo' IX='2'><Cell N='X' V='${n(dx)}'/><Cell N='Y' V='${n(dy)}'/></Row>` +
+        geomRows +
       `</Section>` +
       (nameText ? `<Text>${nameText}</Text>` : "") +
       `</Shape>`
     );
 
-    // Multiplicities/roles = small borderless text Shapes near each endpoint
-    // (a Type='Shape' connector can't carry sub-shape labels like a group). Each
-    // label's PinX/PinY is GLUED to the connector's Begin/End cell via a formula
-    // (+ a fixed offset), so it FOLLOWS the endpoint when Visio re-routes the
-    // line. Round-trip is via the DgxUmlRel blob; foreign re-import ignores these.
+    // Multiplicities/roles = small borderless text Shapes near each endpoint,
+    // offset along the connector's first/last SEGMENT (so they sit beside the
+    // line, not across a diagonal). PinX/PinY track the connector's Begin/End
+    // cell via a formula but WITHOUT GUARD, so the user can still drag them in
+    // Visio (a drag overwrites the formula). Round-trip is via the DgxUmlRel blob.
     if (hasMult) {
-      const len = Math.hypot(dx, dy) || 1;
-      const ux = dx / len, uy = dy / len, perpX = -uy, perpY = ux;
-      const along = Math.min(0.32, len * 0.3), perp = 0.13;
-      const label = (end: "Begin" | "End", ox: number, oy: number, txt?: string) => {
+      const along = 0.28, perp = 0.13;
+      const label = (end: "Begin" | "End", d: { ux: number; uy: number }, side: number, txt?: string) => {
         if (!txt) return;
         const ax = end === "Begin" ? bx : ex, ay = end === "Begin" ? by : ey;
+        const ox = along * d.ux + side * perp * -d.uy;
+        const oy = along * d.uy + side * perp * d.ux;
         shapes.push(
           `<Shape ID='${allocId()}' NameU='UmlLabel' Type='Shape'>` +
-          `<Cell N='PinX' V='${n(ax + ox)}' F='GUARD(Sheet.${id}!${end}X+${n(ox)})'/>` +
-          `<Cell N='PinY' V='${n(ay + oy)}' F='GUARD(Sheet.${id}!${end}Y+${n(oy)})'/>` +
+          `<Cell N='PinX' V='${n(ax + ox)}' F='Sheet.${id}!${end}X+${n(ox)}'/>` +
+          `<Cell N='PinY' V='${n(ay + oy)}' F='Sheet.${id}!${end}Y+${n(oy)}'/>` +
           `<Cell N='Width' V='0.5'/><Cell N='Height' V='0.18'/>` +
           `<Cell N='LocPinX' V='0.25'/><Cell N='LocPinY' V='0.09'/>` +
           `<Cell N='LinePattern' V='0'/><Cell N='FillPattern' V='0'/>` +
           `<Text>${esc(txt)}</Text></Shape>`);
       };
-      label("Begin", along * ux + perp * perpX, along * uy + perp * perpY, beginMult);
-      label("Begin", along * ux - perp * perpX, along * uy - perp * perpY, beginRole);
-      label("End", -along * ux + perp * perpX, -along * uy + perp * perpY, endMult);
-      label("End", -along * ux - perp * perpX, -along * uy - perp * perpY, endRole);
+      label("Begin", bDir, +1, beginMult);
+      label("Begin", bDir, -1, beginRole);
+      label("End", eDir, +1, endMult);
+      label("End", eDir, -1, endRole);
     }
 
     // Reading-direction arrowhead: a small filled triangle beside the name,
@@ -472,14 +526,17 @@ export async function exportVisioDomainV3(
       const toward = (conn.readingDirection === "to-target"
         ? elIdToBox.get(conn.targetId) : elIdToBox.get(conn.sourceId));
       if (toward) {
+        // Point ORTHOGONALLY (horizontal OR vertical) toward the element so the
+        // arrow aligns with a rectilinear segment and can be dragged onto one.
         let tdx = toward.cx - pinx, tdy = toward.cy - piny;
-        const tl = Math.hypot(tdx, tdy) || 1; tdx /= tl; tdy /= tl;
+        if (Math.abs(tdx) >= Math.abs(tdy)) { tdx = Math.sign(tdx) || 1; tdy = 0; }
+        else { tdy = Math.sign(tdy) || 1; tdx = 0; }
         const ang = Math.atan2(tdy, tdx);        // Visio Y-up, CCW radians
         const offX = tdx * 0.3, offY = tdy * 0.3; // sit just ahead of the name
         shapes.push(
           `<Shape ID='${allocId()}' NameU='UmlReadingDir' Type='Shape'>` +
-          `<Cell N='PinX' V='${n(pinx + offX)}' F='GUARD(Sheet.${id}!PinX+${n(offX)})'/>` +
-          `<Cell N='PinY' V='${n(piny + offY)}' F='GUARD(Sheet.${id}!PinY+${n(offY)})'/>` +
+          `<Cell N='PinX' V='${n(pinx + offX)}' F='Sheet.${id}!PinX+${n(offX)}'/>` +
+          `<Cell N='PinY' V='${n(piny + offY)}' F='Sheet.${id}!PinY+${n(offY)}'/>` +
           `<Cell N='Width' V='0.13'/><Cell N='Height' V='0.1'/>` +
           `<Cell N='LocPinX' V='0.065'/><Cell N='LocPinY' V='0.05'/>` +
           `<Cell N='Angle' V='${n(ang)}'/>` +
