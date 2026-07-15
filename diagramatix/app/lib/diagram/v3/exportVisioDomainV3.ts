@@ -303,23 +303,55 @@ export async function exportVisioDomainV3(
         ...memberXml,
       );
     } else if (el.type === "uml-package" || el.type === "uml-note") {
-      // Dedicated standard-UML masters: Package (expanded), Note.
-      // These carry self-contained geometry in the master; a minimal instance
-      // (Master + size + text) inherits the sub-shapes. Package is sized to the
-      // element; Note keeps a compact default.
-      const masterName = el.type === "uml-package" ? "Package (expanded)" : "Note";
-      const master = M[masterName] ?? M["Rounded Rectangle"];
-      if (master === undefined) continue;
+      // Self-contained geometry (the UML group masters don't render from a
+      // scratch instance — same issue as the connectors). Package = a folder
+      // (body + name tab); Note = a rectangle with a folded top-right corner.
       const id = allocId();
       elIdToSheet.set(el.id, id);
       const width = Math.max(MIN_W, el.width / 96), height = Math.max(0.6, el.height / 96);
       const cx = toX(el.x) + width / 2, cy = toYtop(el.y) - height / 2;
       elIdToBox.set(el.id, { cx, cy, hw: width / 2, hh: height / 2 });
+      const isPkg = el.type === "uml-package";
+      let geom: string, txtPinY: number, txtH: number, secCells: string;
+      if (isPkg) {
+        const tabH = Math.min(0.3, height * 0.28), tabW = Math.min(width * 0.45, 1.4);
+        geom =
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - tabH)}'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='${n(tabW)}'/><Cell N='Y' V='${n(height - tabH)}'/></Row>` +
+          `<Row T='LineTo' IX='5'><Cell N='X' V='${n(tabW)}'/><Cell N='Y' V='${n(height)}'/></Row>` +
+          `<Row T='LineTo' IX='6'><Cell N='X' V='0'/><Cell N='Y' V='${n(height)}'/></Row>` +
+          `<Row T='LineTo' IX='7'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>`;
+        // Transparent body so contained classes stay visible; name in the tab.
+        secCells = `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>`;
+        txtPinY = height - tabH / 2; txtH = tabH;
+      } else {
+        const ear = Math.min(0.25, width * 0.25, height * 0.4);
+        geom =
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height)}'/></Row>` +
+          `<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='${n(height)}'/></Row>` +
+          `<Row T='LineTo' IX='6'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='MoveTo' IX='7'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height)}'/></Row>` +
+          `<Row T='LineTo' IX='8'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>` +
+          `<Row T='LineTo' IX='9'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>`;
+        secCells = `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>`;
+        txtPinY = height / 2; txtH = height - 0.15;
+      }
       shapes.push(
-        `<Shape ID='${id}' NameU='${masterName}' Type='Group' Master='${master}'>` +
+        `<Shape ID='${id}' NameU='${isPkg ? "Package" : "Note"}' Type='Shape'>` +
         `<Cell N='PinX' V='${n(cx)}'/><Cell N='PinY' V='${n(cy)}'/><Cell N='Width' V='${n(width)}'/><Cell N='Height' V='${n(height)}'/>` +
-        `<Cell N='LocPinX' V='${n(width / 2)}' F='Inh'/><Cell N='LocPinY' V='${n(height / 2)}' F='Inh'/>` +
+        `<Cell N='LocPinX' V='${n(width / 2)}'/><Cell N='LocPinY' V='${n(height / 2)}'/>` +
+        (isPkg ? "" : `<Cell N='FillForegnd' V='#FFFFF0'/>`) +
+        `<Cell N='FillPattern' V='1'/><Cell N='LineWeight' V='0.01041666666666667'/>` +
+        `<Cell N='TxtPinX' V='${n(width / 2)}'/><Cell N='TxtPinY' V='${n(txtPinY)}'/>` +
+        `<Cell N='TxtWidth' V='${n(width - 0.15)}'/><Cell N='TxtHeight' V='${n(txtH)}'/>` +
+        `<Cell N='TxtLocPinX' V='${n((width - 0.15) / 2)}'/><Cell N='TxtLocPinY' V='${n(txtH / 2)}'/>` +
         propRows([["BpmnId", el.id], ["DgxUml", dgxUml(el)]]) +
+        `<Section N='Geometry' IX='0'>${secCells}${geom}</Section>` +
         `<Text>${esc(el.label ?? "")}</Text></Shape>`
       );
     }
@@ -392,31 +424,28 @@ export async function exportVisioDomainV3(
     const pinx = (bx + ex) / 2, piny = (by + ey) / 2, locx = dx / 2, locy = dy / 2;
     const arrows = CONN_ARROWS[conn.type] ?? { begin: 0, end: 0, dash: false };
 
-    // Orthogonal route in LOCAL coords (origin=Begin). Prefer the Diagramatix
-    // waypoints (rectilinear, matching the original) with endpoints snapped to
-    // the rendered side-points; fall back to a simple Z/L path.
-    const bHoriz = beginSide === "left" || beginSide === "right";
-    const wpAll = conn.waypoints ?? [];
-    const vs = conn.sourceInvisibleLeader ? 1 : 0;
-    const ve = conn.targetInvisibleLeader ? wpAll.length - 2 : wpAll.length - 1;
-    const vis = wpAll.slice(vs, Math.max(vs, ve) + 1).map(p => ({ x: toX(p.x), y: toYtop(p.y) }));
-    if (diamondSwap) vis.reverse();
-    let pathLocal: Array<{ x: number; y: number }>;
-    if (vis.length >= 3) {
-      const m = vis.length;
-      const h01 = Math.abs(vis[1].y - vis[0].y) < Math.abs(vis[1].x - vis[0].x);
-      vis[1] = h01 ? { x: vis[1].x, y: by } : { x: bx, y: vis[1].y };
-      const hL = Math.abs(vis[m - 1].y - vis[m - 2].y) < Math.abs(vis[m - 1].x - vis[m - 2].x);
-      vis[m - 2] = hL ? { x: vis[m - 2].x, y: ey } : { x: ex, y: vis[m - 2].y };
-      vis[0] = { x: bx, y: by }; vis[m - 1] = { x: ex, y: ey };
-      pathLocal = vis.map(p => ({ x: p.x - bx, y: p.y - by }));
-    } else if (Math.abs(dx) < 0.03 || Math.abs(dy) < 0.03) {
-      pathLocal = [{ x: 0, y: 0 }, { x: dx, y: dy }];
+    // Clean ORTHOGONAL route between the two side-points (always rectilinear,
+    // respecting both attachment axes). We deliberately do NOT reuse the
+    // Diagramatix waypoints — remapping them onto the resized Visio boxes
+    // produced non-orthogonal kinks and broke the diamond connectors.
+    const bAxisH = beginSide ? (beginSide === "left" || beginSide === "right") : Math.abs(dx) >= Math.abs(dy);
+    const eAxisH = endSide ? (endSide === "left" || endSide === "right") : Math.abs(dx) >= Math.abs(dy);
+    const isDirect = conn.type === "uml-note-anchor" || conn.type === "uml-containment" || conn.routingType === "direct";
+    let ptsAbs: Array<{ x: number; y: number }>;
+    if (isDirect || Math.abs(dx) < 0.04 || Math.abs(dy) < 0.04) {
+      ptsAbs = [{ x: bx, y: by }, { x: ex, y: ey }];               // already straight
+    } else if (bAxisH && eAxisH) {
+      const mid = (bx + ex) / 2;                                   // both horizontal → Z via midX
+      ptsAbs = [{ x: bx, y: by }, { x: mid, y: by }, { x: mid, y: ey }, { x: ex, y: ey }];
+    } else if (!bAxisH && !eAxisH) {
+      const mid = (by + ey) / 2;                                   // both vertical → Z via midY
+      ptsAbs = [{ x: bx, y: by }, { x: bx, y: mid }, { x: ex, y: mid }, { x: ex, y: ey }];
+    } else if (bAxisH) {
+      ptsAbs = [{ x: bx, y: by }, { x: ex, y: by }, { x: ex, y: ey }]; // L: horizontal then vertical
     } else {
-      pathLocal = bHoriz
-        ? [{ x: 0, y: 0 }, { x: dx / 2, y: 0 }, { x: dx / 2, y: dy }, { x: dx, y: dy }]
-        : [{ x: 0, y: 0 }, { x: 0, y: dy / 2 }, { x: dx, y: dy / 2 }, { x: dx, y: dy }];
+      ptsAbs = [{ x: bx, y: by }, { x: bx, y: ey }, { x: ex, y: ey }]; // L: vertical then horizontal
     }
+    const pathLocal = ptsAbs.map(p => ({ x: p.x - bx, y: p.y - by }));
     const geomRows = pathLocal.map((p, i) =>
       i === 0 ? `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>`
         : `<Row T='LineTo' IX='${i + 1}'><Cell N='X' V='${n(p.x)}'/><Cell N='Y' V='${n(p.y)}'/></Row>`
@@ -452,7 +481,10 @@ export async function exportVisioDomainV3(
           : (ddy >= 0 ? "^ " : "v ");                          // Y-up: +y = screen-up = ^
       }
     }
-    const nameCore = conn.label ?? "";
+    // Strip any directional char already on the label so we never double it up
+    // (e.g. a diagram whose label still carries a stray "< " from an old import).
+    const nameCore = (conn.label ?? "")
+      .replace(/^[<>^v◄►▶▲▼]\s+/i, "").replace(/\s+[<>^v◄►▶▲▼]$/i, "").trim();
     const nameText = (dirPrefix + nameCore).trim() ? esc((dirPrefix + nameCore).trim()) : "";
 
     // Emit the connector as a self-contained 1-D Shape — the SAME recipe the BPMN
