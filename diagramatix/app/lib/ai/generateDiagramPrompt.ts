@@ -126,7 +126,7 @@ IMAGE INPUT — when an image of a UML class / domain diagram is attached, repro
 - a folder-tab / package shape → "uml-package"; classes drawn inside it are that package's members (still list them as separate elements — grouping is by geometry).
 - a folded-corner box of free text → "uml-note".
 - a plain line, or a line with an open arrowhead + role/multiplicity labels → "uml-association" (put multiplicities in "sourceMultiplicity"/"targetMultiplicity").
-- a hollow diamond at one end → "uml-aggregation"; a FILLED (solid) diamond → "uml-composition". Look carefully at every diamond — a solid diamond is composition, not association; don't miss it.
+- a hollow diamond at one end → "uml-aggregation"; a FILLED (solid) diamond → "uml-composition". Diamonds are often SMALL and FAINT — relax your threshold: if you see ANY diamond-ish marker at a line end, classify it as aggregation or composition (never miss one as a plain association); when it looks filled or you can't tell hollow-vs-filled, prefer "uml-composition".
 - a hollow triangle on a SOLID line → "uml-generalisation"; a hollow triangle on a DASHED line → "uml-realisation".
 - an open arrow on a DASHED line → "uml-dependency".
 - a solid line between two packages ending in a circle-with-a-cross ⊕ → "uml-containment".
@@ -139,7 +139,12 @@ CONNECTION DIRECTION — the arrowhead / diamond / triangle / ⊕ ALWAYS sits at
 - containment: target = the containing package (the ⊕ end).
 Getting this backwards flips the arrow — always put the MARKED end as the target.
 
-READING DIRECTION — if a small SOLID triangle (▶ ◀ ▲ ▼) is drawn beside an association NAME to show which way to read it, set "readingDirection": "to-target" if it points from the source toward the target, else "to-source".
+ASSOCIATION NAME vs ROLE NAME — a word/label on an association is EITHER its name OR an end role; tell them apart (this is the #1 mistake — don't file a name as a role):
+- ASSOCIATION NAME → the connection "label". It is a VERB, verb-phrase, adjective or adjectival phrase (e.g. "Oversees", "In Charge Of", "Reports To", "Manages", "Allocated To", "Produces", "Is For", "Requires", "Owned By"), usually Capitalised, sits near the MIDDLE of the line, and very often has a small SOLID reading-direction triangle (▶◀▲▼) right beside it — the name and its reading triangle GO TOGETHER.
+- ROLE NAME → "sourceRole"/"targetRole". It is a NOUN at an END of the line beside a multiplicity, lower case; singular when the multiplicity is 1 or 0..1, plural when 0..*, 1..*, n..m.
+So: a Capitalised verb/adjective near the middle (especially with a small triangle) is the NAME, not a role. A lower-case noun at an end with a multiplicity is a role.
+
+READING DIRECTION — if a small SOLID triangle (▶ ◀ ▲ ▼) is drawn beside an association NAME to show which way to read it, set "readingDirection": "to-target" if it points from the source toward the target, else "to-source". (A name with a triangle is an association name, never a role.)
 
 STEREOTYPES — only set an element "stereotype" (shown as «value») when the drawing ACTUALLY shows a «guillemet» stereotype (e.g. «enumeration», «interface»). Do NOT invent «Class»/«entity» for a plain class — a plain class has NO stereotype.
 
