@@ -347,18 +347,17 @@ export async function exportVisioDomainV3(
         `<Shape ID='${id}' NameU='${isPkg ? "Package" : "Note"}' Type='Shape'>` +
         `<Cell N='PinX' V='${n(cx)}'/><Cell N='PinY' V='${n(cy)}'/><Cell N='Width' V='${n(width)}'/><Cell N='Height' V='${n(height)}'/>` +
         `<Cell N='LocPinX' V='${n(width / 2)}'/><Cell N='LocPinY' V='${n(height / 2)}'/>` +
-        // Theme-aware fill/line (QuickStyle + THEMEVAL formulas) so notes/packages
-        // recolour with the Visio theme like classes do. Note keeps a light tint.
-        `<Cell N='QuickStyleLineColor' V='1'/><Cell N='QuickStyleFillColor' V='1'/>` +
-        `<Cell N='QuickStyleLineMatrix' V='1'/><Cell N='QuickStyleFillMatrix' V='1'/><Cell N='QuickStyleType' V='1'/>` +
-        `<Cell N='LineColor' V='#000000' F='THEMEGUARD(THEMEVAL())'/>` +
-        (isPkg ? "" : `<Cell N='FillForegnd' V='#fffff0' F='THEMEGUARD(MSOTINT(THEMEVAL(),35))'/>`) +
-        `<Cell N='FillPattern' V='1'/><Cell N='LineWeight' V='0.01041666666666667'/>` +
+        // Theme-aware fill via the SAME formula classes use (MSOTINT(THEMEVAL())),
+        // and let the line inherit the themed document default (no explicit
+        // LineColor), so notes/packages recolour with the Visio theme.
+        `<Cell N='LineWeight' V='0.01041666666666667'/>` +
+        (isPkg ? "" : `<Cell N='FillForegnd' V='#fffff0' F='MSOTINT(THEMEVAL(),30)'/><Cell N='FillPattern' V='1'/>`) +
         `<Cell N='TxtPinX' V='${n(txtPinX)}'/><Cell N='TxtPinY' V='${n(txtPinY)}'/>` +
         `<Cell N='TxtWidth' V='${n(txtW)}'/><Cell N='TxtHeight' V='${n(txtH)}'/>` +
         `<Cell N='TxtLocPinX' V='${n(txtW / 2)}'/><Cell N='TxtLocPinY' V='${n(txtH / 2)}'/>` +
         propRows([["BpmnId", el.id], ["DgxUml", dgxUml(el)]]) +
         `<Section N='Geometry' IX='0'>${secCells}${geom}</Section>` +
+        (isPkg ? `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='0'/></Row></Section>` : "") +
         `<Text>${esc(el.label ?? "")}</Text></Shape>`
       );
     }
@@ -384,8 +383,8 @@ export async function exportVisioDomainV3(
   // with the diamond-swap so the diamond/triangle lands on the right element.
   const CONN_ARROWS: Record<string, { begin: number; end: number; dash: boolean }> = {
     "uml-association": { begin: 0, end: 0, dash: false },
-    "uml-aggregation": { begin: 22, end: 0, dash: false },   // hollow diamond
-    "uml-composition": { begin: 254, end: 0, dash: false },  // filled diamond
+    "uml-aggregation": { begin: 22, end: 0, dash: false },   // hollow diamond (standard arrow)
+    "uml-composition": { begin: 0, end: 0, dash: false },    // filled diamond drawn as a sub-shape
     "uml-generalisation": { begin: 0, end: 14, dash: false },// hollow triangle
     "uml-realisation": { begin: 0, end: 14, dash: true },    // hollow triangle, dashed
     "uml-dependency": { begin: 0, end: 12, dash: true },     // open arrow, dashed
@@ -575,15 +574,41 @@ export async function exportVisioDomainV3(
           `<Shape ID='${allocId()}' NameU='UmlLabel' Type='Shape'>` +
           `<Cell N='PinX' V='${n(ax + ox)}' F='Sheet.${id}!${end}X+${n(ox)}'/>` +
           `<Cell N='PinY' V='${n(ay + oy)}' F='Sheet.${id}!${end}Y+${n(oy)}'/>` +
-          `<Cell N='Width' V='0.5'/><Cell N='Height' V='0.18'/>` +
-          `<Cell N='LocPinX' V='0.25'/><Cell N='LocPinY' V='0.09'/>` +
+          `<Cell N='Width' V='0.6'/><Cell N='Height' V='0.18'/>` +
+          `<Cell N='LocPinX' V='0.3'/><Cell N='LocPinY' V='0.09'/>` +
           `<Cell N='LinePattern' V='0'/><Cell N='FillPattern' V='0'/>` +
+          // Size the text box to the text so the role/multiplicity never wraps.
+          `<Cell N='TxtWidth' V='0.6' F='MAX(TEXTWIDTH(TheText),Char.Size)'/>` +
+          `<Cell N='TxtHeight' V='0.18' F='TEXTHEIGHT(TheText,TxtWidth)'/>` +
+          `<Cell N='TxtLocPinX' V='0.3' F='TxtWidth*0.5'/><Cell N='TxtLocPinY' V='0.09' F='TxtHeight*0.5'/>` +
           `<Text>${esc(txt)}</Text></Shape>`);
       };
       label("Begin", bDir, 0.24, +1, beginMult);
       label("Begin", bDir, 0.54, -1, beginRole);
       label("End", eDir, 0.24, +1, endMult);
       label("End", eDir, 0.54, -1, endRole);
+    }
+
+    // Composition's FILLED diamond has no reliable standard arrow index, so draw
+    // it as a small filled rhombus glued to the Begin (diamond) end, oriented
+    // along the first segment.
+    if (conn.type === "uml-composition") {
+      const ang = Math.atan2(bDir.uy, bDir.ux);
+      const ox = bDir.ux * 0.09, oy = bDir.uy * 0.09;
+      shapes.push(
+        `<Shape ID='${allocId()}' NameU='UmlDiamond' Type='Shape'>` +
+        `<Cell N='PinX' V='${n(bx + ox)}' F='Sheet.${id}!BeginX+${n(ox)}'/>` +
+        `<Cell N='PinY' V='${n(by + oy)}' F='Sheet.${id}!BeginY+${n(oy)}'/>` +
+        `<Cell N='Width' V='0.18'/><Cell N='Height' V='0.11'/>` +
+        `<Cell N='LocPinX' V='0.09'/><Cell N='LocPinY' V='0.055'/><Cell N='Angle' V='${n(ang)}'/>` +
+        `<Cell N='FillForegnd' V='#000000'/><Cell N='FillPattern' V='1'/><Cell N='LineWeight' V='0.008'/>` +
+        `<Section N='Geometry' IX='0'><Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0.055'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='0.09'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='0.18'/><Cell N='Y' V='0.055'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='0.09'/><Cell N='Y' V='0.11'/></Row>` +
+          `<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='0.055'/></Row>` +
+        `</Section></Shape>`);
     }
 
     connects.push(
