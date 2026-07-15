@@ -434,27 +434,30 @@ export async function exportVisioDomainV3(
     );
 
     // Multiplicities/roles = small borderless text Shapes near each endpoint
-    // (a Type='Shape' connector can't carry sub-shape labels like a group). The
-    // multiplicity sits one side of the line, the role the other. Round-trip is
-    // via the DgxUmlRel blob; foreign re-import ignores these NameU='UmlLabel's.
+    // (a Type='Shape' connector can't carry sub-shape labels like a group). Each
+    // label's PinX/PinY is GLUED to the connector's Begin/End cell via a formula
+    // (+ a fixed offset), so it FOLLOWS the endpoint when Visio re-routes the
+    // line. Round-trip is via the DgxUmlRel blob; foreign re-import ignores these.
     if (hasMult) {
       const len = Math.hypot(dx, dy) || 1;
       const ux = dx / len, uy = dy / len, perpX = -uy, perpY = ux;
       const along = Math.min(0.32, len * 0.3), perp = 0.13;
-      const label = (cx: number, cy: number, txt?: string) => {
+      const label = (end: "Begin" | "End", ox: number, oy: number, txt?: string) => {
         if (!txt) return;
+        const ax = end === "Begin" ? bx : ex, ay = end === "Begin" ? by : ey;
         shapes.push(
           `<Shape ID='${allocId()}' NameU='UmlLabel' Type='Shape'>` +
-          `<Cell N='PinX' V='${n(cx)}'/><Cell N='PinY' V='${n(cy)}'/>` +
+          `<Cell N='PinX' V='${n(ax + ox)}' F='GUARD(Sheet.${id}!${end}X+${n(ox)})'/>` +
+          `<Cell N='PinY' V='${n(ay + oy)}' F='GUARD(Sheet.${id}!${end}Y+${n(oy)})'/>` +
           `<Cell N='Width' V='0.5'/><Cell N='Height' V='0.18'/>` +
           `<Cell N='LocPinX' V='0.25'/><Cell N='LocPinY' V='0.09'/>` +
           `<Cell N='LinePattern' V='0'/><Cell N='FillPattern' V='0'/>` +
           `<Text>${esc(txt)}</Text></Shape>`);
       };
-      label(bx + along * ux + perp * perpX, by + along * uy + perp * perpY, beginMult);
-      label(bx + along * ux - perp * perpX, by + along * uy - perp * perpY, beginRole);
-      label(ex - along * ux + perp * perpX, ey - along * uy + perp * perpY, endMult);
-      label(ex - along * ux - perp * perpX, ey - along * uy - perp * perpY, endRole);
+      label("Begin", along * ux + perp * perpX, along * uy + perp * perpY, beginMult);
+      label("Begin", along * ux - perp * perpX, along * uy - perp * perpY, beginRole);
+      label("End", -along * ux + perp * perpX, -along * uy + perp * perpY, endMult);
+      label("End", -along * ux - perp * perpX, -along * uy - perp * perpY, endRole);
     }
 
     connects.push(

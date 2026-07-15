@@ -311,14 +311,32 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
     endpoints.set(c[1], e);
   }
 
+  // Geometric fallback for an endpoint Visio left UNGLUED — e.g. the user moved
+  // a shape in Visio and one end of a connector detached from <Connects>. Resolve
+  // it from the connector's cached Begin/End page point to the nearest element.
+  const nearestEl = (inchX?: number, inchY?: number): string | undefined => {
+    if (inchX === undefined || inchY === undefined) return undefined;
+    const px = inchX * PX, py = (pageH - inchY) * PX;
+    let bestId: string | undefined, bestD = Infinity;
+    for (const el of elements) {
+      const ox = Math.max(el.x - px, 0, px - (el.x + el.width));
+      const oy = Math.max(el.y - py, 0, py - (el.y + el.height));
+      const dd = ox * ox + oy * oy;
+      if (dd < bestD) { bestD = dd; bestId = el.id; }
+    }
+    return bestD <= (PX * 1.5) ** 2 ? bestId : undefined; // within ~1.5" of a shape
+  };
+
   for (const s of shapes) {
     const sheetId = attr(s, "ID");
     const masterId = attr(s, "Master");
     const nameU = baseNameU(masterId ? (id2name[masterId] ?? "") : (attr(s, "NameU") ?? ""));
     if (!CONN_TYPE[nameU]) continue;
     const ep = endpoints.get(sheetId!);
-    const srcEl = ep?.begin ? sheetToElId.get(ep.begin) : undefined;
-    const tgtEl = ep?.end ? sheetToElId.get(ep.end) : undefined;
+    let srcEl = ep?.begin ? sheetToElId.get(ep.begin) : undefined;
+    let tgtEl = ep?.end ? sheetToElId.get(ep.end) : undefined;
+    if (!srcEl) srcEl = nearestEl(cellV(s, "BeginX"), cellV(s, "BeginY"));
+    if (!tgtEl) tgtEl = nearestEl(cellV(s, "EndX"), cellV(s, "EndY"));
     if (!srcEl || !tgtEl) { connectorsSkipped++; continue; }
 
     const blob = propVal(s, "DgxUmlRel");
