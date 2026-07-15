@@ -317,12 +317,20 @@ function formatAttrDisplay(attr: UmlAttribute): string {
   return s;
 }
 
-function ClassAttributesList({ element, onUpdateProperties, database }: {
+function ClassAttributesList({ element, onUpdateProperties, database, allElements }: {
   element: DiagramElement;
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
   database?: string;
+  allElements?: DiagramElement[];
 }) {
-  const typeList = (database && database !== "none" && DB_TYPE_LISTS[database]) ? DB_TYPE_LISTS[database] : UML_TYPES;
+  const baseTypes = (database && database !== "none" && DB_TYPE_LISTS[database]) ? DB_TYPE_LISTS[database] : UML_TYPES;
+  // An attribute's type may also be any enumeration (or class) drawn on the same
+  // diagram — offer those names in the picker, after the primitive/DB types.
+  const diagramTypes = (allElements ?? [])
+    .filter(e => (e.type === "uml-enumeration" || e.type === "uml-class") && e.id !== element.id)
+    .map(e => (e.label ?? "").trim())
+    .filter(Boolean);
+  const typeList = Array.from(new Set([...baseTypes, ...diagramTypes]));
   const attrs: UmlAttribute[] = (element.properties.attributes as UmlAttribute[] | undefined) ?? [];
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [draft, setDraft] = useState<UmlAttribute | null>(null);
@@ -390,6 +398,9 @@ function ClassAttributesList({ element, onUpdateProperties, database }: {
                 <select value={draft.type ?? ""} onChange={e => setDraft({ ...draft, type: e.target.value || undefined })}
                   className="text-[9px] border border-gray-300 rounded px-0.5 py-0 flex-1">
                   <option value="">None</option>
+                  {draft.type && !typeList.includes(draft.type) && (
+                    <option key={draft.type} value={draft.type}>{draft.type}</option>
+                  )}
                   {typeList.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
@@ -3126,7 +3137,7 @@ export function PropertiesPanel({
             </label>
           </div>
           {((element.properties.showAttributes as boolean | undefined) ?? false) && (
-            <ClassAttributesList element={element} onUpdateProperties={onUpdateProperties} database={database} />
+            <ClassAttributesList element={element} onUpdateProperties={onUpdateProperties} database={database} allElements={allElements} />
           )}
           {((element.properties.showOperations as boolean | undefined) ?? false) && (
             <ClassOperationsList element={element} onUpdateProperties={onUpdateProperties} />

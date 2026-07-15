@@ -8,6 +8,7 @@
  */
 import type { DiagramData, DiagramElement, Connector, Side } from "./types";
 import { recomputeAllConnectors } from "./routing";
+import { autoResizeUmlElement } from "./umlAutoSize";
 
 interface AiBounds { x: number; y: number; w: number; h: number }
 interface AiEl {
@@ -102,6 +103,22 @@ export function layoutDomainPreserved(
       ...(parent ? { parentId: parent } : {}),
       properties: domainProps(e),
     } as DiagramElement);
+  }
+
+  // Size classes & enumerations to their CONTENT (same sizer the editor uses),
+  // not the AI's fractional image bounds — those come back near-uniform, so
+  // trusting them makes every box the same shape. Re-centre on the original
+  // position so the box stays where the eye expects it in the reproduction.
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i];
+    if (el.type !== "uml-class" && el.type !== "uml-enumeration") continue;
+    const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+    const sized = autoResizeUmlElement(el);
+    elements[i] = {
+      ...sized,
+      x: Math.round(cx - sized.width / 2),
+      y: Math.round(cy - sized.height / 2),
+    };
   }
 
   // Grow each package to enclose its members (image bounds are approximate).
