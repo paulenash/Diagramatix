@@ -53,6 +53,39 @@ describe("domain image reproduction (layout preserved from bounds)", () => {
     expect(assoc.targetMultiplicity).toBe("*");
   });
 
+  it("compacts the exaggerated gaps left by content-sizing, without overlaps", () => {
+    // Mimic the AI's near-uniform image bounds: wide boxes spread across the
+    // canvas. Content-sizing shrinks them (short names), so without compaction
+    // the gaps balloon. Compaction should pull them together but never collide.
+    const spread = {
+      elements: [
+        { id: "a", type: "uml-class", label: "A", bounds: { x: 0.02, y: 0.4, w: 0.18, h: 0.2 } },
+        { id: "b", type: "uml-class", label: "B", bounds: { x: 0.30, y: 0.4, w: 0.18, h: 0.2 } },
+        { id: "c", type: "uml-class", label: "C", bounds: { x: 0.58, y: 0.4, w: 0.18, h: 0.2 } },
+        { id: "d", type: "uml-class", label: "D", bounds: { x: 0.86, y: 0.4, w: 0.12, h: 0.2 } },
+      ],
+      connections: [],
+    };
+    const data = layoutGenericDiagram(spread as never, "domain", { imageAspect: { w: 1000, h: 600 } });
+    const bx = (id: string) => data.elements.find(e => e.id === id)!;
+    // Left-to-right ordering preserved (affine scale keeps collinearity).
+    expect(bx("a").x).toBeLessThan(bx("b").x);
+    expect(bx("b").x).toBeLessThan(bx("c").x);
+    expect(bx("c").x).toBeLessThan(bx("d").x);
+    // No two boxes overlap.
+    for (let i = 0; i < data.elements.length; i++)
+      for (let j = i + 1; j < data.elements.length; j++) {
+        const p = data.elements[i], q = data.elements[j];
+        const hit = p.x < q.x + q.width && p.x + p.width > q.x &&
+                    p.y < q.y + q.height && p.y + p.height > q.y;
+        expect(hit).toBe(false);
+      }
+    // Compacted: the a→b gap is modest, not the ~285px the raw 0.28-fraction
+    // centre spacing (392px) minus the shrunk width would otherwise leave.
+    const gapAB = bx("b").x - (bx("a").x + bx("a").width);
+    expect(gapAB).toBeLessThan(160);
+  });
+
   it("falls back to auto-layout when bounds are absent", () => {
     const noBounds = {
       elements: [

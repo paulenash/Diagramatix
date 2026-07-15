@@ -109,17 +109,62 @@ export function layoutDomainPreserved(
   // not the AI's fractional image bounds — those come back near-uniform, so
   // trusting them makes every box the same shape. Re-centre on the original
   // position so the box stays where the eye expects it in the reproduction.
+  let sumOW = 0, sumNW = 0, sumOH = 0, sumNH = 0;
   for (let i = 0; i < elements.length; i++) {
     const el = elements[i];
     if (el.type !== "uml-class" && el.type !== "uml-enumeration") continue;
     const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
     // 50px clear on each side of the name (Paul) so reproduced boxes aren't tight.
     const sized = autoResizeUmlElement(el, 50);
+    sumOW += el.width; sumOH += el.height; sumNW += sized.width; sumNH += sized.height;
     elements[i] = {
       ...sized,
       x: Math.round(cx - sized.width / 2),
       y: Math.round(cy - sized.height / 2),
     };
+  }
+
+  // COMPACT: the boxes just shrank but their centres still sit on a canvas laid
+  // out for the ORIGINAL sizes, so the gaps between them are exaggerated. Pull
+  // every (non-package) centre toward the layout's top-left corner in proportion
+  // to how much the boxes shrank — this keeps rows/columns aligned (an affine
+  // scale preserves collinearity). Back the scale off toward 1.0 if it would
+  // make any two boxes collide, so compaction never introduces an overlap.
+  const movers = elements.filter(e => e.type !== "uml-package");
+  if (sumOW > 0 && sumOH > 0 && movers.length >= 2) {
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+    const targetSx = clamp(sumNW / sumOW, 0.5, 1);
+    const targetSy = clamp(sumNH / sumOH, 0.5, 1);
+    // Original centres (captured before we move anything).
+    const base = movers.map(e => ({ e, cx: e.x + e.width / 2, cy: e.y + e.height / 2 }));
+    const minCx = Math.min(...base.map(b => b.cx));
+    const minCy = Math.min(...base.map(b => b.cy));
+    const GAP = 24; // keep at least this much clear between boxes
+    const overlaps = (sx: number, sy: number) => {
+      const boxes = base.map(b => ({
+        x: minCx + (b.cx - minCx) * sx - b.e.width / 2,
+        y: minCy + (b.cy - minCy) * sy - b.e.height / 2,
+        w: b.e.width, h: b.e.height,
+      }));
+      for (let i = 0; i < boxes.length; i++)
+        for (let j = i + 1; j < boxes.length; j++) {
+          const a = boxes[i], c = boxes[j];
+          if (a.x < c.x + c.w + GAP && a.x + a.w + GAP > c.x &&
+              a.y < c.y + c.h + GAP && a.y + a.h + GAP > c.y) return true;
+        }
+      return false;
+    };
+    let sx = targetSx, sy = targetSy;
+    // Ease both factors up toward 1 together until the packed layout is clean.
+    for (let step = 0; step < 20 && overlaps(sx, sy); step++) {
+      sx = Math.min(1, sx + 0.025);
+      sy = Math.min(1, sy + 0.025);
+      if (sx >= 1 && sy >= 1) break;
+    }
+    for (const b of base) {
+      b.e.x = Math.round(minCx + (b.cx - minCx) * sx - b.e.width / 2);
+      b.e.y = Math.round(minCy + (b.cy - minCy) * sy - b.e.height / 2);
+    }
   }
 
   // Grow each package to enclose its members (image bounds are approximate).
