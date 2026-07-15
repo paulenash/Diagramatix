@@ -967,9 +967,11 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         );
       })()}
 
-      {/* Floating connector label */}
+      {/* Floating connector label. uml-dependency uses it for its «stereotype»
+          label (on top of the line, movable via labelOffsetX/Y). */}
       {(connector.type === "transition" || connector.type === "flow" || connector.type === "messageBPMN"
         || connector.type === "flowline"
+        || (connector.type === "uml-dependency" && !!connector.label)
         || (connector.type === "sequence" && connector.label !== undefined)) && (
         <InteractionLabel
           connector={connector}

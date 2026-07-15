@@ -164,6 +164,28 @@ describe("domain Visio round-trip (lossless via DgxUml)", () => {
     expect(n1.readingDirection).toBe("to-target");
   });
 
+  it("round-trips a dependency stereotype label («uses»)", async () => {
+    const dep: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "x", type: "uml-class", x: 40, y: 40, width: 200, height: 80, label: "X", properties: {} },
+        { id: "y", type: "uml-class", x: 400, y: 40, width: 200, height: 80, label: "Y", properties: {} },
+      ],
+      connectors: [
+        { id: "d1", sourceId: "x", targetId: "y", sourceSide: "right", targetSide: "left",
+          type: "uml-dependency", directionType: "open-directed", routingType: "rectilinear",
+          sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [], label: "«uses»" },
+      ],
+    };
+    const out = await exportVisioDomainV3(dep, "RTDEP", tmpl());
+    const page = await (await JSZip.loadAsync(out)).file("visio/pages/page1.xml")!.async("string");
+    expect(page).toContain("«uses»");
+    const { data } = await importVisioDomainV3(out.buffer as ArrayBuffer);
+    const d1 = byId(data.connectors, "d1");
+    expect(d1.type).toBe("uml-dependency");
+    expect(d1.label).toBe("«uses»");
+  });
+
   it("foreign path (blobs stripped) reconstructs from Member rows + master NameU", async () => {
     const out = await exportVisioDomainV3(DATA, "RT", tmpl());
     // Strip the DgxUml/DgxUmlRel + BpmnId blobs to simulate a non-Diagramatix file.

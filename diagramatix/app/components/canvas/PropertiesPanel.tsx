@@ -1407,6 +1407,20 @@ export function PropertiesPanel({
                           onChange={e => onUpdateConnectorFields(connector.id, { containmentSwapEnd: e.target.checked })} />
                       </label>
                     )}
+                    {/* Dependency stereotype — becomes the connector's «...» label
+                        (on top of the line, movable). User types the value; the
+                        guillemets are added, just like entity stereotypes. */}
+                    {connector.type === "uml-dependency" && onUpdateConnectorFields && (
+                      <div className="flex items-center gap-1">
+                        <span className={labelCls}>Stereotype:</span>
+                        <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
+                          defaultValue={(connector.label ?? "").replace(/^«/, "").replace(/»$/, "")}
+                          key={`dep-st-${connector.id}`}
+                          onBlur={e => { const v = e.target.value.trim(); onUpdateConnectorFields(connector.id, { label: v ? `«${v}»` : "" }); }}
+                          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                          placeholder="e.g. uses" />
+                      </div>
+                    )}
                     {/* Name */}
                     {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
                       connector.type === "uml-composition") && onUpdateConnectorFields && (
