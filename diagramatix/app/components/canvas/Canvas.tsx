@@ -1831,9 +1831,22 @@ export function Canvas({
         const isAssocBPMN = conn?.type === "associationBPMN";
         const epFilter = isAssocBPMN
           ? undefined  // associationBPMN can connect to any element
-          : conn?.routingType === "direct"
-            ? (el: DiagramElement) => el.type === "use-case"
-            : undefined;
+          : conn?.type === "uml-note-anchor"
+            // A note anchor keeps exactly one Note end: the dragged end must be a
+            // Note if the fixed end is not, else any non-Note (incl. packages).
+            ? (() => {
+                const otherEndId = endpoint === "source" ? conn!.targetId : conn!.sourceId;
+                const otherEl = data.elements.find(e => e.id === otherEndId);
+                const otherIsNote = otherEl?.type === "uml-note";
+                return (el: DiagramElement) => otherIsNote
+                  ? el.type !== "uml-note" && el.type !== "uml-pain-point"
+                  : el.type === "uml-note";
+              })()
+            : conn?.type === "uml-containment"
+              ? (el: DiagramElement) => el.type === "uml-package"
+              : conn?.routingType === "direct"
+                ? (el: DiagramElement) => el.type === "use-case"
+                : undefined;
         const targetEl = findDropTarget(pos, fromId, epFilter);
         if (targetEl) {
           // Data-side lock: when the endpoint being moved currently sits on
@@ -3870,7 +3883,7 @@ export function Canvas({
   // ── Shift-near-boundary quick-add of UML class attributes/operations ──
   // Font scale used by the UML class renderer (mirror of FontScaleCtx value at
   // Canvas.tsx's provider) so the inline editor lands on the right compartment.
-  const umlFsc = ((data.fontSize ?? 12) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1);
+  const umlFsc = ((data.fontSize ?? (diagramType === "domain" ? 14 : 12)) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1);
   // The properties key an inline-edit kind writes to.
   const umlEditKey = (kind: "attribute" | "operation" | "enum-value") =>
     kind === "attribute" ? "attributes" : kind === "operation" ? "operations" : "values";
@@ -4729,9 +4742,9 @@ export function Canvas({
           12 px, Process Names 16 px. Other diagram types keep the old
           12/10/14 defaults. */}
       <DisplayModeCtx.Provider value={displayMode}>
-      <FontScaleCtx.Provider value={((data.fontSize ?? ((diagramType === "context" || diagramType === "basic" || diagramType === "archimate") ? 14 : 12)) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
-      <ConnectorFontScaleCtx.Provider value={((data.connectorFontSize ?? ((diagramType === "context" || diagramType === "basic") ? 12 : 10)) / 10) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
-      <TitleFontSizeCtx.Provider value={data.titleFontSize ?? 14}>
+      <FontScaleCtx.Provider value={((data.fontSize ?? ((diagramType === "context" || diagramType === "basic" || diagramType === "archimate" || diagramType === "domain") ? 14 : 12)) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <ConnectorFontScaleCtx.Provider value={((data.connectorFontSize ?? (diagramType === "domain" ? 14 : (diagramType === "context" || diagramType === "basic") ? 12 : 10)) / 10) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <TitleFontSizeCtx.Provider value={data.titleFontSize ?? (diagramType === "domain" ? 16 : 14)}>
       <PoolFontSizeCtx.Provider value={(data.poolFontSize ?? 16) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <LaneFontSizeCtx.Provider value={(data.laneFontSize ?? 14) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <ValueChainFontSizeCtx.Provider value={(data.valueChainFontSize ?? 16) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
@@ -5033,7 +5046,7 @@ export function Canvas({
             if (createdAt) line3Segs.push({ label: "Created: ", value: formatAustralianDate(createdAt) });
             const line4Segs: Seg[] = updatedAt ? [{ label: "Modified: ", value: formatAustralianTime(updatedAt) }] : [];
             const subLines: Seg[][] = [line2Segs, line3Segs, line4Segs].filter(l => l.length > 0);
-            const tfs = data.titleFontSize ?? 14;
+            const tfs = data.titleFontSize ?? (diagramType === "domain" ? 16 : 14);
             const subFs = Math.round(tfs * 0.79);
             const lineH = Math.round(tfs * 1.15);
             const titleH = (1 + subLines.length) * lineH + 8;

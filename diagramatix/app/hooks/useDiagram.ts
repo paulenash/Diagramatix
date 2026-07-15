@@ -6330,7 +6330,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // containment connector. Any other relationship touching a package is
       // rejected. Containment is package-to-package ONLY.
       const isPackageConn = source.type === "uml-package" || target.type === "uml-package";
-      if (isPackageConn && connectorType !== "uml-dependency" && connectorType !== "uml-containment") return state;
+      if (isPackageConn && connectorType !== "uml-dependency" && connectorType !== "uml-containment"
+        && connectorType !== "uml-note-anchor") return state;
       if (connectorType === "uml-containment"
         && !(source.type === "uml-package" && target.type === "uml-package")) return state;
 

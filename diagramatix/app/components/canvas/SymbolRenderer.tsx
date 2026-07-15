@@ -1451,32 +1451,42 @@ function UmlPackageShape({ el }: { el: DiagramElement }) {
   const baseFill = resolveColor("uml-package", colors);
   const fill = depth > 0 ? lerpHex(baseFill, "#ffffff", Math.min(depth * 0.22, 0.8)) : baseFill;
   const labelFontSize = Math.round(12 * fsc * 10) / 10;
-  // Tab sized to the label but clamped to a fraction of the width.
-  const tabH = Math.min(24, el.height * 0.22);
-  const tabW = Math.min(Math.max(60, (el.label?.length ?? 4) * 7 + 16), el.width * 0.6);
+  const lineH = Math.round(labelFontSize * 1.3);
+  const PADX = 8, PADY = 5;
+  // Name grows to at most 80% of the package width, then WRAPS; the header tab
+  // grows to fit the wrapped lines (issue #4).
+  const maxTabW = el.width * 0.8;
+  const lines = wrapText(el.label || "", Math.max(20, maxTabW - PADX * 2), labelFontSize);
+  const longest = Math.max(1, ...lines.map(l => l.length));
+  const tabW = Math.min(Math.max(60, longest * labelFontSize * 0.6 + PADX * 2), maxTabW);
+  const tabH = Math.min(Math.max(24, lines.length * lineH + PADY * 2), el.height - 12);
   return (
     <g>
-      {/* Tab */}
+      {/* Tab (header) — grows to the wrapped name */}
       <rect x={el.x} y={el.y} width={tabW} height={tabH}
         fill={fill} stroke="#374151" strokeWidth={1.5} />
       {/* Body */}
       <rect x={el.x} y={el.y + tabH} width={el.width} height={el.height - tabH}
         fill={fill} fillOpacity={0.35} stroke="#374151" strokeWidth={1.5} />
-      <text x={el.x + 8} y={el.y + tabH / 2} textAnchor="start" dominantBaseline="middle"
+      <text x={el.x + PADX} y={el.y + PADY + labelFontSize * 0.9} textAnchor="start"
         fontSize={labelFontSize} fill="#111827" fontWeight="bold"
         style={{ pointerEvents: "none", userSelect: "none" }}>
-        {el.label}
+        {lines.map((line, i) => (
+          <tspan key={i} x={el.x + PADX} y={el.y + PADY + labelFontSize * 0.9 + i * lineH}>{line}</tspan>
+        ))}
       </text>
     </g>
   );
 }
 
-// UML Note — folded-corner comment box carrying free text.
+// UML Note — folded-corner comment box carrying free text (wraps to the box).
 function UmlNoteShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
+  const fsc = useContext(FontScaleCtx);
   const fill = resolveColor("uml-note", colors);
   const fold = Math.min(16, el.width * 0.25, el.height * 0.4);
   const x = el.x, y = el.y, w = el.width, h = el.height;
+  const fontSize = Math.round(12 * fsc * 10) / 10;
   // Body path with a folded top-right corner.
   const bodyPath = `M ${x} ${y} L ${x + w - fold} ${y} L ${x + w} ${y + fold} L ${x + w} ${y + h} L ${x} ${y + h} Z`;
   const foldPath = `M ${x + w - fold} ${y} L ${x + w - fold} ${y + fold} L ${x + w} ${y + fold}`;
@@ -1484,6 +1494,17 @@ function UmlNoteShape({ el }: { el: DiagramElement }) {
     <g>
       <path d={bodyPath} fill={fill} stroke="#374151" strokeWidth={1.5} />
       <path d={foldPath} fill="none" stroke="#374151" strokeWidth={1.5} />
+      {/* Text wraps to the note boundary (issue #2). */}
+      <foreignObject x={x + 5} y={y + 4} width={Math.max(4, w - 10)} height={Math.max(4, h - 8)}
+        style={{ pointerEvents: "none" }}>
+        <div style={{
+          width: Math.max(4, w - 10), height: Math.max(4, h - 8), boxSizing: "border-box",
+          fontSize, lineHeight: 1.3, color: "#111827", fontFamily: "inherit",
+          whiteSpace: "pre-wrap", wordBreak: "break-word", overflow: "hidden",
+        }}>
+          {el.label}
+        </div>
+      </foreignObject>
     </g>
   );
 }
@@ -2937,7 +2958,6 @@ export function SymbolRenderer({
         element.type === 'lane' ||
         element.type === 'uml-class' ||
         element.type === 'uml-enumeration' ||
-        element.type === 'uml-package' ||
         element.type === 'uml-pain-point'
       ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge') && (() => {
         const isChevron = element.type === 'chevron' || element.type === 'chevron-collapsed';
