@@ -312,46 +312,48 @@ export async function exportVisioDomainV3(
       const cx = toX(el.x) + width / 2, cy = toYtop(el.y) - height / 2;
       elIdToBox.set(el.id, { cx, cy, hw: width / 2, hh: height / 2 });
       const isPkg = el.type === "uml-package";
-      let geom: string, txtPinX: number, txtPinY: number, txtW: number, txtH: number, secCells: string;
+      // Geometry is FORMULA-driven off Width/Height so the painted shape follows
+      // the selection box when the user moves/resizes it in Visio (issue #3).
+      let geom: string, txtPinX: number, txtPinY: number, txtPinXF: string, txtPinYF: string, txtW: number, txtH: number;
       if (isPkg) {
-        const tabH = Math.min(0.3, height * 0.28), tabW = Math.min(width * 0.45, 1.4);
-        txtPinX = tabW / 2; txtW = tabW - 0.1;
+        const tabH = height * 0.28, tabW = width * 0.45;
         geom =
           `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-          `<Row T='LineTo' IX='2'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='0'/></Row>` +
-          `<Row T='LineTo' IX='3'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - tabH)}'/></Row>` +
-          `<Row T='LineTo' IX='4'><Cell N='X' V='${n(tabW)}'/><Cell N='Y' V='${n(height - tabH)}'/></Row>` +
-          `<Row T='LineTo' IX='5'><Cell N='X' V='${n(tabW)}'/><Cell N='Y' V='${n(height)}'/></Row>` +
-          `<Row T='LineTo' IX='6'><Cell N='X' V='0'/><Cell N='Y' V='${n(height)}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${n(width)}' F='Width'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${n(width)}' F='Width'/><Cell N='Y' V='${n(height - tabH)}' F='Height*0.72'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='${n(tabW)}' F='Width*0.45'/><Cell N='Y' V='${n(height - tabH)}' F='Height*0.72'/></Row>` +
+          `<Row T='LineTo' IX='5'><Cell N='X' V='${n(tabW)}' F='Width*0.45'/><Cell N='Y' V='${n(height)}' F='Height'/></Row>` +
+          `<Row T='LineTo' IX='6'><Cell N='X' V='0'/><Cell N='Y' V='${n(height)}' F='Height'/></Row>` +
           `<Row T='LineTo' IX='7'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>`;
-        secCells = `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>`;
-        txtPinY = height - tabH / 2; txtH = tabH;
+        txtPinX = tabW / 2; txtPinXF = "Width*0.225"; txtPinY = height - tabH / 2; txtPinYF = "Height*0.86";
+        txtW = width * 0.4; txtH = tabH;
       } else {
-        const ear = Math.min(0.25, width * 0.25, height * 0.4);
+        const ear = height * 0.2;
         geom =
           `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-          `<Row T='LineTo' IX='2'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='0'/></Row>` +
-          `<Row T='LineTo' IX='3'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>` +
-          `<Row T='LineTo' IX='4'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height)}'/></Row>` +
-          `<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='${n(height)}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${n(width)}' F='Width'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${n(width)}' F='Width'/><Cell N='Y' V='${n(height - ear)}' F='Height*0.8'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='${n(width - ear)}' F='Width-Height*0.2'/><Cell N='Y' V='${n(height)}' F='Height'/></Row>` +
+          `<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='${n(height)}' F='Height'/></Row>` +
           `<Row T='LineTo' IX='6'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-          `<Row T='MoveTo' IX='7'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height)}'/></Row>` +
-          `<Row T='LineTo' IX='8'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>` +
-          `<Row T='LineTo' IX='9'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>`;
-        secCells = `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>`;
-        txtPinX = width / 2; txtW = width - 0.15; txtPinY = height / 2; txtH = height - 0.15;
+          `<Row T='MoveTo' IX='7'><Cell N='X' V='${n(width - ear)}' F='Width-Height*0.2'/><Cell N='Y' V='${n(height)}' F='Height'/></Row>` +
+          `<Row T='LineTo' IX='8'><Cell N='X' V='${n(width - ear)}' F='Width-Height*0.2'/><Cell N='Y' V='${n(height - ear)}' F='Height*0.8'/></Row>` +
+          `<Row T='LineTo' IX='9'><Cell N='X' V='${n(width)}' F='Width'/><Cell N='Y' V='${n(height - ear)}' F='Height*0.8'/></Row>`;
+        txtPinX = width / 2; txtPinXF = "Width*0.5"; txtPinY = height / 2; txtPinYF = "Height*0.5";
+        txtW = width - 0.15; txtH = height - 0.15;
       }
       shapes.push(
         `<Shape ID='${id}' NameU='${isPkg ? "Package" : "Note"}' Type='Shape'>` +
         `<Cell N='PinX' V='${n(cx)}'/><Cell N='PinY' V='${n(cy)}'/><Cell N='Width' V='${n(width)}'/><Cell N='Height' V='${n(height)}'/>` +
-        `<Cell N='LocPinX' V='${n(width / 2)}'/><Cell N='LocPinY' V='${n(height / 2)}'/>` +
+        `<Cell N='LocPinX' V='${n(width / 2)}' F='Width*0.5'/><Cell N='LocPinY' V='${n(height / 2)}' F='Height*0.5'/>` +
         `<Cell N='LineWeight' V='0.01041666666666667'/>` +
-        (isPkg ? "" : `<Cell N='FillForegnd' V='#fffff0' F='MSOTINT(THEMEVAL(),30)'/><Cell N='FillPattern' V='1'/>`) +
-        `<Cell N='TxtPinX' V='${n(txtPinX)}'/><Cell N='TxtPinY' V='${n(txtPinY)}'/>` +
+        `<Cell N='TxtPinX' V='${n(txtPinX)}' F='${txtPinXF}'/><Cell N='TxtPinY' V='${n(txtPinY)}' F='${txtPinYF}'/>` +
         `<Cell N='TxtWidth' V='${n(txtW)}'/><Cell N='TxtHeight' V='${n(txtH)}'/>` +
         `<Cell N='TxtLocPinX' V='${n(txtW / 2)}'/><Cell N='TxtLocPinY' V='${n(txtH / 2)}'/>` +
         propRows([["BpmnId", el.id], ["DgxUml", dgxUml(el)]]) +
-        `<Section N='Geometry' IX='0'>${secCells}${geom}</Section>` +
+        // No internal fill — transparent for both (package: contained classes stay
+        // visible; note: Paul asked for the light-yellow fill removed, issue #2).
+        `<Section N='Geometry' IX='0'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>${geom}</Section>` +
         (isPkg ? `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='0'/></Row></Section>` : "") +
         `<Text>${esc(el.label ?? "")}</Text></Shape>`
       );
@@ -419,22 +421,19 @@ export async function exportVisioDomainV3(
         default: return edgePoint(b, ox, oy);
       }
     };
-    // Direct connectors (note anchors, containment, routingType:direct) glue to
-    // shape CENTRES via PAR and stay a straight line — Visio never orthogonally
-    // re-routes them on move. Others attach to the correct sides and use _WALKGLUE.
+    // Direct connectors (note anchors, containment, routingType:direct) draw a
+    // straight line between the facing EDGES (not the centres — a centre-to-centre
+    // line paints over the shapes). Others attach to the correct sides. All glue
+    // via _WALKGLUE so the endpoints follow the shapes.
     const isDirect = conn.type === "uml-note-anchor" || conn.type === "uml-containment" || conn.routingType === "direct";
-    const be = isDirect ? { x: s.cx, y: s.cy } : sidePt(s, beginSide, t.cx, t.cy);
-    const en = isDirect ? { x: t.cx, y: t.cy } : sidePt(t, endSide, s.cx, s.cy);
+    const be = isDirect ? edgePoint(s, t.cx, t.cy) : sidePt(s, beginSide, t.cx, t.cy);
+    const en = isDirect ? edgePoint(t, s.cx, s.cy) : sidePt(t, endSide, s.cx, s.cy);
     const bx = be.x, by = be.y, ex = en.x, ey = en.y;
     const dx = ex - bx, dy = ey - by;
     const pinx = (bx + ex) / 2, piny = (by + ey) / 2, locx = dx / 2, locy = dy / 2;
     const arrows = CONN_ARROWS[conn.type] ?? { begin: 0, end: 0, dash: false };
-    const beginGlue = isDirect
-      ? `PAR(PNT(Sheet.${srcSheet}!PinX,Sheet.${srcSheet}!PinY))`
-      : "_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)";
-    const endGlue = isDirect
-      ? `PAR(PNT(Sheet.${tgtSheet}!PinX,Sheet.${tgtSheet}!PinY))`
-      : "_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)";
+    const beginGlue = "_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)";
+    const endGlue = "_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)";
 
     // Clean ORTHOGONAL route between the two side-points (always rectilinear,
     // respecting both attachment axes). We deliberately do NOT reuse the
