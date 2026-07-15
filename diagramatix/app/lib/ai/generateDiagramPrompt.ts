@@ -131,7 +131,13 @@ IMAGE INPUT — when an image of a UML class / domain diagram is attached, repro
 - an open arrow on a DASHED line → "uml-dependency".
 - a solid line between two packages ending in a circle-with-a-cross ⊕ → "uml-containment" (the ⊕ marks the containing package = target).
 - a DASHED line (no arrowhead) from a folded-corner note to another shape → "uml-note-anchor".
-OCR every label verbatim. Don't invent classes, members or relationships that aren't drawn. If the image and the prompt disagree, follow the image.`,
+OCR every label verbatim. Don't invent classes, members or relationships that aren't drawn. If the image and the prompt disagree, follow the image.
+
+REPRODUCE THE ORIGINAL LAYOUT — when reading from an image, also capture the geometry so the diagram matches the drawing:
+- Give EVERY element a "bounds": { "x", "y", "w", "h" } as fractions 0..1 of the WHOLE image (x,y = the shape's top-left corner; w,h = its width/height). Use 2-3 decimals.
+- If a class/enum/note is drawn INSIDE a package (folder-tab box), set that element's "parent" to the id of the containing "uml-package". The package's own bounds must enclose its members.
+- For EVERY connection add "sourceSide" and "targetSide" — the FACE of each box the line leaves/enters: one of "top", "right", "bottom", "left" (a line leaving the right edge → sourceSide "right"). Also add "sourceRole"/"targetRole" when role names are drawn at the ends.
+Example: { "id": "c1", "type": "uml-class", "label": "Order", "bounds": { "x": 0.30, "y": 0.20, "w": 0.18, "h": 0.16 }, "parent": "p1" }`,
 
   context: `You are a Context Diagram expert. Output ONLY valid JSON with elements and connections.
 

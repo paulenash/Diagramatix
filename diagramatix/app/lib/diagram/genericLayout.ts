@@ -8,6 +8,7 @@ import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
 import { CHEVRON_THEMES } from "./chevronThemes";
 import { layoutStateMachine, layoutStateMachinePreserved } from "./stateMachineLayout";
+import { layoutDomainPreserved } from "./domainLayout";
 
 // Value chain AI rule: when a Value Chain contains collapsed
 // processes, pick a random Colour Theme from the catalogue and apply
@@ -194,6 +195,16 @@ export function layoutGenericDiagram(
   if (diagramType === "state-machine"
       && aiElements.some((e) => e.bounds && typeof e.bounds === "object")) {
     const preserved = layoutStateMachinePreserved(
+      aiElements as never, aiConnections as never, opts?.imageAspect,
+    );
+    if (preserved) return preserved;
+  }
+
+  // Domain (UML class) reproduced FROM AN IMAGE: honour per-element `bounds`,
+  // package nesting and connector faces so the diagram matches the drawing.
+  if (diagramType === "domain"
+      && aiElements.some((e) => e.bounds && typeof e.bounds === "object")) {
+    const preserved = layoutDomainPreserved(
       aiElements as never, aiConnections as never, opts?.imageAspect,
     );
     if (preserved) return preserved;
@@ -1003,17 +1014,26 @@ function buildProperties(ai: Record<string, unknown>, diagramType: string): Reco
     }
   }
 
-  // UML class attributes
-  if (ai.type === "uml-class" && Array.isArray(ai.attributes)) {
-    props.showAttributes = true;
-    props.showOperations = false;
-    props.stereotype = diagramType === "domain" ? "entity" : "entity";
+  // UML class attributes + operations
+  if (ai.type === "uml-class") {
+    props.stereotype = "entity";
     props.showStereotype = true;
-    props.attributes = (ai.attributes as Array<Record<string, unknown>>).map((a, i) => ({
-      visibility: a.visibility ?? "+",
-      name: a.name ?? `attr${i}`,
-      type: a.type,
-    }));
+    if (Array.isArray(ai.attributes) && ai.attributes.length) {
+      props.showAttributes = true;
+      props.attributes = (ai.attributes as Array<Record<string, unknown>>).map((a, i) => ({
+        visibility: a.visibility ?? "+",
+        name: a.name ?? `attr${i}`,
+        type: a.type,
+        ...(a.multiplicity ? { multiplicity: a.multiplicity } : {}),
+      }));
+    }
+    if (Array.isArray(ai.operations) && ai.operations.length) {
+      props.showOperations = true;
+      props.operations = (ai.operations as Array<Record<string, unknown>>).map((o, i) => ({
+        visibility: o.visibility ?? "+",
+        name: o.name ?? `op${i}`,
+      }));
+    }
   }
 
   // UML enumeration values
