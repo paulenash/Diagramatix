@@ -2958,6 +2958,8 @@ export function SymbolRenderer({
         element.type === 'lane' ||
         element.type === 'uml-class' ||
         element.type === 'uml-enumeration' ||
+        element.type === 'uml-package' ||
+        element.type === 'uml-note' ||
         element.type === 'uml-pain-point'
       ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge') && (() => {
         const isChevron = element.type === 'chevron' || element.type === 'chevron-collapsed';
