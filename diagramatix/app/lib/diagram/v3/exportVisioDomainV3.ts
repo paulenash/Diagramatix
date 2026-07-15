@@ -37,7 +37,6 @@ const HALF_ROW = 0.0833;            // half a member row (member centre → its 
 const BOTTOM_PAD = 0.0392;          // last member edge → class bottom
 const SEP_HEIGHT = 0.03937;         // the separator line's own height
 const MEMBER_INSET = 0.07874;       // class width − member width
-const CLASS_DEFAULT_W = 2.559055118110236; // the master's default width (every reference class uses it)
 const TITLE_ONLY_H = 0.5;           // height of a class/enum with no members
 // Title-band height (top of the box → the divider under the name/stereotype),
 // measured from the reference MS6 body geometry (divider Y = Height − titleH).
@@ -277,10 +276,10 @@ export async function exportVisioDomainV3(
         else centres.push(centres[i - 1] + ((rows[i].sep || rows[i - 1].sep) ? SEP_STEP : ROW_STEP));
       }
       const height = rows.length ? centres[centres.length - 1] + HALF_ROW + BOTTOM_PAD : TITLE_ONLY_H;
-      // Use the master's DEFAULT width (the value every reference class carries)
-      // so the painted box and the selection box are identical — the reference
-      // keeps a fixed width and only grows for very long text.
-      const width = CLASS_DEFAULT_W;
+      // Use the element's ORIGINAL width (the sub-shapes scale to it via F='Inh'
+      // Width=W), clamped to a readable minimum, so the class matches its size in
+      // the Diagramatix diagram instead of a fixed default.
+      const width = Math.max(MIN_W, el.width / 96);
       const mw = width - MEMBER_INSET;
       const topY = toYtop(el.y);
       const cx = toX(el.x) + width / 2;
@@ -303,33 +302,58 @@ export async function exportVisioDomainV3(
         ...memberXml,
       );
     } else if (el.type === "uml-package" || el.type === "uml-note") {
-      // INSTANCE of the standard-UML Package (expanded) / Note master, so it
-      // matches the other stencil elements (inherits the theme + style). Emit the
-      // master's sub-shapes as MasterShape wrappers — a scratch instance WITHOUT
-      // them doesn't render; with them, the master's formula-driven geometry
-      // inherits and auto-scales to the group's Width/Height.
-      const isPkg = el.type === "uml-package";
-      const masterName = isPkg ? "Package (expanded)" : "Note";
-      const master = M[masterName];
-      if (master === undefined) continue;
+      // Self-contained geometry at the element's ORIGINAL size (the Package/Note
+      // group masters don't scale correctly from a scratch instance — the painted
+      // box detaches from the selection box). Package = a folder (body + name
+      // tab); Note = a rectangle with a folded top-right corner.
       const id = allocId();
       elIdToSheet.set(el.id, id);
       const width = Math.max(MIN_W, el.width / 96), height = Math.max(0.6, el.height / 96);
       const cx = toX(el.x) + width / 2, cy = toYtop(el.y) - height / 2;
       elIdToBox.set(el.id, { cx, cy, hw: width / 2, hh: height / 2 });
-      const subs: Array<[number, string]> = isPkg
-        ? [[6, "Group"], [7, "Shape"], [8, "Group"], [9, "Shape"]]
-        : [[6, "Shape"]];
-      const subShapes = subs.map(([ms, ty]) => `<Shape ID='${allocId()}' Type='${ty}' MasterShape='${ms}'/>`).join("");
+      const isPkg = el.type === "uml-package";
+      let geom: string, txtPinX: number, txtPinY: number, txtW: number, txtH: number, secCells: string;
+      if (isPkg) {
+        const tabH = Math.min(0.3, height * 0.28), tabW = Math.min(width * 0.45, 1.4);
+        txtPinX = tabW / 2; txtW = tabW - 0.1;
+        geom =
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - tabH)}'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='${n(tabW)}'/><Cell N='Y' V='${n(height - tabH)}'/></Row>` +
+          `<Row T='LineTo' IX='5'><Cell N='X' V='${n(tabW)}'/><Cell N='Y' V='${n(height)}'/></Row>` +
+          `<Row T='LineTo' IX='6'><Cell N='X' V='0'/><Cell N='Y' V='${n(height)}'/></Row>` +
+          `<Row T='LineTo' IX='7'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>`;
+        secCells = `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>`;
+        txtPinY = height - tabH / 2; txtH = tabH;
+      } else {
+        const ear = Math.min(0.25, width * 0.25, height * 0.4);
+        geom =
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height)}'/></Row>` +
+          `<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='${n(height)}'/></Row>` +
+          `<Row T='LineTo' IX='6'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+          `<Row T='MoveTo' IX='7'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height)}'/></Row>` +
+          `<Row T='LineTo' IX='8'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>` +
+          `<Row T='LineTo' IX='9'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>`;
+        secCells = `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>`;
+        txtPinX = width / 2; txtW = width - 0.15; txtPinY = height / 2; txtH = height - 0.15;
+      }
       shapes.push(
-        `<Shape ID='${id}' NameU='${masterName}' Type='Group' Master='${master}'>` +
-        `<Cell N='PinX' V='${n(cx)}'/><Cell N='PinY' V='${n(cy)}'/>` +
-        `<Cell N='Width' V='${n(width)}'/><Cell N='Height' V='${n(height)}'/>` +
-        `<Cell N='LocPinX' V='${n(width / 2)}' F='Inh'/><Cell N='LocPinY' V='${n(height / 2)}' F='Inh'/>` +
+        `<Shape ID='${id}' NameU='${isPkg ? "Package" : "Note"}' Type='Shape'>` +
+        `<Cell N='PinX' V='${n(cx)}'/><Cell N='PinY' V='${n(cy)}'/><Cell N='Width' V='${n(width)}'/><Cell N='Height' V='${n(height)}'/>` +
+        `<Cell N='LocPinX' V='${n(width / 2)}'/><Cell N='LocPinY' V='${n(height / 2)}'/>` +
+        `<Cell N='LineWeight' V='0.01041666666666667'/>` +
+        (isPkg ? "" : `<Cell N='FillForegnd' V='#fffff0' F='MSOTINT(THEMEVAL(),30)'/><Cell N='FillPattern' V='1'/>`) +
+        `<Cell N='TxtPinX' V='${n(txtPinX)}'/><Cell N='TxtPinY' V='${n(txtPinY)}'/>` +
+        `<Cell N='TxtWidth' V='${n(txtW)}'/><Cell N='TxtHeight' V='${n(txtH)}'/>` +
+        `<Cell N='TxtLocPinX' V='${n(txtW / 2)}'/><Cell N='TxtLocPinY' V='${n(txtH / 2)}'/>` +
         propRows([["BpmnId", el.id], ["DgxUml", dgxUml(el)]]) +
-        `<Text>${esc(el.label ?? "")}</Text>` +
-        `<Shapes>${subShapes}</Shapes>` +
-        `</Shape>`
+        `<Section N='Geometry' IX='0'>${secCells}${geom}</Section>` +
+        (isPkg ? `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='0'/></Row></Section>` : "") +
+        `<Text>${esc(el.label ?? "")}</Text></Shape>`
       );
     }
     // uml-pain-point: no standard-UML equivalent — skipped.
