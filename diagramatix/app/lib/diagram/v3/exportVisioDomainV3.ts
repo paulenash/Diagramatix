@@ -303,62 +303,33 @@ export async function exportVisioDomainV3(
         ...memberXml,
       );
     } else if (el.type === "uml-package" || el.type === "uml-note") {
-      // Self-contained geometry (the UML group masters don't render from a
-      // scratch instance — same issue as the connectors). Package = a folder
-      // (body + name tab); Note = a rectangle with a folded top-right corner.
+      // INSTANCE of the standard-UML Package (expanded) / Note master, so it
+      // matches the other stencil elements (inherits the theme + style). Emit the
+      // master's sub-shapes as MasterShape wrappers — a scratch instance WITHOUT
+      // them doesn't render; with them, the master's formula-driven geometry
+      // inherits and auto-scales to the group's Width/Height.
+      const isPkg = el.type === "uml-package";
+      const masterName = isPkg ? "Package (expanded)" : "Note";
+      const master = M[masterName];
+      if (master === undefined) continue;
       const id = allocId();
       elIdToSheet.set(el.id, id);
       const width = Math.max(MIN_W, el.width / 96), height = Math.max(0.6, el.height / 96);
       const cx = toX(el.x) + width / 2, cy = toYtop(el.y) - height / 2;
       elIdToBox.set(el.id, { cx, cy, hw: width / 2, hh: height / 2 });
-      const isPkg = el.type === "uml-package";
-      let geom: string, txtPinX: number, txtPinY: number, txtW: number, txtH: number, secCells: string;
-      if (isPkg) {
-        const tabH = Math.min(0.3, height * 0.28), tabW = Math.min(width * 0.45, 1.4);
-        // Name sits in the top-left tab (not centred on the whole package).
-        txtPinX = tabW / 2; txtW = tabW - 0.1;
-        geom =
-          `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-          `<Row T='LineTo' IX='2'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='0'/></Row>` +
-          `<Row T='LineTo' IX='3'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - tabH)}'/></Row>` +
-          `<Row T='LineTo' IX='4'><Cell N='X' V='${n(tabW)}'/><Cell N='Y' V='${n(height - tabH)}'/></Row>` +
-          `<Row T='LineTo' IX='5'><Cell N='X' V='${n(tabW)}'/><Cell N='Y' V='${n(height)}'/></Row>` +
-          `<Row T='LineTo' IX='6'><Cell N='X' V='0'/><Cell N='Y' V='${n(height)}'/></Row>` +
-          `<Row T='LineTo' IX='7'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>`;
-        // Transparent body so contained classes stay visible; name in the tab.
-        secCells = `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>`;
-        txtPinY = height - tabH / 2; txtH = tabH;
-      } else {
-        const ear = Math.min(0.25, width * 0.25, height * 0.4);
-        geom =
-          `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-          `<Row T='LineTo' IX='2'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='0'/></Row>` +
-          `<Row T='LineTo' IX='3'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>` +
-          `<Row T='LineTo' IX='4'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height)}'/></Row>` +
-          `<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='${n(height)}'/></Row>` +
-          `<Row T='LineTo' IX='6'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
-          `<Row T='MoveTo' IX='7'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height)}'/></Row>` +
-          `<Row T='LineTo' IX='8'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>` +
-          `<Row T='LineTo' IX='9'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>`;
-        secCells = `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>`;
-        txtPinX = width / 2; txtW = width - 0.15; txtPinY = height / 2; txtH = height - 0.15;
-      }
+      const subs: Array<[number, string]> = isPkg
+        ? [[6, "Group"], [7, "Shape"], [8, "Group"], [9, "Shape"]]
+        : [[6, "Shape"]];
+      const subShapes = subs.map(([ms, ty]) => `<Shape ID='${allocId()}' Type='${ty}' MasterShape='${ms}'/>`).join("");
       shapes.push(
-        `<Shape ID='${id}' NameU='${isPkg ? "Package" : "Note"}' Type='Shape'>` +
-        `<Cell N='PinX' V='${n(cx)}'/><Cell N='PinY' V='${n(cy)}'/><Cell N='Width' V='${n(width)}'/><Cell N='Height' V='${n(height)}'/>` +
-        `<Cell N='LocPinX' V='${n(width / 2)}'/><Cell N='LocPinY' V='${n(height / 2)}'/>` +
-        // Theme-aware fill via the SAME formula classes use (MSOTINT(THEMEVAL())),
-        // and let the line inherit the themed document default (no explicit
-        // LineColor), so notes/packages recolour with the Visio theme.
-        `<Cell N='LineWeight' V='0.01041666666666667'/>` +
-        (isPkg ? "" : `<Cell N='FillForegnd' V='#fffff0' F='MSOTINT(THEMEVAL(),30)'/><Cell N='FillPattern' V='1'/>`) +
-        `<Cell N='TxtPinX' V='${n(txtPinX)}'/><Cell N='TxtPinY' V='${n(txtPinY)}'/>` +
-        `<Cell N='TxtWidth' V='${n(txtW)}'/><Cell N='TxtHeight' V='${n(txtH)}'/>` +
-        `<Cell N='TxtLocPinX' V='${n(txtW / 2)}'/><Cell N='TxtLocPinY' V='${n(txtH / 2)}'/>` +
+        `<Shape ID='${id}' NameU='${masterName}' Type='Group' Master='${master}'>` +
+        `<Cell N='PinX' V='${n(cx)}'/><Cell N='PinY' V='${n(cy)}'/>` +
+        `<Cell N='Width' V='${n(width)}'/><Cell N='Height' V='${n(height)}'/>` +
+        `<Cell N='LocPinX' V='${n(width / 2)}' F='Inh'/><Cell N='LocPinY' V='${n(height / 2)}' F='Inh'/>` +
         propRows([["BpmnId", el.id], ["DgxUml", dgxUml(el)]]) +
-        `<Section N='Geometry' IX='0'>${secCells}${geom}</Section>` +
-        (isPkg ? `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='0'/></Row></Section>` : "") +
-        `<Text>${esc(el.label ?? "")}</Text></Shape>`
+        `<Text>${esc(el.label ?? "")}</Text>` +
+        `<Shapes>${subShapes}</Shapes>` +
+        `</Shape>`
       );
     }
     // uml-pain-point: no standard-UML equivalent — skipped.
@@ -503,6 +474,24 @@ export async function exportVisioDomainV3(
       .replace(/^[<>^v◄►▶▲▼]\s+/i, "").replace(/\s+[<>^v◄►▶▲▼]$/i, "").trim();
     const nameText = (dirPrefix + nameCore).trim() ? esc((dirPrefix + nameCore).trim()) : "";
 
+    // Composition's FILLED diamond is drawn as a SECOND geometry section ON the
+    // connector shape (so it's permanently part of the connector, like the
+    // aggregation arrowhead) — a filled rhombus at the Begin end along segment 1.
+    let compGeom = "", compFill = "";
+    if (conn.type === "uml-composition") {
+      const prx = -bDir.uy, pry = bDir.ux, L = 0.19, W = 0.05;
+      const vx = (a: number, b: number) => a * bDir.ux + b * prx;
+      const vy = (a: number, b: number) => a * bDir.uy + b * pry;
+      compGeom =
+        `<Section N='Geometry' IX='1'><Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>` +
+        `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${n(vx(L / 2, W))}'/><Cell N='Y' V='${n(vy(L / 2, W))}'/></Row>` +
+        `<Row T='LineTo' IX='3'><Cell N='X' V='${n(vx(L, 0))}'/><Cell N='Y' V='${n(vy(L, 0))}'/></Row>` +
+        `<Row T='LineTo' IX='4'><Cell N='X' V='${n(vx(L / 2, -W))}'/><Cell N='Y' V='${n(vy(L / 2, -W))}'/></Row>` +
+        `<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row></Section>`;
+      compFill = `<Cell N='FillForegnd' V='#000000'/><Cell N='FillPattern' V='1'/>`;
+    }
+
     // Emit the connector as a self-contained 1-D Shape — the SAME recipe the BPMN
     // export uses (ObjType=2 + explicit LineWeight + explicit Geometry visibility
     // cells + _WALKGLUE + centre glue), which is proven to render on first open.
@@ -523,7 +512,7 @@ export async function exportVisioDomainV3(
       `<Cell N='EndX' V='${n(ex)}' F='${endGlue}'/>` +
       `<Cell N='EndY' V='${n(ey)}' F='${endGlue}'/>` +
       `<Cell N='ObjType' V='2'/>` +
-      `<Cell N='LineWeight' V='0.01041666666666667'/>` +
+      `<Cell N='LineWeight' V='0.01041666666666667'/>` + compFill +
       `<Cell N='LinePattern' V='${arrows.dash ? 2 : 1}'/>` +
       `<Cell N='BeginArrow' V='${arrows.begin}'/><Cell N='EndArrow' V='${arrows.end}'/>` +
       `<Cell N='BeginArrowSize' V='2'/><Cell N='EndArrowSize' V='2'/>` +
@@ -551,7 +540,7 @@ export async function exportVisioDomainV3(
       `<Section N='Geometry' IX='0'>` +
         `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
         geomRows +
-      `</Section>` +
+      `</Section>` + compGeom +
       (nameText ? `<Text>${nameText}</Text>` : "") +
       `</Shape>`
     );
@@ -587,28 +576,6 @@ export async function exportVisioDomainV3(
       label("Begin", bDir, 0.54, -1, beginRole);
       label("End", eDir, 0.24, +1, endMult);
       label("End", eDir, 0.54, -1, endRole);
-    }
-
-    // Composition's FILLED diamond has no reliable standard arrow index, so draw
-    // it as a small filled rhombus glued to the Begin (diamond) end, oriented
-    // along the first segment.
-    if (conn.type === "uml-composition") {
-      const ang = Math.atan2(bDir.uy, bDir.ux);
-      const ox = bDir.ux * 0.09, oy = bDir.uy * 0.09;
-      shapes.push(
-        `<Shape ID='${allocId()}' NameU='UmlDiamond' Type='Shape'>` +
-        `<Cell N='PinX' V='${n(bx + ox)}' F='Sheet.${id}!BeginX+${n(ox)}'/>` +
-        `<Cell N='PinY' V='${n(by + oy)}' F='Sheet.${id}!BeginY+${n(oy)}'/>` +
-        `<Cell N='Width' V='0.18'/><Cell N='Height' V='0.11'/>` +
-        `<Cell N='LocPinX' V='0.09'/><Cell N='LocPinY' V='0.055'/><Cell N='Angle' V='${n(ang)}'/>` +
-        `<Cell N='FillForegnd' V='#000000'/><Cell N='FillPattern' V='1'/><Cell N='LineWeight' V='0.008'/>` +
-        `<Section N='Geometry' IX='0'><Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>` +
-          `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0.055'/></Row>` +
-          `<Row T='LineTo' IX='2'><Cell N='X' V='0.09'/><Cell N='Y' V='0'/></Row>` +
-          `<Row T='LineTo' IX='3'><Cell N='X' V='0.18'/><Cell N='Y' V='0.055'/></Row>` +
-          `<Row T='LineTo' IX='4'><Cell N='X' V='0.09'/><Cell N='Y' V='0.11'/></Row>` +
-          `<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='0.055'/></Row>` +
-        `</Section></Shape>`);
     }
 
     connects.push(
