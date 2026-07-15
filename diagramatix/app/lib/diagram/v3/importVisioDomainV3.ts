@@ -412,6 +412,34 @@ export async function importVisioDomainV3(buffer: ArrayBuffer): Promise<DomainIm
     });
   }
 
+  // Reading-direction arrowheads: our export emits a `UmlReadingDir` filled
+  // triangle glued near a connector's midpoint, pointing toward the source/target
+  // element. Our own files recover readingDirection from the blob (which wins);
+  // for a blob-stripped/foreign re-import, recover it from where the triangle
+  // points (assigned to the nearest connector by midpoint).
+  for (const s of shapes) {
+    if (baseNameU(attr(s, "NameU") ?? "") !== "UmlReadingDir") continue;
+    const px = (cellV(s, "PinX") ?? 0) * PX;
+    const py = (pageH - (cellV(s, "PinY") ?? 0)) * PX;
+    const ang = cellV(s, "Angle") ?? 0;
+    const dirx = Math.cos(ang), diry = -Math.sin(ang); // Visio Y-up CCW → screen Y-down
+    let best: Connector | undefined, bestD = Infinity;
+    for (const c of connectors) {
+      const se = elements.find(e => e.id === c.sourceId), te = elements.find(e => e.id === c.targetId);
+      if (!se || !te) continue;
+      const mx = (se.x + se.width / 2 + te.x + te.width / 2) / 2;
+      const my = (se.y + se.height / 2 + te.y + te.height / 2) / 2;
+      const dd = (mx - px) ** 2 + (my - py) ** 2;
+      if (dd < bestD) { bestD = dd; best = c; }
+    }
+    if (!best || best.readingDirection) continue; // blob-set direction wins
+    const se = elements.find(e => e.id === best!.sourceId)!;
+    const te = elements.find(e => e.id === best!.targetId)!;
+    const dotT = dirx * (te.x + te.width / 2 - px) + diry * (te.y + te.height / 2 - py);
+    const dotS = dirx * (se.x + se.width / 2 - px) + diry * (se.y + se.height / 2 - py);
+    best.readingDirection = dotT >= dotS ? "to-target" : "to-source";
+  }
+
   const classifyMaster = (nameU: string): string =>
     CONN_TYPE[nameU] ? `(connector) ${CONN_TYPE[nameU]}`
     : ELEMENT_NAMES.has(nameU) ? "element"

@@ -389,11 +389,7 @@ export async function exportVisioDomainV3(
     const endRole = beginIsSource ? conn.targetRole : conn.sourceRole;
     const hasMult = ASSOC_FAMILY.has(conn.type);
 
-    // Reading direction shown as a glyph appended to the name (option 1 — no
-    // native Visio reading-direction arrow exists in this stencil).
-    const rd = conn.readingDirection === "to-target" ? " ▶"
-      : conn.readingDirection === "to-source" ? " ◀" : "";
-    const nameText = conn.label ? esc(conn.label + rd) : "";
+    const nameText = conn.label ? esc(conn.label) : "";
 
     // Emit the connector as a self-contained 1-D Shape — the SAME recipe the BPMN
     // export uses (ObjType=2 + explicit LineWeight + explicit Geometry visibility
@@ -422,7 +418,16 @@ export async function exportVisioDomainV3(
       `<Cell N='BegTrigger' V='2' F='_XFTRIGGER(Sheet.${srcSheet}!EventXFMod)'/>` +
       `<Cell N='EndTrigger' V='2' F='_XFTRIGGER(Sheet.${tgtSheet}!EventXFMod)'/>` +
       `<Cell N='ConFixedCode' V='6'/>` +
-      (nameText ? `<Cell N='TxtPinX' V='${n(locx)}'/><Cell N='TxtPinY' V='${n(locy + 0.12)}'/>` : "") +
+      // Association name text box: pin just above the line midpoint and auto-size
+      // to the text (as the BPMN export does) so the label actually renders —
+      // TxtPin alone with a 0-width box leaves it invisible.
+      (nameText
+        ? `<Cell N='TxtPinX' V='${n(locx)}'/><Cell N='TxtPinY' V='${n(locy + 0.12)}'/>` +
+          `<Cell N='TxtWidth' V='0.9' F='MAX(TEXTWIDTH(TheText),5*Char.Size)'/>` +
+          `<Cell N='TxtHeight' V='0.2' F='TEXTHEIGHT(TheText,TxtWidth)'/>` +
+          `<Cell N='TxtLocPinX' V='0.45' F='TxtWidth*0.5'/>` +
+          `<Cell N='TxtLocPinY' V='0.1' F='TxtHeight*0.5'/>`
+        : "") +
       propRows([["BpmnId", conn.id], ["DgxUmlRel", dgxUmlRel(conn)]]) +
       `<Section N='Geometry' IX='0'>` +
         `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
@@ -458,6 +463,35 @@ export async function exportVisioDomainV3(
       label("Begin", along * ux - perp * perpX, along * uy - perp * perpY, beginRole);
       label("End", -along * ux + perp * perpX, -along * uy + perp * perpY, endMult);
       label("End", -along * ux - perp * perpX, -along * uy - perp * perpY, endRole);
+    }
+
+    // Reading-direction arrowhead: a small filled triangle beside the name,
+    // pointing toward the source/target element (matching the Diagramatix
+    // original). Glued to the connector's PinX/PinY so it tracks the line.
+    if (conn.readingDirection === "to-target" || conn.readingDirection === "to-source") {
+      const toward = (conn.readingDirection === "to-target"
+        ? elIdToBox.get(conn.targetId) : elIdToBox.get(conn.sourceId));
+      if (toward) {
+        let tdx = toward.cx - pinx, tdy = toward.cy - piny;
+        const tl = Math.hypot(tdx, tdy) || 1; tdx /= tl; tdy /= tl;
+        const ang = Math.atan2(tdy, tdx);        // Visio Y-up, CCW radians
+        const offX = tdx * 0.3, offY = tdy * 0.3; // sit just ahead of the name
+        shapes.push(
+          `<Shape ID='${allocId()}' NameU='UmlReadingDir' Type='Shape'>` +
+          `<Cell N='PinX' V='${n(pinx + offX)}' F='GUARD(Sheet.${id}!PinX+${n(offX)})'/>` +
+          `<Cell N='PinY' V='${n(piny + offY)}' F='GUARD(Sheet.${id}!PinY+${n(offY)})'/>` +
+          `<Cell N='Width' V='0.13'/><Cell N='Height' V='0.1'/>` +
+          `<Cell N='LocPinX' V='0.065'/><Cell N='LocPinY' V='0.05'/>` +
+          `<Cell N='Angle' V='${n(ang)}'/>` +
+          `<Cell N='FillForegnd' V='#374151'/><Cell N='FillPattern' V='1'/><Cell N='LinePattern' V='0'/>` +
+          `<Section N='Geometry' IX='0'>` +
+            `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='1'/>` +
+            `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+            `<Row T='LineTo' IX='2'><Cell N='X' V='0.13'/><Cell N='Y' V='0.05'/></Row>` +
+            `<Row T='LineTo' IX='3'><Cell N='X' V='0'/><Cell N='Y' V='0.1'/></Row>` +
+            `<Row T='LineTo' IX='4'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+          `</Section></Shape>`);
+      }
     }
 
     connects.push(
