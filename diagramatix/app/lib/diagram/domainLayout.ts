@@ -12,7 +12,7 @@ import { recomputeAllConnectors } from "./routing";
 interface AiBounds { x: number; y: number; w: number; h: number }
 interface AiEl {
   id?: string; type: string; label?: string; name?: string;
-  bounds?: unknown; parent?: string;
+  bounds?: unknown; parent?: string; stereotype?: string;
   attributes?: Array<Record<string, unknown>>;
   operations?: Array<Record<string, unknown>>;
   values?: string[];
@@ -35,7 +35,9 @@ function validBounds(b: unknown): b is AiBounds {
 function domainProps(e: AiEl): Record<string, unknown> {
   const props: Record<string, unknown> = {};
   if (e.type === "uml-class") {
-    props.stereotype = "Class"; props.showStereotype = true;
+    // Only show a stereotype the drawing actually had (issue #4) — a plain class
+    // has none; the AI supplies `stereotype` when it reads a «guillemet» tag.
+    if (e.stereotype) { props.stereotype = e.stereotype; props.showStereotype = true; }
     if (Array.isArray(e.attributes) && e.attributes.length) {
       props.showAttributes = true;
       props.attributes = e.attributes.map((a, i) => ({

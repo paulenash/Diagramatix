@@ -126,11 +126,23 @@ IMAGE INPUT — when an image of a UML class / domain diagram is attached, repro
 - a folder-tab / package shape → "uml-package"; classes drawn inside it are that package's members (still list them as separate elements — grouping is by geometry).
 - a folded-corner box of free text → "uml-note".
 - a plain line, or a line with an open arrowhead + role/multiplicity labels → "uml-association" (put multiplicities in "sourceMultiplicity"/"targetMultiplicity").
-- a hollow diamond at one end → "uml-aggregation"; a filled diamond → "uml-composition" (diamond end = source).
-- a hollow triangle on a SOLID line → "uml-generalisation" (triangle end = the parent/superclass = target); a hollow triangle on a DASHED line → "uml-realisation".
+- a hollow diamond at one end → "uml-aggregation"; a FILLED (solid) diamond → "uml-composition". Look carefully at every diamond — a solid diamond is composition, not association; don't miss it.
+- a hollow triangle on a SOLID line → "uml-generalisation"; a hollow triangle on a DASHED line → "uml-realisation".
 - an open arrow on a DASHED line → "uml-dependency".
-- a solid line between two packages ending in a circle-with-a-cross ⊕ → "uml-containment" (the ⊕ marks the containing package = target).
+- a solid line between two packages ending in a circle-with-a-cross ⊕ → "uml-containment".
 - a DASHED line (no arrowhead) from a folded-corner note to another shape → "uml-note-anchor".
+
+CONNECTION DIRECTION — the arrowhead / diamond / triangle / ⊕ ALWAYS sits at the TARGET end; the plain (unmarked) end is the SOURCE. Read the marker off the drawing and set source/target so the marked end is the target:
+- generalisation/realisation: source = the SUBTYPE (child); target = the SUPERTYPE (parent), where the hollow triangle sits. Several children pointing to one parent ALL have target = that parent (never the child).
+- aggregation/composition: source = the PART; target = the WHOLE, where the diamond sits.
+- dependency: source = the client; target = the supplier, where the open arrow points.
+- containment: target = the containing package (the ⊕ end).
+Getting this backwards flips the arrow — always put the MARKED end as the target.
+
+READING DIRECTION — if a small SOLID triangle (▶ ◀ ▲ ▼) is drawn beside an association NAME to show which way to read it, set "readingDirection": "to-target" if it points from the source toward the target, else "to-source".
+
+STEREOTYPES — only set an element "stereotype" (shown as «value») when the drawing ACTUALLY shows a «guillemet» stereotype (e.g. «enumeration», «interface»). Do NOT invent «Class»/«entity» for a plain class — a plain class has NO stereotype.
+
 OCR every label verbatim. Don't invent classes, members or relationships that aren't drawn. If the image and the prompt disagree, follow the image.
 
 REPRODUCE THE ORIGINAL LAYOUT — when reading from an image, also capture the geometry so the diagram matches the drawing:

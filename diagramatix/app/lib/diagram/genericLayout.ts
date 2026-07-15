@@ -1016,8 +1016,8 @@ function buildProperties(ai: Record<string, unknown>, diagramType: string): Reco
 
   // UML class attributes + operations
   if (ai.type === "uml-class") {
-    props.stereotype = "entity";
-    props.showStereotype = true;
+    // Only show a stereotype the drawing actually had (a plain class has none).
+    if (ai.stereotype) { props.stereotype = ai.stereotype; props.showStereotype = true; }
     if (Array.isArray(ai.attributes) && ai.attributes.length) {
       props.showAttributes = true;
       props.attributes = (ai.attributes as Array<Record<string, unknown>>).map((a, i) => ({
