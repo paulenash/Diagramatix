@@ -13,8 +13,15 @@
  */
 import type { DiagramElement } from "./types";
 
-/** Auto-resize a uml-enumeration or uml-class element to fit its label and content */
-export function autoResizeUmlElement(el: DiagramElement): DiagramElement {
+/**
+ * Auto-resize a uml-enumeration or uml-class element to fit its label and content.
+ *
+ * `nameSidePad` (default 0) guarantees at least that many px of clear space on
+ * EACH side of the name text — the image-import layout passes 50 so reproduced
+ * boxes keep breathing room around the title (the editor keeps its tight
+ * default). It only widens; it never shrinks below the content width.
+ */
+export function autoResizeUmlElement(el: DiagramElement, nameSidePad = 0): DiagramElement {
   const BASE_HEADER_H = 28;
   const PAD = 4;
   const CHAR_W = 6.5;
@@ -38,7 +45,7 @@ export function autoResizeUmlElement(el: DiagramElement): DiagramElement {
     const values: string[] = (el.properties.values as string[] | undefined) ?? [];
     const valuesMaxW = values.length > 0 ? Math.max(...values.map(v => v.length * CHAR_W)) : 0;
     const contentW = Math.max(stereotypeW, labelMaxW, valuesMaxW) + PAD * 2;
-    const newWidth = Math.max(MIN_W, contentW);
+    const newWidth = Math.max(MIN_W, contentW, labelMaxW + nameSidePad * 2);
     const ENUM_BOTTOM_PAD = -2; // tighter bottom on enumeration values
     const valuesH = values.length * LINE_H;
     const newHeight = Math.max(MIN_H, headerH + valuesH + (values.length > 0 ? ENUM_BOTTOM_PAD : 0));
@@ -77,7 +84,7 @@ export function autoResizeUmlElement(el: DiagramElement): DiagramElement {
   }
 
   const contentW = maxContentW + PAD * 2;
-  const newWidth = Math.max(MIN_W, contentW);
+  const newWidth = Math.max(MIN_W, contentW, labelMaxW + nameSidePad * 2);
   const BOTTOM_PAD = 10;
   const SECTION_PAD = 5;
   const attrsH = showAttrs ? attributes.length * LINE_H + (attributes.length > 0 && showOps ? SECTION_PAD : 0) : 0;

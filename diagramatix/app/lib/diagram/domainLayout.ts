@@ -113,7 +113,8 @@ export function layoutDomainPreserved(
     const el = elements[i];
     if (el.type !== "uml-class" && el.type !== "uml-enumeration") continue;
     const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
-    const sized = autoResizeUmlElement(el);
+    // 50px clear on each side of the name (Paul) so reproduced boxes aren't tight.
+    const sized = autoResizeUmlElement(el, 50);
     elements[i] = {
       ...sized,
       x: Math.round(cx - sized.width / 2),

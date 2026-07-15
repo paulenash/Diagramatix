@@ -324,10 +324,19 @@ function ClassAttributesList({ element, onUpdateProperties, database, allElement
   allElements?: DiagramElement[];
 }) {
   const baseTypes = (database && database !== "none" && DB_TYPE_LISTS[database]) ? DB_TYPE_LISTS[database] : UML_TYPES;
-  // An attribute's type may also be any enumeration (or class) drawn on the same
-  // diagram — offer those names in the picker, after the primitive/DB types.
+  // An attribute's type may also be an ENUMERATION drawn on the same diagram:
+  // a uml-enumeration element, or a class stereotyped exactly «enumeration» or
+  // «dataType». Plain classes are NOT offered. Names appear after the base types.
   const diagramTypes = (allElements ?? [])
-    .filter(e => (e.type === "uml-enumeration" || e.type === "uml-class") && e.id !== element.id)
+    .filter(e => {
+      if (e.id === element.id) return false;
+      if (e.type === "uml-enumeration") return true;
+      if (e.type === "uml-class") {
+        const st = (e.properties?.stereotype as string | undefined) ?? "";
+        return st === "enumeration" || st === "dataType";
+      }
+      return false;
+    })
     .map(e => (e.label ?? "").trim())
     .filter(Boolean);
   const typeList = Array.from(new Set([...baseTypes, ...diagramTypes]));
