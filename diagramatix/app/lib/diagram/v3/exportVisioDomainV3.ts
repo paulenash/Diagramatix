@@ -312,9 +312,11 @@ export async function exportVisioDomainV3(
       const cx = toX(el.x) + width / 2, cy = toYtop(el.y) - height / 2;
       elIdToBox.set(el.id, { cx, cy, hw: width / 2, hh: height / 2 });
       const isPkg = el.type === "uml-package";
-      let geom: string, txtPinY: number, txtH: number, secCells: string;
+      let geom: string, txtPinX: number, txtPinY: number, txtW: number, txtH: number, secCells: string;
       if (isPkg) {
         const tabH = Math.min(0.3, height * 0.28), tabW = Math.min(width * 0.45, 1.4);
+        // Name sits in the top-left tab (not centred on the whole package).
+        txtPinX = tabW / 2; txtW = tabW - 0.1;
         geom =
           `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
           `<Row T='LineTo' IX='2'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='0'/></Row>` +
@@ -339,17 +341,22 @@ export async function exportVisioDomainV3(
           `<Row T='LineTo' IX='8'><Cell N='X' V='${n(width - ear)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>` +
           `<Row T='LineTo' IX='9'><Cell N='X' V='${n(width)}'/><Cell N='Y' V='${n(height - ear)}'/></Row>`;
         secCells = `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>`;
-        txtPinY = height / 2; txtH = height - 0.15;
+        txtPinX = width / 2; txtW = width - 0.15; txtPinY = height / 2; txtH = height - 0.15;
       }
       shapes.push(
         `<Shape ID='${id}' NameU='${isPkg ? "Package" : "Note"}' Type='Shape'>` +
         `<Cell N='PinX' V='${n(cx)}'/><Cell N='PinY' V='${n(cy)}'/><Cell N='Width' V='${n(width)}'/><Cell N='Height' V='${n(height)}'/>` +
         `<Cell N='LocPinX' V='${n(width / 2)}'/><Cell N='LocPinY' V='${n(height / 2)}'/>` +
-        (isPkg ? "" : `<Cell N='FillForegnd' V='#FFFFF0'/>`) +
+        // Theme-aware fill/line (QuickStyle + THEMEVAL formulas) so notes/packages
+        // recolour with the Visio theme like classes do. Note keeps a light tint.
+        `<Cell N='QuickStyleLineColor' V='1'/><Cell N='QuickStyleFillColor' V='1'/>` +
+        `<Cell N='QuickStyleLineMatrix' V='1'/><Cell N='QuickStyleFillMatrix' V='1'/><Cell N='QuickStyleType' V='1'/>` +
+        `<Cell N='LineColor' V='#000000' F='THEMEGUARD(THEMEVAL())'/>` +
+        (isPkg ? "" : `<Cell N='FillForegnd' V='#fffff0' F='THEMEGUARD(MSOTINT(THEMEVAL(),35))'/>`) +
         `<Cell N='FillPattern' V='1'/><Cell N='LineWeight' V='0.01041666666666667'/>` +
-        `<Cell N='TxtPinX' V='${n(width / 2)}'/><Cell N='TxtPinY' V='${n(txtPinY)}'/>` +
-        `<Cell N='TxtWidth' V='${n(width - 0.15)}'/><Cell N='TxtHeight' V='${n(txtH)}'/>` +
-        `<Cell N='TxtLocPinX' V='${n((width - 0.15) / 2)}'/><Cell N='TxtLocPinY' V='${n(txtH / 2)}'/>` +
+        `<Cell N='TxtPinX' V='${n(txtPinX)}'/><Cell N='TxtPinY' V='${n(txtPinY)}'/>` +
+        `<Cell N='TxtWidth' V='${n(txtW)}'/><Cell N='TxtHeight' V='${n(txtH)}'/>` +
+        `<Cell N='TxtLocPinX' V='${n(txtW / 2)}'/><Cell N='TxtLocPinY' V='${n(txtH / 2)}'/>` +
         propRows([["BpmnId", el.id], ["DgxUml", dgxUml(el)]]) +
         `<Section N='Geometry' IX='0'>${secCells}${geom}</Section>` +
         `<Text>${esc(el.label ?? "")}</Text></Shape>`
@@ -418,11 +425,22 @@ export async function exportVisioDomainV3(
         default: return edgePoint(b, ox, oy);
       }
     };
-    const be = sidePt(s, beginSide, t.cx, t.cy), en = sidePt(t, endSide, s.cx, s.cy);
+    // Direct connectors (note anchors, containment, routingType:direct) glue to
+    // shape CENTRES via PAR and stay a straight line — Visio never orthogonally
+    // re-routes them on move. Others attach to the correct sides and use _WALKGLUE.
+    const isDirect = conn.type === "uml-note-anchor" || conn.type === "uml-containment" || conn.routingType === "direct";
+    const be = isDirect ? { x: s.cx, y: s.cy } : sidePt(s, beginSide, t.cx, t.cy);
+    const en = isDirect ? { x: t.cx, y: t.cy } : sidePt(t, endSide, s.cx, s.cy);
     const bx = be.x, by = be.y, ex = en.x, ey = en.y;
     const dx = ex - bx, dy = ey - by;
     const pinx = (bx + ex) / 2, piny = (by + ey) / 2, locx = dx / 2, locy = dy / 2;
     const arrows = CONN_ARROWS[conn.type] ?? { begin: 0, end: 0, dash: false };
+    const beginGlue = isDirect
+      ? `PAR(PNT(Sheet.${srcSheet}!PinX,Sheet.${srcSheet}!PinY))`
+      : "_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)";
+    const endGlue = isDirect
+      ? `PAR(PNT(Sheet.${tgtSheet}!PinX,Sheet.${tgtSheet}!PinY))`
+      : "_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)";
 
     // Clean ORTHOGONAL route between the two side-points (always rectilinear,
     // respecting both attachment axes). We deliberately do NOT reuse the
@@ -430,7 +448,6 @@ export async function exportVisioDomainV3(
     // produced non-orthogonal kinks and broke the diamond connectors.
     const bAxisH = beginSide ? (beginSide === "left" || beginSide === "right") : Math.abs(dx) >= Math.abs(dy);
     const eAxisH = endSide ? (endSide === "left" || endSide === "right") : Math.abs(dx) >= Math.abs(dy);
-    const isDirect = conn.type === "uml-note-anchor" || conn.type === "uml-containment" || conn.routingType === "direct";
     let ptsAbs: Array<{ x: number; y: number }>;
     if (isDirect || Math.abs(dx) < 0.04 || Math.abs(dy) < 0.04) {
       ptsAbs = [{ x: bx, y: by }, { x: ex, y: ey }];               // already straight
@@ -502,10 +519,10 @@ export async function exportVisioDomainV3(
       `<Cell N='LocPinX' V='${n(locx)}' F='GUARD(Width*0.5)'/>` +
       `<Cell N='LocPinY' V='${n(locy)}' F='GUARD(Height*0.5)'/>` +
       `<Cell N='Angle' V='0' F='GUARD(0DA)'/><Cell N='FlipX' V='0' F='GUARD(FALSE)'/><Cell N='FlipY' V='0' F='GUARD(FALSE)'/>` +
-      `<Cell N='BeginX' V='${n(bx)}' F='_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)'/>` +
-      `<Cell N='BeginY' V='${n(by)}' F='_WALKGLUE(BegTrigger,EndTrigger,WalkPreference)'/>` +
-      `<Cell N='EndX' V='${n(ex)}' F='_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)'/>` +
-      `<Cell N='EndY' V='${n(ey)}' F='_WALKGLUE(EndTrigger,BegTrigger,WalkPreference)'/>` +
+      `<Cell N='BeginX' V='${n(bx)}' F='${beginGlue}'/>` +
+      `<Cell N='BeginY' V='${n(by)}' F='${beginGlue}'/>` +
+      `<Cell N='EndX' V='${n(ex)}' F='${endGlue}'/>` +
+      `<Cell N='EndY' V='${n(ey)}' F='${endGlue}'/>` +
       `<Cell N='ObjType' V='2'/>` +
       `<Cell N='LineWeight' V='0.01041666666666667'/>` +
       `<Cell N='LinePattern' V='${arrows.dash ? 2 : 1}'/>` +
@@ -546,12 +563,14 @@ export async function exportVisioDomainV3(
     // cell via a formula but WITHOUT GUARD, so the user can still drag them in
     // Visio (a drag overwrites the formula). Round-trip is via the DgxUmlRel blob.
     if (hasMult) {
-      const along = 0.28, perp = 0.13;
-      const label = (end: "Begin" | "End", d: { ux: number; uy: number }, side: number, txt?: string) => {
+      const perp = 0.15;
+      // Stagger multiplicity (nearer the end, one side) and role (further along,
+      // other side) so a same-end pair never overlaps.
+      const label = (end: "Begin" | "End", d: { ux: number; uy: number }, alongDist: number, side: number, txt?: string) => {
         if (!txt) return;
         const ax = end === "Begin" ? bx : ex, ay = end === "Begin" ? by : ey;
-        const ox = along * d.ux + side * perp * -d.uy;
-        const oy = along * d.uy + side * perp * d.ux;
+        const ox = alongDist * d.ux + side * perp * -d.uy;
+        const oy = alongDist * d.uy + side * perp * d.ux;
         shapes.push(
           `<Shape ID='${allocId()}' NameU='UmlLabel' Type='Shape'>` +
           `<Cell N='PinX' V='${n(ax + ox)}' F='Sheet.${id}!${end}X+${n(ox)}'/>` +
@@ -561,10 +580,10 @@ export async function exportVisioDomainV3(
           `<Cell N='LinePattern' V='0'/><Cell N='FillPattern' V='0'/>` +
           `<Text>${esc(txt)}</Text></Shape>`);
       };
-      label("Begin", bDir, +1, beginMult);
-      label("Begin", bDir, -1, beginRole);
-      label("End", eDir, +1, endMult);
-      label("End", eDir, -1, endRole);
+      label("Begin", bDir, 0.24, +1, beginMult);
+      label("Begin", bDir, 0.54, -1, beginRole);
+      label("End", eDir, 0.24, +1, endMult);
+      label("End", eDir, 0.54, -1, endRole);
     }
 
     connects.push(
