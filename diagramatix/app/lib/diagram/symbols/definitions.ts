@@ -250,7 +250,7 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   {
     type: "uml-enumeration",
     label: "Enumeration",
-    defaultWidth: 96,
+    defaultWidth: 140,
     defaultHeight: 84,
     description: "A UML enumeration in a domain diagram",
   },
