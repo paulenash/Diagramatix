@@ -26,6 +26,25 @@ interface AiConn {
 }
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+/** Greedy word-wrap to a max character budget per line (long words are split). */
+function wrapWords(text: string, maxChars: number): string[] {
+  const words = (text ?? "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const lines: string[] = [];
+  let cur = "";
+  for (let w of words) {
+    while (w.length > maxChars) { // a single word longer than the line
+      if (cur) { lines.push(cur); cur = ""; }
+      lines.push(w.slice(0, maxChars));
+      w = w.slice(maxChars);
+    }
+    if (!cur) cur = w;
+    else if ((cur + " " + w).length <= maxChars) cur += " " + w;
+    else { lines.push(cur); cur = w; }
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [""];
+}
 function validBounds(b: unknown): b is AiBounds {
   if (!b || typeof b !== "object") return false;
   const o = b as Record<string, unknown>;
@@ -122,6 +141,27 @@ export function layoutDomainPreserved(
       x: Math.round(cx - sized.width / 2),
       y: Math.round(cy - sized.height / 2),
     };
+  }
+
+  // Notes: mimic the original folded-corner sticky — wrap the text to several
+  // lines instead of the single wide line the AI's over-estimated bounds produce.
+  // Size a snug box around the wrapped text (the renderer wraps at ~12px inside
+  // width-10), aiming for a squarish, multi-line note.
+  const NOTE_CHAR_W = 6.6, NOTE_LINE_H = 16, NOTE_PADX = 10, NOTE_PADY = 8, NOTE_FOLD = 14;
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i];
+    if (el.type !== "uml-note") continue;
+    const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+    const clean = (el.label ?? "").replace(/\s+/g, " ").trim();
+    const len = Math.max(1, clean.length);
+    // ~squarish: sqrt-based line count, wrap to that many lines (min 2 for wrap).
+    const targetLines = Math.max(2, Math.min(6, Math.round(Math.sqrt(len / 3))));
+    const maxChars = Math.max(10, Math.ceil(len / targetLines) + 2);
+    const lines = wrapWords(clean, maxChars);
+    const longest = Math.max(1, ...lines.map(l => l.length));
+    const w = Math.round(Math.max(100, Math.min(260, longest * NOTE_CHAR_W + NOTE_PADX * 2 + NOTE_FOLD)));
+    const h = Math.round(Math.max(48, lines.length * NOTE_LINE_H + NOTE_PADY * 2));
+    elements[i] = { ...el, x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), width: w, height: h };
   }
 
   // COMPACT: the boxes just shrank but their centres still sit on a canvas laid

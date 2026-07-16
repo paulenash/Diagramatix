@@ -86,6 +86,23 @@ describe("domain image reproduction (layout preserved from bounds)", () => {
     expect(gapAB).toBeLessThan(160);
   });
 
+  it("wraps an imported note to several lines instead of one wide line", () => {
+    const withNote = {
+      elements: [
+        { id: "c1", type: "uml-class", label: "Toy", bounds: { x: 0.1, y: 0.2, w: 0.2, h: 0.2 } },
+        { id: "n1", type: "uml-note", label: "Sometimes we run out of Toys!!",
+          bounds: { x: 0.5, y: 0.2, w: 0.3, h: 0.25 } },
+      ],
+      connections: [{ sourceId: "n1", targetId: "c1", type: "uml-note-anchor" }],
+    };
+    const data = layoutGenericDiagram(withNote as never, "domain", { imageAspect: { w: 1000, h: 700 } });
+    const note = data.elements.find(e => e.id === "n1")!;
+    // Snug sticky: narrower than the ~30-char text on one line (~195px), tall
+    // enough for multiple wrapped lines (≥ 2 lines * ~16px + padding).
+    expect(note.width).toBeLessThan(180);
+    expect(note.height).toBeGreaterThanOrEqual(48);
+  });
+
   it("falls back to auto-layout when bounds are absent", () => {
     const noBounds = {
       elements: [

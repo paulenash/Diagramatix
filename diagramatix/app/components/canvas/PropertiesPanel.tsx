@@ -1408,15 +1408,18 @@ export function PropertiesPanel({
                         </select>
                       </div>
                     )}
-                    {/* Generalisation — Direct (straight line) toggle */}
-                    {connector.type === "uml-generalisation" && onUpdateConnectorFields && (
-                      <label className="flex items-center gap-1 cursor-pointer">
-                        <span className={labelCls}>Direct:</span>
-                        <input type="checkbox" className="cursor-pointer"
-                          checked={connector.routingType === "direct"}
-                          onChange={e => onUpdateConnectorFields(connector.id, { routingType: e.target.checked ? "direct" : "rectilinear" })} />
-                        <span className="text-[10px] text-gray-500">straight line</span>
-                      </label>
+                    {/* Route — every UML connector chooses Direct (straight line)
+                        or Rectilinear (orthogonal). Rectilinear is the default. */}
+                    {onUpdateConnectorFields && (
+                      <div className="flex items-center gap-1">
+                        <span className={labelCls}>Route:</span>
+                        <select value={connector.routingType === "direct" ? "direct" : "rectilinear"}
+                          onChange={e => onUpdateConnectorFields(connector.id, { routingType: e.target.value as "direct" | "rectilinear" })}
+                          className={selectCls}>
+                          <option value="rectilinear">Rectilinear</option>
+                          <option value="direct">Direct</option>
+                        </select>
+                      </div>
                     )}
                     {/* Containment — move the ⊕ from the target to the source end */}
                     {connector.type === "uml-containment" && onUpdateConnectorFields && (
@@ -3244,7 +3247,9 @@ export function PropertiesPanel({
         </div>
       </div>
     )}
-      <SimulationSection element={element} onUpdateProperties={onUpdateProperties} />
+      {diagramType === "bpmn" && (
+        <SimulationSection element={element} onUpdateProperties={onUpdateProperties} />
+      )}
       <RiskControlSection element={element} catalog={riskCatalog ?? []} onUpdateProperties={onUpdateProperties} onCreate={onCreateRiskItem} open={rcSectionOpen} onToggle={onRcSectionToggle} />
     </div>
   );

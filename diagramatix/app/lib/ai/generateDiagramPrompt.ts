@@ -134,7 +134,7 @@ IMAGE INPUT — when an image of a UML class / domain diagram is attached, repro
 
 CONNECTION DIRECTION — the arrowhead / diamond / triangle / ⊕ ALWAYS sits at the TARGET end; the plain (unmarked) end is the SOURCE. Read the marker off the drawing and set source/target so the marked end is the target:
 - generalisation/realisation: source = the SUBTYPE (child); target = the SUPERTYPE (parent), where the hollow triangle sits. Several children pointing to one parent ALL have target = that parent (never the child).
-- aggregation/composition: source = the PART; target = the WHOLE, where the diamond sits.
+- aggregation/composition: source = the PART; target = the WHOLE, where the diamond sits. The part-count multiplicity (the "many" end, e.g. 2..* — how many parts each whole has) sits at the PART end, so put it in "sourceMultiplicity"; a multiplicity drawn at the diamond/whole end goes in "targetMultiplicity". Each multiplicity belongs to the end it visually touches — never move it to the other end.
 - dependency: source = the client; target = the supplier, where the open arrow points.
 - containment: target = the containing package (the ⊕ end).
 Getting this backwards flips the arrow — always put the MARKED end as the target.
