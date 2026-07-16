@@ -400,10 +400,17 @@ export interface TemplateData {
   connectors: Connector[];
 }
 
-/** Export schema version — bump when the export data structure changes.
+/** Export schema version — the version of the persisted DATA STRUCTURE.
  *  Major bump = breaking (fields removed/renamed). Minor bump = additive (new optional fields).
- *  ON BUMP: also add the entry to public/diagramatix-export.xsd's history block AND to
- *  schema/SCHEMA_CHANGELOG.md (the human-readable changelog). Keep all three in sync.
+ *
+ *  WHEN TO BUMP: ONLY when the data structure actually changes — either the
+ *  Diagram JSON export shape (public/diagramatix-export.xsd) OR the physical
+ *  database as described by the Logical DDL (app/lib/diagram/ddlGenerate.ts).
+ *  A feature-only release that touches neither does NOT bump the version.
+ *
+ *  ON BUMP: keep all FOUR in sync — this constant + history below,
+ *  public/diagramatix-export.xsd (shape + history block), ddlGenerate.ts (the
+ *  Logical DDL), and schema/SCHEMA_CHANGELOG.md (the human-readable changelog).
  *  History:
  *    1.0 — dual versioning across all exports: EXPORT_VERSION renamed to
  *          SCHEMA_VERSION; every JSON/XML export now stamps BOTH schemaVersion

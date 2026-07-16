@@ -13,9 +13,17 @@
   The xs:schema version attribute carries the schemaVersion.
   The appVersion is recorded as an annotation below and injected at runtime via /api/schema.
 
-  MAINTENANCE: when you add a version entry below, ALSO add it to schema/SCHEMA_CHANGELOG.md
-  (the human-readable changelog) and to the SCHEMA_VERSION history comment in
-  app/lib/diagram/types.ts. Keep all three in sync.
+  WHEN TO BUMP schemaVersion: ONLY when the data structure actually changes —
+  either this XSD / the Diagram JSON export shape, OR the physical database as
+  described by the Logical DDL (app/lib/diagram/ddlGenerate.ts). The version number
+  tracks the persisted data structure; if neither the export shape nor the DDL
+  changes, DO NOT bump it (feature-only releases ride the current version).
+
+  MAINTENANCE — these FOUR must always be kept in sync, and move together on a bump:
+    1. app/lib/diagram/types.ts   — the SCHEMA_VERSION constant + its history comment
+    2. this XSD                   — the shape + the history block below
+    3. app/lib/diagram/ddlGenerate.ts — the Logical DDL (physical DB structure)
+    4. schema/SCHEMA_CHANGELOG.md — the human-readable changelog (table + detail)
 
   v1.10 — round-trip serialisation completeness bump.
     No schema shape change. The v1.9 fields below were declared in this
@@ -404,6 +412,36 @@
     entity where-used search, admin-managed "My Teams") and the review-due reminder
     cron; their Diagram denorm columns (procedureDoc*/pcf*/entityRefs) are derived
     from data and are not part of the diagram export.
+
+  v1.37 — Import competitor BPMN diagrams as-is. SHAPE CHANGE: a new OPTIONAL
+    boolean relaxedLayout attribute on <data> (emitted only when true) — "free-form
+    / imported layout": pools may be any size/placement (not stacked full-width),
+    message flows route rectilinearly between non-aligned elements, and the
+    pure-geometry validation rules are suppressed. AI image import can additionally
+    reproduce a vendor's drawn positions + connector attachment/routing (normalised
+    bounds/waypoints are plan-only — NOT part of the export).
+
+  v1.38 — Domain (UML) diagram elements + connectors. SHAPE CHANGE: SymbolTypeEnum
+    gains "uml-package" and "uml-note"; ConnectorTypeEnum gains "uml-containment"
+    (a solid DIRECT package-to-package line ending in a circle-with-cross marker;
+    an OPTIONAL boolean connector attribute containmentSwapEnd moves that marker
+    from the target end to the source end) and "uml-note-anchor" (a dashed DIRECT
+    arrowhead-less Note->element link). Both reuse the existing "direct" routingType.
+    Behaviour-only (no shape change): a "Direct" straight-line option on
+    uml-generalisation and Shift near-edge quick-add of class attributes/operations.
+    (These enum + attribute declarations were synced into this XSD retroactively
+    during the schema-changelog catch-up; the release itself was v1.38.)
+
+  v1.39 — Pain Points. SHAPE CHANGE: SymbolTypeEnum gains "uml-pain-point" (an
+    auto-numbered starburst icon — the number is the element label; the OPTIONAL
+    multi-line properties.description rides in the open PropertiesType) and <data>
+    gains an OPTIONAL boolean showPainPointDescriptions (auto-enabled with the first
+    Pain Point). Behaviour-only: auto-connect on element drop restricted to BPMN /
+    flowchart. (uml-pain-point synced into this XSD retroactively; release v1.39.)
+
+  v1.40 — Pain Point "Display Pain Points" master toggle. SHAPE CHANGE: <data> gains
+    an OPTIONAL boolean showPainPoints (absent or true = icons shown; explicit false
+    = hidden); the v1.39 showPainPointDescriptions toggle nests under it.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -705,6 +743,16 @@
            it belongs to and its author are stored in element.properties
            (reviewId, reviewerId, reviewerName, reviewerEmail). -->
       <xs:enumeration value="review-comment"/>
+      <!-- schema 1.38 — Domain (UML) diagram containers: a resizeable
+           folder-tab package grouping members (by parentId), and a
+           folded-corner free-text note. -->
+      <xs:enumeration value="uml-package"/>
+      <xs:enumeration value="uml-note"/>
+      <!-- schema 1.39 — auto-numbered Pain Point marker. The number is the
+           element label; an OPTIONAL multi-line properties.description and the
+           diagram-level showPainPoints / showPainPointDescriptions booleans
+           control rendering. Type-agnostic (usable on any diagram type). -->
+      <xs:enumeration value="uml-pain-point"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -1053,6 +1101,9 @@
     <xs:attribute name="targetOffsetAlong" type="xs:decimal" use="optional"/>
     <xs:attribute name="labelAnchor"    type="dgx:LabelAnchorEnum" use="optional"/>
     <xs:attribute name="arrowAtSource"  type="xs:boolean" use="optional"/>
+    <!-- schema 1.38 — uml-containment only: move the circle-with-cross marker
+         from the target (containing package) end to the source end. -->
+    <xs:attribute name="containmentSwapEnd" type="xs:boolean" use="optional"/>
     <xs:attribute name="bottleneck"    type="xs:boolean" use="optional"/>
     <!-- Simulation (v1.24 model / v1.25 export): decision-gateway branch
          routing. An outgoing edge of a decision gateway carries EITHER a
