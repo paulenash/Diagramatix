@@ -61,8 +61,8 @@ export interface SupportEmailInput {
   message: string;
   // Diagram data JSON, stringified (the same shape stored in DiagramData).
   diagramJson: string;
-  // PNG of the canvas, base64-encoded (no `data:` prefix).
-  pngBase64: string | null;
+  // SVG of the canvas, base64-encoded (no `data:` prefix).
+  svgBase64: string | null;
 }
 
 export async function sendSupportDiagramEmail(input: SupportEmailInput): Promise<void> {
@@ -80,7 +80,7 @@ export async function sendSupportDiagramEmail(input: SupportEmailInput): Promise
     </table>
     <h3 style="font-family:Arial,sans-serif;font-size:14px;margin-top:18px;">Message</h3>
     <pre style="font-family:Arial,sans-serif;font-size:13px;white-space:pre-wrap;background:#f7f7f7;padding:10px;border:1px solid #e5e5e5;border-radius:4px;">${escapeHtml(input.message || "(no message)")}</pre>
-    <p style="font-family:Arial,sans-serif;font-size:12px;color:#666;">Attachments: diagram JSON ${input.pngBase64 ? "+ PNG screenshot" : "only"}.</p>
+    <p style="font-family:Arial,sans-serif;font-size:12px;color:#666;">Attachments: diagram JSON ${input.svgBase64 ? "+ SVG" : "only"}.</p>
   `;
 
   const attachments: nodemailer.SendMailOptions["attachments"] = [
@@ -90,11 +90,11 @@ export async function sendSupportDiagramEmail(input: SupportEmailInput): Promise
       contentType: "application/json",
     },
   ];
-  if (input.pngBase64) {
+  if (input.svgBase64) {
     attachments.push({
-      filename: `${safeFileName(input.diagramName)}.png`,
-      content: Buffer.from(input.pngBase64, "base64"),
-      contentType: "image/png",
+      filename: `${safeFileName(input.diagramName)}.svg`,
+      content: Buffer.from(input.svgBase64, "base64"),
+      contentType: "image/svg+xml",
     });
   }
 
@@ -114,7 +114,7 @@ export async function sendSupportDiagramEmail(input: SupportEmailInput): Promise
     console.log(`Diagram: ${input.diagramName} (${input.diagramId})`);
     console.log(`Subject: ${input.subject}`);
     console.log(`Message: ${input.message}`);
-    console.log(`PNG:     ${input.pngBase64 ? `${input.pngBase64.length} chars` : "(none)"}`);
+    console.log(`SVG:     ${input.svgBase64 ? `${input.svgBase64.length} chars` : "(none)"}`);
     console.log("========================================\n");
   }
 }

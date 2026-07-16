@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 interface Props {
   diagramId: string;
   diagramName: string;
-  // The live canvas SVG element. We snapshot it to PNG on send. Can be null
-  // if the canvas isn't mounted (the send still works — PNG is omitted and
+  // The live canvas SVG element. We snapshot it to SVG on send. Can be null
+  // if the canvas isn't mounted (the send still works — the SVG is omitted and
   // support gets the JSON only).
   getSvgEl: () => SVGSVGElement | null;
   onClose: () => void;
@@ -15,7 +15,7 @@ interface Props {
 
 // SupportRequestDialog — "Get help with this diagram".
 //
-// Two-field form (subject + message) plus an automatic PNG screenshot of
+// Two-field form (subject + message) plus an automatic SVG snapshot of
 // the current canvas. Submits to /api/support/diagram, which emails
 // support@diagramatix.com.au with the user's email as Reply-To.
 //
@@ -54,14 +54,14 @@ export function SupportRequestDialog({
     setSubmitting(true);
     setError(null);
     try {
-      // Snapshot the canvas to PNG. Best-effort — if the conversion fails
-      // (e.g. tainted canvas, missing SVG element), we still send the
-      // JSON-only email so the user's request isn't lost.
-      let pngBase64: string | null = null;
+      // Snapshot the canvas to SVG. Best-effort — if serialisation fails
+      // (e.g. missing SVG element), we still send the JSON-only email so the
+      // user's request isn't lost.
+      let svgBase64: string | null = null;
       try {
-        pngBase64 = await snapshotCanvasToPng(getSvgEl());
+        svgBase64 = await snapshotCanvasToSvg(getSvgEl());
       } catch (err) {
-        console.warn("[support] PNG snapshot failed; sending JSON only:", err);
+        console.warn("[support] SVG snapshot failed; sending JSON only:", err);
       }
 
       const res = await fetch("/api/support/diagram", {
@@ -71,7 +71,7 @@ export function SupportRequestDialog({
           diagramId,
           subject: subject.trim(),
           message: message.trim(),
-          pngBase64,
+          svgBase64,
         }),
       });
       if (!res.ok) {
@@ -93,8 +93,8 @@ export function SupportRequestDialog({
         <div className="px-5 py-4 border-b border-gray-100">
           <h3 className="text-sm font-semibold text-gray-900">Send to support</h3>
           <p className="text-xs text-gray-600 mt-1">
-            We&apos;ll email <strong>support@diagramatix.com.au</strong> with your message, a PNG
-            screenshot of this diagram, and its JSON. Replies come back to you.
+            We&apos;ll email <strong>support@diagramatix.com.au</strong> with your message, an SVG
+            of this diagram, and its JSON. Replies come back to you.
           </p>
         </div>
 
@@ -151,51 +151,22 @@ export function SupportRequestDialog({
   );
 }
 
-// Serialize the canvas SVG, render it to a <canvas>, and read back a
-// PNG dataURL. Returns base64 (without the `data:image/png;base64,`
-// prefix) so the server can Buffer-decode directly.
+// Serialize the canvas SVG and return it base64-encoded (no `data:` prefix,
+// matching the JSON transport so the server can Buffer-decode directly).
 //
-// Returns null if there's no SVG to snapshot. Throws if the rasterisation
-// fails — the caller treats throw + null both as "send without PNG".
-async function snapshotCanvasToPng(svgEl: SVGSVGElement | null): Promise<string | null> {
+// Returns null if there's no SVG to snapshot. Unlike the former PNG path this
+// keeps the diagram as true vector art — crisp at any zoom and editable.
+async function snapshotCanvasToSvg(svgEl: SVGSVGElement | null): Promise<string | null> {
   if (!svgEl) return null;
 
-  // Clone + strip interactive overlays so the screenshot matches what's
-  // visible on the canvas, not the editor's hover affordances.
+  // Clone + strip interactive overlays so the snapshot matches what's visible
+  // on the canvas, not the editor's hover affordances.
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
   clone.removeAttribute("tabindex");
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   clone.querySelectorAll("[data-interactive]").forEach((n) => n.remove());
 
   const serialized = new XMLSerializer().serializeToString(clone);
-  const svgBlob = new Blob([serialized], { type: "image/svg+xml;charset=utf-8" });
-  const svgUrl = URL.createObjectURL(svgBlob);
-
-  try {
-    const img = await loadImage(svgUrl);
-    const w = img.naturalWidth || svgEl.clientWidth || 1024;
-    const h = img.naturalHeight || svgEl.clientHeight || 768;
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, w, h);
-    ctx.drawImage(img, 0, 0, w, h);
-    const dataUrl = canvas.toDataURL("image/png");
-    const comma = dataUrl.indexOf(",");
-    return comma >= 0 ? dataUrl.slice(comma + 1) : null;
-  } finally {
-    URL.revokeObjectURL(svgUrl);
-  }
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Failed to rasterise SVG"));
-    img.src = src;
-  });
+  // UTF-8-safe base64 (handles any unicode in labels).
+  return btoa(unescape(encodeURIComponent(serialized)));
 }
