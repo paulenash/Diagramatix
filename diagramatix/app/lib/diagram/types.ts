@@ -311,14 +311,14 @@ export interface DiagramData {
    *  Diagram Properties (the description toggle nests under it). */
   showPainPoints?: boolean;
   /** Show each Pain Point's multi-line description caption under its icon on
-   *  the canvas. Auto-enabled when the first Pain Point is added; only takes
-   *  effect while `showPainPoints` is on. Absent/false = icons only. */
+   *  the canvas. OPT-IN (off by default); only takes effect while `showPainPoints`
+   *  is on. Absent/false = icons only. */
   showPainPointDescriptions?: boolean;
   /** "Display Issues" master toggle — render Issue icons (dark-green twin of
    *  Pain Points) on the canvas. Absent/true = shown; explicit false = hidden. */
   showIssues?: boolean;
-  /** Show each Issue's multi-line description caption under its icon. Auto-enabled
-   *  when the first Issue is added; only takes effect while `showIssues` is on. */
+  /** Show each Issue's multi-line description caption under its icon. OPT-IN
+   *  (off by default); only takes effect while `showIssues` is on. */
   showIssueDescriptions?: boolean;
   /** Diagram-level list of all parent diagrams that currently link TO
    *  this diagram (managed by the project-wide "Scan Diagrams for Links"

@@ -29,11 +29,14 @@ describe("issue numbering", () => {
     expect(at(d, "i3")?.label).toBe("3");
   });
 
-  it("auto-enables description display when the FIRST issue is added", () => {
+  it("keeps descriptions OFF by default (Display Issues stays on)", () => {
     let d = base();
     expect(d.showIssueDescriptions).toBeFalsy();
     d = reducer(d, addIssue("i1"));
-    expect(d.showIssueDescriptions).toBe(true);
+    // Descriptions are opt-in — not auto-enabled on first add.
+    expect(d.showIssueDescriptions).toBeFalsy();
+    // Display Issues stays on (absent = shown).
+    expect(d.showIssues).not.toBe(false);
   });
 
   it("renumbers the rest when an issue is deleted (closes the gap)", () => {
@@ -61,6 +64,16 @@ describe("issue numbering", () => {
     const cAfter = at(d, "c1")!, iAfter = at(d, "i1")!;
     expect(iAfter.x).toBe(iBefore.x + (cAfter.x - cBefore.x));
     expect(iAfter.y).toBe(iBefore.y + (cAfter.y - cBefore.y));
+  });
+
+  it("sticks to a child INSIDE a container, not the enclosing container", () => {
+    // A composite-state container with a state child inside it.
+    const container = { id: "cs", type: "composite-state", x: 100, y: 100, width: 400, height: 300, label: "CS", properties: {} };
+    const child = { id: "s1", type: "state", x: 200, y: 200, width: 120, height: 60, label: "S", properties: {}, parentId: "cs" };
+    let d: DiagramData = { elements: [container, child] as never, connectors: [], viewport: { x: 0, y: 0, zoom: 1 } };
+    // Drop an issue centred on the child (which sits inside the container).
+    d = reducer(d, { type: "ADD_ELEMENT", payload: { symbolType: "uml-issue", position: { x: child.x + child.width / 2, y: child.y + child.height / 2 }, id: "i1" } });
+    expect(at(d, "i1")?.parentId).toBe("s1"); // the child, not "cs"
   });
 
   it("numbers issues and pain points INDEPENDENTLY (each its own 1..N)", () => {

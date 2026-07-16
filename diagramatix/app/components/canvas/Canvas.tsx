@@ -7557,6 +7557,7 @@ export function Canvas({
       {painDescEdit && (() => {
         const el = data.elements.find((x) => x.id === painDescEdit.elementId);
         if (!el) return null;
+        const isIssue = el.type === "uml-issue";
         const commit = () => {
           setPainDescEdit((cur) => {
             if (cur) onUpdateProperties?.(cur.elementId, { description: cur.value });
@@ -7574,13 +7575,13 @@ export function Canvas({
             onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); commit(); } }}
             onBlur={commit}
             onMouseDown={(e) => e.stopPropagation()}
-            placeholder="Pain point description (Enter for a new line, Esc to finish)"
+            placeholder={`${isIssue ? "Issue" : "Pain point"} description (Enter for a new line, Esc to finish)`}
             rows={Math.max(2, painDescEdit.value.split("\n").length)}
             style={{
               position: "absolute", left, top, width: w,
               fontSize: Math.max(9, 11 * zoom), zIndex: 60,
-              border: "2px solid #b91c1c", borderRadius: 4, padding: "2px 4px",
-              background: "white", color: "#7f1d1d", textAlign: "center", resize: "none",
+              border: `2px solid ${isIssue ? "#166534" : "#b91c1c"}`, borderRadius: 4, padding: "2px 4px",
+              background: "white", color: isIssue ? "#166534" : "#7f1d1d", textAlign: "center", resize: "none",
             }}
           />
         );

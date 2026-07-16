@@ -456,10 +456,14 @@ const UML_PACKAGE_CHILDREN = new Set<SymbolType>([
   "uml-class", "uml-enumeration", "uml-package", "uml-note", "uml-pain-point", "uml-issue",
 ]);
 
-/** Pick the element a marker (pain point / issue) should stick to: the element
- *  it OVERLAPS most; failing any overlap, the NEAREST element within a small
- *  proximity threshold (so a marker dropped just beside a shape still sticks).
- *  Other markers are never hosts. Returns undefined when nothing is near. */
+/** Pick the element a marker (pain point / issue) should stick to. A marker
+ *  marks a specific SHAPE, not the container it sits inside — so a leaf
+ *  (non-container) element it overlaps always wins over the enclosing
+ *  Composite State / Expanded Subprocess / Value Chain / package / pool. Among
+ *  same-kind candidates: largest overlap, tie-broken by smallest element
+ *  (innermost). With no overlap, the nearest element within a small proximity
+ *  threshold (so a marker dropped just beside a shape still sticks). Other
+ *  markers are never hosts. Returns undefined when nothing is near. */
 function pickMarkerHost(
   marker: { x: number; y: number; width: number; height: number },
   elements: DiagramElement[],
@@ -468,23 +472,28 @@ function pickMarkerHost(
   const NEAR = 40; // px from the marker's edge — "near enough" to stick
   const mx2 = marker.x + marker.width, my2 = marker.y + marker.height;
   const mcx = marker.x + marker.width / 2, mcy = marker.y + marker.height / 2;
-  let hostId: string | undefined, bestArea = 0;
-  let nearestId: string | undefined, nearestDist = Infinity;
+  const cands = [];
   for (const b of elements) {
     if (b.id === selfId || MARKER_TYPES.has(b.type)) continue;
     const ox = Math.max(0, Math.min(mx2, b.x + b.width) - Math.max(marker.x, b.x));
     const oy = Math.max(0, Math.min(my2, b.y + b.height) - Math.max(marker.y, b.y));
     const area = ox * oy;
-    if (area > bestArea) { bestArea = area; hostId = b.id; }
     // Distance from the marker centre to the element rect (0 if inside).
     const dx = Math.max(b.x - mcx, 0, mcx - (b.x + b.width));
     const dy = Math.max(b.y - mcy, 0, mcy - (b.y + b.height));
     const dist = Math.hypot(dx, dy);
-    if (dist < nearestDist) { nearestDist = dist; nearestId = b.id; }
+    cands.push({ id: b.id, area, dist, isCont: isContainerType(b.type), size: b.width * b.height });
   }
-  if (hostId) return hostId;                    // overlaps a shape → stick to it
-  if (nearestDist <= NEAR) return nearestId;    // near a shape → stick to it
-  return undefined;
+  const overlapping = cands.some(c => c.area > 0);
+  const pool = overlapping ? cands.filter(c => c.area > 0) : cands.filter(c => c.dist <= NEAR);
+  if (!pool.length) return undefined;
+  pool.sort((a, b) => {
+    if (a.isCont !== b.isCont) return a.isCont ? 1 : -1;   // leaf shapes before containers
+    if (overlapping) { if (b.area !== a.area) return b.area - a.area; } // bigger overlap
+    else if (a.dist !== b.dist) return a.dist - b.dist;    // nearer
+    return a.size - b.size;                                 // innermost (smallest)
+  });
+  return pool[0].id;
 }
 
 /** Re-number every marker of `type` 1..N (ordered by their current number) so a
@@ -3694,13 +3703,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         taskType:  action.payload.taskType,
         eventType: action.payload.eventType,
       };
-      // Adding the FIRST pain point / issue auto-enables its description display.
-      const enablePainDesc =
-        newEl.type === "uml-pain-point" && !state.elements.some((e) => e.type === "uml-pain-point")
-          ? { showPainPointDescriptions: true }
-        : newEl.type === "uml-issue" && !state.elements.some((e) => e.type === "uml-issue")
-          ? { showIssueDescriptions: true }
-        : {};
+      // Descriptions are OFF by default for both Pain Points and Issues — the
+      // user turns "Show descriptions on diagram" on explicitly. (Display Pain
+      // Points / Display Issues stay ON by default via the absent-means-shown
+      // flags.)
+      const enablePainDesc = {};
       // Snap event to host boundary on drop
       if (BOUNDARY_EVENT_TYPES.has(newEl.type)) {
         const centre = { x: newEl.x + newEl.width / 2, y: newEl.y + newEl.height / 2 };

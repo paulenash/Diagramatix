@@ -24,11 +24,14 @@ describe("pain point numbering", () => {
     expect(at(d, "p3")?.label).toBe("3");
   });
 
-  it("auto-enables description display when the FIRST pain point is added", () => {
+  it("keeps descriptions OFF by default (Display Pain Points stays on)", () => {
     let d = base();
     expect(d.showPainPointDescriptions).toBeFalsy();
     d = reducer(d, addPain("p1"));
-    expect(d.showPainPointDescriptions).toBe(true);
+    // Descriptions are opt-in — not auto-enabled on first add.
+    expect(d.showPainPointDescriptions).toBeFalsy();
+    // Display Pain Points stays on (absent = shown).
+    expect(d.showPainPoints).not.toBe(false);
   });
 
   it("renumbers the rest when a pain point is deleted (closes the gap)", () => {
