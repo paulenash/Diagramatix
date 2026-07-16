@@ -98,13 +98,18 @@ export function DiagramColorModal({
   });
   const [workingDisplayMode, setWorkingDisplayMode] = useState<DisplayMode>(displayMode);
   // Context-Diagram defaults: Entity Names 14 / Process Names 16 / Flow Labels 12.
-  // ArchiMate element names also default to 14.
-  const defaultElementFontSize = (isContext || diagramType === "archimate") ? 14 : 12;
-  const defaultConnectorFontSize = isContext ? 12 : 10;
+  // ArchiMate element names also default to 14. Domain (UML) defaults: Elements 14
+  // / Connectors 14 / Title 16 — MUST match the canvas defaults in Canvas.tsx, else
+  // opening this dialog + applying writes the wrong (smaller) size and the domain
+  // fonts appear to "revert".
+  const isDomain = diagramType === "domain";
+  const defaultElementFontSize = (isContext || diagramType === "archimate" || isDomain) ? 14 : 12;
+  const defaultConnectorFontSize = isContext ? 12 : isDomain ? 14 : 10;
+  const defaultTitleFontSize = isDomain ? 16 : 14;
   const defaultProcessFontSize = 16;
   const [workingFontSize, setWorkingFontSize] = useState(fontSize ?? defaultElementFontSize);
   const [workingConnectorFontSize, setWorkingConnectorFontSize] = useState(connectorFontSize ?? defaultConnectorFontSize);
-  const [workingTitleFontSize, setWorkingTitleFontSize] = useState(titleFontSize ?? 14);
+  const [workingTitleFontSize, setWorkingTitleFontSize] = useState(titleFontSize ?? defaultTitleFontSize);
   const [workingPoolFontSize, setWorkingPoolFontSize] = useState(poolFontSize ?? 16);
   const [workingLaneFontSize, setWorkingLaneFontSize] = useState(laneFontSize ?? 14);
   const [workingProcessFontSize, setWorkingProcessFontSize] = useState(processFontSize ?? defaultProcessFontSize);
@@ -245,9 +250,9 @@ export function DiagramColorModal({
                 { label: "Flow Labels",   value: workingConnectorFontSize, setValue: setWorkingConnectorFontSize, default: 12, min: 6,  max: 24, enabled: !!onConnectorFontSizeChange },
               ]
             : [
-                { label: "Elements",   value: workingFontSize,          setValue: setWorkingFontSize,          default: 12, min: 6,  max: 24, enabled: !!onFontSizeChange },
-                { label: "Connectors", value: workingConnectorFontSize, setValue: setWorkingConnectorFontSize, default: 10, min: 6,  max: 24, enabled: !!onConnectorFontSizeChange },
-                { label: "Title",      value: workingTitleFontSize,     setValue: setWorkingTitleFontSize,     default: 14, min: 8,  max: 30, enabled: !!onTitleFontSizeChange },
+                { label: "Elements",   value: workingFontSize,          setValue: setWorkingFontSize,          default: defaultElementFontSize,   min: 6,  max: 24, enabled: !!onFontSizeChange },
+                { label: "Connectors", value: workingConnectorFontSize, setValue: setWorkingConnectorFontSize, default: defaultConnectorFontSize, min: 6,  max: 24, enabled: !!onConnectorFontSizeChange },
+                { label: "Title",      value: workingTitleFontSize,     setValue: setWorkingTitleFontSize,     default: defaultTitleFontSize,     min: 8,  max: 30, enabled: !!onTitleFontSizeChange },
                 { label: "Pools",      value: workingPoolFontSize,      setValue: setWorkingPoolFontSize,      default: 12, min: 6,  max: 24, enabled: !!onPoolFontSizeChange && diagramType === "bpmn" },
                 { label: "Lanes",      value: workingLaneFontSize,      setValue: setWorkingLaneFontSize,      default: 12, min: 6,  max: 24, enabled: !!onLaneFontSizeChange && diagramType === "bpmn" },
                 { label: "Value Chain Name", value: workingValueChainFontSize,  setValue: setWorkingValueChainFontSize,  default: 16, min: 8, max: 36, enabled: !!onValueChainFontSizeChange && diagramType === "value-chain" },
