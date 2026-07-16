@@ -335,6 +335,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   // SuperAdmin "presentation mode" — double-click the logo to hide SuperAdmin
   // chrome and relabel the subscription tier to Expert. No-op for non-SuperAdmins.
   const { hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(!!isSu);
+  // The auto-collected "Support" project is SuperAdmin-only chrome: highlighted
+  // red when shown, and hidden along with the rest of the SuperAdmin chrome when
+  // the logo is double-clicked (presentation mode).
+  const isSupportProject = (name: string) => !!isSu && name === "Support";
+  const displayedProjects = superAdminHidden
+    ? visibleProjects.filter((p) => !isSupportProject(p.name))
+    : visibleProjects;
   // Skip the intro when RETURNING to the console (e.g. back from a discovered
   // diagram, ?pmnoi=1) — the intro is only for a fresh entry.
   const [skipMiningIntro, setSkipMiningIntro] = useState(false);
@@ -1805,7 +1812,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         {/* Projects — collapsible, first below Reviews. */}
         <CollapsibleSection
           title="Projects"
-          count={visibleProjects.length}
+          count={displayedProjects.length}
           titleAction={
             // Hidden entirely when the profile has no examples-bearing feature.
             hasAnyExampleFeature ? (
@@ -1842,7 +1849,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           ) : undefined}
         >
 
-          {visibleProjects.length === 0 ? (
+          {displayedProjects.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
               <p className="text-gray-500 mb-4">
                 {projects.length > 0 && hideExamples ? "All projects are examples (hidden)" : readOnly ? "No projects" : "No projects yet"}
@@ -1858,7 +1865,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-              {visibleProjects.map((p) => {
+              {displayedProjects.map((p) => {
                 // Tile state taxonomy \u2014 two distinct shared states, two
                 // distinct colour schemes:
                 //   \u2022 isSharedToMe \u2014 the caller is a recipient. Pale
@@ -1887,6 +1894,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 const ex = !isSharedToMe && !isSharedOut && p.exampleType ? EXAMPLE_TILE[p.exampleType] : null;
                 // APQC-generated projects (a linked PCF framework) get a black boundary.
                 const isApqc = !!(p.pcf && typeof p.pcf === "object" && Object.keys(p.pcf as object).length > 0);
+                // The SuperAdmin-only auto-collected "Support" project gets a red boundary.
+                const isSupport = isSupportProject(p.name);
                 return (
                 <div
                   key={p.id}
@@ -1931,7 +1940,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                           : ex
                             ? ex.base
                             : "bg-white border-gray-300 hover:border-blue-300"
-                  } ${isApqc ? "!border-black !border-2" : ""}`}
+                  } ${isApqc ? "!border-black !border-2" : ""} ${isSupport ? "!border-red-500 !border-2 !bg-red-50" : ""}`}
                 >
                   <div className="flex items-center justify-between group/row">
                     <h3
