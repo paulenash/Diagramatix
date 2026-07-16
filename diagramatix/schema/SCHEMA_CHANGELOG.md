@@ -1,14 +1,14 @@
 # Diagramatix Export Schema — Version History
 
-Extracted from the canonical history block in [`public/diagramatix-export.xsd`](public/diagramatix-export.xsd).
+Canonical human-readable changelog for the export schema. Mirrors the inline history block in [`../public/diagramatix-export.xsd`](../public/diagramatix-export.xsd) and the `SCHEMA_VERSION` history comment in [`../app/lib/diagram/types.ts`](../app/lib/diagram/types.ts).
 
 **Two version numbers are tracked**
 - **`schemaVersion`** (major.minor) — the export *data-structure* version. Bumped only when fields are added, removed, or renamed. *Major* = breaking change; *minor* = additive (new optional fields). Carried on the `<xs:schema version="…">` attribute.
 - **`appVersion`** (major.minor.build) — the Diagramatix *application* version. The build number is the git commit count, so it changes every commit. Injected at runtime via `/api/schema`.
 
-**Current version:** `1.37`. The XSD's own history block starts at **v1.10**; the earlier **v1.2–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`app/lib/diagram/types.ts`](app/lib/diagram/types.ts). **Schema versioning began at v1.2** (the initial XSD release) — **v1.0–v1.1** predate the export schema (early MVP "boxes + arrows", before a formal/versioned export existed).
+**Current version:** `1.40`. Versioning began at **v1.0** (dual `schemaVersion` / `appVersion` stamping across every export + a versioned XSD root); **v1.2** was the first release of the enumerated XSD content that every later version evolves from. The XSD's own inline history block starts at **v1.10**; the earlier **v1.0–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`../app/lib/diagram/types.ts`](../app/lib/diagram/types.ts) and git.
 
-> **Maintenance:** keep this file in sync with the schema. On every `SCHEMA_VERSION` bump, update **all three together** — `app/lib/diagram/types.ts` (the constant + its history comment), `public/diagramatix-export.xsd` (its history block + any actual shape change), and **this file** (add a summary-table row *and* a detail section).
+> **Maintenance:** keep this file in sync with the schema. On every `SCHEMA_VERSION` bump, update **all three together** — `../app/lib/diagram/types.ts` (the constant + its history comment), `../public/diagramatix-export.xsd` (its history block + any actual shape change), and **this file** (add a summary-table row *and* a detail section).
 
 > "Schema shape change?" below means the actual **XSD/XML data structure** changed (a new field/element/enum). Most releases bump the version to mark a *feature window* without changing the export shape — the version still advances so importers and the User Guide can detect the release.
 
@@ -18,6 +18,9 @@ Extracted from the canonical history block in [`public/diagramatix-export.xsd`](
 
 | Version | Title | Schema shape change? |
 |---|---|---|
+| **1.40** | Pain Point "Display Pain Points" master toggle (nests the description toggle under it) | **Yes** — new optional diagram-level `showPainPoints` boolean |
+| **1.39** | Pain Points overhaul — auto-numbered `uml-pain-point` icons (number = label, shown large) + optional multi-line description; auto-connect restricted to BPMN/flowchart | **Yes** — new optional diagram-level `showPainPointDescriptions` boolean (+ `properties.description`, open PropertiesType) |
+| **1.38** | Domain (UML) diagram connectors — package containment + note anchors, "Direct" generalisation, Shift near-edge quick-add of attributes | **Yes** — new `ConnectorType` `uml-containment` / `uml-note-anchor` + optional `containmentSwapEnd` |
 | **1.37** | Import competitor BPMN diagrams as-is — diagram-level "free-form / imported layout" (`relaxedLayout`): pools any size/placement (not stacked full-width), rectilinear message flows between non-aligned elements, geometry validation suppressed; AI image import reproduces the vendor's drawn positions + connector attachment/routing (normalised `bounds`) instead of auto-stacking | **Yes** — new optional `relaxedLayout` attribute on `<dgx:data>` |
 | **1.36** | Process Portal (org-wide search/browse of published processes; entity "where-used" search by IT-system/team; admin-managed "My Teams" → one-click "Involving me") + primary procedure document per diagram + review-due reminder cron | **Yes** — new optional `<dgx:procedureDoc>` element |
 | **1.35** | APQC Process Classification Framework (PCF) — reference library + classify + Create APQC Project/Process + AI grounding + coverage + by-category compliance + tailored frameworks (compose/version/divisions); ©APQC attribution rides on PCF-bearing exports | **Yes** — new optional `<dgx:pcfAttribution>` element |
@@ -53,12 +56,22 @@ Extracted from the canonical history block in [`public/diagramatix-export.xsd`](
 | **1.5** | Value Chain diagram type + chevron symbols | **Yes** — `DiagramType "value-chain"`; `chevron`/`chevron-collapsed`/`process-group`; `fillColor`/`description`/`showDescription` |
 | **1.4** | State-machine `fork-join` / `submachine` symbols | **Yes** — `SymbolType "fork-join"` / `"submachine"` |
 | **1.3** | RepeatType MI values + documented enums/properties | **Yes** — `RepeatType "mi-sequential"`/`"mi-parallel"` |
-| **1.2** | Initial XSD release | **Initial schema** |
-| **1.0 – 1.1** | Early MVP (boxes + arrows) | — (predate the export schema; no XSD) |
+| **1.2** | Initial XSD release (enumerated content baseline) | **Initial schema** |
+| **1.1** | BPMN value-analysis + timing properties | **Yes** — `ValueAnalysisEnum` + `TimeUnitEnum` (+ `valueAnalysis`/`cycleTime`/`waitTime`/`timeUnit`/`timeUnitCustom`) |
+| **1.0** | Dual `schemaVersion` / `appVersion` stamping + versioned XSD root | **Versioning baseline** (mechanism, not enum content) |
 
 ---
 
 ## Details (newest first)
+
+### v1.40 — Pain Point "Display Pain Points" master toggle  · **shape change**
+Adds one optional diagram-level boolean **`showPainPoints`** to `<dgx:data>` (absent or `true` = the Pain Point icons render; explicit `false` = hidden). The v1.39 **`showPainPointDescriptions`** toggle now nests under it in Diagram Properties (descriptions only show when icons are shown). Older exports omit the flag and behave as "shown". Additive + optional; no other shape change.
+
+### v1.39 — Pain Points overhaul + auto-connect gating  · **shape change**
+`uml-pain-point` elements are **auto-numbered** — the number is the element `label`, rendered large inside a Visio-style irregular starburst icon — and carry an OPTIONAL multi-line **`properties.description`** (edited by double-clicking the icon or via a list in the Properties panel; the numbers renumber on delete). The one enumerated shape change is a new OPTIONAL diagram-level boolean **`showPainPointDescriptions`** on `<dgx:data>` (auto-enabled when the first Pain Point is added) that renders those descriptions as captions under the icons. `properties.description` rides in the open `PropertiesType`. Pain points are type-agnostic (usable on every diagram type). Separately (behaviour-only, no shape impact): **auto-connect** on element drop is now restricted to **BPMN and flowchart** diagrams. Older exports omit the flag; importers treat it as off.
+
+### v1.38 — Domain (UML) diagram connectors  · **shape change**
+Two new `ConnectorType` values: **`uml-containment`** (a solid *direct* package-to-package line ending in a ⊕ circle-with-cross marker; an OPTIONAL boolean **`containmentSwapEnd`** moves the ⊕ from the target to the source end) and **`uml-note-anchor`** (a dashed *direct* arrowhead-less line from a Note to any element except Pain Points / other Notes). Both reuse the existing `direct` `routingType`; the only new connector field is `containmentSwapEnd`. Also in this window (no shape change): a **"Direct"** straight-line option on `uml-generalisation`, and **Shift** near an edge quick-adds class attributes/operations via the `umlParse` parser. Older exports omit both enum values + the field.
 
 ### v1.37 — Import competitor BPMN diagrams as-is (free-form / imported layout)  · **shape change**
 The one export-shape change is a new **optional boolean `relaxedLayout` attribute** on `<dgx:data>` (alongside `database`): a diagram may carry **`DiagramData.relaxedLayout`**, written only when `true`, so exports without it are unchanged. **Why:** other vendors' BPMN diagrams break two Diagramatix conventions — pools aren't stacked full-width (they can be any size and sit side-by-side) and message flows are rectilinear between elements that aren't vertically aligned. Previously importing one produced a wall of red validation errors and the editor silently re-stacked the pools + forced messages vertical. **Feature scope:** a diagram-level **"Free-form / imported layout"** toggle (Diagram Properties, BPMN only) that (a) suppresses the pure-geometry validation rules (`containment`, `lane-tiling`, `element-overlap`, `pool-header-overrun`, `hanging-message`, container-connector, duplicate-container-name) in both the live and project-wide scanners; (b) stops the reducer's full-width pool cascade + vertical-stack shove so pools keep independent size/placement; and (c) lets message flows route rectilinearly (like sequence connectors) between non-aligned elements instead of the forced shared-x vertical dogleg. **AI image import** gains a **"Reproduce original layout"** option: the vision plan additionally captures each shape's normalised `bounds` and each connector's attachment sides + drawn waypoints, and a dedicated preserved-layout engine path rebuilds the vendor's actual positions (scaled to canvas px, aspect-preserved, with a jitter-repair pass — pool ordering, lane-to-pool snapping, column clustering, containment repair) and sets `relaxedLayout: true`. If the AI's coordinates are unusable it silently falls back to the validated auto-stack layout. Pinned by unit tests T0708–T0711.
@@ -182,7 +195,7 @@ Behavioural changes shipped in this release (Task/Sub-Process Name + autosize, P
 
 ---
 
-> The entries below (**v1.2 – v1.9**) are reconstructed from the `SCHEMA_VERSION` history in `app/lib/diagram/types.ts` — the XSD's own history block doesn't reach this far back.
+> The entries below (**v1.0 – v1.9**) are reconstructed from the `SCHEMA_VERSION` history in `../app/lib/diagram/types.ts` (and git for v1.0–v1.1) — the XSD's own history block doesn't reach this far back.
 
 ### v1.9 — ArchiMate + font/database fields (additive XSD catch-up)  · **shape change**
 Additive, no breaking changes: `DiagramType "archimate"`, `SymbolType "archimate-shape"`, `ConnectorType "archi-*"` (the 11 ArchiMate relationships); `DiagramData` attributes `poolFontSize`, `laneFontSize`, `database`. *(These were declared here but the serialiser didn't actually emit them until v1.10.)*
@@ -210,5 +223,8 @@ Adds `RepeatType` values `mi-sequential` / `mi-parallel`; documents `GatewayRole
 ### v1.2 — Initial XSD release  · **initial schema**
 The first formalised, versioned export schema — the baseline `<diagramatix-export>` structure (elements, connectors, data) that every later version evolves from.
 
-### v1.0 – v1.1 — Early MVP (pre–export-schema)
-These predate the export schema entirely: the early "boxes + arrows" MVP, before a formal/versioned `.xml` / XSD export existed. The schema-version sequence starts at v1.2, so 1.0/1.1 aren't recorded in the schema. *(A precise 1.0/1.1 changelog would have to come from early git history or release notes rather than the export schema.)*
+### v1.1 — BPMN value-analysis + timing properties  · **shape change**
+Adds two enums to the XSD and the matching optional `element.properties` keys: **`ValueAnalysisEnum`** (`none` / `VA` / `NNVA` / `NVA` → `valueAnalysis`) and **`TimeUnitEnum`** (`none` / `sec` / `min` / `hrs` / `days` / `other` → `timeUnit`, with `timeUnitCustom` when `other`), alongside numeric `cycleTime` / `waitTime`. All additive + optional (no migration); older exports remain valid. *(Reconstructed from git — commit `b9da1edb`, 2026-03-28.)*
+
+### v1.0 — Dual versioning across all exports  · **versioning baseline**
+The constant `EXPORT_VERSION` was renamed **`SCHEMA_VERSION`**, and every JSON and XML export began stamping **both** numbers: `schemaVersion` (the export data-structure version) and `appVersion` (`major.minor.build`, the build being the git commit count). Imports are gated by `checkSchemaCompatibility()` (same major.minor accepted; older major accepted with an upgrade warning; newer rejected with "please upgrade"), with backward-compatibility for the old single `version` field. The XSD root carries both `schemaVersion` + `appVersion` attributes (separate `SchemaVersionString` `\d+\.\d+` and `AppVersionString` `\d+\.\d+\.\d+` types), injected at runtime by `/api/schema`. This is the versioning mechanism itself — the enumerated schema *content* baseline lands at **v1.2**. *(Reconstructed from git — commit `588cf6bd`, 2026-03-27.)*

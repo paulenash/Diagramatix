@@ -403,8 +403,18 @@ export interface TemplateData {
 /** Export schema version — bump when the export data structure changes.
  *  Major bump = breaking (fields removed/renamed). Minor bump = additive (new optional fields).
  *  ON BUMP: also add the entry to public/diagramatix-export.xsd's history block AND to
- *  /Version History.md (the human-readable changelog). Keep all three in sync.
+ *  schema/SCHEMA_CHANGELOG.md (the human-readable changelog). Keep all three in sync.
  *  History:
+ *    1.0 — dual versioning across all exports: EXPORT_VERSION renamed to
+ *          SCHEMA_VERSION; every JSON/XML export now stamps BOTH schemaVersion
+ *          (data-structure version) and appVersion (build, from the git commit
+ *          count); import compatibility gated by checkSchemaCompatibility();
+ *          XSD root carries schemaVersion + appVersion (separate
+ *          SchemaVersionString / AppVersionString types).
+ *    1.1 — additive: BPMN value-analysis + timing on element.properties
+ *          (valueAnalysis, cycleTime, waitTime, timeUnit, timeUnitCustom);
+ *          XSD gains ValueAnalysisEnum (none/VA/NNVA/NVA) and TimeUnitEnum
+ *          (none/sec/min/hrs/days/other).
  *    1.2 — initial XSD release
  *    1.3 — added RepeatType values "mi-sequential" / "mi-parallel"; documented
  *          GatewayRoleEnum, SubprocessTypeEnum, PoolTypeEnum and the

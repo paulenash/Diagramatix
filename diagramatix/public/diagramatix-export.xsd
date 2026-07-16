@@ -13,7 +13,7 @@
   The xs:schema version attribute carries the schemaVersion.
   The appVersion is recorded as an annotation below and injected at runtime via /api/schema.
 
-  MAINTENANCE: when you add a version entry below, ALSO add it to /Version History.md
+  MAINTENANCE: when you add a version entry below, ALSO add it to schema/SCHEMA_CHANGELOG.md
   (the human-readable changelog) and to the SCHEMA_VERSION history comment in
   app/lib/diagram/types.ts. Keep all three in sync.
 
