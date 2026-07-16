@@ -3926,10 +3926,8 @@ export function Canvas({
     return { x: el.x, y: attrsY + attrsH + index * lineH, w: el.width, h: lineH };
   }, [umlFsc]);
 
-  // Shift + move near a domain element's left/right/bottom edge. A uml-class
-  // shows the Add-Attribute/Operation flyout; a uml-enumeration opens the value
-  // editor directly. Once shown, the menu persists until an item is chosen, a
-  // background click, or Escape (moving toward the button must NOT dismiss it).
+  // Append an empty value row to an enumeration and open the inline editor over
+  // it. Triggered by a double-click just outside the enum's right/bottom edge.
   const startUmlEnumAdd = useCallback((elementId: string) => {
     const el = data.elements.find((x) => x.id === elementId);
     if (!el) return;
@@ -3940,28 +3938,6 @@ export function Canvas({
     setUmlQuickAddMenu(null);
     setUmlRowEdit({ elementId, kind: "enum-value", index, value: "" });
   }, [data.elements, onUpdateProperties]);
-
-  const handleUmlQuickAddMove = useCallback((e: React.MouseEvent) => {
-    if (diagramType !== "domain") return;
-    if (!e.shiftKey || umlRowEdit || umlQuickAddMenu || isDraggingConnector || isDraggingEndpoint) return;
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const w = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
-    const NEAR = 12;
-    for (const el of data.elements) {
-      if (el.type !== "uml-class" && el.type !== "uml-enumeration") continue;
-      const inYspan = w.y >= el.y && w.y <= el.y + el.height;
-      const inXspan = w.x >= el.x && w.x <= el.x + el.width;
-      const nearLeft = inYspan && Math.abs(w.x - el.x) <= NEAR;
-      const nearRight = inYspan && Math.abs(w.x - (el.x + el.width)) <= NEAR;
-      const nearBottom = inXspan && Math.abs(w.y - (el.y + el.height)) <= NEAR;
-      if (nearLeft || nearRight || nearBottom) {
-        if (el.type === "uml-enumeration") startUmlEnumAdd(el.id);
-        else setUmlQuickAddMenu({ elementId: el.id, screenX: e.clientX - rect.left, screenY: e.clientY - rect.top });
-        return;
-      }
-    }
-  }, [diagramType, umlRowEdit, umlQuickAddMenu, isDraggingConnector, isDraggingEndpoint, svgToWorld, data.elements, startUmlEnumAdd]);
 
   // Append an empty placeholder row (creating the compartment if needed) and
   // open the inline editor over it.
@@ -4803,7 +4779,6 @@ export function Canvas({
           svgRef.current?.focus({ preventScroll: true });
         }}
         onMouseDown={handleBackgroundMouseDown}
-        onMouseMove={handleUmlQuickAddMove}
         onDoubleClickCapture={(e) => {
           // Runs in capture so it pre-empts the element's own double-click.
           // Pain points (any diagram type): double-click edits the multi-line
@@ -4811,6 +4786,27 @@ export function Canvas({
           const rect = svgRef.current?.getBoundingClientRect();
           if (!rect) return;
           const w = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
+          // Quick-add: double-click just OUTSIDE a domain class/enum near its
+          // RIGHT edge → add an ATTRIBUTE (opens the editor at the bottom of the
+          // attributes compartment); near its BOTTOM edge → add an OPERATION
+          // (creates the operations compartment if needed, editor at its bottom).
+          // For an enumeration either edge adds a value. Replaces the old
+          // Shift-drag quick-add.
+          if (diagramType === "domain") {
+            const EDGE = 18;
+            for (const el of data.elements) {
+              if (el.type !== "uml-class" && el.type !== "uml-enumeration") continue;
+              const inY = w.y >= el.y && w.y <= el.y + el.height;
+              const inX = w.x >= el.x && w.x <= el.x + el.width;
+              const nearRight = inY && w.x > el.x + el.width && w.x <= el.x + el.width + EDGE;
+              const nearBottom = inX && w.y > el.y + el.height && w.y <= el.y + el.height + EDGE;
+              if (!nearRight && !nearBottom) continue;
+              if (el.type === "uml-enumeration") startUmlEnumAdd(el.id);
+              else startUmlRowAdd(el.id, nearRight ? "attribute" : "operation");
+              e.stopPropagation(); e.preventDefault();
+              return;
+            }
+          }
           for (const el of data.elements) {
             const hit = w.x >= el.x && w.x <= el.x + el.width && w.y >= el.y && w.y <= el.y + el.height;
             if (!hit) continue;
@@ -7458,29 +7454,6 @@ export function Canvas({
             className="block px-3 py-1.5 text-xs hover:bg-gray-100 w-full text-left rounded"
           >
             Association
-          </button>
-        </div>
-      )}
-
-      {/* UML class quick-add flyout (Shift + near a class edge) — dark grey text
-          on a white background for readability (issue #10). */}
-      {umlQuickAddMenu && (
-        <div
-          style={{ position: "absolute", left: umlQuickAddMenu.screenX, top: umlQuickAddMenu.screenY, zIndex: 55 }}
-          className="bg-white border border-gray-300 rounded shadow-lg p-1"
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <button
-            onMouseDown={(e) => { e.preventDefault(); startUmlRowAdd(umlQuickAddMenu.elementId, "attribute"); }}
-            className="block px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 w-full text-left rounded whitespace-nowrap"
-          >
-            + Add Attribute
-          </button>
-          <button
-            onMouseDown={(e) => { e.preventDefault(); startUmlRowAdd(umlQuickAddMenu.elementId, "operation"); }}
-            className="block px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 w-full text-left rounded whitespace-nowrap"
-          >
-            + Add Operation
           </button>
         </div>
       )}
