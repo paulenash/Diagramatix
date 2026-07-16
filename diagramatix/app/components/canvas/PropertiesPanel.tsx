@@ -22,6 +22,7 @@ import { RiskControlSection, type RiskCatalogItem } from "./RiskControlSection";
 import { PcfClassifySection } from "./PcfClassifySection";
 import type { PcfClassification } from "@/app/lib/diagram/types";
 import { isUmlConnType } from "@/app/lib/diagram/types";
+import { umlAttributeTypeList } from "@/app/lib/diagram/umlTypes";
 import { getCachedCatalogue, findShapeByKey, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
 
 // ArchiMate relationship metadata — maps the archi-* connector type to its
@@ -269,44 +270,6 @@ function MultSelect({ value, onChange }: { value: string; onChange: (v: string) 
   );
 }
 
-const UML_TYPES = ["String", "Number", "Integer", "Date", "DateTime", "Duration", "Money", "Decimal", "Boolean"];
-
-const POSTGRES_TYPES = [
-  "TEXT", "VARCHAR", "CHAR",
-  "INT", "BIGINT", "SMALLINT", "SERIAL", "BIGSERIAL",
-  "NUMERIC", "DECIMAL", "REAL", "DOUBLE PRECISION",
-  "BOOLEAN",
-  "DATE", "TIME", "TIMESTAMP", "TIMESTAMPTZ", "INTERVAL",
-  "UUID", "JSON", "JSONB", "BYTEA", "INET", "CIDR", "MACADDR",
-  "ARRAY", "XML",
-];
-
-const MYSQL_TYPES = [
-  "VARCHAR", "CHAR", "TEXT", "TINYTEXT", "MEDIUMTEXT", "LONGTEXT",
-  "INT", "BIGINT", "SMALLINT", "TINYINT", "MEDIUMINT",
-  "DECIMAL", "FLOAT", "DOUBLE",
-  "BOOLEAN",
-  "DATE", "TIME", "DATETIME", "TIMESTAMP", "YEAR",
-  "BLOB", "TINYBLOB", "MEDIUMBLOB", "LONGBLOB",
-  "ENUM", "SET", "JSON", "BINARY", "VARBINARY",
-];
-
-const MSSQL_TYPES = [
-  "NVARCHAR", "VARCHAR", "NCHAR", "CHAR", "TEXT", "NTEXT",
-  "INT", "BIGINT", "SMALLINT", "TINYINT",
-  "NUMERIC", "DECIMAL", "FLOAT", "REAL", "MONEY", "SMALLMONEY",
-  "BIT",
-  "DATE", "TIME", "DATETIME", "DATETIME2", "SMALLDATETIME", "DATETIMEOFFSET",
-  "UNIQUEIDENTIFIER", "XML", "VARBINARY", "IMAGE",
-  "SQL_VARIANT", "HIERARCHYID", "GEOGRAPHY", "GEOMETRY",
-];
-
-const DB_TYPE_LISTS: Record<string, string[]> = {
-  postgres: POSTGRES_TYPES,
-  mysql: MYSQL_TYPES,
-  mssql: MSSQL_TYPES,
-};
-
 function formatAttrDisplay(attr: UmlAttribute): string {
   let s = "";
   if (attr.visibility) s += attr.visibility + " ";
@@ -325,23 +288,9 @@ function ClassAttributesList({ element, onUpdateProperties, database, allElement
   database?: string;
   allElements?: DiagramElement[];
 }) {
-  const baseTypes = (database && database !== "none" && DB_TYPE_LISTS[database]) ? DB_TYPE_LISTS[database] : UML_TYPES;
-  // An attribute's type may also be an ENUMERATION drawn on the same diagram:
-  // a uml-enumeration element, or a class stereotyped exactly «enumeration» or
-  // «dataType». Plain classes are NOT offered. Names appear after the base types.
-  const diagramTypes = (allElements ?? [])
-    .filter(e => {
-      if (e.id === element.id) return false;
-      if (e.type === "uml-enumeration") return true;
-      if (e.type === "uml-class") {
-        const st = (e.properties?.stereotype as string | undefined) ?? "";
-        return st === "enumeration" || st === "dataType";
-      }
-      return false;
-    })
-    .map(e => (e.label ?? "").trim())
-    .filter(Boolean);
-  const typeList = Array.from(new Set([...baseTypes, ...diagramTypes]));
+  // Shared source of truth so this dropdown matches the inline editor's assist
+  // popup: base primitive/DB types + any enumeration / «dataType» name.
+  const typeList = umlAttributeTypeList(database, allElements, element.id);
   const attrs: UmlAttribute[] = (element.properties.attributes as UmlAttribute[] | undefined) ?? [];
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [draft, setDraft] = useState<UmlAttribute | null>(null);

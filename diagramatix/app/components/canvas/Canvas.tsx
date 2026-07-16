@@ -33,7 +33,8 @@ const UML_VIS_OPTS: { label: string; insert: string }[] = [
   { label: "- private", insert: "- " },
   { label: "# protected", insert: "# " },
 ];
-const UML_TYPE_OPTS = ["String", "Integer", "Boolean", "Date", "DateTime", "Decimal", "Float", "Long", "Double", "UUID", "Text"];
+// The inline "type" assist popup uses the SAME list as the Properties Panel
+// dropdown (umlAttributeTypeList) — computed per-render below from the diagram.
 const UML_MULT_OPTS: { label: string; insert: string }[] = [
   { label: "None", insert: "" },
   { label: "1", insert: "[1]" },
@@ -59,6 +60,7 @@ function umlOpAssistPhase(value: string): "visibility" | null {
 import { PaletteSymbolPreview } from "./Palette";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
 import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
+import { umlAttributeTypeList } from "@/app/lib/diagram/umlTypes";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 import { findShapeByKey as findArchimateShapeByKey } from "@/app/lib/archimate/catalogue";
 import { RemoveSpaceDialog, type RsRef, type RsSelection } from "@/app/components/RemoveSpaceDialog";
@@ -7505,6 +7507,8 @@ export function Canvas({
         // multiplicity. Operations only offer visibility. Enums have no assist.
         const phase = umlRowEdit.kind === "attribute" ? umlAttrAssistPhase(umlRowEdit.value)
           : umlRowEdit.kind === "operation" ? umlOpAssistPhase(umlRowEdit.value) : null;
+        // Type chips = the exact Properties Panel dropdown list (base + enums).
+        const typeOpts = umlAttributeTypeList(data.database, data.elements, umlRowEdit.elementId);
         const setValue = (v: string) => setUmlRowEdit((cur) => (cur ? { ...cur, value: v } : cur));
         const applyVisibility = (insert: string) => setValue(insert + umlRowEdit.value.replace(/^[+\-#]\s*/, ""));
         const applyType = (t: string) => { const ci = umlRowEdit.value.indexOf(":"); setValue(umlRowEdit.value.slice(0, ci) + ": " + t + " "); };
@@ -7543,7 +7547,7 @@ export function Canvas({
                 {phase === "visibility" && UML_VIS_OPTS.map((o) => (
                   <button key={o.label} className={chip} onMouseDown={(e) => { e.preventDefault(); applyVisibility(o.insert); }}>{o.label}</button>
                 ))}
-                {phase === "type" && UML_TYPE_OPTS.map((t) => (
+                {phase === "type" && typeOpts.map((t) => (
                   <button key={t} className={chip} onMouseDown={(e) => { e.preventDefault(); applyType(t); }}>{t}</button>
                 ))}
                 {phase === "multiplicity" && (<>
