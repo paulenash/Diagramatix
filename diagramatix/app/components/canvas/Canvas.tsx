@@ -269,6 +269,9 @@ interface Props {
   /** After the user closes "Scan Diagram for Issues", flagged elements are
    *  tinted on the canvas (red = error, orange = warning) for a short window.
    *  The map is element id → severity; undefined / empty means no tint. */
+  /** Process-Context "Highlight" focus mode toggle (top-panel button). When
+   *  false, selecting an element does NOT dim the rest. Default true. */
+  pcHighlightEnabled?: boolean;
   scanHighlightById?: Map<string, "error" | "warning">;
   /** Same idea, but for connectors. A flagged connector gets a thicker
    *  semi-transparent stroke painted along its waypoints in the severity
@@ -534,6 +537,7 @@ export function Canvas({
   onUpdateConnectorEndpoint,
   selectedElementIds,
   selectedConnectorId,
+  pcHighlightEnabled = true,
   scanHighlightById,
   scanHighlightConnectorById,
   currentIssueIds,
@@ -4569,7 +4573,7 @@ export function Canvas({
   // element is a visible drop target. Once the connector completes,
   // draggingConnector clears and this recomputes from data.connectors — so the
   // newly connected element is automatically folded into the highlight.
-  if ((diagramType === "process-context" || diagramType === "archimate") && selectedElementIds.size >= 1 && !draggingConnector) {
+  if (((diagramType === "process-context" && pcHighlightEnabled) || diagramType === "archimate") && selectedElementIds.size >= 1 && !draggingConnector) {
     for (const c of data.connectors) {
       const srcSel = selectedElementIds.has(c.sourceId);
       const tgtSel = selectedElementIds.has(c.targetId);

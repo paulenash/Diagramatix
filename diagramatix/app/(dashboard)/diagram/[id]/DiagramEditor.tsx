@@ -1079,6 +1079,19 @@ export function DiagramEditor({
   // default ON.
   const [showValueDisplay, setShowValueDisplay] = useState(true);
   const [showBottleneck, setShowBottleneck] = useState(true);
+  // Process-Context "Highlight" focus mode: when ON (default), selecting an
+  // element dims everything except it + what it connects to. Toggled by the
+  // top-panel Highlight button; persisted per diagram.
+  const [highlightEnabled, setHighlightEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    try { const v = localStorage.getItem(`pcHighlight-${diagramId}`); return v === null ? true : v === "true"; }
+    catch { return true; }
+  });
+  const toggleHighlight = () => setHighlightEnabled((v) => {
+    const nv = !v;
+    try { localStorage.setItem(`pcHighlight-${diagramId}`, String(nv)); } catch { /* ignore */ }
+    return nv;
+  });
   useEffect(() => {
     if (localStorage.getItem(`debug-${projectId}`) === "true") setDebugMode(true);
     if (localStorage.getItem(`valueDisplay-${diagramId}`) === "false") setShowValueDisplay(false);
@@ -3050,6 +3063,21 @@ export function DiagramEditor({
             AI Comparison Results
           </button>
         ) : null}
+        {/* Process-Context focus highlight — on/off toggle. When on, selecting an
+            element dims everything except it and what it connects to. */}
+        {diagramType === "process-context" && (
+          <button
+            onClick={toggleHighlight}
+            className={`px-2 py-0.5 text-[11px] rounded border ${
+              highlightEnabled
+                ? "border-green-500 bg-green-50 text-green-700"
+                : "border-gray-300 text-gray-600 hover:bg-gray-50"
+            }`}
+            title="Highlight: when ON, selecting a process or entity dims everything except it and what it connects to"
+          >
+            Highlight{highlightEnabled ? " ✓" : ""}
+          </button>
+        )}
         {/* Review-comment filter — appears once a diagram carries review
             comments, letting the owner focus on one reviewer at a time. */}
         {reviewCommenters.length > 0 && (
@@ -3529,6 +3557,7 @@ export function DiagramEditor({
           onUpdateConnectorEndpoint={updateConnectorEndpoint}
           selectedElementIds={selectedElementIds}
           selectedConnectorId={selectedConnectorId}
+          pcHighlightEnabled={highlightEnabled}
           scanHighlightById={scanHighlight ?? undefined}
           riskHighlightById={riskHighlight ?? undefined}
           scanHighlightConnectorById={scanConnectorHighlight ?? undefined}
