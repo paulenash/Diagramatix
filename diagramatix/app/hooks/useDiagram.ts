@@ -511,7 +511,7 @@ function renumberMarkers(elements: DiagramElement[], type: SymbolType): DiagramE
 
 function containerAccepts(containerType: SymbolType, childType: SymbolType): boolean {
   if (containerType === "system-boundary") return childType === "use-case" || childType === "hourglass";
-  if (containerType === "composite-state") return childType === "state" || childType === "initial-state" || childType === "final-state";
+  if (containerType === "composite-state") return childType === "state" || childType === "initial-state" || childType === "final-state" || childType === "gateway" || childType === "fork-join" || childType === "submachine";
   if (containerType === "pool") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "lane") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "subprocess-expanded") return BPMN_CONTENT_TYPES.has(childType);
@@ -2105,7 +2105,7 @@ function ensureContainersEncloseChildren(
     // (Only triggers when an edge event's parentId is the EP itself, which
     // the "boundary events excluded via parentId" assumption misses.)
     const kids = e.type === "subprocess-expanded"
-      ? allKids.filter((c) => !DATA_ELEMENT_TYPES.has(c.type) && c.boundaryHostId !== e.id)
+      ? allKids.filter((c) => !DATA_ELEMENT_TYPES.has(c.type) && !MARKER_TYPES.has(c.type) && c.boundaryHostId !== e.id)
       : allKids.filter((c) => c.type === "lane" || c.type === "sublane");
     if (kids.length === 0) continue;
     // PAD=0 for lane/sublane children — they fill their pool/lane by
@@ -3841,7 +3841,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (
         newEl.parentId &&
         !newEl.boundaryHostId &&
-        !BOUNDARY_EVENT_TYPES.has(newEl.type)
+        !BOUNDARY_EVENT_TYPES.has(newEl.type) &&
+        !MARKER_TYPES.has(newEl.type) // markers are decorative overlays — never grow/reflow the EP
       ) {
         const parent = workingElements.find((e) => e.id === newEl.parentId);
         if (parent?.type === "subprocess-expanded") {
@@ -4126,8 +4127,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         if (e.id === id) {
           // Pain points / issues attach to whatever element they overlap or are
           // near, so they move with it. Pick the host (any non-marker element) —
-          // bypasses the container logic below.
-          if (MARKER_TYPES.has(e.type) && !lockParentToEP) {
+          // bypasses the container logic below. Markers are SOFT-attached: they
+          // re-pick every frame (ignoring the EP lock) so they attach to an EP
+          // boundary / child and drag off freely.
+          if (MARKER_TYPES.has(e.type)) {
             const hostId = pickMarkerHost({ x: effectiveX, y: effectiveY, width: e.width, height: e.height }, state.elements, id);
             return { ...e, x: effectiveX, y: effectiveY, parentId: hostId };
           }
@@ -4245,7 +4248,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         if (snapX !== null || snapY !== null) {
           const finalX = snapX ?? moved.x;
           const finalY = snapY ?? moved.y;
-          elements = elements.map(e => e.id === id ? { ...e, x: finalX, y: finalY } : e);
+          // The snap moves the chevron off the raw drag position — carry any
+          // attached markers by the SAME residual so they don't fly off (the
+          // main pass already moved them by the pre-snap delta).
+          const snapDx = finalX - moved.x, snapDy = finalY - moved.y;
+          elements = elements.map(e =>
+            e.id === id ? { ...e, x: finalX, y: finalY }
+            : (MARKER_TYPES.has(e.type) && e.parentId === id) ? { ...e, x: e.x + snapDx, y: e.y + snapDy }
+            : e,
+          );
 
           // Auto-reapply theme: if snapped into an existing themed group, recolour
           const group = findSnappedGroup(elements, id);

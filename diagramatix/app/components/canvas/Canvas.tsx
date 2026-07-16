@@ -1112,6 +1112,15 @@ export function Canvas({
   // Initial mount fit — guarded so subsequent re-renders don't keep
   // re-centring as the user pans/zooms.
   const hasFitted = useRef(false);
+  // A diagram that OPENS empty (new/blank) must never auto-fit when the user
+  // drops the first element — leave it exactly where they dropped it (fitting
+  // snaps the lone element to screen-centre, which is disorienting). Mark the
+  // fit as already done at mount so the first drop doesn't trigger performFit.
+  useEffect(() => {
+    if (data.elements.length === 0) hasFitted.current = true;
+    // mount-only — captures the diagram's emptiness when it first opened
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (hasFitted.current || data.elements.length === 0) return;
     hasFitted.current = true;

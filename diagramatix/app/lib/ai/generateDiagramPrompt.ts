@@ -78,7 +78,7 @@ OCR every label verbatim. Do not invent states or transitions that aren't drawn.
 
 REPRODUCE THE ORIGINAL LAYOUT — when reading from an image, also capture the geometry so the diagram matches the drawing:
 - Give EVERY element a "bounds": { "x", "y", "w", "h" } as fractions 0..1 of the WHOLE image (x,y = the shape's top-left corner; w,h = its width/height). Use 2-3 decimals.
-- If a state sits INSIDE a composite-state (a larger rounded box that visually contains it), set that child's "parent" to the id of the containing composite-state (or submachine). Nest every contained state this way. The composite-state's own bounds must enclose its children.
+- If ANY element (a state, gateway/choice, fork-join, or nested submachine) sits INSIDE a composite-state (a larger rounded box that visually contains it), set that child's "parent" to the id of the containing composite-state (or submachine). Nest every contained element this way — not just states. The composite-state's own bounds must enclose its children.
 - For EVERY transition, add "sourceSide" and "targetSide" — which FACE of each box the arrow leaves and enters: one of "top", "right", "bottom", "left". Read them off the drawing (an arrow leaving the right edge → sourceSide "right"; entering the top edge → targetSide "top").
 Example element with geometry: { "id": "s2", "type": "state", "label": "Processing", "bounds": { "x": 0.42, "y": 0.30, "w": 0.16, "h": 0.10 }, "parent": "c1" }
 Example transition with faces: { "sourceId": "s1", "targetId": "s2", "label": "start", "sourceSide": "right", "targetSide": "left" }`,
