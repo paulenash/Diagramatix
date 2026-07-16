@@ -456,6 +456,37 @@ const UML_PACKAGE_CHILDREN = new Set<SymbolType>([
   "uml-class", "uml-enumeration", "uml-package", "uml-note", "uml-pain-point", "uml-issue",
 ]);
 
+/** Pick the element a marker (pain point / issue) should stick to: the element
+ *  it OVERLAPS most; failing any overlap, the NEAREST element within a small
+ *  proximity threshold (so a marker dropped just beside a shape still sticks).
+ *  Other markers are never hosts. Returns undefined when nothing is near. */
+function pickMarkerHost(
+  marker: { x: number; y: number; width: number; height: number },
+  elements: DiagramElement[],
+  selfId: string,
+): string | undefined {
+  const NEAR = 40; // px from the marker's edge — "near enough" to stick
+  const mx2 = marker.x + marker.width, my2 = marker.y + marker.height;
+  const mcx = marker.x + marker.width / 2, mcy = marker.y + marker.height / 2;
+  let hostId: string | undefined, bestArea = 0;
+  let nearestId: string | undefined, nearestDist = Infinity;
+  for (const b of elements) {
+    if (b.id === selfId || MARKER_TYPES.has(b.type)) continue;
+    const ox = Math.max(0, Math.min(mx2, b.x + b.width) - Math.max(marker.x, b.x));
+    const oy = Math.max(0, Math.min(my2, b.y + b.height) - Math.max(marker.y, b.y));
+    const area = ox * oy;
+    if (area > bestArea) { bestArea = area; hostId = b.id; }
+    // Distance from the marker centre to the element rect (0 if inside).
+    const dx = Math.max(b.x - mcx, 0, mcx - (b.x + b.width));
+    const dy = Math.max(b.y - mcy, 0, mcy - (b.y + b.height));
+    const dist = Math.hypot(dx, dy);
+    if (dist < nearestDist) { nearestDist = dist; nearestId = b.id; }
+  }
+  if (hostId) return hostId;                    // overlaps a shape → stick to it
+  if (nearestDist <= NEAR) return nearestId;    // near a shape → stick to it
+  return undefined;
+}
+
 /** Re-number every marker of `type` 1..N (ordered by their current number) so a
  *  deletion closes the gap. The number lives in `label`. */
 function renumberMarkers(elements: DiagramElement[], type: SymbolType): DiagramElement[] {
@@ -3781,6 +3812,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           }
         }
       }
+      // A marker (pain point / issue) sticks to the shape it overlaps or is
+      // near on DROP — overriding any container it happens to sit inside — so it
+      // moves with that shape immediately (not only after being dragged).
+      if (MARKER_TYPES.has(newEl.type)) {
+        newEl = { ...newEl, parentId: pickMarkerHost(newEl, state.elements, newEl.id) };
+      }
       // Text annotations start already tight around their default label
       if (newEl.type === "text-annotation") {
         newEl = autoResizeTextAnnotation(newEl);
@@ -4080,19 +4117,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       let elements = state.elements.map((e) => {
         if (e.id === id) {
-          // Pain points / issues attach to whatever element they partially
-          // cover, so they move with it. Pick the best-overlap host (any
-          // non-marker element) — bypasses the container logic below.
+          // Pain points / issues attach to whatever element they overlap or are
+          // near, so they move with it. Pick the host (any non-marker element) —
+          // bypasses the container logic below.
           if (MARKER_TYPES.has(e.type) && !lockParentToEP) {
-            const px2 = effectiveX + e.width, py2 = effectiveY + e.height;
-            let hostId: string | undefined, bestArea = 0;
-            for (const b of state.elements) {
-              if (b.id === id || MARKER_TYPES.has(b.type)) continue;
-              const ox = Math.max(0, Math.min(px2, b.x + b.width) - Math.max(effectiveX, b.x));
-              const oy = Math.max(0, Math.min(py2, b.y + b.height) - Math.max(effectiveY, b.y));
-              const area = ox * oy;
-              if (area > bestArea) { bestArea = area; hostId = b.id; }
-            }
+            const hostId = pickMarkerHost({ x: effectiveX, y: effectiveY, width: e.width, height: e.height }, state.elements, id);
             return { ...e, x: effectiveX, y: effectiveY, parentId: hostId };
           }
           let parentId = e.parentId;
@@ -7598,15 +7627,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // at drop too, else the generic container re-detection below (which only
       // accepts packages for a marker) would wipe the host.
       if (MARKER_TYPES.has(initialEl.type)) {
-        const px2 = initialEl.x + initialEl.width, py2 = initialEl.y + initialEl.height;
-        let hostId: string | undefined, bestArea = 0;
-        for (const b of elements) {
-          if (b.id === id || MARKER_TYPES.has(b.type)) continue;
-          const ox = Math.max(0, Math.min(px2, b.x + b.width) - Math.max(initialEl.x, b.x));
-          const oy = Math.max(0, Math.min(py2, b.y + b.height) - Math.max(initialEl.y, b.y));
-          const area = ox * oy;
-          if (area > bestArea) { bestArea = area; hostId = b.id; }
-        }
+        const hostId = pickMarkerHost(initialEl, elements, id);
         if (hostId !== initialEl.parentId) {
           elements = elements.map(e => e.id === id ? { ...e, parentId: hostId } : e);
         }

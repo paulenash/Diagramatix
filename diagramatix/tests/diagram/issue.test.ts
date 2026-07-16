@@ -47,6 +47,22 @@ describe("issue numbering", () => {
     expect(d.elements.filter((e) => e.type === "uml-issue")).toHaveLength(2);
   });
 
+  it("a dropped marker sticks to the shape it's over and follows it when it moves", () => {
+    let d = base();
+    d = reducer(d, { type: "ADD_ELEMENT", payload: { symbolType: "uml-class", position: { x: 300, y: 300 }, id: "c1" } });
+    const c1 = at(d, "c1")!;
+    // Drop an issue centred on the class → overlaps → sticks on DROP.
+    d = reducer(d, { type: "ADD_ELEMENT", payload: { symbolType: "uml-issue", position: { x: c1.x + c1.width / 2, y: c1.y + c1.height / 2 }, id: "i1" } });
+    expect(at(d, "i1")?.parentId).toBe("c1");
+
+    // Moving the class carries the marker by the same delta.
+    const cBefore = at(d, "c1")!, iBefore = at(d, "i1")!;
+    d = reducer(d, { type: "MOVE_ELEMENT", payload: { id: "c1", x: cBefore.x + 120, y: cBefore.y + 70, unconstrained: true } });
+    const cAfter = at(d, "c1")!, iAfter = at(d, "i1")!;
+    expect(iAfter.x).toBe(iBefore.x + (cAfter.x - cBefore.x));
+    expect(iAfter.y).toBe(iBefore.y + (cAfter.y - cBefore.y));
+  });
+
   it("numbers issues and pain points INDEPENDENTLY (each its own 1..N)", () => {
     let d = base();
     d = reducer(d, addIssue("i1"));

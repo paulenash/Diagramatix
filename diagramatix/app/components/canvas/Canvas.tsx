@@ -21,7 +21,7 @@ import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
 import { BubbleHelp } from "./BubbleHelp";
 import { EntityNameInput } from "./EntityNameInput";
 import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
-import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { parseUmlAttribute, parseUmlOperation } from "@/app/lib/diagram/umlParse";
@@ -1839,7 +1839,7 @@ export function Canvas({
                 const otherEl = data.elements.find(e => e.id === otherEndId);
                 const otherIsNote = otherEl?.type === "uml-note";
                 return (el: DiagramElement) => otherIsNote
-                  ? el.type !== "uml-note" && el.type !== "uml-pain-point"
+                  ? el.type !== "uml-note" && el.type !== "uml-pain-point" && el.type !== "uml-issue"
                   : el.type === "uml-note";
               })()
             : conn?.type === "uml-containment"
@@ -2034,6 +2034,7 @@ export function Canvas({
         || elType === "chevron" || elType === "chevron-collapsed" || elType === "process-group"
         || elType === "uml-note"
         || elType === "uml-pain-point"
+        || elType === "uml-issue"
         || elType === "archimate-shape"; // all ArchiMate shapes resize freely (incl. icon-only)
       if (!isContainer && !freeResize && ar > 0) {
         if (handle.includes("e") || handle.includes("w")) {
@@ -4373,6 +4374,7 @@ export function Canvas({
                 && el.type !== "process-group"
                 && el.type !== "flowchart-vswimlane"
                 && el.type !== "uml-package" // now rendered in the container pass
+                && el.type !== "uml-pain-point" && el.type !== "uml-issue" // markers render in the top-most pass
                 && !el.boundaryHostId
     );
     function getParentDepth(el: DiagramElement): number {
@@ -4399,6 +4401,10 @@ export function Canvas({
     });
   })();
   const boundaryEvents = data.elements.filter((el) => !!el.boundaryHostId);
+  // Problem markers (Pain Points + Issues) are decorative overlays that must
+  // ALWAYS render on top of every other element — rendered in a dedicated
+  // final pass below (after groups).
+  const markers = data.elements.filter((el) => el.type === "uml-pain-point" || el.type === "uml-issue");
 
   // Active multi-selection (e.g. a template was just stamped onto the
   // diagram). When non-empty, those elements are re-rendered at the
@@ -4755,6 +4761,8 @@ export function Canvas({
       <UmlPackageDepthCtx.Provider value={umlPackageDepthMap}>
       <ShowPainPointsCtx.Provider value={data.showPainPoints !== false}>
       <ShowPainPointDescCtx.Provider value={!!data.showPainPointDescriptions}>
+      <ShowIssuesCtx.Provider value={data.showIssues !== false}>
+      <ShowIssueDescCtx.Provider value={!!data.showIssueDescriptions}>
       <LaneDepthCtx.Provider value={laneDepthMap}>
       <ArchimateDepthCtx.Provider value={archimateDepthMap}>
       <DatabaseCtx.Provider value={data.database}>
@@ -4791,9 +4799,9 @@ export function Canvas({
           for (const el of data.elements) {
             const hit = w.x >= el.x && w.x <= el.x + el.width && w.y >= el.y && w.y <= el.y + el.height;
             if (!hit) continue;
-            // Pain point: edit its description (not the number) — leaving the icon
-            // size + numbering unchanged (issue #3a/e). Works on every type.
-            if (el.type === "uml-pain-point") {
+            // Pain point / issue: edit its description (not the number) — leaving
+            // the icon size + numbering unchanged. Works on every diagram type.
+            if (el.type === "uml-pain-point" || el.type === "uml-issue") {
               setPainDescEdit({ elementId: el.id, value: (el.properties.description as string | undefined) ?? "" });
               e.stopPropagation(); e.preventDefault();
               return;
@@ -6009,6 +6017,40 @@ export function Canvas({
             />
           ))}
 
+          {/* Problem markers (Pain Points + Issues) — TOP-MOST pass so they
+              always sit above every other element (groups, boundary events,
+              containers). onMove sets draggingElementId so the reducer's
+              best-overlap host-picking runs and the marker sticks to whatever
+              it's dropped on. */}
+          {markers.filter(el => !inActiveGroup(el.id)).map((el) => (
+            <SymbolRenderer
+              key={el.id}
+              element={el}
+              selected={selectedElementIds.has(el.id)}
+              isDropTarget={false}
+              isDisallowedTarget={false}
+              onSelect={(ev) => {
+                if (ev?.shiftKey) {
+                  onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
+                } else if (!selectedElementIds.has(el.id)) {
+                  onSetSelectedElements(new Set([el.id]));
+                }
+                onSelectConnector(null);
+              }}
+              onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
+              onDoubleClick={() => {}}
+              onConnectionPointDragStart={() => {}}
+              showConnectionPoints={false}
+              onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
+              svgToWorld={clientToWorld}
+              onUpdateProperties={onUpdateProperties}
+              onUpdateLabel={onUpdateLabel}
+              onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
+              colorConfig={colorConfig}
+              debugMode={debugMode}
+            />
+          ))}
+
           {/* Active-group overlay — when a multi-selection is active
               (most often a template was just stamped) every selected
               element is re-rendered here at the END of the world group
@@ -6847,6 +6889,8 @@ export function Canvas({
       </DatabaseCtx.Provider>
       </ArchimateDepthCtx.Provider>
       </LaneDepthCtx.Provider>
+      </ShowIssueDescCtx.Provider>
+      </ShowIssuesCtx.Provider>
       </ShowPainPointDescCtx.Provider>
       </ShowPainPointsCtx.Provider>
       </UmlPackageDepthCtx.Provider>
