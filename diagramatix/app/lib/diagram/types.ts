@@ -33,6 +33,7 @@ export type SymbolType =
   | "uml-package"
   | "uml-note"
   | "uml-pain-point"
+  | "uml-issue"
   | "sublane"
   | "fork-join"
   | "submachine"
@@ -313,6 +314,12 @@ export interface DiagramData {
    *  the canvas. Auto-enabled when the first Pain Point is added; only takes
    *  effect while `showPainPoints` is on. Absent/false = icons only. */
   showPainPointDescriptions?: boolean;
+  /** "Display Issues" master toggle — render Issue icons (dark-green twin of
+   *  Pain Points) on the canvas. Absent/true = shown; explicit false = hidden. */
+  showIssues?: boolean;
+  /** Show each Issue's multi-line description caption under its icon. Auto-enabled
+   *  when the first Issue is added; only takes effect while `showIssues` is on. */
+  showIssueDescriptions?: boolean;
   /** Diagram-level list of all parent diagrams that currently link TO
    *  this diagram (managed by the project-wide "Scan Diagrams for Links"
    *  feature). A diagram can be linked from many parents — every one of
@@ -965,5 +972,14 @@ export interface TemplateData {
  *             OPTIONAL diagram-level boolean `showPainPoints` (absent/true =
  *             icons shown; explicit false = hidden). The description toggle
  *             nests under it.
+ *
+ *  v1.41 (2026-07-16): Issues — a dark-green twin of Pain Points. New SymbolType
+ *             `uml-issue`: auto-numbered (the number is the `label`), with an
+ *             OPTIONAL multi-line `properties.description`; identical behaviour to
+ *             `uml-pain-point` but rendered dark green. Two new OPTIONAL
+ *             diagram-level booleans `showIssues` (absent/true = shown; explicit
+ *             false = hidden) and `showIssueDescriptions` (auto-enabled with the
+ *             first Issue). Both Pain Points and Issues are now offered on EVERY
+ *             diagram type's palette (type-agnostic).
  */
-export const SCHEMA_VERSION = "1.40";
+export const SCHEMA_VERSION = "1.41";

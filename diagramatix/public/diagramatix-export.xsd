@@ -442,6 +442,15 @@
   v1.40 — Pain Point "Display Pain Points" master toggle. SHAPE CHANGE: <data> gains
     an OPTIONAL boolean showPainPoints (absent or true = icons shown; explicit false
     = hidden); the v1.39 showPainPointDescriptions toggle nests under it.
+
+  v1.41 — Issues (dark-green Pain Point twin). SHAPE CHANGE: SymbolTypeEnum gains
+    "uml-issue" (auto-numbered label + OPTIONAL multi-line properties.description,
+    identical to uml-pain-point but rendered dark green) and <data> gains two
+    OPTIONAL booleans showIssues (absent/true = shown; explicit false = hidden) and
+    showIssueDescriptions (auto-enabled with the first Issue). Both Pain Points and
+    Issues are now offered on EVERY diagram type's palette (type-agnostic).
+    Non-shape: Domain connector routing settled permanently on "sticky" (the legacy
+    Optimal A/B toggle removed); the Database selector is now SuperAdmin-only.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -581,6 +590,11 @@
     <!-- schema 1.39 — render Pain Point descriptions as captions under their
          icons. Auto-enabled when the first Pain Point is added. -->
     <xs:attribute name="showPainPointDescriptions" type="xs:boolean" use="optional"/>
+    <!-- schema 1.41 — "Display Issues" master toggle (dark-green Pain Point twin;
+         absent/true = shown; explicit false = hidden) + render Issue descriptions
+         as captions (auto-enabled with the first Issue). -->
+    <xs:attribute name="showIssues" type="xs:boolean" use="optional"/>
+    <xs:attribute name="showIssueDescriptions" type="xs:boolean" use="optional"/>
   </xs:complexType>
 
   <!-- ============================================================ -->
@@ -753,6 +767,11 @@
            diagram-level showPainPoints / showPainPointDescriptions booleans
            control rendering. Type-agnostic (usable on any diagram type). -->
       <xs:enumeration value="uml-pain-point"/>
+      <!-- schema 1.41 — Issue marker: dark-green twin of the Pain Point,
+           identical behaviour (auto-numbered label + properties.description),
+           gated by the diagram-level showIssues / showIssueDescriptions
+           booleans. Type-agnostic. -->
+      <xs:enumeration value="uml-issue"/>
     </xs:restriction>
   </xs:simpleType>
 

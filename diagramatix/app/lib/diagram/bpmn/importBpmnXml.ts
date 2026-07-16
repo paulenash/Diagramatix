@@ -444,6 +444,7 @@ const FALLBACK_SIZE: Record<SymbolType, { w: number; h: number }> = {
   "uml-package":        { w: 220, h: 160 },
   "uml-note":           { w: 140, h: 70 },
   "uml-pain-point":     { w: 60,  h: 60 },
+  "uml-issue":          { w: 60,  h: 60 },
   "fork-join":          { w: 80, h: 6 },
   "submachine":         { w: 120, h: 60 },
   "chevron":            { w: 120, h: 60 },

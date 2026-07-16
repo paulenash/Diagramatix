@@ -273,7 +273,14 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     label: "Pain Point",
     defaultWidth: 72,
     defaultHeight: 44, // golden-ratio rectangle (72 / 1.618 ≈ 44)
-    description: "A pain-point marker highlighting a problem area on a domain diagram",
+    description: "A pain-point marker highlighting a problem area",
+  },
+  {
+    type: "uml-issue",
+    label: "Issue",
+    defaultWidth: 72,
+    defaultHeight: 44, // golden-ratio rectangle, same as Pain Point
+    description: "An issue marker (dark-green twin of a Pain Point) highlighting a problem area",
   },
   {
     type: "archimate-shape",
@@ -311,11 +318,15 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   { type: "flowchart-vswimlane",    label: "Swimlane",           defaultWidth: 220, defaultHeight: 480, description: "A vertical swimlane column; drop again to add another column to the right" },
 ];
 
+// Pain Point + Issue are type-agnostic problem markers offered on EVERY diagram
+// type's palette (appended to each list below).
+const PROBLEM_MARKERS: SymbolType[] = ["uml-pain-point", "uml-issue"];
+
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
-  context: ["external-entity", "process-system"],
-  basic: ["external-entity", "process-system"],  // legacy alias
-  "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary"],
-  "state-machine": ["state", "submachine", "initial-state", "final-state", "composite-state", "gateway", "fork-join"],
+  context: ["external-entity", "process-system", ...PROBLEM_MARKERS],
+  basic: ["external-entity", "process-system", ...PROBLEM_MARKERS],  // legacy alias
+  "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary", ...PROBLEM_MARKERS],
+  "state-machine": ["state", "submachine", "initial-state", "final-state", "composite-state", "gateway", "fork-join", ...PROBLEM_MARKERS],
   bpmn: [
     "start-event",
     "intermediate-event",
@@ -329,14 +340,15 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
     "data-store",
     "text-annotation",
     "group",
+    ...PROBLEM_MARKERS,
   ],
-  domain: ["uml-package", "uml-class", "uml-enumeration", "uml-note", "uml-pain-point"],
-  "value-chain": ["chevron", "chevron-collapsed", "process-group"],
+  domain: ["uml-package", "uml-class", "uml-enumeration", "uml-note", ...PROBLEM_MARKERS],
+  "value-chain": ["chevron", "chevron-collapsed", "process-group", ...PROBLEM_MARKERS],
   // ArchiMate shapes are driven by the runtime catalogue (see
   // app/lib/archimate/catalogue.ts). The palette renders category accordions
   // reading that catalogue rather than this static list, so the registered
-  // symbol type is a single generic placeholder.
-  archimate: ["archimate-shape"],
+  // symbol type is a single generic placeholder — plus the shared markers.
+  archimate: ["archimate-shape", ...PROBLEM_MARKERS],
   flowchart: [
     "flowchart-terminator", "flowchart-process", "flowchart-decision", "flowchart-io",
     "flowchart-document", "flowchart-multidoc", "flowchart-predefined", "flowchart-preparation",
@@ -344,6 +356,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
     "flowchart-database", "flowchart-onpage", "flowchart-offpage", "flowchart-merge",
     "flowchart-parallel", "flowchart-comment",
     "flowchart-vswimlane",
+    ...PROBLEM_MARKERS,
   ],
 };
 

@@ -18,7 +18,6 @@ import {
 import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { setCurrentDiagramName } from "@/app/lib/help/currentDiagram";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
-import { setUmlStickyRouting, getUmlStickyRouting } from "@/app/lib/diagram/routing";
 import { DiagramColorModal } from "./DiagramColorModal";
 import { TemplateNameModal } from "./TemplateNameModal";
 import { TemplateThumbnail } from "./TemplateThumbnail";
@@ -811,6 +810,8 @@ export function DiagramEditor({
     setRelaxedLayout,
     setShowPainPoints,
     setShowPainPointDescriptions,
+    setShowIssues,
+    setShowIssueDescriptions,
     rerouteAll,
     setProcessOwner,
     setProcedureDoc,
@@ -934,9 +935,8 @@ export function DiagramEditor({
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig | undefined>(undefined);
   const [diagramColorConfig, setDiagramColorConfig] = useState<SymbolColorConfig>(initialDiagramColorConfig ?? {});
   const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
-  // Domain UML connector routing mode — experimental live A/B switch (see the
-  // bottom-centre toggle). Default = the original "optimal" behaviour.
-  const [umlSticky, setUmlSticky] = useState<boolean>(getUmlStickyRouting());
+  // Domain UML connector routing is now permanently STICKY (settled default) —
+  // the experimental A/B toggle was removed.
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   // SuperAdmin model-comparison matrix for this diagram — seeded from the saved
@@ -3625,16 +3625,19 @@ export function DiagramEditor({
             diagramName={diagramName}
             diagramTitle={data.title}
             database={data.database}
-            onSetDatabase={diagramType === "domain" ? setDatabase : undefined}
+            onSetDatabase={diagramType === "domain" && isAdmin && !superAdminHidden ? setDatabase : undefined}
             relaxedLayout={data.relaxedLayout}
             onSetRelaxedLayout={diagramType === "bpmn" ? setRelaxedLayout : undefined}
-            umlSticky={umlSticky}
-            onSetUmlSticky={diagramType === "domain" && isAdmin && !superAdminHidden ? ((v: boolean) => { setUmlStickyRouting(v); setUmlSticky(v); rerouteAll(); }) : undefined}
             painPoints={data.elements.filter(e => e.type === "uml-pain-point")}
             showPainPoints={data.showPainPoints}
             onSetShowPainPoints={setShowPainPoints}
             showPainPointDescriptions={data.showPainPointDescriptions}
             onSetShowPainPointDescriptions={setShowPainPointDescriptions}
+            issues={data.elements.filter(e => e.type === "uml-issue")}
+            showIssues={data.showIssues}
+            onSetShowIssues={setShowIssues}
+            showIssueDescriptions={data.showIssueDescriptions}
+            onSetShowIssueDescriptions={setShowIssueDescriptions}
             onUpdateDiagramTitle={updateDiagramTitle}
             processOwner={data.processOwner}
             onSetProcessOwner={diagramType === "bpmn" ? setProcessOwner : undefined}

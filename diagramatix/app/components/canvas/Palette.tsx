@@ -272,6 +272,13 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
           <polygon points={painPointStarPoints(18, 11, 17, 10.5)} fill={resolveColor("uml-pain-point", colorConfig)} stroke="#b91c1c" strokeWidth={1.5} strokeLinejoin="round" />
         </svg>
       );
+    case "uml-issue":
+      // Dark-green twin of the Pain Point starburst.
+      return (
+        <svg width={28} height={18} viewBox="0 0 36 22">
+          <polygon points={painPointStarPoints(18, 11, 17, 10.5)} fill={resolveColor("uml-issue", colorConfig)} stroke="#166534" strokeWidth={1.5} strokeLinejoin="round" />
+        </svg>
+      );
     case "external-entity":
       return (
         <svg width={28} height={28} viewBox="0 0 36 36">

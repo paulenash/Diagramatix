@@ -20,6 +20,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 
 | Version | Title | Schema shape change? |
 |---|---|---|
+| **1.41** | Issues — dark-green Pain Point twin (`uml-issue`, auto-numbered + description); both markers offered on every diagram type; domain routing settled on sticky (A/B toggle removed); Database selector SuperAdmin-only | **Yes** — new `SymbolType` `uml-issue` + optional diagram-level `showIssues` / `showIssueDescriptions` booleans |
 | **1.40** | Pain Point "Display Pain Points" master toggle (nests the description toggle under it) | **Yes** — new optional diagram-level `showPainPoints` boolean |
 | **1.39** | Pain Points overhaul — auto-numbered `uml-pain-point` icons (number = label, shown large) + optional multi-line description; auto-connect restricted to BPMN/flowchart | **Yes** — new optional diagram-level `showPainPointDescriptions` boolean (+ `properties.description`, open PropertiesType) |
 | **1.38** | Domain (UML) diagram connectors — package containment + note anchors, "Direct" generalisation, Shift near-edge quick-add of attributes | **Yes** — new `ConnectorType` `uml-containment` / `uml-note-anchor` + optional `containmentSwapEnd` |
@@ -65,6 +66,20 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 ---
 
 ## Details (newest first)
+
+### v1.41 — Issues (dark-green Pain Point twin)  · **shape change**
+Adds **`uml-issue`** to `SymbolTypeEnum` — a full behavioural twin of `uml-pain-point`
+rendered dark green: auto-numbered (the number is the `label`, shown large in the
+starburst icon), carrying an OPTIONAL multi-line `properties.description`, decorative
+(never a connector endpoint), renumbering on delete, and riding along with the
+best-overlap host element when it moves. `<data>` gains two OPTIONAL booleans:
+**`showIssues`** (master "Display Issues" toggle — absent/true = shown; explicit false
+= hidden) and **`showIssueDescriptions`** (caption toggle, auto-enabled with the first
+Issue). Both **Pain Points and Issues are now offered on EVERY diagram type's palette**
+(they were domain-only before) — type-agnostic problem markers. Older exports omit the
+enum value + booleans and are unaffected. Non-shape changes in the same release: Domain
+connector routing is settled permanently on **sticky** (the SuperAdmin Optimal A/B
+toggle was removed), and the domain **Database** selector is now **SuperAdmin-only**.
 
 ### v1.40 — Pain Point "Display Pain Points" master toggle  · **shape change**
 Adds one optional diagram-level boolean **`showPainPoints`** to `<dgx:data>` (absent or `true` = the Pain Point icons render; explicit `false` = hidden). The v1.39 **`showPainPointDescriptions`** toggle now nests under it in Diagram Properties (descriptions only show when icons are shown). Older exports omit the flag and behave as "shown". Additive + optional; no other shape change.

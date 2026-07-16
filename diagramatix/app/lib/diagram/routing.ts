@@ -494,10 +494,10 @@ function buildOrthogonalPath(
 export function avoidObstaclesPostLayout(data: DiagramData): void {
   const elMap = new Map(data.elements.map((e) => [e.id, e] as const));
   // Boxes an association must not cross: real shapes, not backgrounds/notes.
-  // Pain points are decorative overlays and are never obstacles (issue #4).
+  // Pain points / issues are decorative overlays and are never obstacles.
   const boxes = data.elements.filter(
     (e) => e.type !== "pool" && e.type !== "lane" && e.type !== "text-annotation" && e.type !== "group"
-      && e.type !== "uml-pain-point",
+      && e.type !== "uml-pain-point" && e.type !== "uml-issue",
   );
   for (const c of data.connectors) {
     const wps = c.waypoints;

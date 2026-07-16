@@ -396,6 +396,8 @@ export type Action =
   | { type: "SET_RELAXED_LAYOUT"; payload: boolean }
   | { type: "SET_SHOW_PAIN_POINTS"; payload: boolean }
   | { type: "SET_SHOW_PAIN_POINT_DESC"; payload: boolean }
+  | { type: "SET_SHOW_ISSUES"; payload: boolean }
+  | { type: "SET_SHOW_ISSUE_DESC"; payload: boolean }
   | { type: "REROUTE_ALL" }
   | { type: "SET_PROCESS_OWNER"; payload: { name?: string; email?: string } }
   | { type: "SET_PROCEDURE_DOC"; payload: { url?: string; name?: string } | undefined }
@@ -444,15 +446,20 @@ function isContainerType(type: SymbolType): boolean {
 
 const PROCESS_GROUP_CHILDREN = new Set<SymbolType>(["chevron", "chevron-collapsed", "process-group"]);
 
+// Problem markers — Pain Points (red) and Issues (dark green). They behave
+// identically: auto-numbered, decorative (never a connector endpoint), and they
+// ride along with the best-overlap host element when it moves.
+const MARKER_TYPES = new Set<SymbolType>(["uml-pain-point", "uml-issue"]);
+
 // A UML package groups any domain-diagram element (including nested packages).
 const UML_PACKAGE_CHILDREN = new Set<SymbolType>([
-  "uml-class", "uml-enumeration", "uml-package", "uml-note", "uml-pain-point",
+  "uml-class", "uml-enumeration", "uml-package", "uml-note", "uml-pain-point", "uml-issue",
 ]);
 
-/** Re-number every pain point 1..N (ordered by their current number) so a
- *  deletion closes the gap (issue #3c). The number lives in `label`. */
-function renumberPainPoints(elements: DiagramElement[]): DiagramElement[] {
-  const pps = elements.filter((e) => e.type === "uml-pain-point");
+/** Re-number every marker of `type` 1..N (ordered by their current number) so a
+ *  deletion closes the gap. The number lives in `label`. */
+function renumberMarkers(elements: DiagramElement[], type: SymbolType): DiagramElement[] {
+  const pps = elements.filter((e) => e.type === type);
   if (pps.length === 0) return elements;
   const ordered = [...pps].sort(
     (a, b) => (parseInt(a.label || "0", 10) || 0) - (parseInt(b.label || "0", 10) || 0),
@@ -3577,10 +3584,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         label = `Package ${count + 1}`;
       } else if (action.payload.symbolType === "uml-note") {
         label = "Note";
-      } else if (action.payload.symbolType === "uml-pain-point") {
-        // Auto-number pain points; the number is the label (shown large in the
-        // icon). The multi-line text lives in properties.description.
-        const count = state.elements.filter((e) => e.type === "uml-pain-point").length;
+      } else if (action.payload.symbolType === "uml-pain-point" || action.payload.symbolType === "uml-issue") {
+        // Auto-number pain points / issues; the number is the label (shown large
+        // in the icon). The multi-line text lives in properties.description.
+        const count = state.elements.filter((e) => e.type === action.payload.symbolType).length;
         label = String(count + 1);
       } else if (action.payload.symbolType === "external-entity") {
         const count = state.elements.filter((e) => e.type === "external-entity").length;
@@ -3656,10 +3663,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         taskType:  action.payload.taskType,
         eventType: action.payload.eventType,
       };
-      // Adding the FIRST pain point auto-enables the description display (issue #3g).
-      const enablePainDesc = newEl.type === "uml-pain-point"
-        && !state.elements.some((e) => e.type === "uml-pain-point")
-        ? { showPainPointDescriptions: true } : {};
+      // Adding the FIRST pain point / issue auto-enables its description display.
+      const enablePainDesc =
+        newEl.type === "uml-pain-point" && !state.elements.some((e) => e.type === "uml-pain-point")
+          ? { showPainPointDescriptions: true }
+        : newEl.type === "uml-issue" && !state.elements.some((e) => e.type === "uml-issue")
+          ? { showIssueDescriptions: true }
+        : {};
       // Snap event to host boundary on drop
       if (BOUNDARY_EVENT_TYPES.has(newEl.type)) {
         const centre = { x: newEl.x + newEl.width / 2, y: newEl.y + newEl.height / 2 };
@@ -4070,14 +4080,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       let elements = state.elements.map((e) => {
         if (e.id === id) {
-          // Pain points attach to whatever element they partially cover, so they
-          // move with it. Pick the best-overlap host (any non-pain-point element)
-          // — bypasses the container logic below (a class isn't a container).
-          if (e.type === "uml-pain-point" && !lockParentToEP) {
+          // Pain points / issues attach to whatever element they partially
+          // cover, so they move with it. Pick the best-overlap host (any
+          // non-marker element) — bypasses the container logic below.
+          if (MARKER_TYPES.has(e.type) && !lockParentToEP) {
             const px2 = effectiveX + e.width, py2 = effectiveY + e.height;
             let hostId: string | undefined, bestArea = 0;
             for (const b of state.elements) {
-              if (b.id === id || b.type === "uml-pain-point") continue;
+              if (b.id === id || MARKER_TYPES.has(b.type)) continue;
               const ox = Math.max(0, Math.min(px2, b.x + b.width) - Math.max(effectiveX, b.x));
               const oy = Math.max(0, Math.min(py2, b.y + b.height) - Math.max(effectiveY, b.y));
               const area = ox * oy;
@@ -4130,9 +4140,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         if (movingIsContainer && (e.parentId === id || descendantIds.has(e.id))) {
           return { ...e, x: e.x + dx, y: e.y + dy };
         }
-        // Pain points attached to a NON-container host follow it when it moves
-        // (container hosts are already covered by the descendant branch above).
-        if (e.type === "uml-pain-point" && e.parentId === id) {
+        // Pain points / issues attached to a NON-container host follow it when
+        // it moves (container hosts are covered by the descendant branch above).
+        if (MARKER_TYPES.has(e.type) && e.parentId === id) {
           return { ...e, x: e.x + dx, y: e.y + dy };
         }
         // Carry boundary events when their host moves
@@ -6174,8 +6184,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
       }
 
-      // A deleted pain point closes the numbering gap (issue #3c).
-      const afterDelete = el?.type === "uml-pain-point" ? renumberPainPoints(elements) : elements;
+      // A deleted pain point / issue closes its numbering gap.
+      const afterDelete = el && MARKER_TYPES.has(el.type) ? renumberMarkers(elements, el.type) : elements;
       return { ...state, elements: updatePoolTypes(afterDelete), connectors };
     }
 
@@ -6250,9 +6260,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       if (isDataConn && connectorType !== "associationBPMN") return state;
 
-      // Pain points are decorative and non-interactive: they can never be a
-      // connector endpoint (issue #4).
-      if (source.type === "uml-pain-point" || target.type === "uml-pain-point") return state;
+      // Pain points / issues are decorative and non-interactive: they can never
+      // be a connector endpoint.
+      if (MARKER_TYPES.has(source.type) || MARKER_TYPES.has(target.type)) return state;
 
       // UML package rule: a package may only be an endpoint of a dependency or a
       // containment connector. Any other relationship touching a package is
@@ -7081,6 +7091,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "SET_SHOW_PAIN_POINT_DESC":
       return { ...state, showPainPointDescriptions: action.payload || undefined };
 
+    case "SET_SHOW_ISSUES":
+      return { ...state, showIssues: action.payload ? undefined : false };
+
+    case "SET_SHOW_ISSUE_DESC":
+      return { ...state, showIssueDescriptions: action.payload || undefined };
+
     // Recompute every connector's route — used to apply a live routing-mode
     // switch (e.g. the Domain UML sticky/optimal toggle) to the current diagram.
     case "REROUTE_ALL":
@@ -7576,16 +7592,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // parentId so the EP-grow path below picks the right container.
       let elements = state.elements;
       let connectors = state.connectors;
-      // Pain points attach to whatever element their boundary overlaps (any
-      // element, not just containers), so they can be dropped onto a class and
-      // move with it — and easily dragged onto another element (issue #4). This
-      // MUST run at drop too, else the generic container re-detection below
-      // (which only accepts packages for a pain-point) would wipe the host.
-      if (initialEl.type === "uml-pain-point") {
+      // Pain points / issues attach to whatever element their boundary overlaps
+      // (any element, not just containers), so they can be dropped onto a class
+      // and move with it — and easily dragged onto another element. This MUST run
+      // at drop too, else the generic container re-detection below (which only
+      // accepts packages for a marker) would wipe the host.
+      if (MARKER_TYPES.has(initialEl.type)) {
         const px2 = initialEl.x + initialEl.width, py2 = initialEl.y + initialEl.height;
         let hostId: string | undefined, bestArea = 0;
         for (const b of elements) {
-          if (b.id === id || b.type === "uml-pain-point") continue;
+          if (b.id === id || MARKER_TYPES.has(b.type)) continue;
           const ox = Math.max(0, Math.min(px2, b.x + b.width) - Math.max(initialEl.x, b.x));
           const oy = Math.max(0, Math.min(py2, b.y + b.height) - Math.max(initialEl.y, b.y));
           const area = ox * oy;
@@ -9204,6 +9220,18 @@ export function useDiagram(initialData: DiagramData) {
       (on: boolean) => {
         invalidateRedo();
         dispatch({ type: "SET_SHOW_PAIN_POINT_DESC", payload: on });
+      }, []
+    ),
+    setShowIssues: useCallback(
+      (on: boolean) => {
+        invalidateRedo();
+        dispatch({ type: "SET_SHOW_ISSUES", payload: on });
+      }, []
+    ),
+    setShowIssueDescriptions: useCallback(
+      (on: boolean) => {
+        invalidateRedo();
+        dispatch({ type: "SET_SHOW_ISSUE_DESC", payload: on });
       }, []
     ),
     rerouteAll: useCallback(

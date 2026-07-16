@@ -107,16 +107,18 @@ interface Props {
    *  elements, with the geometry validation rules suppressed. */
   relaxedLayout?: boolean;
   onSetRelaxedLayout?: (on: boolean) => void;
-  // Domain-only connector-routing A/B switch (Sticky vs Optimal). Present only
-  // for domain diagrams; when the handler is undefined the option is hidden.
-  umlSticky?: boolean;
-  onSetUmlSticky?: (on: boolean) => void;
   // Pain Point list (all pain-point elements on the diagram) + the display flags.
   painPoints?: DiagramElement[];
   showPainPoints?: boolean;
   onSetShowPainPoints?: (on: boolean) => void;
   showPainPointDescriptions?: boolean;
   onSetShowPainPointDescriptions?: (on: boolean) => void;
+  // Issues list (dark-green Pain Point twin) + its display flags.
+  issues?: DiagramElement[];
+  showIssues?: boolean;
+  onSetShowIssues?: (on: boolean) => void;
+  showIssueDescriptions?: boolean;
+  onSetShowIssueDescriptions?: (on: boolean) => void;
   forceCollapseTitle?: boolean;
   /** Per-diagram process owner — surfaced in the new Process Owner
    *  sub-section. Both name + email are optional free-text. */
@@ -785,13 +787,16 @@ export function PropertiesPanel({
   onSetDatabase,
   relaxedLayout,
   onSetRelaxedLayout,
-  umlSticky,
-  onSetUmlSticky,
   painPoints,
   showPainPoints,
   onSetShowPainPoints,
   showPainPointDescriptions,
   onSetShowPainPointDescriptions,
+  issues,
+  showIssues,
+  onSetShowIssues,
+  showIssueDescriptions,
+  onSetShowIssueDescriptions,
   forceCollapseTitle,
   processOwner,
   onSetProcessOwner,
@@ -1067,20 +1072,8 @@ export function PropertiesPanel({
           </label>
         )}
 
-        {/* Connector routing (Sticky vs Optimal) — SuperAdmin-only control (#3).
-            Sticky is the standard for everyone; this red toggle lets a SuperAdmin
-            flip to legacy Optimal, and hides with the other SuperAdmin chrome. */}
-        {onSetUmlSticky && (
-          <label className="flex items-start gap-1.5 mb-0.5 cursor-pointer select-none" title="SuperAdmin: Sticky (standard) keeps endpoints fixed on their face; Optimal (legacy) always snaps both endpoints to the closest faces.">
-            <input type="checkbox" className="mt-[2px] cursor-pointer accent-red-600"
-              checked={!!umlSticky}
-              onChange={e => onSetUmlSticky(e.target.checked)} />
-            <span className="text-[9px] text-red-600 leading-tight">
-              Sticky connector routing
-              <span className="block text-[8px] text-red-400">SuperAdmin · uncheck for legacy Optimal routing</span>
-            </span>
-          </label>
-        )}
+        {/* Connector routing is now permanently STICKY (settled default) — the
+            legacy Optimal A/B toggle was removed. */}
 
         {/* Pain Point list — editable descriptions + on-diagram display toggle
             (issues #3b/#3d/#3g). Shown for any diagram type that has pain points. */}
@@ -1124,6 +1117,52 @@ export function PropertiesPanel({
                       onClick={() => onDeleteElement(pp.id)}
                       className="text-gray-400 hover:text-red-600 text-xs leading-none mt-0.5 shrink-0"
                       title="Delete this pain point"
+                    >×</button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* Issues list — dark-green twin of Pain Points. Identical behaviour;
+            shown for any diagram type that has issues. */}
+        {issues && issues.length > 0 && (
+          <div className="mt-1 mb-1">
+            <div className="text-[9px] font-semibold text-green-800 mb-0.5">Issues</div>
+            {onSetShowIssues && (
+              <label className="flex items-start gap-1.5 mb-1 cursor-pointer select-none" title="Show issue icons on the diagram">
+                <input type="checkbox" className="mt-[2px] cursor-pointer"
+                  checked={showIssues !== false}
+                  onChange={e => onSetShowIssues(e.target.checked)} />
+                <span className="text-[9px] text-gray-600 leading-tight">Display Issues</span>
+              </label>
+            )}
+            {showIssues !== false && onSetShowIssueDescriptions && (
+              <label className="flex items-start gap-1.5 mb-1 ml-4 cursor-pointer select-none" title="Show each issue's description as a caption under its icon">
+                <input type="checkbox" className="mt-[2px] cursor-pointer"
+                  checked={!!showIssueDescriptions}
+                  onChange={e => onSetShowIssueDescriptions(e.target.checked)} />
+                <span className="text-[9px] text-gray-600 leading-tight">Show descriptions on diagram</span>
+              </label>
+            )}
+            <div className="space-y-1">
+              {[...issues]
+                .sort((a, b) => (parseInt(a.label || "0", 10) || 0) - (parseInt(b.label || "0", 10) || 0))
+                .map(iss => (
+                  <div key={iss.id} className="flex items-start gap-1">
+                    <span className="text-[10px] font-bold text-green-800 w-4 shrink-0 text-center mt-0.5">{iss.label}</span>
+                    <textarea
+                      key={`issdesc-${iss.id}`}
+                      defaultValue={(iss.properties.description as string | undefined) ?? ""}
+                      onBlur={e => onUpdateProperties?.(iss.id, { description: e.target.value })}
+                      rows={2}
+                      placeholder="Description…"
+                      className="flex-1 text-[9px] border border-gray-300 rounded px-1 py-0.5 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={() => onDeleteElement(iss.id)}
+                      className="text-gray-400 hover:text-red-600 text-xs leading-none mt-0.5 shrink-0"
+                      title="Delete this issue"
                     >×</button>
                   </div>
                 ))}

@@ -104,7 +104,7 @@ Output format:
 
 Element types: "uml-class" (entity), "uml-enumeration" (lookup), "uml-package" (a resizeable container grouping related elements), "uml-note" (a free-text comment), "uml-pain-point"
 Connection types: "uml-association", "uml-aggregation", "uml-composition", "uml-generalisation", "uml-dependency", "uml-realisation", "uml-containment", "uml-note-anchor"
-Note: a "uml-package" accepts only "uml-dependency" or "uml-containment" connectors; "uml-containment" is package-to-package ONLY (a solid straight line with a ⊕ at the containing package). A "uml-note" connects to any element (except a "uml-pain-point" or another note) ONLY via a "uml-note-anchor" (a dashed straight line, no arrowhead).
+Note: a "uml-package" accepts only "uml-dependency" or "uml-containment" connectors; "uml-containment" is package-to-package ONLY (a solid straight line with a ⊕ at the containing package). A "uml-note" connects to any element (except a "uml-pain-point", a "uml-issue", or another note) ONLY via a "uml-note-anchor" (a dashed straight line, no arrowhead).
 
 Output format:
 {

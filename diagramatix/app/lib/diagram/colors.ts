@@ -49,6 +49,7 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "uml-package":         "#fef9c3",   // light yellow — container tint
   "uml-note":            "#fef3c7",   // note yellow
   "uml-pain-point":      "#fecaca",   // light red — problem marker
+  "uml-issue":           "#15803d",   // dark green — issue marker (Pain Point twin)
   // ArchiMate — actual fill comes from the catalogue + category theme
   // at render time; this is only a fallback when rendering outside the
   // canvas (e.g. a minimap thumbnail).
@@ -110,6 +111,7 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   "uml-package":         "#ffffff",
   "uml-note":            "#ffffff",
   "uml-pain-point":      "#ffffff",
+  "uml-issue":           "#ffffff",
   "archimate-shape":     "#ffffff",
   "review-comment":      "#000000",
   "flowchart-terminator": "#ffffff", "flowchart-process": "#ffffff", "flowchart-decision": "#ffffff",

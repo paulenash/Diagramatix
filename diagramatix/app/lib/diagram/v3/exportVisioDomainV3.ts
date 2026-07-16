@@ -358,7 +358,7 @@ export async function exportVisioDomainV3(
         `<Text>${esc(el.label ?? "")}</Text></Shape>`
       );
     }
-    // uml-pain-point: no standard-UML equivalent — skipped.
+    // uml-pain-point / uml-issue: no standard-UML equivalent — skipped.
   }
 
   // ── Relationships ──

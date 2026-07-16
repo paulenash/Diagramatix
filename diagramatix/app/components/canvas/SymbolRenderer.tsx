@@ -189,6 +189,12 @@ export const ShowPainPointsCtx = createContext<boolean>(true);
 /** Whether Pain Point descriptions render as captions under their icons
  *  (diagram-level `showPainPointDescriptions`). Provided by Canvas.tsx. */
 export const ShowPainPointDescCtx = createContext<boolean>(false);
+/** Whether Issue icons (dark-green Pain Point twin) render on the canvas
+ *  (diagram-level "Display Issues" master toggle). Defaults true. */
+export const ShowIssuesCtx = createContext<boolean>(true);
+/** Whether Issue descriptions render as captions under their icons
+ *  (diagram-level `showIssueDescriptions`). Provided by Canvas.tsx. */
+export const ShowIssueDescCtx = createContext<boolean>(false);
 export const DatabaseCtx = createContext<string | undefined>(undefined);
 /** Map from archimate-shape id → descendant depth (0 = leaf, 1 = parent of
  *  leaves, 2 = grandparent, …). Drives the per-level lightening of
@@ -1523,13 +1529,17 @@ export function painPointStarPoints(cx: number, cy: number, rx: number, ry: numb
   return pts.join(" ");
 }
 
-function UmlPainPointShape({ el }: { el: DiagramElement }) {
+/** Shared starburst marker used by both Pain Points (red) and Issues (dark
+ *  green). Identical geometry + auto-number + description caption; only the
+ *  colours and the show/desc toggles differ. */
+function MarkerShape({ el, show, showDesc, stroke, numberColor, descColor }: {
+  el: DiagramElement; show: boolean; showDesc: boolean;
+  stroke: string; numberColor: string; descColor: string;
+}) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
-  const showPoints = useContext(ShowPainPointsCtx);
-  const showDesc = useContext(ShowPainPointDescCtx);
-  if (!showPoints) return null; // "Display Pain Points" off — hide on canvas
-  const fill = resolveColor("uml-pain-point", colors);
+  if (!show) return null; // master display toggle off — hide on canvas
+  const fill = resolveColor(el.type, colors);
   const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
   const rx = el.width / 2, ry = el.height / 2;
   // Slightly smaller auto-number, shrunk more for 2+ digits so it stays inside.
@@ -1540,16 +1550,16 @@ function UmlPainPointShape({ el }: { el: DiagramElement }) {
   const descLineH = Math.round(13 * fsc);
   return (
     <g>
-      <polygon points={painPointStarPoints(cx, cy, rx, ry)} fill={fill} stroke="#b91c1c" strokeWidth={1.5} strokeLinejoin="round" />
+      <polygon points={painPointStarPoints(cx, cy, rx, ry)} fill={fill} stroke={stroke} strokeWidth={1.5} strokeLinejoin="round" />
       <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
-        fontSize={numberFont} fill="#7f1d1d" fontWeight="bold"
+        fontSize={numberFont} fill={numberColor} fontWeight="bold"
         style={{ pointerEvents: "none", userSelect: "none" }}>
         {el.label}
       </text>
-      {/* Multi-line description caption under the icon (issue #3a/#3g). */}
+      {/* Multi-line description caption under the icon. */}
       {showDesc && descLines.some((l) => l.trim()) && (
         <text x={cx} y={el.y + el.height + descLineH} textAnchor="middle"
-          fontSize={descFont} fill="#7f1d1d"
+          fontSize={descFont} fill={descColor}
           style={{ pointerEvents: "none", userSelect: "none" }}>
           {descLines.map((line, i) => (
             <tspan key={i} x={cx} dy={i === 0 ? 0 : descLineH}>{line}</tspan>
@@ -1558,6 +1568,16 @@ function UmlPainPointShape({ el }: { el: DiagramElement }) {
       )}
     </g>
   );
+}
+
+function UmlPainPointShape({ el }: { el: DiagramElement }) {
+  return <MarkerShape el={el} show={useContext(ShowPainPointsCtx)} showDesc={useContext(ShowPainPointDescCtx)}
+    stroke="#b91c1c" numberColor="#7f1d1d" descColor="#7f1d1d" />;
+}
+
+function UmlIssueShape({ el }: { el: DiagramElement }) {
+  return <MarkerShape el={el} show={useContext(ShowIssuesCtx)} showDesc={useContext(ShowIssueDescCtx)}
+    stroke="#166534" numberColor="#ffffff" descColor="#166534" />;
 }
 
 function ExternalEntityShape({ el }: { el: DiagramElement }) {
@@ -1891,6 +1911,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "uml-package":           return <UmlPackageShape el={el} />;
       case "uml-note":              return <UmlNoteShape el={el} />;
       case "uml-pain-point":        return <UmlPainPointShape el={el} />;
+      case "uml-issue":             return <UmlIssueShape el={el} />;
       case "external-entity":     return <ExternalEntityShape el={el} />;
       case "process-system":      return <ProcessSystemShape el={el} />;
       case "archimate-shape":     return <ArchimateShape el={el} />;
@@ -2960,7 +2981,8 @@ export function SymbolRenderer({
         element.type === 'uml-enumeration' ||
         element.type === 'uml-package' ||
         element.type === 'uml-note' ||
-        element.type === 'uml-pain-point'
+        element.type === 'uml-pain-point' ||
+        element.type === 'uml-issue'
       ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge') && (() => {
         const isChevron = element.type === 'chevron' || element.type === 'chevron-collapsed';
         const isArchi = element.type === 'archimate-shape';
