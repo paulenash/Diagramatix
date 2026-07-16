@@ -134,7 +134,8 @@ export function layoutDomainPreserved(
     if (el.type !== "uml-class" && el.type !== "uml-enumeration") continue;
     const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
     // 50px clear on each side of the name (Paul) so reproduced boxes aren't tight.
-    const sized = autoResizeUmlElement(el, 50);
+    // Domain diagrams default to 14px element font → scale the box to match.
+    const sized = autoResizeUmlElement(el, 50, 14 / 12);
     sumOW += el.width; sumOH += el.height; sumNW += sized.width; sumNH += sized.height;
     elements[i] = {
       ...sized,

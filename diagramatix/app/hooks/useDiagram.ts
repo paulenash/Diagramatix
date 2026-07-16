@@ -456,6 +456,13 @@ const UML_PACKAGE_CHILDREN = new Set<SymbolType>([
   "uml-class", "uml-enumeration", "uml-package", "uml-note", "uml-pain-point", "uml-issue",
 ]);
 
+/** Font scale for domain UML boxes — mirrors the canvas FontScaleCtx
+ *  ((data.fontSize ?? 14) / 12), so class/enum boxes size to the current font.
+ *  uml-class / uml-enumeration only ever live on domain diagrams (default 14). */
+function domainFontScale(fontSize: number | undefined): number {
+  return (fontSize ?? 14) / 12;
+}
+
 /** Pick the element a marker (pain point / issue) should stick to. A marker
  *  marks a specific SHAPE, not the container it sits inside — so a leaf
  *  (non-container) element it overlaps always wins over the enclosing
@@ -5560,7 +5567,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const labelEl = elements.find(e => e.id === action.payload.id);
       if (labelEl && (labelEl.type === "uml-enumeration" || labelEl.type === "uml-class")) {
         const resizedElements = elements.map(e =>
-          e.id === action.payload.id ? autoResizeUmlElement(e) : e
+          e.id === action.payload.id ? autoResizeUmlElement(e, 0, domainFontScale(state.fontSize)) : e
         );
         const connectors = state.connectors.map(conn => {
           if (conn.sourceId !== action.payload.id && conn.targetId !== action.payload.id) return conn;
@@ -5671,7 +5678,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const el = elements.find(e => e.id === action.payload.id);
       if (el && (el.type === "uml-enumeration" || el.type === "uml-class")) {
         const resizedElements = elements.map(e =>
-          e.id === action.payload.id ? autoResizeUmlElement(e) : e
+          e.id === action.payload.id ? autoResizeUmlElement(e, 0, domainFontScale(state.fontSize)) : e
         );
         const connectors = state.connectors.map(conn => {
           if (conn.sourceId !== action.payload.id && conn.targetId !== action.payload.id) return conn;
@@ -7075,8 +7082,24 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "UPDATE_DIAGRAM_TITLE":
       return { ...state, title: action.payload };
 
-    case "SET_FONT_SIZE":
-      return { ...state, fontSize: action.payload };
+    case "SET_FONT_SIZE": {
+      // Re-size every class / enumeration box to the new element font so the
+      // compartments keep fitting, then reroute their connectors.
+      const scale = domainFontScale(action.payload);
+      const elements = state.elements.map(e =>
+        (e.type === "uml-class" || e.type === "uml-enumeration") ? autoResizeUmlElement(e, 0, scale) : e
+      );
+      const touched = new Set(
+        elements.filter((e, i) => e !== state.elements[i]).map(e => e.id)
+      );
+      const connectors = touched.size
+        ? state.connectors.map(conn =>
+            touched.has(conn.sourceId) || touched.has(conn.targetId)
+              ? recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn
+              : conn)
+        : state.connectors;
+      return { ...state, fontSize: action.payload, elements, connectors };
+    }
 
     case "SET_CONNECTOR_FONT_SIZE":
       return { ...state, connectorFontSize: action.payload };

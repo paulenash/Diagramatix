@@ -7489,9 +7489,9 @@ export function Canvas({
         const isEnum = umlRowEdit.kind === "enum-value";
         const isEdit = !!umlRowEdit.isEdit;
         // Grow-to-the-right, matching autoResizeUmlElement's width formula
-        // (CHAR_W 6.5 + PAD*2) so the editor width equals the compartment width
-        // the class will settle to on commit — same as the Properties Panel (#11).
-        const contentW = umlRowEdit.value.length * 6.5 + 8;
+        // (CHAR_W 6.5·fontScale + PAD*2) so the editor width equals the compartment
+        // width the class will settle to on commit — same as the Properties Panel.
+        const contentW = umlRowEdit.value.length * 6.5 * umlFsc + 8;
         const inputW = Math.max(90, r.w * zoom, contentW * zoom);
         const inputH = Math.max(16, r.h * zoom);
         const left = r.x * zoom + pan.x;
@@ -7524,7 +7524,7 @@ export function Canvas({
                 : umlRowEdit.kind === "attribute" ? "+ name : Type [0..*] = default" : "+ operationName()"}
               style={{
                 position: "absolute", left, top, width: inputW, height: inputH,
-                fontSize: Math.max(9, 10 * zoom), zIndex: 60,
+                fontSize: Math.max(9, 10 * umlFsc * zoom), zIndex: 60,
                 border: "2px solid #2563eb", borderRadius: 3, padding: "0 2px",
                 background: "white", color: "#111827",
               }}
