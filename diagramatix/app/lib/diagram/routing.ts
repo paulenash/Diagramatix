@@ -1,5 +1,6 @@
 import type { Bounds, Connector, DiagramData, DiagramElement, Point, RoutingType, Side } from "./types";
 import { isUmlConnType } from "./types";
+import { computePackageTab } from "./textMetrics";
 
 /* ── UML (Domain-diagram) connector routing mode ─────────────────────────
  * Live-toggleable from the editor (bottom-centre switch on Domain diagrams).
@@ -233,14 +234,18 @@ function closestEdgePoint(from: Point, b: Bounds): Point {
 // attaching there floats above the body. Snap those hits down to the body's top
 // edge so connectors always meet the visible outline including the name
 // rectangle (issue #7). Tab dimensions mirror UmlPackageShape in SymbolRenderer.
-function closestPackageEdgePoint(from: Point, el: DiagramElement): Point {
-  const p = closestEdgePoint(from, getBounds(el));
-  const tabH = Math.min(24, el.height * 0.22);
-  const tabW = Math.min(Math.max(60, (el.label?.length ?? 4) * 7 + 16), el.width * 0.6);
-  if (Math.abs(p.y - el.y) < 0.5 && p.x > el.x + tabW) {
-    return { x: p.x, y: el.y + tabH };
-  }
+function snapToPackageSilhouette(p: Point, el: DiagramElement): Point {
+  if (el.type !== "uml-package") return p;
+  // Exact tab geometry (shared with the renderer) so the snap tracks the drawn
+  // tab as the package name — and therefore its width — changes.
+  const { tabW, tabH } = computePackageTab(el);
+  // Only the bbox top edge to the RIGHT of the tab is empty — snap it down.
+  if (Math.abs(p.y - el.y) < 0.5 && p.x > el.x + tabW) return { x: p.x, y: el.y + tabH };
   return p;
+}
+
+function closestPackageEdgePoint(from: Point, el: DiagramElement): Point {
+  return snapToPackageSilhouette(closestEdgePoint(from, getBounds(el)), el);
 }
 
 /** Edge attachment point honouring per-type silhouettes (package L-shape, etc.). */
@@ -957,12 +962,15 @@ export function computeWaypoints(
     const CIRCULAR_TYPES = new Set(["use-case", "process-system"]);
     const srcSpread = Math.abs(sourceOffsetAlong - 0.5) > 1e-6;
     const tgtSpread = Math.abs(targetOffsetAlong - 0.5) > 1e-6;
+    // Offset side-points still honour a package's folder silhouette (snap the
+    // empty bbox-top right of the tab down to the body) — else a package
+    // containment endpoint floats above the body (Paul).
     const srcEdge = CIRCULAR_TYPES.has(source.type)
       ? ellipseEdgePoint(endPt, source)
-      : srcSpread ? sidePoint(source, sourceSide, sourceOffsetAlong) : edgePointFor(endPt, source);
+      : srcSpread ? snapToPackageSilhouette(sidePoint(source, sourceSide, sourceOffsetAlong), source) : edgePointFor(endPt, source);
     const tgtEdge = CIRCULAR_TYPES.has(target.type)
       ? ellipseEdgePoint(startPt, target)
-      : tgtSpread ? sidePoint(target, targetSide, targetOffsetAlong) : edgePointFor(startPt, target);
+      : tgtSpread ? snapToPackageSilhouette(sidePoint(target, targetSide, targetOffsetAlong), target) : edgePointFor(startPt, target);
     return {
       waypoints: [startPt, srcEdge, tgtEdge, endPt],
       sourceInvisibleLeader: true,

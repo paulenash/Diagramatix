@@ -195,3 +195,25 @@ export function autoSizeForType(
   }
   return { w: Math.round(defaultW * MAX_S), h: Math.round(defaultH * MAX_S) };
 }
+
+/**
+ * Tab (header) geometry of a uml-package folder shape. The SINGLE source of
+ * truth shared by UmlPackageShape (SymbolRenderer) and the connector router
+ * (snapToPackageSilhouette) so a connection on the top boundary always meets the
+ * drawn tab — and doesn't drift as the package NAME (hence tab width) changes.
+ * Keep in lock-step with UmlPackageShape.
+ */
+export function computePackageTab(
+  el: { label?: string; width: number; height: number },
+  fontScale = 1,
+): { tabW: number; tabH: number } {
+  const labelFontSize = Math.round(12 * fontScale * 10) / 10;
+  const lineH = Math.round(labelFontSize * 1.3);
+  const PADX = 8, PADY = 5;
+  const maxTabW = el.width * 0.8;
+  const lines = wrapText(el.label || "", Math.max(20, maxTabW - PADX * 2), labelFontSize);
+  const longest = Math.max(1, ...lines.map(l => l.length));
+  const tabW = Math.min(Math.max(60, longest * labelFontSize * 0.6 + PADX * 2), maxTabW);
+  const tabH = Math.min(Math.max(24, lines.length * lineH + PADY * 2), el.height - 12);
+  return { tabW, tabH };
+}

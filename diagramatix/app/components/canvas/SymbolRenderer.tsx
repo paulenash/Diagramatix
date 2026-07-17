@@ -4,7 +4,7 @@ import { useState, createContext, useContext, useRef, useLayoutEffect } from "re
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
 import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
-import { wrapText } from "@/app/lib/diagram/textMetrics";
+import { wrapText, computePackageTab } from "@/app/lib/diagram/textMetrics";
 import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
 import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
 import { ArchimateShape } from "./ArchimateShape";
@@ -1474,12 +1474,11 @@ function UmlPackageShape({ el }: { el: DiagramElement }) {
   const lineH = Math.round(labelFontSize * 1.3);
   const PADX = 8, PADY = 5;
   // Name grows to at most 80% of the package width, then WRAPS; the header tab
-  // grows to fit the wrapped lines (issue #4).
+  // grows to fit the wrapped lines (issue #4). Tab size comes from the shared
+  // computePackageTab so the connector router snaps to the SAME silhouette.
   const maxTabW = el.width * 0.8;
   const lines = wrapText(el.label || "", Math.max(20, maxTabW - PADX * 2), labelFontSize);
-  const longest = Math.max(1, ...lines.map(l => l.length));
-  const tabW = Math.min(Math.max(60, longest * labelFontSize * 0.6 + PADX * 2), maxTabW);
-  const tabH = Math.min(Math.max(24, lines.length * lineH + PADY * 2), el.height - 12);
+  const { tabW, tabH } = computePackageTab(el, fsc);
   return (
     <g>
       {/* Tab (header) — grows to the wrapped name */}
