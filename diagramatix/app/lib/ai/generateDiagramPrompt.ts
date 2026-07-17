@@ -105,6 +105,7 @@ Output format:
 Element types: "uml-class" (entity), "uml-enumeration" (lookup), "uml-package" (a resizeable container grouping related elements), "uml-note" (a free-text comment), "uml-pain-point"
 Connection types: "uml-association", "uml-aggregation", "uml-composition", "uml-generalisation", "uml-dependency", "uml-realisation", "uml-containment", "uml-note-anchor"
 Note: a "uml-package" accepts only "uml-dependency" or "uml-containment" connectors; "uml-containment" is package-to-package ONLY (a solid straight line with a ⊕ at the containing package). A "uml-note" connects to any element (except a "uml-pain-point", a "uml-issue", or another note) ONLY via a "uml-note-anchor" (a dashed straight line, no arrowhead).
+ABSTRACT CLASSES — a class that is an abstract base type or interface never instantiated directly (e.g. an abstract "Component"/"Shape" that concrete classes generalise from) should carry "isAbstract": true (default "abstractDisplay": "italics", which renders the class name in italics). Concrete subclasses are NOT abstract. Example: { "id": "e0", "type": "uml-class", "label": "Component", "isAbstract": true, "operations": [{ "name": "operation", "visibility": "+" }] }
 
 Output format:
 {
@@ -121,7 +122,7 @@ Output format:
 }
 
 IMAGE INPUT — when an image of a UML class / domain diagram is attached, reproduce it exactly. Map the shapes:
-- a rectangle divided into compartments (name / attributes / operations) → "uml-class"; put the class name in "label"; transcribe each attribute row into "attributes" as { "visibility": "+|-|#", "name", "type", "multiplicity" } (parse "- name : Type [0..1]"), and each operation row (e.g. "+ doThing()") into "operations" as { "visibility", "name" }. Set the compartments you see. An attribute's "type" may be a primitive (String, Integer, Boolean, Date, …) OR the exact name of any "uml-enumeration" (or a class stereotyped «enumeration» / «dataType») drawn on THIS diagram — if the type text matches such a name, copy that label verbatim as the type.
+- a rectangle divided into compartments (name / attributes / operations) → "uml-class"; put the class name in "label"; transcribe each attribute row into "attributes" as { "visibility": "+|-|#", "name", "type", "multiplicity" } (parse "- name : Type [0..1]"), and each operation row (e.g. "+ doThing()") into "operations" as { "visibility", "name" }. Set the compartments you see. An attribute's "type" may be a primitive (String, Integer, Boolean, Date, …) OR the exact name of any "uml-enumeration" (or a class stereotyped «enumeration» / «dataType») drawn on THIS diagram — if the type text matches such a name, copy that label verbatim as the type. ABSTRACT: if the class NAME is drawn in ITALICS, or a "{abstract}" line appears under the name, the class is abstract — set "isAbstract": true and "abstractDisplay": "italics" (italic name) or "text" ({abstract} line) to match how it is shown.
 - a box headed «enumeration» (or a plain list of literals) → "uml-enumeration"; put the literals in "values".
 - a folder-tab / package shape → "uml-package"; classes drawn inside it are that package's members (still list them as separate elements — grouping is by geometry).
 - a folded-corner box of free text → "uml-note".

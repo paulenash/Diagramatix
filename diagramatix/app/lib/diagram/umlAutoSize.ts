@@ -41,10 +41,16 @@ export function autoResizeUmlElement(el: DiagramElement, nameSidePad = 0, fontSc
   const stereotypeW = showStereotype ? (`«${stereotype}»`.length * CHAR_W * 0.8) : 0;
   const stereotypeH = showStereotype ? Math.round(9 * fontScale) + 2 : 0; // stereotype font (~9*fsc) + 2px gap
 
+  // Abstract entity shown as a "{abstract}" line adds one header line (italics
+  // display doesn't change the box size).
+  const abstractH = (el.type === "uml-class"
+    && (el.properties.isAbstract as boolean | undefined)
+    && (el.properties.abstractDisplay as string | undefined) === "text") ? LINE_H : 0;
+
   const labelLines = el.label.split("\n");
-  const labelMaxW = Math.max(...labelLines.map(l => l.length * CHAR_W));
+  const labelMaxW = Math.max(...labelLines.map(l => l.length * CHAR_W), abstractH ? "{abstract}".length * CHAR_W * 0.8 : 0);
   const extraLabelLines = Math.max(0, labelLines.length - 1);
-  const headerH = BASE_HEADER_H + extraLabelLines * LINE_H + stereotypeH;
+  const headerH = BASE_HEADER_H + extraLabelLines * LINE_H + stereotypeH + abstractH;
 
   if (el.type === "uml-enumeration") {
     const values: string[] = (el.properties.values as string[] | undefined) ?? [];

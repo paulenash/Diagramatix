@@ -14,6 +14,7 @@ interface AiBounds { x: number; y: number; w: number; h: number }
 interface AiEl {
   id?: string; type: string; label?: string; name?: string;
   bounds?: unknown; parent?: string; stereotype?: string;
+  isAbstract?: boolean; abstractDisplay?: string;
   attributes?: Array<Record<string, unknown>>;
   operations?: Array<Record<string, unknown>>;
   values?: string[];
@@ -40,6 +41,11 @@ function domainProps(e: AiEl): Record<string, unknown> {
     // Only show a stereotype the drawing actually had (issue #4) — a plain class
     // has none; the AI supplies `stereotype` when it reads a «guillemet» tag.
     if (e.stereotype) { props.stereotype = e.stereotype; props.showStereotype = true; }
+    // Abstract entity (italic name in the image → default "italics").
+    if (e.isAbstract) {
+      props.isAbstract = true;
+      props.abstractDisplay = e.abstractDisplay === "text" ? "text" : "italics";
+    }
     if (Array.isArray(e.attributes) && e.attributes.length) {
       props.showAttributes = true;
       props.attributes = e.attributes.map((a, i) => ({

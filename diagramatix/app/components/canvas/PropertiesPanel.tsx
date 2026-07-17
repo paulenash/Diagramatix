@@ -3118,6 +3118,30 @@ export function PropertiesPanel({
               >{(element.properties.showStereotype as boolean | undefined) ?? false ? "On" : "Off"}</button>
             </div>
           )}
+          {/* Abstract entity — shown as an italic class name or a {abstract}
+              line under the name. Entities (uml-class) only. */}
+          {element.type === "uml-class" && (
+            <>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <span className="text-[10px] text-gray-500 w-16 shrink-0">Abstract</span>
+                <input type="checkbox" className="w-3 h-3"
+                  checked={(element.properties.isAbstract as boolean | undefined) ?? false}
+                  onChange={e => onUpdateProperties(element.id, { isAbstract: e.target.checked })} />
+              </label>
+              {((element.properties.isAbstract as boolean | undefined) ?? false) && (
+                <div className="flex items-center gap-1.5">
+                  <label className="text-[10px] text-gray-500 w-16 shrink-0">Display as</label>
+                  <select
+                    value={(element.properties.abstractDisplay as string | undefined) ?? "italics"}
+                    onChange={e => onUpdateProperties(element.id, { abstractDisplay: e.target.value })}
+                    className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer">
+                    <option value="italics">Italic name</option>
+                    <option value="text">{"{abstract}"}</option>
+                  </select>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

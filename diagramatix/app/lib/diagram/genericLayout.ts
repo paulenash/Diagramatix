@@ -1036,6 +1036,11 @@ function buildProperties(ai: Record<string, unknown>, diagramType: string): Reco
   if (ai.type === "uml-class") {
     // Only show a stereotype the drawing actually had (a plain class has none).
     if (ai.stereotype) { props.stereotype = ai.stereotype; props.showStereotype = true; }
+    // Abstract entity (italic name by default, or a {abstract} line).
+    if ((ai as { isAbstract?: boolean }).isAbstract) {
+      props.isAbstract = true;
+      props.abstractDisplay = (ai as { abstractDisplay?: string }).abstractDisplay === "text" ? "text" : "italics";
+    }
     if (Array.isArray(ai.attributes) && ai.attributes.length) {
       props.showAttributes = true;
       props.attributes = (ai.attributes as Array<Record<string, unknown>>).map((a, i) => ({

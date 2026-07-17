@@ -1330,10 +1330,15 @@ function UmlClassShape({ el }: { el: DiagramElement }) {
   const attrFontSize = Math.round(10 * fsc * 10) / 10;
   const stereotypeFontSize = Math.round(9 * fsc * 10) / 10;
   const extraLabelLines = Math.max(0, labelLines.length - 1);
+  // Abstract entity — italic class name (default) OR a "{abstract}" line under it.
+  const isAbstract = (el.properties.isAbstract as boolean | undefined) ?? false;
+  const showAbstractText = isAbstract && (el.properties.abstractDisplay as string | undefined) === "text";
+  const nameItalic = isAbstract && !showAbstractText;
+  const abstractH = showAbstractText ? lineH : 0;
   const stereotypeH = showStereotype ? stereotypeFontSize + 2 : 0; // tight: just text height + 2px
-  const headerH = HEADER_H + extraLabelLines * lineH + stereotypeH;
+  const headerH = HEADER_H + extraLabelLines * lineH + stereotypeH + abstractH;
   // Stereotype + class name block centred vertically in header with tight spacing
-  const blockH = stereotypeH + labelLines.length * lineH;
+  const blockH = stereotypeH + labelLines.length * lineH + abstractH;
   const blockTopY = el.y + (headerH - blockH) / 2;
   const labelStartY = blockTopY + stereotypeH;
 
@@ -1368,13 +1373,22 @@ function UmlClassShape({ el }: { el: DiagramElement }) {
           {`\u00AB${stereotype}\u00BB`}
         </text>
       )}
-      {/* Class name */}
+      {/* Class name — italic when the entity is abstract (display "italics"). */}
       <text textAnchor="middle" fontSize={labelFontSize} fill="#111827" fontWeight="bold"
+        fontStyle={nameItalic ? "italic" : "normal"}
         style={{ userSelect: "none", pointerEvents: "none" }}>
         {labelLines.map((line, i) => (
           <tspan key={i} x={el.x + el.width / 2} y={labelStartY + i * lineH + lineH * 0.75}>{line}</tspan>
         ))}
       </text>
+      {/* Abstract as a "{abstract}" line under the name (display "text"). */}
+      {showAbstractText && (
+        <text x={el.x + el.width / 2} y={labelStartY + labelLines.length * lineH + lineH * 0.72}
+          textAnchor="middle" fontSize={stereotypeFontSize} fill="#6b7280" fontStyle="italic"
+          style={{ pointerEvents: "none", userSelect: "none" }}>
+          {"{abstract}"}
+        </text>
+      )}
       {/* Attributes compartment */}
       {showAttrs && attributes.map((attr, i) => (
         <text key={`a${i}`} x={el.x + PAD} y={attrsY + 2 + (i + 1) * lineH - 2}
