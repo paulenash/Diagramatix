@@ -160,9 +160,9 @@ STEREOTYPES — only set an element "stereotype" (shown as «value») when the d
 OCR every label verbatim. Don't invent classes, members or relationships that aren't drawn. If the image and the prompt disagree, follow the image.
 
 REPRODUCE THE ORIGINAL LAYOUT — when reading from an image, also capture the geometry so the diagram matches the drawing:
-- Give EVERY element a "bounds": { "x", "y", "w", "h" } as fractions 0..1 of the WHOLE image (x,y = the shape's top-left corner; w,h = its width/height). Use 2-3 decimals.
+- Give EVERY element a "bounds": { "x", "y", "w", "h" } as fractions 0..1 of the WHOLE image (x,y = the shape's top-left corner; w,h = its width/height). Use 2-3 decimals. MEASURE each box's ACTUAL drawn width and height — do NOT emit a uniform/default size for every class. A class with many attributes is TALLER; a class with long names/types is WIDER; a small class is SMALL. These w/h are used verbatim (only grown if the transcribed text wouldn't fit), so the proportions must match the drawing.
 - If a class/enum/note is drawn INSIDE a package (folder-tab box), set that element's "parent" to the id of the containing "uml-package". The package's own bounds must enclose its members.
-- For EVERY connection add "sourceSide" and "targetSide" — the FACE of each box the line leaves/enters: one of "top", "right", "bottom", "left" (a line leaving the right edge → sourceSide "right"). Also add "sourceRole"/"targetRole" when role names are drawn at the ends.
+- For EVERY connection add "sourceSide" and "targetSide" — the FACE of each box the line ACTUALLY leaves/enters in the drawing: one of "top", "right", "bottom", "left" (a line leaving the right edge → sourceSide "right"). This face is honoured verbatim, so read it off the image precisely — don't guess from relative position. Also add "sourceRole"/"targetRole" when role names are drawn at the ends.
 Example: { "id": "c1", "type": "uml-class", "label": "Order", "bounds": { "x": 0.30, "y": 0.20, "w": 0.18, "h": 0.16 }, "parent": "p1" }`,
 
   context: `You are a Context Diagram expert. Output ONLY valid JSON with elements and connections.

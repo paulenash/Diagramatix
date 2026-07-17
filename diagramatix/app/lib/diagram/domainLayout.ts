@@ -7,7 +7,7 @@
  * falls back to auto-layout.
  */
 import type { DiagramData, DiagramElement, Connector, Side } from "./types";
-import { recomputeAllConnectors, spreadUmlEndpoints, deconflictUmlSegments, SELF_LOOP_BULGE } from "./routing";
+import { computeWaypoints, spreadUmlEndpoints, deconflictUmlSegments, selfLoopWaypoints, SELF_LOOP_BULGE } from "./routing";
 import { autoResizeUmlElement, sizeUmlNote } from "./umlAutoSize";
 import { parseConstraintText, parseEndRole } from "./umlConstraints";
 
@@ -138,23 +138,24 @@ export function layoutDomainPreserved(
     } as DiagramElement);
   }
 
-  // Size classes & enumerations to their CONTENT (same sizer the editor uses),
-  // not the AI's fractional image bounds — those come back near-uniform, so
-  // trusting them makes every box the same shape. Re-centre on the original
-  // position so the box stays where the eye expects it in the reproduction.
+  // Honour the IMAGE class/enum DIMENSIONS (Paul): use the box the AI measured
+  // off the drawing, and only GROW it when the transcribed content wouldn't fit
+  // (so text is never clipped) — max(image, content). Re-centre on the original
+  // image position so the box stays exactly where it was drawn.
   let sumOW = 0, sumNW = 0, sumOH = 0, sumNH = 0;
   for (let i = 0; i < elements.length; i++) {
     const el = elements[i];
     if (el.type !== "uml-class" && el.type !== "uml-enumeration") continue;
     const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
-    // 50px clear on each side of the name (Paul) so reproduced boxes aren't tight.
-    // Domain diagrams default to 14px element font → scale the box to match.
-    const sized = autoResizeUmlElement(el, 50, 14 / 12);
-    sumOW += el.width; sumOH += el.height; sumNW += sized.width; sumNH += sized.height;
+    // Content MINIMUM (50px clear each side of the name; 14px domain font).
+    const contentMin = autoResizeUmlElement(el, 50, 14 / 12);
+    const w = Math.max(el.width, contentMin.width);
+    const h = Math.max(el.height, contentMin.height);
+    sumOW += el.width; sumOH += el.height; sumNW += w; sumNH += h;
     elements[i] = {
-      ...sized,
-      x: Math.round(cx - sized.width / 2),
-      y: Math.round(cy - sized.height / 2),
+      ...contentMin, width: w, height: h,
+      x: Math.round(cx - w / 2),
+      y: Math.round(cy - h / 2),
     };
   }
 
@@ -322,12 +323,26 @@ export function layoutDomainPreserved(
       } as Connector;
     });
 
-  // Settle sides first, then spread connectors sharing an element side (D4.04/
-  // D4.05) so they don't stack, then recompute waypoints on the spread offsets
-  // (the sticky router preserves them while the side holds).
-  const settled = recomputeAllConnectors(connectors, elements);
-  const spread = spreadUmlEndpoints(settled, elements);
-  const routed = recomputeAllConnectors(spread, elements);
+  // Spread connectors that share an element side (D4.04/D4.05), then build each
+  // one's waypoints DIRECTLY from the face the image reported — NOT the sticky
+  // router's geometrically-optimal face, which would override the drawn
+  // attachment side. A self-loop keeps its 3-segment geometry.
+  const spread = spreadUmlEndpoints(connectors, elements);
+  const elMap = new Map(elements.map(e => [e.id, e]));
+  const routed = spread.map(conn => {
+    const src = elMap.get(conn.sourceId);
+    const tgt = elMap.get(conn.targetId);
+    if (!src || !tgt) return conn;
+    if (conn.sourceId === conn.targetId) {
+      return { ...conn,
+        waypoints: selfLoopWaypoints(src, conn.sourceSide, conn.sourceOffsetAlong ?? 0.3, conn.targetOffsetAlong ?? 0.7, conn.selfLoopBulge ?? SELF_LOOP_BULGE),
+        sourceInvisibleLeader: true, targetInvisibleLeader: true };
+    }
+    try {
+      const r = computeWaypoints(src, tgt, elements, conn.sourceSide, conn.targetSide, conn.routingType, conn.sourceOffsetAlong ?? 0.5, conn.targetOffsetAlong ?? 0.5);
+      return { ...conn, waypoints: r.waypoints, sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
+    } catch { return conn; }
+  });
   return {
     elements,
     connectors: deconflictUmlSegments(routed), // D4.05: pull apart overlapping trunks

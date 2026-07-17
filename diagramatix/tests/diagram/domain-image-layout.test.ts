@@ -109,6 +109,39 @@ describe("domain image reproduction (layout preserved from bounds)", () => {
     expect(right.x - (left.x + left.width)).toBeGreaterThanOrEqual(30);
   });
 
+  it("honours the image class DIMENSIONS (keeps a large drawn box large, not shrunk to content)", () => {
+    const parsed = {
+      elements: [
+        { id: "big",   type: "uml-class", label: "X", bounds: { x: 0.10, y: 0.10, w: 0.35, h: 0.50 } },
+        { id: "small", type: "uml-class", label: "Y", bounds: { x: 0.70, y: 0.10, w: 0.12, h: 0.10 } },
+      ],
+      connections: [],
+    };
+    const data = layoutGenericDiagram(parsed as never, "domain", { imageAspect: { w: 1000, h: 800 } });
+    const big = data.elements.find(e => e.id === "big")!;
+    const small = data.elements.find(e => e.id === "small")!;
+    // Image proportions preserved — the big drawn box stays much larger than the
+    // tiny one (previously both were content-sized to ~the same box).
+    expect(big.width).toBeGreaterThan(small.width * 1.7);
+    expect(big.height).toBeGreaterThan(small.height * 2);
+  });
+
+  it("preserves the image connector attachment FACES (not the optimal-face re-pick)", () => {
+    const parsed = {
+      elements: [
+        { id: "a", type: "uml-class", label: "A", bounds: { x: 0.10, y: 0.10, w: 0.2, h: 0.2 } },
+        { id: "b", type: "uml-class", label: "B", bounds: { x: 0.10, y: 0.60, w: 0.2, h: 0.2 } },
+      ],
+      // A is drawn ABOVE B, but the line leaves/enters the RIGHT face of both.
+      connections: [{ sourceId: "a", targetId: "b", type: "uml-association", sourceSide: "right", targetSide: "right" }],
+    };
+    const data = layoutGenericDiagram(parsed as never, "domain", { imageAspect: { w: 1000, h: 1000 } });
+    const c = data.connectors[0];
+    // Optimal routing would pick bottom→top; the image said right→right → keep it.
+    expect(c.sourceSide).toBe("right");
+    expect(c.targetSide).toBe("right");
+  });
+
   it("wraps an imported note to several lines instead of one wide line", () => {
     const withNote = {
       elements: [
