@@ -822,6 +822,7 @@ export function DiagramEditor({
     convertTaskSubprocess,
     convertProcessCollapsed,
     convertEpToSubprocess,
+    collapsePackage,
     convertEventType,
     addSelfTransition,
     splitConnector,
@@ -2282,6 +2283,81 @@ export function DiagramEditor({
     }
   }
 
+  // Collapse a uml-package (Data Model) into a compact folder whose interior
+  // classes/enums/notes/sub-packages move into a NEW linked Domain diagram
+  // (drill-down). Crossing connectors re-attach to the package. Mirrors the
+  // EP-collapse flow above; see the CONVERT_PACKAGE_COLLAPSED reducer.
+  const [pkgCollapseConfirmId, setPkgCollapseConfirmId] = useState<string | null>(null);
+
+  function requestCollapsePackage(pkgId: string) {
+    if (epCollapseBusyId) return;
+    const pkg = data.elements.find((e) => e.id === pkgId);
+    if (!pkg || pkg.type !== "uml-package") return;
+    const hasChildren = data.elements.some((e) => e.parentId === pkgId);
+    if (!hasChildren) {
+      setEpCollapseMsg("This package is empty — add classes to it before collapsing.");
+      return;
+    }
+    setPkgCollapseConfirmId(pkgId);
+  }
+
+  async function doCollapsePackage(pkgId: string) {
+    if (epCollapseBusyId) return;
+    const pkg = data.elements.find((e) => e.id === pkgId);
+    if (!pkg || pkg.type !== "uml-package") return;
+
+    // Everything nested under the package (classes/enums/notes/sub-packages).
+    const moved = new Set<string>();
+    {
+      const queue = [pkgId];
+      while (queue.length) {
+        const cur = queue.shift()!;
+        for (const e of data.elements) {
+          if (e.parentId === cur && !moved.has(e.id)) {
+            moved.add(e.id);
+            queue.push(e.id);
+          }
+        }
+      }
+    }
+    if (moved.size === 0) return;
+
+    setEpCollapseBusyId(pkgId);
+    try {
+      const captured = captureTemplate(data.elements, data.connectors, moved);
+      const subData = {
+        ...data,
+        elements: captured.elements,
+        connectors: captured.connectors,
+        viewport: { x: 0, y: 0, zoom: 1 },
+      };
+      const name = (pkg.label && pkg.label.trim()) || "Package";
+      const res = await fetch("/api/diagrams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          type: "domain",
+          projectId: projectId ?? undefined,
+          data: subData,
+          colorConfig: diagramColorConfig,
+          displayMode,
+        }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        setEpCollapseMsg(`Could not create the linked package diagram (${res.status}). ${txt}`.trim());
+        return;
+      }
+      const created = await res.json();
+      collapsePackage(pkgId, created?.id ?? null);
+    } catch (err) {
+      setEpCollapseMsg(`Collapse failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setEpCollapseBusyId(null);
+    }
+  }
+
   async function handleDeleteTemplate(templateId: string, isBuiltIn = false) {
     // Immediately show as pending delete
     setDeletingTemplateIds(prev => { const next = new Set(prev); next.add(templateId); return next; });
@@ -3575,6 +3651,7 @@ export function DiagramEditor({
           onUpdateProperties={updateProperties}
           onUpdatePropertiesBatch={updatePropertiesBatch}
           onCollapseEpToSubprocess={requestCollapseEpToSubprocess}
+          onCollapsePackage={requestCollapsePackage}
           onUpdateConnectorWaypoints={updateConnectorWaypoints}
           onUpdateConnectorLabel={updateConnectorLabel}
           onSplitConnector={splitConnector}
@@ -3847,6 +3924,22 @@ export function DiagramEditor({
               if (id) void doCollapseEpToSubprocess(id);
             }}
             onCancel={() => setEpCollapseConfirmId(null)}
+          />
+        )}
+
+        {pkgCollapseConfirmId && (
+          <ConfirmDialog
+            title="Collapse Package"
+            message={"The classes inside this package will be moved into a new linked Domain diagram, and the package will show collapsed with its crossing relationships.\n\nDo you want to continue and create a new diagram?"}
+            confirmLabel="Continue"
+            cancelLabel="Cancel"
+            destructive={false}
+            onConfirm={() => {
+              const id = pkgCollapseConfirmId;
+              setPkgCollapseConfirmId(null);
+              if (id) void doCollapsePackage(id);
+            }}
+            onCancel={() => setPkgCollapseConfirmId(null)}
           />
         )}
 

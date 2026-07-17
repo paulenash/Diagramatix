@@ -1494,6 +1494,19 @@ function UmlPackageShape({ el }: { el: DiagramElement }) {
           <tspan key={i} x={el.x + PADX} y={el.y + PADY + labelFontSize * 0.9 + i * lineH}>{line}</tspan>
         ))}
       </text>
+      {/* Collapsed-package drill marker (⊞), bottom-centre — blue when it links
+          to a sub-diagram, signalling a double-click drills into the contents. */}
+      {!!el.properties.linkedDiagramId && (() => {
+        const s = 13, cx = el.x + el.width / 2, my = el.y + el.height - s - 4;
+        return (
+          <g style={{ pointerEvents: "none" }}>
+            <rect x={cx - s / 2} y={my} width={s} height={s} rx={2}
+              fill="#ffffff" stroke="#2563eb" strokeWidth={1.2} />
+            <line x1={cx} y1={my + 3} x2={cx} y2={my + s - 3} stroke="#2563eb" strokeWidth={1.2} />
+            <line x1={cx - s / 2 + 3} y1={my + s / 2} x2={cx + s / 2 - 3} y2={my + s / 2} stroke="#2563eb" strokeWidth={1.2} />
+          </g>
+        );
+      })()}
     </g>
   );
 }

@@ -274,6 +274,28 @@ export function ElementContextMenu({
           </button>
         </div>
       )}
+
+      {/* uml-package → collapse the Data Model into a linked Domain diagram,
+          showing just the package with its crossing relationships. Hidden once
+          already collapsed (it then has a linkedDiagramId). */}
+      {el.type === "uml-package" && !el.properties?.linkedDiagramId && onAction && (
+        <div>
+          {sections.length > 0 && <div className="border-t border-gray-100 my-0.5" />}
+          <div className="px-3 py-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide select-none">
+            Actions
+          </div>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onAction("collapse-package");
+            }}
+            className="text-left w-full px-3 py-0.5 text-sm text-blue-700 hover:bg-blue-50"
+          >
+            Collapse Package…
+          </button>
+        </div>
+      )}
     </div>
   );
 }

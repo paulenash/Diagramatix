@@ -365,6 +365,7 @@ export type Action =
   | { type: "CONVERT_TASK_SUBPROCESS"; payload: { id: string } }
   | { type: "CONVERT_PROCESS_COLLAPSED"; payload: { id: string } }
   | { type: "CONVERT_EP_TO_SUBPROCESS"; payload: { id: string; linkedDiagramId: string | null } }
+  | { type: "CONVERT_PACKAGE_COLLAPSED"; payload: { id: string; linkedDiagramId: string | null } }
   | { type: "CONVERT_EVENT_TYPE"; payload: { id: string; newEventType: "start-event" | "intermediate-event" | "end-event" } }
   | { type: "ADD_SELF_TRANSITION"; payload: {
       elementId: string;
@@ -5014,6 +5015,52 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements, connectors };
     }
 
+    case "CONVERT_PACKAGE_COLLAPSED": {
+      // Collapse a uml-package (a Data Model) into a compact folder whose
+      // interior classes/enums/notes/sub-packages have been moved into a linked
+      // Domain sub-diagram (created by the caller). Everything nested under the
+      // package is REMOVED here; a connector that CROSSED the boundary
+      // re-attaches to the package; purely-interior connectors are dropped.
+      const { id, linkedDiagramId } = action.payload;
+      const pkg = state.elements.find(e => e.id === id);
+      if (!pkg || pkg.type !== "uml-package") return state;
+
+      const desc = getAllDescendantIds(state.elements, id);
+      if (desc.size === 0) return state; // nothing to collapse
+      const removed = desc;
+      const reattach = desc;
+
+      // A collapsed package is a small folder (no children to enclose), centred
+      // on the old package so crossing connectors barely move.
+      const W = Math.max(150, Math.min(pkg.width, 220));
+      const H = 90;
+      const newX = Math.round(pkg.x + pkg.width / 2 - W / 2);
+      const newY = Math.round(pkg.y + pkg.height / 2 - H / 2);
+
+      const elements = state.elements
+        .filter(e => !removed.has(e.id))
+        .map(e => {
+          if (e.id !== id) return e;
+          const props = { ...e.properties };
+          props.collapsed = true;
+          if (linkedDiagramId) props.linkedDiagramId = linkedDiagramId;
+          return { ...e, x: newX, y: newY, width: W, height: H, properties: props };
+        });
+
+      let connectors = state.connectors
+        // Purely-interior connectors moved to the sub-diagram.
+        .filter(c => !(reattach.has(c.sourceId) && reattach.has(c.targetId)))
+        .map(c => {
+          const src = reattach.has(c.sourceId) ? id : c.sourceId;
+          const tgt = reattach.has(c.targetId) ? id : c.targetId;
+          return src === c.sourceId && tgt === c.targetId ? c : { ...c, sourceId: src, targetId: tgt };
+        })
+        // A re-point that collapsed both ends onto the package is a no-op.
+        .filter(c => c.sourceId !== c.targetId);
+      connectors = recomputeAllConnectors(connectors, elements, state.relaxedLayout);
+      return { ...state, elements, connectors };
+    }
+
     case "CONVERT_EVENT_TYPE": {
       const { id, newEventType } = action.payload;
       const el = state.elements.find(e => e.id === id);
@@ -9401,6 +9448,10 @@ export function useDiagram(initialData: DiagramData) {
     convertEpToSubprocess: useCallback((id: string, linkedDiagramId: string | null) => {
       pushHistory(snapshotData());
       dispatch({ type: "CONVERT_EP_TO_SUBPROCESS", payload: { id, linkedDiagramId } });
+    }, []),
+    collapsePackage: useCallback((id: string, linkedDiagramId: string | null) => {
+      pushHistory(snapshotData());
+      dispatch({ type: "CONVERT_PACKAGE_COLLAPSED", payload: { id, linkedDiagramId } });
     }, []),
     convertEventType: useCallback((id: string, newEventType: "start-event" | "intermediate-event" | "end-event") => {
       pushHistory(snapshotData());

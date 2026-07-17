@@ -304,6 +304,7 @@ interface Props {
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
   onUpdatePropertiesBatch?: (updates: Array<{ id: string; properties: Record<string, unknown> }>) => void;
   onCollapseEpToSubprocess?: (id: string) => void;
+  onCollapsePackage?: (id: string) => void;
   onUpdateConnectorWaypoints?: (id: string, waypoints: Point[]) => void;
   onUpdateConnectorLabel?: (id: string, label?: string, offsetX?: number, offsetY?: number, width?: number) => void;
   onSplitConnector?: (symbolType: SymbolType, position: Point, connectorId: string, taskType?: BpmnTaskType, eventType?: EventType) => void;
@@ -557,6 +558,7 @@ export function Canvas({
   onUpdateProperties,
   onUpdatePropertiesBatch,
   onCollapseEpToSubprocess,
+  onCollapsePackage,
   onUpdateConnectorWaypoints,
   onUpdateConnectorLabel,
   onSplitConnector,
@@ -5231,7 +5233,7 @@ export function Canvas({
                   // Gateway shape double-click never opens the label editor —
                   // the label rect has its own dblclick handler for that.
                   if (el.type === "gateway") return;
-                  const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case" || el.type === "archimate-shape") ? el.properties.linkedDiagramId as string | undefined : undefined;
+                  const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case" || el.type === "archimate-shape" || el.type === "uml-package") ? el.properties.linkedDiagramId as string | undefined : undefined;
                   if (linkedId && onDrillIntoSubprocess) {
                     onDrillIntoSubprocess(linkedId);
                   } else {
@@ -5771,7 +5773,7 @@ export function Canvas({
                 // Gateway shape double-click never opens the label editor —
                 // the label rect has its own dblclick handler for that.
                 if (el.type === "gateway") return;
-                const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case" || el.type === "archimate-shape") ? el.properties.linkedDiagramId as string | undefined : undefined;
+                const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case" || el.type === "archimate-shape" || el.type === "uml-package") ? el.properties.linkedDiagramId as string | undefined : undefined;
                 if (linkedId && onDrillIntoSubprocess) {
                   onDrillIntoSubprocess(linkedId);
                 } else {
@@ -7350,6 +7352,9 @@ export function Canvas({
               setElementContextMenu(null);
               if (action === "collapse-ep" && el.type === "subprocess-expanded") {
                 onCollapseEpToSubprocess?.(el.id);
+              }
+              if (action === "collapse-package" && el.type === "uml-package") {
+                onCollapsePackage?.(el.id);
               }
             }}
             onClose={() => setElementContextMenu(null)}
