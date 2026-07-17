@@ -60,6 +60,22 @@ export function selfLoopWaypoints(
   return [center, srcPt, cp1, cp2, tgtPt, center];
 }
 
+/**
+ * Recover the perpendicular depth of a self-loop's parallel segment from its
+ * waypoints ([center, srcEdge, corner, corner, tgtEdge, center]) — the gap
+ * between the on-boundary edge point (index 1) and its corner (index 2) along
+ * the axis perpendicular to `side`. Returns null when the waypoints aren't a
+ * valid loop yet. Lets a re-route keep whatever depth the user dragged it to.
+ */
+export function measureSelfLoopBulge(waypoints: Point[] | undefined, side: Side): number | null {
+  if (!Array.isArray(waypoints) || waypoints.length < 4) return null;
+  const edge = waypoints[1], corner = waypoints[2];
+  const d = (side === "top" || side === "bottom")
+    ? Math.abs(corner.y - edge.y)
+    : Math.abs(corner.x - edge.x);
+  return d > 1 ? d : null;
+}
+
 export function spreadUmlEndpoints(connectors: Connector[], elements: DiagramElement[]): Connector[] {
   const elMap = new Map(elements.map((e) => [e.id, e]));
   const centreX = (el: DiagramElement) => el.x + el.width / 2;
@@ -1477,7 +1493,12 @@ export function recomputeAllConnectors(
       const side = rawConn.sourceSide ?? "top";
       const srcOff = rawConn.sourceOffsetAlong ?? 0.32;
       const tgtOff = rawConn.targetOffsetAlong ?? 0.68;
-      const bulge = rawConn.selfLoopBulge ?? SELF_LOOP_BULGE;
+      // Preserve the depth the user PLACED the parallel segment at: measure it
+      // from the current waypoints (perpendicular gap between the on-boundary
+      // edge point and its corner) so a re-route after an endpoint move never
+      // shrinks the loop. Fall back to the stored/default bulge.
+      const measured = measureSelfLoopBulge(rawConn.waypoints, side);
+      const bulge = measured ?? rawConn.selfLoopBulge ?? SELF_LOOP_BULGE;
       return {
         ...rawConn,
         sourceSide: side, targetSide: side,

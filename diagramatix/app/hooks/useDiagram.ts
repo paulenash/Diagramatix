@@ -21,7 +21,8 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, SELF_LOOP_BULGE } from "@/app/lib/diagram/routing";
+import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE } from "@/app/lib/diagram/routing";
+import { isUmlConnType } from "@/app/lib/diagram/types";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
@@ -6806,6 +6807,20 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const source = state.elements.find((el) => el.id === updated.sourceId);
         const target = state.elements.find((el) => el.id === updated.targetId);
         if (!source || !target) return conn;
+        // Self-loop: both ends stay on the loop's side (the moved endpoint's new
+        // side); rebuild the 3-segment loop KEEPING the depth the user placed the
+        // parallel segment at (measured from the pre-move waypoints).
+        if (updated.sourceId === updated.targetId && isUmlConnType(updated.type)) {
+          const loopSide = endpoint === "source" ? updated.sourceSide : updated.targetSide;
+          const srcOff = updated.sourceOffsetAlong ?? 0.3;
+          const tgtOff = updated.targetOffsetAlong ?? 0.7;
+          const bulge = measureSelfLoopBulge(conn.waypoints, conn.sourceSide ?? loopSide) ?? conn.selfLoopBulge ?? SELF_LOOP_BULGE;
+          return { ...updated,
+            sourceSide: loopSide, targetSide: loopSide,
+            selfLoopBulge: bulge, routingType: "rectilinear" as RoutingType,
+            waypoints: selfLoopWaypoints(source, loopSide, srcOff, tgtOff, bulge),
+            sourceInvisibleLeader: true, targetInvisibleLeader: true } as Connector;
+        }
         const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
           updated.type === "messageBPMN" && !state.relaxedLayout
             ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,

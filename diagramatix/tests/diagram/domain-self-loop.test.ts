@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { layoutGenericDiagram } from "@/app/lib/diagram/genericLayout";
-import { selfLoopWaypoints, recomputeAllConnectors } from "@/app/lib/diagram/routing";
+import { selfLoopWaypoints, measureSelfLoopBulge, recomputeAllConnectors } from "@/app/lib/diagram/routing";
 import type { DiagramElement, Connector } from "@/app/lib/diagram/types";
 
 describe("self-connector geometry", () => {
@@ -38,6 +38,22 @@ describe("self-connector geometry", () => {
     expect(out.waypoints).toHaveLength(6);
     expect(out.waypoints[1].y).toBe(300);   // rides with the moved element's top
     expect(out.sourceInvisibleLeader).toBe(true);
+  });
+
+  it("PRESERVES the depth the user dragged the parallel segment to on re-route", () => {
+    // User pulled the loop out to 120px depth (waypoints reflect it), but the
+    // stored selfLoopBulge is still the default 60. A re-route must keep 120.
+    const deep = selfLoopWaypoints(el, "top", 0.3, 0.7, 120);
+    expect(measureSelfLoopBulge(deep, "top")).toBe(120);
+    const conn: Connector = {
+      id: "s", sourceId: "c", targetId: "c", type: "uml-composition",
+      sourceSide: "top", targetSide: "top", sourceOffsetAlong: 0.3, targetOffsetAlong: 0.7,
+      selfLoopBulge: 60, directionType: "non-directed", routingType: "rectilinear",
+      sourceInvisibleLeader: true, targetInvisibleLeader: true, waypoints: deep,
+    };
+    const [out] = recomputeAllConnectors([conn], [el]);
+    expect(out.selfLoopBulge).toBe(120);                       // not shrunk to 60
+    expect(measureSelfLoopBulge(out.waypoints, "top")).toBe(120);
   });
 });
 
