@@ -12,6 +12,65 @@ let _umlStickyRouting = true;
 export function setUmlStickyRouting(on: boolean): void { _umlStickyRouting = on; }
 export function getUmlStickyRouting(): boolean { return _umlStickyRouting; }
 
+/**
+ * D5.01 / D5.02 (Domain connector routing) — spread the attachment points of
+ * UML connectors that share an element side. N connectors on the same side
+ * divide it into N+1 equal sections (offsets 1/(N+1) … N/(N+1)) instead of all
+ * stacking at 0.5, leaving room for multiplicity/role labels. Within each side
+ * the connectors are ordered by the position of their opposite endpoint, which
+ * also removes their mutual crossings (the shared-side case of D5.02). A side
+ * with a single connector re-centres at 0.5.
+ *
+ * Operates on connectors whose `sourceSide`/`targetSide` are already settled;
+ * only UML connector types are touched. Returns new Connector objects with
+ * `sourceOffsetAlong`/`targetOffsetAlong` set — the caller recomputes waypoints
+ * afterwards (the sticky router preserves these offsets while the side holds).
+ */
+export function spreadUmlEndpoints(connectors: Connector[], elements: DiagramElement[]): Connector[] {
+  const elMap = new Map(elements.map((e) => [e.id, e]));
+  const centreX = (el: DiagramElement) => el.x + el.width / 2;
+  const centreY = (el: DiagramElement) => el.y + el.height / 2;
+  type Ref = { i: number; end: "src" | "tgt" };
+  const groups = new Map<string, Ref[]>();
+  connectors.forEach((c, i) => {
+    if (!isUmlConnType(c.type)) return;
+    if (!elMap.has(c.sourceId) || !elMap.has(c.targetId)) return;
+    const push = (key: string, ref: Ref) => { const l = groups.get(key); if (l) l.push(ref); else groups.set(key, [ref]); };
+    push(`${c.sourceId}|${c.sourceSide}`, { i, end: "src" });
+    push(`${c.targetId}|${c.targetSide}`, { i, end: "tgt" });
+  });
+  const srcOff = new Map<number, number>();
+  const tgtOff = new Map<number, number>();
+  for (const [key, list] of groups) {
+    const side = key.split("|")[1];
+    if (list.length === 1) {
+      const ref = list[0];
+      (ref.end === "src" ? srcOff : tgtOff).set(ref.i, 0.5);
+      continue;
+    }
+    const horiz = side === "top" || side === "bottom";
+    // Order along the side by the OPPOSITE endpoint's centre → siblings don't cross.
+    list.sort((a, b) => {
+      const ea = elMap.get(a.end === "src" ? connectors[a.i].targetId : connectors[a.i].sourceId)!;
+      const eb = elMap.get(b.end === "src" ? connectors[b.i].targetId : connectors[b.i].sourceId)!;
+      return horiz ? centreX(ea) - centreX(eb) : centreY(ea) - centreY(eb);
+    });
+    list.forEach((ref, idx) => {
+      const off = (idx + 1) / (list.length + 1);
+      (ref.end === "src" ? srcOff : tgtOff).set(ref.i, off);
+    });
+  }
+  return connectors.map((c, i) => {
+    const so = srcOff.get(i), to = tgtOff.get(i);
+    if (so === undefined && to === undefined) return c;
+    return {
+      ...c,
+      ...(so !== undefined ? { sourceOffsetAlong: so } : {}),
+      ...(to !== undefined ? { targetOffsetAlong: to } : {}),
+    };
+  });
+}
+
 function getBounds(el: DiagramElement): Bounds {
   return { x: el.x, y: el.y, width: el.width, height: el.height };
 }

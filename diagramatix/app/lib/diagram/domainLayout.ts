@@ -7,7 +7,7 @@
  * falls back to auto-layout.
  */
 import type { DiagramData, DiagramElement, Connector, Side } from "./types";
-import { recomputeAllConnectors } from "./routing";
+import { recomputeAllConnectors, spreadUmlEndpoints } from "./routing";
 import { autoResizeUmlElement } from "./umlAutoSize";
 
 interface AiBounds { x: number; y: number; w: number; h: number }
@@ -251,9 +251,14 @@ export function layoutDomainPreserved(
       } as Connector;
     });
 
+  // Settle sides first, then spread connectors sharing an element side (D5.01/
+  // D5.02) so they don't stack, then recompute waypoints on the spread offsets
+  // (the sticky router preserves them while the side holds).
+  const settled = recomputeAllConnectors(connectors, elements);
+  const spread = spreadUmlEndpoints(settled, elements);
   return {
     elements,
-    connectors: recomputeAllConnectors(connectors, elements),
+    connectors: recomputeAllConnectors(spread, elements),
     viewport: { x: 0, y: 0, zoom: 1 },
   };
 }

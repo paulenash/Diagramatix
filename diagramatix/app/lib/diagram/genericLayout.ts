@@ -5,7 +5,7 @@
 
 import type { DiagramData, DiagramElement, Connector, Point, Side } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
-import { computeWaypoints } from "./routing";
+import { computeWaypoints, spreadUmlEndpoints } from "./routing";
 import { CHEVRON_THEMES } from "./chevronThemes";
 import { layoutStateMachine, layoutStateMachinePreserved } from "./stateMachineLayout";
 import { layoutDomainPreserved } from "./domainLayout";
@@ -731,13 +731,17 @@ export function layoutGenericDiagram(
     connectors.push(conn);
   }
 
-  // Compute waypoints
-  const computed = connectors.map(conn => {
+  // D5.01/D5.02 (Domain only): spread connectors that share an element side so
+  // they don't stack on top of each other, ordered to avoid mutual crossings.
+  const spread = diagramType === "domain" ? spreadUmlEndpoints(connectors, elements) : connectors;
+
+  // Compute waypoints (honouring the spread offsets for domain)
+  const computed = spread.map(conn => {
     const src = elMap.get(conn.sourceId);
     const tgt = elMap.get(conn.targetId);
     if (!src || !tgt) return conn;
     try {
-      const r = computeWaypoints(src, tgt, elements, conn.sourceSide, conn.targetSide, conn.routingType, 0.5, 0.5);
+      const r = computeWaypoints(src, tgt, elements, conn.sourceSide, conn.targetSide, conn.routingType, conn.sourceOffsetAlong ?? 0.5, conn.targetOffsetAlong ?? 0.5);
       return { ...conn, waypoints: r.waypoints, sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
     } catch { return conn; }
   });
