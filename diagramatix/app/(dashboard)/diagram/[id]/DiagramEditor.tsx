@@ -2330,6 +2330,9 @@ export function DiagramEditor({
         elements: captured.elements,
         connectors: captured.connectors,
         viewport: { x: 0, y: 0, zoom: 1 },
+        // Show THIS diagram as the child's parent immediately (scan-links later
+        // reconciles it authoritatively from the package's linkedDiagramId).
+        parentDiagramIds: [diagramId],
       };
       const name = (pkg.label && pkg.label.trim()) || "Package";
       const res = await fetch("/api/diagrams", {

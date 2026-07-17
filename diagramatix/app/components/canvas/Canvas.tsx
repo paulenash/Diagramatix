@@ -1058,7 +1058,7 @@ export function Canvas({
   //   event       → Trigger options
   const [elementContextMenu, setElementContextMenu] = useState<{
     elementId: string;
-    kind: "task" | "gateway" | "subprocess" | "data-object" | "event";
+    kind: "task" | "gateway" | "subprocess" | "data-object" | "event" | "package";
     screenX: number;
     screenY: number;
   } | null>(null);
@@ -4968,6 +4968,26 @@ export function Canvas({
           const tgt = e.target as Element | null;
           if (tgt?.closest?.("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
           e.preventDefault();
+          // Domain (UML): right-click a uml-package → its Actions menu (Collapse
+          // Package…). Nothing else on a domain canvas has a right-click menu.
+          if (!readOnly && diagramType === "domain") {
+            const drect = svgRef.current?.getBoundingClientRect();
+            if (!drect) return;
+            const wp = svgToWorld(e.clientX - drect.left, e.clientY - drect.top);
+            // Smallest (innermost) package under the cursor.
+            let pkg: DiagramElement | null = null;
+            for (const el of data.elements) {
+              if (el.type !== "uml-package") continue;
+              if (wp.x < el.x || wp.x > el.x + el.width || wp.y < el.y || wp.y > el.y + el.height) continue;
+              if (!pkg || el.width * el.height < pkg.width * pkg.height) pkg = el;
+            }
+            // Only offer the menu when there's an action to show (an
+            // un-collapsed package). A collapsed one drills in via double-click.
+            if (pkg && !pkg.properties.linkedDiagramId) {
+              setElementContextMenu({ elementId: pkg.id, kind: "package", screenX: e.clientX - drect.left, screenY: e.clientY - drect.top });
+            }
+            return;
+          }
           // Beyond suppressing the native menu, the Diagramatix quick-add /
           // element menus only apply to these diagram types.
           if (readOnly || (diagramType !== "bpmn" && diagramType !== "state-machine" && diagramType !== "value-chain")) return;

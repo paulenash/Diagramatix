@@ -373,15 +373,20 @@ export async function POST(req: Request, { params }: Params) {
     }
 
     // (c) Recompute parentDiagramIds. A "parent" is any other diagram
-    //     containing a non-return-link subprocess/subprocess-expanded
-    //     whose linkedDiagramId equals d.id.
+    //     containing a non-return-link element whose linkedDiagramId equals
+    //     d.id — across EVERY drill-linkable type (subprocess, submachine,
+    //     chevron, use-case, ArchiMate shape, and a collapsed uml-package).
+    const LINK_TYPES = new Set([
+      "subprocess", "subprocess-expanded", "submachine",
+      "chevron-collapsed", "use-case", "archimate-shape", "uml-package",
+    ]);
     const parents: string[] = [];
     for (const other of diagrams) {
       if (other.id === d.id) continue;
       const otherEls = other.data?.elements ?? [];
       const links = otherEls.some(
         (e) =>
-          (e.type === "subprocess" || e.type === "subprocess-expanded") &&
+          LINK_TYPES.has(e.type) &&
           !e.properties?.isReturnLink &&
           (e.properties?.linkedDiagramId as string | undefined) === d.id,
       );

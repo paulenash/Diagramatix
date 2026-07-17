@@ -18,7 +18,7 @@ import type { DiagramElement } from "@/app/lib/diagram/types";
  * Headers are non-focusable; ↑ / ↓ navigate across selectable items and
  * skip section dividers, Enter / Space picks, Esc closes.
  */
-export type ContextMenuKind = "task" | "gateway" | "subprocess" | "data-object" | "event";
+export type ContextMenuKind = "task" | "gateway" | "subprocess" | "data-object" | "event" | "package";
 
 type Opt = { value: string; label: string };
 
@@ -160,6 +160,8 @@ function sectionsFor(kind: ContextMenuKind, el: DiagramElement): Section[] {
       }
       return sections;
     }
+    case "package":
+      return []; // no type-picker sections — just the Collapse Package action
   }
 }
 
