@@ -142,6 +142,58 @@ describe("domain image reproduction (layout preserved from bounds)", () => {
     expect(c.targetSide).toBe("right");
   });
 
+  it("maps image open arrowheads to navigability (directionType / arrowAtSource)", () => {
+    const parsed = {
+      elements: [
+        { id: "a", type: "uml-class", label: "A", bounds: { x: 0.10, y: 0.10, w: 0.2, h: 0.2 } },
+        { id: "b", type: "uml-class", label: "B", bounds: { x: 0.60, y: 0.10, w: 0.2, h: 0.2 } },
+        { id: "c", type: "uml-class", label: "C", bounds: { x: 0.10, y: 0.60, w: 0.2, h: 0.2 } },
+      ],
+      connections: [
+        { sourceId: "a", targetId: "b", type: "uml-association", targetArrow: true },  // arrow at target
+        { sourceId: "a", targetId: "c", type: "uml-association", sourceArrow: true },  // arrow at source
+      ],
+    };
+    const data = layoutGenericDiagram(parsed as never, "domain", { imageAspect: { w: 1000, h: 700 } });
+    const ab = data.connectors.find(c => c.targetId === "b")!;
+    const ac = data.connectors.find(c => c.targetId === "c")!;
+    expect(ab.directionType).toBe("open-directed");
+    expect(ab.arrowAtSource).toBeFalsy();          // arrow points at target
+    expect(ac.directionType).toBe("open-directed");
+    expect(ac.arrowAtSource).toBe(true);           // arrow points at source
+  });
+
+  it("uses the image self-loop attachment offsets and extension depth", () => {
+    const parsed = {
+      elements: [{ id: "s", type: "uml-class", label: "S", bounds: { x: 0.3, y: 0.3, w: 0.3, h: 0.2 } }],
+      connections: [{ sourceId: "s", targetId: "s", type: "uml-association", sourceSide: "bottom",
+        sourceOffsetAlong: 0.2, targetOffsetAlong: 0.5, selfLoopDepthFrac: 0.05 }],
+    };
+    const data = layoutGenericDiagram(parsed as never, "domain", { imageAspect: { w: 1000, h: 700 } });
+    const c = data.connectors[0];
+    expect(c.sourceSide).toBe("bottom");
+    expect(c.sourceOffsetAlong).toBeCloseTo(0.2, 5);
+    expect(c.targetOffsetAlong).toBeCloseTo(0.5, 5);
+    expect(c.selfLoopBulge).toBeCloseTo(0.05 * 1400, 0);   // depthFrac × TARGET_W
+  });
+
+  it("nudges a constraint box OUTWARD to clear its own multiplicity", () => {
+    const parsed = {
+      elements: [
+        { id: "a", type: "uml-class", label: "A", bounds: { x: 0.30, y: 0.55, w: 0.2, h: 0.2 } },
+        { id: "b", type: "uml-class", label: "B", bounds: { x: 0.30, y: 0.10, w: 0.2, h: 0.2 } },
+      ],
+      // Source end on A's TOP with a multiplicity AND a constraint — they would
+      // stack; the constraint must move further up (roles/mults stay put).
+      connections: [{ sourceId: "a", targetId: "b", type: "uml-association", sourceSide: "top", targetSide: "bottom",
+        sourceMultiplicity: "1", sourceConstraint: "{ordered}" }],
+    };
+    const data = layoutGenericDiagram(parsed as never, "domain", { imageAspect: { w: 1000, h: 800 } });
+    const c = data.connectors[0];
+    expect(c.sourceConstraintOffset).toBeTruthy();
+    expect(c.sourceConstraintOffset!.y).toBeLessThan(0);   // pushed up (outward from a top side)
+  });
+
   it("wraps an imported note to several lines instead of one wide line", () => {
     const withNote = {
       elements: [

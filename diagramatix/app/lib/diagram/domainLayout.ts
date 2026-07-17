@@ -6,10 +6,11 @@
  * grid-flowing. Returns null when the geometry is missing/sparse so the caller
  * falls back to auto-layout.
  */
-import type { DiagramData, DiagramElement, Connector, Side } from "./types";
+import type { DiagramData, DiagramElement, Connector, Side, Point } from "./types";
+import { isUmlConnType } from "./types";
 import { computeWaypoints, spreadUmlEndpoints, deconflictUmlSegments, selfLoopWaypoints, SELF_LOOP_BULGE } from "./routing";
 import { autoResizeUmlElement, sizeUmlNote } from "./umlAutoSize";
-import { parseConstraintText, parseEndRole } from "./umlConstraints";
+import { parseConstraintText, parseEndRole, buildConstraintText } from "./umlConstraints";
 
 /** Map an image-read constraint string to the per-end connector fields. */
 function endConstraintFields(end: "source" | "target", raw?: string): Record<string, unknown> {
@@ -21,6 +22,85 @@ function endConstraintFields(end: "source" | "target", raw?: string): Record<str
   if (c.readOnly) out[`${end}ReadOnly`] = true;
   if (c.union)    out[`${end}Union`] = true;
   if (c.other)    out[`${end}ConstraintOther`] = c.other;
+  return out;
+}
+
+// ── Constraint de-overlap ────────────────────────────────────────────────
+// The multiplicity + role labels stay anchored close to the connector end
+// (Paul); only the {…} CONSTRAINT box is nudged perpendicular-outward to clear
+// overlaps with elements, the end's own role/multiplicity, and other
+// constraints. Mirrors the renderer's offset tables so the estimate matches.
+const FS = 10, LINE_H = 13, CHAR_W = 5.5, CONSTRAINT_MAXW = 130;
+type Rect = { x: number; y: number; w: number; h: number };
+const rectsOverlap = (a: Rect, b: Rect, gap = 3) =>
+  a.x < b.x + b.w + gap && a.x + a.w + gap > b.x && a.y < b.y + b.h + gap && a.y + a.h + gap > b.y;
+const multOff = (s: Side) => ({ bottom: { x: -15, y: 15 }, left: { x: -15, y: -15 }, top: { x: -15, y: -15 }, right: { x: 15, y: -15 } }[s]);
+const roleOff = (s: Side) => ({ bottom: { x: 15, y: 15 }, left: { x: -15, y: 15 }, top: { x: 15, y: -15 }, right: { x: 15, y: 15 } }[s]);
+const constraintBase = (s: Side) => { const m = multOff(s); switch (s) { case "bottom": return { x: m.x, y: m.y + LINE_H }; case "top": return { x: m.x, y: m.y - LINE_H }; case "left": return { x: m.x - LINE_H, y: m.y }; case "right": return { x: m.x + LINE_H, y: m.y }; } };
+const outwardDir = (s: Side) => ({ top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } }[s]);
+
+function constraintBoxRect(pt: Point, side: Side, text: string, dx: number, dy: number): Rect {
+  const textW = text.length * CHAR_W;
+  const w = Math.min(CONSTRAINT_MAXW, textW + 6);
+  const lines = Math.max(1, Math.ceil(textW / (CONSTRAINT_MAXW - 6)));
+  const h = lines * LINE_H + 4;
+  const base = constraintBase(side);
+  const anchorX = pt.x + base.x + dx, anchorY = pt.y + base.y + dy;
+  const x = base.x < 0 ? anchorX - w : anchorX; // grows away from the element
+  return { x, y: anchorY, w, h };
+}
+
+function deOverlapConstraints(connectors: Connector[], elements: DiagramElement[]): Connector[] {
+  const obstacles: Rect[] = elements.map(e => ({ x: e.x, y: e.y, w: e.width, h: e.height }));
+  interface CEnd { idx: number; end: "source" | "target"; pt: Point; side: Side; text: string; }
+  const cEnds: CEnd[] = [];
+  const endPt = (c: Connector, which: "s" | "t"): Point | null => {
+    const w = c.waypoints; if (!w || w.length < 2) return null;
+    return which === "s" ? (c.sourceInvisibleLeader ? w[1] : w[0])
+                         : (c.targetInvisibleLeader ? w[w.length - 2] : w[w.length - 1]);
+  };
+  const labelRect = (pt: Point, off: { x: number; y: number }, text: string): Rect => {
+    const w = Math.max(10, text.length * CHAR_W);
+    return { x: pt.x + off.x - w / 2, y: pt.y + off.y - LINE_H / 2, w, h: LINE_H };
+  };
+  connectors.forEach((c, idx) => {
+    if (!isUmlConnType(c.type)) return;
+    const sp = endPt(c, "s"), tp = endPt(c, "t");
+    // Roles + multiplicities are fixed obstacles (kept near the endpoint).
+    if (sp) {
+      if (c.sourceMultiplicity) obstacles.push(labelRect(sp, multOff(c.sourceSide), c.sourceMultiplicity));
+      const sr = `${c.sourceVisibility ?? ""}${c.sourceRole ?? ""}`;
+      if (sr) obstacles.push(labelRect(sp, roleOff(c.sourceSide), sr));
+    }
+    if (tp) {
+      if (c.targetMultiplicity) obstacles.push(labelRect(tp, multOff(c.targetSide), c.targetMultiplicity));
+      const tr = `${c.targetVisibility ?? ""}${c.targetRole ?? ""}`;
+      if (tr) obstacles.push(labelRect(tp, roleOff(c.targetSide), tr));
+    }
+    const sc = buildConstraintText({ ordered: c.sourceOrdered, unique: c.sourceUnique, readOnly: c.sourceReadOnly, union: c.sourceUnion, other: c.sourceConstraintOther });
+    const tc = buildConstraintText({ ordered: c.targetOrdered, unique: c.targetUnique, readOnly: c.targetReadOnly, union: c.targetUnion, other: c.targetConstraintOther });
+    if (sp && sc) cEnds.push({ idx, end: "source", pt: sp, side: c.sourceSide, text: sc });
+    if (tp && tc) cEnds.push({ idx, end: "target", pt: tp, side: c.targetSide, text: tc });
+  });
+
+  const placed: Rect[] = [];
+  const out = connectors.map(c => ({ ...c }));
+  const STEP = LINE_H, MAX_STEPS = 8;
+  for (const ce of cEnds) {
+    const dir = outwardDir(ce.side);
+    let best = { dx: 0, dy: 0 };
+    for (let s = 0; s <= MAX_STEPS; s++) {
+      const dx = dir.x * STEP * s, dy = dir.y * STEP * s;
+      const rect = constraintBoxRect(ce.pt, ce.side, ce.text, dx, dy);
+      const hit = obstacles.some(o => rectsOverlap(rect, o)) || placed.some(o => rectsOverlap(rect, o));
+      if (!hit) { best = { dx, dy }; placed.push(rect); break; }
+      if (s === MAX_STEPS) { best = { dx, dy }; placed.push(rect); } // give up: keep furthest tried
+    }
+    if (best.dx !== 0 || best.dy !== 0) {
+      const field = ce.end === "source" ? "sourceConstraintOffset" : "targetConstraintOffset";
+      (out[ce.idx] as unknown as Record<string, Point>)[field] = { x: best.dx, y: best.dy };
+    }
+  }
   return out;
 }
 
@@ -41,6 +121,11 @@ interface AiConn {
   sourceRole?: string; targetRole?: string;
   sourceConstraint?: string; targetConstraint?: string;
   sourceDerived?: boolean; targetDerived?: boolean;
+  // Navigability: an OPEN arrowhead drawn at that end.
+  sourceArrow?: boolean; targetArrow?: boolean;
+  // Self-connector geometry read off the image.
+  sourceOffsetAlong?: number; targetOffsetAlong?: number;
+  selfLoopDepthFrac?: number; // loop extension as a fraction of image width
 }
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -292,10 +377,23 @@ export function layoutDomainPreserved(
         : c.routingType === "rectilinear" ? "rectilinear"
         : "rectilinear";
       // Self-connector (a relationship from a class to ITSELF): both ends sit on
-      // one side, spread apart, and recomputeAllConnectors builds the 3-segment
-      // loop. Choose the reported side, else "top".
+      // one side; use the attachment points + extension the image reported so the
+      // loop matches the drawing (fall back to sensible defaults).
       const isSelf = c.sourceId === c.targetId;
       const selfSide = (SIDES.has(c.sourceSide as Side) ? c.sourceSide : "top") as Connector["sourceSide"];
+      const selfSrcOff = typeof c.sourceOffsetAlong === "number" ? clamp01(c.sourceOffsetAlong) : 0.3;
+      const selfTgtOff = typeof c.targetOffsetAlong === "number" ? clamp01(c.targetOffsetAlong) : 0.7;
+      const selfBulge = typeof c.selfLoopDepthFrac === "number" && c.selfLoopDepthFrac > 0
+        ? Math.max(24, Math.min(320, c.selfLoopDepthFrac * TARGET_W)) : SELF_LOOP_BULGE;
+      // Navigability: map open arrowheads to the directed/both direction model.
+      // Only associations carry navigability arrows (agg/comp/etc. have their own
+      // end markers).
+      const srcArrow = type === "uml-association" && c.sourceArrow === true;
+      const tgtArrow = type === "uml-association" && c.targetArrow === true;
+      const directionType: Connector["directionType"] =
+        srcArrow && tgtArrow ? "both"
+        : srcArrow || tgtArrow ? "open-directed"
+        : "non-directed";
       return {
         // Index-suffixed so two connectors between the SAME pair of elements
         // (e.g. the upperValue and lowerValue compositions here) get DISTINCT
@@ -305,9 +403,11 @@ export function layoutDomainPreserved(
         sourceSide: isSelf ? selfSide : (SIDES.has(c.sourceSide as Side) ? c.sourceSide : "right") as Connector["sourceSide"],
         targetSide: isSelf ? selfSide : (SIDES.has(c.targetSide as Side) ? c.targetSide : "left") as Connector["targetSide"],
         type,
-        directionType: "non-directed",
+        directionType,
+        // Open arrow at the SOURCE end → arrowAtSource (renderer flips the marker).
+        ...(srcArrow && !tgtArrow ? { arrowAtSource: true } : {}),
         routingType: isSelf ? "rectilinear" : routingType,
-        ...(isSelf ? { sourceOffsetAlong: 0.3, targetOffsetAlong: 0.7, selfLoopBulge: SELF_LOOP_BULGE } : {}),
+        ...(isSelf ? { sourceOffsetAlong: selfSrcOff, targetOffsetAlong: selfTgtOff, selfLoopBulge: selfBulge } : {}),
         sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
         ...(c.sourceMultiplicity ? { sourceMultiplicity: c.sourceMultiplicity } : {}),
         ...(c.targetMultiplicity ? { targetMultiplicity: c.targetMultiplicity } : {}),
@@ -345,7 +445,9 @@ export function layoutDomainPreserved(
   });
   return {
     elements,
-    connectors: deconflictUmlSegments(routed), // D4.05: pull apart overlapping trunks
+    // D4.05: pull apart overlapping trunks, then nudge constraint boxes clear of
+    // roles/multiplicities/elements/other constraints (roles + mults stay put).
+    connectors: deOverlapConstraints(deconflictUmlSegments(routed), elements),
     viewport: { x: 0, y: 0, zoom: 1 },
   };
 }
