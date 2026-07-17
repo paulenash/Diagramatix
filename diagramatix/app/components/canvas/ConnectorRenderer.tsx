@@ -508,6 +508,15 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
         onMouseDown={handleLabelMouseDown}
         onDoubleClick={handleDoubleClick}
       />
+      {/* Dependency «stereotype»: an OPAQUE box just fitting the text, so the
+          label obscures the connector line running underneath it (#3). */}
+      {connector.type === "uml-dependency" && !isEditing && lines.some(l => l.trim()) && (() => {
+        const textW = Math.max(...lines.map(l => l.length * avgCharWidth)) + 6;
+        return (
+          <rect x={lCx - textW / 2} y={lTy - 1} width={textW} height={lHeight + 2}
+            fill="white" rx={2} style={{ pointerEvents: "none" }} />
+        );
+      })()}
       {/* Label text (hidden while editing) */}
       {!isEditing && (
         <text textAnchor="middle" fontSize={fontSize} fill="#374151" style={{ pointerEvents: "none", userSelect: "none" }}>

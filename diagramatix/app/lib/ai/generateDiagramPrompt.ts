@@ -129,9 +129,10 @@ IMAGE INPUT — when an image of a UML class / domain diagram is attached, repro
 - a plain line, or a line with an open arrowhead + role/multiplicity labels → "uml-association" (put multiplicities in "sourceMultiplicity"/"targetMultiplicity").
 - a hollow diamond at one end → "uml-aggregation"; a FILLED (solid) diamond → "uml-composition". Diamonds are often SMALL and FAINT — relax your threshold: if you see ANY diamond-ish marker at a line end, classify it as aggregation or composition (never miss one as a plain association); when it looks filled or you can't tell hollow-vs-filled, prefer "uml-composition".
 - a hollow triangle on a SOLID line → "uml-generalisation"; a hollow triangle on a DASHED line → "uml-realisation".
-- an open arrow on a DASHED line → "uml-dependency".
+- an open arrow on a DASHED line → "uml-dependency". A dependency usually carries a «stereotype» label near its middle (e.g. «use», «create», «call») — put it in the connection "label" WITH the guillemets (default «use» if it has none).
 - a solid line between two packages ending in a circle-with-a-cross ⊕ → "uml-containment".
 - a DASHED line (no arrowhead) from a folded-corner note to another shape → "uml-note-anchor".
+- ROUTING — for EACH connection add "routingType": "direct" if it is drawn as a STRAIGHT line, or "rectilinear" if it is drawn with RIGHT-ANGLE bends, matching the image. (Generalisation, realisation and dependency are usually straight → "direct".)
 
 CONNECTION DIRECTION — the arrowhead / diamond / triangle / ⊕ ALWAYS sits at the TARGET end; the plain (unmarked) end is the SOURCE. Read the marker off the drawing and set source/target so the marked end is the target:
 - generalisation/realisation: source = the SUBTYPE (child); target = the SUPERTYPE (parent), where the hollow triangle sits. Several children pointing to one parent ALL have target = that parent (never the child).

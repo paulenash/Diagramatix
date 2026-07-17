@@ -86,6 +86,29 @@ describe("domain image reproduction (layout preserved from bounds)", () => {
     expect(gapAB).toBeLessThan(160);
   });
 
+  it("D4.06 — separates classes the image drew overlapping, favouring a horizontal gap", () => {
+    // The AI reports two classes whose image bounds OVERLAP (same region).
+    const overlapping = {
+      elements: [
+        { id: "a", type: "uml-class", label: "AccountHolder",
+          bounds: { x: 0.20, y: 0.30, w: 0.30, h: 0.25 } },
+        { id: "b", type: "uml-class", label: "SavingsAccount",
+          bounds: { x: 0.28, y: 0.34, w: 0.30, h: 0.25 } },
+      ],
+      connections: [],
+    };
+    const data = layoutGenericDiagram(overlapping as never, "domain", { imageAspect: { w: 1000, h: 700 } });
+    const a = data.elements.find(e => e.id === "a")!;
+    const b = data.elements.find(e => e.id === "b")!;
+    // No overlap.
+    const hit = a.x < b.x + b.width && a.x + a.width > b.x &&
+                a.y < b.y + b.height && a.y + a.height > b.y;
+    expect(hit).toBe(false);
+    // Resolved sideways (horizontal preference) with a real gap between edges.
+    const left = a.x <= b.x ? a : b, right = a.x <= b.x ? b : a;
+    expect(right.x - (left.x + left.width)).toBeGreaterThanOrEqual(30);
+  });
+
   it("wraps an imported note to several lines instead of one wide line", () => {
     const withNote = {
       elements: [

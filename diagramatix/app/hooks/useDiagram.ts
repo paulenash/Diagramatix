@@ -6257,7 +6257,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     }
 
     case "ADD_CONNECTOR": {
-      const { sourceId, targetId, connectorType, directionType, routingType, force, initialLabel } = action.payload;
+      const { sourceId, targetId, connectorType, directionType, routingType: payloadRoutingType, force, initialLabel } = action.payload;
+      // Domain: generalisation / realisation / dependency default to DIRECT
+      // (straight) lines when drawn manually (matches AI text generation).
+      const routingType: RoutingType =
+        (connectorType === "uml-generalisation" || connectorType === "uml-realisation" || connectorType === "uml-dependency")
+          ? "direct" : payloadRoutingType;
       // eslint-disable-next-line prefer-const
       let { sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong } = action.payload;
       const source = state.elements.find((el) => el.id === sourceId);
@@ -6550,6 +6555,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         targetInvisibleLeader,
         waypoints,
         label:        initialLabel !== undefined ? initialLabel
+                    : connectorType === "uml-dependency" ? "«use»"
                     : isFlow       ? `flow ${flowCount + 1}`
                     : isFromInitialState ? ""
                     : isTransition ? `transition ${transitionCount + 1}`

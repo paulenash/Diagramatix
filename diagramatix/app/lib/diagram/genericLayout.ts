@@ -695,7 +695,10 @@ export function layoutGenericDiagram(
     }
 
     const connType = c.type ?? defaultConnType[diagramType] ?? "sequence";
-    const routing = defaultRouting[diagramType] ?? "rectilinear";
+    // Domain: generalisation / realisation / dependency default to DIRECT lines.
+    const umlDirect = diagramType === "domain" &&
+      (connType === "uml-generalisation" || connType === "uml-realisation" || connType === "uml-dependency");
+    const routing = umlDirect ? "direct" : (defaultRouting[diagramType] ?? "rectilinear");
     let direction = defaultDirection[diagramType] ?? "directed";
 
     // Hourglass actors: ensure connector is directed from hourglass → process
@@ -736,7 +739,8 @@ export function layoutGenericDiagram(
       sourceInvisibleLeader: false,
       targetInvisibleLeader: false,
       waypoints: [] as Point[],
-      label: c.label ?? "",
+      // Dependency default stereotype «use» when the AI gives none.
+      label: c.label ?? (connType === "uml-dependency" ? "«use»" : ""),
       ...(c.sourceMultiplicity ? { sourceMultiplicity: c.sourceMultiplicity } : {}),
       ...(c.targetMultiplicity ? { targetMultiplicity: c.targetMultiplicity } : {}),
     } as Connector;

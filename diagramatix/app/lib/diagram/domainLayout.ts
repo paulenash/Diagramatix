@@ -21,6 +21,7 @@ interface AiEl {
 }
 interface AiConn {
   sourceId: string; targetId: string; type?: string; label?: string;
+  routingType?: string;
   sourceSide?: string; targetSide?: string;
   sourceMultiplicity?: string; targetMultiplicity?: string;
   sourceRole?: string; targetRole?: string;
@@ -186,6 +187,48 @@ export function layoutDomainPreserved(
     }
   }
 
+  // D4.06 — SEPARATE overlapping entities/enums. The compaction above only
+  // avoids INTRODUCING overlaps; boxes that already overlap (the image drew them
+  // touching, or content-sizing grew a box past its neighbour's gap) still need
+  // pulling apart. Push any pair closer than the minimum gap apart along their
+  // axis of least penetration — the horizontal gap is larger, so overlaps
+  // resolve sideways by preference (Paul: "especially in the horizontal
+  // direction"). Iterative relaxation converges quickly for the handful of
+  // boxes in a class diagram.
+  if (movers.length >= 2) {
+    const HGAP = 40, VGAP = 24;
+    for (let pass = 0; pass < 60; pass++) {
+      let moved = false;
+      for (let i = 0; i < movers.length; i++) {
+        for (let j = i + 1; j < movers.length; j++) {
+          const a = movers[i], b = movers[j];
+          const ax2 = a.x + a.width, ay2 = a.y + a.height;
+          const bx2 = b.x + b.width, by2 = b.y + b.height;
+          // Signed overlap incl. the required gap on each axis (>0 == too close).
+          const ox = Math.min(ax2 + HGAP, bx2 + HGAP) - Math.max(a.x - HGAP, b.x - HGAP) - HGAP;
+          const oy = Math.min(ay2 + VGAP, by2 + VGAP) - Math.max(a.y - VGAP, b.y - VGAP) - VGAP;
+          if (ox <= 0 || oy <= 0) continue; // already clear on at least one axis
+          const acx = a.x + a.width / 2, bcx = b.x + b.width / 2;
+          const acy = a.y + a.height / 2, bcy = b.y + b.height / 2;
+          // Push apart along the axis the boxes are already more separated on,
+          // biased HORIZONTAL (Paul: "especially in the horizontal direction").
+          // Side-by-side boxes spread sideways; a genuine parent-above-child
+          // stack (centres near-aligned in x) still resolves vertically.
+          const dcx = Math.abs(bcx - acx), dcy = Math.abs(bcy - acy);
+          if (dcx * 1.6 >= dcy) {
+            const push = ox / 2, dir = acx <= bcx ? -1 : 1;
+            a.x = Math.round(a.x + dir * push); b.x = Math.round(b.x - dir * push);
+          } else {
+            const push = oy / 2, dir = acy <= bcy ? -1 : 1;
+            a.y = Math.round(a.y + dir * push); b.y = Math.round(b.y - dir * push);
+          }
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+  }
+
   // Grow each package to enclose its members (image bounds are approximate).
   const HEADER = 30, PAD = 16;
   for (const c of elements) {
@@ -211,7 +254,14 @@ export function layoutDomainPreserved(
     .filter(c => elIds.has(c.sourceId) && elIds.has(c.targetId))
     .map(c => {
       const type = (c.type ?? "uml-association") as Connector["type"];
-      const direct = type === "uml-note-anchor" || type === "uml-containment";
+      // Mimic how the connector was drawn in the image when the AI reports it
+      // (straight = direct, right-angled = rectilinear); note-anchor / containment
+      // are always direct.
+      const alwaysDirect = type === "uml-note-anchor" || type === "uml-containment";
+      const routingType: Connector["routingType"] = alwaysDirect ? "direct"
+        : c.routingType === "direct" ? "direct"
+        : c.routingType === "rectilinear" ? "rectilinear"
+        : "rectilinear";
       return {
         id: `conn-${c.sourceId}-${c.targetId}`,
         sourceId: c.sourceId, targetId: c.targetId,
@@ -219,7 +269,7 @@ export function layoutDomainPreserved(
         targetSide: (SIDES.has(c.targetSide as Side) ? c.targetSide : "left") as Connector["targetSide"],
         type,
         directionType: "non-directed",
-        routingType: direct ? "direct" : "rectilinear",
+        routingType,
         sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
         ...(c.sourceMultiplicity ? { sourceMultiplicity: c.sourceMultiplicity } : {}),
         ...(c.targetMultiplicity ? { targetMultiplicity: c.targetMultiplicity } : {}),

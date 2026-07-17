@@ -1432,9 +1432,9 @@ export function PropertiesPanel({
                           placeholder="e.g. uses" />
                       </div>
                     )}
-                    {/* Name */}
-                    {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
-                      connector.type === "uml-composition") && onUpdateConnectorFields && (
+                    {/* Name \u2014 associations only (composition/aggregation don't
+                        carry a name or reading direction, #4). */}
+                    {connector.type === "uml-association" && onUpdateConnectorFields && (
                       <div className="flex items-center gap-1">
                         <span className={labelCls}>Name:</span>
                         <input type="text" className={"flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"}
@@ -1444,20 +1444,27 @@ export function PropertiesPanel({
                           placeholder="association name" />
                       </div>
                     )}
-                    {/* Reading Direction */}
-                    {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
-                      connector.type === "uml-composition") && onUpdateConnectorFields && (
-                      <div className="flex items-center gap-1">
-                        <span className={labelCls}>Reading Dir:</span>
-                        <select value={connector.readingDirection ?? "none"}
-                          onChange={e => onUpdateConnectorFields(connector.id, { readingDirection: e.target.value as "none" | "to-source" | "to-target" })}
-                          className={selectCls}>
-                          <option value="none">None</option>
-                          <option value="to-source">{"\u25C0"} To Source</option>
-                          <option value="to-target">To Target {"\u25B6"}</option>
-                        </select>
-                      </div>
-                    )}
+                    {/* Reading Direction \u2014 associations only; greyed out until the
+                        association has a Name (a reading direction reads the name,
+                        #5a). The select shows the current choice and offers the
+                        alternatives + None (#5b). */}
+                    {connector.type === "uml-association" && onUpdateConnectorFields && (() => {
+                      const hasName = !!(connector.associationName ?? "").trim();
+                      const rd = connector.readingDirection ?? "none";
+                      return (
+                        <div className="flex items-center gap-1">
+                          <span className={`${labelCls} ${hasName ? "" : "opacity-40"}`}>Reading Dir:</span>
+                          <select value={rd} disabled={!hasName}
+                            onChange={e => onUpdateConnectorFields(connector.id, { readingDirection: e.target.value as "none" | "to-source" | "to-target" })}
+                            className={`${selectCls} ${hasName ? "opacity-100" : "opacity-40 cursor-not-allowed"}`}
+                            title={hasName ? undefined : "Add an association Name first"}>
+                            <option value="none">None</option>
+                            <option value="to-source">{"\u25C0"} To Source</option>
+                            <option value="to-target">To Target {"\u25B6"}</option>
+                          </select>
+                        </div>
+                      );
+                    })()}
                     {/* Navigability */}
                     {connector.type === "uml-association" && !isClassEnumConn && onUpdateConnectorDirection && onUpdateConnectorFields && (
                       <div className="flex items-center gap-1">
@@ -1634,8 +1641,9 @@ export function PropertiesPanel({
           })();
           const showDirection = !involvesAnnotation &&
             connector.type !== "messageBPMN" &&
-            connector.type !== "uml-association" && connector.type !== "uml-aggregation" &&
-            connector.type !== "uml-composition" && connector.type !== "uml-generalisation" &&
+            // Domain (UML) connectors carry their own end semantics (fixed
+            // arrowheads / diamonds / triangles) — no generic Direction control.
+            !isUmlConnType(connector.type) &&
             (isAssocBPMN || isAssocPC ||
             (connector.type !== "sequence" && connector.type !== "transition" && connector.type !== "flow") ||
             connector.routingType === "direct");
