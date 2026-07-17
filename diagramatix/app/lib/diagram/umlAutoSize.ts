@@ -110,14 +110,14 @@ export function autoResizeUmlElement(el: DiagramElement, nameSidePad = 0, fontSc
 /** Approximate width of one glyph as a fraction of the font size, calibrated to
  *  a sans-serif (the canvas font). Good enough to predict browser line-wrapping. */
 function charEm(ch: string): number {
-  if (ch === " ") return 0.28;
-  if ("iljI|.,:;'!".includes(ch)) return 0.26;
-  if ("ftr()[]{}/\\-".includes(ch)) return 0.34;
-  if (ch === "m" || ch === "M" || ch === "W") return 0.85;
-  if (ch === "w") return 0.72;
-  if (ch >= "A" && ch <= "Z") return 0.68;
-  if (ch >= "0" && ch <= "9") return 0.56;
-  return 0.53; // default lowercase
+  if (ch === " ") return 0.25;
+  if ("iljI|.,:;'!".includes(ch)) return 0.23;
+  if ("ftr()[]{}/\\-".includes(ch)) return 0.31;
+  if (ch === "m" || ch === "M" || ch === "W") return 0.78;
+  if (ch === "w") return 0.66;
+  if (ch >= "A" && ch <= "Z") return 0.62;
+  if (ch >= "0" && ch <= "9") return 0.52;
+  return 0.48; // default lowercase
 }
 function textWidthPx(s: string, fontSize: number): number {
   let w = 0;
