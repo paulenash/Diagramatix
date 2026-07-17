@@ -1280,9 +1280,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
 
         return (
           <g>
-            {/* Source end: Role+Vis on one side, Mult on other, Constraints same side as Mult */}
-            {(srcRole || srcVis) && <EndLabel text={srcRole ?? ""}
-              prefix={srcVis ?? undefined} prefixLarger
+            {/* Source end: visibility + role as ONE token (e.g. "+ownerUpper",
+                "+/upper") — inline at a single size so the visibility character
+                never overlaps the name. */}
+            {(srcRole || srcVis) && <EndLabel text={`${srcVis ?? ""}${srcRole ?? ""}`}
               anchorX={srcRoleBaseX} anchorY={srcRoleBaseY}
               offsetField="sourceRoleOffset" offset={connector.sourceRoleOffset} anchor={srcRoleAnchor} />}
             {srcMult && <EndLabel text={srcMult} bold
@@ -1301,8 +1302,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
               anchorY={srcPt.y + constraintOffset(connector.sourceSide, srcConstraint ? 1 : 0).cy}
               offsetField="sourceQualifierOffset" offset={connector.sourceQualifierOffset} anchor={srcAnchor} />}
             {/* Target end: same layout */}
-            {(tgtRole || tgtVis) && <EndLabel text={tgtRole ?? ""}
-              prefix={tgtVis ?? undefined} prefixLarger
+            {(tgtRole || tgtVis) && <EndLabel text={`${tgtVis ?? ""}${tgtRole ?? ""}`}
               anchorX={tgtRoleBaseX} anchorY={tgtRoleBaseY}
               offsetField="targetRoleOffset" offset={connector.targetRoleOffset} anchor={tgtRoleAnchor} />}
             {tgtMult && <EndLabel text={tgtMult} bold

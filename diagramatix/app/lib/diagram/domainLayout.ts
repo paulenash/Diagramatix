@@ -9,7 +9,7 @@
 import type { DiagramData, DiagramElement, Connector, Side } from "./types";
 import { recomputeAllConnectors, spreadUmlEndpoints, deconflictUmlSegments } from "./routing";
 import { autoResizeUmlElement, sizeUmlNote } from "./umlAutoSize";
-import { parseConstraintText } from "./umlConstraints";
+import { parseConstraintText, parseEndRole } from "./umlConstraints";
 
 /** Map an image-read constraint string to the per-end connector fields. */
 function endConstraintFields(end: "source" | "target", raw?: string): Record<string, unknown> {
@@ -268,8 +268,11 @@ export function layoutDomainPreserved(
   const SIDES = new Set<Side>(["top", "right", "bottom", "left"]);
   const connectors: Connector[] = aiConnections
     .filter(c => elIds.has(c.sourceId) && elIds.has(c.targetId))
-    .map(c => {
+    .map((c, i) => {
       const type = (c.type ?? "uml-association") as Connector["type"];
+      // Parse a leading visibility (+ - # ~) and derived "/" out of each role.
+      const sr = parseEndRole(c.sourceRole);
+      const tr = parseEndRole(c.targetRole);
       // Mimic how the connector was drawn in the image when the AI reports it
       // (straight = direct, right-angled = rectilinear); note-anchor / containment
       // are always direct.
@@ -279,7 +282,10 @@ export function layoutDomainPreserved(
         : c.routingType === "rectilinear" ? "rectilinear"
         : "rectilinear";
       return {
-        id: `conn-${c.sourceId}-${c.targetId}`,
+        // Index-suffixed so two connectors between the SAME pair of elements
+        // (e.g. the upperValue and lowerValue compositions here) get DISTINCT
+        // ids — duplicate ids collapse to a single rendered connector.
+        id: `conn-${c.sourceId}-${c.targetId}-${i}`,
         sourceId: c.sourceId, targetId: c.targetId,
         sourceSide: (SIDES.has(c.sourceSide as Side) ? c.sourceSide : "right") as Connector["sourceSide"],
         targetSide: (SIDES.has(c.targetSide as Side) ? c.targetSide : "left") as Connector["targetSide"],
@@ -289,10 +295,12 @@ export function layoutDomainPreserved(
         sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
         ...(c.sourceMultiplicity ? { sourceMultiplicity: c.sourceMultiplicity } : {}),
         ...(c.targetMultiplicity ? { targetMultiplicity: c.targetMultiplicity } : {}),
-        ...(c.sourceRole ? { sourceRole: c.sourceRole } : {}),
-        ...(c.targetRole ? { targetRole: c.targetRole } : {}),
-        ...(c.sourceDerived ? { sourceDerived: true } : {}),
-        ...(c.targetDerived ? { targetDerived: true } : {}),
+        ...(sr.role ? { sourceRole: sr.role } : {}),
+        ...(tr.role ? { targetRole: tr.role } : {}),
+        ...(sr.visibility ? { sourceVisibility: sr.visibility } : {}),
+        ...(tr.visibility ? { targetVisibility: tr.visibility } : {}),
+        ...((c.sourceDerived || sr.derived) ? { sourceDerived: true } : {}),
+        ...((c.targetDerived || tr.derived) ? { targetDerived: true } : {}),
         ...endConstraintFields("source", c.sourceConstraint),
         ...endConstraintFields("target", c.targetConstraint),
         ...(c.label ? { label: c.label } : {}),

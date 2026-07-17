@@ -14,6 +14,23 @@ export interface EndConstraint {
   other?: string;
 }
 
+/**
+ * Split an association-end role string into its parts. Image ingestion / AI
+ * import often deliver the whole "+ /ownedElement" as one token — pull the
+ * leading visibility (+ - # ~) and the derived "/" marker out so they land in
+ * the right connector fields.
+ */
+export function parseEndRole(raw: string | null | undefined): { role?: string; visibility?: string; derived?: boolean } {
+  if (!raw) return {};
+  let s = raw.trim();
+  const out: { role?: string; visibility?: string; derived?: boolean } = {};
+  const vis = s.match(/^([+\-#~])\s*/);
+  if (vis) { out.visibility = vis[1]; s = s.slice(vis[0].length); }
+  if (s.startsWith("/")) { out.derived = true; s = s.slice(1).trim(); }
+  if (s) out.role = s;
+  return out;
+}
+
 /** The four canonical booleans, in the order they should be displayed. */
 const CANONICAL: Array<{ key: keyof EndConstraint; label: string }> = [
   { key: "ordered", label: "ordered" },

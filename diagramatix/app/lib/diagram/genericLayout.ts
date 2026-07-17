@@ -7,7 +7,7 @@ import type { DiagramData, DiagramElement, Connector, Point, Side } from "./type
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints, spreadUmlEndpoints, deconflictUmlSegments } from "./routing";
 import { sizeUmlNote } from "./umlAutoSize";
-import { parseConstraintText } from "./umlConstraints";
+import { parseConstraintText, parseEndRole } from "./umlConstraints";
 import { CHEVRON_THEMES } from "./chevronThemes";
 import { layoutStateMachine, layoutStateMachinePreserved } from "./stateMachineLayout";
 import { layoutDomainPreserved } from "./domainLayout";
@@ -699,7 +699,8 @@ export function layoutGenericDiagram(
     }
   }
 
-  for (const c of aiConnections) {
+  for (let ci = 0; ci < aiConnections.length; ci++) {
+    const c = aiConnections[ci];
     let src = elMap.get(c.sourceId);
     let tgt = elMap.get(c.targetId);
     if (!src || !tgt) continue;
@@ -748,8 +749,12 @@ export function layoutGenericDiagram(
       tgtSide = "left";
     }
 
+    const sr = parseEndRole(c.sourceRole);
+    const tr = parseEndRole(c.targetRole);
     const conn: Connector = {
-      id: `conn-${src.id}-${tgt.id}`,
+      // Index-suffixed so multiple connectors between the SAME element pair get
+      // distinct ids (duplicate ids collapse to one rendered connector).
+      id: `conn-${src.id}-${tgt.id}-${ci}`,
       sourceId: src.id, targetId: tgt.id,
       sourceSide: srcSide as Connector["sourceSide"],
       targetSide: tgtSide as Connector["targetSide"],
@@ -763,10 +768,12 @@ export function layoutGenericDiagram(
       label: c.label ?? (connType === "uml-dependency" ? "«use»" : ""),
       ...(c.sourceMultiplicity ? { sourceMultiplicity: c.sourceMultiplicity } : {}),
       ...(c.targetMultiplicity ? { targetMultiplicity: c.targetMultiplicity } : {}),
-      ...(c.sourceRole ? { sourceRole: c.sourceRole } : {}),
-      ...(c.targetRole ? { targetRole: c.targetRole } : {}),
-      ...(c.sourceDerived ? { sourceDerived: true } : {}),
-      ...(c.targetDerived ? { targetDerived: true } : {}),
+      ...(sr.role ? { sourceRole: sr.role } : {}),
+      ...(tr.role ? { targetRole: tr.role } : {}),
+      ...(sr.visibility ? { sourceVisibility: sr.visibility } : {}),
+      ...(tr.visibility ? { targetVisibility: tr.visibility } : {}),
+      ...((c.sourceDerived || sr.derived) ? { sourceDerived: true } : {}),
+      ...((c.targetDerived || tr.derived) ? { targetDerived: true } : {}),
       // Association-end constraints: the AI may supply them only when the user
       // explicitly asks. Parse the {…} string into the structured flags + other.
       ...umlEndConstraint("source", c.sourceConstraint),
