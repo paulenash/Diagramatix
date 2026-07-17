@@ -1527,26 +1527,36 @@ export function PropertiesPanel({
                       onBlur={e => onUpdateConnectorFields(connector.id, { sourceRole: e.target.value })}
                       onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                       placeholder="role name" />
+                    <label className="flex items-center gap-0.5 text-[10px] text-gray-600 cursor-pointer shrink-0" title="derived role — renders as / before the name">
+                      <input type="checkbox" checked={connector.sourceDerived ?? false}
+                        onChange={e => onUpdateConnectorFields(connector.id, { sourceDerived: e.target.checked })}
+                        className="w-3 h-3 rounded border-gray-300" />
+                      /derived
+                    </label>
                   </div>
                   <div className="flex items-center gap-1">
                     <label className="text-[9px] text-gray-400 w-12 shrink-0">Multiplicity</label>
                     <MultSelect value={connector.sourceMultiplicity ?? ""}
                       onChange={v => onUpdateConnectorFields(connector.id, { sourceMultiplicity: v })} />
                   </div>
-                  <div className="flex items-center gap-1">
-                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Constraints</label>
-                    <label className="flex items-center gap-0.5 text-[10px] text-gray-600 cursor-pointer">
-                      <input type="checkbox" checked={connector.sourceOrdered ?? false}
-                        onChange={e => onUpdateConnectorFields(connector.id, { sourceOrdered: e.target.checked })}
-                        className="w-3 h-3 rounded border-gray-300" />
-                      ordered
-                    </label>
-                    <label className="flex items-center gap-0.5 text-[10px] text-gray-600 cursor-pointer">
-                      <input type="checkbox" checked={connector.sourceUnique ?? false}
-                        onChange={e => onUpdateConnectorFields(connector.id, { sourceUnique: e.target.checked })}
-                        className="w-3 h-3 rounded border-gray-300" />
-                      unique
-                    </label>
+                  <div className="flex items-start gap-1">
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0 pt-0.5">Constraints</label>
+                    <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                      <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                        {([["sourceOrdered", "ordered"], ["sourceUnique", "unique"], ["sourceReadOnly", "readOnly"], ["sourceUnion", "union"]] as const).map(([field, lbl]) => (
+                          <label key={field} className="flex items-center gap-0.5 text-[10px] text-gray-600 cursor-pointer">
+                            <input type="checkbox" checked={(connector[field] as boolean) ?? false}
+                              onChange={e => onUpdateConnectorFields(connector.id, { [field]: e.target.checked } as Partial<Connector>)}
+                              className="w-3 h-3 rounded border-gray-300" />
+                            {lbl}
+                          </label>
+                        ))}
+                      </div>
+                      <textarea rows={3} placeholder="other, e.g. subsets member, subsets ownedElement"
+                        defaultValue={connector.sourceConstraintOther ?? ""} key={`sco-${connector.id}`}
+                        onBlur={e => onUpdateConnectorFields(connector.id, { sourceConstraintOther: e.target.value })}
+                        className="w-full text-[10px] border border-gray-300 rounded px-1 py-0.5 min-w-0 resize-none" />
+                    </div>
                   </div>
                   <div className="flex items-center gap-1">
                     <label className="text-[9px] text-gray-400 w-12 shrink-0">Visibility</label>
@@ -1582,26 +1592,36 @@ export function PropertiesPanel({
                       onBlur={e => onUpdateConnectorFields(connector.id, { targetRole: e.target.value })}
                       onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                       placeholder="role name" />
+                    <label className="flex items-center gap-0.5 text-[10px] text-gray-600 cursor-pointer shrink-0" title="derived role — renders as / before the name">
+                      <input type="checkbox" checked={connector.targetDerived ?? false}
+                        onChange={e => onUpdateConnectorFields(connector.id, { targetDerived: e.target.checked })}
+                        className="w-3 h-3 rounded border-gray-300" />
+                      /derived
+                    </label>
                   </div>
                   <div className="flex items-center gap-1">
                     <label className="text-[9px] text-gray-400 w-12 shrink-0">Multiplicity</label>
                     <MultSelect value={connector.targetMultiplicity ?? ""}
                       onChange={v => onUpdateConnectorFields(connector.id, { targetMultiplicity: v })} />
                   </div>
-                  <div className="flex items-center gap-1">
-                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Constraints</label>
-                    <label className="flex items-center gap-0.5 text-[10px] text-gray-600 cursor-pointer">
-                      <input type="checkbox" checked={connector.targetOrdered ?? false}
-                        onChange={e => onUpdateConnectorFields(connector.id, { targetOrdered: e.target.checked })}
-                        className="w-3 h-3 rounded border-gray-300" />
-                      ordered
-                    </label>
-                    <label className="flex items-center gap-0.5 text-[10px] text-gray-600 cursor-pointer">
-                      <input type="checkbox" checked={connector.targetUnique ?? false}
-                        onChange={e => onUpdateConnectorFields(connector.id, { targetUnique: e.target.checked })}
-                        className="w-3 h-3 rounded border-gray-300" />
-                      unique
-                    </label>
+                  <div className="flex items-start gap-1">
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0 pt-0.5">Constraints</label>
+                    <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                      <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                        {([["targetOrdered", "ordered"], ["targetUnique", "unique"], ["targetReadOnly", "readOnly"], ["targetUnion", "union"]] as const).map(([field, lbl]) => (
+                          <label key={field} className="flex items-center gap-0.5 text-[10px] text-gray-600 cursor-pointer">
+                            <input type="checkbox" checked={(connector[field] as boolean) ?? false}
+                              onChange={e => onUpdateConnectorFields(connector.id, { [field]: e.target.checked } as Partial<Connector>)}
+                              className="w-3 h-3 rounded border-gray-300" />
+                            {lbl}
+                          </label>
+                        ))}
+                      </div>
+                      <textarea rows={3} placeholder="other, e.g. subsets member, subsets ownedElement"
+                        defaultValue={connector.targetConstraintOther ?? ""} key={`tco-${connector.id}`}
+                        onBlur={e => onUpdateConnectorFields(connector.id, { targetConstraintOther: e.target.value })}
+                        className="w-full text-[10px] border border-gray-300 rounded px-1 py-0.5 min-w-0 resize-none" />
+                    </div>
                   </div>
                   <div className="flex items-center gap-1">
                     <label className="text-[9px] text-gray-400 w-12 shrink-0">Visibility</label>

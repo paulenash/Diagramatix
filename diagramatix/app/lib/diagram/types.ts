@@ -231,23 +231,35 @@ export interface Connector {
   sourcePropertyString?: string;  // e.g. "{ordered}", "{unique}"
   sourceOrdered?: boolean;
   sourceUnique?: boolean;
+  sourceReadOnly?: boolean;       // {readOnly}
+  sourceUnion?: boolean;          // {union}
+  sourceConstraintOther?: string; // free-form, e.g. "subsets member, subsets ownedElement"
+  sourceDerived?: boolean;        // derived end → "/" between visibility and role name
   sourceVisibility?: string;      // +, -, #
   sourceQualifier?: string;       // e.g. "accountNumber"
   sourceRoleOffset?: Point;       // offset for visibility+role composite label
   sourceMultOffset?: Point;       // offset for multiplicity label
-  sourceConstraintOffset?: Point; // offset for {ordered}
-  sourceUniqueOffset?: Point;     // offset for {unique}
+  sourceConstraintOffset?: Point; // offset for the combined {…} constraint box
+  sourceConstraintSize?: Point;   // constraint box width in .x (px) → text re-wraps to it
+  sourceQualifierOffset?: Point;  // offset for the [qualifier] label
+  sourceUniqueOffset?: Point;     // (legacy) formerly the separate {unique} label
   targetRole?: string;
   targetMultiplicity?: string;
   targetPropertyString?: string;
   targetOrdered?: boolean;
   targetUnique?: boolean;
+  targetReadOnly?: boolean;
+  targetUnion?: boolean;
+  targetConstraintOther?: string;
+  targetDerived?: boolean;
   targetVisibility?: string;
   targetQualifier?: string;
   targetRoleOffset?: Point;
   targetMultOffset?: Point;
-  targetConstraintOffset?: Point; // offset for {ordered}
-  targetUniqueOffset?: Point;     // offset for {unique}
+  targetConstraintOffset?: Point; // offset for the combined {…} constraint box
+  targetConstraintSize?: Point;   // constraint box width in .x (px)
+  targetQualifierOffset?: Point;  // offset for the [qualifier] label
+  targetUniqueOffset?: Point;     // (legacy)
   // UML association name (shown near midpoint)
   associationName?: string;
   readingDirection?: "none" | "to-source" | "to-target";

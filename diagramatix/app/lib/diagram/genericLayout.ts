@@ -7,6 +7,7 @@ import type { DiagramData, DiagramElement, Connector, Point, Side } from "./type
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints, spreadUmlEndpoints, deconflictUmlSegments } from "./routing";
 import { sizeUmlNote } from "./umlAutoSize";
+import { parseConstraintText } from "./umlConstraints";
 import { CHEVRON_THEMES } from "./chevronThemes";
 import { layoutStateMachine, layoutStateMachinePreserved } from "./stateMachineLayout";
 import { layoutDomainPreserved } from "./domainLayout";
@@ -178,7 +179,26 @@ interface AiParsed {
     type?: string;
     sourceMultiplicity?: string;
     targetMultiplicity?: string;
+    sourceRole?: string;
+    targetRole?: string;
+    sourceConstraint?: string;   // e.g. "{readOnly, subsets member}" or "readOnly, union"
+    targetConstraint?: string;
+    sourceDerived?: boolean;
+    targetDerived?: boolean;
   }>;
+}
+
+/** Map an AI-supplied constraint string to the per-end connector fields. */
+function umlEndConstraint(end: "source" | "target", raw?: string): Partial<Connector> {
+  if (!raw || !raw.trim()) return {};
+  const c = parseConstraintText(raw);
+  const out: Record<string, unknown> = {};
+  if (c.ordered)  out[`${end}Ordered`] = true;
+  if (c.unique)   out[`${end}Unique`] = true;
+  if (c.readOnly) out[`${end}ReadOnly`] = true;
+  if (c.union)    out[`${end}Union`] = true;
+  if (c.other)    out[`${end}ConstraintOther`] = c.other;
+  return out as Partial<Connector>;
 }
 
 export function layoutGenericDiagram(
@@ -743,6 +763,14 @@ export function layoutGenericDiagram(
       label: c.label ?? (connType === "uml-dependency" ? "«use»" : ""),
       ...(c.sourceMultiplicity ? { sourceMultiplicity: c.sourceMultiplicity } : {}),
       ...(c.targetMultiplicity ? { targetMultiplicity: c.targetMultiplicity } : {}),
+      ...(c.sourceRole ? { sourceRole: c.sourceRole } : {}),
+      ...(c.targetRole ? { targetRole: c.targetRole } : {}),
+      ...(c.sourceDerived ? { sourceDerived: true } : {}),
+      ...(c.targetDerived ? { targetDerived: true } : {}),
+      // Association-end constraints: the AI may supply them only when the user
+      // explicitly asks. Parse the {…} string into the structured flags + other.
+      ...umlEndConstraint("source", c.sourceConstraint),
+      ...umlEndConstraint("target", c.targetConstraint),
     } as Connector;
     connectors.push(conn);
   }

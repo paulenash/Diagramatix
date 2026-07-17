@@ -4,6 +4,7 @@ import { useState, useContext } from "react";
 
 import type { Connector, Point, Side } from "@/app/lib/diagram/types";
 import { isUmlConnType } from "@/app/lib/diagram/types";
+import { buildConstraintText } from "@/app/lib/diagram/umlConstraints";
 import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
 import { ArchimateConnectorRenderer, isArchimateConnectorType } from "./ArchimateConnectorRenderer";
@@ -563,6 +564,119 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
+const DEFAULT_CONSTRAINT_W = 130;
+
+/** Greedy word-wrap to a maximum character count per line. */
+function wrapConstraint(text: string, maxChars: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    if (!cur) { cur = w; continue; }
+    if ((cur + " " + w).length <= maxChars) cur += " " + w;
+    else { lines.push(cur); cur = w; }
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [text];
+}
+
+/**
+ * The combined association-end constraint — a single { … } list that is movable
+ * (drag the text) AND resizeable (drag the bottom-right handle), with the text
+ * re-wrapping to the box width. Renders as plain UML text; a faint border and
+ * the resize handle appear only on hover / when the connector is selected.
+ */
+function ConstraintBox({
+  text, anchorX, anchorY, offset, offsetField, width, sizeField,
+  fs, lineH, connectorId, svgToWorld, onUpdateEndOffset, setDraggingEndLabel, draggingKey, selected,
+}: {
+  text: string; anchorX: number; anchorY: number;
+  offset?: Point; offsetField: string;
+  width?: number; sizeField: string;
+  fs: number; lineH: number; connectorId: string;
+  svgToWorld?: (clientX: number, clientY: number) => Point;
+  onUpdateEndOffset?: (connectorId: string, field: string, offset: Point) => void;
+  setDraggingEndLabel: (v: string | null) => void;
+  draggingKey: string | null;
+  selected: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const ox = offset?.x ?? 0, oy = offset?.y ?? 0;
+  const boxW = Math.max(40, width ?? DEFAULT_CONSTRAINT_W);
+  const padX = 3, padY = 2;
+  const charW = fs * 0.55;
+  const maxChars = Math.max(4, Math.floor((boxW - padX * 2) / charW));
+  const lines = wrapConstraint(text, maxChars);
+  const boxH = lines.length * lineH + padY * 2;
+  const x = anchorX + ox, y = anchorY + oy; // box top-left
+  const showChrome = hovered || selected || draggingKey === offsetField || draggingKey === sizeField;
+
+  function startMove(e: React.MouseEvent) {
+    if (!svgToWorld || !onUpdateEndOffset) return;
+    e.stopPropagation();
+    const startWorld = svgToWorld(e.clientX, e.clientY);
+    const startOx = ox, startOy = oy;
+    document.body.style.cursor = "grabbing";
+    setDraggingEndLabel(offsetField);
+    function onMove(ev: MouseEvent) {
+      const cur = svgToWorld!(ev.clientX, ev.clientY);
+      onUpdateEndOffset!(connectorId, offsetField, { x: startOx + cur.x - startWorld.x, y: startOy + cur.y - startWorld.y });
+    }
+    function onUp() {
+      document.body.style.cursor = "";
+      setDraggingEndLabel(null);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  function startResize(e: React.MouseEvent) {
+    if (!svgToWorld || !onUpdateEndOffset) return;
+    e.stopPropagation();
+    const startWorld = svgToWorld(e.clientX, e.clientY);
+    const startW = boxW;
+    document.body.style.cursor = "nwse-resize";
+    setDraggingEndLabel(sizeField);
+    function onMove(ev: MouseEvent) {
+      const cur = svgToWorld!(ev.clientX, ev.clientY);
+      onUpdateEndOffset!(connectorId, sizeField, { x: Math.max(40, startW + (cur.x - startWorld.x)), y: 0 });
+    }
+    function onUp() {
+      document.body.style.cursor = "";
+      setDraggingEndLabel(null);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  const handle = Math.max(5, fs * 0.6);
+  return (
+    <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      {showChrome && (
+        <rect x={x} y={y} width={boxW} height={boxH} rx={2}
+          fill="white" fillOpacity={0.85} stroke="#93c5fd" strokeWidth={0.7}
+          style={{ pointerEvents: "none" }} />
+      )}
+      <text fontSize={fs} fill="#374151"
+        style={{ cursor: onUpdateEndOffset ? "grab" : "default", userSelect: "none" }}
+        onMouseDown={startMove}>
+        {lines.map((ln, i) => (
+          <tspan key={i} x={x + padX} y={y + padY + lineH * i + fs * 0.9}>{ln}</tspan>
+        ))}
+      </text>
+      {showChrome && onUpdateEndOffset && (
+        <rect x={x + boxW - handle} y={y + boxH - handle} width={handle} height={handle} rx={1}
+          fill="#3b82f6" style={{ cursor: "nwse-resize" }}
+          onMouseDown={startResize} />
+      )}
+    </g>
+  );
+}
+
 export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
@@ -1006,14 +1120,21 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         const tgtPrev = visibleWaypoints[visibleWaypoints.length - 2];
         const srcDx = srcNext.x - srcPt.x, srcDy = srcNext.y - srcPt.y;
         const tgtDx = tgtPt.x - tgtPrev.x, tgtDy = tgtPt.y - tgtPrev.y;
-        // Build label groups first (needed to determine placement)
-        const srcRole = connector.sourceRole || null;
+        // Build label groups first (needed to determine placement). A derived
+        // end shows a "/" before the role name (after the visibility).
+        const srcRoleRaw = connector.sourceRole || null;
+        const srcRole = srcRoleRaw ? `${connector.sourceDerived ? "/" : ""}${srcRoleRaw}` : null;
         const srcVis = connector.sourceVisibility || null;
         const srcMult = connector.sourceMultiplicity || null;
-        const srcOrdered = connector.sourceOrdered ? "{ordered}" : null;
-        const srcUnique = connector.sourceUnique ? "{unique}" : null;
+        // Combined { … } constraint list (ordered/unique/readOnly/union + other).
+        const srcConstraint = buildConstraintText({
+          ordered: connector.sourceOrdered, unique: connector.sourceUnique,
+          readOnly: connector.sourceReadOnly, union: connector.sourceUnion,
+          other: connector.sourceConstraintOther,
+        });
         const srcQual = connector.sourceQualifier ? `[${connector.sourceQualifier}]` : null;
-        const tgtRole = connector.targetRole || null;
+        const tgtRoleRaw = connector.targetRole || null;
+        const tgtRole = tgtRoleRaw ? `${connector.targetDerived ? "/" : ""}${tgtRoleRaw}` : null;
 
         // Multiplicity offset based on which element edge the connector attaches to:
         // bottom: (-5, +5), left: (+5, -5), top: (-5, -5), right: (+5, -5)
@@ -1061,9 +1182,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         const srcR = roleOffset(connector.sourceSide);
         const srcRoleBaseX = srcPt.x + srcR.rx;
         const srcRoleBaseY = srcPt.y + srcR.ry;
-        // Source constraints: same side as multiplicity, further out (stacked)
+        // Source constraint box base: same side as multiplicity, further out.
         const srcC0 = constraintOffset(connector.sourceSide, 0);
-        const srcC1 = constraintOffset(connector.sourceSide, 1);
 
         // Target: unit vectors (reversed to point away from target)
         const tgtLen = Math.hypot(tgtDx, tgtDy) || 1;
@@ -1071,8 +1191,11 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         const tgtPerpUx = -tgtUy, tgtPerpUy = tgtUx;
         const tgtVis = connector.targetVisibility || null;
         const tgtMult = connector.targetMultiplicity || null;
-        const tgtOrdered = connector.targetOrdered ? "{ordered}" : null;
-        const tgtUnique = connector.targetUnique ? "{unique}" : null;
+        const tgtConstraint = buildConstraintText({
+          ordered: connector.targetOrdered, unique: connector.targetUnique,
+          readOnly: connector.targetReadOnly, union: connector.targetUnion,
+          other: connector.targetConstraintOther,
+        });
         const tgtQual = connector.targetQualifier ? `[${connector.targetQualifier}]` : null;
 
         // Target multiplicity base: edge point + side-based offset
@@ -1085,10 +1208,9 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         const tgtRoleBaseY = tgtPt.y + tgtR.ry;
         // Target constraints: same side as multiplicity, further out (stacked)
         const tgtC0 = constraintOffset(connector.targetSide, 0);
-        const tgtC1 = constraintOffset(connector.targetSide, 1);
 
-        if (!srcRole && !srcVis && !srcMult && !srcOrdered && !srcUnique && !srcQual
-          && !tgtRole && !tgtVis && !tgtMult && !tgtOrdered && !tgtUnique && !tgtQual) return null;
+        if (!srcRole && !srcVis && !srcMult && !srcConstraint && !srcQual
+          && !tgtRole && !tgtVis && !tgtMult && !tgtConstraint && !tgtQual) return null;
 
         // Draggable label component
         function EndLabel({ text, anchorX, anchorY, offsetField, offset, anchor, bold, prefix, prefixLarger }: {
@@ -1154,16 +1276,17 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
             {srcMult && <EndLabel text={srcMult} bold
               anchorX={srcMultBaseX} anchorY={srcMultBaseY}
               offsetField="sourceMultOffset" offset={connector.sourceMultOffset} anchor={srcAnchor} />}
-            {srcOrdered && <EndLabel text={srcOrdered}
+            {srcConstraint && <ConstraintBox text={srcConstraint}
               anchorX={srcPt.x + srcC0.cx} anchorY={srcPt.y + srcC0.cy}
-              offsetField="sourceConstraintOffset" offset={connector.sourceConstraintOffset} anchor={srcAnchor} />}
-            {srcUnique && <EndLabel text={srcUnique}
-              anchorX={srcPt.x + (srcOrdered ? srcC1.cx : srcC0.cx)} anchorY={srcPt.y + (srcOrdered ? srcC1.cy : srcC0.cy)}
-              offsetField="sourceUniqueOffset" offset={connector.sourceUniqueOffset} anchor={srcAnchor} />}
+              offsetField="sourceConstraintOffset" offset={connector.sourceConstraintOffset}
+              sizeField="sourceConstraintSize" width={connector.sourceConstraintSize?.x}
+              fs={fs} lineH={lineH} connectorId={connector.id} svgToWorld={svgToWorld}
+              onUpdateEndOffset={onUpdateEndOffset} setDraggingEndLabel={setDraggingEndLabel}
+              draggingKey={draggingEndLabel} selected={selected} />}
             {srcQual && <EndLabel text={srcQual}
-              anchorX={srcPt.x + constraintOffset(connector.sourceSide, (srcOrdered ? 1 : 0) + (srcUnique ? 1 : 0)).cx}
-              anchorY={srcPt.y + constraintOffset(connector.sourceSide, (srcOrdered ? 1 : 0) + (srcUnique ? 1 : 0)).cy}
-              offsetField="sourceConstraintOffset" offset={connector.sourceConstraintOffset} anchor={srcAnchor} />}
+              anchorX={srcPt.x + constraintOffset(connector.sourceSide, srcConstraint ? 1 : 0).cx}
+              anchorY={srcPt.y + constraintOffset(connector.sourceSide, srcConstraint ? 1 : 0).cy}
+              offsetField="sourceQualifierOffset" offset={connector.sourceQualifierOffset} anchor={srcAnchor} />}
             {/* Target end: same layout */}
             {(tgtRole || tgtVis) && <EndLabel text={tgtRole ?? ""}
               prefix={tgtVis ?? undefined} prefixLarger
@@ -1172,16 +1295,17 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
             {tgtMult && <EndLabel text={tgtMult} bold
               anchorX={tgtMultBaseX} anchorY={tgtMultBaseY}
               offsetField="targetMultOffset" offset={connector.targetMultOffset} anchor={tgtAnchor} />}
-            {tgtOrdered && <EndLabel text={tgtOrdered}
+            {tgtConstraint && <ConstraintBox text={tgtConstraint}
               anchorX={tgtPt.x + tgtC0.cx} anchorY={tgtPt.y + tgtC0.cy}
-              offsetField="targetConstraintOffset" offset={connector.targetConstraintOffset} anchor={tgtAnchor} />}
-            {tgtUnique && <EndLabel text={tgtUnique}
-              anchorX={tgtPt.x + (tgtOrdered ? tgtC1.cx : tgtC0.cx)} anchorY={tgtPt.y + (tgtOrdered ? tgtC1.cy : tgtC0.cy)}
-              offsetField="targetUniqueOffset" offset={connector.targetUniqueOffset} anchor={tgtAnchor} />}
+              offsetField="targetConstraintOffset" offset={connector.targetConstraintOffset}
+              sizeField="targetConstraintSize" width={connector.targetConstraintSize?.x}
+              fs={fs} lineH={lineH} connectorId={connector.id} svgToWorld={svgToWorld}
+              onUpdateEndOffset={onUpdateEndOffset} setDraggingEndLabel={setDraggingEndLabel}
+              draggingKey={draggingEndLabel} selected={selected} />}
             {tgtQual && <EndLabel text={tgtQual}
-              anchorX={tgtPt.x + constraintOffset(connector.targetSide, (tgtOrdered ? 1 : 0) + (tgtUnique ? 1 : 0)).cx}
-              anchorY={tgtPt.y + constraintOffset(connector.targetSide, (tgtOrdered ? 1 : 0) + (tgtUnique ? 1 : 0)).cy}
-              offsetField="targetConstraintOffset" offset={connector.targetConstraintOffset} anchor={tgtAnchor} />}
+              anchorX={tgtPt.x + constraintOffset(connector.targetSide, tgtConstraint ? 1 : 0).cx}
+              anchorY={tgtPt.y + constraintOffset(connector.targetSide, tgtConstraint ? 1 : 0).cy}
+              offsetField="targetQualifierOffset" offset={connector.targetQualifierOffset} anchor={tgtAnchor} />}
           </g>
         );
       })()}

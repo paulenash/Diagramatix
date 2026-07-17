@@ -2967,9 +2967,9 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
       const endLabelResets = {
         associationNameOffset: undefined,
         sourceRoleOffset: undefined, sourceMultOffset: undefined,
-        sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
+        sourceConstraintOffset: undefined, sourceUniqueOffset: undefined, sourceQualifierOffset: undefined,
         targetRoleOffset: undefined, targetMultOffset: undefined,
-        targetConstraintOffset: undefined, targetUniqueOffset: undefined,
+        targetConstraintOffset: undefined, targetUniqueOffset: undefined, targetQualifierOffset: undefined,
       };
       const c1 = { ...conn, waypoints: r1.waypoints, sourceInvisibleLeader: r1.sourceInvisibleLeader, targetInvisibleLeader: r1.targetInvisibleLeader,
         ...endLabelResets };
@@ -6767,11 +6767,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const updated = endpoint === "source"
           ? { ...conn, sourceId: newElementId, sourceSide: side, sourceOffsetAlong: off,
               sourceRoleOffset: undefined, sourceMultOffset: undefined,
-              sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
+              sourceConstraintOffset: undefined, sourceUniqueOffset: undefined, sourceQualifierOffset: undefined,
               associationNameOffset: undefined }
           : { ...conn, targetId: newElementId, targetSide: side, targetOffsetAlong: off,
               targetRoleOffset: undefined, targetMultOffset: undefined,
-              targetConstraintOffset: undefined, targetUniqueOffset: undefined,
+              targetConstraintOffset: undefined, targetUniqueOffset: undefined, targetQualifierOffset: undefined,
               associationNameOffset: undefined };
         const source = state.elements.find((el) => el.id === updated.sourceId);
         const target = state.elements.find((el) => el.id === updated.targetId);
@@ -6827,9 +6827,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
         const updated = { ...conn, sourceOffsetAlong: newSrcOffset, targetOffsetAlong: newTgtOffset,
           sourceRoleOffset: undefined, sourceMultOffset: undefined,
-          sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
+          sourceConstraintOffset: undefined, sourceUniqueOffset: undefined, sourceQualifierOffset: undefined,
           targetRoleOffset: undefined, targetMultOffset: undefined,
-          targetConstraintOffset: undefined, targetUniqueOffset: undefined,
+          targetConstraintOffset: undefined, targetUniqueOffset: undefined, targetQualifierOffset: undefined,
           associationNameOffset: undefined };
         const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
           updated.type === "messageBPMN" && !state.relaxedLayout
@@ -6982,10 +6982,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const updated = endpoint === "source"
           ? { ...conn, sourceSide: rSide, sourceOffsetAlong: rOff,
               sourceRoleOffset: undefined, sourceMultOffset: undefined,
-              sourceConstraintOffset: undefined, sourceUniqueOffset: undefined }
+              sourceConstraintOffset: undefined, sourceUniqueOffset: undefined, sourceQualifierOffset: undefined }
           : { ...conn, targetSide: rSide, targetOffsetAlong: rOff,
               targetRoleOffset: undefined, targetMultOffset: undefined,
-              targetConstraintOffset: undefined, targetUniqueOffset: undefined };
+              targetConstraintOffset: undefined, targetUniqueOffset: undefined, targetQualifierOffset: undefined };
         const source = state.elements.find((el) => el.id === updated.sourceId);
         const target = state.elements.find((el) => el.id === updated.targetId);
         if (!source || !target) return conn;

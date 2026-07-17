@@ -9,6 +9,20 @@
 import type { DiagramData, DiagramElement, Connector, Side } from "./types";
 import { recomputeAllConnectors, spreadUmlEndpoints, deconflictUmlSegments } from "./routing";
 import { autoResizeUmlElement, sizeUmlNote } from "./umlAutoSize";
+import { parseConstraintText } from "./umlConstraints";
+
+/** Map an image-read constraint string to the per-end connector fields. */
+function endConstraintFields(end: "source" | "target", raw?: string): Record<string, unknown> {
+  if (!raw || !raw.trim()) return {};
+  const c = parseConstraintText(raw);
+  const out: Record<string, unknown> = {};
+  if (c.ordered)  out[`${end}Ordered`] = true;
+  if (c.unique)   out[`${end}Unique`] = true;
+  if (c.readOnly) out[`${end}ReadOnly`] = true;
+  if (c.union)    out[`${end}Union`] = true;
+  if (c.other)    out[`${end}ConstraintOther`] = c.other;
+  return out;
+}
 
 interface AiBounds { x: number; y: number; w: number; h: number }
 interface AiEl {
@@ -25,6 +39,8 @@ interface AiConn {
   sourceSide?: string; targetSide?: string;
   sourceMultiplicity?: string; targetMultiplicity?: string;
   sourceRole?: string; targetRole?: string;
+  sourceConstraint?: string; targetConstraint?: string;
+  sourceDerived?: boolean; targetDerived?: boolean;
 }
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -275,6 +291,10 @@ export function layoutDomainPreserved(
         ...(c.targetMultiplicity ? { targetMultiplicity: c.targetMultiplicity } : {}),
         ...(c.sourceRole ? { sourceRole: c.sourceRole } : {}),
         ...(c.targetRole ? { targetRole: c.targetRole } : {}),
+        ...(c.sourceDerived ? { sourceDerived: true } : {}),
+        ...(c.targetDerived ? { targetDerived: true } : {}),
+        ...endConstraintFields("source", c.sourceConstraint),
+        ...endConstraintFields("target", c.targetConstraint),
         ...(c.label ? { label: c.label } : {}),
       } as Connector;
     });

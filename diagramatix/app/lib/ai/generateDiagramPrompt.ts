@@ -106,6 +106,7 @@ Element types: "uml-class" (entity), "uml-enumeration" (lookup), "uml-package" (
 Connection types: "uml-association", "uml-aggregation", "uml-composition", "uml-generalisation", "uml-dependency", "uml-realisation", "uml-containment", "uml-note-anchor"
 Note: a "uml-package" accepts only "uml-dependency" or "uml-containment" connectors; "uml-containment" is package-to-package ONLY (a solid straight line with a ⊕ at the containing package). A "uml-note" connects to any element (except a "uml-pain-point", a "uml-issue", or another note) ONLY via a "uml-note-anchor" (a dashed straight line, no arrowhead).
 ABSTRACT CLASSES — a class that is an abstract base type or interface never instantiated directly (e.g. an abstract "Component"/"Shape" that concrete classes generalise from) should carry "isAbstract": true (default "abstractDisplay": "italics", which renders the class name in italics). Concrete subclasses are NOT abstract. Example: { "id": "e0", "type": "uml-class", "label": "Component", "isAbstract": true, "operations": [{ "name": "operation", "visibility": "+" }] }
+ASSOCIATION-END CONSTRAINTS — only include end constraints when the user's description EXPLICITLY asks for them. When asked, add "sourceConstraint"/"targetConstraint" as a comma list of any of ordered, unique, readOnly, union plus any free-form text (e.g. "readOnly, subsets member"); a derived end (a "/" before the role name) is "sourceDerived"/"targetDerived": true. Otherwise omit these fields.
 
 Output format:
 {
@@ -147,6 +148,10 @@ ASSOCIATION NAME vs ROLE NAME — a word/label on an association is EITHER its n
 So: a Capitalised verb/adjective near the middle (especially with a small triangle) is the NAME, not a role. A lower-case noun at an end with a multiplicity is a role.
 
 READING DIRECTION — if a small SOLID triangle (▶ ◀ ▲ ▼) is drawn beside an association NAME to show which way to read it, set "readingDirection": "to-target" if it points from the source toward the target, else "to-source". (A name with a triangle is an association name, never a role.)
+
+END CONSTRAINTS — a { … } list drawn beside an association END states that end's constraints, e.g. "{ordered}", "{readOnly, union}", "{subsets member, subsets ownedElement}". Copy it verbatim into "sourceConstraint"/"targetConstraint" for the end it visually touches. Recognised keywords are ordered, unique, readOnly, union; anything else (e.g. "subsets member") is kept as free-form text — transcribe it exactly.
+
+DERIVED END — a role name prefixed with a slash (e.g. "/ownedElement") marks a DERIVED end: set "sourceDerived"/"targetDerived": true and put the role name WITHOUT the leading slash in "sourceRole"/"targetRole".
 
 STEREOTYPES — only set an element "stereotype" (shown as «value») when the drawing ACTUALLY shows a «guillemet» stereotype (e.g. «enumeration», «interface»). Do NOT invent «Class»/«entity» for a plain class — a plain class has NO stereotype.
 
