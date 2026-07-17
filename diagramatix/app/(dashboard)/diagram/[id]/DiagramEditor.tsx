@@ -26,6 +26,7 @@ import { Canvas } from "@/app/components/canvas/Canvas";
 import { Palette } from "@/app/components/canvas/Palette";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
+import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { AnimateOverlay } from "@/app/components/canvas/AnimateOverlay";
@@ -2361,6 +2362,20 @@ export function DiagramEditor({
     }
   }
 
+  // Package ↔ same-named diagram linking on rename. Offer to link a package to a
+  // domain diagram that shares its name; unlink a NAME-DERIVED link when the
+  // name changes (a manual link to a differently-named diagram is left alone).
+  const [pkgLinkOffer, setPkgLinkOffer] = useState<{ pkgId: string; diagramId: string; name: string } | null>(null);
+  const handleUpdateLabel = useCallback((id: string, label: string) => {
+    const el = data.elements.find((e) => e.id === id);
+    updateLabel(id, label);
+    if (!el || el.type !== "uml-package") return;
+    const linkedId = el.properties.linkedDiagramId as string | undefined;
+    const { unlink, offer } = resolvePackageNameLink(el.label ?? "", label, linkedId, siblingDiagrams);
+    if (unlink) updateProperties(id, { linkedDiagramId: null });
+    if (offer) setPkgLinkOffer({ pkgId: id, diagramId: offer.diagramId, name: offer.name });
+  }, [data.elements, siblingDiagrams, updateLabel, updateProperties]);
+
   async function handleDeleteTemplate(templateId: string, isBuiltIn = false) {
     // Immediately show as pending delete
     setDeletingTemplateIds(prev => { const next = new Set(prev); next.add(templateId); return next; });
@@ -3617,7 +3632,7 @@ export function DiagramEditor({
           onAddElement={addElementGated}
           onMoveElement={moveElement}
           onResizeElement={resizeElement}
-          onUpdateLabel={updateLabel}
+          onUpdateLabel={handleUpdateLabel}
           entityStructure={entityStructure}
           onAddEntityNode={addEntityNode}
           onBeginLabelEdit={beginLabelEdit}
@@ -3693,7 +3708,7 @@ export function DiagramEditor({
             connector={selectedConnector}
             diagramType={diagramType}
             multiSelectionCount={selectedElementIds.size}
-            onUpdateLabel={updateLabel}
+            onUpdateLabel={handleUpdateLabel}
             onUpdateProperties={updateProperties}
             riskCatalog={riskCatalog}
             onCreateRiskItem={riskLibraryId ? onCreateRiskItem : undefined}
@@ -3943,6 +3958,22 @@ export function DiagramEditor({
               if (id) void doCollapsePackage(id);
             }}
             onCancel={() => setPkgCollapseConfirmId(null)}
+          />
+        )}
+
+        {pkgLinkOffer && (
+          <ConfirmDialog
+            title="Link to existing diagram?"
+            message={`A Domain diagram named "${pkgLinkOffer.name}" already exists in this project.\n\nLink this package to it, so double-clicking drills into that diagram?`}
+            confirmLabel="Link"
+            cancelLabel="Don't link"
+            destructive={false}
+            onConfirm={() => {
+              const offer = pkgLinkOffer;
+              setPkgLinkOffer(null);
+              if (offer) updateProperties(offer.pkgId, { linkedDiagramId: offer.diagramId });
+            }}
+            onCancel={() => setPkgLinkOffer(null)}
           />
         )}
 

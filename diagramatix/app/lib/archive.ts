@@ -104,6 +104,41 @@ export async function archiveDiagram(
     [JSON.stringify(archiveMeta), archive.adminId, archive.id, diagramId]
   );
   if (res.rowCount === 0) throw new Error("Diagram not found");
+
+  // A linked CHILD diagram was just archived (deleted). Any element in a SIBLING
+  // diagram that drills into it — a collapsed uml-package, a subprocess, etc. —
+  // would be left with a dangling link + drill marker. Null out those links so
+  // the element reverts to a plain, unlinked shape. The element itself is NEVER
+  // removed, and no parent diagram is touched beyond dropping the stale link.
+  await clearDanglingLinksTo(diagramId, originalProjectId);
+}
+
+/** Null out `linkedDiagramId` on any element (in the same project's other
+ *  diagrams) that pointed at the now-removed diagram. */
+async function clearDanglingLinksTo(removedDiagramId: string, projectId: string | null) {
+  if (!projectId) return;
+  const siblings = await prisma.diagram.findMany({
+    where: { projectId, id: { not: removedDiagramId } },
+    select: { id: true, data: true },
+  });
+  for (const sib of siblings) {
+    const data = sib.data as unknown as { elements?: Array<{ properties?: Record<string, unknown> }> } | null;
+    const els = data?.elements;
+    if (!Array.isArray(els)) continue;
+    let touched = false;
+    for (const e of els) {
+      if (e.properties && e.properties.linkedDiagramId === removedDiagramId) {
+        e.properties.linkedDiagramId = null;
+        touched = true;
+      }
+    }
+    if (touched) {
+      await pgPool.query(
+        `UPDATE "Diagram" SET "data" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2`,
+        [JSON.stringify(data), sib.id],
+      );
+    }
+  }
 }
 
 /** Restore a diagram from the archive to its original owner/project */
