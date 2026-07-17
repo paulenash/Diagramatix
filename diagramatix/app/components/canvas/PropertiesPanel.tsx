@@ -1497,9 +1497,11 @@ export function PropertiesPanel({
             </>
           );
         })()}
-        {/* Reverse button for aggregation/composition/generalisation only */}
+        {/* Reverse button for the directed UML connectors. Dependency is always
+            directed (open arrowhead) and needs the reverse option too. */}
         {(connector.type === "uml-aggregation" || connector.type === "uml-composition" ||
-          connector.type === "uml-generalisation") && onReverseConnector && (
+          connector.type === "uml-generalisation" ||
+          connector.type === "uml-dependency") && onReverseConnector && (
           <button
             onClick={() => onReverseConnector(connector.id)}
             className="w-full px-3 py-1 text-[10px] bg-gray-50 text-gray-700 border border-gray-300 rounded hover:bg-gray-100"

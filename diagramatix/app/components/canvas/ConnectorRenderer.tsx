@@ -808,7 +808,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           {connector.type === "uml-aggregation" && <UmlDiamondOpen id={umlDiamondId} color={strokeColor} />}
           {connector.type === "uml-composition" && <UmlDiamondFilled id={umlDiamondId} color={strokeColor} />}
           {connector.type === "uml-generalisation" && <UmlTriangleOpen id={umlTriangleId} color={strokeColor} />}
-          {connector.type === "uml-dependency" && showArrow && <OpenArrowMarker id={openMarkerId} color={strokeColor} />}
+          {connector.type === "uml-dependency" && showArrow && !connector.arrowAtSource && <OpenArrowMarker id={openMarkerId} color={strokeColor} />}
+          {connector.type === "uml-dependency" && showArrow && connector.arrowAtSource && <OpenArrowMarkerStart id={`${openMarkerId}-src`} color={strokeColor} />}
           {connector.type === "uml-realisation" && <UmlTriangleOpen id={umlTriangleId} color={strokeColor} />}
           {connector.type === "uml-containment" && <UmlContainmentCircle id={umlContainmentId} color={strokeColor} />}
           {/* uml-note-anchor: dashed line, no markers */}
@@ -895,7 +896,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         markerStart={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-start-${connector.id})`
           : connector.type === "uml-containment" && connector.containmentSwapEnd ? `url(#${umlContainmentId})`
-          : connector.type === "uml-association" && showArrow && connector.arrowAtSource ? `url(#${openMarkerId}-src)`
+          : (connector.type === "uml-association" || connector.type === "uml-dependency") && showArrow && connector.arrowAtSource ? `url(#${openMarkerId}-src)`
           : isBothArrow ? `url(#${openStartMarkerId})`
           : undefined
         }
@@ -904,7 +905,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
           : (connector.type === "uml-generalisation" || connector.type === "uml-realisation") ? `url(#${umlTriangleId})`
           : connector.type === "uml-association" && showArrow && !connector.arrowAtSource ? `url(#${openMarkerId})`
-          : connector.type === "uml-dependency" && showArrow ? `url(#${openMarkerId})`
+          : connector.type === "uml-dependency" && showArrow && !connector.arrowAtSource ? `url(#${openMarkerId})`
           : connector.type === "uml-containment" && !connector.containmentSwapEnd ? `url(#${umlContainmentId})`
           : showArrow && !isUmlConn ? `url(#${isOpenArrow ? openMarkerId : markerId})`
           : undefined
@@ -922,7 +923,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           markerStart={
             isMessageBPMN ? `url(#msg-start-${connector.id})`
             : connector.type === "uml-containment" && connector.containmentSwapEnd ? `url(#${umlContainmentId})`
-            : connector.type === "uml-association" && showArrow && connector.arrowAtSource ? `url(#${openMarkerId}-src)`
+            : (connector.type === "uml-association" || connector.type === "uml-dependency") && showArrow && connector.arrowAtSource ? `url(#${openMarkerId}-src)`
             : isBothArrow ? `url(#${openStartMarkerId})`
             : undefined
           }
@@ -931,7 +932,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
             : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
             : (connector.type === "uml-generalisation" || connector.type === "uml-realisation") ? `url(#${umlTriangleId})`
             : connector.type === "uml-association" && showArrow && !connector.arrowAtSource ? `url(#${openMarkerId})`
-            : connector.type === "uml-dependency" && showArrow ? `url(#${openMarkerId})`
+            : connector.type === "uml-dependency" && showArrow && !connector.arrowAtSource ? `url(#${openMarkerId})`
             : connector.type === "uml-containment" && !connector.containmentSwapEnd ? `url(#${umlContainmentId})`
             : showArrow && !isUmlConn ? `url(#${isOpenArrow ? openMarkerId : markerId})`
             : undefined
