@@ -26,6 +26,40 @@ export function getUmlStickyRouting(): boolean { return _umlStickyRouting; }
  * `sourceOffsetAlong`/`targetOffsetAlong` set — the caller recomputes waypoints
  * afterwards (the sticky router preserves these offsets while the side holds).
  */
+/** Default perpendicular depth of a self-connector loop. Roomy enough for a
+ *  role + multiplicity + constraint at each end without crowding the element. */
+export const SELF_LOOP_BULGE = 66;
+
+/**
+ * Waypoints for a self-connector (source === target). The loop leaves the given
+ * `side` at `srcOff`, runs out `bulge` px perpendicular, across to the `tgtOff`
+ * column, and back in — a squared-off 3-segment loop. Returned in the standard
+ * 6-point invisible-leader format [center, srcEdge, corner1, corner2, tgtEdge,
+ * center]; rectilinear render draws the rectangle, curvilinear draws a bezier.
+ */
+export function selfLoopWaypoints(
+  el: DiagramElement, side: Side, srcOff: number, tgtOff: number, bulge: number,
+): Point[] {
+  const sp = (o: number): Point => {
+    switch (side) {
+      case "top":    return { x: el.x + el.width * o, y: el.y };
+      case "bottom": return { x: el.x + el.width * o, y: el.y + el.height };
+      case "left":   return { x: el.x, y: el.y + el.height * o };
+      case "right":  return { x: el.x + el.width, y: el.y + el.height * o };
+    }
+  };
+  const srcPt = sp(srcOff), tgtPt = sp(tgtOff);
+  let cp1: Point, cp2: Point;
+  switch (side) {
+    case "top":    cp1 = { x: srcPt.x, y: srcPt.y - bulge }; cp2 = { x: tgtPt.x, y: tgtPt.y - bulge }; break;
+    case "bottom": cp1 = { x: srcPt.x, y: srcPt.y + bulge }; cp2 = { x: tgtPt.x, y: tgtPt.y + bulge }; break;
+    case "left":   cp1 = { x: srcPt.x - bulge, y: srcPt.y }; cp2 = { x: tgtPt.x - bulge, y: tgtPt.y }; break;
+    case "right":  cp1 = { x: srcPt.x + bulge, y: srcPt.y }; cp2 = { x: tgtPt.x + bulge, y: tgtPt.y }; break;
+  }
+  const center: Point = { x: el.x + el.width / 2, y: el.y + el.height / 2 };
+  return [center, srcPt, cp1, cp2, tgtPt, center];
+}
+
 export function spreadUmlEndpoints(connectors: Connector[], elements: DiagramElement[]): Connector[] {
   const elMap = new Map(elements.map((e) => [e.id, e]));
   const centreX = (el: DiagramElement) => el.x + el.width / 2;
@@ -34,6 +68,7 @@ export function spreadUmlEndpoints(connectors: Connector[], elements: DiagramEle
   const groups = new Map<string, Ref[]>();
   connectors.forEach((c, i) => {
     if (!isUmlConnType(c.type)) return;
+    if (c.sourceId === c.targetId) return; // self-loops have their own geometry
     if (!elMap.has(c.sourceId) || !elMap.has(c.targetId)) return;
     const push = (key: string, ref: Ref) => { const l = groups.get(key); if (l) l.push(ref); else groups.set(key, [ref]); };
     push(`${c.sourceId}|${c.sourceSide}`, { i, end: "src" });
@@ -87,7 +122,7 @@ export function deconflictUmlSegments(connectors: Connector[]): Connector[] {
   // Work on a COPY of the raw waypoints — NEVER consolidate: the edge-attachment
   // points are collinear with the invisible leaders, so consolidating would drop
   // them and detach the connector from the element.
-  const wps = connectors.map(c => (isUmlConnType(c.type) && Array.isArray(c.waypoints) ? c.waypoints.map(p => ({ ...p })) : null));
+  const wps = connectors.map(c => (isUmlConnType(c.type) && c.sourceId !== c.targetId && Array.isArray(c.waypoints) ? c.waypoints.map(p => ({ ...p })) : null));
 
   type Trunk = { ci: number; a: number; b: number; coord: number; lo: number; hi: number };
   const findTrunks = (orient: "h" | "v"): Trunk[] => {
@@ -1434,6 +1469,25 @@ export function recomputeAllConnectors(
     const source = elementMap.get(rawConn.sourceId);
     const target = elementMap.get(rawConn.targetId);
     if (!source || !target) return rawConn;
+
+    // UML self-connector (source === target): rebuild the 3-segment loop off the
+    // stored side, keeping both endpoints on that side. State-machine transitions
+    // are self-loops too but curvilinear + handled elsewhere — restrict to UML.
+    if (rawConn.sourceId === rawConn.targetId && isUmlConnType(rawConn.type)) {
+      const side = rawConn.sourceSide ?? "top";
+      const srcOff = rawConn.sourceOffsetAlong ?? 0.32;
+      const tgtOff = rawConn.targetOffsetAlong ?? 0.68;
+      const bulge = rawConn.selfLoopBulge ?? SELF_LOOP_BULGE;
+      return {
+        ...rawConn,
+        sourceSide: side, targetSide: side,
+        sourceOffsetAlong: srcOff, targetOffsetAlong: tgtOff,
+        selfLoopBulge: bulge,
+        routingType: "rectilinear",
+        waypoints: selfLoopWaypoints(source, side, srcOff, tgtOff, bulge),
+        sourceInvisibleLeader: true, targetInvisibleLeader: true,
+      };
+    }
 
     // Free-form / imported message flow — dedicated rules (Paul 2026-07-12):
     //  1/2. Attaches ONLY to the TOP or BOTTOM of its endpoints (activities,

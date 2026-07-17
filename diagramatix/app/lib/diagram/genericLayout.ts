@@ -5,7 +5,7 @@
 
 import type { DiagramData, DiagramElement, Connector, Point, Side } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
-import { computeWaypoints, spreadUmlEndpoints, deconflictUmlSegments } from "./routing";
+import { computeWaypoints, spreadUmlEndpoints, deconflictUmlSegments, selfLoopWaypoints, SELF_LOOP_BULGE } from "./routing";
 import { sizeUmlNote } from "./umlAutoSize";
 import { parseConstraintText, parseEndRole } from "./umlConstraints";
 import { CHEVRON_THEMES } from "./chevronThemes";
@@ -735,13 +735,16 @@ export function layoutGenericDiagram(
       }
     }
 
-    // Determine sides
+    // Determine sides. A self-connector (src === tgt) loops off one side.
+    const isSelf = src.id === tgt.id;
     const srcCx = src.x + src.width / 2;
     const tgtCx = tgt.x + tgt.width / 2;
     const srcCy = src.y + src.height / 2;
     const tgtCy = tgt.y + tgt.height / 2;
     let srcSide: string, tgtSide: string;
-    if (Math.abs(tgtCy - srcCy) > Math.abs(tgtCx - srcCx)) {
+    if (isSelf) {
+      srcSide = "top"; tgtSide = "top";
+    } else if (Math.abs(tgtCy - srcCy) > Math.abs(tgtCx - srcCx)) {
       srcSide = tgtCy > srcCy ? "bottom" : "top";
       tgtSide = tgtCy > srcCy ? "top" : "bottom";
     } else {
@@ -760,10 +763,11 @@ export function layoutGenericDiagram(
       targetSide: tgtSide as Connector["targetSide"],
       type: connType as Connector["type"],
       directionType: direction as Connector["directionType"],
-      routingType: routing as Connector["routingType"],
+      routingType: (isSelf ? "rectilinear" : routing) as Connector["routingType"],
       sourceInvisibleLeader: false,
       targetInvisibleLeader: false,
       waypoints: [] as Point[],
+      ...(isSelf ? { sourceOffsetAlong: 0.3, targetOffsetAlong: 0.7, selfLoopBulge: SELF_LOOP_BULGE } : {}),
       // Dependency default stereotype «use» when the AI gives none.
       label: c.label ?? (connType === "uml-dependency" ? "«use»" : ""),
       ...(c.sourceMultiplicity ? { sourceMultiplicity: c.sourceMultiplicity } : {}),
@@ -791,6 +795,12 @@ export function layoutGenericDiagram(
     const src = elMap.get(conn.sourceId);
     const tgt = elMap.get(conn.targetId);
     if (!src || !tgt) return conn;
+    // Self-connector: build the 3-segment loop off the stored side.
+    if (conn.sourceId === conn.targetId) {
+      return { ...conn,
+        waypoints: selfLoopWaypoints(src, conn.sourceSide, conn.sourceOffsetAlong ?? 0.3, conn.targetOffsetAlong ?? 0.7, conn.selfLoopBulge ?? SELF_LOOP_BULGE),
+        sourceInvisibleLeader: true, targetInvisibleLeader: true };
+    }
     try {
       const r = computeWaypoints(src, tgt, elements, conn.sourceSide, conn.targetSide, conn.routingType, conn.sourceOffsetAlong ?? 0.5, conn.targetOffsetAlong ?? 0.5);
       return { ...conn, waypoints: r.waypoints, sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };

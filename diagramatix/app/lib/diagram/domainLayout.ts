@@ -7,7 +7,7 @@
  * falls back to auto-layout.
  */
 import type { DiagramData, DiagramElement, Connector, Side } from "./types";
-import { recomputeAllConnectors, spreadUmlEndpoints, deconflictUmlSegments } from "./routing";
+import { recomputeAllConnectors, spreadUmlEndpoints, deconflictUmlSegments, SELF_LOOP_BULGE } from "./routing";
 import { autoResizeUmlElement, sizeUmlNote } from "./umlAutoSize";
 import { parseConstraintText, parseEndRole } from "./umlConstraints";
 
@@ -290,17 +290,23 @@ export function layoutDomainPreserved(
         : c.routingType === "direct" ? "direct"
         : c.routingType === "rectilinear" ? "rectilinear"
         : "rectilinear";
+      // Self-connector (a relationship from a class to ITSELF): both ends sit on
+      // one side, spread apart, and recomputeAllConnectors builds the 3-segment
+      // loop. Choose the reported side, else "top".
+      const isSelf = c.sourceId === c.targetId;
+      const selfSide = (SIDES.has(c.sourceSide as Side) ? c.sourceSide : "top") as Connector["sourceSide"];
       return {
         // Index-suffixed so two connectors between the SAME pair of elements
         // (e.g. the upperValue and lowerValue compositions here) get DISTINCT
         // ids — duplicate ids collapse to a single rendered connector.
         id: `conn-${c.sourceId}-${c.targetId}-${i}`,
         sourceId: c.sourceId, targetId: c.targetId,
-        sourceSide: (SIDES.has(c.sourceSide as Side) ? c.sourceSide : "right") as Connector["sourceSide"],
-        targetSide: (SIDES.has(c.targetSide as Side) ? c.targetSide : "left") as Connector["targetSide"],
+        sourceSide: isSelf ? selfSide : (SIDES.has(c.sourceSide as Side) ? c.sourceSide : "right") as Connector["sourceSide"],
+        targetSide: isSelf ? selfSide : (SIDES.has(c.targetSide as Side) ? c.targetSide : "left") as Connector["targetSide"],
         type,
         directionType: "non-directed",
-        routingType,
+        routingType: isSelf ? "rectilinear" : routingType,
+        ...(isSelf ? { sourceOffsetAlong: 0.3, targetOffsetAlong: 0.7, selfLoopBulge: SELF_LOOP_BULGE } : {}),
         sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
         ...(c.sourceMultiplicity ? { sourceMultiplicity: c.sourceMultiplicity } : {}),
         ...(c.targetMultiplicity ? { targetMultiplicity: c.targetMultiplicity } : {}),

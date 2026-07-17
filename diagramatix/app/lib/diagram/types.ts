@@ -265,6 +265,9 @@ export interface Connector {
   readingDirection?: "none" | "to-source" | "to-target";
   associationNameOffset?: Point;
   arrowAtSource?: boolean; // if true, open-directed arrow is shown at source end instead of target
+  // Self-connector (source === target): perpendicular depth of the 3-segment
+  // loop off the element's side. Drives the loop geometry on recompute.
+  selfLoopBulge?: number;
   // uml-containment only: if true, the ⊕ circle-with-cross marker is drawn at the
   // SOURCE end instead of its default TARGET end (the containing/parent package).
   containmentSwapEnd?: boolean;

@@ -1365,10 +1365,16 @@ export function Canvas({
         pos.x >= srcEl.x && pos.x <= srcEl.x + srcEl.width &&
         pos.y >= srcEl.y && pos.y <= srcEl.y + srcEl.height
       ) {
-        // Self-transition for state elements: if drag started and ended on same state
+        // Self-loop: drag started and ended on the same element.
+        // • State elements → a curvilinear self-transition.
+        // • Domain entities/enums → a squared-off UML self-connector (default
+        //   association; switch the relationship type in the properties panel).
         const SELF_TRANS_TYPES = new Set(["state", "composite-state", "submachine"]);
-        if (SELF_TRANS_TYPES.has(srcEl.type) && onAddSelfTransition) {
-          // Determine which long side is nearest to the release point
+        const DOMAIN_SELF_TYPES = new Set(["uml-class", "uml-enumeration"]);
+        const wantsStateSelf = SELF_TRANS_TYPES.has(srcEl.type) && onAddSelfTransition;
+        const wantsDomainSelf = diagramType === "domain" && DOMAIN_SELF_TYPES.has(srcEl.type);
+        if (wantsStateSelf || wantsDomainSelf) {
+          // Determine which side is nearest to the release point
           const distTop    = Math.abs(pos.y - srcEl.y);
           const distBottom = Math.abs(pos.y - (srcEl.y + srcEl.height));
           const distLeft   = Math.abs(pos.x - srcEl.x);
@@ -1380,17 +1386,23 @@ export function Canvas({
           else if (minDist === distLeft)   side = "left";
           else                             side = "right";
 
-          // Place source and target 40px apart centred on the midpoint
-          // For top/bottom: offset is along width; for left/right: along height
+          // Place source and target ends symmetrically about the release point.
+          // Domain loops need a wider gap for role + multiplicity labels.
           const dim = (side === "top" || side === "bottom") ? srcEl.width : srcEl.height;
           const midFrac = (side === "top" || side === "bottom")
             ? (pos.x - srcEl.x) / dim
             : (pos.y - srcEl.y) / dim;
-          const halfGap = 20 / dim; // 40px apart → 20px each side
+          const halfGap = (wantsDomainSelf ? 34 : 20) / dim;
           const srcOff = Math.max(0.05, Math.min(0.95, midFrac - halfGap));
           const tgtOff = Math.max(0.05, Math.min(0.95, midFrac + halfGap));
 
-          onAddSelfTransition(elementId, side, srcOff, tgtOff, 60);
+          if (wantsDomainSelf) {
+            // A self-loop off a Note/Package makes no sense — those were excluded
+            // above. Default relationship is a plain association.
+            onAddConnector(elementId, elementId, "uml-association", "non-directed", "rectilinear", side, side, srcOff, tgtOff);
+          } else if (onAddSelfTransition) {
+            onAddSelfTransition(elementId, side, srcOff, tgtOff, 60);
+          }
         }
         setDraggingConnector(null);
         window.removeEventListener("mousemove", onMouseMove);
@@ -5822,7 +5834,10 @@ export function Canvas({
               draggingSourceEl?.type === "subprocess-expanded" &&
               el.boundaryHostId === draggingSourceEl.id;
             const SELF_TRANSITION_TYPES = new Set(["state", "composite-state", "submachine"]);
-            const isSelfStateTarget = el.id === draggingConnector?.fromId && SELF_TRANSITION_TYPES.has(el.type);
+            const DOMAIN_SELF_TARGET_TYPES = new Set(["uml-class", "uml-enumeration"]);
+            const isSelfStateTarget = el.id === draggingConnector?.fromId &&
+              (SELF_TRANSITION_TYPES.has(el.type) ||
+               (diagramType === "domain" && DOMAIN_SELF_TARGET_TYPES.has(el.type)));
             if (isDraggingConnector && (el.id !== draggingConnector!.fromId || isSelfStateTarget) && !skipBecauseOwnBoundary
                 && !draggingFromFinalState && el.type !== "initial-state") {
               // Throwing/send boundary events excluded only if they already have an outgoing messageBPMN

@@ -21,7 +21,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair } from "@/app/lib/diagram/routing";
+import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, SELF_LOOP_BULGE } from "@/app/lib/diagram/routing";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
@@ -6268,6 +6268,36 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const source = state.elements.find((el) => el.id === sourceId);
       const target = state.elements.find((el) => el.id === targetId);
       if (!source || !target) return state;
+
+      // ── UML self-connector (source === target) ────────────────────────────
+      // A relationship from an entity to itself renders as a squared-off
+      // 3-segment loop off one side, with room for a role + multiplicity at
+      // each end. Only the reflexive relationships (association / aggregation /
+      // composition) self-loop; generalisation, realisation, dependency,
+      // containment and note-anchor to self are meaningless → reject.
+      if (sourceId === targetId) {
+        const SELF_LOOP_TYPES = new Set(["uml-association", "uml-aggregation", "uml-composition"]);
+        if (!SELF_LOOP_TYPES.has(connectorType)) return state;
+        if (source.type === "uml-package" || source.type === "uml-note") return state;
+        const side: Side = sourceSide ?? "top";
+        const srcOff = sourceOffsetAlong ?? 0.32;
+        const tgtOff = targetOffsetAlong ?? 0.68;
+        const bulge = SELF_LOOP_BULGE;
+        const selfConn: Connector = {
+          id: nanoid(),
+          sourceId, targetId,
+          sourceSide: side, targetSide: side,
+          sourceOffsetAlong: srcOff, targetOffsetAlong: tgtOff,
+          type: connectorType as Connector["type"],
+          directionType,
+          routingType: "rectilinear",
+          selfLoopBulge: bulge,
+          sourceInvisibleLeader: true, targetInvisibleLeader: true,
+          waypoints: selfLoopWaypoints(source, side, srcOff, tgtOff, bulge),
+          label: initialLabel ?? (connectorType === "uml-dependency" ? "«use»" : ""),
+        };
+        return { ...state, connectors: [...state.connectors, selfConn] };
+      }
 
       // Parallel (fork/join) bar: an endpoint on it MUST sit on a long face so
       // the connector leaves/arrives perpendicular — never on the narrow ends.
