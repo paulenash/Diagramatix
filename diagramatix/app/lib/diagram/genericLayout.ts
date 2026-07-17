@@ -1082,12 +1082,18 @@ function buildProperties(ai: Record<string, unknown>, diagramType: string): Reco
     }
     if (Array.isArray(ai.attributes) && ai.attributes.length) {
       props.showAttributes = true;
-      props.attributes = (ai.attributes as Array<Record<string, unknown>>).map((a, i) => ({
-        visibility: a.visibility ?? "+",
-        name: a.name ?? `attr${i}`,
-        type: a.type,
-        ...(a.multiplicity ? { multiplicity: a.multiplicity } : {}),
-      }));
+      props.attributes = (ai.attributes as Array<Record<string, unknown>>).map((a, i) => {
+        let name = (a.name as string) ?? `attr${i}`;
+        let derived = a.isDerived === true;
+        if (name.startsWith("/")) { derived = true; name = name.slice(1).trim(); }
+        return {
+          visibility: a.visibility ?? "+",
+          name,
+          ...(derived ? { isDerived: true } : {}),
+          type: a.type,
+          ...(a.multiplicity ? { multiplicity: a.multiplicity } : {}),
+        };
+      });
     }
     if (Array.isArray(ai.operations) && ai.operations.length) {
       props.showOperations = true;

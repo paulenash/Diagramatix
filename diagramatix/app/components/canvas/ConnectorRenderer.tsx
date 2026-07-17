@@ -587,10 +587,10 @@ function wrapConstraint(text: string, maxChars: number): string[] {
  * the resize handle appear only on hover / when the connector is selected.
  */
 function ConstraintBox({
-  text, anchorX, anchorY, tetherX, tetherY, offset, offsetField, width, sizeField,
+  text, anchorX, anchorY, tetherX, tetherY, growLeft, offset, offsetField, width, sizeField,
   fs, lineH, connectorId, svgToWorld, onUpdateEndOffset, setDraggingEndLabel, draggingKey, selected,
 }: {
-  text: string; anchorX: number; anchorY: number; tetherX: number; tetherY: number;
+  text: string; anchorX: number; anchorY: number; tetherX: number; tetherY: number; growLeft: boolean;
   offset?: Point; offsetField: string;
   width?: number; sizeField: string;
   fs: number; lineH: number; connectorId: string;
@@ -608,7 +608,12 @@ function ConstraintBox({
   const maxChars = Math.max(4, Math.floor((boxW - padX * 2) / charW));
   const lines = wrapConstraint(text, maxChars);
   const boxH = lines.length * lineH + padY * 2;
-  const x = anchorX + ox, y = anchorY + oy; // box top-left
+  // The anchor is the endpoint-near corner. For a left-facing end the box grows
+  // LEFT (into the channel), so its right edge sits at the anchor — otherwise it
+  // would extend back over its own element (#4). The resize handle then lives on
+  // the far (away-from-element) corner.
+  const x = growLeft ? anchorX + ox - boxW : anchorX + ox;
+  const y = anchorY + oy;
   const showChrome = hovered || selected || draggingKey === offsetField || draggingKey === sizeField;
 
   function startMove(e: React.MouseEvent) {
@@ -637,11 +642,14 @@ function ConstraintBox({
     e.stopPropagation();
     const startWorld = svgToWorld(e.clientX, e.clientY);
     const startW = boxW;
-    document.body.style.cursor = "nwse-resize";
+    document.body.style.cursor = "nesw-resize";
     setDraggingEndLabel(sizeField);
     function onMove(ev: MouseEvent) {
       const cur = svgToWorld!(ev.clientX, ev.clientY);
-      onUpdateEndOffset!(connectorId, sizeField, { x: Math.max(40, startW + (cur.x - startWorld.x)), y: 0 });
+      // Grow toward the far corner: rightward for a right box, leftward for a
+      // left box (so the endpoint-near edge stays put).
+      const dW = (growLeft ? -1 : 1) * (cur.x - startWorld.x);
+      onUpdateEndOffset!(connectorId, sizeField, { x: Math.max(40, startW + dW), y: 0 });
     }
     function onUp() {
       document.body.style.cursor = "";
@@ -654,6 +662,8 @@ function ConstraintBox({
   }
 
   const handle = Math.max(7, fs * 0.8);
+  // Far bottom corner (away from the element): bottom-left for a left box.
+  const hx = growLeft ? x : x + boxW - handle;
   return (
     <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
       {/* Tether back to the connector attachment point while the box is moved. */}
@@ -662,15 +672,19 @@ function ConstraintBox({
           stroke="#9ca3af" strokeWidth={0.7} strokeDasharray="3 2"
           style={{ pointerEvents: "none" }} />
       )}
-      {/* Full-box hit area — keeps the box "hovered" across its whole extent
-          (so the resize handle doesn't vanish as the cursor crosses it) and
-          makes the body draggable like a Note. Transparent until chrome shows. */}
-      <rect x={x} y={y} width={boxW} height={boxH} rx={2}
-        fill={showChrome ? "white" : "transparent"} fillOpacity={showChrome ? 0.85 : 1}
-        stroke={showChrome ? "#93c5fd" : "none"} strokeWidth={0.7}
-        style={{ cursor: onUpdateEndOffset ? "grab" : "default" }}
-        onMouseDown={startMove} />
-      <text fontSize={fs} fill="#374151" style={{ pointerEvents: "none", userSelect: "none" }}>
+      {/* Full-box hit area is drawn ONLY while the box is active (hovered /
+          selected / dragging) — otherwise it would blanket the connector, its
+          endpoints and the role labels beneath and swallow their clicks (#2/#3).
+          When idle, only the text glyphs are interactive. */}
+      {showChrome && (
+        <rect x={x} y={y} width={boxW} height={boxH} rx={2}
+          fill="white" fillOpacity={0.85} stroke="#93c5fd" strokeWidth={0.7}
+          style={{ cursor: onUpdateEndOffset ? "grab" : "default" }}
+          onMouseDown={startMove} />
+      )}
+      <text fontSize={fs} fill="#374151"
+        style={{ cursor: onUpdateEndOffset ? "grab" : "default", pointerEvents: showChrome ? "none" : "auto", userSelect: "none" }}
+        onMouseDown={startMove}>
         {lines.map((ln, i) => (
           <tspan key={i} x={x + padX} y={y + padY + lineH * i + fs * 0.9}>{ln}</tspan>
         ))}
@@ -679,9 +693,9 @@ function ConstraintBox({
           zone with a small visible marker on top. */}
       {showChrome && onUpdateEndOffset && (
         <>
-          <rect x={x + boxW - handle - 3} y={y + boxH - handle - 3} width={handle + 6} height={handle + 6}
-            fill="transparent" style={{ cursor: "nwse-resize" }} onMouseDown={startResize} />
-          <rect x={x + boxW - handle} y={y + boxH - handle} width={handle} height={handle} rx={1}
+          <rect x={hx - 3} y={y + boxH - handle - 3} width={handle + 6} height={handle + 6}
+            fill="transparent" style={{ cursor: "nesw-resize" }} onMouseDown={startResize} />
+          <rect x={hx} y={y + boxH - handle} width={handle} height={handle} rx={1}
             fill="#3b82f6" style={{ pointerEvents: "none" }} />
         </>
       )}
@@ -1291,7 +1305,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
               offsetField="sourceMultOffset" offset={connector.sourceMultOffset} anchor={srcAnchor} />}
             {srcConstraint && <ConstraintBox text={srcConstraint}
               anchorX={srcPt.x + srcC0.cx} anchorY={srcPt.y + srcC0.cy}
-              tetherX={srcPt.x} tetherY={srcPt.y}
+              tetherX={srcPt.x} tetherY={srcPt.y} growLeft={srcC0.cx < 0}
               offsetField="sourceConstraintOffset" offset={connector.sourceConstraintOffset}
               sizeField="sourceConstraintSize" width={connector.sourceConstraintSize?.x}
               fs={fs} lineH={lineH} connectorId={connector.id} svgToWorld={svgToWorld}
@@ -1310,7 +1324,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
               offsetField="targetMultOffset" offset={connector.targetMultOffset} anchor={tgtAnchor} />}
             {tgtConstraint && <ConstraintBox text={tgtConstraint}
               anchorX={tgtPt.x + tgtC0.cx} anchorY={tgtPt.y + tgtC0.cy}
-              tetherX={tgtPt.x} tetherY={tgtPt.y}
+              tetherX={tgtPt.x} tetherY={tgtPt.y} growLeft={tgtC0.cx < 0}
               offsetField="targetConstraintOffset" offset={connector.targetConstraintOffset}
               sizeField="targetConstraintSize" width={connector.targetConstraintSize?.x}
               fs={fs} lineH={lineH} connectorId={connector.id} svgToWorld={svgToWorld}

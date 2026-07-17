@@ -65,12 +65,21 @@ function domainProps(e: AiEl): Record<string, unknown> {
     }
     if (Array.isArray(e.attributes) && e.attributes.length) {
       props.showAttributes = true;
-      props.attributes = e.attributes.map((a, i) => ({
-        visibility: (a.visibility as string) ?? "+",
-        name: (a.name as string) ?? `attr${i}`,
-        ...(a.type ? { type: a.type as string } : {}),
-        ...(a.multiplicity ? { multiplicity: a.multiplicity as string } : {}),
-      }));
+      props.attributes = e.attributes.map((a, i) => {
+        // A "/name" in the image marks a derived attribute; the model may report
+        // it via isDerived OR by leaving the slash on the name — handle both.
+        let name = (a.name as string) ?? `attr${i}`;
+        let derived = a.isDerived === true;
+        if (name.startsWith("/")) { derived = true; name = name.slice(1).trim(); }
+        return {
+          visibility: (a.visibility as string) ?? "+",
+          name,
+          ...(derived ? { isDerived: true } : {}),
+          ...(a.type ? { type: a.type as string } : {}),
+          ...(a.multiplicity ? { multiplicity: a.multiplicity as string } : {}),
+          ...(a.defaultValue ? { defaultValue: a.defaultValue as string } : {}),
+        };
+      });
     }
     if (Array.isArray(e.operations) && e.operations.length) {
       props.showOperations = true;

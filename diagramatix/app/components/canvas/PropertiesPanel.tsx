@@ -1555,7 +1555,7 @@ export function PropertiesPanel({
                       <textarea rows={3} placeholder="other, e.g. subsets member, subsets ownedElement"
                         defaultValue={connector.sourceConstraintOther ?? ""} key={`sco-${connector.id}`}
                         onBlur={e => onUpdateConnectorFields(connector.id, { sourceConstraintOther: e.target.value })}
-                        className="w-full text-[10px] border border-gray-300 rounded px-1 py-0.5 min-w-0 resize-none" />
+                        className="w-full text-[10px] border border-gray-300 rounded px-1 py-0.5 min-w-0 resize-y" />
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
@@ -1620,7 +1620,7 @@ export function PropertiesPanel({
                       <textarea rows={3} placeholder="other, e.g. subsets member, subsets ownedElement"
                         defaultValue={connector.targetConstraintOther ?? ""} key={`tco-${connector.id}`}
                         onBlur={e => onUpdateConnectorFields(connector.id, { targetConstraintOther: e.target.value })}
-                        className="w-full text-[10px] border border-gray-300 rounded px-1 py-0.5 min-w-0 resize-none" />
+                        className="w-full text-[10px] border border-gray-300 rounded px-1 py-0.5 min-w-0 resize-y" />
                     </div>
                   </div>
                   <div className="flex items-center gap-1">

@@ -899,13 +899,19 @@ export function computeWaypoints(
     // Use closest boundary point on each element, along the line between their centres.
     // Use-case elements use the exact ellipse boundary; all others use the bounding rectangle.
     // The invisible leaders hide center→edge; the visible segment is edge→edge.
+    // EXCEPTION: when an endpoint carries a spread offset (≠ 0.5 — e.g. two
+    // straight compositions between the same pair, separated by D4.04), attach
+    // at that offset point on its side instead of the centre projection, so the
+    // parallel lines don't collapse onto each other.
     const CIRCULAR_TYPES = new Set(["use-case", "process-system"]);
+    const srcSpread = Math.abs(sourceOffsetAlong - 0.5) > 1e-6;
+    const tgtSpread = Math.abs(targetOffsetAlong - 0.5) > 1e-6;
     const srcEdge = CIRCULAR_TYPES.has(source.type)
       ? ellipseEdgePoint(endPt, source)
-      : edgePointFor(endPt, source);
+      : srcSpread ? sidePoint(source, sourceSide, sourceOffsetAlong) : edgePointFor(endPt, source);
     const tgtEdge = CIRCULAR_TYPES.has(target.type)
       ? ellipseEdgePoint(startPt, target)
-      : edgePointFor(startPt, target);
+      : tgtSpread ? sidePoint(target, targetSide, targetOffsetAlong) : edgePointFor(startPt, target);
     return {
       waypoints: [startPt, srcEdge, tgtEdge, endPt],
       sourceInvisibleLeader: true,

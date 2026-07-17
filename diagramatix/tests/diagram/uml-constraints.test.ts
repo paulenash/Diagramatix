@@ -112,4 +112,44 @@ describe("image ingestion maps end constraints + derived onto the connector", ()
     expect(links[0].targetRole).toBe("upperValue");
     expect(links[1].sourceRole).toBe("ownerLower");
   });
+
+  it("two DIRECT (straight) links between the same pair get separated endpoints", () => {
+    // Near-aligned classes + routingType "direct" — the bug was that direct
+    // routing ignored the spread offset, so both straight lines collapsed onto
+    // the same edge point.
+    const parsed = {
+      elements: [
+        { id: "me", type: "uml-class", label: "MultiplicityElement", bounds: { x: 0.12, y: 0.55, w: 0.26, h: 0.16 } },
+        { id: "vs", type: "uml-class", label: "ValueSpecification", bounds: { x: 0.78, y: 0.58, w: 0.20, h: 0.07 } },
+      ],
+      connections: [
+        { sourceId: "vs", targetId: "me", type: "uml-composition", routingType: "direct", sourceRole: "upperValue", targetRole: "ownerUpper" },
+        { sourceId: "vs", targetId: "me", type: "uml-composition", routingType: "direct", sourceRole: "lowerValue", targetRole: "ownerLower" },
+      ],
+    };
+    const data = layoutGenericDiagram(parsed as never, "domain", { imageAspect: { w: 1000, h: 600 } });
+    const links = data.connectors.filter(c => c.type === "uml-composition");
+    expect(links).toHaveLength(2);
+    // The visible edge point on the target (me) must differ in Y between the two.
+    const meEdgeY = (c: typeof links[number]) => c.waypoints[c.waypoints.length - 2].y;
+    expect(Math.abs(meEdgeY(links[0]) - meEdgeY(links[1]))).toBeGreaterThan(8);
+  });
+
+  it("transcribes a derived attribute (isDerived / leading slash) on image ingest", () => {
+    const parsed = {
+      elements: [
+        { id: "me", type: "uml-class", label: "MultiplicityElement",
+          bounds: { x: 0.1, y: 0.3, w: 0.3, h: 0.3 },
+          attributes: [
+            { visibility: "+", name: "/upper", type: "UnlimitedNatural", multiplicity: "0..1" },
+            { visibility: "+", name: "lower", type: "Integer", isDerived: true },
+          ] },
+      ],
+      connections: [],
+    };
+    const data = layoutGenericDiagram(parsed as never, "domain", { imageAspect: { w: 1000, h: 700 } });
+    const attrs = data.elements.find(e => e.id === "me")!.properties.attributes as Array<{ name: string; isDerived?: boolean }>;
+    expect(attrs[0]).toMatchObject({ name: "upper", isDerived: true });   // slash stripped
+    expect(attrs[1]).toMatchObject({ name: "lower", isDerived: true });   // flag honoured
+  });
 });
