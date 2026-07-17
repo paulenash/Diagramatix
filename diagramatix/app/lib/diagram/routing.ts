@@ -71,6 +71,85 @@ export function spreadUmlEndpoints(connectors: Connector[], elements: DiagramEle
   });
 }
 
+/**
+ * D4.05 (Domain) — pull apart connector MID-CHANNEL segments that lie on top of
+ * one another. Spreading the endpoints (D4.04) stops them sharing an attachment
+ * point, but two connectors between the same pair can still route their long
+ * horizontal/vertical trunk through the SAME channel (same y / same x) and
+ * overlap. This staggers each conflicting group of parallel, overlapping trunks
+ * onto distinct lines spaced `GAP` apart. Only UML connectors are touched;
+ * operates on the routed waypoints and returns new Connector objects.
+ */
+export function deconflictUmlSegments(connectors: Connector[]): Connector[] {
+  const GAP = 12;
+  const MIN_TRUNK = 24; // ignore short segments (leaders / jogs)
+
+  // Consolidate redundant collinear points so a trunk's neighbours are genuine
+  // direction changes (shifting a trunk then can't bend a collinear neighbour).
+  const consolidate = (pts: Point[]): Point[] => {
+    if (!Array.isArray(pts) || pts.length < 3) return (pts ?? []).map(p => ({ ...p }));
+    const out: Point[] = [{ ...pts[0] }];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const a = out[out.length - 1], b = pts[i], c = pts[i + 1];
+      const collinearH = Math.abs(a.y - b.y) < 0.5 && Math.abs(b.y - c.y) < 0.5;
+      const collinearV = Math.abs(a.x - b.x) < 0.5 && Math.abs(b.x - c.x) < 0.5;
+      if (collinearH || collinearV) continue; // drop redundant midpoint
+      out.push({ ...b });
+    }
+    out.push({ ...pts[pts.length - 1] });
+    return out;
+  };
+  const wps = connectors.map(c => (isUmlConnType(c.type) ? consolidate(c.waypoints) : null));
+
+  type Trunk = { ci: number; a: number; b: number; coord: number; lo: number; hi: number };
+  const findTrunks = (orient: "h" | "v"): Trunk[] => {
+    const out: Trunk[] = [];
+    wps.forEach((w, ci) => {
+      if (!w || w.length < 2) return;
+      let best: Trunk | null = null;
+      for (let i = 0; i < w.length - 1; i++) {
+        const p = w[i], q = w[i + 1];
+        const isH = Math.abs(p.y - q.y) < 0.5, isV = Math.abs(p.x - q.x) < 0.5;
+        if (orient === "h" && isH && !isV) {
+          const len = Math.abs(q.x - p.x);
+          if (len >= MIN_TRUNK && (!best || len > best.hi - best.lo)) best = { ci, a: i, b: i + 1, coord: p.y, lo: Math.min(p.x, q.x), hi: Math.max(p.x, q.x) };
+        } else if (orient === "v" && isV && !isH) {
+          const len = Math.abs(q.y - p.y);
+          if (len >= MIN_TRUNK && (!best || len > best.hi - best.lo)) best = { ci, a: i, b: i + 1, coord: p.x, lo: Math.min(p.y, q.y), hi: Math.max(p.y, q.y) };
+        }
+      }
+      if (best) out.push(best);
+    });
+    return out;
+  };
+  const resolve = (orient: "h" | "v") => {
+    const ts = findTrunks(orient);
+    const used = new Array(ts.length).fill(false);
+    for (let i = 0; i < ts.length; i++) {
+      if (used[i]) continue;
+      const group = [ts[i]]; used[i] = true;
+      for (let j = i + 1; j < ts.length; j++) {
+        if (used[j]) continue;
+        const conflict = group.some(g => Math.abs(g.coord - ts[j].coord) < GAP && ts[j].lo < g.hi - 2 && ts[j].hi > g.lo + 2);
+        if (conflict) { group.push(ts[j]); used[j] = true; }
+      }
+      if (group.length < 2) continue;
+      group.sort((a, b) => a.coord - b.coord);
+      const mean = group.reduce((s, g) => s + g.coord, 0) / group.length;
+      const start = mean - (GAP * (group.length - 1)) / 2;
+      group.forEach((g, k) => {
+        const newCoord = Math.round(start + k * GAP);
+        const w = wps[g.ci]!;
+        if (orient === "h") { w[g.a].y = newCoord; w[g.b].y = newCoord; }
+        else { w[g.a].x = newCoord; w[g.b].x = newCoord; }
+      });
+    }
+  };
+  resolve("h");
+  resolve("v");
+  return connectors.map((c, ci) => (wps[ci] ? { ...c, waypoints: wps[ci]! } : c));
+}
+
 function getBounds(el: DiagramElement): Bounds {
   return { x: el.x, y: el.y, width: el.width, height: el.height };
 }

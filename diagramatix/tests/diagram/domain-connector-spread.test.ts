@@ -5,8 +5,8 @@
  * siblings on a side don't cross. A lone connector re-centres at 0.5.
  */
 import { describe, it, expect } from "vitest";
-import { spreadUmlEndpoints } from "@/app/lib/diagram/routing";
-import type { Connector, DiagramElement } from "@/app/lib/diagram/types";
+import { spreadUmlEndpoints, deconflictUmlSegments } from "@/app/lib/diagram/routing";
+import type { Connector, DiagramElement, Point } from "@/app/lib/diagram/types";
 
 const el = (id: string, x: number, y: number): DiagramElement =>
   ({ id, type: "uml-class", x, y, width: 120, height: 60, label: id, properties: {} } as DiagramElement);
@@ -64,6 +64,33 @@ describe("D4.04/D4.05 — domain connector endpoint spread", () => {
     const out = spreadUmlEndpoints([conn("c1", "A", "B", "right", "left")], [A, B]);
     expect(out[0].sourceOffsetAlong).toBe(0.5);
     expect(out[0].targetOffsetAlong).toBe(0.5);
+  });
+
+  it("de-conflicts overlapping parallel mid-channel trunks (D4.05)", () => {
+    // Two UML connectors whose long horizontal trunk sits at the SAME y and
+    // overlaps in x — they must be pulled onto distinct lines.
+    const wp = (pts: [number, number][]): Point[] => pts.map(([x, y]) => ({ x, y }));
+    const c1 = { ...conn("c1", "A", "B", "bottom", "top"), waypoints: wp([[10, 100], [110, 100], [110, 40]]) } as unknown as Connector;
+    const c2 = { ...conn("c2", "A", "B", "bottom", "top"), waypoints: wp([[60, 100], [210, 100], [210, 40]]) } as unknown as Connector;
+    const out = deconflictUmlSegments([c1, c2]);
+    const trunkY = (c: Connector) => {
+      // y of the longest horizontal segment
+      let best = { y: NaN, len: -1 };
+      for (let i = 0; i < c.waypoints.length - 1; i++) {
+        const p = c.waypoints[i], q = c.waypoints[i + 1];
+        if (Math.abs(p.y - q.y) < 0.5) { const len = Math.abs(q.x - p.x); if (len > best.len) best = { y: p.y, len }; }
+      }
+      return best.y;
+    };
+    expect(trunkY(out[0])).not.toBe(trunkY(out[1])); // no longer collinear
+    expect(Math.abs(trunkY(out[0]) - trunkY(out[1]))).toBeGreaterThanOrEqual(10);
+  });
+
+  it("leaves a single connector's trunk unchanged", () => {
+    const wp = (pts: [number, number][]): Point[] => pts.map(([x, y]) => ({ x, y }));
+    const c1 = { ...conn("c1", "A", "B", "bottom", "top"), waypoints: wp([[10, 100], [110, 100], [110, 40]]) } as unknown as Connector;
+    const out = deconflictUmlSegments([c1]);
+    expect(out[0].waypoints).toEqual(c1.waypoints);
   });
 
   it("leaves non-UML connectors untouched", () => {

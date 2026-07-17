@@ -22,7 +22,7 @@ import type {
   SymbolType,
 } from "@/app/lib/diagram/types";
 import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair } from "@/app/lib/diagram/routing";
-import { autoResizeUmlElement } from "@/app/lib/diagram/umlAutoSize";
+import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
 import { autoSizeForType, getDefaultSize, wrapText, type AutosizeType } from "@/app/lib/diagram/textMetrics";
@@ -5568,6 +5568,19 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (labelEl && (labelEl.type === "uml-enumeration" || labelEl.type === "uml-class")) {
         const resizedElements = elements.map(e =>
           e.id === action.payload.id ? autoResizeUmlElement(e, 0, domainFontScale(state.fontSize)) : e
+        );
+        const connectors = state.connectors.map(conn => {
+          if (conn.sourceId !== action.payload.id && conn.targetId !== action.payload.id) return conn;
+          return recomputeAllConnectors([conn], resizedElements, state.relaxedLayout)[0] ?? conn;
+        });
+        return { ...state, elements: resizedElements, connectors };
+      }
+      // Auto-resize a note to JUST contain its edited text — keep the current
+      // width (respects a manual resize) and re-fit the height.
+      if (labelEl && labelEl.type === "uml-note") {
+        const scale = domainFontScale(state.fontSize);
+        const resizedElements = elements.map(e =>
+          e.id === action.payload.id ? { ...e, height: sizeUmlNote(e.label, { width: e.width, fontScale: scale }).height } : e
         );
         const connectors = state.connectors.map(conn => {
           if (conn.sourceId !== action.payload.id && conn.targetId !== action.payload.id) return conn;

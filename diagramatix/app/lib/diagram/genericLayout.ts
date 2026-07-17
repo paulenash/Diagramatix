@@ -5,7 +5,8 @@
 
 import type { DiagramData, DiagramElement, Connector, Point, Side } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
-import { computeWaypoints, spreadUmlEndpoints } from "./routing";
+import { computeWaypoints, spreadUmlEndpoints, deconflictUmlSegments } from "./routing";
+import { sizeUmlNote } from "./umlAutoSize";
 import { CHEVRON_THEMES } from "./chevronThemes";
 import { layoutStateMachine, layoutStateMachinePreserved } from "./stateMachineLayout";
 import { layoutDomainPreserved } from "./domainLayout";
@@ -667,6 +668,17 @@ export function layoutGenericDiagram(
     "value-chain": "directed",
   };
 
+  // Domain notes: size each note's box to JUST contain its wrapped text
+  // (matches the renderer at the 14px domain font, not 12px) — no overflow, no
+  // gap at the bottom.
+  if (diagramType === "domain") {
+    for (const el of elements) {
+      if (el.type !== "uml-note") continue;
+      const s = sizeUmlNote(el.label, { fontScale: 14 / 12 });
+      el.width = s.width; el.height = s.height;
+    }
+  }
+
   for (const c of aiConnections) {
     let src = elMap.get(c.sourceId);
     let tgt = elMap.get(c.targetId);
@@ -736,7 +748,7 @@ export function layoutGenericDiagram(
   const spread = diagramType === "domain" ? spreadUmlEndpoints(connectors, elements) : connectors;
 
   // Compute waypoints (honouring the spread offsets for domain)
-  const computed = spread.map(conn => {
+  const computed0 = spread.map(conn => {
     const src = elMap.get(conn.sourceId);
     const tgt = elMap.get(conn.targetId);
     if (!src || !tgt) return conn;
@@ -745,6 +757,8 @@ export function layoutGenericDiagram(
       return { ...conn, waypoints: r.waypoints, sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
     } catch { return conn; }
   });
+  // D4.05 (Domain only): pull apart mid-channel trunks that overlap.
+  const computed = diagramType === "domain" ? deconflictUmlSegments(computed0) : computed0;
 
   return {
     elements,
