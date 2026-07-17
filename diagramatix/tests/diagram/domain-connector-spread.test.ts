@@ -6,6 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { spreadUmlEndpoints, deconflictUmlSegments } from "@/app/lib/diagram/routing";
+import { layoutGenericDiagram } from "@/app/lib/diagram/genericLayout";
 import type { Connector, DiagramElement, Point } from "@/app/lib/diagram/types";
 
 const el = (id: string, x: number, y: number): DiagramElement =>
@@ -66,31 +67,79 @@ describe("D4.04/D4.05 — domain connector endpoint spread", () => {
     expect(out[0].targetOffsetAlong).toBe(0.5);
   });
 
-  it("de-conflicts overlapping parallel mid-channel trunks (D4.05)", () => {
-    // Two UML connectors whose long horizontal trunk sits at the SAME y and
-    // overlaps in x — they must be pulled onto distinct lines.
-    const wp = (pts: [number, number][]): Point[] => pts.map(([x, y]) => ({ x, y }));
-    const c1 = { ...conn("c1", "A", "B", "bottom", "top"), waypoints: wp([[10, 100], [110, 100], [110, 40]]) } as unknown as Connector;
-    const c2 = { ...conn("c2", "A", "B", "bottom", "top"), waypoints: wp([[60, 100], [210, 100], [210, 40]]) } as unknown as Connector;
+  // Realistic path: [srcCentre, srcEdge, corner, trunkA, trunkB(=corner), tgtEdge,
+  // tgtCentre] — the first/last segment is an invisible leader.
+  const withLeaders = (id: string, pts: [number, number][]): Connector => ({
+    ...conn(id, "A", "B", "bottom", "top"),
+    sourceInvisibleLeader: true, targetInvisibleLeader: true,
+    waypoints: pts.map(([x, y]) => ({ x, y })),
+  } as unknown as Connector);
+
+  const trunkY = (c: Connector) => {
+    let best = { y: NaN, len: -1 };
+    for (let i = 0; i < c.waypoints.length - 1; i++) {
+      const p = c.waypoints[i], q = c.waypoints[i + 1];
+      if (Math.abs(p.y - q.y) < 0.5) { const len = Math.abs(q.x - p.x); if (len > best.len) best = { y: p.y, len }; }
+    }
+    return best.y;
+  };
+
+  it("de-conflicts overlapping trunks WITHOUT moving the endpoints/edge points (D4.05)", () => {
+    // Both trunks sit at y=120 and overlap in x → must be pulled apart.
+    const c1 = withLeaders("c1", [[100, 20], [100, 50], [100, 120], [300, 120], [300, 180], [300, 210]]);
+    const c2 = withLeaders("c2", [[150, 20], [150, 50], [150, 120], [400, 120], [400, 180], [400, 210]]);
     const out = deconflictUmlSegments([c1, c2]);
-    const trunkY = (c: Connector) => {
-      // y of the longest horizontal segment
-      let best = { y: NaN, len: -1 };
-      for (let i = 0; i < c.waypoints.length - 1; i++) {
-        const p = c.waypoints[i], q = c.waypoints[i + 1];
-        if (Math.abs(p.y - q.y) < 0.5) { const len = Math.abs(q.x - p.x); if (len > best.len) best = { y: p.y, len }; }
-      }
-      return best.y;
-    };
-    expect(trunkY(out[0])).not.toBe(trunkY(out[1])); // no longer collinear
+    // Trunks are now on distinct lines.
+    expect(trunkY(out[0])).not.toBe(trunkY(out[1]));
     expect(Math.abs(trunkY(out[0]) - trunkY(out[1]))).toBeGreaterThanOrEqual(10);
+    // Centre endpoints (leaders) and edge-attachment points are UNCHANGED — the
+    // connector still reaches its elements.
+    for (const [ci, o] of [c1, c2].entries()) {
+      const before = o.waypoints, after = out[ci].waypoints;
+      expect(after[0]).toEqual(before[0]);                 // src centre
+      expect(after[1]).toEqual(before[1]);                 // src edge
+      expect(after[after.length - 1]).toEqual(before[before.length - 1]); // tgt centre
+      expect(after[after.length - 2]).toEqual(before[before.length - 2]); // tgt edge
+    }
   });
 
-  it("leaves a single connector's trunk unchanged", () => {
-    const wp = (pts: [number, number][]): Point[] => pts.map(([x, y]) => ({ x, y }));
-    const c1 = { ...conn("c1", "A", "B", "bottom", "top"), waypoints: wp([[10, 100], [110, 100], [110, 40]]) } as unknown as Connector;
+  it("leaves a single connector's waypoints unchanged", () => {
+    const c1 = withLeaders("c1", [[100, 20], [100, 50], [100, 120], [300, 120], [300, 180], [300, 210]]);
     const out = deconflictUmlSegments([c1]);
     expect(out[0].waypoints).toEqual(c1.waypoints);
+  });
+
+  it("every GENERATED connector stays attached to its source AND target element", () => {
+    // The Composite-pattern shape: 3 classes, and TWO connectors between
+    // Component↔Composite (a generalisation + an aggregation) — the case where
+    // de-confliction previously detached the line from the element.
+    const parsed = {
+      elements: [
+        { id: "comp", type: "uml-class", label: "Component" },
+        { id: "leaf", type: "uml-class", label: "Leaf" },
+        { id: "composite", type: "uml-class", label: "Composite" },
+      ],
+      connections: [
+        { sourceId: "leaf", targetId: "comp", type: "uml-generalisation" },
+        { sourceId: "composite", targetId: "comp", type: "uml-generalisation" },
+        { sourceId: "comp", targetId: "composite", type: "uml-aggregation" },
+      ],
+    };
+    const data = layoutGenericDiagram(parsed as never, "domain");
+    const byId = new Map(data.elements.map(e => [e.id, e]));
+    const onBoundary = (p: Point, el: DiagramElement, tol = 2) => {
+      const inX = p.x >= el.x - tol && p.x <= el.x + el.width + tol;
+      const inY = p.y >= el.y - tol && p.y <= el.y + el.height + tol;
+      const onLR = (Math.abs(p.x - el.x) <= tol || Math.abs(p.x - (el.x + el.width)) <= tol) && inY;
+      const onTB = (Math.abs(p.y - el.y) <= tol || Math.abs(p.y - (el.y + el.height)) <= tol) && inX;
+      return onLR || onTB;
+    };
+    for (const c of data.connectors) {
+      if (c.type === "uml-note-anchor") continue;
+      const s = byId.get(c.sourceId)!, t = byId.get(c.targetId)!;
+      expect(c.waypoints.some(p => onBoundary(p, s)), `${c.type} ${c.sourceId}→${c.targetId}: SOURCE end detached`).toBe(true);
+      expect(c.waypoints.some(p => onBoundary(p, t)), `${c.type} ${c.sourceId}→${c.targetId}: TARGET end detached`).toBe(true);
+    }
   });
 
   it("leaves non-UML connectors untouched", () => {

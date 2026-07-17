@@ -101,20 +101,43 @@ export function autoResizeUmlElement(el: DiagramElement, nameSidePad = 0, fontSc
   return { ...el, width: newWidth, height: newHeight };
 }
 
-/** Greedy word-wrap to a max character budget per line (long words are split). */
-export function wrapWords(text: string, maxChars: number): string[] {
+/** Approximate width of one glyph as a fraction of the font size, calibrated to
+ *  a sans-serif (the canvas font). Good enough to predict browser line-wrapping. */
+function charEm(ch: string): number {
+  if (ch === " ") return 0.28;
+  if ("iljI|.,:;'!".includes(ch)) return 0.26;
+  if ("ftr()[]{}/\\-".includes(ch)) return 0.34;
+  if (ch === "m" || ch === "M" || ch === "W") return 0.85;
+  if (ch === "w") return 0.72;
+  if (ch >= "A" && ch <= "Z") return 0.68;
+  if (ch >= "0" && ch <= "9") return 0.56;
+  return 0.53; // default lowercase
+}
+function textWidthPx(s: string, fontSize: number): number {
+  let w = 0;
+  for (const ch of s) w += charEm(ch) * fontSize;
+  return w;
+}
+
+/** Word-wrap by PIXEL width (matching the browser), returning the line array. */
+export function wrapByWidth(text: string, maxWidthPx: number, fontSize: number): string[] {
   const words = (text ?? "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
   const lines: string[] = [];
-  let cur = "";
-  for (let w of words) {
-    while (w.length > maxChars) { // a single word longer than the line
-      if (cur) { lines.push(cur); cur = ""; }
-      lines.push(w.slice(0, maxChars));
-      w = w.slice(maxChars);
+  const spaceW = charEm(" ") * fontSize;
+  let cur = "", curW = 0;
+  for (let word of words) {
+    // A single word wider than the line breaks mid-word.
+    while (textWidthPx(word, fontSize) > maxWidthPx && word.length > 1) {
+      let i = word.length;
+      while (i > 1 && textWidthPx(word.slice(0, i), fontSize) > maxWidthPx) i--;
+      if (cur) { lines.push(cur); cur = ""; curW = 0; }
+      lines.push(word.slice(0, i));
+      word = word.slice(i);
     }
-    if (!cur) cur = w;
-    else if ((cur + " " + w).length <= maxChars) cur += " " + w;
-    else { lines.push(cur); cur = w; }
+    const wW = textWidthPx(word, fontSize);
+    if (!cur) { cur = word; curW = wW; }
+    else if (curW + spaceW + wW <= maxWidthPx) { cur += " " + word; curW += spaceW + wW; }
+    else { lines.push(cur); cur = word; curW = wW; }
   }
   if (cur) lines.push(cur);
   return lines.length ? lines : [""];
@@ -124,32 +147,31 @@ export function wrapWords(text: string, maxChars: number): string[] {
  * Size a uml-note's box to JUST contain its wrapped text — matching the renderer
  * (`UmlNoteShape`): a foreignObject at (x+5, y+4, w-10, h-8) whose div has
  * padding 3px 5px and fontSize 12·fontScale, lineHeight 1.3. So the usable text
- * width is w-20 and the height needed is 14 + lines·(12·fontScale·1.3).
+ * width is w-20 and the height needed is 14 + lines·(12·fontScale·1.3), where the
+ * line count comes from PIXEL-accurate wrapping (a flat char budget over-counts).
  *
  * `fontScale` MUST match the canvas FontScaleCtx ((data.fontSize ?? 14)/12 for
  * domain) so the box fits the rendered 14px text, not 12px. When `width` is
  * given (an existing note) the width is kept and only the height re-fits; when
- * omitted (fresh/generated note) a squarish width is chosen from the text length.
+ * omitted (fresh/generated note) a comfortably-wide width is chosen from the text.
  */
 export function sizeUmlNote(label: string, opts?: { width?: number; fontScale?: number }): { width: number; height: number } {
   const fontScale = opts?.fontScale ?? 1;
   const FS = 12 * fontScale;
-  const charW = 0.52 * FS;   // avg glyph width at the note font size
-  const lineH = 1.3 * FS;    // renderer lineHeight
+  const lineH = 1.3 * FS;
   const clean = (label ?? "").replace(/\s+/g, " ").trim();
-  const len = Math.max(1, clean.length);
+  const totalPx = textWidthPx(clean, FS);
   let width: number;
   if (opts?.width && opts.width > 40) {
     width = opts.width;
   } else {
-    // Fresh note: a comfortably WIDE sticky (comment notes read wider than tall);
-    // pick a target line count, then the width from the per-line character budget.
+    // Fresh note: a comfortably WIDE sticky. Aim for ~sqrt lines, so the width is
+    // the total text width divided across that many lines (+20 for the box chrome).
+    const len = Math.max(1, clean.length);
     const targetLines = Math.max(2, Math.min(6, Math.round(Math.sqrt(len / 6))));
-    const maxChars = Math.max(10, Math.ceil(len / targetLines));
-    width = Math.max(120, Math.min(280, Math.round(maxChars * charW + 20)));
+    width = Math.max(120, Math.min(280, Math.round(totalPx / targetLines + 20)));
   }
-  const innerChars = Math.max(6, Math.floor((width - 20) / charW));
-  const lines = wrapWords(clean, innerChars);
+  const lines = wrapByWidth(clean, width - 20, FS);
   const height = Math.ceil(14 + lines.length * lineH);
   return { width: Math.round(width), height };
 }

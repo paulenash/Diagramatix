@@ -84,38 +84,36 @@ export function deconflictUmlSegments(connectors: Connector[]): Connector[] {
   const GAP = 12;
   const MIN_TRUNK = 24; // ignore short segments (leaders / jogs)
 
-  // Consolidate redundant collinear points so a trunk's neighbours are genuine
-  // direction changes (shifting a trunk then can't bend a collinear neighbour).
-  const consolidate = (pts: Point[]): Point[] => {
-    if (!Array.isArray(pts) || pts.length < 3) return (pts ?? []).map(p => ({ ...p }));
-    const out: Point[] = [{ ...pts[0] }];
-    for (let i = 1; i < pts.length - 1; i++) {
-      const a = out[out.length - 1], b = pts[i], c = pts[i + 1];
-      const collinearH = Math.abs(a.y - b.y) < 0.5 && Math.abs(b.y - c.y) < 0.5;
-      const collinearV = Math.abs(a.x - b.x) < 0.5 && Math.abs(b.x - c.x) < 0.5;
-      if (collinearH || collinearV) continue; // drop redundant midpoint
-      out.push({ ...b });
-    }
-    out.push({ ...pts[pts.length - 1] });
-    return out;
-  };
-  const wps = connectors.map(c => (isUmlConnType(c.type) ? consolidate(c.waypoints) : null));
+  // Work on a COPY of the raw waypoints — NEVER consolidate: the edge-attachment
+  // points are collinear with the invisible leaders, so consolidating would drop
+  // them and detach the connector from the element.
+  const wps = connectors.map(c => (isUmlConnType(c.type) && Array.isArray(c.waypoints) ? c.waypoints.map(p => ({ ...p })) : null));
 
   type Trunk = { ci: number; a: number; b: number; coord: number; lo: number; hi: number };
   const findTrunks = (orient: "h" | "v"): Trunk[] => {
     const out: Trunk[] = [];
     wps.forEach((w, ci) => {
-      if (!w || w.length < 2) return;
+      if (!w || w.length < 4) return;
+      // Only shift segments STRICTLY between the source-edge and target-edge
+      // points (the leaders are the first/last segment), and whose neighbours are
+      // perpendicular — so we never move an endpoint or bend a collinear run.
+      const c = connectors[ci];
+      const srcEdge = c.sourceInvisibleLeader ? 1 : 0;
+      const tgtEdge = c.targetInvisibleLeader ? w.length - 2 : w.length - 1;
       let best: Trunk | null = null;
-      for (let i = 0; i < w.length - 1; i++) {
+      for (let i = srcEdge + 1; i + 1 < tgtEdge; i++) {
         const p = w[i], q = w[i + 1];
         const isH = Math.abs(p.y - q.y) < 0.5, isV = Math.abs(p.x - q.x) < 0.5;
         if (orient === "h" && isH && !isV) {
           const len = Math.abs(q.x - p.x);
-          if (len >= MIN_TRUNK && (!best || len > best.hi - best.lo)) best = { ci, a: i, b: i + 1, coord: p.y, lo: Math.min(p.x, q.x), hi: Math.max(p.x, q.x) };
+          const beforeV = Math.abs(w[i - 1].x - p.x) < 0.5;   // neighbour before is vertical
+          const afterV = Math.abs(w[i + 2].x - q.x) < 0.5;    // neighbour after is vertical
+          if (len >= MIN_TRUNK && beforeV && afterV && (!best || len > best.hi - best.lo)) best = { ci, a: i, b: i + 1, coord: p.y, lo: Math.min(p.x, q.x), hi: Math.max(p.x, q.x) };
         } else if (orient === "v" && isV && !isH) {
           const len = Math.abs(q.y - p.y);
-          if (len >= MIN_TRUNK && (!best || len > best.hi - best.lo)) best = { ci, a: i, b: i + 1, coord: p.x, lo: Math.min(p.y, q.y), hi: Math.max(p.y, q.y) };
+          const beforeH = Math.abs(w[i - 1].y - p.y) < 0.5;   // neighbour before is horizontal
+          const afterH = Math.abs(w[i + 2].y - q.y) < 0.5;    // neighbour after is horizontal
+          if (len >= MIN_TRUNK && beforeH && afterH && (!best || len > best.hi - best.lo)) best = { ci, a: i, b: i + 1, coord: p.x, lo: Math.min(p.y, q.y), hi: Math.max(p.y, q.y) };
         }
       }
       if (best) out.push(best);
