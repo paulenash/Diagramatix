@@ -13,12 +13,12 @@ export function setUmlStickyRouting(on: boolean): void { _umlStickyRouting = on;
 export function getUmlStickyRouting(): boolean { return _umlStickyRouting; }
 
 /**
- * D5.01 / D5.02 (Domain connector routing) — spread the attachment points of
+ * D4.04 / D4.05 (Domain connector routing) — spread the attachment points of
  * UML connectors that share an element side. N connectors on the same side
  * divide it into N+1 equal sections (offsets 1/(N+1) … N/(N+1)) instead of all
  * stacking at 0.5, leaving room for multiplicity/role labels. Within each side
  * the connectors are ordered by the position of their opposite endpoint, which
- * also removes their mutual crossings (the shared-side case of D5.02). A side
+ * also removes their mutual crossings (the shared-side case of D4.05). A side
  * with a single connector re-centres at 0.5.
  *
  * Operates on connectors whose `sourceSide`/`targetSide` are already settled;

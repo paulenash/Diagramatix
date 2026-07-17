@@ -731,7 +731,7 @@ export function layoutGenericDiagram(
     connectors.push(conn);
   }
 
-  // D5.01/D5.02 (Domain only): spread connectors that share an element side so
+  // D4.04/D4.05 (Domain only): spread connectors that share an element side so
   // they don't stack on top of each other, ordered to avoid mutual crossings.
   const spread = diagramType === "domain" ? spreadUmlEndpoints(connectors, elements) : connectors;
 

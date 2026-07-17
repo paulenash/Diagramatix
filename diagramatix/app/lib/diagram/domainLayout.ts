@@ -251,8 +251,8 @@ export function layoutDomainPreserved(
       } as Connector;
     });
 
-  // Settle sides first, then spread connectors sharing an element side (D5.01/
-  // D5.02) so they don't stack, then recompute waypoints on the spread offsets
+  // Settle sides first, then spread connectors sharing an element side (D4.04/
+  // D4.05) so they don't stack, then recompute waypoints on the spread offsets
   // (the sticky router preserves them while the side holds).
   const settled = recomputeAllConnectors(connectors, elements);
   const spread = spreadUmlEndpoints(settled, elements);

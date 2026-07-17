@@ -1,5 +1,5 @@
 /**
- * D5.01 / D5.02 — Domain connector routing.
+ * D4.04 / D4.05 — Domain connector routing.
  * Connectors that share an element SIDE are spread into N+1 sections (offsets
  * 1/(N+1) … N/(N+1)) so none coincide, and ordered by the opposite endpoint so
  * siblings on a side don't cross. A lone connector re-centres at 0.5.
@@ -19,7 +19,7 @@ const conn = (id: string, sourceId: string, targetId: string, sourceSide: string
     sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
   } as unknown as Connector);
 
-describe("D5.01/D5.02 — domain connector endpoint spread", () => {
+describe("D4.04/D4.05 — domain connector endpoint spread", () => {
   it("two connectors sharing a side split it into 3 sections (1/3, 2/3)", () => {
     const A = el("A", 0, 0), B = el("B", 400, 0);
     const c1 = conn("c1", "A", "B", "right", "left");
