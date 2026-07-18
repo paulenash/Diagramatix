@@ -1186,12 +1186,15 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         // For left/right edges: constraints stack vertically below/above multiplicity
         function constraintOffset(side: Side, index: number): { cx: number; cy: number } {
           const m = multOffset(side);
-          const spacing = lineH; // distance between stacked constraints
+          const spacing = lineH;       // distance between stacked constraints
+          const base = lineH * 2;      // start CLEARLY beyond the role/multiplicity
+                                       // labels and further from the element (Paul);
+                                       // mirrors CONSTRAINT_BASE in domainLayout.ts
           switch (side) {
-            case "bottom": return { cx: m.mx, cy: m.my + spacing * (index + 1) };
-            case "top":    return { cx: m.mx, cy: m.my - spacing * (index + 1) };
-            case "left":   return { cx: m.mx - spacing * (index + 1), cy: m.my };
-            case "right":  return { cx: m.mx + spacing * (index + 1), cy: m.my };
+            case "bottom": return { cx: m.mx, cy: m.my + base + spacing * index };
+            case "top":    return { cx: m.mx, cy: m.my - base - spacing * index };
+            case "left":   return { cx: m.mx - base - spacing * index, cy: m.my };
+            case "right":  return { cx: m.mx + base + spacing * index, cy: m.my };
           }
         }
 

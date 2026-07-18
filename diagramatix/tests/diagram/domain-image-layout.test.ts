@@ -126,6 +126,25 @@ describe("domain image reproduction (layout preserved from bounds)", () => {
     expect(big.height).toBeGreaterThan(small.height * 2);
   });
 
+  it("defaults an association-end role to public '+' when the image omits visibility", () => {
+    const parsed = {
+      elements: [
+        { id: "a", type: "uml-class", label: "A", bounds: { x: 0.10, y: 0.10, w: 0.2, h: 0.2 } },
+        { id: "b", type: "uml-class", label: "B", bounds: { x: 0.60, y: 0.10, w: 0.2, h: 0.2 } },
+      ],
+      // Roles carry NO visibility glyph (the usual case for a drawn diagram) —
+      // except the target, which explicitly reads "#".
+      connections: [{ sourceId: "a", targetId: "b", type: "uml-association",
+        sourceRole: "owner", targetRole: "#items" }],
+    };
+    const data = layoutGenericDiagram(parsed as never, "domain", { imageAspect: { w: 1000, h: 700 } });
+    const c = data.connectors[0];
+    expect(c.sourceRole).toBe("owner");
+    expect(c.sourceVisibility).toBe("+");    // filled in
+    expect(c.targetRole).toBe("items");
+    expect(c.targetVisibility).toBe("#");    // explicit glyph preserved
+  });
+
   it("preserves the image connector attachment FACES (not the optimal-face re-pick)", () => {
     const parsed = {
       elements: [

@@ -31,12 +31,16 @@ function endConstraintFields(end: "source" | "target", raw?: string): Record<str
 // overlaps with elements, the end's own role/multiplicity, and other
 // constraints. Mirrors the renderer's offset tables so the estimate matches.
 const FS = 10, LINE_H = 13, CHAR_W = 5.5, CONSTRAINT_MAXW = 130;
+// The {…} constraint box starts CLEARLY beyond the role/multiplicity labels
+// (which sit ~15px off the endpoint) and further from the element — Paul wants
+// constraints read as the outermost end decoration. Mirror in ConnectorRenderer.
+const CONSTRAINT_BASE = LINE_H * 2;
 type Rect = { x: number; y: number; w: number; h: number };
 const rectsOverlap = (a: Rect, b: Rect, gap = 3) =>
   a.x < b.x + b.w + gap && a.x + a.w + gap > b.x && a.y < b.y + b.h + gap && a.y + a.h + gap > b.y;
 const multOff = (s: Side) => ({ bottom: { x: -15, y: 15 }, left: { x: -15, y: -15 }, top: { x: -15, y: -15 }, right: { x: 15, y: -15 } }[s]);
 const roleOff = (s: Side) => ({ bottom: { x: 15, y: 15 }, left: { x: -15, y: 15 }, top: { x: 15, y: -15 }, right: { x: 15, y: 15 } }[s]);
-const constraintBase = (s: Side) => { const m = multOff(s); switch (s) { case "bottom": return { x: m.x, y: m.y + LINE_H }; case "top": return { x: m.x, y: m.y - LINE_H }; case "left": return { x: m.x - LINE_H, y: m.y }; case "right": return { x: m.x + LINE_H, y: m.y }; } };
+const constraintBase = (s: Side) => { const m = multOff(s); switch (s) { case "bottom": return { x: m.x, y: m.y + CONSTRAINT_BASE }; case "top": return { x: m.x, y: m.y - CONSTRAINT_BASE }; case "left": return { x: m.x - CONSTRAINT_BASE, y: m.y }; case "right": return { x: m.x + CONSTRAINT_BASE, y: m.y }; } };
 const outwardDir = (s: Side) => ({ top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } }[s]);
 
 function constraintBoxRect(pt: Point, side: Side, text: string, dx: number, dy: number): Rect {
@@ -411,10 +415,11 @@ export function layoutDomainPreserved(
         sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [],
         ...(c.sourceMultiplicity ? { sourceMultiplicity: c.sourceMultiplicity } : {}),
         ...(c.targetMultiplicity ? { targetMultiplicity: c.targetMultiplicity } : {}),
-        ...(sr.role ? { sourceRole: sr.role } : {}),
-        ...(tr.role ? { targetRole: tr.role } : {}),
-        ...(sr.visibility ? { sourceVisibility: sr.visibility } : {}),
-        ...(tr.visibility ? { targetVisibility: tr.visibility } : {}),
+        // An association-end role is public "+" by default — image drawings
+        // usually omit the visibility glyph, so fill it in when a role is present
+        // but no explicit visibility was read (Paul: "typically all missing → +").
+        ...(sr.role ? { sourceRole: sr.role, sourceVisibility: sr.visibility ?? "+" } : {}),
+        ...(tr.role ? { targetRole: tr.role, targetVisibility: tr.visibility ?? "+" } : {}),
         ...((c.sourceDerived || sr.derived) ? { sourceDerived: true } : {}),
         ...((c.targetDerived || tr.derived) ? { targetDerived: true } : {}),
         ...endConstraintFields("source", c.sourceConstraint),
