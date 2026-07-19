@@ -10,6 +10,7 @@ import {
   OrgContextError,
 } from "@/app/lib/auth/orgContext";
 import { deriveDiagramDenorm } from "@/app/lib/diagram/denorm";
+import { validateDiagramData } from "@/app/lib/diagram/validateDiagram";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -77,6 +78,10 @@ export async function PUT(req: Request, { params }: Params) {
   const { id } = await params;
   const body = await req.json();
   const { data } = body;
+
+  // Log-only schema validation of the persisted body (save hot path NEVER
+  // rejects — a bad save is logged and still written). Fire-and-forget.
+  if (data !== undefined) void validateDiagramData(data, { route: "PUT /api/diagrams/[id]", diagramId: id, mode: "log" });
 
   // Three write paths converge here, in order of precedence:
   //   1. Reviewer save — assigned reviewers can write `data` only

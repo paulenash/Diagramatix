@@ -78,6 +78,9 @@ const SCOPED_OMITTED = new Set<string>([
   // Global key-value app settings (e.g. the AI-Generate model) are system
   // config, not per-user/org data — carried by the SuperAdmin full backup only.
   "AppSetting",
+  // Diagram-JSON schema-validation findings are app-side observability, not
+  // per-user/org data — carried by the SuperAdmin full backup only.
+  "SchemaValidationIssue",
   ...SIMULATOR_TABLES,
   ...RISK_CONTROL_TABLES,
   ...PCF_TABLES,

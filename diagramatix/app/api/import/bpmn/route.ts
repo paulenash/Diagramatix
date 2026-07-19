@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { uploadSizeError } from "@/app/lib/uploadLimit";
 import { importBpmnXml } from "@/app/lib/diagram/bpmn/importBpmnXml";
+import { validateDiagramData } from "@/app/lib/diagram/validateDiagram";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import {
@@ -199,6 +200,7 @@ export async function POST(request: Request) {
   });
   if (conflict) finalName = `${rawName} ${timestampSuffix()}`;
 
+  void validateDiagramData(parsed.data, { route: "import/bpmn", mode: "log" });
   const diagram = await prisma.diagram.create({
     data: {
       name: finalName,

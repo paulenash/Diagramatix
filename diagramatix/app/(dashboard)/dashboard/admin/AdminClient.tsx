@@ -747,6 +747,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "ai-rules", title: "AI Rules & Preferences", description: "Geometric + style rules that steer AI BPMN generation.", href: "/dashboard/rules" },
   { id: "ai-model", title: "AI Generate Model", description: "Choose the Claude model AI diagram generation uses (default Haiku 4.5).", href: "/dashboard/admin/ai-model" },
   { id: "database", title: "Database Access", description: "Inspect the live database and run maintenance queries.", href: "/dashboard/admin/database" },
+  { id: "schema-validation", title: "Schema Validation", description: "Runtime Diagram-JSON validation findings (parallel Zod validator) — corruption, dangling refs, drift. Log-only observability.", href: "/dashboard/admin/schema-validation" },
   { id: "ddl", title: "DDL Generation", description: "Download the Diagramatix schema as DDL — the curated LOGICAL model (PostgreSQL / MySQL / SQL Server) or the PHYSICAL DDL of the live database.", ddl: true },
   { id: "archive", title: "System Archive", description: "Archived projects and diagrams across the system.", href: "/dashboard/admin/archive" },
   { id: "subscriptions", title: "Subscription Prices & Limits", description: "Tier pricing and per-tier feature limits.", href: "/dashboard/admin/subscriptions" },

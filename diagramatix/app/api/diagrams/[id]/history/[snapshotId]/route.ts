@@ -5,6 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { restoreDiagramSnapshot, PublishError } from "@/app/lib/diagram/publishVersion";
+import { validateDiagramData } from "@/app/lib/diagram/validateDiagram";
 
 type Params = { params: Promise<{ id: string; snapshotId: string }> };
 
@@ -70,6 +71,9 @@ export async function POST(_req: Request, { params }: Params) {
 
   try {
     const updated = await restoreDiagramSnapshot(id, snapshotId, session.user.id);
+    // Log-only validation of the restored (snapshot) body.
+    const restoredData = (updated as { data?: unknown } | null)?.data;
+    if (restoredData && typeof restoredData === "object") void validateDiagramData(restoredData, { route: "history/restore", diagramId: id, mode: "log" });
     return NextResponse.json(updated);
   } catch (err) {
     if (err instanceof PublishError) return NextResponse.json({ error: err.message }, { status: err.status });

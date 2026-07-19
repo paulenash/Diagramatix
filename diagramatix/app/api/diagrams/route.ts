@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
+import { validateDiagramData } from "@/app/lib/diagram/validateDiagram";
 import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { gateLimit } from "@/app/lib/subscription-route";
 import {
@@ -165,6 +166,7 @@ export async function POST(req: Request) {
     }
   }
 
+  void validateDiagramData(seededData, { route: "POST /api/diagrams", mode: "log" });
   const diagram = await prisma.diagram.create({
     data: {
       name: name.trim(),

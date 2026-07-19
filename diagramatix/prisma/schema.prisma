@@ -1558,3 +1558,23 @@ model AppSetting {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+// Runtime Diagram-JSON validation findings (parallel Zod validator). App-side
+// observability only — NOT part of the diagram export/DDL, so it does NOT bump
+// SCHEMA_VERSION. One row per DISTINCT problem (deduped by `signature` = route +
+// issue path + id-normalised message); repeats bump `count` + `lastSeen`.
+model SchemaValidationIssue {
+  id            String   @id @default(cuid())
+  signature     String   @unique
+  route         String
+  diagramId     String?
+  schemaVersion String?
+  path          String
+  message       String   @db.Text
+  count         Int      @default(1)
+  resolved      Boolean  @default(false)
+  firstSeen     DateTime @default(now())
+  lastSeen      DateTime @updatedAt
+
+  @@index([resolved, lastSeen])
+}

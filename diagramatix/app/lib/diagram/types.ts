@@ -430,9 +430,11 @@ export interface TemplateData {
  *  database as described by the Logical DDL (app/lib/diagram/ddlGenerate.ts).
  *  A feature-only release that touches neither does NOT bump the version.
  *
- *  ON BUMP: keep all FOUR in sync — this constant + history below,
+ *  ON BUMP: keep all FIVE in sync — this constant + history below,
  *  public/diagramatix-export.xsd (shape + history block), ddlGenerate.ts (the
- *  Logical DDL), and schema/SCHEMA_CHANGELOG.md (the human-readable changelog).
+ *  Logical DDL), schema/SCHEMA_CHANGELOG.md (the human-readable changelog), and
+ *  app/lib/diagram/diagramSchema.ts (the runtime Zod validator — its key sets are
+ *  drift-guarded against these interfaces by tests/schema/diagram-schema-types.test.ts).
  *  History:
  *    1.0 — dual versioning across all exports: EXPORT_VERSION renamed to
  *          SCHEMA_VERSION; every JSON/XML export now stamps BOTH schemaVersion

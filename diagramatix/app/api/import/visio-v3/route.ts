@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { uploadSizeError } from "@/app/lib/uploadLimit";
 import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
+import { validateDiagramData } from "@/app/lib/diagram/validateDiagram";
 import { importVisioDomainV3, isDomainVisio } from "@/app/lib/diagram/v3/importVisioDomainV3";
 import { isReadOnlyImpersonation, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
@@ -191,6 +192,7 @@ export async function POST(request: Request) {
     finalName = `${rawName} ${timestampSuffix()}`;
   }
 
+  void validateDiagramData(parsed.data, { route: "import/visio-v3", mode: "log" });
   const diagram = await prisma.diagram.create({
     data: {
       name: finalName,
