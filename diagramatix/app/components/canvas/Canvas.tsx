@@ -7094,6 +7094,7 @@ export function Canvas({
                 flatLevel={flatLevel}
                 onCommit={commitName}
                 onCommitNew={async (name, level, parentId) => { await onAddEntityNode(listId, { name, level, parentId }); commitName(name); }}
+                onNameOnly={commitName}
                 onCancel={() => setEditingLabel(null)}
               />
             );
@@ -7134,6 +7135,7 @@ export function Canvas({
                 flatLevel={flatLevel}
                 onCommit={commitName}
                 onCommitNew={async (name, level, parentId) => { await onAddEntityNode(listId, { name, level, parentId }); commitName(name); }}
+                onNameOnly={commitName}
                 onCancel={() => setEditingLabel(null)}
               />
             );

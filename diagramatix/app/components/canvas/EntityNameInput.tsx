@@ -15,7 +15,7 @@ import {
  */
 export function EntityNameInput({
   box, fontSizePx, suggestions, defaultName, allowNew, flatLevel,
-  onCommit, onCommitNew, onCancel,
+  onCommit, onCommitNew, onNameOnly, onCancel,
 }: {
   box: { x: number; y: number; width: number; height: number };
   fontSizePx: number;
@@ -25,12 +25,17 @@ export function EntityNameInput({
   flatLevel: EntityNodeLevel | null;   // set → flat list (no placement dialog)
   onCommit: (name: string) => void;
   onCommitNew: (name: string, level: EntityNodeLevel, parentId: string | null) => void;
+  // When present, a brand-new name (not already in the list) prompts "Add to
+  // list" vs "Name only". "Name only" just labels the element (stays off-list,
+  // so Entity Drift flags it). Absent → new names are always added to the list.
+  onNameOnly?: (name: string) => void;
   onCancel: () => void;
 }) {
   const [value, setValue] = useState(defaultName ?? "");
   const [touched, setTouched] = useState(false);
   const [hi, setHi] = useState(0);
   const [placing, setPlacing] = useState(false);     // placement dialog open
+  const [asking, setAsking] = useState(false);       // "add to list vs name only" prompt
   const [placeParent, setPlaceParent] = useState<string | "">(""); // "" = top level
   const suppressBlur = useRef(false);
 
@@ -51,6 +56,9 @@ export function EntityNameInput({
       // typed exact takes priority above; here use highlighted on explicit nav
     }
     if (allowNew) {
+      // Brand-new name. When onNameOnly is wired, ask whether to add it to the
+      // list or just name the element (leaving it as Entity-Drift divergence).
+      if (onNameOnly) { setAsking(true); return; }
       if (flatLevel) { onCommitNew(v, flatLevel, null); return; }
       setPlacing(true); return;       // hierarchy → ask where
     }
@@ -72,7 +80,7 @@ export function EntityNameInput({
           value={value}
           onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
           onChange={(e) => { setValue(e.target.value); setTouched(true); setHi(0); }}
-          onBlur={() => { if (!suppressBlur.current && !placing) commit(); }}
+          onBlur={() => { if (!suppressBlur.current && !placing && !asking) commit(); }}
           onKeyDown={(e) => {
             if (e.key === "Escape") { e.preventDefault(); onCancel(); return; }
             if (e.key === "ArrowDown") { e.preventDefault(); setHi(h => Math.min(h + 1, filtered.length - 1)); return; }
@@ -124,6 +132,46 @@ export function EntityNameInput({
           </div>
         )}
       </div>
+
+      {asking && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[60]"
+          onMouseDown={() => { suppressBlur.current = true; }}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 p-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">
+              “{value.trim()}” isn’t in the list
+            </h3>
+            <p className="text-xs text-gray-600 mb-4">
+              Add it to the entity list, or just name this element? A name-only
+              element stays off-list and shows up under “Highlight Entity List Changes”.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  const v = value.trim();
+                  setAsking(false);
+                  if (flatLevel) { onCommitNew(v, flatLevel, null); }
+                  else { setPlacing(true); }   // hierarchy → choose where next
+                }}
+                className="text-xs px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-left"
+              >
+                <span className="font-medium">Add to list</span>
+                <span className="block text-[10px] text-blue-100">Becomes part of the structure</span>
+              </button>
+              <button
+                onClick={() => { onNameOnly?.(value.trim()); }}
+                className="text-xs px-3 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 text-left"
+              >
+                <span className="font-medium">Name only</span>
+                <span className="block text-[10px] text-gray-400">Off-list — will show as drift</span>
+              </button>
+              <button
+                onClick={() => { setAsking(false); suppressBlur.current = false; }}
+                className="text-xs px-3 py-1.5 text-gray-500 hover:text-gray-800 self-end mt-1"
+              >Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {placing && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[60]"
