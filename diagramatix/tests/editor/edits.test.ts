@@ -97,4 +97,54 @@ describe("editor edits — pool / lane", () => {
     const v = findRoutingViolations(d);
     expect(v, `\n  - ${v.join("\n  - ")}`).toEqual([]);
   });
+
+  it("T0914 — two adjacent SUB-LANES (nested divisions) can be swapped", () => {
+    // Sub-lanes are nested `lane` elements (parent is a lane). Create two under
+    // l1, then swap them — the generalised reducer must handle any level.
+    let d = build(POOL.elements, POOL.connections);
+    d = dispatch(d, { type: "ADD_SUBLANE", payload: { laneId: "l1" } });
+    d = dispatch(d, { type: "ADD_SUBLANE", payload: { laneId: "l1" } });
+    const subs = d.elements.filter((e) => e.type === "lane" && e.parentId === "l1").sort((a, b) => a.y - b.y);
+    expect(subs.length, "should have created sub-lanes under l1").toBeGreaterThanOrEqual(2);
+
+    const [top, bottom] = subs;
+    const topY0 = top.y, bottomY0 = bottom.y;
+    d = dispatch(d, { type: "SWAP_LANES_VERTICAL", payload: { laneId: bottom.id, direction: "up" } });
+
+    // The two sub-lanes exchanged vertical position.
+    expect(at(d, bottom.id).y, "lower sub-lane moved up").toBeLessThan(bottomY0);
+    expect(at(d, top.id).y, "upper sub-lane moved down").toBeGreaterThan(topY0 - 1);
+    // Routing stays clean.
+    const v = findRoutingViolations(d);
+    expect(v, `\n  - ${v.join("\n  - ")}`).toEqual([]);
+  });
+
+  it("T0915 — a gateway's top/bottom branches flip when the lanes they point into are swapped", () => {
+    // Decision gateway G (a pool child) branches TOP into the upper lane and
+    // BOTTOM into the lower lane. Swapping the lanes must re-anchor the branches
+    // (top↔bottom) — the "gateway top/middle/bottom" rule, driven by the swap
+    // sets (so it fires the same for lanes and sub-lanes).
+    const d0: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "P", type: "pool", x: 0, y: 0, width: 520, height: 200, label: "P", properties: {} },
+        { id: "U", type: "lane", parentId: "P", x: 40, y: 0, width: 480, height: 100, label: "Upper", properties: {} },
+        { id: "L", type: "lane", parentId: "P", x: 40, y: 100, width: 480, height: 100, label: "Lower", properties: {} },
+        { id: "eU", type: "task", parentId: "U", x: 320, y: 25, width: 90, height: 50, label: "Up", properties: {} },
+        { id: "eL", type: "task", parentId: "L", x: 320, y: 125, width: 90, height: 50, label: "Low", properties: {} },
+        { id: "G", type: "gateway", parentId: "P", x: 160, y: 90, width: 40, height: 40, label: "?", properties: {} },
+      ],
+      connectors: [
+        { id: "cUp", sourceId: "G", targetId: "eU", sourceSide: "top", targetSide: "left", type: "sequence", directionType: "directed", routingType: "rectilinear", sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [{ x: 180, y: 90 }, { x: 365, y: 50 }] },
+        { id: "cDn", sourceId: "G", targetId: "eL", sourceSide: "bottom", targetSide: "left", type: "sequence", directionType: "directed", routingType: "rectilinear", sourceInvisibleLeader: false, targetInvisibleLeader: false, waypoints: [{ x: 180, y: 130 }, { x: 365, y: 150 }] },
+      ],
+    };
+    const d = dispatch(d0, { type: "SWAP_LANES_VERTICAL", payload: { laneId: "L", direction: "up" } });
+    const cUp = d.connectors.find((c) => c.id === "cUp")!;
+    const cDn = d.connectors.find((c) => c.id === "cDn")!;
+    // The branch that pointed UP now leaves the gateway's BOTTOM (its target lane
+    // is now below), and vice-versa.
+    expect(cUp.sourceSide, "up-branch re-anchors to bottom").toBe("bottom");
+    expect(cDn.sourceSide, "down-branch re-anchors to top").toBe("top");
+  });
 });

@@ -4607,14 +4607,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "SWAP_LANES_VERTICAL": {
       const { laneId, direction } = action.payload;
       const lane = state.elements.find(e => e.id === laneId);
-      if (!lane || lane.type !== "lane") return state;
-      // Phase 1 of the lane-swap feature only covers top-level lanes
-      // (parent is a pool). Sub-lane swaps are a future iteration.
+      // A "division" is any lane or sub-lane (at any nesting depth). Two
+      // divisions swap when they share a parent and are adjacent at that level.
+      if (!lane || (lane.type !== "lane" && lane.type !== "sublane")) return state;
       const parent = lane.parentId ? state.elements.find(e => e.id === lane.parentId) : null;
-      if (!parent || parent.type !== "pool") return state;
-      // Find adjacent sibling lane in the chosen direction.
+      if (!parent || (parent.type !== "pool" && parent.type !== "lane" && parent.type !== "sublane")) return state;
+      // Find adjacent sibling division (same type + same parent) in the direction.
       const siblings = state.elements
-        .filter(e => e.type === "lane" && e.parentId === parent.id)
+        .filter(e => e.type === lane.type && e.parentId === parent.id)
         .sort((a, b) => a.y - b.y);
       const idx = siblings.findIndex(s => s.id === laneId);
       if (idx < 0) return state;

@@ -5299,14 +5299,14 @@ export function Canvas({
               moves the whole group. Active-group lanes are skipped here
               and re-rendered in the overlay block at the end. */}
           {lanes.filter(el => !inActiveGroup(el.id)).map((el) => {
-            // Lane-swap eligibility — only top-level lanes (parent is a
-            // pool) get the ↑/↓ controls in the first cut. Sub-lanes
-            // currently don't (deferred per Paul 2026-06-04).
+            // Lane-swap eligibility — any division (a lane or a sub-lane) whose
+            // parent is a pool OR another lane gets the ↑/↓ controls, so two
+            // adjacent divisions at the SAME level can be swapped at any depth.
             const parentEl = data.elements.find(e => e.id === el.parentId);
-            const isTopLevelLane = parentEl?.type === "pool";
+            const isDivision = parentEl?.type === "pool" || parentEl?.type === "lane";
             let canSwapLaneUp: boolean | undefined;
             let canSwapLaneDown: boolean | undefined;
-            if (isTopLevelLane && parentEl) {
+            if (isDivision && parentEl) {
               const siblingLanes = lanes
                 .filter(l => l.parentId === parentEl.id)
                 .sort((a, b) => a.y - b.y);
