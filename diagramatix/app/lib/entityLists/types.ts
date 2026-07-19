@@ -96,6 +96,12 @@ export interface EntitySuggestion {
   level: EntityNodeLevel;
   parentId: string | null;
   depth: number;
+  // Document suggestions carry their linked SharePoint file (if any) so naming a
+  // Data Object from one can attach the same file to the element.
+  spDriveId?: string | null;
+  spItemId?: string | null;
+  spName?: string | null;
+  spWebUrl?: string | null;
 }
 
 /** The active project structure, grouped by kind, loaded into the editor. */
@@ -121,7 +127,10 @@ export function toSuggestions(nodes: EntityNodeDTO[]): EntitySuggestion[] {
   const out: EntitySuggestion[] = [];
   const walk = (parentId: string | null, depth: number) => {
     for (const n of byParent.get(parentId) ?? []) {
-      out.push({ id: n.id, name: n.name, level: n.level, parentId: n.parentId, depth });
+      out.push({
+        id: n.id, name: n.name, level: n.level, parentId: n.parentId, depth,
+        spDriveId: n.spDriveId ?? null, spItemId: n.spItemId ?? null, spName: n.spName ?? null, spWebUrl: n.spWebUrl ?? null,
+      });
       walk(n.id, depth + 1);
     }
   };

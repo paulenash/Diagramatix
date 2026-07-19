@@ -7047,7 +7047,18 @@ export function Canvas({
           const flatLevel: EntityNodeLevel = isDoc ? 'Document' : 'DataStore';
           const listId = entityStructure?.listIds[kind];
           if (entityStructure && suggestions && listId && onAddEntityNode) {
-            const commitName = (name: string) => { onUpdateLabel(editingLabel.elementId, name); setEditingLabel(null); };
+            const commitName = (name: string) => {
+              onUpdateLabel(editingLabel.elementId, name);
+              // Naming a Data Object from a Documents entry that has a linked
+              // SharePoint file → attach that same file to the element.
+              if (isDoc) {
+                const match = suggestions.find((s) => s.name.trim().toLowerCase() === name.trim().toLowerCase());
+                if (match?.spItemId && onUpdateProperties) {
+                  onUpdateProperties(editingLabel.elementId, { sharepointLink: { driveId: match.spDriveId, itemId: match.spItemId, name: match.spName ?? name, webUrl: match.spWebUrl } });
+                }
+              }
+              setEditingLabel(null);
+            };
             return (
               <EntityNameInput
                 box={{ x: editingLabel.x, y: editingLabel.y, width: Math.max(editingLabel.width, 150), height: editingLabel.height }}
