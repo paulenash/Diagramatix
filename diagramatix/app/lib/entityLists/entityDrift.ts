@@ -26,16 +26,18 @@ export function computeEntityDrift(
     const label = (el.label ?? "").trim();
     if (!label) continue;
     const n = norm(label);
-    let ok: boolean | null = null; // null → element type not checked
+    let target: Set<string> | null = null; // the list this element's name should be in
     if (el.type === "pool") {
-      ok = el.properties?.poolType === "black-box"
-        ? (el.properties?.isSystem ? sys.has(n) : part.has(n))
-        : org.has(n);
-    } else if (el.type === "lane" || el.type === "sublane") ok = org.has(n);
-    else if (el.type === "system") ok = sys.has(n);
-    else if (el.type === "data-object") ok = docs.has(n);
-    else if (el.type === "data-store") ok = stores.has(n);
-    if (ok === false) m.set(el.id, "drift");
+      target = el.properties?.poolType === "black-box"
+        ? (el.properties?.isSystem ? sys : part)
+        : org;
+    } else if (el.type === "lane" || el.type === "sublane") target = org;
+    else if (el.type === "system") target = sys;
+    else if (el.type === "data-object") target = docs;
+    else if (el.type === "data-store") target = stores;
+    // Only flag against a NON-EMPTY list — an empty (uncurated) list flags nothing,
+    // so a project that hasn't populated e.g. Documents doesn't ring every Data Object.
+    if (target && target.size > 0 && !target.has(n)) m.set(el.id, "drift");
   }
   return m;
 }

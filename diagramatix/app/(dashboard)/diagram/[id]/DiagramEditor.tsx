@@ -1300,6 +1300,13 @@ export function DiagramEditor({
   // black-box pool → External Participants / IT Systems), data-object → Documents,
   // data-store → Data Stores. Purely a highlight — nothing on the diagram changes.
   const [entityDriftEnabled, setEntityDriftEnabled] = useState(false);
+  // Only offer/compute drift when the project has ADOPTED a structure with actual
+  // entries — otherwise there's nothing to check against (and empty lists would
+  // otherwise ring everything).
+  const entityHasNames = !!entityStructure && (
+    entityStructure.orgStructure.length + entityStructure.participants.length +
+    entityStructure.systems.length + entityStructure.documents.length + entityStructure.dataStores.length
+  ) > 0;
   const entityDrift = useMemo<Map<string, "drift"> | null>(() => {
     if (!entityDriftEnabled || !entityStructure) return null;
     const m = computeEntityDrift(data.elements, entityStructure);
@@ -3190,8 +3197,9 @@ export function DiagramEditor({
           </button>
         )}
         {/* Highlight Entity List Changes — rings any element whose name isn't in
-            the project's adopted Entity Structure. Only when a structure is loaded. */}
-        {entityStructure && (
+            the project's adopted Entity Structure. Only when a structure with
+            entries has been adopted into this project. */}
+        {entityHasNames && (
           <button
             onClick={() => setEntityDriftEnabled((v) => !v)}
             className={`px-2 py-0.5 text-[11px] rounded border ${
