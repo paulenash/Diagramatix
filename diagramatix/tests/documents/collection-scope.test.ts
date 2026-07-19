@@ -22,22 +22,33 @@ describe("document collections", () => {
     await expect(prisma.helpChapter.create({ data: { collection: "user-guide", slug: "overview", title: "dup", sortOrder: 1 } })).rejects.toThrow();
   });
 
-  it("T0650 — a User Guide restore leaves the Technical Design Notes intact", async () => {
+  it("T0650 — a User Guide restore leaves the Technical Design Notes intact, category survives", async () => {
     // A tech-design chapter that must survive.
     const td = await prisma.helpChapter.create({ data: { collection: "tech-design", slug: "miner-design", title: "Miner Design", sortOrder: 0 } });
     await prisma.helpSection.create({ data: { chapterId: td.id, collection: "tech-design", heading: "Overview", bodyMarkdown: "notes", sortOrder: 0 } });
-    // A user-guide chapter to back up + restore.
-    await prisma.helpChapter.create({ data: { collection: "user-guide", slug: "getting-started", title: "Getting Started", sortOrder: 0 } });
+    // A user-guide chapter (WITH a category) to back up + restore.
+    await prisma.helpChapter.create({ data: { collection: "user-guide", slug: "getting-started", title: "Getting Started", category: "Getting Started", sortOrder: 0 } });
 
-    const backup = await buildGuideBackup(null);           // scoped to user-guide only
-    await restoreGuideBackup(backup, null);                 // scoped wipe + re-insert
+    const backup = await buildGuideBackup("user-guide");           // scoped to user-guide only
+    await restoreGuideBackup(backup, null, "user-guide");           // scoped wipe + re-insert
 
     // tech-design survived the restore untouched.
     expect(await prisma.helpChapter.count({ where: { collection: "tech-design" } })).toBe(1);
     const survivor = await prisma.helpChapter.findFirst({ where: { collection: "tech-design", slug: "miner-design" }, include: { sections: true } });
     expect(survivor?.title).toBe("Miner Design");
     expect(survivor?.sections.length).toBe(1);
-    // user-guide restored.
+    // user-guide restored, WITH its category preserved through the backup round-trip.
     expect(await prisma.helpChapter.count({ where: { collection: "user-guide" } })).toBe(1);
+    const restored = await prisma.helpChapter.findFirst({ where: { collection: "user-guide", slug: "getting-started" } });
+    expect(restored?.category).toBe("Getting Started");
+  });
+
+  it("T0901 — importing a Technical Design Notes backup under the User Guide is rejected", async () => {
+    await prisma.helpChapter.create({ data: { collection: "tech-design", slug: "miner-design", title: "Miner Design", sortOrder: 0 } });
+    const tdBackup = await buildGuideBackup("tech-design");
+    // Restoring a tech-design file INTO user-guide must throw before touching the DB.
+    await expect(restoreGuideBackup(tdBackup, null, "user-guide")).rejects.toThrow(/tech-design/);
+    // The user-guide collection was never wiped/created.
+    expect(await prisma.helpChapter.count({ where: { collection: "user-guide" } })).toBe(0);
   });
 });

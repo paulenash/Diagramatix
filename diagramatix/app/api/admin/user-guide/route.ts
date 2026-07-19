@@ -38,7 +38,7 @@ type InSection = {
   imageAlt?: string | null;
   imageCaption?: string | null;
 };
-type InChapter = { slug?: string; title?: string; adminOnly?: boolean; sections?: InSection[] };
+type InChapter = { slug?: string; title?: string; category?: string | null; adminOnly?: boolean; sections?: InSection[] };
 
 const clean = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
@@ -61,16 +61,27 @@ export async function PUT(req: Request) {
     seen.add(slug);
   }
 
+  // The editor UI doesn't yet edit `category`, and this PUT recreates every
+  // chapter from scratch — so remember each slug's current category and re-apply
+  // it (unless the payload explicitly carries one) to avoid wiping seeded groups.
+  const prevCategory = new Map(
+    (await prisma.helpChapter.findMany({
+      where: { collection: COLLECTION }, select: { slug: true, category: true },
+    })).map(c => [c.slug, c.category]),
+  );
+
   await prisma.$transaction(async (tx) => {
     await tx.helpSection.deleteMany({ where: { collection: COLLECTION } });
     await tx.helpChapter.deleteMany({ where: { collection: COLLECTION } });
     for (let ci = 0; ci < chapters.length; ci++) {
       const ch = chapters[ci];
+      const slug = (ch.slug ?? "").trim();
       const created = await tx.helpChapter.create({
         data: {
-          slug: (ch.slug ?? "").trim(),
+          slug,
           collection: COLLECTION,
           title: (ch.title ?? "").trim() || "Untitled chapter",
+          category: ch.category !== undefined ? clean(ch.category) : (prevCategory.get(slug) ?? null),
           sortOrder: ci,
           adminOnly: !!ch.adminOnly,
         },

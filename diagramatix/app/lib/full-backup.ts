@@ -81,13 +81,18 @@ export async function buildFullBackup(
   appVersion: string,
   onProgress?: BackupProgressFn,
 ): Promise<Uint8Array> {
-  // Replace Date objects with ISO strings so the JSON serialiser doesn't
-  // need to know about Prisma's runtime types. Json columns are already
+  // Replace Date objects with ISO strings, and binary (Bytes) columns with a
+  // self-describing base64 sentinel { __bytes__ }, so the JSON serialiser
+  // doesn't need to know Prisma's runtime types and restore can round-trip them
+  // (a raw Buffer/Uint8Array JSON-serialises to an index-map that Prisma then
+  // rejects as "Expected Bytes, provided Object"). Json columns are already
   // plain objects/strings via Prisma's deserialisation.
   function toIso(row: Record<string, unknown>): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(row)) {
-      out[k] = v instanceof Date ? v.toISOString() : v;
+      if (v instanceof Date) out[k] = v.toISOString();
+      else if (v instanceof Uint8Array) out[k] = { __bytes__: Buffer.from(v).toString("base64") };
+      else out[k] = v;
     }
     return out;
   }
@@ -171,8 +176,20 @@ export interface FullRestoreResult {
 // convertDates(model, row) call site stay unchanged; each restore primes it
 // from getBackupSchema() before inserting.
 let _timestampColumns: Record<string, string[]> = {};
+// Revive the { __bytes__: base64 } sentinel written by buildFullBackup back into
+// a Buffer so Prisma accepts it for Bytes columns (e.g. HelpImage.bytes). Generic
+// — covers any binary column. Returns the same row when there's nothing to revive.
+function reviveBytes(row: Record<string, unknown>): Record<string, unknown> {
+  let out: Record<string, unknown> | null = null;
+  for (const [k, v] of Object.entries(row)) {
+    if (v && typeof v === "object" && !Array.isArray(v) && typeof (v as { __bytes__?: unknown }).__bytes__ === "string") {
+      (out ??= { ...row })[k] = Buffer.from((v as { __bytes__: string }).__bytes__, "base64");
+    }
+  }
+  return out ?? row;
+}
 function convertDates(model: string, row: Record<string, unknown>): Record<string, unknown> {
-  return reviveDates(model, row, _timestampColumns);
+  return reviveBytes(reviveDates(model, row, _timestampColumns));
 }
 
 /** Wipe-and-reload restore: TRUNCATE every table in reverse dependency

@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   if (!(file instanceof Blob)) return NextResponse.json({ error: "file required" }, { status: 400 });
 
   try {
-    const result = await restoreGuideBackup(await file.arrayBuffer(), session.user.id);
+    const result = await restoreGuideBackup(await file.arrayBuffer(), session.user.id, "user-guide");
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Restore failed" }, { status: 400 });

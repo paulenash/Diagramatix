@@ -11,7 +11,7 @@ export async function GET() {
   const session = await auth();
   if (!session?.user?.id || !isSuperuser(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const bytes = await buildGuideBackup(session.user.email ?? null);
+  const bytes = await buildGuideBackup("user-guide", session.user.email ?? null);
   return new NextResponse(bytes as BodyInit, {
     headers: {
       "Content-Type": "application/zip",

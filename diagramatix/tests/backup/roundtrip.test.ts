@@ -60,6 +60,12 @@ describe("full backup round-trip", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await prisma.simulationExample.create({ data: { slug: "rt-example", title: "RT Example", published: true, package: { version: 1 } as any } });
 
+    // User Guide content — the full (catalog-driven, all-columns) backup must
+    // carry the guide tables AND the new HelpChapter.category column + image bytes.
+    const helpCh = await prisma.helpChapter.create({ data: { collection: "user-guide", slug: "rt-guide", title: "RT Guide", category: "Getting Started", sortOrder: 0 } });
+    await prisma.helpSection.create({ data: { chapterId: helpCh.id, collection: "user-guide", heading: "Intro", bodyMarkdown: "hi", sortOrder: 0 } });
+    await prisma.helpImage.create({ data: { filename: "rt.png", screenName: "RT", mimeType: "image/png", bytes: Buffer.from([1, 2, 3, 4]) } });
+
     const before = {
       org: await prisma.org.count(),
       user: await prisma.user.count(),
@@ -74,6 +80,9 @@ describe("full backup round-trip", () => {
       studyRoot: await prisma.simulationStudyRoot.count(),
       scenario: await prisma.simulationScenario.count(),
       example: await prisma.simulationExample.count(),
+      helpChapter: await prisma.helpChapter.count(),
+      helpSection: await prisma.helpSection.count(),
+      helpImage: await prisma.helpImage.count(),
     };
 
     const bytes = await buildFullBackup("test@diagramatix.test", "test", undefined);
@@ -120,5 +129,15 @@ describe("full backup round-trip", () => {
     const child = await prisma.entityNode.findFirst({ where: { name: "Finance" } });
     expect(child?.parentId).toBe(root.id);
     expect(child?.level).toBe("Team");
+
+    // User Guide tables round-trip, and the new category column survives (the
+    // full backup dumps all columns, so a new column is carried automatically).
+    expect(await prisma.helpChapter.count()).toBe(before.helpChapter);
+    expect(await prisma.helpSection.count()).toBe(before.helpSection);
+    expect(await prisma.helpImage.count()).toBe(before.helpImage);
+    const rtGuide = await prisma.helpChapter.findFirst({ where: { collection: "user-guide", slug: "rt-guide" } });
+    expect(rtGuide?.category).toBe("Getting Started");
+    const rtImg = await prisma.helpImage.findFirst({ where: { filename: "rt.png" } });
+    expect(Buffer.from(rtImg!.bytes as Uint8Array).equals(Buffer.from([1, 2, 3, 4]))).toBe(true);
   });
 });

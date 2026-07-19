@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { HelpViewer, type RenderedChapter } from "./HelpViewer";
+import { HelpSidebar, type GuideIndexEntry } from "./HelpSidebar";
 import { isSuperuser } from "@/app/lib/superuser";
 import { prisma } from "@/app/lib/db";
 import { renderHelpMarkdown } from "@/app/lib/help/renderMarkdown";
@@ -11,27 +12,28 @@ export const metadata = { title: "Diagramatix — User Guide" };
 export default async function HelpPage({
   searchParams,
 }: {
-  searchParams: Promise<{ c?: string; view?: string }>;
+  searchParams: Promise<{ c?: string; view?: string; q?: string; cat?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   const realIsAdmin = isSuperuser(session);
-  const { c, view } = await searchParams;
+  const { c, view, q, cat } = await searchParams;
   // SuperAdmin can preview the standard (User / OrgAdmin) view. `isAdmin` is the
   // EFFECTIVE flag used for filtering.
   const previewStandard = realIsAdmin && view === "standard";
   const isAdmin = realIsAdmin && !previewStandard;
   const viewQs = previewStandard ? "&view=standard" : "";
 
-  // Nav: all chapters (slug/title/adminOnly only). The guide now lives in the DB
-  // (migrated out of chapters.tsx), so SuperAdmins can edit it in-app.
-  const navChapters = await prisma.helpChapter.findMany({
+  // One query feeds BOTH the searchable sidebar index and the current chapter's
+  // rendered body. The guide lives in the DB (migrated out of chapters.tsx) so
+  // SuperAdmins can edit it in-app.
+  const allChapters = await prisma.helpChapter.findMany({
     where: { collection: "user-guide" },
     orderBy: { sortOrder: "asc" },
-    select: { slug: true, title: true, adminOnly: true },
+    include: { sections: { orderBy: { sortOrder: "asc" } } },
   });
-  const visibleChapters = isAdmin ? navChapters : navChapters.filter(ch => !ch.adminOnly);
+  const visibleChapters = isAdmin ? allChapters : allChapters.filter(ch => !ch.adminOnly);
 
   if (visibleChapters.length === 0) {
     return (
@@ -45,17 +47,14 @@ export default async function HelpPage({
   }
 
   const currentSlug = visibleChapters.find(ch => ch.slug === c)?.slug ?? visibleChapters[0].slug;
+  const dbChapter = visibleChapters.find(ch => ch.slug === currentSlug)!;
 
   // Render only the CURRENT chapter's sections (markdown → sanitised HTML).
-  const dbChapter = await prisma.helpChapter.findFirst({
-    where: { slug: currentSlug, collection: "user-guide" },
-    include: { sections: { orderBy: { sortOrder: "asc" } } },
-  });
   const current: RenderedChapter = {
-    slug: dbChapter!.slug,
-    title: dbChapter!.title,
-    adminOnly: dbChapter!.adminOnly,
-    sections: dbChapter!.sections.map(s => ({
+    slug: dbChapter.slug,
+    title: dbChapter.title,
+    adminOnly: dbChapter.adminOnly,
+    sections: dbChapter.sections.map(s => ({
       heading: s.heading,
       bodyHtml: renderHelpMarkdown(s.bodyMarkdown),
       adminOnly: s.adminOnly,
@@ -64,6 +63,18 @@ export default async function HelpPage({
       imageCaption: s.imageCaption,
     })),
   };
+
+  // Lightweight full-guide search index (title + plaintext of visible sections).
+  const entries: GuideIndexEntry[] = visibleChapters.map(ch => ({
+    slug: ch.slug,
+    title: ch.title,
+    category: ch.category,
+    adminOnly: ch.adminOnly,
+    text: ch.sections
+      .filter(s => isAdmin || !s.adminOnly)
+      .map(s => `${s.heading ?? ""} ${s.bodyMarkdown}`)
+      .join(" "),
+  }));
 
   return (
     <div className="min-h-screen dgx-dashboard-bg">
@@ -107,36 +118,14 @@ export default async function HelpPage({
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto px-6 py-6 grid grid-cols-[220px_1fr] gap-6">
-        <nav className="text-sm">
-          <ol className="space-y-1">
-            {visibleChapters.map((ch, i) => {
-              const active = ch.slug === current.slug;
-              const adminOnly = isAdmin && ch.adminOnly;
-              return (
-                <li key={ch.slug}>
-                  <Link
-                    href={`/help?c=${ch.slug}${viewQs}`}
-                    className={`flex items-center justify-between gap-2 px-2 py-1 rounded ${
-                      active
-                        ? "bg-blue-50 text-blue-700 font-medium"
-                        : adminOnly
-                          ? "text-red-700 hover:bg-red-50"
-                          : "text-gray-700 hover:bg-gray-100"
-                    }`}
-                  >
-                    <span>{i + 1}. {ch.title}</span>
-                    {adminOnly && (
-                      <span className="text-[9px] font-semibold text-red-600 border border-red-300 bg-red-50 rounded px-1 shrink-0">
-                        SUPER
-                      </span>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ol>
-        </nav>
+      <div className="max-w-6xl mx-auto px-6 py-6 grid grid-cols-[240px_1fr] gap-6">
+        <HelpSidebar
+          entries={entries}
+          currentSlug={current.slug}
+          viewQs={viewQs}
+          initialQuery={q ?? ""}
+          initialCategory={cat ?? ""}
+        />
 
         <main className="bg-white border border-gray-200 rounded-lg p-6">
           <HelpViewer chapter={current} isAdmin={isAdmin} />

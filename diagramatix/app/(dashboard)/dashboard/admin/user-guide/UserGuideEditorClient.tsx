@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -18,10 +18,10 @@ type Section = {
   imageAlt: string | null;
   imageCaption: string | null;
 };
-type Chapter = { slug: string; title: string; adminOnly: boolean; sections: Section[] };
+type Chapter = { slug: string; title: string; category: string | null; adminOnly: boolean; sections: Section[] };
 
 const newSection = (): Section => ({ heading: "", bodyMarkdown: "", adminOnly: false, image: null, imageAlt: null, imageCaption: null });
-const newChapter = (n: number): Chapter => ({ slug: `new-chapter-${n}`, title: "New chapter", adminOnly: false, sections: [newSection()] });
+const newChapter = (n: number): Chapter => ({ slug: `new-chapter-${n}`, title: "New chapter", category: null, adminOnly: false, sections: [newSection()] });
 
 function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   const j = i + dir;
@@ -31,12 +31,17 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   return next;
 }
 
-const COLLECTION_LABEL: Record<string, string> = { "user-guide": "User Guide", "tech-design": "Technical Design Notes" };
+type DocKey = "user-guide" | "tech-design" | "documents";
+const COLLECTION_LABEL: Record<DocKey, string> = { "user-guide": "User Guide", "tech-design": "Technical Design Notes", "documents": "Other Documents" };
 
-export function UserGuideEditorClient() {
+export function UserGuideEditorClient({ hasMicrosoft = false }: { hasMicrosoft?: boolean }) {
   const searchParams = useSearchParams();
-  const initialCollection = searchParams.get("collection") === "tech-design" ? "tech-design" : "user-guide";
-  const [collection, setCollection] = useState<"user-guide" | "tech-design">(initialCollection);
+  const docParam = searchParams.get("doc");
+  const initialDoc: DocKey =
+    docParam === "documents" ? "documents"
+    : (docParam === "tech-design" || searchParams.get("collection") === "tech-design") ? "tech-design"
+    : "user-guide";
+  const [doc, setDoc] = useState<DocKey>(initialDoc);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [snapshot, setSnapshot] = useState("");
   const [selCh, setSelCh] = useState(0);
@@ -44,8 +49,8 @@ export function UserGuideEditorClient() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<{ kind: "idle" | "saving" | "saved" | "error"; msg?: string }>({ kind: "idle" });
   const [confirm, setConfirm] = useState<null | { msg: string; onYes: () => void }>(null);
-  const [tab, setTab] = useState<"guide" | "documents">("guide");
   const [mode, setMode] = useState<"edit" | "view">("edit");
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const [exportMenu, setExportMenu] = useState(false);
   const [pickImage, setPickImage] = useState(false);
   const [imgOpen, setImgOpen] = useState(false);
@@ -60,16 +65,18 @@ export function UserGuideEditorClient() {
     return name.replace(/\.[A-Za-z0-9]+$/, "");
   };
 
+  const [reloadKey, setReloadKey] = useState(0); // bump to force a re-fetch (e.g. after Import)
   useEffect(() => {
+    if (doc === "documents") { setLoading(false); return; } // "Other Documents" renders <DocumentsTab/>, no chapter fetch
     setLoading(true);
     (async () => {
       try {
-        const res = await fetch(`/api/admin/documents/${collection}`);
+        const res = await fetch(`/api/admin/documents/${doc}`);
         if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`);
         const data = await res.json();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const chs: Chapter[] = (data.chapters ?? []).map((c: any) => ({
-          slug: c.slug, title: c.title, adminOnly: !!c.adminOnly,
+          slug: c.slug, title: c.title, category: c.category ?? null, adminOnly: !!c.adminOnly,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           sections: (c.sections ?? []).map((s: any) => ({
             heading: s.heading ?? "", bodyMarkdown: s.bodyMarkdown ?? "", adminOnly: !!s.adminOnly,
@@ -86,11 +93,17 @@ export function UserGuideEditorClient() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collection]);
+  }, [doc, reloadKey]);
 
   const dirty = useMemo(() => JSON.stringify(chapters) !== snapshot, [chapters, snapshot]);
   const ch = chapters[selCh];
   const sec = ch?.sections[selSec];
+  // Existing categories → datalist suggestions, so authors reuse names rather
+  // than coining near-duplicates. Free text still allowed (drives the /help filter).
+  const categoryOptions = useMemo(
+    () => Array.from(new Set(chapters.map(c => c.category).filter((v): v is string => !!v))).sort(),
+    [chapters],
+  );
 
   // Open the image panel automatically when the selected section has an image.
   useEffect(() => {
@@ -122,7 +135,7 @@ export function UserGuideEditorClient() {
   async function save(): Promise<boolean> {
     setStatus({ kind: "saving" });
     try {
-      const res = await fetch(`/api/admin/documents/${collection}`, {
+      const res = await fetch(`/api/admin/documents/${doc}`, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chapters }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`);
@@ -143,14 +156,40 @@ export function UserGuideEditorClient() {
     setChapters(JSON.parse(snapshot));
     setSelCh(0); setSelSec(0); setStatus({ kind: "idle" });
   }
-  function switchCollection(next: "user-guide" | "tech-design") {
-    if (next === collection) return;
-    if (dirty) { setConfirm({ msg: "Discard unsaved changes and switch document?", onYes: () => { setConfirm(null); setCollection(next); } }); return; }
-    setCollection(next);
+  function switchDoc(next: DocKey) {
+    if (next === doc) return;
+    if (dirty) { setConfirm({ msg: "Discard unsaved changes and switch document?", onYes: () => { setConfirm(null); setMode("edit"); setDoc(next); } }); return; }
+    setMode("edit"); setDoc(next);
   }
-  const isTech = collection === "tech-design";
+  const isTech = doc === "tech-design";
+  const isDocuments = doc === "documents";
 
-  if (loading) return <div className="p-6 text-sm text-gray-500">Loading the guide…</div>;
+  // ── Import a `.diag-guide` backup INTO the current document (replaces its content). ──
+  function chooseImport() { importInputRef.current?.click(); }
+  async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    setConfirm({
+      msg: `Import “${file.name}” into ${COLLECTION_LABEL[doc]}? This REPLACES all current content of this document.`,
+      onYes: async () => {
+        setConfirm(null);
+        setStatus({ kind: "saving" });
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          const res = await fetch(`/api/admin/documents/${doc}/restore`, { method: "POST", body: fd });
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+          setStatus({ kind: "saved" });
+          setReloadKey((k) => k + 1); // re-fetch the freshly-restored content
+        } catch (err) {
+          setStatus({ kind: "error", msg: err instanceof Error ? err.message : "Import failed" });
+        }
+      },
+    });
+  }
+
+  if (loading && !isDocuments) return <div className="p-6 text-sm text-gray-500">Loading the guide…</div>;
 
   return (
     <div className="h-screen dgx-dashboard-bg flex flex-col overflow-hidden">
@@ -159,36 +198,33 @@ export function UserGuideEditorClient() {
           <Link href="/dashboard/admin" className="text-sm text-red-600 hover:text-red-800">‹ SuperAdmin</Link>
           <h1 className="text-lg font-semibold text-gray-900">Document Editor</h1>
           {mode === "edit" && (
-            <select
-              value={collection}
-              onChange={(e) => switchCollection(e.target.value as "user-guide" | "tech-design")}
-              className="text-xs border border-gray-300 rounded px-2 py-1 text-gray-800 bg-white"
-              title="Which document to edit"
-            >
-              <option value="user-guide">User Guide</option>
-              <option value="tech-design">Technical Design Notes</option>
-            </select>
-          )}
-          {mode === "edit" && (
             <div className="flex items-center gap-1 ml-1">
-              {(["guide", "documents"] as const).map((t) => (
-                <button key={t} onClick={() => setTab(t)}
-                  className={`text-xs px-2.5 py-1 rounded ${tab === t ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"}`}>
-                  {t === "guide" ? "Guide" : "Documents"}
-                </button>
-              ))}
+              {(["user-guide", "tech-design", "documents"] as const).map((d) => {
+                const active = doc === d;
+                const gated = d === "documents" && !hasMicrosoft;
+                return (
+                  <button key={d} onClick={() => switchDoc(d)} disabled={gated}
+                    title={gated ? "Sign in with Microsoft to enable SharePoint" : undefined}
+                    className={`text-xs px-2.5 py-1 rounded ${active ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"} ${gated ? "opacity-40 cursor-not-allowed" : ""}`}>
+                    {COLLECTION_LABEL[d]}
+                  </button>
+                );
+              })}
             </div>
           )}
           {mode === "view" && (
-            <span className="text-sm text-gray-500 ml-1">Viewing — <span className="text-gray-800 font-medium">{ch?.title}</span></span>
+            <span className="text-sm text-gray-500 ml-1">
+              <span className="text-gray-800 font-medium">{COLLECTION_LABEL[doc]}</span>
+              {" — Viewing — "}<span className="text-gray-800 font-medium">{ch?.title}</span>
+            </span>
           )}
         </div>
-        {tab === "guide" && mode === "view" && (
+        {!isDocuments && mode === "view" && (
           <button onClick={() => setMode("edit")} className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-medium hover:bg-blue-700">
             ‹ Back to Edit Mode
           </button>
         )}
-        {tab === "guide" && mode === "edit" && (
+        {!isDocuments && mode === "edit" && (
           <div className="flex items-center gap-2 text-xs">
             {status.kind === "saved" && <span className="text-green-600">Saved</span>}
             {status.kind === "error" && <span className="text-red-600">{status.msg}</span>}
@@ -198,16 +234,21 @@ export function UserGuideEditorClient() {
               {exportMenu && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setExportMenu(false)} />
-                  <div className="absolute right-0 z-30 mt-1 w-64 bg-white border border-gray-200 rounded shadow-lg text-gray-700">
-                    <a href={`/api/admin/documents/${collection}/export`} onClick={() => setExportMenu(false)} className="block w-full text-left px-3 py-1.5 hover:bg-blue-50">Whole document (.docx)</a>
-                    {ch?.slug && <a href={`/api/admin/documents/${collection}/export?chapter=${ch.slug}`} onClick={() => setExportMenu(false)} className="block w-full text-left px-3 py-1.5 hover:bg-blue-50">This chapter — {ch.title} (.docx)</a>}
+                  <div className="absolute right-0 z-30 mt-1 w-72 bg-white border border-gray-200 rounded shadow-lg text-gray-700">
+                    <a href={`/api/admin/documents/${doc}/export`} onClick={() => setExportMenu(false)} className="block w-full text-left px-3 py-1.5 hover:bg-blue-50">Whole document (.docx)</a>
+                    {ch?.slug && <a href={`/api/admin/documents/${doc}/export?chapter=${ch.slug}`} onClick={() => setExportMenu(false)} className="block w-full text-left px-3 py-1.5 hover:bg-blue-50">This chapter — {ch.title} (.docx)</a>}
                     <div className="border-t border-gray-100 my-1" />
                     <button onClick={() => { setExportMenu(false); void exportGuideZip(chapters); }} className="block w-full text-left px-3 py-1.5 hover:bg-blue-50">Bundle (.zip + images/)</button>
                     <button onClick={() => { setExportMenu(false); void exportGuideSelfContained(chapters); }} className="block w-full text-left px-3 py-1.5 hover:bg-blue-50">Self-contained (.md)</button>
+                    <div className="border-t border-gray-100 my-1" />
+                    <a href={`/api/admin/documents/${doc}/backup`} onClick={() => setExportMenu(false)} className="block w-full text-left px-3 py-1.5 hover:bg-blue-50">Backup for transfer (.diag-guide)</a>
+                    <p className="px-3 pt-0.5 pb-1 text-[10px] text-gray-400">Round-trips content, categories &amp; images between environments — pair with Import.</p>
                   </div>
                 </>
               )}
             </div>
+            <button onClick={chooseImport} disabled={status.kind === "saving"} className="px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40" title="Replace this document from a .diag-guide backup">Import…</button>
+            <input ref={importInputRef} type="file" accept=".diag-guide" onChange={onImportFile} className="hidden" />
             <Link href={isTech ? "/tech-notes" : "/help"} target="_blank" className="px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50">{isTech ? "Open notes ↗" : "Open guide ↗"}</Link>
             <button onClick={cancel} disabled={!dirty} className="px-3 py-1 rounded border border-gray-300 text-gray-700 disabled:opacity-40">Cancel</button>
             <button onClick={saveAndView} disabled={status.kind === "saving"} className="px-3 py-1 rounded bg-blue-600 text-white font-medium disabled:opacity-40 hover:bg-blue-700">
@@ -221,7 +262,7 @@ export function UserGuideEditorClient() {
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-      {tab === "documents" ? <DocumentsTab /> : mode === "view" ? (
+      {isDocuments ? <DocumentsTab /> : mode === "view" ? (
         <GuidePreview chapters={chapters} selCh={selCh} selSec={selSec} setSelCh={setSelCh} setSelSec={setSelSec} />
       ) : (
       <div className="max-w-7xl mx-auto px-6 py-5 grid grid-cols-[240px_1fr] gap-5">
@@ -267,6 +308,15 @@ export function UserGuideEditorClient() {
                       className="mt-1 w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono" />
                   </label>
                 </div>
+                {doc === "user-guide" && (
+                  <label className="text-xs text-gray-600 block">Category
+                    <input list="guide-categories" value={ch.category ?? ""}
+                      onChange={(e) => patchChapter(selCh, { category: e.target.value.trim() || null })}
+                      placeholder="e.g. Getting Started — groups this chapter in the guide's search filter"
+                      className="mt-1 w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+                    <datalist id="guide-categories">{categoryOptions.map((c) => <option key={c} value={c} />)}</datalist>
+                  </label>
+                )}
                 <label className="flex items-center gap-2 text-xs text-gray-700">
                   <input type="checkbox" checked={ch.adminOnly} onChange={(e) => patchChapter(selCh, { adminOnly: e.target.checked })} />
                   <span className="text-red-700 font-medium">SuperAdmin-only chapter</span> — hidden from User / OrgAdmin viewers

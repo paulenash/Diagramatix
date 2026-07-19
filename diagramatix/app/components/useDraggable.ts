@@ -16,13 +16,29 @@ export function useDraggable(storageKey: string, fallback: () => DragPos, size =
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const moved = useRef(false);
 
+  // Keep a position fully inside the current viewport. A saved position (or the
+  // resolution it was saved at) can be larger than today's window — without this
+  // the control would render off-screen and be unreachable (e.g. the camera
+  // button "disappearing" after a resize).
+  const clampToView = useCallback((p: DragPos): DragPos => ({
+    left: Math.max(0, Math.min((window.innerWidth || size) - size, p.left)),
+    top: Math.max(0, Math.min((window.innerHeight || size) - size, p.top)),
+  }), [size]);
+
   useEffect(() => {
     try {
       const s = localStorage.getItem(storageKey);
-      setPos(s ? (JSON.parse(s) as DragPos) : fallback());
-    } catch { setPos(fallback()); }
+      setPos(clampToView(s ? (JSON.parse(s) as DragPos) : fallback()));
+    } catch { setPos(clampToView(fallback())); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
+
+  // Re-clamp if the window shrinks so the control stays reachable.
+  useEffect(() => {
+    const onResize = () => setPos((p) => (p ? clampToView(p) : p));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [clampToView]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (!pos) return;

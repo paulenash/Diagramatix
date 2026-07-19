@@ -1459,6 +1459,7 @@ model HelpChapter {
   slug       String
   collection String        @default("user-guide")   // "user-guide" (the in-app help) | "tech-design" (SuperAdmin design notes)
   title      String
+  category   String?        // optional grouping for the searchable/filterable viewer (e.g. "Diagram Types", "AI Generation"); null = ungrouped
   sortOrder  Int           @default(0)
   adminOnly  Boolean       @default(false)
   sections   HelpSection[]

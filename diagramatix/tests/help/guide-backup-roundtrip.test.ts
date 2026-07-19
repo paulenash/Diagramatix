@@ -30,7 +30,7 @@ async function seedGuide(userId: string) {
     data: { filename: "visio.png", screenName: "Diagram Editor", diagramName: "Order Process", mimeType: "image/png", bytes: BYTES_B, createdById: userId },
   });
 
-  const ch1 = await prisma.helpChapter.create({ data: { slug: "getting-started", title: "Getting Started", sortOrder: 0 } });
+  const ch1 = await prisma.helpChapter.create({ data: { slug: "getting-started", title: "Getting Started", category: "Getting Started", sortOrder: 0 } });
   const ch2 = await prisma.helpChapter.create({ data: { slug: "admin", title: "Admin", sortOrder: 1, adminOnly: true } });
 
   // Section-image-FIELD ref + INLINE body ref, both pointing at library images.
@@ -58,7 +58,7 @@ describe("User Guide backup round-trip", () => {
     const { user } = await createUserWithOrg();
     const { imgA, imgB, ch1 } = await seedGuide(user.id);
 
-    const bytes = await buildGuideBackup("admin@test");
+    const bytes = await buildGuideBackup("user-guide", "admin@test");
 
     // Simulate restoring into a fresh DB: wipe the three guide tables first.
     await prisma.helpSection.deleteMany({});
@@ -68,7 +68,7 @@ describe("User Guide backup round-trip", () => {
     expect(await prisma.helpImage.count()).toBe(0);
 
     const result = await restoreGuideBackup(bytes, user.id);
-    expect(result).toEqual({ images: 2, chapters: 2, sections: 3 });
+    expect(result).toEqual({ images: 2, chapters: 2, sections: 3, collection: "user-guide" });
 
     expect(await prisma.helpChapter.count()).toBe(2);
     expect(await prisma.helpSection.count()).toBe(3);
@@ -86,6 +86,7 @@ describe("User Guide backup round-trip", () => {
     // Chapter + sections preserved (id, order, content).
     const rch1 = await prisma.helpChapter.findUnique({ where: { id: ch1.id }, include: { sections: { orderBy: { sortOrder: "asc" } } } });
     expect(rch1?.title).toBe("Getting Started");
+    expect(rch1?.category).toBe("Getting Started"); // category survives the backup round-trip
     expect(rch1?.sections.length).toBe(2);
 
     // CRUCIAL: references still resolve because ids are preserved.
@@ -102,7 +103,7 @@ describe("User Guide backup round-trip", () => {
   it("is idempotent — restoring twice yields one set, not duplicates", async () => {
     const { user } = await createUserWithOrg();
     await seedGuide(user.id);
-    const bytes = await buildGuideBackup(null);
+    const bytes = await buildGuideBackup("user-guide");
 
     await restoreGuideBackup(bytes, user.id);
     await restoreGuideBackup(bytes, user.id);
@@ -110,6 +111,25 @@ describe("User Guide backup round-trip", () => {
     expect(await prisma.helpImage.count()).toBe(2);
     expect(await prisma.helpChapter.count()).toBe(2);
     expect(await prisma.helpSection.count()).toBe(3);
+  });
+
+  it("T0902 — round-trips the Technical Design Notes collection independently", async () => {
+    const { user } = await createUserWithOrg();
+    // A user-guide chapter that must NOT be touched by a tech-design restore.
+    await prisma.helpChapter.create({ data: { collection: "user-guide", slug: "ug", title: "UG", sortOrder: 0 } });
+    // A tech-design chapter to back up + restore.
+    const td = await prisma.helpChapter.create({ data: { collection: "tech-design", slug: "miner", title: "Miner Design", sortOrder: 0 } });
+    await prisma.helpSection.create({ data: { chapterId: td.id, collection: "tech-design", heading: "Overview", bodyMarkdown: "internal", sortOrder: 0 } });
+
+    const bytes = await buildGuideBackup("tech-design");
+    const result = await restoreGuideBackup(bytes, user.id, "tech-design");
+    expect(result.collection).toBe("tech-design");
+    expect(result.chapters).toBe(1);
+
+    // tech-design restored; user-guide untouched.
+    expect(await prisma.helpChapter.count({ where: { collection: "tech-design" } })).toBe(1);
+    expect(await prisma.helpChapter.count({ where: { collection: "user-guide" } })).toBe(1);
+    expect((await prisma.helpChapter.findFirst({ where: { collection: "tech-design", slug: "miner" } }))?.title).toBe("Miner Design");
   });
 
   it("rejects a non-guide / garbage upload before touching the DB", async () => {
