@@ -275,6 +275,9 @@ interface Props {
    *  false, selecting an element does NOT dim the rest. Default true. */
   pcHighlightEnabled?: boolean;
   scanHighlightById?: Map<string, "error" | "warning">;
+  /** "Highlight Entity List Changes": elements whose name isn't in the project's
+   *  adopted Entity Structure get an amber dashed ring. Read-only overlay. */
+  entityDriftById?: Map<string, "drift">;
   /** Same idea, but for connectors. A flagged connector gets a thicker
    *  semi-transparent stroke painted along its waypoints in the severity
    *  colour. Used by rules like `connector-bends`. */
@@ -542,6 +545,7 @@ export function Canvas({
   selectedConnectorId,
   pcHighlightEnabled = true,
   scanHighlightById,
+  entityDriftById,
   scanHighlightConnectorById,
   currentIssueIds,
   riskHighlightById,
@@ -6878,6 +6882,27 @@ export function Canvas({
                 />
               );
             })}
+
+          {/* Entity-list drift — amber dashed ring on elements whose name isn't
+              in the project's adopted Entity Structure ("Highlight Entity List
+              Changes"). Read-only; nothing on the diagram is altered. */}
+          {entityDriftById && entityDriftById.size > 0 && data.elements
+            .filter((el: DiagramElement) => entityDriftById.has(el.id))
+            .map((el: DiagramElement) => (
+              <rect
+                key={`drift-hl-${el.id}`}
+                x={el.x - 3}
+                y={el.y - 3}
+                width={el.width + 6}
+                height={el.height + 6}
+                fill="none"
+                stroke="#d97706"
+                strokeWidth={3 / zoom}
+                strokeDasharray={`${6 / zoom} ${4 / zoom}`}
+                rx={4}
+                pointerEvents="none"
+              />
+            ))}
 
           {/* Connector scan highlights — drawn LAST so they overlay the
               normal connector strokes. The first and last waypoints of a

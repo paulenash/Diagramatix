@@ -43,6 +43,7 @@ import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { AiPanel } from "./AiPanel";
 import { AiComparisonModal, type AiComparison } from "@/app/components/AiComparisonModal";
 import { toSuggestions, type ProjectEntityStructure, type EntityListDTO, type EntityNodeLevel } from "@/app/lib/entityLists/types";
+import { computeEntityDrift } from "@/app/lib/entityLists/entityDrift";
 import { PlanPanel } from "./PlanPanel";
 import { SendForReviewDialog } from "./SendForReviewDialog";
 import { PublishVersionDialog } from "./PublishVersionDialog";
@@ -1293,6 +1294,17 @@ export function DiagramEditor({
     }
     return m.size > 0 ? m : null;
   }, [rcSectionOpen, data.elements]);
+
+  // "Highlight Entity List Changes" (drift): flag elements whose NAME isn't in the
+  // project's adopted Entity Structure. pool/lane/sublane → Org Hierarchy (or a
+  // black-box pool → External Participants / IT Systems), data-object → Documents,
+  // data-store → Data Stores. Purely a highlight — nothing on the diagram changes.
+  const [entityDriftEnabled, setEntityDriftEnabled] = useState(false);
+  const entityDrift = useMemo<Map<string, "drift"> | null>(() => {
+    if (!entityDriftEnabled || !entityStructure) return null;
+    const m = computeEntityDrift(data.elements, entityStructure);
+    return m.size > 0 ? m : null;
+  }, [entityDriftEnabled, entityStructure, data.elements]);
 
   // Parallel highlight map for connectors — same severity-wins rule but keyed
   // by connector id. Drives the orange overlay path drawn in Canvas.
@@ -3177,6 +3189,21 @@ export function DiagramEditor({
             Highlight{highlightEnabled ? " ✓" : ""}
           </button>
         )}
+        {/* Highlight Entity List Changes — rings any element whose name isn't in
+            the project's adopted Entity Structure. Only when a structure is loaded. */}
+        {entityStructure && (
+          <button
+            onClick={() => setEntityDriftEnabled((v) => !v)}
+            className={`px-2 py-0.5 text-[11px] rounded border ${
+              entityDriftEnabled
+                ? "border-amber-500 bg-amber-50 text-amber-700"
+                : "border-gray-300 text-gray-600 hover:bg-gray-50"
+            }`}
+            title="Highlight Entity List Changes: rings any pool/lane, participant, IT system, document or data-store name that isn't in this project's adopted Entity Structure"
+          >
+            Entity Drift{entityDriftEnabled ? " ✓" : ""}
+          </button>
+        )}
         {/* Review-comment filter — appears once a diagram carries review
             comments, letting the owner focus on one reviewer at a time. */}
         {reviewCommenters.length > 0 && (
@@ -3659,6 +3686,7 @@ export function DiagramEditor({
           pcHighlightEnabled={highlightEnabled}
           scanHighlightById={scanHighlight ?? undefined}
           riskHighlightById={riskHighlight ?? undefined}
+          entityDriftById={entityDrift ?? undefined}
           scanHighlightConnectorById={scanConnectorHighlight ?? undefined}
           currentIssueIds={currentIssueIds.size > 0 ? currentIssueIds : undefined}
           onSetSelectedElements={setSelectedElementIds}
