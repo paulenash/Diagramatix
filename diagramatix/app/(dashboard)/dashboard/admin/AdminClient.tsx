@@ -768,6 +768,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "bubble-help", title: "Bubble Help", description: "The contextual help-cloud topics shown in the editor.", href: "/dashboard/admin/bubble-help" },
   { id: "user-guide", title: "Document Editor", description: "Edit the in-app User Guide, the SuperAdmin Technical Design Notes, and Other Documents (SharePoint) — WYSIWYG with tables & symbols; export to .docx or a .diag-guide backup, and import between environments.", href: "/dashboard/admin/user-guide" },
   { id: "tech-design-notes-read", title: "Technical Design Notes", description: "Read-only view of the Technical Design Notes (no editor chrome).", href: "/tech-notes" },
+  { id: "image-library", title: "Image Library", description: "Manage User Guide & Technical Design Notes images — upload, see where each is used, replace an image everywhere by drag-and-drop, and delete. Images are shared across documents.", href: "/dashboard/admin/image-library" },
   { id: "diagram-types", title: "Diagram Types", description: "The 2-character codes and pastel colours shown per diagram type.", href: "/dashboard/admin/diagram-types?from=/dashboard/admin" },
   { id: "diagram-type-sort", title: "Diagram Type Sort Order", description: "The order diagram types are listed across the app and in the project Diagram Type sort.", href: "/dashboard/diagram-type-sort-order?from=/dashboard/admin" },
   { id: "prompts", title: "AI Prompt Maintenance", description: "Maintain your own saved AI generation prompts.", href: "/dashboard/prompts?from=/dashboard/admin" },
