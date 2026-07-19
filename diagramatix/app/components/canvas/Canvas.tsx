@@ -6907,21 +6907,28 @@ export function Canvas({
               Changes"). Read-only; nothing on the diagram is altered. */}
           {entityDriftById && entityDriftById.size > 0 && data.elements
             .filter((el: DiagramElement) => entityDriftById.has(el.id))
-            .map((el: DiagramElement) => (
-              <rect
-                key={`drift-hl-${el.id}`}
-                x={el.x - 3}
-                y={el.y - 3}
-                width={el.width + 6}
-                height={el.height + 6}
-                fill="none"
-                stroke="#d97706"
-                strokeWidth={3 / zoom}
-                strokeDasharray={`${6 / zoom} ${4 / zoom}`}
-                rx={4}
-                pointerEvents="none"
-              />
-            ))}
+            .map((el: DiagramElement) => {
+              // Data Objects / Data Stores show their NAME below a small icon —
+              // extend the ring down so it clearly wraps the name too (a ring on
+              // the tiny icon alone is easy to miss).
+              const belowLabel = el.type === "data-object" || el.type === "data-store";
+              const extraH = belowLabel ? 24 : 0;
+              return (
+                <rect
+                  key={`drift-hl-${el.id}`}
+                  x={el.x - 3}
+                  y={el.y - 3}
+                  width={el.width + 6}
+                  height={el.height + 6 + extraH}
+                  fill="none"
+                  stroke="#d97706"
+                  strokeWidth={3 / zoom}
+                  strokeDasharray={`${6 / zoom} ${4 / zoom}`}
+                  rx={4}
+                  pointerEvents="none"
+                />
+              );
+            })}
 
           {/* Connector scan highlights — drawn LAST so they overlay the
               normal connector strokes. The first and last waypoints of a
