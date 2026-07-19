@@ -493,12 +493,17 @@ export function DiagramEditor({
       if (!res.ok) return;
       const { lists } = (await res.json()) as { lists: EntityListDTO[] };
       const pick = (kind: EntityListDTO["kind"]) => lists.find(l => l.kind === kind);
-      const p = pick("Participant"), s = pick("System"), o = pick("OrgStructure");
+      const p = pick("Participant"), s = pick("System"), o = pick("OrgStructure"), d = pick("Document"), ds = pick("DataStore");
       setEntityStructure({
         participants: p ? toSuggestions(p.nodes) : [],
         systems: s ? toSuggestions(s.nodes) : [],
         orgStructure: o ? toSuggestions(o.nodes) : [],
-        listIds: { ...(p ? { Participant: p.id } : {}), ...(s ? { System: s.id } : {}), ...(o ? { OrgStructure: o.id } : {}) },
+        documents: d ? toSuggestions(d.nodes) : [],
+        dataStores: ds ? toSuggestions(ds.nodes) : [],
+        listIds: {
+          ...(p ? { Participant: p.id } : {}), ...(s ? { System: s.id } : {}), ...(o ? { OrgStructure: o.id } : {}),
+          ...(d ? { Document: d.id } : {}), ...(ds ? { DataStore: ds.id } : {}),
+        },
       });
     } catch { /* ignore */ }
   }, [projectId]);

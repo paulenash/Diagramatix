@@ -6959,6 +6959,7 @@ export function Canvas({
         const editingEl = data.elements.find(e => e.id === editingLabel.elementId);
         const isUseCase = editingEl?.type === 'use-case';
         const isPoolLane = editingEl?.type === 'pool' || editingEl?.type === 'lane';
+        const isDataObjOrStore = editingEl?.type === 'data-object' || editingEl?.type === 'data-store';
         const hasTaskMarker = editingEl?.type === 'task' && !!editingEl?.taskType && editingEl?.taskType !== 'none';
         const isUmlElement = editingEl?.type === 'uml-class' || editingEl?.type === 'uml-enumeration';
         const commonChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -7009,6 +7010,32 @@ export function Canvas({
               }}
             />
           );
+        }
+        if (isDataObjOrStore) {
+          // Entity-list autocomplete: data-object → Documents, data-store → Data
+          // Stores (flat). Falls through to the plain textarea when the project
+          // has no adopted structure loaded.
+          const el = editingEl!;
+          const isDoc = el.type === 'data-object';
+          const kind: EntityListKind = isDoc ? 'Document' : 'DataStore';
+          const suggestions = isDoc ? entityStructure?.documents : entityStructure?.dataStores;
+          const flatLevel: EntityNodeLevel = isDoc ? 'Document' : 'DataStore';
+          const listId = entityStructure?.listIds[kind];
+          if (entityStructure && suggestions && listId && onAddEntityNode) {
+            const commitName = (name: string) => { onUpdateLabel(editingLabel.elementId, name); setEditingLabel(null); };
+            return (
+              <EntityNameInput
+                box={{ x: editingLabel.x, y: editingLabel.y, width: Math.max(editingLabel.width, 150), height: editingLabel.height }}
+                fontSizePx={(data.fontSize ?? 12) * 11 / 12 * zoom}
+                suggestions={suggestions}
+                allowNew
+                flatLevel={flatLevel}
+                onCommit={commitName}
+                onCommitNew={async (name, level, parentId) => { await onAddEntityNode(listId, { name, level, parentId }); commitName(name); }}
+                onCancel={() => setEditingLabel(null)}
+              />
+            );
+          }
         }
         if (isPoolLane) {
           // Entity-list autocomplete: white-box pool & lane → Org Structure

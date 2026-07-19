@@ -85,3 +85,72 @@ export async function adoptStructure(
 
   return { listId: created.id, nodeCount: master.nodes.length };
 }
+
+// A transaction client (structural — avoids importing the generated Prisma types).
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+interface MasterNode {
+  id: string; parentId: string | null; name: string; level: string; sortOrder: number;
+  spDriveId: string | null; spItemId: string | null; spName: string | null; spWebUrl: string | null;
+}
+
+/** Clone master nodes into a project list, parents-first, remapping parentId and
+ *  stamping each copy's `sourceNodeId` (provenance for Sync) + SharePoint fields. */
+async function cloneNodesInto(tx: Tx, listId: string, masterNodes: MasterNode[]): Promise<number> {
+  const idMap = new Map<string, string>();
+  const remaining = [...masterNodes];
+  let guard = remaining.length + 1;
+  while (remaining.length && guard-- > 0) {
+    for (let i = remaining.length - 1; i >= 0; i--) {
+      const n = remaining[i];
+      if (n.parentId && !idMap.has(n.parentId)) continue; // wait for parent
+      const created = await tx.entityNode.create({
+        data: {
+          listId, parentId: n.parentId ? idMap.get(n.parentId)! : null,
+          name: n.name, level: n.level as never, sortOrder: n.sortOrder,
+          spDriveId: n.spDriveId, spItemId: n.spItemId, spName: n.spName, spWebUrl: n.spWebUrl,
+          sourceNodeId: n.id,
+        },
+      });
+      idMap.set(n.id, created.id);
+      remaining.splice(i, 1);
+    }
+  }
+  return masterNodes.length;
+}
+
+export interface AdoptFullResult { lists: number; nodes: number; }
+
+/** Adopt a whole org-master EntityStructure (all five lists) into a project as
+ *  independent COPIES. Each copy keeps `sourceListId`; each node keeps
+ *  `sourceNodeId` — so "Sync updates" can later merge master changes while
+ *  preserving the project's own additions. Replacing wipes ALL the project's
+ *  existing entity lists first. */
+export async function adoptStructureFull(
+  projectId: string,
+  projectOrgId: string,
+  structureId: string,
+  opts: { replace?: boolean } = {},
+): Promise<AdoptFullResult> {
+  const structure = await prisma.entityStructure.findFirst({
+    where: { id: structureId, orgId: projectOrgId },
+    include: { lists: { include: { nodes: true } } },
+  });
+  if (!structure) throw new AdoptStructureError("Structure not found", 404);
+
+  const existingCount = await prisma.entityList.count({ where: { projectId } });
+  if (existingCount > 0 && !opts.replace) {
+    throw new AdoptStructureError("This project has already adopted a structure. Pass ?replace=true to overwrite.", 409);
+  }
+
+  let nodeTotal = 0;
+  await prisma.$transaction(async (tx) => {
+    if (existingCount > 0) await tx.entityList.deleteMany({ where: { projectId } });
+    for (const master of structure.lists) {
+      const copy = await tx.entityList.create({
+        data: { name: master.name, kind: master.kind, projectId, sourceListId: master.id },
+      });
+      nodeTotal += await cloneNodesInto(tx, copy.id, master.nodes as MasterNode[]);
+    }
+  });
+  return { lists: structure.lists.length, nodes: nodeTotal };
+}

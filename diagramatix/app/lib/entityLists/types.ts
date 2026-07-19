@@ -103,6 +103,8 @@ export interface ProjectEntityStructure {
   participants: EntitySuggestion[];
   systems: EntitySuggestion[];
   orgStructure: EntitySuggestion[];
+  documents: EntitySuggestion[];
+  dataStores: EntitySuggestion[];
   /** projectId-scoped EntityList id per kind, for the "add new node" POST. */
   listIds: Partial<Record<EntityListKind, string>>;
 }
