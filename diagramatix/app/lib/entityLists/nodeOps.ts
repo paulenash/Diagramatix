@@ -7,10 +7,22 @@ export class NodeOpError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
 }
 
+/** Pull the optional SharePoint-link fields (Document nodes) out of an input. */
+type SpInput = { spDriveId?: unknown; spItemId?: unknown; spName?: unknown; spWebUrl?: unknown };
+function spFields(input: SpInput, forUpdate: boolean): Record<string, string | null> {
+  const out: Record<string, string | null> = {};
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  for (const k of ["spDriveId", "spItemId", "spName", "spWebUrl"] as const) {
+    // On create, only include provided values; on update, allow explicit clearing.
+    if (forUpdate ? k in input : input[k] !== undefined) out[k] = str(input[k]);
+  }
+  return out;
+}
+
 /** Create a node in a list. parentId must (when set) belong to the same list. */
 export async function createNode(
   listId: string,
-  input: { name?: unknown; level?: unknown; parentId?: unknown; sortOrder?: unknown },
+  input: { name?: unknown; level?: unknown; parentId?: unknown; sortOrder?: unknown } & SpInput,
 ) {
   const name = typeof input.name === "string" ? input.name.trim() : "";
   const level = input.level as EntityNodeLevel;
@@ -29,18 +41,18 @@ export async function createNode(
     });
     sortOrder = (last?.sortOrder ?? -1) + 1;
   }
-  return prisma.entityNode.create({ data: { listId, name, level, parentId, sortOrder } });
+  return prisma.entityNode.create({ data: { listId, name, level, parentId, sortOrder, ...spFields(input, false) } });
 }
 
 /** Update a node (rename / move / re-level / reorder). */
 export async function updateNode(
   listId: string,
   nodeId: string,
-  input: { name?: unknown; level?: unknown; parentId?: unknown; sortOrder?: unknown },
+  input: { name?: unknown; level?: unknown; parentId?: unknown; sortOrder?: unknown } & SpInput,
 ) {
   const node = await prisma.entityNode.findFirst({ where: { id: nodeId, listId }, select: { id: true } });
   if (!node) throw new NodeOpError("Not found", 404);
-  const data: { name?: string; level?: EntityNodeLevel; parentId?: string | null; sortOrder?: number } = {};
+  const data: { name?: string; level?: EntityNodeLevel; parentId?: string | null; sortOrder?: number } & Record<string, string | null> = { ...spFields(input, true) };
   if (input.name !== undefined) {
     const name = typeof input.name === "string" ? input.name.trim() : "";
     if (!name) throw new NodeOpError("Name required", 400);

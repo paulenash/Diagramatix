@@ -65,6 +65,11 @@ const SCOPED_OMITTED = new Set<string>([
   "CollaborationGroup", "CollaborationGroupMember", "DiagramReview", "DiagramReviewer",
   "OwnershipTransfer", "ScannerRule", "SubscriptionLevel", "Feature", "BubbleHelp",
   "DiagramTypeStyle",
+  // Entity Structures are org MASTERS (like the org-master EntityLists) — the
+  // scoped org/user backup recreates only project COPIES of EntityList (which
+  // carry no structureId), never the masters, so EntityStructure is not carried
+  // by the scoped backup. It IS carried by the SuperAdmin full backup (catalog-driven).
+  "EntityStructure",
   // The DB-backed User Guide is SYSTEM/admin content, not per-user data — it's
   // deliberately not in the scoped org/user backup. It's carried by the
   // SuperAdmin full backup (catalog-driven) AND its own dedicated table-level

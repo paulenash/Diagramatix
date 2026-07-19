@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { SharePointPicker } from "@/app/components/SharePointPicker";
 import {
-  childLevelFor, isFlatKind, toSuggestions,
+  childLevelFor, isFlatKind, toSuggestions, FLAT_LEVEL_FOR,
   ENTITY_NODE_LEVEL_LABELS,
   type EntityListDTO, type EntityNodeLevel,
 } from "@/app/lib/entityLists/types";
@@ -23,8 +24,10 @@ export function EntityListEditor({
   onChange: () => void;
 }) {
   const flat = isFlatKind(list.kind);
-  const flatLevel: EntityNodeLevel = list.kind === "System" ? "System" : "Participant";
+  const flatLevel: EntityNodeLevel = FLAT_LEVEL_FOR[list.kind] ?? "Participant";
+  const isDocuments = list.kind === "Document";
   const suggestions = toSuggestions(list.nodes);
+  const nodeById = new Map(list.nodes.map((n) => [n.id, n]));
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -33,6 +36,7 @@ export function EntityListEditor({
   const [addParent, setAddParent] = useState<string | null | "top">(null); // node id, null=flat add, "top"=closed
   const [addVal, setAddVal] = useState("");
   const [confirm, setConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [spNode, setSpNode] = useState<string | null>(null); // Document node being linked to SharePoint
 
   const nodesUrl = `${basePath}/${list.id}/nodes`;
 
@@ -75,14 +79,37 @@ export function EntityListEditor({
             ) : (
               <span className="flex-1 text-gray-800">{n.name}</span>
             )}
+            {isDocuments && editId !== n.id && (() => {
+              const sp = nodeById.get(n.id);
+              return sp?.spWebUrl ? (
+                <a href={sp.spWebUrl} target="_blank" rel="noopener noreferrer" title={sp.spName ?? "Linked file"}
+                  className="text-[10px] text-blue-600 hover:underline max-w-[10rem] truncate">📎 {sp.spName ?? "file"}</a>
+              ) : (
+                <span className="text-[10px] text-gray-400 italic">not linked</span>
+              );
+            })()}
             {canEdit && editId !== n.id && (
               <>
+                {isDocuments && (
+                  <button onClick={() => setSpNode(n.id)} className="text-blue-400 hover:text-blue-600 px-1">
+                    {nodeById.get(n.id)?.spWebUrl ? "Change" : "Link file…"}
+                  </button>
+                )}
+                {isDocuments && nodeById.get(n.id)?.spWebUrl && (
+                  <button onClick={() => call(`${nodesUrl}/${n.id}`, "PUT", { spDriveId: null, spItemId: null, spName: null, spWebUrl: null })}
+                    className="text-gray-400 hover:text-gray-700 px-1">Unlink</button>
+                )}
                 <button onClick={() => { setEditId(n.id); setEditVal(n.name); }} className="text-gray-400 hover:text-gray-700 px-1">Edit</button>
                 <button onClick={() => setConfirm({ id: n.id, name: n.name })} className="text-red-400 hover:text-red-600 px-1">Delete</button>
               </>
             )}
           </div>
         ))}
+        {spNode && (
+          <SharePointPicker mode="file" title="Link a SharePoint file"
+            onPick={(sel) => { const id = spNode; setSpNode(null); void call(`${nodesUrl}/${id}`, "PUT", { spDriveId: sel.driveId, spItemId: sel.itemId, spName: sel.name, spWebUrl: sel.webUrl }); }}
+            onCancel={() => setSpNode(null)} />
+        )}
         {canEdit && (
           <div className="flex items-center gap-1 pt-1">
             <input value={addParent === null ? addVal : ""} onFocus={() => setAddParent(null)}

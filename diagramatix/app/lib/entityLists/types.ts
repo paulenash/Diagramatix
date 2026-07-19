@@ -4,20 +4,25 @@
  * unions so client components never import the generated Prisma client.
  */
 
-export type EntityListKind = "Participant" | "System" | "OrgStructure";
-export const ENTITY_LIST_KINDS: EntityListKind[] = ["Participant", "System", "OrgStructure"];
+export type EntityListKind = "Participant" | "System" | "OrgStructure" | "Document" | "DataStore";
+export const ENTITY_LIST_KINDS: EntityListKind[] = ["Participant", "System", "OrgStructure", "Document", "DataStore"];
+/** The five lists that make up an Entity Structure, in display order. */
+export const STRUCTURE_LIST_KINDS: EntityListKind[] = ["OrgStructure", "Participant", "System", "Document", "DataStore"];
 
 export type EntityNodeLevel =
   | "Participant" | "System"
-  | "Organisation" | "OrgUnit" | "Team" | "Role";
+  | "Organisation" | "OrgUnit" | "Team" | "Role"
+  | "Document" | "DataStore";
 export const ENTITY_NODE_LEVELS: EntityNodeLevel[] =
-  ["Participant", "System", "Organisation", "OrgUnit", "Team", "Role"];
+  ["Participant", "System", "Organisation", "OrgUnit", "Team", "Role", "Document", "DataStore"];
 
 /** Human labels for the UI. */
 export const ENTITY_LIST_KIND_LABELS: Record<EntityListKind, string> = {
+  OrgStructure: "Organisation Hierarchy",
   Participant: "External Participants",
   System: "IT Systems",
-  OrgStructure: "Organisation Structure",
+  Document: "Documents",
+  DataStore: "Data Stores",
 };
 export const ENTITY_NODE_LEVEL_LABELS: Record<EntityNodeLevel, string> = {
   Participant: "Participant",
@@ -26,10 +31,17 @@ export const ENTITY_NODE_LEVEL_LABELS: Record<EntityNodeLevel, string> = {
   OrgUnit: "Org Unit",
   Team: "Team",
   Role: "Role",
+  Document: "Document",
+  DataStore: "Data Store",
 };
 
 /** The hierarchy levels, ordered top→bottom, for the OrgStructure kind. */
 export const ORG_STRUCTURE_LEVELS: EntityNodeLevel[] = ["Organisation", "OrgUnit", "Team", "Role"];
+
+/** The flat (single-level) node level for a flat kind. */
+export const FLAT_LEVEL_FOR: Partial<Record<EntityListKind, EntityNodeLevel>> = {
+  Participant: "Participant", System: "System", Document: "Document", DataStore: "DataStore",
+};
 
 /** Valid child level under a given parent level (null parent = top level). */
 export function childLevelFor(parentLevel: EntityNodeLevel | null): EntityNodeLevel {
@@ -40,7 +52,7 @@ export function childLevelFor(parentLevel: EntityNodeLevel | null): EntityNodeLe
 
 /** Is this kind a flat list (no hierarchy)? */
 export function isFlatKind(kind: EntityListKind): boolean {
-  return kind === "Participant" || kind === "System";
+  return kind !== "OrgStructure";
 }
 
 // ── DTOs returned by the API ────────────────────────────────────────
@@ -51,6 +63,13 @@ export interface EntityNodeDTO {
   name: string;
   level: EntityNodeLevel;
   sortOrder: number;
+  // Document-kind items: an optional linked SharePoint file.
+  spDriveId?: string | null;
+  spItemId?: string | null;
+  spName?: string | null;
+  spWebUrl?: string | null;
+  // Project-copy provenance (null on masters + on project additions).
+  sourceNodeId?: string | null;
 }
 export interface EntityListDTO {
   id: string;
@@ -58,8 +77,16 @@ export interface EntityListDTO {
   kind: EntityListKind;
   orgId: string | null;
   projectId: string | null;
+  structureId: string | null;
   sourceListId: string | null;
   nodes: EntityNodeDTO[];
+}
+/** A named org-allocated Entity Structure: up to one list per kind. */
+export interface EntityStructureDTO {
+  id: string;
+  name: string;
+  orgId: string;
+  lists: EntityListDTO[];
 }
 
 /** A node decorated with its depth (0 = top) for indented rendering. */

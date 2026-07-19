@@ -87,6 +87,7 @@ model Org {
   diagramRules        DiagramRules[]
   collaborationGroups CollaborationGroup[]
   entityLists         EntityList[]
+  entityStructures    EntityStructure[]
   riskControlLibraries RiskControlLibrary[]
   pcfFrameworks       PcfFramework[]
   simulationTeams     SimulationTeam[]
@@ -945,6 +946,8 @@ enum EntityListKind {
   Participant
   System
   OrgStructure
+  Document
+  DataStore
 }
 
 enum EntityNodeLevel {
@@ -954,27 +957,51 @@ enum EntityNodeLevel {
   OrgUnit
   Team
   Role
+  Document
+  DataStore
+}
+
+// A named, org-allocated Entity Structure bundles the (up to) five lists an org
+// governs — Organisational Hierarchy (OrgStructure) + External Participants
+// (Participant) + IT Systems (System) + Documents + Data Stores. `orgId` IS the
+// allocation: SuperAdmin creates a structure for an org; that org's OrgAdmin may
+// edit it; projects in the org adopt a copy of it.
+model EntityStructure {
+  id        String       @id @default(cuid())
+  name      String
+  orgId     String
+  org       Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  lists     EntityList[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([orgId])
 }
 
 model EntityList {
-  id           String         @id @default(cuid())
+  id           String           @id @default(cuid())
   name         String
   kind         EntityListKind
   // Exactly one of orgId / projectId is set.
   orgId        String?
-  org          Org?           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org          Org?             @relation(fields: [orgId], references: [id], onDelete: Cascade)
   projectId    String?
-  project      Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project      Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // The named Entity Structure this list belongs to (org masters). Null for
+  // legacy / ungrouped lists and for project copies.
+  structureId  String?
+  structure    EntityStructure? @relation(fields: [structureId], references: [id], onDelete: Cascade)
   // The org master this project copy was cloned from (provenance only).
   sourceListId String?
-  sourceList   EntityList?    @relation("EntityListClone", fields: [sourceListId], references: [id], onDelete: SetNull)
-  clones       EntityList[]   @relation("EntityListClone")
+  sourceList   EntityList?      @relation("EntityListClone", fields: [sourceListId], references: [id], onDelete: SetNull)
+  clones       EntityList[]     @relation("EntityListClone")
   nodes        EntityNode[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@index([orgId, kind])
   @@index([projectId, kind])
+  @@index([structureId])
 }
 
 model EntityNode {
@@ -988,10 +1015,22 @@ model EntityNode {
   name      String
   level     EntityNodeLevel
   sortOrder Int             @default(0)
+  // Document-kind items may link to a SharePoint file. Stored as scalar columns
+  // (not JSON) to sidestep the Prisma 7 JSON-write caveat; mirrors the
+  // element.properties.sharepointLink shape { driveId, itemId, name, webUrl }.
+  spDriveId String?
+  spItemId  String?
+  spName    String?
+  spWebUrl  String?
+  // Provenance on a PROJECT COPY node → the master node it was cloned from. Null
+  // on masters AND on project-local additions. Drives "Sync updates" (soft
+  // pointer, no FK: a master node may be deleted and Sync reconciles).
+  sourceNodeId String?
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
   @@index([listId, parentId, sortOrder])
+  @@index([sourceNodeId])
 }
 
 // ────────────────────────────────────────────────────────────────────────────
