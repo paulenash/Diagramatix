@@ -3601,9 +3601,12 @@ export function Canvas({
     // (isEditingGatewayLabel state) and calls onLabelFocusEditStart /
     // End on the Canvas-supplied focus-zoom hooks. Single-click on the
     // shape still selects the element (handled upstream).
+    // Events + gateways edit their name via SymbolRenderer's own below-shape
+    // editor. Data Objects / Data Stores are NOT here: they fall through to the
+    // editingLabel overlay below (positioned under the shape) so the Entity
+    // Structure Documents / Data Stores suggestions can appear.
     const LABEL_ONLY_ZOOM = new Set([
-      "start-event", "intermediate-event", "end-event",
-      "gateway", "data-store", "data-object",
+      "start-event", "intermediate-event", "end-event", "gateway",
     ]);
     if (LABEL_ONLY_ZOOM.has(el.type)) return;
 
@@ -3622,7 +3625,11 @@ export function Canvas({
     let zoomCenterX = el.x + el.width / 2;
     let zoomCenterY = el.y + el.height / 2;
     let zoomWorldWidth = el.width;
-    if (el.type === "pool" || el.type === "lane") {
+    if (el.type === "data-object" || el.type === "data-store") {
+      // Aim the focus zoom at the label below the small icon.
+      zoomCenterY = el.y + el.height + 14;
+      zoomWorldWidth = Math.max(el.width, 150);
+    } else if (el.type === "pool" || el.type === "lane") {
       const storedW = el.type === "pool"
         ? (el.properties?.poolHeaderWidth as number | undefined)
         : (el.properties?.laneHeaderWidth as number | undefined);
@@ -3677,6 +3684,18 @@ export function Canvas({
         y: textTopY * effectiveZoom + effectivePan.y,
         width: (el.width - PAD - 4) * effectiveZoom,
         height: (textH + 4) * effectiveZoom,
+        value: el.label,
+      });
+    } else if (el.type === "data-object" || el.type === "data-store") {
+      // Name sits BELOW the small icon — open the editor there (min 150px wide so
+      // the Documents / Data Stores suggestion list has room).
+      const w = Math.max(el.width, 150);
+      setEditingLabel({
+        elementId: el.id,
+        x: (el.x + el.width / 2 - w / 2) * effectiveZoom + effectivePan.x,
+        y: (el.y + el.height + 6) * effectiveZoom + effectivePan.y,
+        width: w * effectiveZoom,
+        height: 22 * effectiveZoom,
         value: el.label,
       });
     } else {

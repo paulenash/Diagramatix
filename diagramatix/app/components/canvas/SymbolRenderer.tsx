@@ -2465,6 +2465,11 @@ export function SymbolRenderer({
       isArchiActorIcon
     ) && !(element.type === "gateway" && (element.properties.gatewayRole as string | undefined) === "merge");
 
+  // Data Objects / Data Stores keep their label BELOW the shape, but their name
+  // is edited via the Canvas overlay editor (which offers the Entity Structure
+  // Documents / Data Stores suggestions). Everything else edits inline here.
+  const externalEditInline = hasExternalLabel && element.type !== "data-object" && element.type !== "data-store";
+
   function beginExternalLabelEdit() {
     const labelOffsetX = (element.properties.labelOffsetX as number) ?? 0;
     const labelOffsetY = (element.properties.labelOffsetY as number) ?? 7;
@@ -2492,7 +2497,7 @@ export function SymbolRenderer({
   // the outer <g> interception once the element was selected.
   function handleShapeBodyDblClick(e: React.MouseEvent) {
     e.stopPropagation();
-    if (hasExternalLabel && !multiSelected) { beginExternalLabelEdit(); return; }
+    if (externalEditInline && !multiSelected) { beginExternalLabelEdit(); return; }
     onDoubleClick();
   }
 
@@ -2520,7 +2525,7 @@ export function SymbolRenderer({
         // focus hook deselects the shape. When this shape is part of a
         // multi-selection we fall through to onDoubleClick so the gateway
         // group-connect (diamond) gesture still fires instead.
-        if (hasExternalLabel && !multiSelected) { beginExternalLabelEdit(); return; }
+        if (externalEditInline && !multiSelected) { beginExternalLabelEdit(); return; }
         onDoubleClick();
       }}
       // Cursor scheme (G05): grabbable elements get .dgx-grab so the
