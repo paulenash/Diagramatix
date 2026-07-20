@@ -4,6 +4,26 @@
 
 **Framework abbreviations (indicative):** SOC 2 (Trust Services Criteria), ISO = ISO/IEC 27001:2022 Annex A, GDPR (EU 2016/679), CPS = APRA CPS 234 / CPS 230 (relevant for Australian regulated customers).
 
+## Remediation status — Phase A1 shipped
+
+Phase A1 (governance foundations) is on `main`. Closed or partially closed:
+
+| Finding | Status | Commit / how |
+|---|---|---|
+| ENT-05 (no per-tenant AI disable) | ✅ Closed | `Org.allowAi` + `gateOrgPolicy` on all AI routes |
+| ENT-07 (raw audio to Deepgram) | ✅ Closed | `Org.allowVoiceAi` gates transcribe + dictation |
+| ENT-08 (no AI proxy seam) | ✅ Closed | `ANTHROPIC_BASE_URL` factory `makeAnthropic()` |
+| ENT-10 (support email carries diagram) | ✅ Closed | `allowExternalExport` + `allowSupportDiagram` (strips diagram + skips vendor-copy) |
+| ENT-11 (`/api/account` authZ gap) | ✅ Closed | `requireOrgAdminFor` gate; pwd min 6→8 |
+| ENT-16 (process content in logs) | ✅ Closed | `DEBUG_CONTENT_LOGS` gate on the content logs |
+| ENT-15 (cross-org sharing) | 🟡 Partial | "Apply Enterprise Mode" turns it off; vendor-lock still open |
+| ENT-02 (impersonation) | 🟡 Partial | cookies now HttpOnly+Secure; audit + edit-opt-in → Phase A2 |
+
+Also new: a customer-admin **"Data & AI Governance"** panel (org-settings) with per-capability
+toggles + **Apply Enterprise Mode**, and all AI now runs on the single admin-selected model.
+Remaining high-severity items (ENT-01/03/04/06) are Phase A2/A3. The rows below are the original
+assessment (pre-remediation).
+
 ## Register
 
 | ID | Finding | Sev | Evidence | Framework touchpoints |
