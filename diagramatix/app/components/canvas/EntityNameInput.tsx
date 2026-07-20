@@ -128,12 +128,12 @@ export function EntityNameInput({
             }}
           >
             {!filtering && withKids.size > 0 && (
-              <div style={{ display: "flex", gap: 8, padding: "3px 8px", borderBottom: "1px solid #f3f4f6" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 8px", borderBottom: "1px solid #f3f4f6" }}>
                 <button type="button" onClick={() => setCollapsed(new Set())}
-                  style={{ fontSize: 10, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Expand all</button>
+                  style={{ fontSize: 10, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", gap: 2 }}><span style={{ fontSize: 18, lineHeight: 1 }}>⊞</span> Expand all</button>
                 <span style={{ color: "#d1d5db", fontSize: 10 }}>·</span>
                 <button type="button" onClick={() => setCollapsed(new Set(withKids))}
-                  style={{ fontSize: 10, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Collapse all</button>
+                  style={{ fontSize: 10, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", gap: 2 }}><span style={{ fontSize: 18, lineHeight: 1 }}>⊟</span> Collapse all</button>
               </div>
             )}
             {rows.map((s, i) => (
@@ -152,10 +152,10 @@ export function EntityNameInput({
                   <button type="button"
                     onClick={(e) => { e.stopPropagation(); toggleCollapse(s.id); }}
                     title={collapsed.has(s.id) ? "Expand" : "Collapse"}
-                    style={{ fontSize: 9, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", padding: 0, marginRight: 4, width: 10 }}>
+                    style={{ fontSize: 18, lineHeight: 1, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", padding: 0, marginRight: 4, width: 20 }}>
                     {collapsed.has(s.id) ? "▸" : "▾"}
                   </button>
-                ) : (!filtering ? <span style={{ display: "inline-block", width: 10, marginRight: 4 }} /> : null)}
+                ) : (!filtering ? <span style={{ display: "inline-block", width: 20, marginRight: 4 }} /> : null)}
                 <span style={{ color: "#9ca3af", fontSize: 9, marginRight: 6 }}>{ENTITY_NODE_LEVEL_LABELS[s.level]}</span>
                 {s.name}
               </div>

@@ -143,19 +143,19 @@ export function EntityListEditor({
       {suggestions.length === 0 && <p className="text-xs text-gray-400 italic">No structure yet.</p>}
       {withKids.size > 0 && (
         <div className="flex items-center gap-2 pb-0.5">
-          <button onClick={() => setCollapsed(new Set())} className="text-[10px] text-blue-600 hover:text-blue-800">Expand all</button>
+          <button onClick={() => setCollapsed(new Set())} className="text-[10px] text-blue-600 hover:text-blue-800 inline-flex items-center gap-0.5"><span className="text-[18px] leading-none">⊞</span> Expand all</button>
           <span className="text-gray-300 text-[10px]">·</span>
-          <button onClick={() => setCollapsed(new Set(withKids))} className="text-[10px] text-blue-600 hover:text-blue-800">Collapse all</button>
+          <button onClick={() => setCollapsed(new Set(withKids))} className="text-[10px] text-blue-600 hover:text-blue-800 inline-flex items-center gap-0.5"><span className="text-[18px] leading-none">⊟</span> Collapse all</button>
         </div>
       )}
       {visible.map((n) => (
         <div key={n.id} style={{ paddingLeft: n.depth * 14 }} className="flex items-center gap-1 text-xs group">
           {withKids.has(n.id) ? (
             <button onClick={() => toggleCollapse(n.id)} title={collapsed.has(n.id) ? "Expand" : "Collapse"}
-              className="w-3 shrink-0 text-gray-400 hover:text-gray-700 text-[9px] leading-none">
+              className="w-5 shrink-0 text-gray-400 hover:text-gray-700 text-[18px] leading-none">
               {collapsed.has(n.id) ? "▸" : "▾"}
             </button>
-          ) : <span className="w-3 shrink-0" />}
+          ) : <span className="w-5 shrink-0" />}
           <span className="text-[9px] text-gray-500 w-14 shrink-0">{ENTITY_NODE_LEVEL_LABELS[n.level]}</span>
           {editId === n.id ? (
             <input autoFocus value={editVal} onChange={(e) => setEditVal(e.target.value)}
