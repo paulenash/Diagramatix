@@ -35,6 +35,7 @@ import { getRiskControl } from "@/app/lib/diagram/riskControl";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { featureVars, tonesFor } from "@/app/lib/theme/featureColors";
+import { useOrgPolicy } from "@/app/lib/auth/useOrgPolicy";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { InfoDialog } from "@/app/components/InfoDialog";
@@ -967,6 +968,7 @@ export function DiagramEditor({
   // apply deterministic layout). Other types use the legacy one-shot AI panel.
   const usesPlanPanel = diagramType === "bpmn" || diagramType === "flowchart";
   const featureScheme = useFeatureColors();
+  const orgPolicy = useOrgPolicy(); // enterprise governance — hide AI when the org disables it
   // The Simulator (Matrix-style process simulation) is offered for BPMN.
   const supportsSimulator = diagramType === "bpmn";
   const [showSendReview, setShowSendReview] = useState(false);
@@ -1114,6 +1116,11 @@ export function DiagramEditor({
   // SuperAdmin "presentation mode" — double-click the logo to hide the SuperAdmin
   // chip + the SuperAdmin AI options. No-op for non-SuperAdmins.
   const { hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(isAdmin);
+  // Enterprise policy binds everyone EXCEPT an active (non-presenting) SuperAdmin.
+  // So a SuperAdmin keeps AI; "Hide SuperAdmin" makes the org policy take effect
+  // live (updates as the toggle flips — handy for demoing Org Settings).
+  const policyBindsMe = !isAdmin || superAdminHidden;
+  const aiAllowedHere = orgPolicy.allowAi || !policyBindsMe;
   type TemplateRow = { id: string; name: string; group: string | null };
   const [userTemplates, setUserTemplates] = useState<TemplateRow[]>([]);
   const [builtInTemplates, setBuiltInTemplates] = useState<TemplateRow[]>([]);
@@ -3481,8 +3488,9 @@ export function DiagramEditor({
 
         {/* AI Generate — restored to the toolbar (in the AI feature colour). For
             BPMN/flowchart this opens the 2-phase Plan panel; other types open the
-            legacy one-shot AI panel. */}
-        {!readOnly && diagramType !== "basic" && (
+            legacy one-shot AI panel. Hidden when the org's policy disables AI
+            (a non-presenting SuperAdmin is exempt). */}
+        {!readOnly && diagramType !== "basic" && aiAllowedHere && (
           <button
             onClick={() => {
               if (usesPlanPanel) {

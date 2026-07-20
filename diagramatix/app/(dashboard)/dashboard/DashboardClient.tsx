@@ -337,7 +337,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [miningProject, setMiningProject] = useState<{ id: string; name: string } | null>(null);
   // SuperAdmin "presentation mode" — double-click the logo to hide SuperAdmin
   // chrome and relabel the subscription tier to Expert. No-op for non-SuperAdmins.
-  const { hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(!!isSu);
+  const { mode: adminViewMode, hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(!!isSu);
   // The auto-collected "Support" project is SuperAdmin-only chrome: highlighted
   // red when shown, and hidden along with the rest of the SuperAdmin chrome when
   // the logo is double-clicked (presentation mode).
@@ -1559,13 +1559,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 </a>
               )}
 
-              {/* Org-level shortcuts — visible to OrgOwner / OrgAdmin
-                  only. SuperAdmins reach the same pages via the
-                  SuperAdmin chip above, so we don't render a second
-                  copy for them. Orange styling matches the SuperAdmin
-                  chip pattern — both are elevated roles and should
-                  read as such across the app. */}
-              {!isSu && (orgRole === "Owner" || orgRole === "Admin") && (
+              {/* Org-level shortcuts — visible to a real OrgOwner / OrgAdmin, and
+                  to a SuperAdmin who has cycled the logo into the "orgadmin" view
+                  (so they can act as / demo an OrgAdmin for their own org). Orange
+                  styling matches the elevated-role convention. */}
+              {((!isSu && (orgRole === "Owner" || orgRole === "Admin")) || (isSu && adminViewMode === "orgadmin")) && (
                 <a
                   href="/dashboard/org-admin"
                   className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"

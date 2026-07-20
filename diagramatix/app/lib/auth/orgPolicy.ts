@@ -5,8 +5,26 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/app/lib/db";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
+import { isSuperuser } from "@/app/lib/superuser";
 
 type Session = Parameters<typeof tryGetCurrentOrgId>[0];
+
+/** Cookie mirroring the SuperAdmin view mode (see app/hooks/useSuperAdminChrome.ts):
+ *  "superadmin" | "orgadmin" | "user". Lets the server apply policy as the mode dictates. */
+export const SA_MODE_COOKIE = "dgx_sa_mode";
+
+/**
+ * Whether org policy binds THIS caller. It binds everyone EXCEPT a SuperAdmin in
+ * the full "superadmin" view — the vendor operator keeps full access there. When
+ * a SuperAdmin switches to the "orgadmin" or "user" view (by cycling the logo),
+ * they experience the app as that role and the org's policy applies (this is also
+ * how a SuperAdmin demonstrates the policy).
+ */
+async function policyBindsCaller(session: Session): Promise<boolean> {
+  if (!isSuperuser(session ?? null)) return true;
+  const mode = (await cookies()).get(SA_MODE_COOKIE)?.value;
+  return mode === "orgadmin" || mode === "user"; // absent/"superadmin" → bypass
+}
 
 export type OrgPolicyKey =
   | "allowAi" | "allowVoiceAi" | "allowExternalExport" | "allowSharePoint" | "allowSupportDiagram";
@@ -40,8 +58,10 @@ export async function getOrgPolicy(orgId: string): Promise<OrgPolicy> {
   };
 }
 
-/** Non-throwing check for the caller's active org. No active org → allowed. */
+/** Non-throwing check for the caller's active org. No active org → allowed.
+ *  A non-presenting SuperAdmin is never bound (returns true). */
 export async function orgPolicyAllows(session: Session, key: OrgPolicyKey): Promise<boolean> {
+  if (!(await policyBindsCaller(session))) return true;
   const orgId = await tryGetCurrentOrgId(session, await cookies());
   if (!orgId) return true;
   const policy = await getOrgPolicy(orgId);

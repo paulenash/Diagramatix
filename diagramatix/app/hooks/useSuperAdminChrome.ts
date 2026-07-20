@@ -3,35 +3,63 @@
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * SuperAdmin "presentation mode". Double-clicking the Diagramatix logo (top-left)
- * toggles hiding of SuperAdmin-only UI chrome — the SuperAdmin chips, the project
- * Org-reassign dropdown, and the SuperAdmin AI options — and relabels the
- * subscription tier to "Expert", so a SuperAdmin can demo / screenshot the app as
- * an ordinary user. The state is persisted in localStorage so it survives
- * navigation between the Dashboard, Project and Diagram screens, and is synced
- * live within a page (and across tabs) via a window event.
+ * SuperAdmin "view mode" — double-clicking the Diagramatix logo (top-left) cycles
+ * a SuperAdmin through three views so they can use / demo / screenshot the app as
+ * different roles:
  *
- * Returns `{ hidden, toggle }`. Only the header component (which renders the logo)
- * wires `toggle` to an onDoubleClick; every other consumer just reads `hidden`.
- * Strictly a no-op for non-SuperAdmins: `toggle` does nothing and `hidden` is
- * always false.
+ *   superadmin → orgadmin → user → (back to) superadmin
+ *
+ *   • superadmin — full SuperAdmin chrome (chips, Org-reassign, SuperAdmin AI
+ *     options), tier shows normally, and enterprise Org policy is BYPASSED.
+ *   • orgadmin   — SuperAdmin chrome hidden, the OrgAdmin button shown, behaves as
+ *     an OrgAdmin for the active org; Org policy APPLIES.
+ *   • user       — no admin chrome at all, behaves as an ordinary member; Org
+ *     policy APPLIES.
+ *
+ * The mode is persisted in localStorage (survives navigation, synced across tabs /
+ * components via a window event) AND mirrored to the `dgx_sa_mode` cookie so the
+ * SERVER can apply policy accordingly (see app/lib/auth/orgPolicy.ts).
+ *
+ * `hidden` = "hide SuperAdmin chrome" = mode !== "superadmin", so every existing
+ * consumer that reads `hidden` keeps working (SuperAdmin chrome shows only in the
+ * superadmin view). Strictly a no-op for non-SuperAdmins.
  */
-const KEY = "dgx.superAdminChromeHidden";
-const EVENT = "dgx:superadmin-chrome";
+export type AdminViewMode = "superadmin" | "orgadmin" | "user";
 
-function read(): boolean {
-  try { return localStorage.getItem(KEY) === "1"; } catch { return false; }
+const KEY = "dgx.superAdminViewMode";
+const VER_KEY = "dgx.superAdminViewModeBuild";
+const EVENT = "dgx:superadmin-chrome";
+const COOKIE = "dgx_sa_mode";
+const ORDER: AdminViewMode[] = ["superadmin", "orgadmin", "user"];
+// Build stamp (commit count, baked in per deploy). A new build resets the view
+// mode to "superadmin" so the demo mode never survives a deployment (local or prod).
+const BUILD = process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0";
+
+function readMode(): AdminViewMode {
+  try {
+    if (localStorage.getItem(VER_KEY) !== BUILD) {
+      localStorage.setItem(VER_KEY, BUILD);
+      localStorage.setItem(KEY, "superadmin");
+      return "superadmin";
+    }
+    const v = localStorage.getItem(KEY);
+    return v === "orgadmin" || v === "user" ? v : "superadmin";
+  } catch { return "superadmin"; }
 }
 
-export function useSuperAdminChrome(isSuperAdmin: boolean): { hidden: boolean; toggle: () => void } {
-  const [hidden, setHidden] = useState(false);
+function writeCookie(mode: AdminViewMode): void {
+  try { document.cookie = `${COOKIE}=${mode}; path=/; samesite=lax; max-age=31536000`; } catch { /* ignore */ }
+}
 
-  // Initial read (client only) + live sync from the toggle / other tabs / other
-  // components mounting this hook on the same page.
+export function useSuperAdminChrome(isSuperAdmin: boolean): { mode: AdminViewMode; hidden: boolean; toggle: () => void } {
+  const [mode, setMode] = useState<AdminViewMode>("superadmin");
+
   useEffect(() => {
-    if (!isSuperAdmin) { setHidden(false); return; }
-    setHidden(read());
-    const sync = () => setHidden(read());
+    if (!isSuperAdmin) { setMode("superadmin"); writeCookie("superadmin"); return; }
+    const m = readMode();
+    setMode(m);
+    writeCookie(m); // keep the server-readable cookie in sync with stored state
+    const sync = () => { const v = readMode(); setMode(v); writeCookie(v); };
     window.addEventListener(EVENT, sync);
     window.addEventListener("storage", sync);
     return () => { window.removeEventListener(EVENT, sync); window.removeEventListener("storage", sync); };
@@ -39,9 +67,12 @@ export function useSuperAdminChrome(isSuperAdmin: boolean): { hidden: boolean; t
 
   const toggle = useCallback(() => {
     if (!isSuperAdmin) return;
-    try { localStorage.setItem(KEY, read() ? "0" : "1"); } catch { /* ignore */ }
+    const next = ORDER[(ORDER.indexOf(readMode()) + 1) % ORDER.length];
+    try { localStorage.setItem(KEY, next); } catch { /* ignore */ }
+    writeCookie(next);
     window.dispatchEvent(new Event(EVENT));
   }, [isSuperAdmin]);
 
-  return { hidden: isSuperAdmin && hidden, toggle };
+  const effective: AdminViewMode = isSuperAdmin ? mode : "superadmin";
+  return { mode: effective, hidden: isSuperAdmin && effective !== "superadmin", toggle };
 }
