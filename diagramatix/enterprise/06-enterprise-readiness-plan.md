@@ -40,7 +40,7 @@ The single most important build is to make **per-tenant governance a first-class
 
 Indicative sizing for a small team; phases can overlap. Findings in **bold** are the audit blockers.
 
-### Phase A1 — Governance foundations *(≈ weeks 1–4)*
+### Phase A1 — Governance foundations *(≈ weeks 1–4)* — ✅ SHIPPED 2026-07-20 (see [07](07-implementation-log.md))
 - **Organisation Policy engine**: `Org` policy columns + `gateOrgPolicy()` helper + org-settings UI + Enterprise-Mode preset. → closes **ENT-05**, ENT-07, ENT-10, ENT-15.
 - **`ANTHROPIC_BASE_URL` seam** + route the 3 hard-coded-model AI features through the admin picker. → ENT-08, AI-management.
 - **Quick fixes**: `/api/account` authZ + password-policy alignment (ENT-11); scrub process content from server logs (ENT-16); HttpOnly impersonation cookies (part of ENT-02).
@@ -92,7 +92,7 @@ Assemble the pack a customer's risk team asks for, most of it derivable from thi
 
 | Milestone | ~When | Findings closed | What we can credibly tell an enterprise |
 |---|---|---|---|
-| **M1 — Governance foundations** (A1 + evidence pack) | ~Wk 4–6 | ENT-05/08/10/11/15/16 | "Your admins control AI, voice, export & sharing per tenant; here's our data-flow + questionnaire." |
+| **M1 — Governance foundations** (A1 ✅ + evidence pack ⬜) | ~Wk 4–6 | ENT-05/07/08/10/11/16 ✅ | "Your admins control AI, voice, export & sharing per tenant; here's our data-flow + questionnaire." |
 | **M2 — Accountable & least-privilege** (A2) | ~Wk 8 | ENT-01/02/03/13/19 | "All access is logged & attributable; admin is MFA-gated; nothing your policy forbids can run." |
 | **M3 — Your identity, your instance** (A3 + Tier 2) | ~Wk 14–16 | ENT-04/06/09/12/14 | "Bring your IdP + MFA; run a dedicated instance in your region with your AI keys or none." |
 | **M4 — Certified** (SOC 2 Type II) | ~Mo 9–12 | assurance | "SOC 2 Type II under NDA." |
