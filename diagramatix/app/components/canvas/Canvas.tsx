@@ -3625,8 +3625,8 @@ export function Canvas({
     let zoomCenterX = el.x + el.width / 2;
     let zoomCenterY = el.y + el.height / 2;
     let zoomWorldWidth = el.width;
-    if (el.type === "data-object" || el.type === "data-store") {
-      // Aim the focus zoom at the label below the small icon.
+    if (el.type === "data-object" || el.type === "data-store" || el.type === "system") {
+      // Aim the focus zoom at the label below the shape.
       zoomCenterY = el.y + el.height + 14;
       zoomWorldWidth = Math.max(el.width, 150);
     } else if (el.type === "pool" || el.type === "lane") {
@@ -3686,9 +3686,9 @@ export function Canvas({
         height: (textH + 4) * effectiveZoom,
         value: el.label,
       });
-    } else if (el.type === "data-object" || el.type === "data-store") {
-      // Name sits BELOW the small icon — open the editor there (min 150px wide so
-      // the Documents / Data Stores suggestion list has room).
+    } else if (el.type === "data-object" || el.type === "data-store" || el.type === "system") {
+      // Name sits BELOW the shape — open the editor there (min 150px wide so the
+      // Documents / Data Stores / IT Systems suggestion list has room).
       const w = Math.max(el.width, 150);
       setEditingLabel({
         elementId: el.id,
@@ -7011,6 +7011,7 @@ export function Canvas({
         const isUseCase = editingEl?.type === 'use-case';
         const isPoolLane = editingEl?.type === 'pool' || editingEl?.type === 'lane';
         const isDataObjOrStore = editingEl?.type === 'data-object' || editingEl?.type === 'data-store';
+        const isSystemElement = editingEl?.type === 'system';
         const hasTaskMarker = editingEl?.type === 'task' && !!editingEl?.taskType && editingEl?.taskType !== 'none';
         const isUmlElement = editingEl?.type === 'uml-class' || editingEl?.type === 'uml-enumeration';
         const commonChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -7092,6 +7093,29 @@ export function Canvas({
                 suggestions={suggestions}
                 allowNew
                 flatLevel={flatLevel}
+                onCommit={commitName}
+                onCommitNew={async (name, level, parentId) => { await onAddEntityNode(listId, { name, level, parentId }); commitName(name); }}
+                onNameOnly={commitName}
+                onCancel={() => setEditingLabel(null)}
+              />
+            );
+          }
+        }
+        if (isSystemElement) {
+          // Entity-list autocomplete: a process-context `system` element → IT
+          // Systems (flat). Falls through to the plain textarea when the project
+          // has no adopted structure loaded.
+          const suggestions = entityStructure?.systems;
+          const listId = entityStructure?.listIds['System'];
+          if (entityStructure && suggestions && listId && onAddEntityNode) {
+            const commitName = (name: string) => { onUpdateLabel(editingLabel.elementId, name); setEditingLabel(null); };
+            return (
+              <EntityNameInput
+                box={{ x: editingLabel.x, y: editingLabel.y, width: Math.max(editingLabel.width, 150), height: editingLabel.height }}
+                fontSizePx={(data.fontSize ?? 12) * 11 / 12 * zoom}
+                suggestions={suggestions}
+                allowNew
+                flatLevel={'System'}
                 onCommit={commitName}
                 onCommitNew={async (name, level, parentId) => { await onAddEntityNode(listId, { name, level, parentId }); commitName(name); }}
                 onNameOnly={commitName}
