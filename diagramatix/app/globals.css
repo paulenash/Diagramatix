@@ -86,3 +86,15 @@ body {
   background-color: #60a5fa; pointer-events: none;
 }
 .ProseMirror.resize-cursor { cursor: col-resize; }
+
+/* Feature Colours — a tile / menu-row / button coloured by an app feature. The
+ * three tones come from CSS variables set inline via featureVars() (see
+ * app/lib/theme/featureColors.ts); hover swaps the background to the highlight
+ * tone with no JS. Colours are runtime-configurable hex, so they can't be
+ * Tailwind classes. */
+.feature-tile {
+  background: var(--fb);
+  color: var(--ft);
+  border-color: var(--ft);
+}
+.feature-tile:hover { background: var(--fh); }
