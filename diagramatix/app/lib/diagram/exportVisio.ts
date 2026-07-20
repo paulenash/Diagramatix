@@ -384,9 +384,12 @@ export async function exportVisio(
   console.log("[exportVisio] Elements:", data.elements.length, "Connectors:", data.connectors.length);
   console.log("[exportVisio] Bounds:", bounds);
   console.log("[exportVisio] Page size:", pageW.toFixed(2), "x", pageH.toFixed(2), "inches");
-  console.log("[exportVisio] Shapes XML (first 500):", shapesXml.substring(0, 500));
   console.log("[exportVisio] Connects XML length:", connectsXml.length);
-  console.log("[exportVisio] page1.xml content (first 300):", pageContentXml(shapesXml, connectsXml, pageW, pageH).substring(0, 300));
+  // Generated page XML embeds diagram content — only log it when debugging (ENT-16).
+  if (process.env.DEBUG_CONTENT_LOGS === "1") {
+    console.log("[exportVisio] Shapes XML (first 500):", shapesXml.substring(0, 500));
+    console.log("[exportVisio] page1.xml content (first 300):", pageContentXml(shapesXml, connectsXml, pageW, pageH).substring(0, 300));
+  }
 
   // Build the .vsdx ZIP from scratch.
   const zip = new JSZip();

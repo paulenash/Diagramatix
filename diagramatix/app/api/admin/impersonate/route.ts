@@ -53,16 +53,23 @@ export async function POST(req: Request) {
   }
 
   const cookieStore = await cookies();
+  // HttpOnly + Secure: these cookies decide whose data every query runs against,
+  // so client JS must never read or forge them. The "you are impersonating"
+  // banner is driven by a server-computed `isImpersonating` flag, not by reading
+  // these cookies in the browser (ENT-02).
+  const secure = process.env.NODE_ENV === "production";
   cookieStore.set(IMPERSONATE_COOKIE, userId, {
     path: "/",
     sameSite: "lax",
-    httpOnly: false, // client JS reads for orange background
+    httpOnly: true,
+    secure,
     maxAge: 60 * 60 * 8, // 8 hours
   });
   cookieStore.set(IMPERSONATE_MODE_COOKIE, resolvedMode, {
     path: "/",
     sameSite: "lax",
-    httpOnly: false,
+    httpOnly: true,
+    secure,
     maxAge: 60 * 60 * 8,
   });
 

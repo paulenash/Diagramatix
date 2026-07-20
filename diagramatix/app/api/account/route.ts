@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { isImpersonating } from "@/app/lib/superuser";
 import {
   getCurrentOrgId,
+  requireOrgAdminFor,
   OrgContextError,
 } from "@/app/lib/auth/orgContext";
 
@@ -90,8 +91,8 @@ export async function PUT(req: Request) {
     if (!valid) {
       return NextResponse.json({ error: "Current password is incorrect" }, { status: 403 });
     }
-    if (newPassword.length < 6) {
-      return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
+    if (newPassword.length < 8) {
+      return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
     }
     const hash = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({ where: { id: userId }, data: { password: hash } });
@@ -104,6 +105,16 @@ export async function PUT(req: Request) {
   } catch { /* no org */ }
 
   if (orgId && (orgName !== undefined || orgEntityType !== undefined)) {
+    // Editing the org's identity requires Owner/Admin (or SuperAdmin) — a plain
+    // member must not be able to rename or re-type the org (ENT-11).
+    try {
+      await requireOrgAdminFor(session, await cookies(), orgId);
+    } catch (e) {
+      if (e instanceof OrgContextError) {
+        return NextResponse.json({ error: e.message }, { status: e.status });
+      }
+      throw e;
+    }
     const data: Record<string, string> = {};
     if (orgName !== undefined) data.name = orgName.trim();
     if (orgEntityType !== undefined) data.entityType = orgEntityType;

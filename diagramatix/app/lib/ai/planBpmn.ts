@@ -410,8 +410,10 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
   try {
     parsed = JSON.parse(jsonStr);
   } catch (parseErr) {
-    console.error("[planBpmn] JSON parse failed. Raw response (first 1 KB):",
-      textBlock.text.slice(0, 1024));
+    // Raw model output can contain generated process content — gate it (ENT-16).
+    console.error("[planBpmn] JSON parse failed.", process.env.DEBUG_CONTENT_LOGS === "1"
+      ? `Raw response (first 1 KB): ${textBlock.text.slice(0, 1024)}`
+      : "(set DEBUG_CONTENT_LOGS=1 to log raw output)");
     return {
       ok: false,
       status: 500,

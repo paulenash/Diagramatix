@@ -113,7 +113,10 @@ export async function sendSupportDiagramEmail(input: SupportEmailInput): Promise
     console.log(`From:    ${userDisplay}`);
     console.log(`Diagram: ${input.diagramName} (${input.diagramId})`);
     console.log(`Subject: ${input.subject}`);
-    console.log(`Message: ${input.message}`);
+    // Message body is customer content — only logged when explicitly debugging (ENT-16).
+    console.log(process.env.DEBUG_CONTENT_LOGS === "1"
+      ? `Message: ${input.message}`
+      : `Message: (${input.message.length} chars — set DEBUG_CONTENT_LOGS=1 to log)`);
     console.log(`SVG:     ${input.svgBase64 ? `${input.svgBase64.length} chars` : "(none)"}`);
     console.log("========================================\n");
   }
