@@ -10,6 +10,7 @@
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 
 const DG = "https://api.deepgram.com/v1/listen";
 const MAX_BYTES = 40 * 1024 * 1024; // 40 MB
@@ -19,6 +20,8 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const _pol = await gateOrgPolicy(session, "allowVoiceAi");
+  if (_pol) return _pol;
   const key = process.env.DEEPGRAM_API_KEY;
   if (!key) {
     return NextResponse.json({ error: "Audio transcription not configured" }, { status: 503 });

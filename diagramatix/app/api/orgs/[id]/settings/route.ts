@@ -9,6 +9,7 @@ import {
   OrgContextError,
 } from "@/app/lib/auth/orgContext";
 import { OrgEntityType } from "@/app/generated/prisma/enums";
+import { ORG_POLICY_KEYS } from "@/app/lib/auth/orgPolicy";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -86,6 +87,11 @@ export async function GET(_req: Request, { params }: Params) {
       name: true,
       entityType: true,
       allowCrossOrgSharing: true,
+      allowAi: true,
+      allowVoiceAi: true,
+      allowExternalExport: true,
+      allowSharePoint: true,
+      allowSupportDiagram: true,
       createdAt: true,
       _count: { select: { members: true, projects: true, diagrams: true } },
     },
@@ -137,9 +143,16 @@ export async function PUT(req: Request, { params }: Params) {
     entityType?: unknown;
   };
 
-  const updates: { allowCrossOrgSharing?: boolean; name?: string; entityType?: OrgEntityType } = {};
+  const updates: Record<string, unknown> = {};
   if (typeof body.allowCrossOrgSharing === "boolean") {
     updates.allowCrossOrgSharing = body.allowCrossOrgSharing;
+  }
+  // Enterprise governance policy flags — editable by the org's own Owner/Admin
+  // (or SuperAdmin), the same gate as allowCrossOrgSharing. This is how a customer
+  // enforces THEIR policy (disable AI, block external export, …).
+  const bodyRec = body as Record<string, unknown>;
+  for (const key of ORG_POLICY_KEYS) {
+    if (typeof bodyRec[key] === "boolean") updates[key] = bodyRec[key];
   }
 
   // SuperAdmin-only fields. Done with a separate isSuperuser check
@@ -174,12 +187,17 @@ export async function PUT(req: Request, { params }: Params) {
 
   const updated = await prisma.org.update({
     where: { id },
-    data: updates,
+    data: updates as Parameters<typeof prisma.org.update>[0]["data"],
     select: {
       id: true,
       name: true,
       entityType: true,
       allowCrossOrgSharing: true,
+      allowAi: true,
+      allowVoiceAi: true,
+      allowExternalExport: true,
+      allowSharePoint: true,
+      allowSupportDiagram: true,
       createdAt: true,
       _count: { select: { members: true, projects: true, diagrams: true } },
     },

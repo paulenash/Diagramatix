@@ -79,6 +79,16 @@ model Org {
   // org admin explicitly opts in.
   allowCrossOrgSharing Boolean @default(false)
 
+  // ── Enterprise governance policy (Phase A1c; see diagramatix/enterprise/). ──
+  // Per-org switches an OrgAdmin/SuperAdmin sets so a customer's own policy is
+  // enforced by the platform. All default TRUE (backward-compatible; nothing
+  // changes until a tenant tightens them). "Enterprise Mode" flips them off.
+  allowAi             Boolean @default(true)  // AI (LLM) features               ENT-05
+  allowVoiceAi        Boolean @default(true)  // voice → text (Deepgram)         ENT-07
+  allowExternalExport Boolean @default(true)  // push data OUT (SharePoint upload) ENT-10
+  allowSharePoint     Boolean @default(true)  // SharePoint/OneDrive integration E3
+  allowSupportDiagram Boolean @default(true)  // attach diagram to support email ENT-10
+
   members             OrgMember[]
   memberTeams         OrgMemberTeam[]
   projects            Project[]

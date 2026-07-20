@@ -20,6 +20,7 @@ import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { discoverProcess } from "@/app/lib/mining/discoverProcess";
 import { generateProcessViaAi } from "@/app/lib/mining/aiProcess";
+import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import type { Variant, MiningStats } from "@/app/lib/mining/types";
 import type { DiagramData } from "@/app/lib/diagram/types";
@@ -56,6 +57,8 @@ export async function POST(req: Request, { params }: Params) {
   let data: DiagramData;
   let nameSuffix = "discovered";
   if (useAi) {
+    const _pol = await gateOrgPolicy(session, "allowAi");
+    if (_pol) return _pol;
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return NextResponse.json({ error: "AI not configured. Set ANTHROPIC_API_KEY." }, { status: 503 });
     if (userId) { const block = await gateLimit(userId, "aiAttempts"); if (block) return block; }

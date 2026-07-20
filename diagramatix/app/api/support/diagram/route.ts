@@ -7,6 +7,7 @@ import {
   OrgContextError,
 } from "@/app/lib/auth/orgContext";
 import { sendSupportDiagramEmail } from "@/app/lib/email";
+import { orgPolicyAllows } from "@/app/lib/auth/orgPolicy";
 
 // POST /api/support/diagram
 //
@@ -81,6 +82,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Diagram not found" }, { status: 404 });
   }
 
+  // Org policy may forbid the diagram itself leaving with the support request —
+  // then we send the note only (no JSON snapshot, no screenshot) and skip the
+  // copy into the vendor Support project (ENT-10).
+  const withDiagram = await orgPolicyAllows(session, "allowSupportDiagram");
+
   try {
     await sendSupportDiagramEmail({
       fromUserName: session.user.name ?? null,
@@ -89,8 +95,10 @@ export async function POST(req: Request) {
       diagramName: diagram.name,
       subject: subject || `Help with: ${diagram.name}`,
       message,
-      diagramJson: JSON.stringify(diagram.data, null, 2),
-      svgBase64,
+      diagramJson: withDiagram
+        ? JSON.stringify(diagram.data, null, 2)
+        : "(diagram content omitted by your organisation's policy)",
+      svgBase64: withDiagram ? svgBase64 : null,
     });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -103,15 +111,18 @@ export async function POST(req: Request) {
 
   // Best-effort: deposit an annotated copy into the SuperAdmin "Support"
   // project. Never fail the user's request if this side-effect errors.
-  try {
-    await depositToSupportProject({
-      diagram,
-      fromUserName: session.user.name ?? null,
-      fromUserEmail: session.user.email,
-      message,
-    });
-  } catch (err) {
-    console.error("[POST /api/support/diagram] support-project deposit failed:", err);
+  // Skipped when org policy forbids the diagram leaving with support requests.
+  if (withDiagram) {
+    try {
+      await depositToSupportProject({
+        diagram,
+        fromUserName: session.user.name ?? null,
+        fromUserEmail: session.user.email,
+        message,
+      });
+    } catch (err) {
+      console.error("[POST /api/support/diagram] support-project deposit failed:", err);
+    }
   }
 
   return NextResponse.json({ ok: true });

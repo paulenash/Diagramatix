@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
@@ -45,6 +46,8 @@ type ModelResult = {
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const _pol = await gateOrgPolicy(session, "allowAi");
+  if (_pol) return _pol;
   if (!isSuperuser(session)) return NextResponse.json({ error: "AI model comparison is SuperAdmin-only" }, { status: 403 });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

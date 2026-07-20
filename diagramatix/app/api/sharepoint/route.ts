@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { listSites, searchSites, listDrives, listDriveRoot, listFolder, getItem, getMyDrive, listMyDriveRoot, listMyDriveFolder, getPreviewUrl } from "@/app/lib/sharepoint";
 import { getMsAccessToken } from "@/app/lib/sharepoint-token";
 
@@ -19,6 +20,8 @@ export async function GET(request: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const _pol = await gateOrgPolicy(session, "allowSharePoint");
+  if (_pol) return _pol;
 
   const token = await getMsAccessToken(request);
   if (!token) {

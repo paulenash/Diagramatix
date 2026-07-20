@@ -9,6 +9,7 @@
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 
 const DG = "https://api.deepgram.com/v1";
 const TTL_SECONDS = 600;
@@ -18,6 +19,8 @@ export async function POST() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const _pol = await gateOrgPolicy(session, "allowVoiceAi");
+  if (_pol) return _pol;
 
   const masterKey = process.env.DEEPGRAM_API_KEY;
   if (!masterKey) {

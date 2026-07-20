@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { explainMiningResults } from "@/app/lib/mining/explainResults";
@@ -29,6 +30,8 @@ export async function POST(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
+  const _pol = await gateOrgPolicy(session, "allowAi");
+  if (_pol) return _pol;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "AI not configured. Set ANTHROPIC_API_KEY." }, { status: 503 });

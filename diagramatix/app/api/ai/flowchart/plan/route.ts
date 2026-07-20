@@ -6,6 +6,7 @@
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { prisma } from "@/app/lib/db";
 import { planFlowchart } from "@/app/lib/ai/planFlowchart";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
@@ -17,6 +18,8 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const _pol = await gateOrgPolicy(session, "allowAi");
+  if (_pol) return _pol;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {

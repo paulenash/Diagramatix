@@ -11,6 +11,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { auth } from "@/auth";
+import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 
 // Model resolved centrally via the admin AI-model setting (was claude-sonnet-4-6).
 
@@ -25,6 +26,8 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const _pol = await gateOrgPolicy(session, "allowAi");
+  if (_pol) return _pol;
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const { transcript, diagramType } = await req.json().catch(() => ({ transcript: "" }));
   if (typeof transcript !== "string" || !transcript.trim()) {

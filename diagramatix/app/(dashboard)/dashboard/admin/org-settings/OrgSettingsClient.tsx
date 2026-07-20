@@ -17,11 +17,25 @@ export interface OrgDetail {
   name: string;
   entityType: OrgEntityType;
   allowCrossOrgSharing: boolean;
+  allowAi: boolean;
+  allowVoiceAi: boolean;
+  allowExternalExport: boolean;
+  allowSharePoint: boolean;
+  allowSupportDiagram: boolean;
   createdAt: string;
   memberCount: number;
   projectCount: number;
   diagramCount: number;
 }
+
+type PolicyKey = "allowAi" | "allowVoiceAi" | "allowExternalExport" | "allowSharePoint" | "allowSupportDiagram";
+const POLICY_FIELDS: { key: PolicyKey; label: string; desc: string }[] = [
+  { key: "allowAi", label: "AI features", desc: "Diagram generation, refine, staff narratives, mining AI and assessments — all send process content to Anthropic (Claude)." },
+  { key: "allowVoiceAi", label: "Voice transcription", desc: "Audio-to-process and live dictation send audio to Deepgram (speech-to-text)." },
+  { key: "allowExternalExport", label: "External export", desc: "Pushing exports out of Diagramatix to SharePoint / OneDrive." },
+  { key: "allowSharePoint", label: "SharePoint integration", desc: "Browsing, importing and linking SharePoint / OneDrive files." },
+  { key: "allowSupportDiagram", label: "Attach diagram to support", desc: "Include the diagram JSON + screenshot when using “Help with this diagram”." },
+];
 
 export interface OrgListItem {
   id: string;
@@ -76,10 +90,18 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
   // (default "Other") for forward-compat with any future use case.
   const [name, setName] = useState(org.name);
   const [allowCrossOrg, setAllowCrossOrg] = useState(org.allowCrossOrgSharing);
+  const [policy, setPolicy] = useState<Record<PolicyKey, boolean>>({
+    allowAi: org.allowAi, allowVoiceAi: org.allowVoiceAi, allowExternalExport: org.allowExternalExport,
+    allowSharePoint: org.allowSharePoint, allowSupportDiagram: org.allowSupportDiagram,
+  });
   useEffect(() => {
     setName(org.name);
     setAllowCrossOrg(org.allowCrossOrgSharing);
-  }, [org.id, org.name, org.allowCrossOrgSharing]);
+    setPolicy({
+      allowAi: org.allowAi, allowVoiceAi: org.allowVoiceAi, allowExternalExport: org.allowExternalExport,
+      allowSharePoint: org.allowSharePoint, allowSupportDiagram: org.allowSupportDiagram,
+    });
+  }, [org.id, org.name, org.allowCrossOrgSharing, org.allowAi, org.allowVoiceAi, org.allowExternalExport, org.allowSharePoint, org.allowSupportDiagram]);
 
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
@@ -112,7 +134,7 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
   // SuperAdmin and OrgAdmin; name/entityType are SuperAdmin-only (the
   // server re-checks).
   const saveField = useCallback(
-    async (patch: Partial<{ name: string; entityType: OrgEntityType; allowCrossOrgSharing: boolean }>) => {
+    async (patch: Partial<{ name: string; entityType: OrgEntityType; allowCrossOrgSharing: boolean } & Record<PolicyKey, boolean>>) => {
       setSaving(true);
       setSavedMessage(null);
       try {
@@ -356,6 +378,58 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
                   }`}
                 />
               </button>
+            </div>
+          </div>
+
+          {/* ── Data & AI Governance (enterprise policy) ─────────────── */}
+          <div className="bg-white rounded-md border border-gray-200">
+            <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-gray-800">Data &amp; AI Governance</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Control what can leave {org.name}. Turn a capability OFF to enforce it for
+                  everyone in this org — the platform blocks it, not just the UI.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  const off = { allowAi: false, allowVoiceAi: false, allowExternalExport: false, allowSharePoint: false, allowSupportDiagram: false };
+                  setPolicy(off);
+                  setAllowCrossOrg(false);
+                  saveField({ ...off, allowCrossOrgSharing: false });
+                }}
+                className="shrink-0 text-xs px-2.5 py-1.5 rounded border border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50"
+                title="Turn OFF AI, voice, external export, SharePoint, support-attach and cross-org sharing"
+              >
+                Apply Enterprise Mode
+              </button>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {POLICY_FIELDS.map((f) => (
+                <div key={f.key} className="flex items-start justify-between gap-4 px-5 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-800">{f.label}</p>
+                    <p className="text-xs text-gray-500 mt-1">{f.desc}</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={policy[f.key]}
+                    disabled={saving}
+                    onClick={() => {
+                      const next = !policy[f.key];
+                      setPolicy((p) => ({ ...p, [f.key]: next }));
+                      saveField({ [f.key]: next });
+                    }}
+                    className={`shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${policy[f.key] ? "bg-blue-600" : "bg-gray-300"}`}
+                    title={policy[f.key] ? "Allowed (ON)" : "Blocked by policy (OFF)"}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${policy[f.key] ? "translate-x-5" : "translate-x-0.5"}`} />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 
