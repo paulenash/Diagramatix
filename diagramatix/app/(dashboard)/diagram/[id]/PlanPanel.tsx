@@ -34,6 +34,8 @@ import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { appendClarifications, appendRefinements } from "@/app/lib/diagram/clarifications";
 import type { RefineQuestion } from "@/app/lib/ai/refineQuestions";
 import type { AiFeedback } from "@/app/lib/diagram/types";
+import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
+import { tonesFor } from "@/app/lib/theme/featureColors";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -102,6 +104,7 @@ export function PlanPanel({
   pcf,
 }: Props) {
   const { data: authSession } = useSession();
+  const aiColor = tonesFor(useFeatureColors(), "ai").text;
   const isSuperuser = !!authSession?.user?.email
     && SUPERUSER_EMAILS.has(authSession.user.email.toLowerCase());
   // SuperAdmin "presentation mode" (toggled by double-clicking the logo) — hides
@@ -885,7 +888,8 @@ export function PlanPanel({
           {diagramType === "bpmn" && (
             <div className="mt-1 shrink-0">
               <button onClick={() => handleRefine()} disabled={!prompt.trim() || busy !== null}
-                className="w-full px-2 py-1 text-[11px] font-medium text-indigo-700 border border-indigo-300 bg-indigo-50 rounded hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+                style={{ ["--ai" as string]: aiColor }}
+                className="ai-outline w-full px-2 py-1 text-[11px] font-medium border rounded disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
                 title="Ask the AI a few clarifying questions and fold your answers into the prompt before you Plan">
                 {busy === "refine" && <Spinner />}
                 {busy === "refine" ? "Refining…" : "✨ Refine prompt"}
@@ -1089,7 +1093,8 @@ export function PlanPanel({
           <button
             onClick={callPlan}
             disabled={!prompt.trim() || busy !== null}
-            className="flex-1 px-2 py-1 text-[11px] font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+            style={{ ["--ai" as string]: aiColor }}
+            className="ai-solid flex-1 px-2 py-1 text-[11px] font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
           >
             {busy === "plan" && <Spinner />}
             {busy === "plan" ? "Planning…" : hasPlan ? "Re-send to Sonnet" : "Plan"}

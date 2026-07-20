@@ -278,6 +278,7 @@ interface Props {
   /** "Highlight Entity List Changes": elements whose name isn't in the project's
    *  adopted Entity Structure get an amber dashed ring. Read-only overlay. */
   entityDriftById?: Map<string, "drift">;
+  driftColor?: string;   // Entity-Drift ring colour (Feature Colours: entityLists)
   /** Same idea, but for connectors. A flagged connector gets a thicker
    *  semi-transparent stroke painted along its waypoints in the severity
    *  colour. Used by rules like `connector-bends`. */
@@ -546,6 +547,7 @@ export function Canvas({
   pcHighlightEnabled = true,
   scanHighlightById,
   entityDriftById,
+  driftColor,
   scanHighlightConnectorById,
   currentIssueIds,
   riskHighlightById,
@@ -6921,7 +6923,7 @@ export function Canvas({
                   width={el.width + 6}
                   height={el.height + 6 + extraH}
                   fill="none"
-                  stroke="#d97706"
+                  stroke={driftColor ?? "#d97706"}
                   strokeWidth={3 / zoom}
                   strokeDasharray={`${6 / zoom} ${4 / zoom}`}
                   rx={4}

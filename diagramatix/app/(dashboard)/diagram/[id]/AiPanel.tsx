@@ -14,6 +14,8 @@ import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { AudioToProcessButton } from "@/app/components/AudioToProcessButton";
 import { appendClarifications } from "@/app/lib/diagram/clarifications";
 import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
+import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
+import { tonesFor } from "@/app/lib/theme/featureColors";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -67,6 +69,7 @@ export function AiPanel({
   onAudioPhaseChange, aiFeedback, onAiFeedback, diagramId, onComparison, pcf,
 }: Props) {
   const { data: authSession } = useSession();
+  const aiColor = tonesFor(useFeatureColors(), "ai").text;
   const isSuperuser = !!authSession?.user?.email
     && SUPERUSER_EMAILS.has(authSession.user.email.toLowerCase());
   // SuperAdmin "presentation mode" (toggled by double-clicking the logo) — hides
@@ -426,7 +429,7 @@ export function AiPanel({
   return (
     <div className="w-80 border-l border-gray-200 bg-white flex flex-col shrink-0 overflow-hidden">
       <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">AI Generate</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: aiColor }}>AI Generate</h3>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm">&times;</button>
       </div>
 
@@ -638,7 +641,8 @@ export function AiPanel({
 
         <div className="flex gap-1.5">
           <button onClick={() => handleGenerate()} disabled={generating || !prompt.trim()}
-            className="flex-1 px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5">
+            style={{ ["--ai" as string]: aiColor }}
+            className="ai-solid flex-1 px-3 py-1.5 text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5">
             {generating && (
               <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />

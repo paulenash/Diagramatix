@@ -98,3 +98,16 @@ body {
   border-color: var(--ft);
 }
 .feature-tile:hover { background: var(--fh); }
+/* Persistent "on / selected" state — sits at the highlight tone. */
+.feature-tile-active {
+  background: var(--fh);
+  color: var(--ft);
+  border-color: var(--ft);
+}
+
+/* AI Generation buttons — solid + outline, driven by the --ai var (the AI
+ * feature Text colour) so they follow the configured AI colour. */
+.ai-solid { background: var(--ai); color: #fff; }
+.ai-solid:hover:not(:disabled) { filter: brightness(0.93); }
+.ai-outline { color: var(--ai); border-color: var(--ai); background: transparent; }
+.ai-outline:hover { background: color-mix(in srgb, var(--ai) 12%, transparent); }

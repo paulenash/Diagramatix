@@ -33,6 +33,8 @@ import { AnimateOverlay } from "@/app/components/canvas/AnimateOverlay";
 import type { RiskCatalogItem } from "@/app/components/canvas/RiskControlSection";
 import { getRiskControl } from "@/app/lib/diagram/riskControl";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
+import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
+import { featureVars, tonesFor } from "@/app/lib/theme/featureColors";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { InfoDialog } from "@/app/components/InfoDialog";
@@ -964,6 +966,7 @@ export function DiagramEditor({
   // BPMN and Standard Flowchart both use the 2-phase Plan panel (plan → edit →
   // apply deterministic layout). Other types use the legacy one-shot AI panel.
   const usesPlanPanel = diagramType === "bpmn" || diagramType === "flowchart";
+  const featureScheme = useFeatureColors();
   // The Simulator (Matrix-style process simulation) is offered for BPMN.
   const supportsSimulator = diagramType === "bpmn";
   const [showSendReview, setShowSendReview] = useState(false);
@@ -3476,40 +3479,42 @@ export function DiagramEditor({
           </>
         )}
 
+        {/* AI Generate — restored to the toolbar (in the AI feature colour). For
+            BPMN/flowchart this opens the 2-phase Plan panel; other types open the
+            legacy one-shot AI panel. */}
+        {!readOnly && diagramType !== "basic" && (
+          <button
+            onClick={() => {
+              if (usesPlanPanel) {
+                setShowPlanPanel(prev => !prev);
+                if (!showPlanPanel) { setShowAiPanel(false); setShowHistoryPanel(false); }
+              } else {
+                setShowAiPanel(prev => !prev);
+                if (!showAiPanel) { setShowHistoryPanel(false); setShowPlanPanel(false); }
+              }
+            }}
+            style={featureVars(featureScheme, "ai")}
+            className={`px-2 py-0.5 text-[11px] rounded border ${(usesPlanPanel ? showPlanPanel : showAiPanel) ? "feature-tile-active" : "feature-tile"}`}
+            title={usesPlanPanel ? "Two-phase AI generation: plan first, then apply layout" : "Generate a diagram from a natural-language description"}
+          >
+            ✨ AI Generate
+          </button>
+        )}
         {!readOnly && (
           <div className="relative" ref={clearMenuRef}>
             <button
               onClick={() => setClearMenuOpen(prev => !prev)}
               className={`px-2 py-0.5 text-[11px] rounded border ${
-                showHistoryPanel || showPlanPanel || showAiPanel
+                showHistoryPanel
                   ? "text-blue-700 border-blue-400 bg-blue-50"
                   : "text-gray-700 border-gray-300 hover:bg-gray-50"
               }`}
-              title="Diagram actions — generate, simulate, animate, review, help + configuration"
+              title="Diagram actions — simulate, animate, review, help + configuration"
             >
               Diagram ▾
             </button>
             {clearMenuOpen && (
               <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50">
-                {/* Primary actions (moved here from the toolbar 2026-07-07). */}
-                {diagramType !== "basic" && (
-                  <button
-                    onClick={() => {
-                      setClearMenuOpen(false);
-                      if (usesPlanPanel) {
-                        setShowPlanPanel(prev => !prev);
-                        if (!showPlanPanel) { setShowAiPanel(false); setShowHistoryPanel(false); }
-                      } else {
-                        setShowAiPanel(prev => !prev);
-                        if (!showAiPanel) { setShowHistoryPanel(false); setShowPlanPanel(false); }
-                      }
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-blue-50"
-                    title={usesPlanPanel ? "Two-phase AI generation: plan first, then apply layout" : "Generate a diagram from a natural-language description"}
-                  >
-                    AI Generate
-                  </button>
-                )}
                 {supportsSimulator && (
                   <button
                     onClick={() => { setClearMenuOpen(false); setShowSimulator(true); }}
@@ -3695,6 +3700,7 @@ export function DiagramEditor({
           scanHighlightById={scanHighlight ?? undefined}
           riskHighlightById={riskHighlight ?? undefined}
           entityDriftById={entityDrift ?? undefined}
+          driftColor={tonesFor(featureScheme, "entityLists").text}
           scanHighlightConnectorById={scanConnectorHighlight ?? undefined}
           currentIssueIds={currentIssueIds.size > 0 ? currentIssueIds : undefined}
           onSetSelectedElements={setSelectedElementIds}
