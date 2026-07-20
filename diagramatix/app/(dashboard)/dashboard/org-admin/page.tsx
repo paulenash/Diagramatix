@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
+import { SA_MODE_COOKIE } from "@/app/lib/auth/orgPolicy";
 import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { getEntitlements } from "@/app/lib/subscription";
 import { OrgAdminClient } from "./OrgAdminClient";
@@ -20,9 +21,14 @@ import { OrgAdminClient } from "./OrgAdminClient";
 export default async function OrgAdminPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (isSuperuser(session)) redirect("/dashboard/admin");
 
   const cookieStore = await cookies();
+  // A SuperAdmin normally has the wider SuperAdmin dashboard — but when they've
+  // cycled the logo into the "orgadmin" view they want to act as / demo an
+  // OrgAdmin, so stay here and render the OrgAdmin screen for their active org.
+  const asOrgAdmin = isSuperuser(session) && cookieStore.get(SA_MODE_COOKIE)?.value === "orgadmin";
+  if (isSuperuser(session) && !asOrgAdmin) redirect("/dashboard/admin");
+
   const activeOrgId = await getCurrentOrgId(session, cookieStore);
 
   const membership = await prisma.orgMember.findFirst({
@@ -30,7 +36,7 @@ export default async function OrgAdminPage() {
     select: { role: true, org: { select: { name: true } } },
   });
   const isOrgAdmin = membership?.role === "Owner" || membership?.role === "Admin";
-  if (!isOrgAdmin) redirect("/dashboard");
+  if (!isOrgAdmin && !asOrgAdmin) redirect("/dashboard");
 
   // Feature entitlements for THIS OrgAdmin's own subscription — tiles whose
   // feature isn't included are greyed out (non-clickable).
