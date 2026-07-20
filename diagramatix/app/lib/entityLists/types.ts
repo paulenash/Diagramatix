@@ -137,3 +137,32 @@ export function toSuggestions(nodes: EntityNodeDTO[]): EntitySuggestion[] {
   walk(null, 0);
   return out;
 }
+
+/** Ids of nodes that have at least one child, from a DFS-ordered suggestion list. */
+export function idsWithChildren(suggestions: EntitySuggestion[]): Set<string> {
+  const s = new Set<string>();
+  for (const n of suggestions) if (n.parentId) s.add(n.parentId);
+  return s;
+}
+
+/**
+ * Filter a DFS-ordered suggestion list, hiding every descendant of a collapsed
+ * node. Relies on toSuggestions' depth-first ordering: once a collapsed node is
+ * seen, skip rows deeper than it until depth returns to its level or shallower.
+ */
+export function visibleSuggestions(
+  suggestions: EntitySuggestion[], collapsed: Set<string>,
+): EntitySuggestion[] {
+  if (collapsed.size === 0) return suggestions;
+  const out: EntitySuggestion[] = [];
+  let hideDepth: number | null = null;
+  for (const n of suggestions) {
+    if (hideDepth !== null) {
+      if (n.depth > hideDepth) continue;   // descendant of a collapsed node → hide
+      hideDepth = null;                     // back out to a sibling/ancestor
+    }
+    out.push(n);
+    if (collapsed.has(n.id)) hideDepth = n.depth;
+  }
+  return out;
+}

@@ -5,7 +5,7 @@ import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import {
   childLevelFor, isFlatKind, toSuggestions, FLAT_LEVEL_FOR,
-  ENTITY_NODE_LEVEL_LABELS,
+  ENTITY_NODE_LEVEL_LABELS, idsWithChildren, visibleSuggestions,
   type EntityListDTO, type EntityNodeLevel,
 } from "@/app/lib/entityLists/types";
 
@@ -37,6 +37,10 @@ export function EntityListEditor({
   const [addVal, setAddVal] = useState("");
   const [confirm, setConfirm] = useState<{ id: string; name: string } | null>(null);
   const [spNode, setSpNode] = useState<string | null>(null); // Document node being linked to SharePoint
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set()); // hierarchy: collapsed node ids
+  const toggleCollapse = (id: string) => setCollapsed((prev) => {
+    const nx = new Set(prev); if (nx.has(id)) nx.delete(id); else nx.add(id); return nx;
+  });
 
   const nodesUrl = `${basePath}/${list.id}/nodes`;
 
@@ -131,12 +135,27 @@ export function EntityListEditor({
   }
 
   // ── Hierarchy (Org Structure) ──────────────────────────────────────
+  const withKids = idsWithChildren(suggestions);
+  const visible = visibleSuggestions(suggestions, collapsed);
   return (
     <div className="space-y-0.5">
       {err && <p className="text-[10px] text-red-500">{err}</p>}
       {suggestions.length === 0 && <p className="text-xs text-gray-400 italic">No structure yet.</p>}
-      {suggestions.map((n) => (
+      {withKids.size > 0 && (
+        <div className="flex items-center gap-2 pb-0.5">
+          <button onClick={() => setCollapsed(new Set())} className="text-[10px] text-blue-600 hover:text-blue-800">Expand all</button>
+          <span className="text-gray-300 text-[10px]">·</span>
+          <button onClick={() => setCollapsed(new Set(withKids))} className="text-[10px] text-blue-600 hover:text-blue-800">Collapse all</button>
+        </div>
+      )}
+      {visible.map((n) => (
         <div key={n.id} style={{ paddingLeft: n.depth * 14 }} className="flex items-center gap-1 text-xs group">
+          {withKids.has(n.id) ? (
+            <button onClick={() => toggleCollapse(n.id)} title={collapsed.has(n.id) ? "Expand" : "Collapse"}
+              className="w-3 shrink-0 text-gray-400 hover:text-gray-700 text-[9px] leading-none">
+              {collapsed.has(n.id) ? "▸" : "▾"}
+            </button>
+          ) : <span className="w-3 shrink-0" />}
           <span className="text-[9px] text-gray-500 w-14 shrink-0">{ENTITY_NODE_LEVEL_LABELS[n.level]}</span>
           {editId === n.id ? (
             <input autoFocus value={editVal} onChange={(e) => setEditVal(e.target.value)}
@@ -148,7 +167,7 @@ export function EntityListEditor({
           {canEdit && editId !== n.id && (
             <span className="opacity-0 group-hover:opacity-100 flex gap-1">
               {n.level !== "Role" && (
-                <button onClick={() => { setAddParent(n.id); setAddVal(""); }} title="Add child"
+                <button onClick={() => { setAddParent(n.id); setAddVal(""); setCollapsed((prev) => { const nx = new Set(prev); nx.delete(n.id); return nx; }); }} title="Add child"
                   className="text-blue-400 hover:text-blue-600 px-0.5">+{ENTITY_NODE_LEVEL_LABELS[childLevelFor(n.level)]}</button>
               )}
               <button onClick={() => { setEditId(n.id); setEditVal(n.name); }} className="text-gray-400 hover:text-gray-700 px-0.5">Edit</button>

@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
-  childLevelFor, ENTITY_NODE_LEVEL_LABELS,
+  childLevelFor, ENTITY_NODE_LEVEL_LABELS, idsWithChildren, visibleSuggestions,
   type EntitySuggestion, type EntityNodeLevel,
 } from "@/app/lib/entityLists/types";
 
@@ -37,13 +37,27 @@ export function EntityNameInput({
   const [placing, setPlacing] = useState(false);     // placement dialog open
   const [asking, setAsking] = useState(false);       // "add to list vs name only" prompt
   const [placeParent, setPlaceParent] = useState<string | "">(""); // "" = top level
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set()); // hierarchy: collapsed ids
   const suppressBlur = useRef(false);
+  const toggleCollapse = (id: string) => setCollapsed((prev) => {
+    const nx = new Set(prev); if (nx.has(id)) nx.delete(id); else nx.add(id); return nx;
+  });
 
   const filtered = useMemo(() => {
     const q = value.trim().toLowerCase();
     if (!touched || !q) return suggestions;
     return suggestions.filter(s => s.name.toLowerCase().includes(q));
   }, [value, touched, suggestions]);
+
+  // While actively filtering by typed text, show the flat matches (collapse is
+  // moot); otherwise show the tree with collapsed subtrees hidden. `rows` is the
+  // list actually rendered AND the one keyboard nav walks.
+  const withKids = useMemo(() => idsWithChildren(suggestions), [suggestions]);
+  const filtering = touched && !!value.trim();
+  const rows = useMemo(
+    () => (filtering ? filtered : visibleSuggestions(suggestions, collapsed)),
+    [filtering, filtered, suggestions, collapsed],
+  );
 
   const exact = suggestions.find(s => s.name.toLowerCase() === value.trim().toLowerCase());
 
@@ -83,14 +97,14 @@ export function EntityNameInput({
           onBlur={() => { if (!suppressBlur.current && !placing && !asking) commit(); }}
           onKeyDown={(e) => {
             if (e.key === "Escape") { e.preventDefault(); onCancel(); return; }
-            if (e.key === "ArrowDown") { e.preventDefault(); setHi(h => Math.min(h + 1, filtered.length - 1)); return; }
+            if (e.key === "ArrowDown") { e.preventDefault(); setHi(h => Math.min(h + 1, rows.length - 1)); return; }
             if (e.key === "ArrowUp") { e.preventDefault(); setHi(h => Math.max(h - 1, 0)); return; }
             if (e.key === "Enter") {
               e.preventDefault();
               // Unmodified default → accept it.
               if (!touched && defaultName) { onCommit(defaultName); return; }
               // Highlighted row wins when the list is showing matches.
-              if (touched && filtered[hi]) { onCommit(filtered[hi].name); return; }
+              if (touched && rows[hi]) { onCommit(rows[hi].name); return; }
               commit();
             }
           }}
@@ -102,7 +116,7 @@ export function EntityNameInput({
             outline: "none", padding: "4px", boxSizing: "border-box",
           }}
         />
-        {filtered.length > 0 && (
+        {rows.length > 0 && (
           <div
             onMouseDown={() => { suppressBlur.current = true; }}
             onMouseUp={() => { suppressBlur.current = false; }}
@@ -113,7 +127,16 @@ export function EntityNameInput({
               fontSize: 12,
             }}
           >
-            {filtered.map((s, i) => (
+            {!filtering && withKids.size > 0 && (
+              <div style={{ display: "flex", gap: 8, padding: "3px 8px", borderBottom: "1px solid #f3f4f6" }}>
+                <button type="button" onClick={() => setCollapsed(new Set())}
+                  style={{ fontSize: 10, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Expand all</button>
+                <span style={{ color: "#d1d5db", fontSize: 10 }}>·</span>
+                <button type="button" onClick={() => setCollapsed(new Set(withKids))}
+                  style={{ fontSize: 10, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Collapse all</button>
+              </div>
+            )}
+            {rows.map((s, i) => (
               <div
                 key={s.id}
                 onMouseEnter={() => setHi(i)}
@@ -125,6 +148,14 @@ export function EntityNameInput({
                   color: "#374151",
                 }}
               >
+                {!filtering && withKids.has(s.id) ? (
+                  <button type="button"
+                    onClick={(e) => { e.stopPropagation(); toggleCollapse(s.id); }}
+                    title={collapsed.has(s.id) ? "Expand" : "Collapse"}
+                    style={{ fontSize: 9, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", padding: 0, marginRight: 4, width: 10 }}>
+                    {collapsed.has(s.id) ? "▸" : "▾"}
+                  </button>
+                ) : (!filtering ? <span style={{ display: "inline-block", width: 10, marginRight: 4 }} /> : null)}
                 <span style={{ color: "#9ca3af", fontSize: 9, marginRight: 6 }}>{ENTITY_NODE_LEVEL_LABELS[s.level]}</span>
                 {s.name}
               </div>
