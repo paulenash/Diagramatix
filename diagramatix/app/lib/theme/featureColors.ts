@@ -12,7 +12,7 @@
  */
 
 export type FeatureColorKey =
-  | "simulator" | "mining" | "riskControl" | "apqc" | "portal"
+  | "simulator" | "mining" | "riskControl" | "apqc" | "portal" | "projectSharing"
   | "ai" | "entityLists" | "superAdmin" | "orgAdmin";
 
 export interface FeatureColor { bg: string; text: string }
@@ -29,6 +29,7 @@ export const FEATURE_META: { key: FeatureColorKey; label: string; group: "produc
   { key: "riskControl", label: "Risk & Control",      group: "product", note: "Risk & Control Examples, RCM / GRC admin" },
   { key: "apqc",        label: "APQC PCF",            group: "product", note: "APQC tiles, Create APQC Process" },
   { key: "portal",      label: "Portal / Publishing", group: "product", note: "Process Portal & publishing surfaces" },
+  { key: "projectSharing", label: "Project Sharing",  group: "product", note: "Project Sharing tiles (SuperAdmin + OrgAdmin)" },
   { key: "ai",          label: "AI Generation",       group: "accent",  note: "Toolbar AI Generate + every AI-generation trigger" },
   { key: "entityLists", label: "Entity Lists / Drift", group: "accent", note: "Entity Lists admin + the Entity-Drift ring" },
   { key: "superAdmin",  label: "SuperAdmin (fallback)", group: "role",  note: "Fallback for unmapped SuperAdmin Tools tiles" },
@@ -47,6 +48,7 @@ export const DEFAULT_FEATURE_COLORS: Record<FeatureColorKey, FeatureColor> = {
   riskControl: { bg: "#f0f9ff", text: "#075985" }, // sky
   apqc:        { bg: "#eef2ff", text: "#4338ca" }, // indigo
   portal:      { bg: "#eff6ff", text: "#1d4ed8" }, // blue
+  projectSharing: { bg: "#ecfdf5", text: "#047857" }, // emerald
   ai:          { bg: "#f5f3ff", text: "#6d28d9" }, // violet
   entityLists: { bg: "#fff1f2", text: "#be123c" }, // rose
   superAdmin:  { bg: "#fef2f2", text: "#b91c1c" }, // red

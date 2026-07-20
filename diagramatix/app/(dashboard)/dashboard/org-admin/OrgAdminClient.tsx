@@ -34,6 +34,7 @@ const CARDS: MenuCard[] = [
     title: "Project Sharing",
     description:
       "See every shared project in your Org plus the editors / viewers on each.",
+    feature: "projectSharing",
   },
   {
     href: "/notifications?from=/dashboard/org-admin",
