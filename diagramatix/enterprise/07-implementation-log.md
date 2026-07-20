@@ -42,6 +42,11 @@ The centrepiece: per-tenant governance the customer's own OrgAdmin controls, enf
 - **UI + API**: `app/api/orgs/[id]/settings` (GET/PUT) now read/write the 5 flags (editable by the org's own Owner/Admin, same gate as `allowCrossOrgSharing`). `OrgSettingsClient.tsx` gained a **"Data & AI Governance"** card with per-capability toggles + an **"Apply Enterprise Mode"** button (turns all 5 off + cross-org sharing off in one save). `org-settings/page.tsx` selects/maps the new fields.
 - **Tests**: `tests/enterprise/org-policy.test.ts` (T0921–T0922). Full suite 1130 green.
 
+### A1c refinement — SuperAdmin 3-way view + live UI gating (`0830a225`)
+- **Policy binding rule:** the org policy binds everyone **except a SuperAdmin in the full "superadmin" view**. A SuperAdmin (the vendor operator) keeps full access by default; cycling the logo to **orgadmin** or **user** makes the policy apply (and is how you demo it).
+- **`useSuperAdminChrome` is now tri-state** — logo double-click cycles `superadmin → orgadmin → user → superadmin`. It returns `{ mode, hidden, toggle }`; `hidden = mode !== "superadmin"` keeps all existing consumers working. `orgadmin` view also shows the **OrgAdmin button** (`DashboardClient`). Mode is mirrored to the **`dgx_sa_mode` cookie** (server-readable) and **versioned to `NEXT_PUBLIC_COMMIT_COUNT`** so it **resets to superadmin on every deploy**.
+- **Enforcement is now UI + server:** `orgPolicy.ts` `policyBindsCaller()` reads `dgx_sa_mode`; new **`GET /api/org/policy`** + **`useOrgPolicy()`** hook let the client hide capabilities live. First applied to the Diagram toolbar **AI Generate** button (hidden when AI disallowed for the current view). *Follow-up: extend UI hiding to the other gated entry points (voice mic, SharePoint import/export, APQC create) using the same hook.*
+
 ### Runbook — add a new org policy flag (reuse this pattern)
 1. Add `allowX Boolean @default(true)` to `Org` in `prisma/schema.prisma`; `npx prisma db push && npx prisma generate`.
 2. Add `"allowX"` to `OrgPolicyKey` / `ORG_POLICY_KEYS` + a message in `ORG_POLICY_MESSAGES`, and the field to `getOrgPolicy`'s select/return (`app/lib/auth/orgPolicy.ts`).
