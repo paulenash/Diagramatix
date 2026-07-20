@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
+import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import { buildGenericSystemPrompt } from "@/app/lib/ai/generateDiagramPrompt";
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
   console.log("[AI generate-diagram]", diagramType, "full:", fullLen, "chars → green-only+pcf:", rules.length, "chars");
 
   try {
-    const client = new Anthropic({ apiKey });
+    const client = makeAnthropic(apiKey);
     const systemPrompt = buildGenericSystemPrompt(diagramType, rules);
 
     // Build user message content: text prompt + optional document attachment

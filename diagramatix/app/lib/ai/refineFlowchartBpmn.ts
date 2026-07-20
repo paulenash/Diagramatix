@@ -7,6 +7,7 @@
  * whatever the model returns. Any failure returns the input unchanged.
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
 import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
 
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001"; // AI Generate default (see app/lib/ai/models.ts)
@@ -27,7 +28,7 @@ export async function refineFlowchartBpmnPlan(opts: {
 }): Promise<RefineResult> {
   const { apiKey, elements, connections } = opts;
   try {
-    const client = new Anthropic({ apiKey });
+    const client = makeAnthropic(apiKey);
     const resp = await client.messages.create({
       model: opts.model ?? DEFAULT_MODEL,
       max_tokens: 4096,

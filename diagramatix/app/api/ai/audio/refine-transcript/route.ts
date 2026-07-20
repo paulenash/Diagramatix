@@ -8,9 +8,11 @@
  */
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
+import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { auth } from "@/auth";
 
-const MODEL = "claude-sonnet-4-6";
+// Model resolved centrally via the admin AI-model setting (was claude-sonnet-4-6).
 
 const SYSTEM = `You clean up a transcript of a SPOKEN discussion about a business process so it can be turned into a diagram. Rewrite it as a clear, concise, ORDERED description of the process: who does what, in what sequence, the decisions and their branches, and any systems / data involved. Remove filler, repetition, tangents and small talk. Do NOT invent steps, roles or branches that were not discussed.
 
@@ -34,9 +36,10 @@ export async function POST(req: Request) {
   }
 
   try {
-    const client = new Anthropic({ apiKey });
+    const client = makeAnthropic(apiKey);
+    const model = await getAiGenerateModel();
     const resp = await client.messages.create({
-      model: MODEL,
+      model,
       max_tokens: 4096,
       system: SYSTEM,
       messages: [{

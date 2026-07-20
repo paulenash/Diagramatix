@@ -7,9 +7,12 @@
  *
  * Keep the Anthropic-facing logic here so the API route stays thin.
  */
-import Anthropic from "@anthropic-ai/sdk";
+import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
+import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 
-const NARRATIVE_MODEL = "claude-sonnet-4-6";
+// Model is resolved centrally via getAiGenerateModel() (the admin AI-model
+// setting) so an enterprise sees and controls a single model across all AI
+// features. Was pinned to claude-sonnet-4-6.
 
 /** Default briefing used when no DiagramRules row exists yet. Same text
  *  is upserted into the DB the first time the rules editor lists this
@@ -94,10 +97,11 @@ export async function generateStaffNarrative(args: {
     return { ok: false, status: 400, error: "Technical description is empty" };
   }
   const systemPrompt = briefing.trim() || DEFAULT_STAFF_NARRATIVE_BRIEFING;
-  const client = new Anthropic({ apiKey });
+  const model = await getAiGenerateModel();
+  const client = makeAnthropic(apiKey);
   try {
     const message = await client.messages.create({
-      model: NARRATIVE_MODEL,
+      model,
       max_tokens: 2048,
       system: systemPrompt,
       messages: [{ role: "user", content: trimmed }],
@@ -106,7 +110,7 @@ export async function generateStaffNarrative(args: {
     if (!textBlock || textBlock.type !== "text") {
       return { ok: false, status: 500, error: "No response from AI" };
     }
-    return { ok: true, narrative: textBlock.text.trim(), model: NARRATIVE_MODEL };
+    return { ok: true, narrative: textBlock.text.trim(), model };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, status: 500, error: `Staff narrative generation failed: ${msg}` };

@@ -6,7 +6,7 @@
  * it calls Claude directly with the configured model. Layered ON TOP of the
  * deterministic mining; the numbers come from the run, the model just narrates.
  */
-import Anthropic from "@anthropic-ai/sdk";
+import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
 import type { Variant, MiningStats, Performance } from "./types";
 import type { ConformanceResult } from "./transitionConformance";
 
@@ -74,7 +74,7 @@ export function buildExplainPrompt(input: ExplainInput): string {
 }
 
 export async function explainMiningResults(input: ExplainInput): Promise<string> {
-  const client = new Anthropic({ apiKey: input.apiKey });
+  const client = makeAnthropic(input.apiKey);
   const message = await client.messages.create({
     model: input.model,
     max_tokens: 1400,

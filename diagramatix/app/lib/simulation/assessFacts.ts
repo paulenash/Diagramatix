@@ -6,10 +6,12 @@
  * Keep the Anthropic-facing logic here so the API route stays thin (mirrors
  * staffNarrative.ts).
  */
-import Anthropic from "@anthropic-ai/sdk";
+import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
+import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import type { RunMetrics } from "./results";
 
-const ASSESS_MODEL = "claude-opus-4-8";
+// Model resolved centrally via getAiGenerateModel() (was pinned to claude-opus-4-8)
+// so all AI honours the single admin-controlled model. See enterprise/ ENT-08.
 
 export interface ComparisonFacts {
   unit: string;
@@ -97,17 +99,18 @@ export type SimAssessmentResult =
   | { ok: false; status: number; error: string };
 
 export async function generateSimAssessment(args: { apiKey: string; facts: ComparisonFacts }): Promise<SimAssessmentResult> {
-  const client = new Anthropic({ apiKey: args.apiKey });
+  const model = await getAiGenerateModel();
+  const client = makeAnthropic(args.apiKey);
   try {
     const message = await client.messages.create({
-      model: ASSESS_MODEL,
+      model,
       max_tokens: 512,
       system: ASSESS_SYSTEM,
       messages: [{ role: "user", content: JSON.stringify(args.facts, null, 2) }],
     });
     const block = message.content.find((b) => b.type === "text");
     if (!block || block.type !== "text") return { ok: false, status: 500, error: "No response from AI" };
-    return { ok: true, assessment: block.text.trim(), model: ASSESS_MODEL };
+    return { ok: true, assessment: block.text.trim(), model };
   } catch (err) {
     return { ok: false, status: 500, error: `Assessment failed: ${err instanceof Error ? err.message : String(err)}` };
   }

@@ -10,6 +10,7 @@
  * the model resolved (getAiGenerateModel()); this helper is deliberately dumb.
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
 import { buildGenericSystemPrompt } from "./generateDiagramPrompt";
 
 export interface GenericPlanInput {
@@ -26,7 +27,7 @@ export interface GenericPlanInput {
 export interface GenericPlan { elements?: any[]; connections?: any[] }
 
 export async function planGeneric(input: GenericPlanInput): Promise<GenericPlan> {
-  const client = new Anthropic({ apiKey: input.apiKey });
+  const client = makeAnthropic(input.apiKey);
   const systemPrompt = buildGenericSystemPrompt(input.diagramType, input.rules);
 
   const userContent: Anthropic.Messages.ContentBlockParam[] = [];
