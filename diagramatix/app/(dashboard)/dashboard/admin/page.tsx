@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { isSuperuser, SUPERUSER_EMAILS } from "@/app/lib/superuser";
+import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { getEffectiveSubscriptionLevelId } from "@/app/lib/subscription";
 import { AdminClient } from "./AdminClient";
@@ -10,7 +11,10 @@ import { AdminClient } from "./AdminClient";
 export default async function AdminPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  const su = isSuperuser(session);
+  // Mode-aware: a SuperAdmin in the orgadmin/user demo view is treated as a
+  // non-SuperAdmin here, so they get the OrgAdmin-scoped page (their org's users,
+  // no SuperAdmin Tools) instead of the full SuperAdmin dashboard.
+  const su = await isActingSuperuser(session);
 
   // OrgAdmin access (Paul's 2026-06-08 item 8): non-SuperAdmin Org
   // owners + admins can see this page filtered to their active Org,

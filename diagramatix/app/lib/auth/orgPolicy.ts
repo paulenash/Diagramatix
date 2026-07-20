@@ -26,6 +26,20 @@ async function policyBindsCaller(session: Session): Promise<boolean> {
   return mode === "orgadmin" || mode === "user"; // absent/"superadmin" → bypass
 }
 
+/**
+ * True only when the caller is a SuperAdmin AND currently in the full "superadmin"
+ * view (not the orgadmin/user demo views). Use this — instead of `isSuperuser` —
+ * to gate SuperAdmin-only SURFACES (the SuperAdmin dashboard, SuperAdmin Tools,
+ * SuperAdmin chrome) so that a SuperAdmin who has cycled the logo into orgadmin /
+ * user view sees no SuperAdmin content. (Deep API authorisation still uses the
+ * real `isSuperuser` — this is about what the acting view exposes.)
+ */
+export async function isActingSuperuser(session: Session): Promise<boolean> {
+  if (!isSuperuser(session ?? null)) return false;
+  const mode = (await cookies()).get(SA_MODE_COOKIE)?.value;
+  return mode !== "orgadmin" && mode !== "user";
+}
+
 export type OrgPolicyKey =
   | "allowAi" | "allowVoiceAi" | "allowExternalExport" | "allowSharePoint" | "allowSupportDiagram";
 

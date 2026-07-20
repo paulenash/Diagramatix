@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { isSuperuser } from "@/app/lib/superuser";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { ARCHIVE_PROJECT_NAME } from "@/app/lib/archive";
 import { AdminSharingClient, type SharedProjectRow, type OrgOption } from "./AdminSharingClient";
@@ -40,7 +40,7 @@ export default async function AdminSharingPage({
   const activeOrgId = await tryGetCurrentOrgId(session, cookieStore);
   if (!activeOrgId) redirect("/dashboard");
 
-  const su = isSuperuser(session);
+  const su = await isActingSuperuser(session); // mode-aware: false in orgadmin/user view
 
   // Non-SuperAdmins must be Owner or OrgAdmin in their active Org.
   // SuperAdmins bypass — they don't need OrgMember membership.
