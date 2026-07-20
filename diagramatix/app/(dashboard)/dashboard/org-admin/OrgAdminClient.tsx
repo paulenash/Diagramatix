@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import type { Entitlements, FeatureKey } from "@/app/lib/subscription";
+import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
+import { featureVars, type FeatureColorKey } from "@/app/lib/theme/featureColors";
 
 interface MenuCard {
   href: string;
@@ -10,6 +12,8 @@ interface MenuCard {
   /** When set, the tile is greyed + non-clickable unless the Org's
    *  subscription includes this feature. */
   featureKey?: FeatureKey;
+  /** Feature Colour; unset → the orgAdmin (orange) fallback. */
+  feature?: FeatureColorKey;
 }
 
 const CARDS: MenuCard[] = [
@@ -42,6 +46,7 @@ const CARDS: MenuCard[] = [
     title: "Team Membership",
     description:
       "Assign Org members to teams / roles (from your Org-Structure Entity List). Powers the Process Portal's “Involving me” view.",
+    feature: "entityLists",
   },
   {
     href: "/dashboard/org-admin/backup",
@@ -54,12 +59,14 @@ const CARDS: MenuCard[] = [
     title: "AI Prompt Maintenance",
     description:
       "Maintain your own saved AI generation prompts.",
+    feature: "ai",
   },
   {
     href: "/dashboard/admin/entity-lists?from=/dashboard/org-admin",
     title: "Entity Lists",
     description:
       "Organisation structures, external participants and IT systems used to name BPMN pools and lanes.",
+    feature: "entityLists",
   },
   {
     href: "/dashboard/admin/risk-controls?from=/dashboard/org-admin",
@@ -67,6 +74,7 @@ const CARDS: MenuCard[] = [
     description:
       "Master library of Risks and Controls that projects adopt, attach to process steps and export as a Risk-Control Matrix.",
     featureKey: "riskControl",
+    feature: "riskControl",
   },
   {
     href: "/dashboard/compliance?from=/dashboard/org-admin",
@@ -74,6 +82,7 @@ const CARDS: MenuCard[] = [
     description:
       "How well your controls are operating over time — effectiveness trends and alerts assembled from DiagramatixMINER runs across every project.",
     featureKey: "riskControl",
+    feature: "riskControl",
   },
   {
     href: "/dashboard/admin/pcf?from=/dashboard/org-admin",
@@ -81,6 +90,7 @@ const CARDS: MenuCard[] = [
     description:
       "Browse the APQC Process Classification Framework — the Cross-Industry standard and industry variants — to classify and structure your processes.",
     featureKey: "apqc",
+    feature: "apqc",
   },
   {
     href: "/dashboard/diagram-type-sort-order?from=/dashboard/org-admin",
@@ -96,6 +106,7 @@ const CARDS: MenuCard[] = [
  */
 export function OrgAdminClient({ orgName, entitlements }: { orgName: string; entitlements?: Entitlements }) {
   const router = useRouter();
+  const scheme = useFeatureColors();
   const ent: Entitlements = entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true };
 
   return (
@@ -143,13 +154,19 @@ export function OrgAdminClient({ orgName, entitlements }: { orgName: string; ent
                 </div>
               );
             }
+            const fv = card.feature ? featureVars(scheme, card.feature) : undefined;
             return (
               <a
                 key={card.href}
                 href={card.href}
-                className="block bg-white border border-orange-300 rounded-md p-4 hover:bg-orange-50 hover:border-orange-400 transition-colors"
+                style={fv}
+                className={`block rounded-md p-4 border transition-colors ${
+                  card.feature
+                    ? "feature-tile"
+                    : "bg-white border-orange-300 hover:bg-orange-50 hover:border-orange-400"
+                }`}
               >
-                <h2 className="text-sm font-semibold text-orange-700">
+                <h2 className={`text-sm font-semibold ${card.feature ? "" : "text-orange-700"}`}>
                   {card.title}
                 </h2>
                 <p className="text-xs text-gray-600 mt-1.5 leading-snug">

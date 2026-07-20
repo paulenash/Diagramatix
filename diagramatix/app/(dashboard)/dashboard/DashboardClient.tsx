@@ -24,6 +24,8 @@ import { BackupProgressModal } from "@/app/components/BackupProgressModal";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
 import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
+import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
+import { featureVars } from "@/app/lib/theme/featureColors";
 
 interface DiagramSummary {
   id: string;
@@ -254,6 +256,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   // Per-tier feature entitlements (SuperAdmin → all true). When the snapshot is
   // absent (legacy/unseeded) default to all-on so nothing is hidden by accident.
   const ent = usageSnapshot?.entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true };
+  const featureScheme = useFeatureColors();
   // The Hide-Examples toggle only makes sense if the profile includes at least
   // one feature that HAS an examples gallery (Simulator / Mining / Risk-Control).
   const hasAnyExampleFeature = ent.simulator || ent.processMining || ent.riskControl;
@@ -1679,30 +1682,33 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     <a
                       href="/dashboard/simulator-examples"
                       onClick={() => setFileMenuOpen(false)}
-                      className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      style={featureVars(featureScheme, "simulator")}
+                      className="feature-tile block w-full text-left px-3 py-2 text-xs"
                       title="Load a ready-made example simulation to explore or demo"
                     >
-                      Simulator Examples
+                      <span className="mr-2">◈</span>Simulator Examples
                     </a>
                     )}
                     {ent.processMining && (
                     <a
                       href="/dashboard/mining-examples"
                       onClick={() => setFileMenuOpen(false)}
-                      className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      style={featureVars(featureScheme, "mining")}
+                      className="feature-tile block w-full text-left px-3 py-2 text-xs"
                       title="Load a ready-made process-mining example (event log + reference lifecycle) to explore or demo"
                     >
-                      Process Mining Examples
+                      <span className="mr-2">⛏</span>Process Mining Examples
                     </a>
                     )}
                     {ent.riskControl && (
                     <a
                       href="/dashboard/risk-control-examples"
                       onClick={() => setFileMenuOpen(false)}
-                      className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      style={featureVars(featureScheme, "riskControl")}
+                      className="feature-tile block w-full text-left px-3 py-2 text-xs"
                       title="Load a ready-made Risk & Control (GRC) example — process + risks/controls + mining effectiveness"
                     >
-                      Risk &amp; Control Examples
+                      <span className="mr-2">⚖</span>Risk &amp; Control Examples
                     </a>
                     )}
                     <div className="border-t border-gray-100" />

@@ -8,6 +8,8 @@ import { UsagePopover } from "@/app/components/UsagePopover";
 import { displayOrgRole } from "@/app/lib/auth/orgRoleLabels";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { safeInternalPath } from "@/app/lib/safeRedirect";
+import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
+import { featureVars, type FeatureColorKey } from "@/app/lib/theme/featureColors";
 
 interface UserRow {
   id: string;
@@ -740,30 +742,32 @@ interface AdminTile {
   href?: string;     // navigation tiles
   ddl?: boolean;     // the special "Generate DDL" tile renders GenerateDdlButton
   users?: boolean;   // the "Registered Users" tile reveals the user table
+  feature?: FeatureColorKey; // Feature Colour; unset → the superAdmin (red) fallback
 }
 
 const ADMIN_TILES: AdminTile[] = [
   { id: "users", title: "Registered Users", description: "Every registered user — status, subscription, current diagram.", users: true },
-  { id: "ai-rules", title: "AI Rules & Preferences", description: "Geometric + style rules that steer AI BPMN generation.", href: "/dashboard/rules" },
-  { id: "ai-model", title: "AI Generate Model", description: "Choose the Claude model AI diagram generation uses (default Haiku 4.5).", href: "/dashboard/admin/ai-model" },
+  { id: "ai-rules", title: "AI Rules & Preferences", description: "Geometric + style rules that steer AI BPMN generation.", href: "/dashboard/rules", feature: "ai" },
+  { id: "ai-model", title: "AI Generate Model", description: "Choose the Claude model AI diagram generation uses (default Haiku 4.5).", href: "/dashboard/admin/ai-model", feature: "ai" },
   { id: "database", title: "Database Access", description: "Inspect the live database and run maintenance queries.", href: "/dashboard/admin/database" },
   { id: "schema-validation", title: "Schema Validation", description: "Runtime Diagram-JSON validation findings (parallel Zod validator) — corruption, dangling refs, drift. Log-only observability.", href: "/dashboard/admin/schema-validation" },
   { id: "ddl", title: "DDL Generation", description: "Download the Diagramatix schema as DDL — the curated LOGICAL model (PostgreSQL / MySQL / SQL Server) or the PHYSICAL DDL of the live database.", ddl: true },
   { id: "archive", title: "System Archive", description: "Archived projects and diagrams across the system.", href: "/dashboard/admin/archive" },
   { id: "subscriptions", title: "Subscription Prices & Limits", description: "Tier pricing and per-tier feature limits.", href: "/dashboard/admin/subscriptions" },
   { id: "features", title: "Features Catalog", description: "Edit the public feature catalog (draft / publish).", href: "/dashboard/admin/features" },
-  { id: "simulator-examples", title: "Simulator Examples", description: "Curate the simulation sample processes users can adopt — capture a study, edit metadata, publish / unpublish.", href: "/dashboard/admin/simulator-examples" },
-  { id: "mining-examples", title: "Process Mining Examples", description: "Curate the process-mining samples users can adopt — capture a run, edit metadata, publish / unpublish.", href: "/dashboard/admin/mining-examples" },
-  { id: "risk-control-examples", title: "Risk & Control Examples", description: "Curate the GRC examples users can adopt — process + risks/controls + mining effectiveness; edit metadata, publish / unpublish.", href: "/dashboard/admin/risk-control-examples" },
+  { id: "simulator-examples", title: "Simulator Examples", description: "Curate the simulation sample processes users can adopt — capture a study, edit metadata, publish / unpublish.", href: "/dashboard/admin/simulator-examples", feature: "simulator" },
+  { id: "mining-examples", title: "Process Mining Examples", description: "Curate the process-mining samples users can adopt — capture a run, edit metadata, publish / unpublish.", href: "/dashboard/admin/mining-examples", feature: "mining" },
+  { id: "risk-control-examples", title: "Risk & Control Examples", description: "Curate the GRC examples users can adopt — process + risks/controls + mining effectiveness; edit metadata, publish / unpublish.", href: "/dashboard/admin/risk-control-examples", feature: "riskControl" },
   { id: "groups", title: "Collaboration Groups", description: "Every Collaboration Group in the system.", href: "/dashboard/admin/groups" },
-  { id: "ai-plan", title: "AI Plan Formats", description: "Saved AI two-phase plan format templates.", href: "/dashboard/admin/ai-plan-format" },
+  { id: "ai-plan", title: "AI Plan Formats", description: "Saved AI two-phase plan format templates.", href: "/dashboard/admin/ai-plan-format", feature: "ai" },
   { id: "org-settings", title: "Org Settings", description: "Manage Orgs, OrgAdmins, and cross-Org sharing.", href: "/dashboard/admin/org-settings" },
-  { id: "entity-lists", title: "Entity Lists", description: "Org structures, external participants and IT systems for BPMN pool/lane naming.", href: "/dashboard/admin/entity-lists" },
-  { id: "team-membership", title: "Team Membership", description: "Assign Org members to teams / roles (Org-Structure Entity List) — powers the Process Portal's “Involving me” view. Applies to the currently-active Org.", href: "/dashboard/org-admin/team-membership" },
-  { id: "risk-controls", title: "Risk & Control Catalog", description: "Master library of Risks and Controls; projects adopt a copy, attach them to steps and export a Risk-Control Matrix.", href: "/dashboard/admin/risk-controls" },
-  { id: "compliance", title: "Compliance Monitoring", description: "Org-wide control operating-effectiveness over time — trends + alerts from DiagramatixMINER runs across every project.", href: "/dashboard/compliance?from=/dashboard/admin" },
-  { id: "pcf", title: "Process Classification (APQC PCF)", description: "Browse the APQC Process Classification Framework® — Cross-Industry + industry variants — the reference taxonomy for classifying processes.", href: "/dashboard/admin/pcf?from=/dashboard/admin" },
-  { id: "pcf-colours", title: "APQC PCF Hierarchy Colours", description: "The two-tone colour per PCF level (Category → Task) — one main colour + a lightness %; applied wherever the APQC hierarchy is shown.", href: "/dashboard/admin/pcf-colours" },
+  { id: "entity-lists", title: "Entity Lists", description: "Org structures, external participants and IT systems for BPMN pool/lane naming.", href: "/dashboard/admin/entity-lists", feature: "entityLists" },
+  { id: "team-membership", title: "Team Membership", description: "Assign Org members to teams / roles (Org-Structure Entity List) — powers the Process Portal's “Involving me” view. Applies to the currently-active Org.", href: "/dashboard/org-admin/team-membership", feature: "entityLists" },
+  { id: "risk-controls", title: "Risk & Control Catalog", description: "Master library of Risks and Controls; projects adopt a copy, attach them to steps and export a Risk-Control Matrix.", href: "/dashboard/admin/risk-controls", feature: "riskControl" },
+  { id: "compliance", title: "Compliance Monitoring", description: "Org-wide control operating-effectiveness over time — trends + alerts from DiagramatixMINER runs across every project.", href: "/dashboard/compliance?from=/dashboard/admin", feature: "riskControl" },
+  { id: "pcf", title: "Process Classification (APQC PCF)", description: "Browse the APQC Process Classification Framework® — Cross-Industry + industry variants — the reference taxonomy for classifying processes.", href: "/dashboard/admin/pcf?from=/dashboard/admin", feature: "apqc" },
+  { id: "pcf-colours", title: "APQC PCF Hierarchy Colours", description: "The two-tone colour per PCF level (Category → Task) — one main colour + a lightness %; applied wherever the APQC hierarchy is shown.", href: "/dashboard/admin/pcf-colours", feature: "apqc" },
+  { id: "feature-colours", title: "Feature Colours", description: "Set the Background + Text colour for each feature area (Simulator, Mining, AI, Entity Lists, …) — the highlight is a darkened shade. Applied to the dashboard menus, admin tiles, AI controls and the Entity-Drift ring.", href: "/dashboard/admin/feature-colours" },
   { id: "sharing", title: "Project Sharing", description: "Every shared project plus its editors / viewers.", href: "/dashboard/admin/sharing" },
   { id: "scanner-rules", title: "BPMN Scanner Rules", description: "Rules used by the diagram issue scanner.", href: "/dashboard/admin/scanner-rules" },
   { id: "bubble-help", title: "Bubble Help", description: "The contextual help-cloud topics shown in the editor.", href: "/dashboard/admin/bubble-help" },
@@ -772,7 +776,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "image-library", title: "Image Library", description: "Manage User Guide & Technical Design Notes images — upload, see where each is used, replace an image everywhere by drag-and-drop, and delete. Images are shared across documents.", href: "/dashboard/admin/image-library" },
   { id: "diagram-types", title: "Diagram Types", description: "The 2-character codes and pastel colours shown per diagram type.", href: "/dashboard/admin/diagram-types?from=/dashboard/admin" },
   { id: "diagram-type-sort", title: "Diagram Type Sort Order", description: "The order diagram types are listed across the app and in the project Diagram Type sort.", href: "/dashboard/diagram-type-sort-order?from=/dashboard/admin" },
-  { id: "prompts", title: "AI Prompt Maintenance", description: "Maintain your own saved AI generation prompts.", href: "/dashboard/prompts?from=/dashboard/admin" },
+  { id: "prompts", title: "AI Prompt Maintenance", description: "Maintain your own saved AI generation prompts.", href: "/dashboard/prompts?from=/dashboard/admin", feature: "ai" },
   { id: "notifications", title: "Notifications & Feedback", description: "Inspect any user's notification feed — filter by Org & User.", href: "/notifications?from=/dashboard/admin" },
 ];
 
@@ -780,6 +784,7 @@ const TILE_ORDER_KEY = "dgx.superadmin.tileOrder";
 
 function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
   const router = useRouter();
+  const scheme = useFeatureColors();
   const [order, setOrder] = useState<string[]>(ADMIN_TILES.map(t => t.id));
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
@@ -821,7 +826,10 @@ function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
       </div>
       <div className="pr-1">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {tiles.map(t => (
+          {tiles.map(t => {
+            const interactive = !!(t.href || t.users);
+            const fv = t.feature ? featureVars(scheme, t.feature) : undefined;
+            return (
             <div
               key={t.id}
               draggable
@@ -829,13 +837,16 @@ function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
               onDragOver={e => e.preventDefault()}
               onDrop={() => onDrop(t.id)}
               onClick={() => { if (t.users) onShowUsers(); else if (t.href) router.push(t.href); }}
-              className={`relative bg-white border border-red-300 rounded-md p-4 transition-colors ${
-                t.href || t.users ? "cursor-pointer hover:bg-red-50 hover:border-red-400" : ""
+              style={fv}
+              className={`relative rounded-md p-4 border transition-colors ${
+                t.feature
+                  ? `feature-tile ${interactive ? "cursor-pointer" : ""}`
+                  : `bg-white border-red-300 ${interactive ? "cursor-pointer hover:bg-red-50 hover:border-red-400" : ""}`
               } ${draggingId === t.id ? "opacity-50" : ""}`}
             >
               <div className="flex items-start justify-between gap-2">
-                <h3 className="text-sm font-semibold text-red-700">{t.title}</h3>
-                <span className="text-gray-300 select-none cursor-grab" title="Drag to reorder">⠿</span>
+                <h3 className={`text-sm font-semibold ${t.feature ? "" : "text-red-700"}`}>{t.title}</h3>
+                <span className="text-gray-400 select-none cursor-grab" title="Drag to reorder">⠿</span>
               </div>
               <p className="text-xs text-gray-600 mt-1.5 leading-snug">{t.description}</p>
               {t.ddl && (
@@ -844,7 +855,8 @@ function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>
