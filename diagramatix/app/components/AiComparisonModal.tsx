@@ -24,7 +24,7 @@ export interface AiComparison {
 
 /**
  * SuperAdmin "AI Comparison Results" — the matrix from a multi-model BPMN
- * generation (Fable 5 / Opus 4.8 / Sonnet 5 / Haiku 4.5). The current diagram was
+ * generation (the selected models). The current diagram was
  * filled with the BEST output (fewest layout issues), marked ★; this shows per-model
  * conformance + a link to each saved model diagram (with ?from= so the editor's back
  * nav returns here).
@@ -33,10 +33,12 @@ export function AiComparisonModal({
   comparison,
   currentDiagramId,
   onClose,
+  onClear,
 }: {
   comparison: AiComparison;
   currentDiagramId: string;
   onClose: () => void;
+  onClear?: () => void;
 }) {
   const router = useRouter();
   const models = comparison.models ?? [];
@@ -102,6 +104,18 @@ export function AiComparisonModal({
             ))}
           </tbody>
         </table>
+
+        {onClear && (
+          <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+            <button
+              onClick={onClear}
+              className="text-[11px] rounded border border-red-300 text-red-700 px-2.5 py-1 hover:bg-red-50"
+              title="Clear these comparison results from the diagram"
+            >
+              Remove results
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

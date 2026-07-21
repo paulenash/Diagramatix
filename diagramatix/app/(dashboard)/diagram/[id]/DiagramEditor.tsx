@@ -965,6 +965,15 @@ export function DiagramEditor({
       ? initialAiComparison : null,
   );
   const [showComparisonModal, setShowComparisonModal] = useState(false);
+  const [confirmClearComparison, setConfirmClearComparison] = useState(false);
+  // Clear the stored AI comparison so its toolbar button + modal go away.
+  const clearComparison = useCallback(async () => {
+    setConfirmClearComparison(false);
+    try {
+      const res = await fetch(`/api/ai/generate-bpmn/compare?diagramId=${encodeURIComponent(diagramId)}`, { method: "DELETE" });
+      if (res.ok) { setAiComparison(null); setShowComparisonModal(false); }
+    } catch { /* leave the results in place on failure */ }
+  }, [diagramId]);
   const [aiPanelGenerating, setAiPanelGenerating] = useState(false);
   const [aiPanelNarrativeGenerating, setAiPanelNarrativeGenerating] = useState(false);
   const [showPlanPanel, setShowPlanPanel] = useState(false);
@@ -3188,7 +3197,7 @@ export function DiagramEditor({
         {/* AI Generate, Simulator, Animate!, Send for Review and Get help were
             moved into the unified "Diagram ▾" menu further along the toolbar
             (2026-07-07) to declutter the top bar. */}
-        {isAdmin && aiComparison ? (
+        {isAdmin && !superAdminHidden && aiComparison ? (
           <button
             onClick={() => setShowComparisonModal(true)}
             className="px-2 py-0.5 text-[11px] rounded border border-red-400 text-red-700 hover:bg-red-50"
@@ -3906,13 +3915,24 @@ export function DiagramEditor({
           />
         )}
 
-        {isAdmin && showComparisonModal && aiComparison ? (
+        {isAdmin && !superAdminHidden && showComparisonModal && aiComparison ? (
           <AiComparisonModal
             comparison={aiComparison as AiComparison}
             currentDiagramId={diagramId}
             onClose={() => setShowComparisonModal(false)}
+            onClear={() => { setShowComparisonModal(false); setConfirmClearComparison(true); }}
           />
         ) : null}
+
+        {confirmClearComparison && (
+          <ConfirmDialog
+            title="Remove comparison results?"
+            message="This clears the saved AI comparison for this diagram. The per-model diagrams saved earlier are not affected — delete those separately if you want. You can re-run a comparison any time."
+            confirmLabel="Remove"
+            onConfirm={clearComparison}
+            onCancel={() => setConfirmClearComparison(false)}
+          />
+        )}
 
         {showAnimate && (
           <AnimateOverlay data={data} diagramName={diagramName} onClose={() => setShowAnimate(false)} />

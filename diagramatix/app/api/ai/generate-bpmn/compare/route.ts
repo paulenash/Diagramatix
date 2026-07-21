@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
-import { prisma } from "@/app/lib/db";
+import { prisma, pgPool } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
@@ -183,4 +183,21 @@ export async function POST(req: Request) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return NextResponse.json({ comparison, filled: !!chosenData, diagramData: (chosenData as any) ?? undefined });
+}
+
+/**
+ * DELETE — clear the stored AI comparison matrix on a diagram (resets the
+ * `aiComparison` column to {}), so the "AI Comparison Results" button goes away.
+ * SuperAdmin-only, same as generating it. Raw SQL (Prisma 7 omits JSON fields from
+ * model update inputs). The per-model diagrams saved earlier are separate diagrams
+ * the user deletes on their own; this only removes the comparison record.
+ */
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isSuperuser(session)) return NextResponse.json({ error: "SuperAdmin only" }, { status: 403 });
+  const diagramId = new URL(req.url).searchParams.get("diagramId");
+  if (!diagramId) return NextResponse.json({ error: "diagramId is required" }, { status: 400 });
+  await pgPool.query('UPDATE "Diagram" SET "aiComparison" = $1::jsonb WHERE id = $2', ["{}", diagramId]);
+  return NextResponse.json({ ok: true });
 }
