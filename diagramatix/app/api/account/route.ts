@@ -3,12 +3,14 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import bcrypt from "bcryptjs";
-import { isImpersonating } from "@/app/lib/superuser";
+import { isImpersonating, isSuperuser } from "@/app/lib/superuser";
 import {
   getCurrentOrgId,
   requireOrgAdminFor,
   OrgContextError,
 } from "@/app/lib/auth/orgContext";
+import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
+import { eraseUser } from "@/app/lib/account/eraseUser";
 
 /** GET /api/account — return current user profile + org details */
 export async function GET() {
@@ -124,4 +126,59 @@ export async function PUT(req: Request) {
   }
 
   return NextResponse.json({ success: true });
+}
+
+/**
+ * DELETE /api/account — self-service account erasure (GDPR right to erasure, ENT-12).
+ *   Body: { confirmEmail: string } — must match the caller's own email.
+ *
+ * Permanently deletes the caller and cascades their data (Diagram, Project,
+ * OrgMember, DiagramTemplate, Prompt, DiagramRules, UsageCounter). Published
+ * versions/bundles survive with a null author (SetNull). Any Org the caller was
+ * the SOLE remaining member of — with no data left after the cascade — is then
+ * removed too, so self-erasure doesn't leave orphan orgs behind. Audited.
+ *
+ * Blocked for SuperAdmins (would remove an administrator — they're handled via
+ * the admin route) and while impersonating.
+ */
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  try {
+    if (isImpersonating(session, await cookies())) {
+      return NextResponse.json({ error: "Cannot delete an account while impersonating" }, { status: 403 });
+    }
+  } catch { /* cookies may fail */ }
+  if (isSuperuser(session)) {
+    return NextResponse.json(
+      { error: "Administrator accounts can't be self-deleted. Contact support." },
+      { status: 403 },
+    );
+  }
+
+  const userId = session.user.id;
+  const body = await req.json().catch(() => ({}));
+  const me = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, orgMembers: { select: { orgId: true } }, _count: { select: { projects: true, diagrams: true } } },
+  });
+  if (!me) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  if (typeof body.confirmEmail !== "string" || body.confirmEmail.trim().toLowerCase() !== me.email.trim().toLowerCase()) {
+    return NextResponse.json({ error: "Type your email address exactly to confirm deletion." }, { status: 400 });
+  }
+
+  const orgIds = me.orgMembers.map((m) => m.orgId);
+
+  await recordAudit({
+    actorUserId: userId, actorEmail: me.email,
+    action: AUDIT.UserSelfDelete, targetType: "user", targetId: userId,
+    meta: { projects: me._count.projects, diagrams: me._count.diagrams, orgs: orgIds.length },
+    ip: ipFromRequest(req),
+  });
+
+  const { orgsRemoved } = await eraseUser(userId);
+  return NextResponse.json({ deleted: true, orgsRemoved });
 }

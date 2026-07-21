@@ -823,6 +823,32 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [acctShowConfirmPwd, setAcctShowConfirmPwd] = useState(false);
   const [acctSaving, setAcctSaving] = useState(false);
   const [acctMsg, setAcctMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  // Self-service account erasure (GDPR right to erasure).
+  const [acctDeleteOpen, setAcctDeleteOpen] = useState(false);
+  const [acctDeleteConfirm, setAcctDeleteConfirm] = useState("");
+  const [acctDeleting, setAcctDeleting] = useState(false);
+
+  async function handleDeleteAccount() {
+    setAcctDeleting(true); setAcctMsg(null);
+    try {
+      const res = await fetch("/api/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmEmail: acctDeleteConfirm.trim() }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setAcctMsg({ text: j.error ?? "Could not delete account", ok: false });
+        return;
+      }
+      // Account is gone — end the session and leave.
+      await signOut({ callbackUrl: "/login" });
+    } catch {
+      setAcctMsg({ text: "Network error", ok: false });
+    } finally {
+      setAcctDeleting(false);
+    }
+  }
 
   async function handleAccountSave() {
     setAcctSaving(true);
@@ -2569,6 +2595,50 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 <p className={`text-xs ${acctMsg.ok ? "text-green-600" : "text-red-600"}`}>
                   {acctMsg.text}
                 </p>
+              )}
+
+              {/* Danger zone — self-service account erasure */}
+              {!isSu && (
+                <div className="mt-2 border border-red-200 rounded-md">
+                  {!acctDeleteOpen ? (
+                    <button
+                      onClick={() => { setAcctDeleteOpen(true); setAcctDeleteConfirm(""); setAcctMsg(null); }}
+                      className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 rounded-md"
+                    >
+                      Delete my account…
+                    </button>
+                  ) : (
+                    <div className="p-3 bg-red-50/50">
+                      <p className="text-xs text-red-700 font-medium">Permanently delete your account</p>
+                      <p className="text-[11px] text-gray-600 mt-1">
+                        This erases you and all your projects, diagrams and templates. Anything you
+                        published stays visible with no author. This cannot be undone. Type your email
+                        <span className="font-mono"> {userEmail}</span> to confirm.
+                      </p>
+                      <input
+                        value={acctDeleteConfirm}
+                        onChange={(e) => setAcctDeleteConfirm(e.target.value)}
+                        placeholder="your email"
+                        className="mt-2 w-full text-xs border border-red-300 rounded px-2 py-1.5"
+                      />
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          onClick={handleDeleteAccount}
+                          disabled={acctDeleting || acctDeleteConfirm.trim().toLowerCase() !== (userEmail ?? "").toLowerCase()}
+                          className="px-3 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {acctDeleting ? "Deleting…" : "Delete permanently"}
+                        </button>
+                        <button
+                          onClick={() => { setAcctDeleteOpen(false); setAcctDeleteConfirm(""); }}
+                          className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 

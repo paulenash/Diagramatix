@@ -13,6 +13,7 @@ export const AUDIT = {
   RestoreWipe: "restore.wipe",
   ExportOrgBackup: "export.org-backup",
   UserDelete: "user.delete",
+  UserSelfDelete: "user.self-delete",
   OrgSettingsUpdate: "org.settings.update",
   ShareCreate: "share.create",
   ShareRevoke: "share.revoke",
