@@ -8,7 +8,7 @@ import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import { buildGenericSystemPrompt } from "@/app/lib/ai/generateDiagramPrompt";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 
 
 export async function POST(req: Request) {
@@ -17,14 +17,15 @@ export async function POST(req: Request) {
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
 
-  // Provider-aware: the selected model decides which key/endpoint (Claude vs Kimi).
-  const model = await getAiGenerateModel();
-  const apiKey = aiApiKey(model);
-  if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
-
   const { prompt, diagramType, attachment, pcfNodeId } = await req.json();
   if (!prompt?.trim()) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
   if (!diagramType) return NextResponse.json({ error: "diagramType required" }, { status: 400 });
+
+  // Provider-aware + vision-aware: image input uses the Vision-model override when
+  // set; the selected model then decides the key/endpoint (Claude vs Kimi).
+  const model = await resolveGenerateModel(attachment?.type === "image");
+  const apiKey = aiApiKey(model);
+  if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
 
   // Subscription cap: AI attempts. Check before the model call.
   const aiBlock = await gateLimit(session.user.id, "aiAttempts");

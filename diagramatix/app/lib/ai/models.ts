@@ -15,13 +15,18 @@ export interface AiModel {
   id: string;
   label: string;
   provider?: AiProvider; // absent ⇒ "anthropic"
+  /** Whether the model can read images (vision). Drives the optional Vision-model
+   *  picker: `false` = text-only (excluded from the vision picker + flagged if it's
+   *  the only model). Absent ⇒ unknown (allowed, not flagged). Claude models are
+   *  all multimodal. */
+  vision?: boolean;
 }
 
 export const AI_MODELS: AiModel[] = [
-  { id: "claude-fable-5", label: "Fable 5" },
-  { id: "claude-opus-4-8", label: "Opus 4.8" },
-  { id: "claude-sonnet-5", label: "Sonnet 5" },
-  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
+  { id: "claude-fable-5", label: "Fable 5", vision: true },
+  { id: "claude-opus-4-8", label: "Opus 4.8", vision: true },
+  { id: "claude-sonnet-5", label: "Sonnet 5", vision: true },
+  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", vision: true },
 ];
 
 /** Production default for AI Generate. Haiku 4.5 is consistently the best BPMN
@@ -60,10 +65,10 @@ export function customModels(): AiModel[] {
  * Server-only (env is stripped client-side → [] there; the client gets the list
  * as a prop). */
 const DEFAULT_MOONSHOT_MODELS: AiModel[] = [
-  { id: "kimi-latest", label: "Kimi Latest", provider: "moonshot" },
-  { id: "kimi-k2-0711-preview", label: "Kimi K2", provider: "moonshot" },
-  { id: "moonshot-v1-128k", label: "Moonshot v1 128k", provider: "moonshot" },
-  { id: "moonshot-v1-128k-vision-preview", label: "Moonshot v1 128k (vision)", provider: "moonshot" },
+  { id: "kimi-latest", label: "Kimi Latest", provider: "moonshot", vision: true },
+  { id: "kimi-k2-0711-preview", label: "Kimi K2", provider: "moonshot", vision: false },
+  { id: "moonshot-v1-128k", label: "Moonshot v1 128k", provider: "moonshot", vision: false },
+  { id: "moonshot-v1-128k-vision-preview", label: "Moonshot v1 128k (vision)", provider: "moonshot", vision: true },
 ];
 
 export function moonshotModels(): AiModel[] {
@@ -76,7 +81,10 @@ export function moonshotModels(): AiModel[] {
       const [rawId, ...rest] = entry.split("|");
       const id = rawId.trim();
       if (!id) return null;
-      return { id, label: rest.join("|").trim() || id, provider: "moonshot" };
+      // Best-effort vision flag from the id ("…vision…" or "kimi-latest"); unknown
+      // ids are left undefined (allowed in the vision picker, not flagged).
+      const vision = /vision/i.test(id) || /^kimi-latest/i.test(id) ? true : undefined;
+      return { id, label: rest.join("|").trim() || id, provider: "moonshot", vision };
     })
     .filter((m): m is AiModel => m !== null);
 }
@@ -93,6 +101,10 @@ export const aiModelLabel = (id: string | null | undefined): string =>
 /** The provider serving a model id. Unknown / untagged ids ⇒ "anthropic". */
 export const providerForModel = (id: string | null | undefined): AiProvider =>
   allModels().find((m) => m.id === id)?.provider ?? "anthropic";
+
+/** A model's vision capability: true / false / undefined (unknown). */
+export const modelVision = (id: string | null | undefined): boolean | undefined =>
+  allModels().find((m) => m.id === id)?.vision;
 
 /** Resolve a stored setting value to a usable model id: the stored value if it's
  *  a known model, otherwise the production default. Pure — unit-tested. */

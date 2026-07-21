@@ -9,7 +9,7 @@ import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { prisma } from "@/app/lib/db";
 import { planFlowchart } from "@/app/lib/ai/planFlowchart";
-import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
@@ -22,15 +22,16 @@ export async function POST(req: Request) {
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
 
-  const selectedModel = await getAiGenerateModel();
-  const apiKey = aiApiKey(selectedModel);
-  if (!apiKey) {
-    return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
-  }
-
   const { prompt, attachment } = await req.json();
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
+  }
+
+  // Image input uses the Vision-model override when set; else the main model.
+  const selectedModel = await resolveGenerateModel(attachment?.type === "image");
+  const apiKey = aiApiKey(selectedModel);
+  if (!apiKey) {
+    return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
   }
 
   const aiBlock = await gateLimit(session.user.id, "aiAttempts");

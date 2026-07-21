@@ -5,7 +5,7 @@
  * production default (Haiku 4.5).
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { AI_MODELS, DEFAULT_AI_MODEL, isKnownAiModel, resolveAiModel, aiModelLabel, allModels, moonshotModels, providerForModel } from "@/app/lib/ai/models";
+import { AI_MODELS, DEFAULT_AI_MODEL, isKnownAiModel, resolveAiModel, aiModelLabel, allModels, moonshotModels, providerForModel, modelVision } from "@/app/lib/ai/models";
 
 describe("AI model list + resolver", () => {
   it("T0577 — the production default is Haiku 4.5 and is a known model", () => {
@@ -50,8 +50,8 @@ describe("Moonshot (Kimi) provider registry", () => {
     process.env.MOONSHOT_MODELS = "kimi-latest|Kimi Latest, moonshot-v1-128k";
     const ms = moonshotModels();
     expect(ms).toEqual([
-      { id: "kimi-latest", label: "Kimi Latest", provider: "moonshot" },
-      { id: "moonshot-v1-128k", label: "moonshot-v1-128k", provider: "moonshot" }, // bare id → label = id
+      { id: "kimi-latest", label: "Kimi Latest", provider: "moonshot", vision: true }, // kimi-latest → vision
+      { id: "moonshot-v1-128k", label: "moonshot-v1-128k", provider: "moonshot", vision: undefined }, // bare id → label = id
     ]);
     expect(isKnownAiModel("kimi-latest")).toBe(true);
     expect(providerForModel("kimi-latest")).toBe("moonshot");
@@ -71,5 +71,23 @@ describe("Moonshot (Kimi) provider registry", () => {
     expect(providerForModel("claude-haiku-4-5-20251001")).toBe("anthropic");
     expect(providerForModel("something-unknown")).toBe("anthropic");
     expect(providerForModel(null)).toBe("anthropic");
+  });
+
+  it("T0960 — vision capability: Claude all true; Kimi per-model; env ids heuristic", () => {
+    // Claude models are all multimodal.
+    for (const m of AI_MODELS) expect(m.vision).toBe(true);
+    expect(modelVision("claude-haiku-4-5-20251001")).toBe(true);
+
+    process.env.MOONSHOT_API_KEY = "sk-test";
+    delete process.env.MOONSHOT_MODELS; // curated default list
+    expect(modelVision("kimi-latest")).toBe(true);
+    expect(modelVision("kimi-k2-0711-preview")).toBe(false);           // text-only
+    expect(modelVision("moonshot-v1-128k")).toBe(false);               // text-only
+    expect(modelVision("moonshot-v1-128k-vision-preview")).toBe(true);
+
+    // Env-declared ids: "vision" in the id → true; otherwise unknown (undefined).
+    process.env.MOONSHOT_MODELS = "some-vision-model|V, plain-text-model|T";
+    expect(moonshotModels().find((m) => m.id === "some-vision-model")?.vision).toBe(true);
+    expect(moonshotModels().find((m) => m.id === "plain-text-model")?.vision).toBeUndefined();
   });
 });
