@@ -36,7 +36,7 @@ The route picks the branch server-side (`orgPolicyAllows("allowAi") && ANTHROPIC
 ### What still works with AI off
 Nearly everything — Diagramatix is not an AI-first tool:
 - All **manual diagramming** + editing, pools/lanes/sublanes, smart connector routing, the **deterministic auto-layout** engines, templates, typography.
-- **DiagramatixMINER** — the core is **100% deterministic**: ingest event logs, **discover** processes/state-machines, run conformance. Only AI-*curate* is gated; **Explain** falls back to a deterministic Results summary.
+- **DiagramatixMINER** — the core is **100% deterministic**: ingest event logs, **discover** processes/state-machines, run conformance, and — from an OCEL object-centric log — build the **UML class diagram** (object model: types → classes, relationships → associations, shared-event interactions → weighted/dashed links; `buildDomainFromOcel`, no AI). Only AI-*curate* is gated; **Explain** falls back to a deterministic Results summary.
 - **Simulator** — full engine + runs + comparisons; the AI verdict falls back to a deterministic Comparison summary.
 - **Risk & Controls**, **APQC** browse/classify/folder-seed, **Publishing / Process Portal**, **Import/Export** (Visio, XES/OCEL, competitor-BPMN import), **Entity Structures**, sharing, backups.
 
