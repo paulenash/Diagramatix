@@ -7883,6 +7883,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const isContainerDrop = isContainerType(finalEl.type);
       const selfIds = new Set<string>([finalEl.id]);
       if (isContainerDrop) for (const d of getAllDescendantIds(elements, finalEl.id)) selfIds.add(d);
+      // ...and never splice into a connector that terminates on one of the moved
+      // element's ANCESTOR containers (e.g. a task inside an Expanded Subprocess vs
+      // a connector into that EP). The container's centre sits deep inside its own
+      // box, right along where its children live, so the source→target-centre
+      // "flow-line" net would spuriously treat every child as dropped on that
+      // connector — splicing child→parent flow that crosses the container boundary.
+      { let anc = elements.find(e => e.id === finalEl.parentId);
+        const guard = new Set<string>();
+        while (anc && !guard.has(anc.id)) { guard.add(anc.id); selfIds.add(anc.id); anc = elements.find(e => e.id === anc!.parentId); } }
       // Detect the connector to split. Tasks are routing obstacles, so while the
       // element was being dragged onto a connector the router bent that connector
       // AROUND it — by drop time its LIVE path no longer overlaps the element and

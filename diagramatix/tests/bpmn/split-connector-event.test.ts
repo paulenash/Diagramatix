@@ -320,4 +320,47 @@ describe("insert an existing activity onto a connector, halves parallel (T0725)"
     expect(d.connectors.some((c) => c.sourceId === "a" && c.targetId === "f")).toBe(true);
     expect(d.connectors.some((c) => c.sourceId === "f" && c.targetId === "b")).toBe(true);
   });
+
+  it("moving a child task inside an EP does NOT splice a connector that targets the EP (T0947)", () => {
+    // Regression: a connector from an external task INTO an Expanded Subprocess has
+    // its target-centre deep INSIDE the EP, right where the EP's children sit. The
+    // routing-independent source→target-centre "flow line" therefore passes through
+    // every child box — so nudging/clicking a child was mis-detected as "dropped on
+    // that connector" and spuriously spliced into external→child→EP (a flow crossing
+    // the subprocess boundary), lurching the child onto the line. The moved element's
+    // ANCESTOR containers must be excluded from splice candidates.
+    const d0 = {
+      elements: [
+        { id: "a", type: "task", x: 100, y: 200, width: 100, height: 60, label: "A", properties: {} },
+        // EP whose centre (460,240) sits among its children on the y≈230 flow line.
+        { id: "ep", type: "subprocess-expanded", x: 300, y: 180, width: 320, height: 120, label: "EP", properties: {} },
+        { id: "c1", type: "task", x: 340, y: 210, width: 80, height: 40, label: "C1", parentId: "ep", properties: {} },
+        { id: "c2", type: "task", x: 480, y: 210, width: 80, height: 40, label: "C2", parentId: "ep", properties: {} },
+      ],
+      connectors: [
+        // External → EP: target-centre is inside the EP, so the flow line crosses c1/c2.
+        { id: "ext", type: "sequence", sourceId: "a", targetId: "ep", sourceSide: "right", targetSide: "left",
+          directionType: "directed", routingType: "rectilinear",
+          waypoints: [{ x: 200, y: 230 }, { x: 250, y: 230 }, { x: 300, y: 230 }] },
+        { id: "ic", type: "sequence", sourceId: "c1", targetId: "c2", sourceSide: "right", targetSide: "left",
+          directionType: "directed", routingType: "rectilinear",
+          waypoints: [{ x: 420, y: 230 }, { x: 480, y: 230 }] },
+      ],
+    } as unknown as DiagramData;
+
+    const c1Before = d0.elements.find((e) => e.id === "c1")!;
+    const out = reducer(d0, { type: "MOVE_END", payload: { id: "c1" } });
+
+    // The connector into the EP is untouched — no child→parent splice.
+    expect(out.connectors.some((c) => c.id === "ext")).toBe(true);
+    expect(out.connectors.some((c) => c.sourceId === "a" && c.targetId === "c1")).toBe(false);
+    expect(out.connectors.some((c) => c.sourceId === "c1" && c.targetId === "ep")).toBe(false);
+    // Internal flow preserved; net connector count unchanged (nothing spliced).
+    expect(out.connectors.some((c) => c.id === "ic")).toBe(true);
+    expect(out.connectors.length).toBe(d0.connectors.length);
+    // The child was NOT snap-lurched onto the flow line.
+    const c1After = out.elements.find((e) => e.id === "c1")!;
+    expect(c1After.x).toBe(c1Before.x);
+    expect(c1After.y).toBe(c1Before.y);
+  });
 });
