@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { isSuperuser } from "@/app/lib/superuser";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { RiskControlsClient } from "./RiskControlsClient";
 
@@ -23,7 +23,7 @@ export default async function RiskControlsPage({ searchParams }: { searchParams:
   const activeOrgId = await tryGetCurrentOrgId(session, cookieStore);
   if (!activeOrgId) redirect("/dashboard");
 
-  const su = isSuperuser(session);
+  const su = await isActingSuperuser(session);
   const { orgId: orgIdParam, from } = await searchParams;
   const selectedOrgId = su ? (orgIdParam ?? activeOrgId) : activeOrgId;
 

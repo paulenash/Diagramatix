@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { isSuperuser } from "@/app/lib/superuser";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { PcfClient } from "./PcfClient";
 
@@ -17,7 +17,7 @@ export default async function PcfPage({ searchParams }: Props) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const cookieStore = await cookies();
-  const su = isSuperuser(session);
+  const su = await isActingSuperuser(session);
   const { orgId: orgIdParam, from } = await searchParams;
   const activeOrgId = await tryGetCurrentOrgId(session, cookieStore);
   const selectedOrgId = su ? (orgIdParam ?? activeOrgId) : activeOrgId;

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { isSuperuser } from "@/app/lib/superuser";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { getFeatureColors } from "@/app/lib/theme/featureColorsSetting";
 import { FeatureColoursClient } from "./FeatureColoursClient";
 
@@ -13,6 +13,6 @@ import { FeatureColoursClient } from "./FeatureColoursClient";
 export default async function FeatureColoursPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (!isSuperuser(session)) redirect("/dashboard");
+  if (!(await isActingSuperuser(session))) redirect("/dashboard");
   return <FeatureColoursClient initial={await getFeatureColors()} />;
 }

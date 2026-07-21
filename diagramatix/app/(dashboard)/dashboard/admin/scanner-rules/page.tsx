@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { isSuperuser } from "@/app/lib/superuser";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { rulesMetadata } from "@/app/lib/diagram/checks/diagramChecks";
 import { ScannerRulesClient, type MergedRule } from "./ScannerRulesClient";
 
@@ -15,7 +15,7 @@ import { ScannerRulesClient, type MergedRule } from "./ScannerRulesClient";
 export default async function ScannerRulesPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (!isSuperuser(session)) redirect("/dashboard");
+  if (!(await isActingSuperuser(session))) redirect("/dashboard");
 
   const codeRules = rulesMetadata();
   const dbRules = await prisma.scannerRule.findMany();

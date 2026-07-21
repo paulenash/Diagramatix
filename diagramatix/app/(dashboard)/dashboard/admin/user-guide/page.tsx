@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { isSuperuser } from "@/app/lib/superuser";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { UserGuideEditorClient } from "./UserGuideEditorClient";
 
 export const metadata = { title: "Document Editor — SuperAdmin" };
@@ -9,7 +9,7 @@ export const metadata = { title: "Document Editor — SuperAdmin" };
 export default async function UserGuideAdminPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (!isSuperuser(session)) redirect("/dashboard");
+  if (!(await isActingSuperuser(session))) redirect("/dashboard");
   // Whether the SuperAdmin is signed into Microsoft — gates the "Other Documents"
   // (SharePoint) button. Same boolean the dashboard uses to enable SharePoint UI.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

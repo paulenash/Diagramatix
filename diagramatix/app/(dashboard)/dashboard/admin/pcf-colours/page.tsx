@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { isSuperuser } from "@/app/lib/superuser";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { getPcfLevelColors } from "@/app/lib/pcf/levelColorsSetting";
 import { PcfColoursClient } from "./PcfColoursClient";
 
@@ -12,6 +12,6 @@ import { PcfColoursClient } from "./PcfColoursClient";
 export default async function PcfColoursPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (!isSuperuser(session)) redirect("/dashboard");
+  if (!(await isActingSuperuser(session))) redirect("/dashboard");
   return <PcfColoursClient initial={await getPcfLevelColors()} />;
 }

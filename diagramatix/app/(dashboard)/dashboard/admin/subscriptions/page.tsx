@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/db";
-import { isSuperuser } from "@/app/lib/superuser";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { SubscriptionsEditor, type TierRow } from "./SubscriptionsEditor";
 
 export const metadata = { title: "Diagramatix — Subscription Prices and Limits" };
@@ -9,7 +9,7 @@ export const metadata = { title: "Diagramatix — Subscription Prices and Limits
 export default async function SubscriptionsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (!isSuperuser(session)) redirect("/dashboard");
+  if (!(await isActingSuperuser(session))) redirect("/dashboard");
 
   const tiers = await prisma.subscriptionLevel.findMany({
     orderBy: { sortOrder: "asc" },

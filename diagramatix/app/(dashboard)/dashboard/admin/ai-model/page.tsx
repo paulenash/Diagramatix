@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { isSuperuser } from "@/app/lib/superuser";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { AI_MODELS } from "@/app/lib/ai/models";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { AiModelClient } from "./AiModelClient";
@@ -13,6 +13,6 @@ import { AiModelClient } from "./AiModelClient";
 export default async function AiModelPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (!isSuperuser(session)) redirect("/dashboard");
+  if (!(await isActingSuperuser(session))) redirect("/dashboard");
   return <AiModelClient models={AI_MODELS} initialModel={await getAiGenerateModel()} />;
 }

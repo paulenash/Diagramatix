@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/db";
-import { isSuperuser } from "@/app/lib/superuser";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { FeaturesEditor, type FeatureRow } from "./FeaturesEditor";
 
 export const metadata = { title: "Diagramatix — Features Catalog" };
@@ -9,7 +9,7 @@ export const metadata = { title: "Diagramatix — Features Catalog" };
 export default async function FeaturesAdminPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (!isSuperuser(session)) redirect("/dashboard");
+  if (!(await isActingSuperuser(session))) redirect("/dashboard");
 
   const features = await prisma.feature.findMany({
     orderBy: { sortOrder: "asc" },
