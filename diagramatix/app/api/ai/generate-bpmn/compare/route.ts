@@ -144,9 +144,13 @@ export async function POST(req: Request) {
   const best = pickBestModel(results, MODELS.map((m) => m.id));
   const chosenData = best ? dataByModel.get(best.model) ?? null : null;
 
+  // ENT-14: the raw prompt is customer content — don't persist it by default.
+  // Store only its length; opt in to keeping the text with AI_COMPARE_STORE_PROMPT=1.
+  const storePrompt = process.env.AI_COMPARE_STORE_PROMPT === "1";
   const comparison = {
     generatedAt: new Date().toISOString(),
-    prompt: effPrompt,
+    ...(storePrompt ? { prompt: effPrompt } : {}),
+    promptChars: effPrompt.length,
     attachment: attachment ? { name: attachment.name ?? null, type: attachment.type } : null,
     chosenModel: best?.label ?? null,
     chosenModelId: best?.model ?? null,

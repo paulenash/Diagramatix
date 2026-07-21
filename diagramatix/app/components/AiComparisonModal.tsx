@@ -15,7 +15,8 @@ interface ModelCell {
 }
 export interface AiComparison {
   generatedAt?: string;
-  prompt?: string;
+  prompt?: string;       // only present when AI_COMPARE_STORE_PROMPT is enabled
+  promptChars?: number;  // length of the prompt (always retained)
   chosenModel?: string;
   chosenModelId?: string;
   models?: ModelCell[];
@@ -55,8 +56,10 @@ export function AiComparisonModal({
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-lg leading-none" aria-label="Close">&times;</button>
         </div>
 
-        {comparison.prompt && (
+        {comparison.prompt ? (
           <p className="text-[11px] text-gray-600 bg-gray-50 border border-gray-200 rounded p-2 mb-3 whitespace-pre-wrap max-h-24 overflow-auto">{comparison.prompt}</p>
+        ) : comparison.promptChars != null && (
+          <p className="text-[11px] text-gray-400 italic mb-3">Prompt not retained ({comparison.promptChars} chars) — set AI_COMPARE_STORE_PROMPT=1 to keep it.</p>
         )}
 
         <table className="w-full text-[11px] border-collapse">
