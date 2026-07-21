@@ -27,6 +27,7 @@ import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
+import { useAiAllowed } from "@/app/lib/auth/useAiAllowed";
 
 // --- Folder tree types ---
 interface FolderNode {
@@ -381,6 +382,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   // Per-tier feature access (SuperAdmin → all true). Absent → all-on so nothing
   // is hidden by accident on a legacy/unseeded profile.
   const ent = entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true };
+  const aiAllowed = useAiAllowed(); // hide AI-generation entry points when the org disables AI
   const pcfColors = usePcfLevelColors();
   // SuperAdmin "presentation mode" — double-click the logo to hide the SuperAdmin
   // chip + the Org reassign dropdown. No-op for non-SuperAdmins.
@@ -2439,7 +2441,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               >
                 + New Diagram
               </button>
-              {ent.apqc && (
+              {ent.apqc && aiAllowed && (
               <button
                 onClick={() => setShowPcfCreate(true)}
                 className="px-3 py-1 text-xs font-medium rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50"

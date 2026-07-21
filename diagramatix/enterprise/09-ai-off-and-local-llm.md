@@ -33,8 +33,8 @@ Nearly everything — Diagramatix is not an AI-first tool:
 
 **Pitch:** *"With AI off you still have a complete manual + deterministic process-modelling, mining and GRC platform."*
 
-### Known UX gap
-The Diagram toolbar **AI Generate** button hides live when AI is off (via `useOrgPolicy`), but the **mining AI-curate** and **APQC "Create Process"** buttons don't yet — they appear and then 403 with the policy message. Close this (extend the `useOrgPolicy` hook to those surfaces) before a strict-customer demo. Tracked as the A1 UI-hiding follow-up.
+### UI hiding (done)
+When AI is off, the AI entry points hide live — the Diagram toolbar **AI Generate** button, the mining **AI-curate** (process + state-machine) and **Explain results**, and the APQC **Create Process** button. Driven by the shared `useAiAllowed()` hook (`app/lib/auth/useAiAllowed.ts` = org policy + the SuperAdmin view-mode bypass), so a full-view SuperAdmin still sees them. The server routes enforce it regardless — this is UX polish so strict tenants never see a dead button.
 
 ## Posture 2 — AI on, contained (the usual enterprise answer)
 

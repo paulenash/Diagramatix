@@ -18,6 +18,7 @@ import type { LogMapping, MiningStats } from "@/app/lib/mining/types";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
+import { useAiAllowed } from "@/app/lib/auth/useAiAllowed";
 
 interface RunRow {
   id: string; name: string; stats: MiningStats; mapping: Partial<LogMapping>;
@@ -91,6 +92,8 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   // AI "Explain results"
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explaining, setExplaining] = useState(false);
+  // Hide the AI-curate / Explain actions when the org disables AI (server enforces regardless).
+  const aiAllowed = useAiAllowed();
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/projects/${projectId}/mining/runs`);
@@ -686,9 +689,11 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                   {bpmnBusy ? "Discovering…" : "Discover process"}
                 </button>
                 {bpmnBusy && <DiagramatixThrobber size={20} tone="amber" />}
+                {aiAllowed && (
                 <button onClick={() => discover(selected.id, true)} disabled={discovering} className="text-xs bg-amber-900/60 hover:bg-amber-800 disabled:opacity-40 text-amber-100 rounded px-2.5 py-1.5" title="Use AI (rules + template + your configured model) to curate a cleaner process — needs ANTHROPIC_API_KEY + credits">
                   {aiBpmn ? "✨ Curating…" : "✨ AI-curate"}
                 </button>
+                )}
                 {aiBpmn && <DiagramatixThrobber size={20} tone="amber" />}
                 {selected.discoveredBpmnId && (
                   <a href={openDiagram(selected.discoveredBpmnId)} onClick={stashReturn} className="text-xs text-amber-300 hover:text-amber-200 underline">Open discovered diagram →</a>
@@ -730,9 +735,11 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                   <button onClick={() => createReference(selected.id, false)} disabled={discovering} className="text-xs bg-amber-800 hover:bg-amber-700 disabled:opacity-40 text-white rounded px-3 py-1.5" title="Create a SEPARATE reference (a copy of the mined lifecycle) that discovery + refresh never overwrite — no AI needed. Then edit it into your rulebook.">
                     {smBusy ? "Creating…" : "＋ Create reference"}
                   </button>
+                  {aiAllowed && (
                   <button onClick={() => createReference(selected.id, true)} disabled={discovering} className="text-xs bg-amber-900/60 hover:bg-amber-800 disabled:opacity-40 text-amber-100 rounded px-2.5 py-1.5" title="AI-curate a cleaner reference (tidy labels, merged states, noise dropped) — needs API credits">
                     {aiSm ? "✨ Curating…" : "✨ AI-curate"}
                   </button>
+                  )}
                   {(smBusy || aiSm) && <DiagramatixThrobber size={18} tone="amber" />}
                   <span className="text-[10px] text-stone-400">No reference yet — create a <span className="text-stone-300">separate</span> governed state machine, then <span className="text-stone-300">edit it into your rulebook</span> (prune the moves that shouldn&rsquo;t be allowed). It stays independent of the discovered mirror above, so editing it turns the discovered transitions <span className="text-rose-300">red</span> where they deviate.</span>
                 </div>
@@ -784,7 +791,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
               </div>
             </div>
 
-            {/* AI: explain what the mining revealed — lights up once fully mined */}
+            {/* AI: explain what the mining revealed — lights up once fully mined.
+                Hidden entirely when the org disables AI. */}
+            {aiAllowed && (
             <div className={`mt-4 pt-3 border-t transition-colors ${allStepsDone ? "border-amber-500/60" : "border-stone-700"}`}>
               <h3 className={`text-xs font-semibold mb-1 ${allStepsDone ? "text-amber-200" : "text-stone-500"}`}>Explain results</h3>
               <p className="text-[11px] text-stone-400 mb-2">
@@ -821,6 +830,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 <div className="mt-3 rounded border border-amber-500/40 bg-stone-900/70 p-3 text-[11px] text-stone-200 leading-relaxed whitespace-pre-wrap">{explanation}</div>
               )}
             </div>
+            )}
 
             {/* Admin: capture this run into the Mining-Example catalog */}
             {isAdmin && <SaveRunAsExample projectId={projectId} runId={selected.id} defaultTitle={selected.name} />}
