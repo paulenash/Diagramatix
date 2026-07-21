@@ -12,7 +12,7 @@
  * are the caller's responsibility (see /api/ai/bpmn/refine-questions).
  */
 import Anthropic from "@anthropic-ai/sdk";
-import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
+import { makeAiClient } from "@/app/lib/ai/anthropicClient";
 
 export interface RefineQuestion {
   /** Short crisp label used for the appended prompt line, e.g. "Process initiator". */
@@ -114,7 +114,7 @@ export async function refineQuestions(opts: {
   dimensions?: string;
 }): Promise<RefineQuestionsResult> {
   const { apiKey, prompt, rules, model = DEFAULT_MODEL, dimensions = BPMN_REFINE_DIMENSIONS } = opts;
-  const client = makeAnthropic(apiKey);
+  const client = makeAiClient(model, apiKey);
   const systemPrompt = buildSystemPrompt(dimensions, rules);
 
   let message: Anthropic.Messages.Message;

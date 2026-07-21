@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { prisma } from "@/app/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
-import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
+import { makeAiClient, aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import { buildGenericSystemPrompt } from "@/app/lib/ai/generateDiagramPrompt";
@@ -17,8 +17,10 @@ export async function POST(req: Request) {
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "AI not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 503 });
+  // Provider-aware: the selected model decides which key/endpoint (Claude vs Kimi).
+  const model = await getAiGenerateModel();
+  const apiKey = aiApiKey(model);
+  if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
 
   const { prompt, diagramType, attachment, pcfNodeId } = await req.json();
   if (!prompt?.trim()) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
   console.log("[AI generate-diagram]", diagramType, "full:", fullLen, "chars → green-only+pcf:", rules.length, "chars");
 
   try {
-    const client = makeAnthropic(apiKey);
+    const client = makeAiClient(model, apiKey);
     const systemPrompt = buildGenericSystemPrompt(diagramType, rules);
 
     // Build user message content: text prompt + optional document attachment
@@ -75,7 +77,7 @@ export async function POST(req: Request) {
     userContent.push({ type: "text", text: prompt.trim() });
 
     const message = await client.messages.create({
-      model: await getAiGenerateModel(),
+      model,
       max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: "user", content: userContent }],

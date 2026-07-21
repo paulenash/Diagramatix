@@ -6,7 +6,7 @@
  * `layoutFlowchartDiagram` — no layout happens here.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
+import { makeAiClient } from "@/app/lib/ai/anthropicClient";
 import type { Attachment } from "./planBpmn";
 import type { AiFcElement, AiFcConnection } from "@/app/lib/diagram/layoutFlowchart";
 
@@ -68,7 +68,7 @@ export function normaliseFlowchartPlan(parsed: { elements: AiFcElement[]; connec
 
 export async function planFlowchart(opts: PlanFlowchartOptions): Promise<PlanFlowchartResult> {
   const { apiKey, prompt, attachment, rules, model = DEFAULT_MODEL } = opts;
-  const client = makeAnthropic(apiKey);
+  const client = makeAiClient(model, apiKey);
   const systemPrompt = buildFlowchartSystemPrompt(rules);
 
   const userContent: Anthropic.Messages.ContentBlockParam[] = [];

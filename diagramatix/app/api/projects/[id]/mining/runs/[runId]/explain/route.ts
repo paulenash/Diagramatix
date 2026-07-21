@@ -12,6 +12,7 @@ import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext
 import { orgPolicyAllows, orgRedactionEnabled } from "@/app/lib/auth/orgPolicy";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { makeRedactor } from "@/app/lib/ai/redaction";
 import { explainMiningResults, summariseMiningResults } from "@/app/lib/mining/explainResults";
 import type { Variant, MiningStats, Performance } from "@/app/lib/mining/types";
@@ -59,7 +60,8 @@ export async function POST(_req: Request, { params }: Params) {
   // Branch: AI narrates only when the org allows AI AND a key is configured.
   // Otherwise fall back to the deterministic templated summary (ENT-05) — a 200,
   // not a 403 — so strict/AI-off tenants still get a Results summary.
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const model = await getAiGenerateModel();
+  const apiKey = aiApiKey(model);
   const aiOn = (await orgPolicyAllows(session, "allowAi")) && !!apiKey;
   if (!aiOn) {
     return NextResponse.json({ explanation: summariseMiningResults(base), deterministic: true });
@@ -80,7 +82,7 @@ export async function POST(_req: Request, { params }: Params) {
     : undefined;
 
   try {
-    const explanation = await explainMiningResults({ apiKey: apiKey!, model: await getAiGenerateModel(), ...base }, redactor);
+    const explanation = await explainMiningResults({ apiKey: apiKey!, model, ...base }, redactor);
     if (userId) await recordUsage(userId, "aiAttempts");
     return NextResponse.json({ explanation });
   } catch (err) {

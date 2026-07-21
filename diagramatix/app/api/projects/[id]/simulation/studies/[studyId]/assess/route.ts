@@ -11,6 +11,8 @@ import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { orgPolicyAllows, orgRedactionEnabled } from "@/app/lib/auth/orgPolicy";
 import { makeRedactor } from "@/app/lib/ai/redaction";
+import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import type { RunMetrics } from "@/app/lib/simulation/results";
 import { buildComparisonFacts, generateSimAssessment, summariseComparison } from "@/app/lib/simulation/assessFacts";
 
@@ -78,7 +80,8 @@ export async function POST(req: Request, { params }: Params) {
   // Branch: AI narrates only when the org allows AI AND a key is configured.
   // Otherwise fall back to the deterministic templated comparison (ENT-05) — a 200,
   // not a 403 — so strict/AI-off tenants still get a Comparison summary.
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const model = await getAiGenerateModel();
+  const apiKey = aiApiKey(model);
   const aiOn = (await orgPolicyAllows(session, "allowAi")) && !!apiKey;
   if (!aiOn) {
     return NextResponse.json({ assessment: summariseComparison(facts), facts, deterministic: true });

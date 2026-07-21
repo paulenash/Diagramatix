@@ -6,7 +6,7 @@
  * Keep the Anthropic-facing logic here so the API route stays thin (mirrors
  * staffNarrative.ts).
  */
-import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
+import { makeAiClient } from "@/app/lib/ai/anthropicClient";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import type { Redactor } from "@/app/lib/ai/redaction";
 import type { RunMetrics } from "./results";
@@ -129,7 +129,7 @@ export type SimAssessmentResult =
 
 export async function generateSimAssessment(args: { apiKey: string; facts: ComparisonFacts }, redactor?: Redactor): Promise<SimAssessmentResult> {
   const model = await getAiGenerateModel();
-  const client = makeAnthropic(args.apiKey);
+  const client = makeAiClient(model, args.apiKey);
   // ENT-06: pseudonymise scenario/team names in the facts JSON before egress,
   // restore them in the reply. redactor is undefined (no-op) unless the org opts in.
   const payload = JSON.stringify(args.facts, null, 2);

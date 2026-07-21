@@ -5,6 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
@@ -17,9 +18,10 @@ export async function POST(req: Request) {
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const model = await getAiGenerateModel();
+  const apiKey = aiApiKey(model);
   if (!apiKey) {
-    return NextResponse.json({ error: "AI service not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 503 });
+    return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
   }
 
   const { prompt, attachment, pcfNodeId } = await req.json();
@@ -50,7 +52,7 @@ export async function POST(req: Request) {
   console.log("[AI generate-bpmn] full:", rules.length, "chars → green-only:", aiRules.length, "chars", pcfNodeId ? "+ PCF grounding" : "");
 
   try {
-    const result = await planBpmn({ apiKey, prompt, attachment, rules: grounded, model: await getAiGenerateModel() });
+    const result = await planBpmn({ apiKey, prompt, attachment, rules: grounded, model });
     if (!result.ok) {
       return NextResponse.json({ error: result.error, raw: result.raw }, { status: result.status });
     }

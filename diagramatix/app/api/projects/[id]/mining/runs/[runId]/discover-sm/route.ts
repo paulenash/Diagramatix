@@ -21,6 +21,7 @@ import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { discoverStateMachine } from "@/app/lib/mining/discoverStateMachine";
 import { generateStateMachineViaAi } from "@/app/lib/mining/aiStateMachine";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
@@ -61,8 +62,9 @@ export async function POST(req: Request, { params }: Params) {
   if (useAi) {
     const _pol = await gateOrgPolicy(session, "allowAi");
     if (_pol) return _pol;
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: "AI not configured. Set ANTHROPIC_API_KEY." }, { status: 503 });
+    const model = await getAiGenerateModel();
+    const apiKey = aiApiKey(model);
+    if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
     if (userId) { const block = await gateLimit(userId, "aiAttempts"); if (block) return block; }
 
     // General + state-machine default rules → GREEN (AI-enforceable) only.
@@ -78,7 +80,7 @@ export async function POST(req: Request, { params }: Params) {
     try {
       data = await generateStateMachineViaAi({
         apiKey,
-        model: await getAiGenerateModel(),
+        model,
         rules,
         variants,
         stats: (run.stats ?? {}) as unknown as MiningStats,

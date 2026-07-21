@@ -13,6 +13,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { gateOrgPolicy, orgRedactionEnabled } from "@/app/lib/auth/orgPolicy";
 import { makeRedactor } from "@/app/lib/ai/redaction";
+import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { prisma } from "@/app/lib/db";
 import {
   generateStaffNarrative,
@@ -28,10 +30,11 @@ export async function POST(req: Request) {
   }
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const model = await getAiGenerateModel();
+  const apiKey = aiApiKey(model);
   if (!apiKey) {
     return NextResponse.json(
-      { error: "AI service not configured. Set ANTHROPIC_API_KEY in .env" },
+      { error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." },
       { status: 503 },
     );
   }

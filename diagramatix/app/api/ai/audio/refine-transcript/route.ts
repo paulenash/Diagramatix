@@ -8,7 +8,7 @@
  */
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
+import { makeAiClient, aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
@@ -28,7 +28,8 @@ export async function POST(req: Request) {
   }
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const model = await getAiGenerateModel();
+  const apiKey = aiApiKey(model);
   const { transcript, diagramType } = await req.json().catch(() => ({ transcript: "" }));
   if (typeof transcript !== "string" || !transcript.trim()) {
     return NextResponse.json({ error: "transcript is required" }, { status: 400 });
@@ -39,8 +40,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const client = makeAnthropic(apiKey);
-    const model = await getAiGenerateModel();
+    const client = makeAiClient(model, apiKey);
     const resp = await client.messages.create({
       model,
       max_tokens: 4096,

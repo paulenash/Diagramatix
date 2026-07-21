@@ -10,17 +10,19 @@ import { describe, it, expect, vi } from "vitest";
 // Capture what the client is asked to send, and echo the tokens back so we can
 // verify restore. The narrative "quotes" the user content the model received.
 const sent: string[] = [];
-vi.mock("@/app/lib/ai/anthropicClient", () => ({
-  makeAnthropic: () => ({
-    messages: {
-      create: async ({ messages }: { messages: { content: string }[] }) => {
-        const content = messages[0].content;
-        sent.push(content);
-        // Pretend the model wrote a narrative that reuses the tokens it saw.
-        return { content: [{ type: "text", text: `The narrative mentions ${content}` }] };
-      },
+const fakeClient = {
+  messages: {
+    create: async ({ messages }: { messages: { content: string }[] }) => {
+      const content = messages[0].content;
+      sent.push(content);
+      // Pretend the model wrote a narrative that reuses the tokens it saw.
+      return { content: [{ type: "text", text: `The narrative mentions ${content}` }] };
     },
-  }),
+  },
+};
+vi.mock("@/app/lib/ai/anthropicClient", () => ({
+  makeAiClient: () => fakeClient,
+  makeAnthropic: () => fakeClient,
 }));
 vi.mock("@/app/lib/ai/aiModelSetting", () => ({ getAiGenerateModel: async () => "test-model" }));
 

@@ -8,6 +8,8 @@ import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { refineFlowchartBpmnPlan } from "@/app/lib/ai/refineFlowchartBpmn";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -17,9 +19,10 @@ export async function POST(req: Request) {
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const model = await getAiGenerateModel();
+  const apiKey = aiApiKey(model);
   if (!apiKey) {
-    return NextResponse.json({ error: "AI service not configured." }, { status: 503 });
+    return NextResponse.json({ error: "AI not configured for the selected model." }, { status: 503 });
   }
 
   const { elements, connections } = await req.json();
@@ -30,7 +33,7 @@ export async function POST(req: Request) {
   const aiBlock = await gateLimit(session.user.id, "aiAttempts");
   if (aiBlock) return aiBlock;
 
-  const result = await refineFlowchartBpmnPlan({ apiKey, elements, connections });
+  const result = await refineFlowchartBpmnPlan({ apiKey, elements, connections, model });
   // Only count the attempt when the model actually contributed a refinement.
   if (result.refined) await recordUsage(session.user.id, "aiAttempts");
 

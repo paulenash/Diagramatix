@@ -6,7 +6,7 @@
  * it calls Claude directly with the configured model. Layered ON TOP of the
  * deterministic mining; the numbers come from the run, the model just narrates.
  */
-import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
+import { makeAiClient } from "@/app/lib/ai/anthropicClient";
 import type { Redactor } from "@/app/lib/ai/redaction";
 import type { Variant, MiningStats, Performance } from "./types";
 import type { ConformanceResult } from "./transitionConformance";
@@ -118,7 +118,7 @@ export function summariseMiningResults(input: Omit<ExplainInput, "apiKey" | "mod
 }
 
 export async function explainMiningResults(input: ExplainInput, redactor?: Redactor): Promise<string> {
-  const client = makeAnthropic(input.apiKey);
+  const client = makeAiClient(input.model, input.apiKey);
   // ENT-06: pseudonymise identifiable names in the prompt before egress, restore
   // them in the reply. redactor is undefined (no-op) unless the org opts in.
   const prompt = buildExplainPrompt(input);

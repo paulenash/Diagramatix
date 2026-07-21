@@ -5,9 +5,16 @@
  * in step.
  */
 
+/** Which vendor endpoint a model is served from. Absent ⇒ "anthropic" (the
+ *  default, and how every built-in Claude model is treated). Moonshot/Kimi is
+ *  reached via its Anthropic-compatible endpoint, so it reuses the same SDK +
+ *  Messages-API shape — only the base URL + key differ (see anthropicClient.ts). */
+export type AiProvider = "anthropic" | "moonshot";
+
 export interface AiModel {
   id: string;
   label: string;
+  provider?: AiProvider; // absent ⇒ "anthropic"
 }
 
 export const AI_MODELS: AiModel[] = [
@@ -44,14 +51,48 @@ export function customModels(): AiModel[] {
     .filter((m): m is AiModel => m !== null);
 }
 
-/** Claude models plus any configured local/custom models. */
-export const allModels = (): AiModel[] => [...AI_MODELS, ...customModels()];
+/**
+ * Moonshot (Kimi) models, offered ONLY when `MOONSHOT_API_KEY` is set — so a
+ * Claude-only deployment's picker stays clean. Ids come from `MOONSHOT_MODELS`
+ * (same `id|Label` syntax as AI_CUSTOM_MODELS); when that's unset we fall back to
+ * a small curated default so the feature works out of the box with just the key.
+ * Reached via Moonshot's Anthropic-compatible endpoint (anthropicClient.ts).
+ * Server-only (env is stripped client-side → [] there; the client gets the list
+ * as a prop). */
+const DEFAULT_MOONSHOT_MODELS: AiModel[] = [
+  { id: "kimi-latest", label: "Kimi Latest", provider: "moonshot" },
+  { id: "kimi-k2-0711-preview", label: "Kimi K2", provider: "moonshot" },
+  { id: "moonshot-v1-128k", label: "Moonshot v1 128k", provider: "moonshot" },
+  { id: "moonshot-v1-128k-vision-preview", label: "Moonshot v1 128k (vision)", provider: "moonshot" },
+];
+
+export function moonshotModels(): AiModel[] {
+  if (!process.env.MOONSHOT_API_KEY?.trim()) return [];
+  const raw = process.env.MOONSHOT_MODELS?.trim();
+  if (!raw) return DEFAULT_MOONSHOT_MODELS;
+  return raw
+    .split(",")
+    .map((entry): AiModel | null => {
+      const [rawId, ...rest] = entry.split("|");
+      const id = rawId.trim();
+      if (!id) return null;
+      return { id, label: rest.join("|").trim() || id, provider: "moonshot" };
+    })
+    .filter((m): m is AiModel => m !== null);
+}
+
+/** Claude models, plus Moonshot/Kimi (when configured), plus any local/custom models. */
+export const allModels = (): AiModel[] => [...AI_MODELS, ...moonshotModels(), ...customModels()];
 
 export const isKnownAiModel = (id: string | null | undefined): boolean =>
   !!id && allModels().some((m) => m.id === id);
 
 export const aiModelLabel = (id: string | null | undefined): string =>
   allModels().find((m) => m.id === id)?.label ?? id ?? "(unknown)";
+
+/** The provider serving a model id. Unknown / untagged ids ⇒ "anthropic". */
+export const providerForModel = (id: string | null | undefined): AiProvider =>
+  allModels().find((m) => m.id === id)?.provider ?? "anthropic";
 
 /** Resolve a stored setting value to a usable model id: the stored value if it's
  *  a known model, otherwise the production default. Pure — unit-tested. */

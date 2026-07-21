@@ -12,7 +12,8 @@ import {
   summariseConformance,
 } from "@/app/lib/diagram/checks/connectorConformance";
 import { pickBestModel } from "@/app/lib/ai/pickBestModel";
-import { AI_MODELS } from "@/app/lib/ai/models";
+import { allModels } from "@/app/lib/ai/models";
+import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 
 /**
  * SuperAdmin "Full model comparison" for a BPMN AI prompt.
@@ -26,10 +27,6 @@ import { AI_MODELS } from "@/app/lib/ai/models";
  * the current diagram's `aiComparison` column so the "AI Comparison Results"
  * button can show it. SuperAdmin-only; makes real model calls.
  */
-// The models compared — the shared AI_MODELS list (also drives the AI-Generate
-// default picker), so adding/renaming a model updates both surfaces at once.
-const MODELS = AI_MODELS;
-
 type ModelResult = {
   model: string;
   label: string;
@@ -50,8 +47,14 @@ export async function POST(req: Request) {
   if (_pol) return _pol;
   if (!isSuperuser(session)) return NextResponse.json({ error: "AI model comparison is SuperAdmin-only" }, { status: 403 });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "AI service not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 503 });
+  // Compare spans every configured provider (Claude + Kimi when a Moonshot key is
+  // set). Pass as long as AT LEAST ONE provider key exists; per-model keys are
+  // resolved in the loop, and a model whose provider key is missing is skipped.
+  const anyKey = !!process.env.ANTHROPIC_API_KEY?.trim() || !!process.env.MOONSHOT_API_KEY?.trim();
+  if (!anyKey) return NextResponse.json({ error: "No AI provider configured. Set ANTHROPIC_API_KEY and/or MOONSHOT_API_KEY." }, { status: 503 });
+  // The models compared — every model the picker offers (Claude + Kimi), so adding
+  // a provider/model updates Compare and the AI-Generate picker at once.
+  const MODELS = allModels();
 
   // Accept every input the two-phase "Plan" flow accepts, so Compare is a
   // complete alternative: a text prompt AND/OR an attachment (PDF / text / image),
@@ -104,9 +107,12 @@ export async function POST(req: Request) {
   const dataByModel = new Map<string, any>();
 
   for (const m of MODELS) {
+    // Each model uses its own provider's key; skip any whose key isn't configured.
+    const key = aiApiKey(m.id);
+    if (!key) { results.push({ model: m.id, label: m.label, ok: false, ms: 0, error: "No API key configured for this model's provider" }); continue; }
     const t0 = Date.now();
     try {
-      const res = await planBpmn({ apiKey, prompt: effPrompt, attachment, rules: grounded, model: m.id, captureGeometry: wantGeometry });
+      const res = await planBpmn({ apiKey: key, prompt: effPrompt, attachment, rules: grounded, model: m.id, captureGeometry: wantGeometry });
       const ms = Date.now() - t0;
       if (!res.ok) { results.push({ model: m.id, label: m.label, ok: false, ms, error: res.error }); continue; }
       // Reproduce the imported image's layout when geometry was captured and the

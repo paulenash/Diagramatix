@@ -10,7 +10,7 @@
  * plan to `layoutBpmnDiagram` when they are ready to render.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
+import { makeAiClient } from "@/app/lib/ai/anthropicClient";
 import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { renderFlowchartMappingForPrompt } from "@/app/lib/diagram/translate/flowchartBpmnMap";
 import { hardWrapProcessName } from "@/app/lib/diagram/textMetrics";
@@ -333,7 +333,7 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
  */
 export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
   const { apiKey, prompt, attachment, rules, model = DEFAULT_MODEL, captureGeometry = false } = opts;
-  const client = makeAnthropic(apiKey);
+  const client = makeAiClient(model, apiKey);
   // Geometry capture only makes sense with an image to measure.
   const wantGeometry = captureGeometry && attachment?.type === "image";
   const systemPrompt = buildSystemPrompt(rules, wantGeometry);

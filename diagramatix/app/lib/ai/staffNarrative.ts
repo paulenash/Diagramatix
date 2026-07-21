@@ -7,7 +7,7 @@
  *
  * Keep the Anthropic-facing logic here so the API route stays thin.
  */
-import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
+import { makeAiClient } from "@/app/lib/ai/anthropicClient";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import type { Redactor } from "@/app/lib/ai/redaction";
 
@@ -99,7 +99,7 @@ export async function generateStaffNarrative(args: {
   }
   const systemPrompt = briefing.trim() || DEFAULT_STAFF_NARRATIVE_BRIEFING;
   const model = await getAiGenerateModel();
-  const client = makeAnthropic(apiKey);
+  const client = makeAiClient(model, apiKey);
   try {
     // ENT-06: pseudonymise the named people/teams/systems in the technical
     // description before egress, restore them in the narrative. redactor is

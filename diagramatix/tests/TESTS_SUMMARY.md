@@ -938,6 +938,21 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0577 | the production default is Haiku 4.5 and is a known model | The default silently drifting or pointing at a bad id | If DEFAULT_AI_MODEL changed away from a real model |
 | T0578 | resolveAiModel keeps a known id, falls back to the default for unset/blank/removed | Generation calling a non-existent model after a bad/emptied setting | If the fallback/validation regressed |
 | T0579 | every model has an id + label; unknown ids are rejected | A malformed model list or an unknown id being accepted | If the list or isKnownAiModel regressed |
+| T0949 | Moonshot models are offered ONLY when MOONSHOT_API_KEY is set (key gates the whole list) | Kimi models cluttering / half-working on a Claude-only deployment | If the key gate in moonshotModels() were removed |
+| T0950 | with the key set, MOONSHOT_MODELS is parsed (id\|Label) and tagged provider=moonshot; Claude stays first | A mis-parsed Kimi list or wrong provider tag routing Kimi to Anthropic | If the parser or provider tagging regressed |
+| T0951 | key set + MOONSHOT_MODELS unset → a curated default Kimi list | The feature being unusable without hand-listing model ids | If the default-list fallback regressed |
+| T0952 | Claude + unknown + null ids all resolve provider=anthropic | A Claude/unknown id being sent to the Moonshot endpoint | If providerForModel's default regressed |
+
+### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
+
+Which key + endpoint a model's provider uses. Pure (reads env, no network), so it pins the routing that decides where a prompt egresses.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0953 | a Claude model uses ANTHROPIC_API_KEY + ANTHROPIC_BASE_URL; a caller-passed key overrides env | Claude traffic losing the enterprise proxy or the explicit key | If aiClientConfig's anthropic branch regressed |
+| T0954 | a Kimi model uses MOONSHOT_API_KEY + the international endpoint; the Anthropic key is NOT used for it | Kimi calls going to Anthropic (or leaking the Anthropic key/endpoint) | If the moonshot branch or key selection regressed |
+| T0955 | MOONSHOT_BASE_URL overrides the endpoint (e.g. mainland China) | Data-residency control over the Moonshot endpoint being ignored | If the base-URL override regressed |
+| T0956 | aiApiKey is undefined when the selected provider's key is missing | A route proceeding without a key (and a confusing downstream error) | If aiApiKey stopped returning undefined on a missing key |
 
 ### `tests/ai/split-rules.test.ts` — Only GREEN rules reach the AI model
 
