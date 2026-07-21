@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { PromptDialog } from "@/app/components/PromptDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
 import { displayOrgRole } from "@/app/lib/auth/orgRoleLabels";
@@ -232,11 +233,11 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
     }
   }
 
-  async function handleViewAs(userId: string, mode: "view" | "edit", target?: string) {
+  async function handleViewAs(userId: string, mode: "view" | "edit", target?: string, reason?: string) {
     await fetch("/api/admin/impersonate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, mode }),
+      body: JSON.stringify({ userId, mode, reason }),
     });
     // Hard navigation so the server sees the new impersonation cookies.
     // Jump directly to the user's open diagram when we have one, otherwise
@@ -519,17 +520,17 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
       </div>
 
       {editConfirm && (
-        <ConfirmDialog
+        <PromptDialog
           title="Open in Edit Mode?"
-          message={`You are about to open ${editConfirm.email}'s session in EDIT mode. Any changes you make will save to their account.\n\nUse Edit Mode for support and repair only — the user will see your edits when they next sign in.`}
+          message={`You are about to open ${editConfirm.email}'s session in EDIT mode. Changes save to their account, are recorded in the Audit Log, and the session is time-boxed to 1 hour.\n\nEnter a reason (support ticket, repair note) — it's stored with the audit entry.`}
+          placeholder="Reason for edit-mode access"
           confirmLabel="Open in Edit Mode"
-          cancelLabel="Cancel"
-          destructive
+          validate={(v) => (v.trim().length < 3 ? "Please enter a reason (at least 3 characters)." : null)}
           onCancel={() => setEditConfirm(null)}
-          onConfirm={() => {
+          onConfirm={(reason) => {
             const c = editConfirm;
             setEditConfirm(null);
-            if (c) handleViewAs(c.userId, "edit", c.target);
+            if (c) handleViewAs(c.userId, "edit", c.target, reason.trim());
           }}
         />
       )}

@@ -14,11 +14,17 @@ export async function POST(req: Request) {
   }
   const su = isSuperuser(session);
 
-  const { userId, mode } = (await req.json()) as { userId?: string; mode?: string };
+  const { userId, mode, reason } = (await req.json()) as { userId?: string; mode?: string; reason?: string };
   if (!userId) {
     return NextResponse.json({ error: "userId required" }, { status: 400 });
   }
   const resolvedMode: "view" | "edit" = mode === "edit" ? "edit" : "view";
+  // Edit mode mutates another user's data — require a reason (recorded in the
+  // audit log) and time-box it tighter than view mode (ENT-02).
+  const trimmedReason = typeof reason === "string" ? reason.trim() : "";
+  if (resolvedMode === "edit" && trimmedReason.length < 3) {
+    return NextResponse.json({ error: "Edit-mode impersonation requires a reason." }, { status: 400 });
+  }
 
   // Validate target user exists
   const target = await prisma.user.findUnique({
@@ -59,19 +65,13 @@ export async function POST(req: Request) {
   // banner is driven by a server-computed `isImpersonating` flag, not by reading
   // these cookies in the browser (ENT-02).
   const secure = process.env.NODE_ENV === "production";
+  // Edit mode is time-boxed tighter (1h) than read-only view (8h).
+  const maxAge = resolvedMode === "edit" ? 60 * 60 : 60 * 60 * 8;
   cookieStore.set(IMPERSONATE_COOKIE, userId, {
-    path: "/",
-    sameSite: "lax",
-    httpOnly: true,
-    secure,
-    maxAge: 60 * 60 * 8, // 8 hours
+    path: "/", sameSite: "lax", httpOnly: true, secure, maxAge,
   });
   cookieStore.set(IMPERSONATE_MODE_COOKIE, resolvedMode, {
-    path: "/",
-    sameSite: "lax",
-    httpOnly: true,
-    secure,
-    maxAge: 60 * 60 * 8,
+    path: "/", sameSite: "lax", httpOnly: true, secure, maxAge,
   });
 
   await recordAudit({
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
     action: AUDIT.ImpersonateStart,
     targetType: "user",
     targetId: userId,
-    meta: { mode: resolvedMode, targetEmail: target.email, viaSuperAdmin: su },
+    meta: { mode: resolvedMode, targetEmail: target.email, viaSuperAdmin: su, ...(trimmedReason ? { reason: trimmedReason } : {}) },
     ip: ipFromRequest(req),
   });
 
