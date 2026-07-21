@@ -51,6 +51,7 @@ Indicative sizing for a small team; phases can overlap. Findings in **bold** are
 - **Impersonation hardening**: default `view`-only, opt-in `edit` with stored reason, tighter time-box, target indicator. → **ENT-02**.
 - **SuperAdmin as a stored role + MFA + break-glass logging** (retire the hard-coded email allowlist to a bootstrap-only fallback). → **ENT-01**.
 - **Session policy**: configurable `maxAge` + idle timeout. → ENT-13.
+- **Acting-view = true server-side downgrade** (folded in from A1): extend `isActingSuperuser` to gate **all** `/dashboard/admin/**` pages + SuperAdmin-only API routes so a SuperAdmin in orgadmin/user view is fully treated as that role — not just the click-reachable surfaces done in A1. Enumerate which routes downgrade vs keep real `isSuperuser` (impersonation / backup / break-glass); pair with the audit log; it's a view preference (cookie), not a trust boundary.
 - **Sales claim unlocked:** *"Every privileged action, including ours, is logged and attributable; admin access is MFA-gated and least-privilege."*
 
 ### Phase A3 — Enterprise identity & privacy *(≈ weeks 8–16)*
