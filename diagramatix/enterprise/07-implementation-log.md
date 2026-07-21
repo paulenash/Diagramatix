@@ -13,8 +13,10 @@
 | B | Deployment tiers (dedicated instance) | ⬜ planned |
 | C | Questionnaire pack + SOC 2 Type II | ⬜ planned |
 
-**Findings closed so far:** ENT-03, ENT-05, ENT-07, ENT-08, ENT-10, ENT-11, ENT-13, ENT-16 (full); ENT-02 (audit + reason + time-box + HttpOnly — remaining: per-mutation logging), ENT-15 (partial).
-**Still open (high):** ENT-01 (SuperAdmin emails → stored role + MFA, A2c deferred), ENT-04 (no SAML/MFA), ENT-06 (AI content minimisation).
+**Findings closed so far:** ENT-03, ENT-05, ENT-07, ENT-08, ENT-10, ENT-11, ENT-12, ENT-13, ENT-14, ENT-16 (full); ENT-02 (audit + reason + time-box + HttpOnly — remaining: per-mutation logging), ENT-04 (require-SSO + domain-restricted reg — remaining: SAML/OIDC + MFA + email verify), ENT-15 (partial).
+**Still open (high):** ENT-01 (SuperAdmin emails → stored role + MFA, A2c deferred), ENT-06 (reversible pre-egress AI redaction, deferred). Deferred mega-items: full SSO/SAML/OIDC+SCIM, email verification, dedicated single-tenant instance tier.
+
+**Resume here:** read this file top-to-bottom (status snapshot → phase sections → "continue here"/deferred blocks). Remaining work, roughly ordered: (1) A2c SuperAdmin stored role + MFA, (2) full SSO/SAML/OIDC per-org + SCIM, (3) email verification, (4) AI redaction (ENT-06), (5) dedicated single-tenant instance tier + SOC 2 evidence pack. Each is independently shippable; conventions at the end of this file.
 
 ---
 
