@@ -244,6 +244,7 @@ jobs:
           # enterprise/). The tech-design one must run AFTER add-tech-design-notes.ts
           # (its identity-access chapter). Feature lands as a DRAFT — Publish once.
           npx --yes tsx@4 scripts/add-features-enterprise-governance.ts || echo "add-features-enterprise-governance skipped"
+          npx --yes tsx@4 scripts/add-features-flexible-ai.ts || echo "add-features-flexible-ai skipped"
           npx --yes tsx@4 scripts/add-tech-design-enterprise-governance.ts || echo "add-tech-design-enterprise-governance skipped"
           # Tech Notes: the CI/CD deployment walk-through (this very pipeline).
           npx --yes tsx@4 scripts/add-tech-design-deployment.ts || echo "add-tech-design-deployment skipped"
