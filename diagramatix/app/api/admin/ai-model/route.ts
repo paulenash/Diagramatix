@@ -6,13 +6,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
-import { AI_MODELS } from "@/app/lib/ai/models";
+import { allModels } from "@/app/lib/ai/models";
 import { getAiGenerateModel, setAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 
 export async function GET() {
   const session = await auth();
   if (!isSuperuser(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  return NextResponse.json({ model: await getAiGenerateModel(), models: AI_MODELS });
+  return NextResponse.json({ model: await getAiGenerateModel(), models: allModels() });
 }
 
 export async function PUT(req: Request) {

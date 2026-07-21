@@ -30,8 +30,10 @@ export function AiModelClient({ models, initialModel }: { models: AiModel[]; ini
       <Link href="/dashboard/admin" className="text-sm text-gray-500 hover:text-gray-700">← SuperAdmin</Link>
       <h1 className="text-lg font-semibold text-gray-900 mt-2">AI Generate Model</h1>
       <p className="text-sm text-gray-600 mt-1">
-        The Claude model used for AI diagram generation (BPMN + flowchart), for every user. The
-        &ldquo;Compare all models&rdquo; tool still runs <em>every</em> model regardless of this choice.
+        The model used for AI diagram generation (BPMN + flowchart), for every user. Includes any
+        local / self-hosted models configured for on-prem AI (via <code className="text-xs">AI_CUSTOM_MODELS</code>
+        + <code className="text-xs">ANTHROPIC_BASE_URL</code>). The &ldquo;Compare all models&rdquo; tool
+        still runs the Claude models regardless of this choice.
       </p>
 
       <div className="mt-5 bg-white border border-gray-200 rounded-lg p-4">

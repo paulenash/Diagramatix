@@ -22,11 +22,36 @@ export const AI_MODELS: AiModel[] = [
  *  SuperAdmin changes it via the AI Generate Model setting. */
 export const DEFAULT_AI_MODEL = "claude-haiku-4-5-20251001";
 
+/**
+ * Extra models for a self-hosted / on-prem deployment, declared in the
+ * `AI_CUSTOM_MODELS` env var (comma-separated `id|Label`, or bare `id`). These
+ * pair with `ANTHROPIC_BASE_URL` pointing at a local Anthropic-compatible gateway
+ * (e.g. LiteLLM in front of vLLM/Ollama), so an air-gapped tenant can run AI
+ * Generate against a local model — no traffic to Anthropic. Server-only: on the
+ * client the var is stripped and this returns [] (the client gets the list as a
+ * prop). Empty/unset → no custom models (plain Claude behaviour). */
+export function customModels(): AiModel[] {
+  const raw = process.env.AI_CUSTOM_MODELS?.trim();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((entry): AiModel | null => {
+      const [rawId, ...rest] = entry.split("|");
+      const id = rawId.trim();
+      if (!id) return null;
+      return { id, label: rest.join("|").trim() || id };
+    })
+    .filter((m): m is AiModel => m !== null);
+}
+
+/** Claude models plus any configured local/custom models. */
+export const allModels = (): AiModel[] => [...AI_MODELS, ...customModels()];
+
 export const isKnownAiModel = (id: string | null | undefined): boolean =>
-  !!id && AI_MODELS.some((m) => m.id === id);
+  !!id && allModels().some((m) => m.id === id);
 
 export const aiModelLabel = (id: string | null | undefined): string =>
-  AI_MODELS.find((m) => m.id === id)?.label ?? id ?? "(unknown)";
+  allModels().find((m) => m.id === id)?.label ?? id ?? "(unknown)";
 
 /** Resolve a stored setting value to a usable model id: the stored value if it's
  *  a known model, otherwise the production default. Pure — unit-tested. */
