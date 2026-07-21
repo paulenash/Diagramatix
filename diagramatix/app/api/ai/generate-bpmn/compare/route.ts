@@ -12,7 +12,7 @@ import {
   summariseConformance,
 } from "@/app/lib/diagram/checks/connectorConformance";
 import { pickBestModel } from "@/app/lib/ai/pickBestModel";
-import { allModels } from "@/app/lib/ai/models";
+import { allModels, resolvedEnvSecret } from "@/app/lib/ai/models";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 
 /**
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   // Compare spans every configured provider (Claude + Kimi when a Moonshot key is
   // set). Pass as long as AT LEAST ONE provider key exists; per-model keys are
   // resolved in the loop, and a model whose provider key is missing is skipped.
-  const anyKey = !!process.env.ANTHROPIC_API_KEY?.trim() || !!process.env.MOONSHOT_API_KEY?.trim();
+  const anyKey = !!resolvedEnvSecret(process.env.ANTHROPIC_API_KEY) || !!resolvedEnvSecret(process.env.MOONSHOT_API_KEY);
   if (!anyKey) return NextResponse.json({ error: "No AI provider configured. Set ANTHROPIC_API_KEY and/or MOONSHOT_API_KEY." }, { status: 503 });
   // Accept every input the two-phase "Plan" flow accepts, so Compare is a
   // complete alternative: a text prompt AND/OR an attachment (PDF / text / image),

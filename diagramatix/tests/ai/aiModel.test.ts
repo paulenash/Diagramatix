@@ -45,6 +45,18 @@ describe("Moonshot (Kimi) provider registry", () => {
     expect(isKnownAiModel("kimi-latest")).toBe(false);
   });
 
+  it("T0962 — an unresolved Azure Key Vault reference is treated as no key (not offered)", () => {
+    // App Service leaves the literal reference string in the env var when it can't
+    // resolve the secret — non-empty, so the model WOULD show, but every call 401s.
+    process.env.MOONSHOT_API_KEY = "@Microsoft.KeyVault(VaultName=dgx-kv;SecretName=moonshot-api-key)";
+    process.env.MOONSHOT_MODELS = "kimi-latest|Kimi";
+    expect(moonshotModels()).toEqual([]);                       // hidden, not silently broken
+    expect(allModels()).toEqual(AI_MODELS);
+    // A real key value resolves normally.
+    process.env.MOONSHOT_API_KEY = "sk-real";
+    expect(moonshotModels().length).toBeGreaterThan(0);
+  });
+
   it("T0950 — with the key set, MOONSHOT_MODELS is parsed (id|Label), tagged provider=moonshot", () => {
     process.env.MOONSHOT_API_KEY = "sk-test";
     process.env.MOONSHOT_MODELS = "kimi-latest|Kimi Latest, moonshot-v1-128k";

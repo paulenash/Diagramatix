@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { providerForModel } from "./models";
+import { providerForModel, resolvedEnvSecret } from "./models";
 
 /**
  * Anthropic client construction, honouring the optional `ANTHROPIC_BASE_URL` env
@@ -22,8 +22,8 @@ const MOONSHOT_DEFAULT_BASE_URL = "https://api.moonshot.ai/anthropic";
 /** The key env var that serves a given model's provider. */
 export function aiApiKey(model: string | null | undefined): string | undefined {
   return providerForModel(model) === "moonshot"
-    ? process.env.MOONSHOT_API_KEY?.trim() || undefined
-    : process.env.ANTHROPIC_API_KEY?.trim() || undefined;
+    ? resolvedEnvSecret(process.env.MOONSHOT_API_KEY)
+    : resolvedEnvSecret(process.env.ANTHROPIC_API_KEY);
 }
 
 /**
@@ -39,13 +39,13 @@ export function aiClientConfig(
 ): { apiKey: string; baseURL?: string } {
   if (providerForModel(model) === "moonshot") {
     return {
-      apiKey: process.env.MOONSHOT_API_KEY?.trim() ?? "",
+      apiKey: resolvedEnvSecret(process.env.MOONSHOT_API_KEY) ?? "",
       baseURL: process.env.MOONSHOT_BASE_URL?.trim() || MOONSHOT_DEFAULT_BASE_URL,
     };
   }
   const baseURL = process.env.ANTHROPIC_BASE_URL?.trim();
   return {
-    apiKey: fallbackApiKey ?? process.env.ANTHROPIC_API_KEY?.trim() ?? "",
+    apiKey: fallbackApiKey ?? resolvedEnvSecret(process.env.ANTHROPIC_API_KEY) ?? "",
     baseURL: baseURL || undefined,
   };
 }

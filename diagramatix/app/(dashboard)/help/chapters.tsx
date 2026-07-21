@@ -3987,9 +3987,9 @@ export const CHAPTERS: HelpChapter[] = [
               </li>
             </ul>
             <p className="mt-2">
-              <strong>Re-send to Sonnet</strong> runs the Plan step again with
-              the current prompt (asks for confirmation if you have unsynced
-              edits). <strong>Apply Layout</strong> runs the second phase and
+              <strong>Re-send to AI</strong> runs the Plan step again with
+              the current prompt using the selected AI model (asks for
+              confirmation if you have unsynced edits). <strong>Apply Layout</strong> runs the second phase and
               replaces the canvas with the result.
             </p>
           </>

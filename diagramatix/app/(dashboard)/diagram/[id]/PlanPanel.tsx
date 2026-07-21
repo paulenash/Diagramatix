@@ -1146,7 +1146,7 @@ export function PlanPanel({
             className="ai-solid flex-1 px-2 py-1 text-[11px] font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
           >
             {busy === "plan" && <Spinner />}
-            {busy === "plan" ? "Planning…" : hasPlan ? "Re-send to Sonnet" : "Plan"}
+            {busy === "plan" ? "Planning…" : hasPlan ? "Re-send to AI" : "Plan"}
           </button>
           <button
             onClick={callApplyLayout}
@@ -1378,7 +1378,7 @@ export function PlanPanel({
         <ConfirmDialog
           title="Replace your plan edits?"
           message="You have edits on the current plan. Re-sending to Sonnet will replace them."
-          confirmLabel="Re-send to Sonnet"
+          confirmLabel="Re-send to AI"
           cancelLabel="Keep edits"
           destructive
           onCancel={() => setReplacePlanConfirm(false)}

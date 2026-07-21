@@ -22,6 +22,22 @@ export interface AiModel {
   vision?: boolean;
 }
 
+/**
+ * Read a provider-key env var, returning undefined for values that can't be a
+ * real key. Besides blank, this catches an **unresolved Azure Key Vault reference**:
+ * when App Service can't resolve `@Microsoft.KeyVault(...)` (e.g. the managed
+ * identity lacks "Key Vault Secrets User" on the vault), it leaves the LITERAL
+ * reference string in the env var — non-empty, so the model would show in the
+ * picker, but useless as a key (every call 401s "Invalid Authentication"). Treating
+ * it as "not set" turns that silent 401 into a clear "AI not configured".
+ */
+export function resolvedEnvSecret(raw: string | null | undefined): string | undefined {
+  const v = raw?.trim();
+  if (!v) return undefined;
+  if (/^@Microsoft\.KeyVault\(/i.test(v)) return undefined; // unresolved KV reference
+  return v;
+}
+
 export const AI_MODELS: AiModel[] = [
   { id: "claude-fable-5", label: "Fable 5", vision: true },
   { id: "claude-opus-4-8", label: "Opus 4.8", vision: true },
@@ -76,7 +92,7 @@ const DEFAULT_MOONSHOT_MODELS: AiModel[] = [
 ];
 
 export function moonshotModels(): AiModel[] {
-  if (!process.env.MOONSHOT_API_KEY?.trim()) return [];
+  if (!resolvedEnvSecret(process.env.MOONSHOT_API_KEY)) return [];
   const raw = process.env.MOONSHOT_MODELS?.trim();
   if (!raw) return DEFAULT_MOONSHOT_MODELS;
   return raw
