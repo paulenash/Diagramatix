@@ -22,6 +22,7 @@ export interface OrgDetail {
   allowExternalExport: boolean;
   allowSharePoint: boolean;
   allowSupportDiagram: boolean;
+  requireSso: boolean;
   createdAt: string;
   memberCount: number;
   projectCount: number;
@@ -94,6 +95,7 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
     allowAi: org.allowAi, allowVoiceAi: org.allowVoiceAi, allowExternalExport: org.allowExternalExport,
     allowSharePoint: org.allowSharePoint, allowSupportDiagram: org.allowSupportDiagram,
   });
+  const [requireSso, setRequireSso] = useState(org.requireSso);
   useEffect(() => {
     setName(org.name);
     setAllowCrossOrg(org.allowCrossOrgSharing);
@@ -101,7 +103,8 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
       allowAi: org.allowAi, allowVoiceAi: org.allowVoiceAi, allowExternalExport: org.allowExternalExport,
       allowSharePoint: org.allowSharePoint, allowSupportDiagram: org.allowSupportDiagram,
     });
-  }, [org.id, org.name, org.allowCrossOrgSharing, org.allowAi, org.allowVoiceAi, org.allowExternalExport, org.allowSharePoint, org.allowSupportDiagram]);
+    setRequireSso(org.requireSso);
+  }, [org.id, org.name, org.allowCrossOrgSharing, org.allowAi, org.allowVoiceAi, org.allowExternalExport, org.allowSharePoint, org.allowSupportDiagram, org.requireSso]);
 
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
@@ -134,7 +137,7 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
   // SuperAdmin and OrgAdmin; name/entityType are SuperAdmin-only (the
   // server re-checks).
   const saveField = useCallback(
-    async (patch: Partial<{ name: string; entityType: OrgEntityType; allowCrossOrgSharing: boolean } & Record<PolicyKey, boolean>>) => {
+    async (patch: Partial<{ name: string; entityType: OrgEntityType; allowCrossOrgSharing: boolean; requireSso: boolean } & Record<PolicyKey, boolean>>) => {
       setSaving(true);
       setSavedMessage(null);
       try {
@@ -430,6 +433,30 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* ── Access — require single sign-on ──────────────────────── */}
+          <div className="bg-white rounded-md border border-gray-200">
+            <div className="flex items-start justify-between gap-4 px-5 py-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-800">Require single sign-on (Microsoft)</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  When ON, members of {org.name} can't sign in with a password — they must use
+                  the Microsoft SSO button. Set this only once your users can authenticate that way.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={requireSso}
+                disabled={saving}
+                onClick={() => { const next = !requireSso; setRequireSso(next); saveField({ requireSso: next }); }}
+                className={`shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${requireSso ? "bg-blue-600" : "bg-gray-300"}`}
+                title={requireSso ? "SSO required" : "Password login allowed"}
+              >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${requireSso ? "translate-x-5" : "translate-x-0.5"}`} />
+              </button>
             </div>
           </div>
 

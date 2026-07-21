@@ -39,6 +39,18 @@ export async function registerUser(input: {
     return { ok: false, status: 400, error: "Password must be at least 8 characters" };
   }
 
+  // A3d (ENT-04): optional domain allowlist for self-registration. When
+  // REGISTRATION_ALLOWED_DOMAINS is set (comma-separated), only those email
+  // domains may self-register; everyone else is provisioned by an admin / SSO.
+  const allowed = (process.env.REGISTRATION_ALLOWED_DOMAINS ?? "")
+    .split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
+  if (allowed.length > 0) {
+    const domain = String(email).toLowerCase().split("@")[1] ?? "";
+    if (!allowed.includes(domain)) {
+      return { ok: false, status: 403, error: "Self-registration isn't available for this email domain." };
+    }
+  }
+
   const existing = await prisma.user.findUnique({ where: { email: email as string } });
   if (existing) {
     return { ok: false, status: 409, error: "Email already registered" };

@@ -93,6 +93,7 @@ export async function GET(_req: Request, { params }: Params) {
       allowExternalExport: true,
       allowSharePoint: true,
       allowSupportDiagram: true,
+      requireSso: true,
       createdAt: true,
       _count: { select: { members: true, projects: true, diagrams: true } },
     },
@@ -155,6 +156,8 @@ export async function PUT(req: Request, { params }: Params) {
   for (const key of ORG_POLICY_KEYS) {
     if (typeof bodyRec[key] === "boolean") updates[key] = bodyRec[key];
   }
+  // Access policy: require SSO (A3d) — same OrgAdmin/SuperAdmin gate as above.
+  if (typeof bodyRec.requireSso === "boolean") updates.requireSso = bodyRec.requireSso;
 
   // SuperAdmin-only fields. Done with a separate isSuperuser check
   // rather than another gate() call because gate() conflates
@@ -205,6 +208,7 @@ export async function PUT(req: Request, { params }: Params) {
       allowExternalExport: true,
       allowSharePoint: true,
       allowSupportDiagram: true,
+      requireSso: true,
       createdAt: true,
       _count: { select: { members: true, projects: true, diagrams: true } },
     },

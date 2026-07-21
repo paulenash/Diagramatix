@@ -31,6 +31,15 @@ export async function verifyCredentials(
 
   if (!user || !passwordMatch) return null;
 
+  // A3d (ENT-04): if any of the user's orgs mandates single sign-on, password
+  // login is blocked — they must use the Microsoft provider. Returning null keeps
+  // the timing/enumeration profile identical to a wrong password.
+  const ssoOrg = await prisma.orgMember.findFirst({
+    where: { userId: user.id, org: { requireSso: true } },
+    select: { id: true },
+  });
+  if (ssoOrg) return null;
+
   return {
     id: user.id,
     email: user.email,

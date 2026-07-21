@@ -88,6 +88,9 @@ model Org {
   allowExternalExport Boolean @default(true)  // push data OUT (SharePoint upload) ENT-10
   allowSharePoint     Boolean @default(true)  // SharePoint/OneDrive integration E3
   allowSupportDiagram Boolean @default(true)  // attach diagram to support email ENT-10
+  // Access policy (A3d, ENT-04): when true, members can't sign in with a password —
+  // they must use Microsoft single sign-on. Enforced in verifyCredentials.
+  requireSso          Boolean @default(false)
 
   members             OrgMember[]
   memberTeams         OrgMemberTeam[]
