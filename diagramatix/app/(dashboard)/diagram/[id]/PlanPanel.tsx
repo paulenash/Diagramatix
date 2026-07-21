@@ -13,6 +13,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
+import type { AiModel } from "@/app/lib/ai/models";
 import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
 import { arrayBufferToBase64 } from "@/app/lib/base64";
 import type { Connector, DiagramData, DiagramElement } from "@/app/lib/diagram/types";
@@ -112,6 +113,24 @@ export function PlanPanel({
   const { hidden: superAdminHidden } = useSuperAdminChrome(isSuperuser || !!isAdmin);
   const [comparing, setComparing] = useState(false);
   const [compareStatus, setCompareStatus] = useState<string | null>(null);
+  // SuperAdmin model comparison — the models offered (Claude + Kimi + custom) and
+  // which are ticked. Loaded once when the compare section is visible; defaults to
+  // all ticked. The compare run uses exactly the ticked subset.
+  const [availModels, setAvailModels] = useState<AiModel[]>([]);
+  const [pickedModels, setPickedModels] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!isSuperuser || superAdminHidden || diagramType !== "bpmn") return;
+    let on = true;
+    fetch("/api/admin/ai-model").then((r) => (r.ok ? r.json() : null)).then((j) => {
+      if (on && Array.isArray(j?.models)) {
+        setAvailModels(j.models);
+        setPickedModels(new Set(j.models.map((m: AiModel) => m.id)));
+      }
+    }).catch(() => {});
+    return () => { on = false; };
+  }, [isSuperuser, superAdminHidden, diagramType]);
+  const toggleCompareModel = (id: string) =>
+    setPickedModels((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const [prompt, setPrompt] = useState("");
   const [clarifyOpen, setClarifyOpen] = useState(false);
   // "Refine" — AI-generated clarifying questions that enrich the prompt before Plan.
@@ -140,10 +159,13 @@ export function PlanPanel({
     const effPrompt = prompt.trim();
     // Compare is a complete alternative to Plan — a prompt OR an attachment.
     if ((!effPrompt && !attachment) || !diagramId) return;
+    const models = [...pickedModels];
+    if (models.length === 0) return; // nothing ticked
     setComparing(true);
     setBusy("compare"); // drives the red full-canvas throbber overlay
     setError(null);
-    setCompareStatus("Comparing Fable 5 / Opus 4.8 / Sonnet 5 / Haiku 4.5 — this takes 2-3 minutes…");
+    const pickedLabels = availModels.filter((m) => pickedModels.has(m.id)).map((m) => m.label);
+    setCompareStatus(`Comparing ${pickedLabels.join(" / ")} — this can take a few minutes…`);
     try {
       const res = await fetch("/api/ai/generate-bpmn/compare", {
         method: "POST",
@@ -151,6 +173,7 @@ export function PlanPanel({
         body: JSON.stringify({
           prompt: effPrompt,
           diagramId,
+          models,
           attachment: attachment ?? undefined,
           // Reproduce original layout is BPMN image-only, same as the Plan flow.
           captureGeometry: !isFlowchart && attachment?.type === "image" ? preserveLayout : false,
@@ -914,11 +937,33 @@ export function PlanPanel({
           )}
           {isSuperuser && !superAdminHidden && diagramType === "bpmn" && (
             <div className="mt-1 shrink-0">
-              <button onClick={() => handleCompare()} disabled={comparing || (!prompt.trim() && !attachment) || !diagramId}
+              {/* Tick the models to run head-to-head (Claude + Kimi + custom). */}
+              {availModels.length > 0 && (
+                <div className="mb-1 border border-gray-200 rounded p-1.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[9px] uppercase tracking-wide text-gray-400">Models to compare</span>
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => setPickedModels(new Set(availModels.map((m) => m.id)))}
+                        className="text-[9px] text-gray-500 hover:text-gray-700 underline">All</button>
+                      <button type="button" onClick={() => setPickedModels(new Set())}
+                        className="text-[9px] text-gray-500 hover:text-gray-700 underline">None</button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                    {availModels.map((m) => (
+                      <label key={m.id} className="flex items-center gap-1 text-[10px] text-gray-700 cursor-pointer">
+                        <input type="checkbox" checked={pickedModels.has(m.id)} onChange={() => toggleCompareModel(m.id)} className="w-3 h-3" />
+                        <span className="truncate">{m.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <button onClick={() => handleCompare()} disabled={comparing || (!prompt.trim() && !attachment) || !diagramId || pickedModels.size === 0}
                 className="w-full px-2 py-1 text-[11px] text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
-                title="SuperAdmin: generate with Fable 5, Opus 4.8, Sonnet 5 and Haiku 4.5 from the prompt and/or attachment, fill this diagram with the best result, and save one diagram per model">
+                title="SuperAdmin: generate the ticked models from the prompt and/or attachment, fill this diagram with the best result, and save one diagram per model">
                 {comparing && (<svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>)}
-                {comparing ? "Comparing models…" : "Compare all models (SuperAdmin)"}
+                {comparing ? "Comparing models…" : `Compare selected models${pickedModels.size ? ` (${pickedModels.size})` : ""} · SuperAdmin`}
               </button>
               {compareStatus && <p className="text-[9px] text-gray-600 mt-0.5 whitespace-pre-wrap">{compareStatus}</p>}
             </div>

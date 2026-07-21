@@ -49,8 +49,8 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
         Moonshot / Kimi models when <code className="text-xs">MOONSHOT_API_KEY</code> is set (reached
         via Kimi&rsquo;s Anthropic-compatible endpoint), plus any local / self-hosted models
         (via <code className="text-xs">AI_CUSTOM_MODELS</code> + <code className="text-xs">ANTHROPIC_BASE_URL</code>).
-        The &ldquo;Compare all models&rdquo; tool runs every model listed here (each on its own
-        provider&rsquo;s key).
+        The &ldquo;Compare selected models&rdquo; tool (in the AI panel) lets you tick which of
+        these to run head-to-head, each on its own provider&rsquo;s key.
       </p>
 
       <div className="mt-5 bg-white border border-gray-200 rounded-lg p-4">

@@ -52,16 +52,13 @@ export async function POST(req: Request) {
   // resolved in the loop, and a model whose provider key is missing is skipped.
   const anyKey = !!process.env.ANTHROPIC_API_KEY?.trim() || !!process.env.MOONSHOT_API_KEY?.trim();
   if (!anyKey) return NextResponse.json({ error: "No AI provider configured. Set ANTHROPIC_API_KEY and/or MOONSHOT_API_KEY." }, { status: 503 });
-  // The models compared — every model the picker offers (Claude + Kimi), so adding
-  // a provider/model updates Compare and the AI-Generate picker at once.
-  const MODELS = allModels();
-
   // Accept every input the two-phase "Plan" flow accepts, so Compare is a
   // complete alternative: a text prompt AND/OR an attachment (PDF / text / image),
   // with image geometry-capture for the "reproduce original layout" mode.
   const body = (await req.json().catch(() => ({}))) as {
     prompt?: string;
     diagramId?: string;
+    models?: string[];
     attachment?: import("@/app/lib/ai/planBpmn").Attachment;
     captureGeometry?: boolean;
     imageAspect?: { w: number; h: number };
@@ -71,6 +68,14 @@ export async function POST(req: Request) {
   // Need a diagram to fill, plus SOME input (a prompt or an attachment).
   if (!diagramId || (!prompt?.trim() && !attachment)) {
     return NextResponse.json({ error: "diagramId and at least a prompt or an attachment are required" }, { status: 400 });
+  }
+
+  // The models compared — the caller-selected subset (validated against the picker
+  // list); an empty/absent selection falls back to every model (Claude + Kimi + custom).
+  const requested = Array.isArray(body.models) ? body.models.filter((x): x is string => typeof x === "string") : [];
+  const MODELS = requested.length ? allModels().filter((m) => requested.includes(m.id)) : allModels();
+  if (MODELS.length === 0) {
+    return NextResponse.json({ error: "Select at least one valid model to compare" }, { status: 400 });
   }
   // planBpmn always needs prompt text — synthesise one when only a file is given.
   const effPrompt = prompt?.trim()
