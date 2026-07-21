@@ -30,7 +30,7 @@ const DETAILS = [
   "",
   "**Enterprise Mode** — one click turns all of the above off (plus cross-organisation sharing), as a safe default for regulated tenants.",
   "",
-  "**AI on your terms.** Route all AI through your own gateway, private endpoint or region, or switch it off completely for your tenant. AI uses a single, centrally-chosen model so you always know exactly what your data is sent to.",
+  "**AI on your terms.** Route all AI through your own gateway/region, run a **local model fully on-premises**, or switch AI off completely for your tenant — AI uses a single, centrally-chosen model you approve. (See the *Flexible AI* feature for the deployment options.)",
   "",
   "**Accountability.** An append-only **Audit Log** records every privileged action — administrator impersonation (with a required reason and a time-boxed session), data exports and backups, deletions and policy changes — so you can see who did what, when, to which tenant.",
   "",
