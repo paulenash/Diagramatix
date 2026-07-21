@@ -86,27 +86,21 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   const body = await req.json();
-  const { name, colorConfig, fontConfig, description, ownerName, folderTree, orgId, pcf } = body;
+  const { name, colorConfig, fontConfig, description, ownerName, folderTree, pcf } = body;
 
   if (name !== undefined && !name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
-  // Reassigning a project's owning Org (the "Org Owner", which drives org-wide RCM
-  // numbering) is SuperAdmin-only — the owner/OrgAdmin edits everything else.
-  if (orgId !== undefined && orgId !== existing.orgId) {
-    if (!isSuperuser(session)) {
-      return NextResponse.json({ error: "Only a SuperAdmin can change a project's Org Owner" }, { status: 403 });
-    }
-    const org = await prisma.org.findUnique({ where: { id: orgId }, select: { id: true } });
-    if (!org) return NextResponse.json({ error: "Org not found" }, { status: 400 });
-  }
+  // Re-homing a project's owning Org is NOT done here — it drives org-wide RCM
+  // numbering + the compliance roll-up, so it lives on the SuperAdmin "Project Org
+  // Maintenance" tile (POST /api/admin/project-org-maintenance), which also runs
+  // the required re-numbering of both Orgs. Any `orgId` in this body is ignored.
 
   try {
     const dataUpdate: Record<string, string | null> = {};
     if (name !== undefined) dataUpdate.name = name.trim();
     if (description !== undefined) dataUpdate.description = description;
     if (ownerName !== undefined) dataUpdate.ownerName = ownerName;
-    if (orgId !== undefined && orgId !== existing.orgId && isSuperuser(session)) dataUpdate.orgId = orgId;
     // Renaming an adopted example makes it the user's own project — drop the
     // example tint (normal white tile) AND decouple it from its source example
     // so a future re-adopt creates a fresh copy instead of overwriting this work.

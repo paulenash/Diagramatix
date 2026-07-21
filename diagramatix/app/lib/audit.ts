@@ -15,6 +15,7 @@ export const AUDIT = {
   UserDelete: "user.delete",
   UserSelfDelete: "user.self-delete",
   OrgSettingsUpdate: "org.settings.update",
+  ProjectRehome: "project.rehome",
   ShareCreate: "share.create",
   ShareRevoke: "share.revoke",
 } as const;

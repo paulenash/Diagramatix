@@ -86,4 +86,34 @@ describe("org-wide RCM renumber", () => {
     expect(newCodeByItem.get("y")).toBe("R-002");
     expect(newCodeByItem.get("z")).toBe("C-001");
   });
+
+  it("T0948 — re-home invariant: a project joining an org gets collision-free codes", () => {
+    // The gaining Org (Org2) already has a master with R-001 / C-001.
+    const org2Master: RenumberLib = {
+      id: "org2Master", isMaster: true, sourceLibraryId: null,
+      items: [
+        { id: "o2-r1", kind: "Risk", code: "R-001", name: "Late settlement" },
+        { id: "o2-c1", kind: "Control", code: "C-001", name: "Daily reconciliation" },
+      ],
+    };
+    // A project re-homed from Org1 — its OWN library, DISTINCT risks/controls that
+    // happen to reuse R-001/C-001 (assigned under Org1's old sequence).
+    const moved: RenumberLib = {
+      id: "movedLib", isMaster: false, sourceLibraryId: null,
+      items: [
+        { id: "mv-r1", kind: "Risk", code: "R-001", name: "Duplicate payment" },
+        { id: "mv-c1", kind: "Control", code: "C-001", name: "Three-way match" },
+      ],
+    };
+
+    // This is what the re-home does for the NEW org: renumber the merged catalog.
+    const { newCodeByItem } = assignOrgWideCodes([org2Master, moved]);
+
+    // Every distinct item ends up with a distinct code — no duplicate survives the move.
+    const codes = ["o2-r1", "o2-c1", "mv-r1", "mv-c1"].map((id) => newCodeByItem.get(id));
+    expect(new Set(codes).size).toBe(4);
+    // The moved (distinct-source) items did NOT keep the incumbent's codes.
+    expect(newCodeByItem.get("mv-r1")).not.toBe(newCodeByItem.get("o2-r1"));
+    expect(newCodeByItem.get("mv-c1")).not.toBe(newCodeByItem.get("o2-c1"));
+  });
 });

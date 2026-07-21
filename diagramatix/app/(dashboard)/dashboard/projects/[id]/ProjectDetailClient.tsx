@@ -389,26 +389,11 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   const { hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(!!isAdmin);
   const [diagrams, setDiagrams] = useState(project.diagrams);
   const [projectName, setProjectName] = useState(project.name);
-  // "Org Owner": the owning Org drives org-wide RCM numbering. Read-only for
-  // everyone; only a SuperAdmin can reassign it (server also enforces this).
-  const [orgOwnerId, setOrgOwnerId] = useState(project.orgId ?? "");
-  const [orgOwnerBusy, setOrgOwnerBusy] = useState(false);
-  const orgOwnerName = allOrgs?.find((o) => o.id === orgOwnerId)?.name ?? orgName ?? "";
-  const reassignOrgOwner = async (newOrgId: string) => {
-    const prev = orgOwnerId;
-    setOrgOwnerId(newOrgId);
-    setOrgOwnerBusy(true);
-    try {
-      const res = await fetch(`/api/projects/${project.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId: newOrgId }),
-      });
-      if (!res.ok) { setOrgOwnerId(prev); }
-      else { router.refresh(); }
-    } catch { setOrgOwnerId(prev); }
-    finally { setOrgOwnerBusy(false); }
-  };
+  // "Org Owner": the owning Org drives org-wide RCM numbering + the compliance
+  // roll-up. Read-only chip here for everyone — re-homing a project between Orgs
+  // now lives on the SuperAdmin "Project Org Maintenance" tile (which also runs
+  // the required re-numbering of both Orgs).
+  const orgOwnerName = allOrgs?.find((o) => o.id === (project.orgId ?? ""))?.name ?? orgName ?? "";
 
   // Tile grid column count — computed from the grid container's actual width
   // (not the viewport). This gives "primacy" to the nav-tree width: when the
@@ -2178,24 +2163,13 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               project header to match the sidebar. Value still lives on
               project.ownerName and round-trips through exports. */}
           <span className="text-[10px] text-gray-900 shrink-0" title="Diagramatix version">v{SCHEMA_VERSION}{version ? `.${version}` : ""}</span>
-          {/* Org Owner — the owning Org drives org-wide RCM code numbering.
-              Read-only chip for everyone; SuperAdmin gets an inline picker
-              (red styling per the role convention). */}
-          {(orgOwnerName || isAdmin) && (
-            <span className="shrink-0 inline-flex items-center gap-1 text-[11px]" title="Org Owner — drives org-wide Risk & Control numbering (SuperAdmin can reassign)">
+          {/* Org Owner — the owning Org drives org-wide RCM code numbering + the
+              compliance roll-up. Read-only chip; re-homing moved to the SuperAdmin
+              "Project Org Maintenance" tile (it also renumbers both Orgs). */}
+          {orgOwnerName && (
+            <span className="shrink-0 inline-flex items-center gap-1 text-[11px]" title="Org Owner — drives org-wide Risk & Control numbering + compliance roll-up (re-home via SuperAdmin → Project Org Maintenance)">
               <span className="text-gray-400">Org&nbsp;Owner:</span>
-              {isAdmin && !superAdminHidden && allOrgs && allOrgs.length > 0 ? (
-                <select
-                  value={orgOwnerId}
-                  disabled={orgOwnerBusy}
-                  onChange={(e) => reassignOrgOwner(e.target.value)}
-                  className="text-[11px] font-medium text-red-700 border border-red-300 rounded px-1 py-0.5 bg-red-50 outline-none disabled:opacity-50"
-                >
-                  {allOrgs.map((o) => (<option key={o.id} value={o.id}>{o.name}</option>))}
-                </select>
-              ) : (
-                <span className="font-medium text-gray-600">{orgOwnerName}</span>
-              )}
+              <span className="font-medium text-gray-600">{orgOwnerName}</span>
             </span>
           )}
           {/* SuperAdmin shortcut — leftmost item in the header menu
