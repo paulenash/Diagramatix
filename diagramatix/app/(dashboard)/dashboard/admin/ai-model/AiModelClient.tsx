@@ -3,6 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { AiModel } from "@/app/lib/ai/models";
+import { pricingFor, typicalCost, TYPICAL_GEN, PRICING_SNAPSHOT_DATE } from "@/app/lib/ai/pricing";
+
+const fmtRate = (n: number) => `$${n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)}`;
+const fmtCost = (n: number) => (n < 0.01 ? `${(n * 100).toFixed(2)}¢` : `$${n.toFixed(3)}`);
 
 export function AiModelClient({ models, initialModel, initialVisionModel }: {
   models: AiModel[];
@@ -24,6 +28,12 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
   // Only vision-capable (or unknown) models are valid as the Vision model.
   const visionChoices = models.filter((m) => m.vision !== false);
 
+  // Cost comparison — the priced models, scaled to the dearest output rate so the
+  // bars read "how expensive relative to the priciest". Models with no known price
+  // (e.g. kimi-latest, which floats to Moonshot's flagship) show "varies".
+  const priced = models.map((m) => ({ m, p: pricingFor(m.id) }));
+  const maxRate = Math.max(1, ...priced.flatMap(({ p }) => (p ? [p.in, p.out] : [])));
+
   async function save() {
     setBusy(true); setErr(null);
     try {
@@ -43,7 +53,7 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
   return (
     <div className="max-w-2xl mx-auto p-6">
       <Link href="/dashboard/admin" className="text-sm text-gray-500 hover:text-gray-700">← SuperAdmin</Link>
-      <h1 className="text-lg font-semibold text-gray-900 mt-2">AI Generate Model</h1>
+      <h1 className="text-lg font-semibold text-gray-900 mt-2">AI Models Selection</h1>
       <p className="text-sm text-gray-600 mt-1">
         The model used for AI diagram generation (BPMN + flowchart), for every user. Includes
         Moonshot / Kimi models when <code className="text-xs">MOONSHOT_API_KEY</code> is set (reached
@@ -89,6 +99,60 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
             vision model above (or choose a vision-capable default).
           </p>
         )}
+      </div>
+
+      {/* Cost comparison — a static reference snapshot so the choice above is made
+          with pricing in view. Output tokens dominate generation cost, so the bars
+          are scaled to the dearest output rate. */}
+      <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4">
+        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+          Cost comparison <span className="normal-case text-gray-400">(USD per 1M tokens)</span>
+        </label>
+        <table className="w-full text-[12px] mt-2">
+          <thead>
+            <tr className="text-left text-gray-400 border-b border-gray-100">
+              <th className="py-1 pr-2 font-medium">Model</th>
+              <th className="py-1 px-2 font-medium w-[38%]">Input</th>
+              <th className="py-1 px-2 font-medium w-[38%]">Output</th>
+              <th className="py-1 pl-2 font-medium text-right whitespace-nowrap">≈ / generation</th>
+            </tr>
+          </thead>
+          <tbody>
+            {priced.map(({ m, p }) => (
+              <tr key={m.id} className={`border-b border-gray-50 ${m.id === model ? "bg-green-50/60" : ""}`}>
+                <td className="py-1.5 pr-2 font-medium text-gray-800 whitespace-nowrap">
+                  {m.label}
+                  {m.provider === "moonshot" && <span className="ml-1 text-[9px] text-purple-600 bg-purple-50 border border-purple-200 rounded px-1">Kimi</span>}
+                  {m.id === model && <span className="ml-1 text-[9px] text-green-700">● default</span>}
+                </td>
+                {p ? (
+                  <>
+                    <td className="py-1.5 px-2">
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex-1 h-2 bg-gray-100 rounded overflow-hidden"><div className="h-full bg-sky-400" style={{ width: `${(p.in / maxRate) * 100}%` }} /></div>
+                        <span className="text-gray-600 tabular-nums w-9 text-right">{fmtRate(p.in)}</span>
+                      </div>
+                    </td>
+                    <td className="py-1.5 px-2">
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex-1 h-2 bg-gray-100 rounded overflow-hidden"><div className="h-full bg-amber-400" style={{ width: `${(p.out / maxRate) * 100}%` }} /></div>
+                        <span className="text-gray-600 tabular-nums w-9 text-right">{fmtRate(p.out)}</span>
+                      </div>
+                    </td>
+                    <td className="py-1.5 pl-2 text-right text-gray-800 tabular-nums whitespace-nowrap">{fmtCost(typicalCost(p))}</td>
+                  </>
+                ) : (
+                  <td colSpan={3} className="py-1.5 px-2 text-gray-400 italic">varies — floats to the provider&rsquo;s current rate</td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-[11px] text-gray-400 mt-2">
+          Static snapshot ({PRICING_SNAPSHOT_DATE}) — verify at anthropic.com/pricing and platform.kimi.ai.
+          &ldquo;≈ / generation&rdquo; assumes ~{(TYPICAL_GEN.inTokens / 1000)}K input + {(TYPICAL_GEN.outTokens / 1000)}K output tokens (a typical BPMN prompt);
+          output tokens dominate the cost.
+        </p>
       </div>
 
       <div className="mt-4 flex items-center gap-3">

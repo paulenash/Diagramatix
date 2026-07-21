@@ -13,7 +13,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
-import type { AiModel } from "@/app/lib/ai/models";
+import { AI_MODELS, type AiModel } from "@/app/lib/ai/models";
 import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
 import { arrayBufferToBase64 } from "@/app/lib/base64";
 import type { Connector, DiagramData, DiagramElement } from "@/app/lib/diagram/types";
@@ -116,8 +116,12 @@ export function PlanPanel({
   // SuperAdmin model comparison — the models offered (Claude + Kimi + custom) and
   // which are ticked. Loaded once when the compare section is visible; defaults to
   // all ticked. The compare run uses exactly the ticked subset.
-  const [availModels, setAvailModels] = useState<AiModel[]>([]);
-  const [pickedModels, setPickedModels] = useState<Set<string>>(new Set());
+  // Seed from the built-in Claude models so the checkbox list + a non-empty
+  // selection exist on FIRST render — the button's `pickedModels.size` gate would
+  // otherwise stay hard-disabled ("can't be used") until the async fetch below
+  // lands. The fetch then replaces this with the full list (Claude + Kimi).
+  const [availModels, setAvailModels] = useState<AiModel[]>(AI_MODELS);
+  const [pickedModels, setPickedModels] = useState<Set<string>>(new Set(AI_MODELS.map((m) => m.id)));
   useEffect(() => {
     if (!isSuperuser || superAdminHidden || diagramType !== "bpmn") return;
     let on = true;

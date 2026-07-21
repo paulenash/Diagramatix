@@ -79,11 +79,13 @@ describe("Moonshot (Kimi) provider registry", () => {
     expect(modelVision("claude-haiku-4-5-20251001")).toBe(true);
 
     process.env.MOONSHOT_API_KEY = "sk-test";
-    delete process.env.MOONSHOT_MODELS; // curated default list
+    delete process.env.MOONSHOT_MODELS; // curated default list (kimi-latest + Kimi K2)
     expect(modelVision("kimi-latest")).toBe(true);
     expect(modelVision("kimi-k2-0711-preview")).toBe(false);           // text-only
-    expect(modelVision("moonshot-v1-128k")).toBe(false);               // text-only
-    expect(modelVision("moonshot-v1-128k-vision-preview")).toBe(true);
+    // A "vision" id supplied via MOONSHOT_MODELS is flagged multimodal by heuristic.
+    process.env.MOONSHOT_MODELS = "moonshot-v1-128k|V1, moonshot-v1-128k-vision-preview|V1 vision";
+    expect(modelVision("moonshot-v1-128k")).toBeUndefined();           // unknown → not flagged
+    expect(modelVision("moonshot-v1-128k-vision-preview")).toBe(true); // "vision" in id → true
 
     // Env-declared ids: "vision" in the id → true; otherwise unknown (undefined).
     process.env.MOONSHOT_MODELS = "some-vision-model|V, plain-text-model|T";
