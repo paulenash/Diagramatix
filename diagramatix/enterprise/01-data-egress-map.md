@@ -14,6 +14,7 @@
 | E6 | **Mining webhook** (inbound) | Event-log ingest | External system **pushes** event logs in | Per-source hashed key (`dgxk_…`) | Don't create a webhook source |
 | E7 | **Azure Blob** (`*.blob.core.windows.net`) | Event-log pull | Nothing out; app **pulls** CSV/XES logs | User-pasted SAS URL | Don't create a blob source |
 | E8 | **File downloads** (to the user) | Export | Visio `.vsdx`, `.docx`, XML/XSD/JSON, XLSX, PDF, `.dgxsim`, mining bundles, **backups** | Session + project access | Per-feature; see §Exports |
+| E9 | **Moonshot / Kimi** (`api.moonshot.ai`, opt-in) | AI (LLM) | Same as E1 — **only when a Kimi model is the selected AI-Generate model** | `MOONSHOT_API_KEY` | Unset key (Kimi models disappear) · per-tenant `allowAi=false` · ENT-06 redaction |
 | — | Telemetry / analytics / error-reporting | — | **None** — none present | — | N/A (positive) |
 
 Two facts frame everything below: there is **no analytics, telemetry or error-reporting egress** anywhere in the code (no Sentry/PostHog/GA/Segment/Datadog), and **no secrets are committed** to the repo (production secrets flow from Azure Key Vault → App Service settings; only `.env.example` placeholders are tracked).
@@ -22,7 +23,13 @@ Two facts frame everything below: there is **no analytics, telemetry or error-re
 
 ## E1 — Anthropic (AI). *Detail in [02-ai-governance.md](02-ai-governance.md).*
 
-Every AI feature calls Anthropic's **default public endpoint** via `@anthropic-ai/sdk` 0.88.0 (`new Anthropic({ apiKey })`), keyed by a single global `ANTHROPIC_API_KEY`. **No base-URL override, no streaming, no region/residency option** — so there is currently no seam to route AI through an enterprise proxy, private gateway, or Bedrock/Vertex without a code change. Content sent ranges from a free-text prompt up to the **entire diagram graph with every label** (`refineFlowchartBpmn.ts:35`) and a full **technical narrative naming roles, teams and IT systems** (`staff-narrative`). Gating is global-only (unset the key, or set a tier's AI quota to zero).
+Every AI feature calls Anthropic's **default public endpoint** via `@anthropic-ai/sdk` 0.88.0 (`new Anthropic({ apiKey })`), keyed by a single global `ANTHROPIC_API_KEY`. Content sent ranges from a free-text prompt up to the **entire diagram graph with every label** (`refineFlowchartBpmn.ts:35`) and a full **technical narrative naming roles, teams and IT systems** (`staff-narrative`).
+
+**Update (shipped since the original assessment):** the "global-only, no seam" limits above are largely closed — there is now a per-deployment **`ANTHROPIC_BASE_URL`** override (enterprise proxy / private gateway / region-pin; ENT-08), **per-tenant** `allowAi` gating (ENT-05), reversible **pre-egress redaction** on the structured narrators (`aiRedaction`, ENT-06), and **per-model provider routing** so a non-Anthropic AI (Moonshot/Kimi, E9) is choosable alongside Claude. See [09-ai-off-and-local-llm.md](09-ai-off-and-local-llm.md).
+
+## E9 — Moonshot / Kimi (alternative AI provider, opt-in)
+
+A **second, choosable** LLM vendor, off unless enabled. Reached via Moonshot's **Anthropic-compatible** endpoint (default `https://api.moonshot.ai/anthropic`; `MOONSHOT_BASE_URL` overridable to `…moonshot.cn/anthropic`), so it reuses the same SDK + Messages API — no separate integration. Kimi models appear in the SuperAdmin **AI Generate Model** picker (and Compare) **only when `MOONSHOT_API_KEY` is set**; egress happens **only when a Kimi model is the selected model** (`app/lib/ai/anthropicClient.ts` routes by the model's provider). What leaves = the same content as E1. Governed identically to Anthropic: **per-tenant `allowAi`** and **ENT-06 redaction** wrap at the route level, so a Kimi call is gated / pseudonymised exactly as a Claude call. **Residency:** default endpoint is international; the `.cn` host processes data in China — a DPA consideration if used. Turn off by unsetting `MOONSHOT_API_KEY` (models vanish) or `allowAi=false` (per tenant).
 
 ## E2 — Deepgram (voice→text)
 
@@ -84,6 +91,6 @@ These stream files to the authenticated user's browser (and, if the user chooses
 
 All are read from `process.env`; none are committed. Secrets (🔑) vs identifiers/config:
 
-`DATABASE_URL` 🔑 · `AUTH_SECRET` 🔑 · `AZURE_CLIENT_SECRET` 🔑 · `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` · `STRIPE_SECRET_KEY` 🔑 · `STRIPE_WEBHOOK_SECRET` 🔑 · `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` · `DEEPGRAM_API_KEY` 🔑 · `ANTHROPIC_API_KEY` 🔑 · `SMTP_PASS` 🔑 (+ `SMTP_HOST/PORT/SECURE/USER/FROM`) · `CRON_SECRET` 🔑 · `ADMIN_PASSWORD` 🔑 · `AUTH_TRUST_HOST` / `NEXTAUTH_URL`.
+`DATABASE_URL` 🔑 · `AUTH_SECRET` 🔑 · `AZURE_CLIENT_SECRET` 🔑 · `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` · `STRIPE_SECRET_KEY` 🔑 · `STRIPE_WEBHOOK_SECRET` 🔑 · `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` · `DEEPGRAM_API_KEY` 🔑 · `ANTHROPIC_API_KEY` 🔑 · `ANTHROPIC_BASE_URL` (optional proxy/region) · `MOONSHOT_API_KEY` 🔑 (optional — enables the Kimi provider, E9) · `MOONSHOT_MODELS` / `MOONSHOT_BASE_URL` (optional config) · `SMTP_PASS` 🔑 (+ `SMTP_HOST/PORT/SECURE/USER/FROM`) · `CRON_SECRET` 🔑 · `ADMIN_PASSWORD` 🔑 · `AUTH_TRUST_HOST` / `NEXTAUTH_URL`.
 
-Production values come from **Azure Key Vault → App Service application settings** (`.env.example` header). A single shared `CRON_SECRET` guards all cron endpoints with no per-caller identity ([ENT-18](04-findings-register.md)).
+Production values come from **Azure Key Vault → App Service application settings** (`.env.example` header) — e.g. the vault secret `moonshot-api-key` surfaced as the app setting `MOONSHOT_API_KEY` via a Key Vault reference, mirroring `ANTHROPIC_API_KEY`. A single shared `CRON_SECRET` guards all cron endpoints with no per-caller identity ([ENT-18](04-findings-register.md)).
