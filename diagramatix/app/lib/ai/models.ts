@@ -80,15 +80,16 @@ export function customModels(): AiModel[] {
  * Reached via Moonshot's Anthropic-compatible endpoint (anthropicClient.ts).
  * Server-only (env is stripped client-side → [] there; the client gets the list
  * as a prop). */
-// Only ids we know are valid on Moonshot's NATIVE API go here — a wrong id 400s.
-// `kimi-latest` auto-tracks Moonshot's current flagship (multimodal), so it stays
-// modern with no code change; `kimi-k2-0711-preview` is the cheap text workhorse.
-// To offer specific newer models (K2.6, K3, …), set MOONSHOT_MODELS with the exact
-// ids copied from the Kimi console — aggregator slugs like "kimi-k2.6" are NOT
-// guaranteed to match the native `model` field.
+// Only ids that resolve on the current Kimi platform (platform.kimi.ai /
+// api.moonshot.ai) go here — a wrong id 404s "Not found the model … or Permission
+// denied". These three were confirmed live against a real account; the legacy ids
+// (kimi-latest, kimi-k2-0711-preview, moonshot-v1-*) are retired and 404. Vision is
+// left unset (image support is inconclusive on these) — Claude is the image→diagram
+// path. Override the whole list with MOONSHOT_MODELS using exact console ids.
 const DEFAULT_MOONSHOT_MODELS: AiModel[] = [
-  { id: "kimi-latest", label: "Kimi Latest", provider: "moonshot", vision: true },
-  { id: "kimi-k2-0711-preview", label: "Kimi K2", provider: "moonshot", vision: false },
+  { id: "kimi-k3", label: "Kimi K3", provider: "moonshot" },
+  { id: "kimi-k2.6", label: "Kimi K2.6", provider: "moonshot" },
+  { id: "kimi-k2.7-code", label: "Kimi K2.7 Code", provider: "moonshot" },
 ];
 
 export function moonshotModels(): AiModel[] {

@@ -25,15 +25,15 @@ const PRICING: Record<string, ModelPrice> = {
   "claude-opus-4-8": { in: 5, out: 25 },
   "claude-sonnet-5": { in: 3, out: 15, note: "intro $2 / $10 through 2026-08-31" },
   "claude-haiku-4-5-20251001": { in: 1, out: 5 },
-  // Kimi / Moonshot — international USD
+  // Kimi / Moonshot — international USD (platform.kimi.ai). These three are the
+  // current default lineup; the rest are priced for reference if registered via
+  // MOONSHOT_MODELS.
+  "kimi-k3": { in: 3, out: 15 },
+  "kimi-k2.6": { in: 0.95, out: 4 },
+  "kimi-k2.7-code": { in: 0.95, out: 4 },
+  "kimi-k2.5": { in: 0.6, out: 3 },
   "kimi-k2-0711-preview": { in: 0.6, out: 2.5 },
   "moonshot-v1-128k": { in: 2, out: 5 },
-  "moonshot-v1-128k-vision-preview": { in: 2, out: 5 },
-  // Newer named Kimi models — priced here for reference, but only appear in the app
-  // when their EXACT native ids are registered via MOONSHOT_MODELS.
-  "kimi-k2.5": { in: 0.6, out: 3 },
-  "kimi-k2.6": { in: 0.95, out: 4 },
-  "kimi-k3": { in: 3, out: 15 },
 };
 
 /** The reference price for a model id, or undefined when unknown / floating. */

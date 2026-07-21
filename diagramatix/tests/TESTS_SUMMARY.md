@@ -942,7 +942,7 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0950 | with the key set, MOONSHOT_MODELS is parsed (id\|Label) and tagged provider=moonshot; Claude stays first | A mis-parsed Kimi list or wrong provider tag routing Kimi to Anthropic | If the parser or provider tagging regressed |
 | T0951 | key set + MOONSHOT_MODELS unset → a curated default Kimi list | The feature being unusable without hand-listing model ids | If the default-list fallback regressed |
 | T0952 | Claude + unknown + null ids all resolve provider=anthropic | A Claude/unknown id being sent to the Moonshot endpoint | If providerForModel's default regressed |
-| T0960 | vision capability flags — Claude all true; default Kimi list (kimi-latest true, Kimi K2 false); env ids heuristic ("vision" in id → true, else unknown) | The optional Vision-model picker offering a text-only model, or wrongly flagging a capable default | If the `vision` flags or the env heuristic regressed |
+| T0960 | vision capability flags — Claude all true; default Kimi list (kimi-k3/k2.6 vision unset); env ids heuristic ("vision" in id → true, else unknown) | The optional Vision-model picker offering a text-only model, or wrongly flagging a capable default | If the `vision` flags or the env heuristic regressed |
 | T0962 | an unresolved Azure Key Vault reference (`@Microsoft.KeyVault(...)` left literal in the env var) is treated as no key — model hidden, not offered-then-401 | A silent 401 "Invalid Authentication" loop when the KV reference doesn't resolve (managed-identity access), with the model still shown | If `resolvedEnvSecret`'s KV-reference guard regressed |
 
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)

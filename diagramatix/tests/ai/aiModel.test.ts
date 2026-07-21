@@ -76,7 +76,8 @@ describe("Moonshot (Kimi) provider registry", () => {
     const ms = moonshotModels();
     expect(ms.length).toBeGreaterThan(0);
     expect(ms.every((m) => m.provider === "moonshot")).toBe(true);
-    expect(ms.some((m) => m.id === "kimi-latest")).toBe(true);
+    // The defaults are live-verified current-platform ids (kimi-k3 is the flagship).
+    expect(ms.some((m) => m.id === "kimi-k3")).toBe(true);
   });
 
   it("T0952 — Claude ids are always provider=anthropic; unknown ids default to anthropic", () => {
@@ -91,9 +92,9 @@ describe("Moonshot (Kimi) provider registry", () => {
     expect(modelVision("claude-haiku-4-5-20251001")).toBe(true);
 
     process.env.MOONSHOT_API_KEY = "sk-test";
-    delete process.env.MOONSHOT_MODELS; // curated default list (kimi-latest + Kimi K2)
-    expect(modelVision("kimi-latest")).toBe(true);
-    expect(modelVision("kimi-k2-0711-preview")).toBe(false);           // text-only
+    delete process.env.MOONSHOT_MODELS; // curated default list (kimi-k3, k2.6, k2.7-code)
+    expect(modelVision("kimi-k3")).toBeUndefined();                    // vision unset (unknown)
+    expect(modelVision("kimi-k2.6")).toBeUndefined();
     // A "vision" id supplied via MOONSHOT_MODELS is flagged multimodal by heuristic.
     process.env.MOONSHOT_MODELS = "moonshot-v1-128k|V1, moonshot-v1-128k-vision-preview|V1 vision";
     expect(modelVision("moonshot-v1-128k")).toBeUndefined();           // unknown → not flagged
