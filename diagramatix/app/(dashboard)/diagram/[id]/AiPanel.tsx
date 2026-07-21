@@ -357,7 +357,7 @@ export function AiPanel({
     setComparing(true);
     setGenerating(true); // drives the full-canvas overlay
     setError(null);
-    setStatus("Comparing models — Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5 (this takes 2-3 minutes)…");
+    setStatus("Comparing the available models (this takes a few minutes)…");
     try {
       const res = await fetch("/api/ai/generate-bpmn/compare", {
         method: "POST",
@@ -701,7 +701,7 @@ export function AiPanel({
           <button onClick={() => handleCompare()}
             disabled={generating || comparing || !prompt.trim() || !diagramId}
             className="w-full px-3 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
-            title="SuperAdmin: generate with Fable 5, Opus 4.8, Sonnet 5 and Haiku 4.5, fill this diagram with the best result, and save one diagram per model">
+            title="SuperAdmin: generate with every available model, fill this diagram with the best result, and save one diagram per model">
             {comparing && (
               <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />

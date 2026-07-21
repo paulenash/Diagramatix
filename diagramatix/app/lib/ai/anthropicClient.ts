@@ -59,5 +59,12 @@ export function aiClientConfig(
  */
 export function makeAiClient(model: string | null | undefined, fallbackApiKey?: string): Anthropic {
   const { apiKey, baseURL } = aiClientConfig(model, fallbackApiKey);
+  if (providerForModel(model) === "moonshot") {
+    // Moonshot's Anthropic-compatible endpoint authenticates via
+    // `Authorization: Bearer <key>` (like Claude Code's ANTHROPIC_AUTH_TOKEN), NOT
+    // Anthropic's native `x-api-key` header. So hand the key to the SDK as
+    // `authToken` (Bearer) and null out apiKey to suppress the x-api-key header.
+    return new Anthropic({ authToken: apiKey, apiKey: null, baseURL });
+  }
   return baseURL ? new Anthropic({ apiKey, baseURL }) : new Anthropic({ apiKey });
 }

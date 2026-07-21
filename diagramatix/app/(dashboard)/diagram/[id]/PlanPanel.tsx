@@ -651,7 +651,7 @@ export function PlanPanel({
     setBusy("plan");
     setError(null);
     setIssues(null);
-    setStatus("Requesting plan from Sonnet (15–30 s)…");
+    setStatus("Requesting plan from the AI model (15–30 s)…");
     try {
       const res = await fetch(`${apiBase}/plan`, {
         method: "POST",

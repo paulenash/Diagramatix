@@ -4,7 +4,7 @@
  * selected model's provider, with no network call — that's what we pin here.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { aiClientConfig, aiApiKey } from "@/app/lib/ai/anthropicClient";
+import { aiClientConfig, aiApiKey, makeAiClient } from "@/app/lib/ai/anthropicClient";
 
 const ENV_KEYS = ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "MOONSHOT_API_KEY", "MOONSHOT_BASE_URL", "MOONSHOT_MODELS"] as const;
 
@@ -47,5 +47,21 @@ describe("aiClientConfig / aiApiKey — provider routing", () => {
   it("T0956 — aiApiKey is undefined when the selected provider's key is missing", () => {
     delete process.env.ANTHROPIC_API_KEY;
     expect(aiApiKey("claude-haiku-4-5-20251001")).toBeUndefined();
+  });
+
+  it("T0961 — a Moonshot client authenticates with Bearer (authToken), not x-api-key", () => {
+    // Moonshot's Anthropic-compatible endpoint wants Authorization: Bearer, so the
+    // Anthropic SDK must carry the key as authToken (Bearer) with apiKey nulled out
+    // (else it sends the x-api-key header Moonshot rejects → 401).
+    process.env.MOONSHOT_API_KEY = "sk-moon";
+    process.env.MOONSHOT_MODELS = "kimi-k2-0711-preview|Kimi K2";
+    const kimi = makeAiClient("kimi-k2-0711-preview");
+    expect(kimi.authToken).toBe("sk-moon");
+    expect(kimi.apiKey).toBeNull();
+
+    // Claude still uses x-api-key (apiKey), no bearer token.
+    process.env.ANTHROPIC_API_KEY = "sk-ant";
+    const claude = makeAiClient("claude-haiku-4-5-20251001");
+    expect(claude.apiKey).toBe("sk-ant");
   });
 });
