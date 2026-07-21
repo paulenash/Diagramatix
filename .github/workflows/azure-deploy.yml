@@ -239,6 +239,12 @@ jobs:
           npx --yes tsx@4 scripts/add-features-import-competitor-bpmn.ts || echo "add-features-import-competitor-bpmn skipped"
           npx --yes tsx@4 scripts/add-guide-import-competitor-bpmn.ts || echo "add-guide-import-competitor-bpmn skipped"
           npx --yes tsx@4 scripts/add-tech-design-import-competitor-bpmn.ts || echo "add-tech-design-import-competitor-bpmn skipped"
+          # Enterprise governance & security — LIVING entries (upsert-and-update on
+          # every run) that track the enterprise-readiness programme (diagramatix/
+          # enterprise/). The tech-design one must run AFTER add-tech-design-notes.ts
+          # (its identity-access chapter). Feature lands as a DRAFT — Publish once.
+          npx --yes tsx@4 scripts/add-features-enterprise-governance.ts || echo "add-features-enterprise-governance skipped"
+          npx --yes tsx@4 scripts/add-tech-design-enterprise-governance.ts || echo "add-tech-design-enterprise-governance skipped"
           # Populate the Portal's denormalised Diagram columns (pcf*/procedureDoc*/
           # entityRefs) for diagrams last saved before those columns existed. Idempotent.
           npx --yes tsx@4 scripts/backfill-diagram-pcf.ts || echo "backfill-diagram-pcf skipped"

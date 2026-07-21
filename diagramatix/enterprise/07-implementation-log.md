@@ -71,6 +71,14 @@ Security-critical auth change; needs a dedicated session. Plan: replace the `SUP
 - B: dedicated single-tenant instance (parameterise `azure-deploy.yml` per instance: region, keys, secrets; ops runbook).
 - C: questionnaire pack (data-flow from doc 01, sub-processor list, DPA, SIG/CAIQ answers) now; SOC 2 Type II via Vanta/Drata once pipeline justifies.
 
+## Collateral kept in sync
+- **Feature catalog** — `scripts/add-features-enterprise-governance.ts` (a LIVING draft entry "Enterprise Governance & Security"; upserts-and-updates on every run, incl. on deploy). Lands as a **draft** — a SuperAdmin clicks Publish in `/dashboard/admin/features` to make it public.
+- **Technical Design Notes** — `scripts/add-tech-design-enterprise-governance.ts` (a section under the `identity-access` chapter; upsert-by-heading, re-runs on deploy). Read at `/tech-notes`.
+- Both are wired into the deploy seed list (`.github/workflows/azure-deploy.yml`, after `add-tech-design-notes.ts`).
+- **XSD (`public/diagramatix-export.xsd`) & Logical DDL (`app/lib/diagram/ddlGenerate.ts`)** — **no change**: they describe the *diagram export* data structure, which the governance work (DB tables + auth) does not touch. The XSD version is templated from `SCHEMA_VERSION` (1.41). The **Physical DDL** (`physicalDdl.ts`) is generated from the live DB, so it auto-includes `AuditLog` + the `Org` policy columns.
+- **`.env.example`** — documents `ANTHROPIC_BASE_URL`, `AUTH_SESSION_MAX_AGE`, `AUTH_SESSION_UPDATE_AGE`.
+- *Not yet done (candidate):* an OrgAdmin-facing **User Guide** section on the Data & AI Governance panel (`add-guide-*.ts` pattern) — the tech notes above are SuperAdmin-only.
+
 ## Conventions for continuing
 - Commit per sub-phase; run `npm run build` + `npx vitest run` before pushing; push to `main` (Azure auto-deploys + runs `prisma db push`).
 - Test numbers are append-only `Tnnnn` from the highest (currently **T0922**).
