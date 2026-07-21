@@ -77,6 +77,31 @@ export function shade(hex: string, pct: number): string {
 /** The highlight (hover / selected) tone for a background at a given darken %. */
 export const highlightOf = (bg: string, pct: number): string => shade(bg, pct);
 
+/** Relative luminance (WCAG) of a #rrggbb — 0 (black) … 1 (white). */
+export function relLuminance(hex: string): number {
+  if (!isHex(hex)) return 0;
+  const n = parseInt(hex.slice(1), 16);
+  const chan = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  return 0.2126 * chan((n >> 16) & 0xff) + 0.7152 * chan((n >> 8) & 0xff) + 0.0722 * chan(n & 0xff);
+}
+
+/** WCAG contrast ratio between two #rrggbb colours (1 … 21). */
+export function contrastRatio(a: string, b: string): number {
+  const la = relLuminance(a), lb = relLuminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+/**
+ * A text colour guaranteed readable on `bg`: the caller's preferred colour when it
+ * already clears WCAG AA (~4.5:1), otherwise near-black / near-white by the
+ * background's luminance. So a sane palette keeps its chosen text unchanged, and
+ * only an unreadable custom combination (e.g. dark text on a dark bg) gets rescued.
+ */
+export function readableTextOn(bg: string, preferred: string): string {
+  if (contrastRatio(preferred, bg) >= 4.5) return preferred;
+  return relLuminance(bg) > 0.4 ? "#111827" : "#f9fafb";
+}
+
 /** Normalise arbitrary input into a full, valid scheme (defaults fill any gap). */
 export function resolveFeatureScheme(input: unknown): FeatureColorScheme {
   const src = (input && typeof input === "object") ? input as Record<string, unknown> : {};

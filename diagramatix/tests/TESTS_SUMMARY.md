@@ -954,6 +954,16 @@ Which key + endpoint a model's provider uses. Pure (reads env, no network), so i
 | T0955 | MOONSHOT_BASE_URL overrides the endpoint (e.g. mainland China) | Data-residency control over the Moonshot endpoint being ignored | If the base-URL override regressed |
 | T0956 | aiApiKey is undefined when the selected provider's key is missing | A route proceeding without a key (and a confusing downstream error) | If aiApiKey stopped returning undefined on a missing key |
 
+### `tests/theme/contrast.test.ts` — feature-tile contrast guarantee
+
+`readableTextOn` keeps a palette's configured text when legible, but rescues an unreadable combination so admin tiles never render dark-on-dark (or light-on-light) under a customised Feature-Colours palette.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0957 | the default palette keeps its configured text (every feature already clears WCAG AA) | The default admin tiles changing appearance / the defaults being low-contrast | If a default colour pair dropped below 4.5:1, or readableTextOn over-rode a legible pair |
+| T0958 | dark text on a dark customised bg is rescued to a light, readable colour | A customised palette making tile text invisible (dark-on-dark) | If the contrast fallback regressed |
+| T0959 | light text on a light bg is rescued to a dark, readable colour | Light-on-light unreadable tiles | If the luminance branch of readableTextOn regressed |
+
 ### `tests/ai/split-rules.test.ts` — Only GREEN rules reach the AI model
 
 | Ref | Test | Protects you against | How it would break (go red) |

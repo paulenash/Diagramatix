@@ -10,7 +10,7 @@ import { displayOrgRole } from "@/app/lib/auth/orgRoleLabels";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { safeInternalPath } from "@/app/lib/safeRedirect";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
-import { featureVars, type FeatureColorKey } from "@/app/lib/theme/featureColors";
+import { tonesFor, readableTextOn, type FeatureColorKey } from "@/app/lib/theme/featureColors";
 
 interface UserRow {
   id: string;
@@ -831,7 +831,14 @@ function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {tiles.map(t => {
             const interactive = !!(t.href || t.users);
-            const fv = t.feature ? featureVars(scheme, t.feature) : undefined;
+            // Feature tiles carry the configured colour, but the text is contrast-
+            // guaranteed: a readable colour is used when the configured text would be
+            // unreadable on its background (a customised palette), so tiles never go
+            // dark-on-dark. Default palettes are unaffected (their text already passes).
+            const tones = t.feature ? tonesFor(scheme, t.feature) : null;
+            const readable = tones ? readableTextOn(tones.bg, tones.text) : undefined;
+            const fv: Record<string, string> | undefined = tones ? { "--fb": tones.bg, "--ft": readable!, "--fh": tones.hi } : undefined;
+            const descFixed = !!tones && readable !== tones.text; // only when contrast was rescued
             return (
             <div
               key={t.id}
@@ -851,7 +858,8 @@ function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
                 <h3 className={`text-sm font-semibold ${t.feature ? "" : "text-red-700"}`}>{t.title}</h3>
                 <span className="text-gray-400 select-none cursor-grab" title="Drag to reorder">⠿</span>
               </div>
-              <p className="text-xs text-gray-600 mt-1.5 leading-snug">{t.description}</p>
+              <p className={`text-xs mt-1.5 leading-snug ${descFixed ? "" : "text-gray-600"}`}
+                 style={descFixed ? { color: readable, opacity: 0.85 } : undefined}>{t.description}</p>
               {t.ddl && (
                 <div className="mt-2" onClick={e => e.stopPropagation()}>
                   <GenerateDdlButton />

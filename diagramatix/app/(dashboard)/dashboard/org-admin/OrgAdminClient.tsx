@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { Entitlements, FeatureKey } from "@/app/lib/subscription";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
-import { featureVars, type FeatureColorKey } from "@/app/lib/theme/featureColors";
+import { tonesFor, readableTextOn, type FeatureColorKey } from "@/app/lib/theme/featureColors";
 
 interface MenuCard {
   href: string;
@@ -155,7 +155,12 @@ export function OrgAdminClient({ orgName, entitlements }: { orgName: string; ent
                 </div>
               );
             }
-            const fv = card.feature ? featureVars(scheme, card.feature) : undefined;
+            // Contrast-guaranteed text (see AdminClient): a customised palette can't
+            // make a tile dark-on-dark; default palettes are unaffected.
+            const tones = card.feature ? tonesFor(scheme, card.feature) : null;
+            const readable = tones ? readableTextOn(tones.bg, tones.text) : undefined;
+            const fv: Record<string, string> | undefined = tones ? { "--fb": tones.bg, "--ft": readable!, "--fh": tones.hi } : undefined;
+            const descFixed = !!tones && readable !== tones.text;
             return (
               <a
                 key={card.href}
@@ -170,7 +175,8 @@ export function OrgAdminClient({ orgName, entitlements }: { orgName: string; ent
                 <h2 className={`text-sm font-semibold ${card.feature ? "" : "text-orange-700"}`}>
                   {card.title}
                 </h2>
-                <p className="text-xs text-gray-600 mt-1.5 leading-snug">
+                <p className={`text-xs mt-1.5 leading-snug ${descFixed ? "" : "text-gray-600"}`}
+                   style={descFixed ? { color: readable, opacity: 0.85 } : undefined}>
                   {card.description}
                 </p>
               </a>
