@@ -22,7 +22,8 @@ Diagramatix stores and reasons about customers' **business processes** — pool/
 | [04-findings-register.md](04-findings-register.md) | The consolidated findings, each with severity, evidence, impact and control mapping. **Start here for the audit view.** |
 | [05-gating-and-remediation-plan.md](05-gating-and-remediation-plan.md) | Concrete, code-level ways to **minimise or gate** every risky feature — reusing patterns already in the codebase — phased from quick wins to strategic work, including an "Enterprise Mode" profile. |
 | [06-enterprise-readiness-plan.md](06-enterprise-readiness-plan.md) | **The go-to-market plan** — three workstreams (product controls, deployment tiers, compliance evidence) sequenced into a timeline where each phase unlocks a defensible sales claim. Start here for "what do we actually do." |
-| [07-implementation-log.md](07-implementation-log.md) | **Living build log** — what's shipped (commits, files, findings closed), how to add a new policy flag, and exactly where to continue (Phase A2 next). Read this first if resuming the work. |
+| [07-implementation-log.md](07-implementation-log.md) | **Living build log** — what's shipped (commits, files, findings closed), how to add a new policy flag, and exactly where to continue. Read this first if resuming the work. |
+| [08-sso-vendor-decision.md](08-sso-vendor-decision.md) | **Decision record** — WorkOS vs Auth0 for the deferred per-org SSO/SAML/OIDC + SCIM item (ENT-04 core). Recommends WorkOS; pricing to re-verify. |
 
 > **Build status (2026-07-20):** Phase A1 (governance foundations) has shipped — a per-tenant
 > **Organisation Policy** engine with an "Enterprise Mode", an `ANTHROPIC_BASE_URL` proxy seam, and

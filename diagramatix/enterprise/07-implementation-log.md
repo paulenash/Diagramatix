@@ -80,7 +80,7 @@ Security-critical auth change; needs a dedicated session. Plan: replace the `SUP
 - **A3d — Identity hardening** (`66b1e4c6`, ENT-04 partial): `Org.requireSso` — when on, `verifyCredentials` blocks password login for that org's members (must use Microsoft SSO; returns null to preserve the timing/enum profile), toggle in Org Settings. `REGISTRATION_ALLOWED_DOMAINS` env — optional self-registration domain allowlist (`registerUser` → 403). Tests T0928-T0930.
 
 ### Deferred — A3 mega-items (dedicated sessions)
-- **Full SSO/SAML + generic OIDC per-org + SCIM** (ENT-04 core) — a large auth-core feature (per-org IdP config, SAML library, callback routes). `requireSso` (A3d) already leverages the existing Entra SSO; this is the customer-brings-their-own-IdP piece.
+- **Full SSO/SAML + generic OIDC per-org + SCIM** (ENT-04 core) — a large auth-core feature (per-org IdP config, SAML library, callback routes). `requireSso` (A3d) already leverages the existing Entra SSO; this is the customer-brings-their-own-IdP piece. **Direction chosen: buy, not build → WorkOS (recommended) vs Auth0 — see the decision doc [08](08-sso-vendor-decision.md).** Pairs with A2c (MFA): decide the platform question first.
 - **Email verification** on signup — a full token+email+verify+login-gate flow (reuse the password-reset token pattern).
 - **Reversible pre-egress AI redaction** (ENT-06) — pseudonymise people/team/system names before the prompt leaves the tenant, restore in the output (`aiRedaction` org flag). Complex (reversible mapping over free-text); prioritise staff-narrative + transcript.
 - **Dedicated single-tenant instance tier** (Workstream B) — parameterise `azure-deploy.yml` per instance (region, keys, secrets) + an ops runbook.
