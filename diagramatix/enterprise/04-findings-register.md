@@ -17,7 +17,10 @@ Phase A1 (governance foundations) is on `main`. Closed or partially closed:
 | ENT-11 (`/api/account` authZ gap) | ✅ Closed | `requireOrgAdminFor` gate; pwd min 6→8 |
 | ENT-16 (process content in logs) | ✅ Closed | `DEBUG_CONTENT_LOGS` gate on the content logs |
 | ENT-15 (cross-org sharing) | 🟡 Partial | "Apply Enterprise Mode" turns it off; vendor-lock still open |
-| ENT-02 (impersonation) | 🟡 Partial | cookies now HttpOnly+Secure; audit + edit-opt-in → Phase A2 |
+| **ENT-03 (no audit log)** | ✅ Closed (A2a) | `AuditLog` + `recordAudit()`; impersonation/exports/wipe/delete/policy logged + viewer |
+| **ENT-02 (impersonation)** | ✅ Mostly (A2a/b) | HttpOnly+Secure cookies, audited start/stop, edit needs a reason + 1h time-box. Remaining: per-mutation logging |
+| **ENT-13 (30-day sessions)** | ✅ Closed (A2d) | configurable `maxAge` (7-day default) + rolling refresh |
+| **ENT-01 (SuperAdmin emails)** | 🟡 Detectable | now audit-logged (A2a); stored-role + MFA deferred to A2c |
 
 Also new: a customer-admin **"Data & AI Governance"** panel (org-settings) with per-capability
 toggles + **Apply Enterprise Mode**, and all AI now runs on the single admin-selected model.

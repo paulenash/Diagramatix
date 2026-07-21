@@ -8,13 +8,13 @@
 |---|---|---|
 | Analysis + plan | docs 00–06 | ✅ shipped (`e21cf62b`) |
 | **A1** Governance foundations | policy engine, AI proxy seam, quick fixes | ✅ **shipped** (`98f3e996`, `2f54b363`, `b3b1c0c3`, status `e794779a`) |
-| **A2** Accountability | audit log, impersonation hardening, SuperAdmin role+MFA, session policy | ⬜ **next** |
+| **A2** Accountability | audit log, impersonation hardening, session policy, acting-view downgrade | 🟡 **mostly shipped** — A2c (SuperAdmin role + MFA) deferred |
 | **A3** Enterprise identity & privacy | SAML/OIDC+SCIM, GDPR erasure, AI redaction, dedicated-instance tier | ⬜ planned |
 | B | Deployment tiers (dedicated instance) | ⬜ planned |
 | C | Questionnaire pack + SOC 2 Type II | ⬜ planned |
 
-**Findings closed so far:** ENT-05, ENT-07, ENT-08, ENT-10, ENT-11, ENT-16 (full); ENT-02, ENT-15 (partial).
-**Still open (high):** ENT-01 (SuperAdmin emails), ENT-03 (no audit log), ENT-04 (no SAML/MFA), ENT-06 (AI content minimisation).
+**Findings closed so far:** ENT-03, ENT-05, ENT-07, ENT-08, ENT-10, ENT-11, ENT-13, ENT-16 (full); ENT-02 (audit + reason + time-box + HttpOnly — remaining: per-mutation logging), ENT-15 (partial).
+**Still open (high):** ENT-01 (SuperAdmin emails → stored role + MFA, A2c deferred), ENT-04 (no SAML/MFA), ENT-06 (AI content minimisation).
 
 ---
 
@@ -56,15 +56,15 @@ The centrepiece: per-tenant governance the customer's own OrgAdmin controls, enf
 
 ---
 
-## Next — Phase A2 (accountability): where to start
+## Phase A2 — Accountability 🟡 (2026-07-20)
 
-Goal: make privileged/data actions **attributable**. This converts ENT-01/02/19 from invisible to detectable and is the biggest remaining trust win.
+- **A2a — Audit log** (`1e76adf4`, ENT-03): `AuditLog` table (append-only) + `recordAudit()` (`app/lib/audit.ts`; never throws; `meta` = JSON string of ids/counts/modes only). Instrumented: impersonation start/stop, full-backup export + **wipe**, org-admin backup, user delete, org settings/policy updates. SuperAdmin **Audit Log** viewer page + tile. *Follow-ups: share create/revoke, per-mutation-while-impersonating logging, optional AI-egress logging, retention/TTL.*
+- **A2b — Impersonation hardening** (`a04b5fc7`, ENT-02): edit mode requires a **reason** (PromptDialog → stored in the audit start entry) and is **time-boxed to 1h** (view stays 8h, default). *Follow-up: log every mutation taken while impersonating.*
+- **A2d — Session policy** (`60545c8b`, ENT-13): configurable `maxAge` (default 7-day cap) + daily `updateAge` in `auth.config.ts`; env `AUTH_SESSION_MAX_AGE` / `AUTH_SESSION_UPDATE_AGE`.
+- **A2e — Acting-view downgrade (pages)** (`95c9795b`): swapped `isSuperuser` → `isActingSuperuser` on **all 22** `/dashboard/admin/**` pages, so a SuperAdmin in orgadmin/user view can't reach SuperAdmin surfaces by URL either (super-only pages redirect; dual pages fall to their OrgAdmin branch). *Remaining: SuperAdmin-only **API routes** still use real `isSuperuser` — needs the downgrade-vs-keep enumeration (impersonation/backup/break-glass keep it).*
 
-1. **Audit log** (ENT-03) — new Prisma model, e.g. `AuditLog { id, at, actorUserId, effectiveUserId, orgId?, action, targetType?, targetId?, meta Json, ip? }` + a `recordAudit(...)` helper (`app/lib/audit.ts`). Call it on: impersonation start/stop **and each mutation while impersonating** (`getViewAsUserId` is the seam), all exports/backups (`admin/full-backup`, `org-admin/backup`, Visio/docx/bundle export routes), full-backup **wipe**, user delete, share create/revoke, org policy changes, and (optionally) each AI egress with a content hash. Add a SuperAdmin viewer page + a retention/TTL.
-2. **Impersonation hardening** (ENT-02) — default `view`, make `edit` opt-in with a stored reason, tighter time-box, target-visible indicator; log every session via `recordAudit`.
-3. **SuperAdmin → stored role + MFA** (ENT-01) — replace the `SUPERUSER_EMAILS` allowlist (`app/lib/superuser.ts`) with a `User.isSuperAdmin` flag (or a role), granted/revoked via a logged action; require MFA on those accounts; keep the allowlist only as a bootstrap fallback. Touches every `isSuperuser(session)` call site (many) — do it behind the same helper so call sites don't change.
-4. **Session policy** (ENT-13) — set `session.maxAge` + idle handling in `auth.config.ts`; make configurable.
-5. **Acting-view = true server-side downgrade** (folded in from A1) — today `isActingSuperuser` gates only the SuperAdmin *surfaces reachable via the OrgAdmin UI* (`/dashboard/admin`, `org-settings`, `sharing`); a deep URL-typed SuperAdmin sub-page still opens as SuperAdmin. In A2, make the acting view authoritative everywhere: gate **all** `/dashboard/admin/**` pages + SuperAdmin-only API routes on `isActingSuperuser` (or an `effectiveIsSuperuser(session)` helper), so a SuperAdmin in orgadmin/user view is fully treated as that role. **Design notes:** (a) real `isSuperuser` must remain for impersonation/backup/break-glass paths a presenting SuperAdmin shouldn't lose — enumerate which routes downgrade vs stay; (b) pair with the **audit log** so switching views and any privileged action are recorded; (c) the switch is a client cookie (`dgx_sa_mode`) — treat it as a *view preference*, not a security boundary (a determined SuperAdmin can unset it), so this is UX-correctness + demo-integrity, not a trust boundary. Wire it through the same `SA_MODE_COOKIE` seam.
+### Deferred — A2c: SuperAdmin → stored role + MFA (ENT-01)
+Security-critical auth change; needs a dedicated session. Plan: replace the `SUPERUSER_EMAILS` allowlist (`app/lib/superuser.ts`) with a `User.isSuperAdmin` flag (or role) granted/revoked via a **logged** action (bootstrap the allowlist once), keeping the change **behind `isSuperuser(session)`** so the many call sites don't move. **MFA** (TOTP enrol + recovery codes + verify step) is a whole feature — scope it separately. Until done, ENT-01's "3 hard-coded emails" remains, but is now **detectable** via the audit log (A2a).
 
 ## Then — Phase A3 / B / C (see [06](06-enterprise-readiness-plan.md))
 - A3: SAML/generic-OIDC + `requireSso` enforcement + SCIM; GDPR self-erasure (`DELETE /api/account`); pre-egress AI redaction (`aiRedaction` flag, prioritise narrative/transcript); least-privilege Graph scope option.
