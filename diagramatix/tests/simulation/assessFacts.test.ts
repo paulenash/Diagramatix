@@ -4,7 +4,7 @@
  * what we pin. T0547-T0548.
  */
 import { describe, it, expect } from "vitest";
-import { buildComparisonFacts } from "@/app/lib/simulation/assessFacts";
+import { buildComparisonFacts, summariseComparison } from "@/app/lib/simulation/assessFacts";
 import type { RunMetrics } from "@/app/lib/simulation/results";
 
 const stat = (mean: number, p5 = mean, p50 = mean, p95 = mean) => ({ mean, p5, p50, p95 });
@@ -57,5 +57,30 @@ describe("buildComparisonFacts", () => {
     const f = buildComparisonFacts(base, tobe, "A", "B", "minute");
     expect(f.cost).toBeUndefined();
     expect(f.flow.typicalPctFaster).toBe(Math.round(((10 - 8) / 10) * 100)); // 20
+  });
+});
+
+describe("summariseComparison — deterministic fallback (AI off)", () => {
+  it("T0936 — templates flow/throughput/cost/bottleneck + a verdict, no AI", () => {
+    const base = mk({ p50: 154, p95: 310, mean: 181, sd: 68, completed: 299, cpc: 125, total: 37237, util: 0.83, cap: 3 });
+    const tobe = mk({ p50: 24, p95: 116, mean: 40, sd: 36, completed: 299, cpc: 24, total: 7189, util: 0.14, cap: 3 });
+    const f = buildComparisonFacts(base, tobe, "As-is", "To-be", "minute");
+    const s = summariseComparison(f);
+    expect(s).toContain("To-be vs As-is");
+    expect(s).toContain("154 → 24 minute");          // typical flow
+    expect(s).toContain("84% faster");                // typical delta
+    expect(s).toContain("cheaper");                   // cost block present
+    expect(s).toContain("Ops");                       // bottleneck
+    expect(s).toContain("relieved 69 pts");
+    expect(s).toContain("improvement on flow time");  // verdict
+    expect(s).toContain("deterministically");         // no-AI footer
+  });
+
+  it("T0937 — omits the cost line when there is no cost", () => {
+    const base = mk({ p50: 10, p95: 20, mean: 12, sd: 3, completed: 100, cpc: 0, total: 0, util: 0.5, cap: 2 });
+    const tobe = mk({ p50: 8, p95: 15, mean: 9, sd: 2, completed: 100, cpc: 0, total: 0, util: 0.3, cap: 2 });
+    const s = summariseComparison(buildComparisonFacts(base, tobe, "A", "B", "minute"));
+    expect(s).not.toContain("Cost per case");
+    expect(s).toContain("B is an improvement on flow time");
   });
 });

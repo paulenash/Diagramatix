@@ -9,10 +9,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
-import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
+import { orgPolicyAllows } from "@/app/lib/auth/orgPolicy";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
-import { explainMiningResults } from "@/app/lib/mining/explainResults";
+import { explainMiningResults, summariseMiningResults } from "@/app/lib/mining/explainResults";
 import type { Variant, MiningStats, Performance } from "@/app/lib/mining/types";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 
@@ -30,12 +30,6 @@ export async function POST(_req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  const _pol = await gateOrgPolicy(session, "allowAi");
-  if (_pol) return _pol;
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "AI not configured. Set ANTHROPIC_API_KEY." }, { status: 503 });
-
   const run = await prisma.processMiningRun.findFirst({ where: { id: runId, projectId: id } });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const variants = (run.variants ?? []) as unknown as Variant[];
@@ -43,29 +37,38 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "This run has nothing to explain yet." }, { status: 400 });
   }
 
-  const userId = session?.user?.id;
-  if (userId) { const block = await gateLimit(userId, "aiAttempts"); if (block) return block; }
-
   let referenceName: string | undefined;
   if (run.referenceSmId) {
     const ref = await prisma.diagram.findFirst({ where: { id: run.referenceSmId, projectId: id }, select: { name: true } });
     referenceName = ref?.name ?? undefined;
   }
 
+  const base = {
+    runName: run.name,
+    stats: (run.stats ?? {}) as unknown as MiningStats,
+    variants,
+    conformance: (run.conformance ?? null) as unknown as ConformanceResult | null,
+    performance: (run.performance ?? null) as unknown as Performance | null,
+    hasBpmn: !!run.discoveredBpmnId,
+    hasStateMachine: !!run.discoveredSmId,
+    hasTwin: !!run.studyId,
+    referenceName,
+  };
+
+  // Branch: AI narrates only when the org allows AI AND a key is configured.
+  // Otherwise fall back to the deterministic templated summary (ENT-05) — a 200,
+  // not a 403 — so strict/AI-off tenants still get a Results summary.
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const aiOn = (await orgPolicyAllows(session, "allowAi")) && !!apiKey;
+  if (!aiOn) {
+    return NextResponse.json({ explanation: summariseMiningResults(base), deterministic: true });
+  }
+
+  const userId = session?.user?.id;
+  if (userId) { const block = await gateLimit(userId, "aiAttempts"); if (block) return block; }
+
   try {
-    const explanation = await explainMiningResults({
-      apiKey,
-      model: await getAiGenerateModel(),
-      runName: run.name,
-      stats: (run.stats ?? {}) as unknown as MiningStats,
-      variants,
-      conformance: (run.conformance ?? null) as unknown as ConformanceResult | null,
-      performance: (run.performance ?? null) as unknown as Performance | null,
-      hasBpmn: !!run.discoveredBpmnId,
-      hasStateMachine: !!run.discoveredSmId,
-      hasTwin: !!run.studyId,
-      referenceName,
-    });
+    const explanation = await explainMiningResults({ apiKey: apiKey!, model: await getAiGenerateModel(), ...base });
     if (userId) await recordUsage(userId, "aiAttempts");
     return NextResponse.json({ explanation });
   } catch (err) {

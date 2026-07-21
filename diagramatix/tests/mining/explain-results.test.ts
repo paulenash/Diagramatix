@@ -4,7 +4,7 @@
  * model call needs a live key). This pins that the model is fed the real numbers.
  */
 import { describe, it, expect } from "vitest";
-import { buildExplainPrompt, type ExplainInput } from "@/app/lib/mining/explainResults";
+import { buildExplainPrompt, summariseMiningResults, type ExplainInput } from "@/app/lib/mining/explainResults";
 
 const INPUT: ExplainInput = {
   apiKey: "x", model: "m", runName: "AP Jan",
@@ -35,5 +35,27 @@ describe("explain-results prompt", () => {
     expect(p).toContain("On Hold → In Progress");                  // the deviation
     expect(p).toContain('"AP Reference"');                          // the reference name
     expect(p).toContain("5 rows were dropped");
+  });
+});
+
+describe("summariseMiningResults — deterministic fallback (AI off)", () => {
+  it("T0934 — templates paths, conformance + timing from the same facts, no AI", () => {
+    const s = summariseMiningResults(INPUT);
+    expect(s).toContain("200 cases");
+    expect(s).toContain("30 days");
+    expect(s).toContain("Create → Approve");                        // top path
+    expect(s).toContain("53% of cases");                            // 105 of 200 cases
+    expect(s).toContain("90.5% fit");                               // conformance
+    expect(s).toContain("181 of 200");
+    expect(s).toContain("On Hold → In Progress");                   // top deviation
+    expect(s).toContain("BPMN process");                            // artefacts
+    expect(s).toContain("deterministically");                       // the "no AI" footer
+  });
+
+  it("T0935 — degrades gracefully with no conformance / performance", () => {
+    const s = summariseMiningResults({ ...INPUT, conformance: null, performance: null });
+    expect(s).toContain("200 cases");
+    expect(s).not.toContain("fit");                                 // no conformance line
+    expect(s).not.toContain("Slowest step");                        // no timing line
   });
 });

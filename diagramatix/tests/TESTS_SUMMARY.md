@@ -765,6 +765,7 @@ The adoptable process-mining sample (mirrors Simulator Examples): a portable pac
 | T0608 | conformance oracle: permissive clean (181/200), strict flags 39 rework cases (144/200) | The sample's headline conformance story silently changing | If the baked log/references or the conformance engine changed |
 | T0619 | ships a raw sampleLog that rebuilds to the same run (import-first flow) | The confirm-the-analysis import producing a different run than the baked one | If the sample log or the parser drifted |
 | T0624 | the AI Explain-results brief carries the run's stats, top paths, conformance + artefacts (`explain-results.test.ts`) | The "Explain results" summary being fed wrong/empty numbers | If `buildExplainPrompt` stopped serialising a section |
+| T0934-T0935 | `summariseMiningResults` — the deterministic (AI-off) Results summary templates paths/conformance/timing from the same facts, and degrades gracefully with no conformance/performance (`explain-results.test.ts`) | The AI-off mining fallback showing wrong numbers or crashing on partial runs | If the deterministic summariser drifted from the facts |
 | T0625 | ships three choosable period scenarios (Jan 2025 / Jul 2025 / Jan 2026) with compliance DECLINING back in time (fitness strictly increasing toward the present; older months carry the unknown "Disputed" state + undocumented transitions) | The multi-scenario story silently flattening or reversing | If a period's mix/seed or the ordering changed |
 
 ### `tests/mining/` — standards interchange + optional state + governance (Changes A/B/C)
@@ -1364,6 +1365,7 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 |------|------|----------------------|------------------------------|
 | T0547 | computes case-level speed/cost/bottleneck deltas from the two runs | The AI assessment being fed wrong figures | If `buildComparisonFacts` mis-computed a delta |
 | T0548 | omits the cost block when neither run has a cost | A phantom $0 cost saving in the prose | If the no-cost guard were removed |
+| T0936-T0937 | `summariseComparison` — the deterministic (AI-off) Comparison summary templates flow/throughput/cost/bottleneck + a verdict, and omits the cost line when there's no cost | The AI-off sim fallback showing wrong deltas or a phantom cost line | If the deterministic summariser drifted from the facts |
 
 ### `tests/simulation/runHistory.test.ts` — Run History pruning policy
 

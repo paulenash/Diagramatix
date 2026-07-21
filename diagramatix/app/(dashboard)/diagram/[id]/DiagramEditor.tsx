@@ -54,6 +54,7 @@ import { PublishBundleDialog } from "./PublishBundleDialog";
 import { SupportRequestDialog } from "./SupportRequestDialog";
 import { FeedbackPanel } from "./FeedbackPanel";
 import { AlertDialog } from "@/app/components/AlertDialog";
+import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { SharePointPreview } from "@/app/components/SharePointPreview";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
@@ -949,6 +950,11 @@ export function DiagramEditor({
   // Domain UML connector routing is now permanently STICKY (settled default) —
   // the experimental A/B toggle was removed.
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
+  // Deterministic "Process description" — a structured plain-text walk of the current
+  // diagram (buildPromptFromDiagram). Always available, no AI, so AI-off tenants still
+  // get a readable narrative. Holds the generated text while the modal is open.
+  const [processDescription, setProcessDescription] = useState<string | null>(null);
+  const [descriptionCopied, setDescriptionCopied] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   // SuperAdmin model-comparison matrix for this diagram — seeded from the saved
   // column on load, updated after a fresh "Compare all models". Drives the
@@ -3595,6 +3601,22 @@ export function DiagramEditor({
                 >
                   Configuration
                 </button>
+                {data.elements.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setClearMenuOpen(false);
+                      setDescriptionCopied(false);
+                      setProcessDescription(
+                        buildPromptFromDiagram(data.elements, data.connectors, diagramType as DiagramType)
+                          || "This diagram is empty — nothing to describe yet.",
+                      );
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    title="A structured plain-language description of this diagram, computed deterministically (no AI)"
+                  >
+                    Process description
+                  </button>
+                )}
                 {diagramType === "bpmn" && (
                   <>
                     <div className="border-t border-gray-100" />
@@ -4884,6 +4906,32 @@ export function DiagramEditor({
           browser. Built-in template creation is gated by the isAdmin
           check on the "+ Create Built-In Template" menu item; the server
           re-checks via SUPERUSER_EMAILS on save. */}
+
+      {/* Process description — deterministic, structured plain-text walk of the
+          current diagram. No AI; available even when the org disables AI. */}
+      {processDescription !== null && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setProcessDescription(null)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-800">Process description</h2>
+                <p className="text-[11px] text-gray-500">Generated deterministically from this diagram — no AI.</p>
+              </div>
+              <button onClick={() => setProcessDescription(null)} className="text-gray-400 hover:text-gray-700 text-lg leading-none" title="Close">×</button>
+            </div>
+            <pre className="flex-1 overflow-auto px-4 py-3 text-xs text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">{processDescription}</pre>
+            <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-200">
+              <button
+                onClick={() => { navigator.clipboard?.writeText(processDescription).then(() => { setDescriptionCopied(true); }, () => {}); }}
+                className="text-xs rounded border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+              >
+                {descriptionCopied ? "Copied ✓" : "Copy"}
+              </button>
+              <button onClick={() => setProcessDescription(null)} className="text-xs rounded bg-gray-800 px-3 py-1.5 text-white hover:bg-gray-700">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDiagramMaintenance && (
         <DiagramColorModal

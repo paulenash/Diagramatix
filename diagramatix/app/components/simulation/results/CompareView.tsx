@@ -12,6 +12,7 @@
 import { useState } from "react";
 import { type RunMetrics, fmtDelta, fmtMoney } from "@/app/lib/simulation/results";
 import { FlowHistogram } from "./FlowHistogram";
+import { useAiAllowed } from "@/app/lib/auth/useAiAllowed";
 
 export interface CompareEntry { key: string; name: string; isBaseline?: boolean; metrics: RunMetrics }
 
@@ -47,6 +48,7 @@ export function CompareView({ entries, assessFn }: {
   entries: CompareEntry[];
   assessFn?: () => Promise<{ assessment?: string; error?: string }>;
 }) {
+  const aiAllowed = useAiAllowed();
   const [assessment, setAssessment] = useState<string | null>(null);
   const [assessing, setAssessing] = useState(false);
   const [assessErr, setAssessErr] = useState<string | null>(null);
@@ -95,14 +97,14 @@ export function CompareView({ entries, assessFn }: {
         <div className="mb-2">
           {!assessment && (
             <button onClick={runAssessment} disabled={assessing} className="text-[10px] px-2 py-1 rounded border border-green-500/40 text-green-200 hover:bg-green-400/10 disabled:opacity-50">
-              {assessing ? "Assessing…" : "✨ Explain these results"}
+              {assessing ? "Assessing…" : aiAllowed ? "✨ Explain these results" : "Comparison summary"}
             </button>
           )}
           {assessErr && <p className="text-amber-400/80 text-[10px] mt-1">{assessErr}</p>}
           {assessment && (
             <div className="border border-green-500/40 rounded bg-green-400/5 px-2 py-1.5">
               <div className="flex items-center justify-between mb-0.5">
-                <span className="text-green-400/60 uppercase tracking-widest text-[9px]">AI assessment</span>
+                <span className="text-green-400/60 uppercase tracking-widest text-[9px]">{aiAllowed ? "AI assessment" : "Comparison summary"}</span>
                 <button onClick={runAssessment} disabled={assessing} className="text-green-400/50 hover:text-green-200 text-[9px] disabled:opacity-50">{assessing ? "…" : "↻ regenerate"}</button>
               </div>
               <p className="text-green-200/90 text-[11px] leading-relaxed whitespace-pre-line">{assessment}</p>

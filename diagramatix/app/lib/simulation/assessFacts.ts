@@ -83,6 +83,34 @@ export function buildComparisonFacts(base: RunMetrics, tobe: RunMetrics, baseNam
   return facts;
 }
 
+/**
+ * Deterministic "poor-man's" alternative to the AI assessment — a plain-English
+ * comparison templated from the same computed facts. Used as the fallback when AI
+ * is turned off for the org (ENT-05). Pure.
+ */
+export function summariseComparison(f: ComparisonFacts): string {
+  const dir = (pct: number) => (pct > 2 ? "faster" : pct < -2 ? "slower" : "about the same");
+  const signed = (pct: number) => `${pct >= 0 ? "+" : ""}${pct}%`;
+  const out: string[] = [];
+  out.push(`${f.tobeName} vs ${f.baseName} (${f.replications} replications):`);
+  out.push(`- Typical time per case (p50): ${r0(f.flow.baseTypical)} → ${r0(f.flow.tobeTypical)} ${f.unit} (${Math.abs(f.flow.typicalPctFaster)}% ${dir(f.flow.typicalPctFaster)}).`);
+  out.push(`- Near-worst per case (p95): ${r0(f.flow.baseNearWorst)} → ${r0(f.flow.tobeNearWorst)} ${f.unit} (${Math.abs(f.flow.nearWorstPctFaster)}% ${dir(f.flow.nearWorstPctFaster)}).`);
+  out.push(`- Spread (sd): ${r0(f.flow.baseSpreadSd)} → ${r0(f.flow.tobeSpreadSd)} ${f.unit} — ${f.flow.tobeSpreadSd < f.flow.baseSpreadSd ? "more predictable" : f.flow.tobeSpreadSd > f.flow.baseSpreadSd ? "less predictable" : "unchanged"}.`);
+  out.push(`- Throughput: ${r1(f.throughput.base)} → ${r1(f.throughput.tobe)} cases/${f.unit} (${signed(f.throughput.pctChange)}).`);
+  if (f.cost) {
+    const c = f.cost;
+    out.push(`- Cost per case: ${r0(c.basePerCase)} → ${r0(c.tobePerCase)} (${c.pctCheaper >= 0 ? `${c.pctCheaper}% cheaper` : `${Math.abs(c.pctCheaper)}% dearer`}; ${c.totalSaved >= 0 ? "saves" : "adds"} ${Math.abs(r0(c.totalSaved))} total).`);
+  }
+  if (f.bottleneck) {
+    const b = f.bottleneck;
+    out.push(`- Bottleneck (${b.team}): ${r0(b.baseUtilPct)}% → ${r0(b.tobeUtilPct)}% utilisation (${b.relievedPts >= 0 ? "relieved" : "worsened"} ${Math.abs(r0(b.relievedPts))} pts${b.fteFreed != null ? `, ~${r1(b.fteFreed)} FTE freed` : ""}).`);
+  }
+  const verdict = f.flow.typicalPctFaster > 2 ? "an improvement on flow time" : f.flow.typicalPctFaster < -2 ? "a regression on flow time" : "roughly neutral on flow time";
+  out.push(`Overall: ${f.tobeName} is ${verdict}${f.cost && f.cost.pctCheaper > 2 ? ` and cheaper per case` : ""}.`);
+  out.push(``, `(Summary generated deterministically — enable AI for a narrated assessment.)`);
+  return out.join("\n");
+}
+
 const ASSESS_SYSTEM = `You are a process-improvement analyst helping a business audience read a discrete-event simulation that compares two versions of the same process: a baseline ("as-is") and a proposed redesign ("to-be").
 
 You are given a JSON object of ALREADY-COMPUTED figures. Write a SHORT assessment — 2 to 4 sentences, plain English, no bullet points, no headings — that explains not just WHAT changed but WHY. Good causal explanations: lower bottleneck utilisation means work stops queueing, so both the typical time and its variability fall; a tighter spread (sd) or smaller typical→near-worst gap means the process is more predictable; cheaper cost-per-case comes from moving work to a lower-cost resource; equal throughput means both versions clear the same demand, so the win is speed/cost/predictability, not volume.

@@ -791,13 +791,15 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
               </div>
             </div>
 
-            {/* AI: explain what the mining revealed — lights up once fully mined.
-                Hidden entirely when the org disables AI. */}
-            {aiAllowed && (
+            {/* Explain results — lights up once fully mined. When the org allows AI it
+                narrates; when AI is off it falls back to a deterministic templated summary
+                (server picks the branch), so the card stays available either way. */}
             <div className={`mt-4 pt-3 border-t transition-colors ${allStepsDone ? "border-amber-500/60" : "border-stone-700"}`}>
-              <h3 className={`text-xs font-semibold mb-1 ${allStepsDone ? "text-amber-200" : "text-stone-500"}`}>Explain results</h3>
+              <h3 className={`text-xs font-semibold mb-1 ${allStepsDone ? "text-amber-200" : "text-stone-500"}`}>{aiAllowed ? "Explain results" : "Results summary"}</h3>
               <p className="text-[11px] text-stone-400 mb-2">
-                An AI summary of what the mining revealed — the real process, the conformance findings, timing, and the twin.
+                {aiAllowed
+                  ? "An AI summary of what the mining revealed — the real process, the conformance findings, timing, and the twin."
+                  : "A structured summary of what the mining revealed — the real process, the conformance findings and timing — computed deterministically (no AI)."}
               </p>
               {/* Prerequisites — the button lights up when every step is done. */}
               <ul className="text-[11px] mb-2.5 flex flex-col gap-0.5">
@@ -816,13 +818,13 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 ))}
               </ul>
               {allStepsDone
-                ? <p className="text-[11px] text-amber-300/80 mb-2">All steps complete — ready to explain.</p>
+                ? <p className="text-[11px] text-amber-300/80 mb-2">All steps complete — ready to summarise.</p>
                 : <p className="text-[11px] text-stone-500 mb-2">Complete the steps above to enable the summary.</p>}
               <div className="flex items-center gap-3 flex-wrap">
                 <button onClick={() => explain(selected.id)} disabled={!allStepsDone || explaining}
                   className={`text-xs rounded px-3 py-1.5 text-white disabled:cursor-not-allowed ${allStepsDone ? "bg-amber-600 hover:bg-amber-500 shadow-[0_0_16px_rgba(217,119,6,0.5)]" : "bg-stone-700/60 !text-stone-400"}`}
                   title={allStepsDone ? "Summarise what the mining discovered" : "Complete discovery + conformance first"}>
-                  {explaining ? "Analysing…" : "✨ Explain results"}
+                  {explaining ? "Analysing…" : aiAllowed ? "✨ Explain results" : "Summarise results"}
                 </button>
                 {explaining && <DiagramatixThrobber size={20} tone="amber" />}
               </div>
@@ -830,7 +832,6 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 <div className="mt-3 rounded border border-amber-500/40 bg-stone-900/70 p-3 text-[11px] text-stone-200 leading-relaxed whitespace-pre-wrap">{explanation}</div>
               )}
             </div>
-            )}
 
             {/* Admin: capture this run into the Mining-Example catalog */}
             {isAdmin && <SaveRunAsExample projectId={projectId} runId={selected.id} defaultTitle={selected.name} />}

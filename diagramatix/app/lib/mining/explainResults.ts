@@ -73,6 +73,49 @@ export function buildExplainPrompt(input: ExplainInput): string {
   return lines.filter((l) => l !== "").join("\n");
 }
 
+/**
+ * Deterministic "poor-man's" alternative to the AI explanation — a plain-English
+ * summary templated from the same computed metrics (paths, conformance, timing).
+ * Used as the fallback when AI is turned off for the org (ENT-05). Pure.
+ */
+export function summariseMiningResults(input: Omit<ExplainInput, "apiKey" | "model">): string {
+  const s = input.stats;
+  const span = s.from && s.to ? `${Math.round((s.to - s.from) / 86_400_000)} days` : "an unknown span";
+  const top = [...input.variants].sort((a, b) => b.count - a.count);
+  const total = s.cases || top.reduce((m, v) => m + v.count, 0) || 1;
+  const pct = (n: number) => Math.round((n / total) * 100);
+  const out: string[] = [];
+
+  out.push(`This log holds ${s.cases} cases and ${s.events} events across ${s.variants} distinct paths, over ~${span}.`);
+  if (top[0]) out.push(`- Most common path (${pct(top[0].count)}% of cases): ${top[0].events.join(" → ")}.`);
+  if (top[1]) out.push(`- Next most common (${pct(top[1].count)}%): ${top[1].events.join(" → ")}.`);
+  out.push(`- ${s.variants} distinct paths — ${s.variants > 20 ? "high variability" : s.variants > 5 ? "moderate variability" : "fairly standardised"}.`);
+
+  if (input.conformance) {
+    const c = input.conformance;
+    out.push(`Conformance vs the reference${input.referenceName ? ` "${input.referenceName}"` : ""}: ${(c.fitness * 100).toFixed(1)}% fit — ${c.conformingCases} of ${c.totalCases} cases replay cleanly.`);
+    if (c.violations.length) {
+      out.push(`Top deviations:`);
+      for (const v of c.violations.slice(0, 5)) out.push(`  - ${v.message} (${v.cases} case${v.cases === 1 ? "" : "s"}).`);
+    } else out.push(`- No deviations — every case conforms.`);
+  }
+
+  if (input.performance) {
+    const p = input.performance;
+    const durs = Object.entries(p.activityDurations ?? {})
+      .map(([a, xs]) => ({ a, mean: xs.length ? xs.reduce((m, n) => m + n, 0) / xs.length : 0 }))
+      .filter((d) => d.mean > 0).sort((x, y) => y.mean - x.mean);
+    if (durs[0]) out.push(`Slowest step on average: ${durs[0].a} (~${durs[0].mean.toFixed(1)} ${p.clockUnit}).`);
+    const rc = Object.entries(p.resourceConcurrency ?? {});
+    if (rc.length) { const b = rc.sort((a, z) => z[1] - a[1])[0]; out.push(`Busiest resource: ${b[0]} (peak concurrency ${b[1]}).`); }
+  }
+
+  const arte = [input.hasBpmn && "a BPMN process", input.hasStateMachine && "a state-machine lifecycle", input.hasTwin && "a simulation digital twin"].filter(Boolean);
+  if (arte.length) out.push(`Produced: ${arte.join(", ")}.`);
+  out.push(``, `(Summary generated deterministically — enable AI for a narrated explanation.)`);
+  return out.join("\n");
+}
+
 export async function explainMiningResults(input: ExplainInput): Promise<string> {
   const client = makeAnthropic(input.apiKey);
   const message = await client.messages.create({

@@ -9,9 +9,9 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
-import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
+import { orgPolicyAllows } from "@/app/lib/auth/orgPolicy";
 import type { RunMetrics } from "@/app/lib/simulation/results";
-import { buildComparisonFacts, generateSimAssessment } from "@/app/lib/simulation/assessFacts";
+import { buildComparisonFacts, generateSimAssessment, summariseComparison } from "@/app/lib/simulation/assessFacts";
 
 type Params = { params: Promise<{ id: string; studyId: string }> };
 
@@ -54,12 +54,6 @@ export async function POST(req: Request, { params }: Params) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-  const _pol = await gateOrgPolicy(session, "allowAi");
-  if (_pol) return _pol;
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "AI service not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 501 });
-
   const body = await req.json().catch(() => ({}));
   // Two modes: compare two SAVED runs (baselineRunId/compareRunId), or two
   // scenarios' latest runs (baselineScenarioId/compareScenarioId).
@@ -79,7 +73,17 @@ export async function POST(req: Request, { params }: Params) {
 
   const unit = base.metrics.clockUnit || tobe.metrics.clockUnit || "";
   const facts = buildComparisonFacts(base.metrics, tobe.metrics, base.name, tobe.name, unit);
-  const result = await generateSimAssessment({ apiKey, facts });
+
+  // Branch: AI narrates only when the org allows AI AND a key is configured.
+  // Otherwise fall back to the deterministic templated comparison (ENT-05) — a 200,
+  // not a 403 — so strict/AI-off tenants still get a Comparison summary.
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const aiOn = (await orgPolicyAllows(session, "allowAi")) && !!apiKey;
+  if (!aiOn) {
+    return NextResponse.json({ assessment: summariseComparison(facts), facts, deterministic: true });
+  }
+
+  const result = await generateSimAssessment({ apiKey: apiKey!, facts });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
   return NextResponse.json({ assessment: result.assessment, model: result.model, facts });
 }

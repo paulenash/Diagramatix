@@ -24,17 +24,26 @@ Turning AI off removes the **generative accelerators and AI narratives**, not th
 
 Voice is a **separate** flag (`allowVoiceAi`) gating `audio/transcribe` + `dictation/token` (Deepgram) — so you can keep AI text but block voice, or vice-versa. With voice off, dictation falls back to the browser's built-in speech engine.
 
+### Deterministic equivalents (graceful degradation, not a dead end)
+Three of the AI *narration* features are layered on top of numbers the platform **already computes deterministically** — so with AI off they fall back to a **templated summary of the same figures** instead of a 403. The output is plainer prose, but the facts are identical (and provably un-invented). Shipped:
+
+- **Mining "Results summary"** (`.../explain`) — `summariseMiningResults()` templates the discovered paths, conformance fitness + top deviations, and slowest step / busiest resource. The mining console card stays visible and relabels *Explain results → Results summary*.
+- **Simulation "Comparison summary"** (`.../assess`) — `summariseComparison()` templates the flow-time/throughput/cost/bottleneck deltas + a verdict. The compare panel button relabels *Explain these results → Comparison summary*.
+- **"Process description"** (Diagram ▾ menu, always available) — `buildPromptFromDiagram()` renders a structured plain-language walk of the current diagram. This is the deterministic counterpart of the AI *staff narrative*, surfaced through a standalone menu entry so it's reachable even when the AI panel is hidden.
+
+The route picks the branch server-side (`orgPolicyAllows("allowAi") && ANTHROPIC_API_KEY`); when AI is on it narrates, when off it returns the deterministic summary with `deterministic: true`. **True AI-only** features (diagram generation, Refine, AI-curate, model compare) have no deterministic equivalent and remain fully gated/hidden.
+
 ### What still works with AI off
 Nearly everything — Diagramatix is not an AI-first tool:
 - All **manual diagramming** + editing, pools/lanes/sublanes, smart connector routing, the **deterministic auto-layout** engines, templates, typography.
-- **DiagramatixMINER** — the core is **100% deterministic**: ingest event logs, **discover** processes/state-machines, run conformance. Only the optional AI-curate/explain layer is gated.
-- **Simulator** — full engine + runs + comparisons (only the AI verdict is lost).
+- **DiagramatixMINER** — the core is **100% deterministic**: ingest event logs, **discover** processes/state-machines, run conformance. Only AI-*curate* is gated; **Explain** falls back to a deterministic Results summary.
+- **Simulator** — full engine + runs + comparisons; the AI verdict falls back to a deterministic Comparison summary.
 - **Risk & Controls**, **APQC** browse/classify/folder-seed, **Publishing / Process Portal**, **Import/Export** (Visio, XES/OCEL, competitor-BPMN import), **Entity Structures**, sharing, backups.
 
 **Pitch:** *"With AI off you still have a complete manual + deterministic process-modelling, mining and GRC platform."*
 
 ### UI hiding (done)
-When AI is off, the AI entry points hide live — the Diagram toolbar **AI Generate** button, the mining **AI-curate** (process + state-machine) and **Explain results**, and the APQC **Create Process** button. Driven by the shared `useAiAllowed()` hook (`app/lib/auth/useAiAllowed.ts` = org policy + the SuperAdmin view-mode bypass), so a full-view SuperAdmin still sees them. The server routes enforce it regardless — this is UX polish so strict tenants never see a dead button.
+When AI is off, the true AI-only entry points hide live — the Diagram toolbar **AI Generate** button, the mining **AI-curate** (process + state-machine), and the APQC **Create Process** button. Driven by the shared `useAiAllowed()` hook (`app/lib/auth/useAiAllowed.ts` = org policy + the SuperAdmin view-mode bypass), so a full-view SuperAdmin still sees them. The server routes enforce it regardless — this is UX polish so strict tenants never see a dead button. The three features with deterministic equivalents (Explain results, Simulation assessment, staff narrative) **don't** hide — they relabel and return the templated summary (see above).
 
 ## Posture 2 — AI on, contained (the usual enterprise answer)
 
