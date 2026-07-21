@@ -88,7 +88,7 @@ Security-critical auth change; needs a dedicated session. Plan: replace the `SUP
 ## Local / on-prem LLM (`90ef4cb5`)
 On top of the `ANTHROPIC_BASE_URL` seam: **`AI_CUSTOM_MODELS`** (comma-separated `id|Label`) registers non-Claude models so they pass validation (`models.ts` `customModels()`/`allModels()`), appear in the SuperAdmin AI-Generate picker, and can be the default. Point `ANTHROPIC_BASE_URL` at a local Anthropic-compatible gateway (LiteLLM → vLLM/Ollama) and an air-gapped tenant runs AI Generate on a local model. Tests T0931-T0933. Full guide + AI-off impacts + posture spectrum in [09](09-ai-off-and-local-llm.md). Remaining for full on-prem: multimodal model for image/PDF ingestion (customer infra) + the dedicated-instance packaging (Workstream B).
 
-## Deterministic AI-off fallbacks — 3 cheap wins (`__COMMIT__`)
+## Deterministic AI-off fallbacks — 3 cheap wins (`68a83e2e`)
 Three AI *narration* features are layered on numbers the platform already computes, so with AI off they now **degrade gracefully to a templated summary** instead of a 403/hidden button:
 - **Mining "Results summary"** — `summariseMiningResults()` in `explainResults.ts`; the `.../explain` route branches on `orgPolicyAllows("allowAi") && ANTHROPIC_API_KEY`, returning `{ explanation, deterministic: true }` when off. The console card stays visible and relabels *Explain results → Results summary*. Tests T0934-T0935.
 - **Simulation "Comparison summary"** — `summariseComparison()` in `assessFacts.ts`; the `.../assess` route branches the same way (`{ assessment, facts, deterministic: true }`). `CompareView` relabels *Explain these results → Comparison summary* via `useAiAllowed()`. Tests T0936-T0937.
