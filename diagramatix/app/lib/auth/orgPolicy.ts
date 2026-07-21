@@ -83,6 +83,21 @@ export async function orgPolicyAllows(session: Session, key: OrgPolicyKey): Prom
 }
 
 /**
+ * ENT-06 — whether pre-egress AI redaction is ON for the caller's active org.
+ * Unlike the `allow*` gates this is a behavioural modifier (default OFF), not a
+ * 403, so it lives outside ORG_POLICY_KEYS. Binds like the other policy: a
+ * full-view SuperAdmin (vendor operator) is not bound, so they see raw output —
+ * which is also how you demo the difference by cycling the logo into orgadmin view.
+ */
+export async function orgRedactionEnabled(session: Session): Promise<boolean> {
+  if (!(await policyBindsCaller(session))) return false;
+  const orgId = await tryGetCurrentOrgId(session, await cookies());
+  if (!orgId) return false;
+  const org = await prisma.org.findUnique({ where: { id: orgId }, select: { aiRedaction: true } });
+  return org?.aiRedaction ?? false;
+}
+
+/**
  * Route guard: returns a 403 NextResponse when the caller's active org disables
  * `key`, else null. Usage:
  *   const blocked = await gateOrgPolicy(session, "allowAi");

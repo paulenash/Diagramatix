@@ -91,6 +91,9 @@ model Org {
   // Access policy (A3d, ENT-04): when true, members can't sign in with a password —
   // they must use Microsoft single sign-on. Enforced in verifyCredentials.
   requireSso          Boolean @default(false)
+  // AI privacy (ENT-06): when true, identifiable names are pseudonymised before an
+  // AI prompt leaves the tenant and restored in the reply. Opt-in (default off).
+  aiRedaction         Boolean @default(false)
 
   members             OrgMember[]
   memberTeams         OrgMemberTeam[]

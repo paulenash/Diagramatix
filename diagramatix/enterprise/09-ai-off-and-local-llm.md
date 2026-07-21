@@ -7,7 +7,7 @@
 | Posture | For | How | State |
 |---|---|---|---|
 | **1. AI off** | Tenants that forbid third-party AI | `Org.allowAi = false` (Org Settings → Data & AI Governance, or Enterprise Mode) | ✅ shipped (A1c) |
-| **2. AI on, contained** | Tenants OK with AI under their control | `ANTHROPIC_BASE_URL` (their proxy/region), BYO key, Anthropic ZDR/no-train, or pre-egress redaction | ✅ proxy/key shipped · redaction deferred (ENT-06) |
+| **2. AI on, contained** | Tenants OK with AI under their control | `ANTHROPIC_BASE_URL` (their proxy/region), BYO key, Anthropic ZDR/no-train, or pre-egress redaction | ✅ proxy/key + structured-narrator redaction shipped (ENT-06) |
 | **3. AI on-prem (local LLM)** | Air-gapped / no-external-AI shops | `ANTHROPIC_BASE_URL` → local gateway + `AI_CUSTOM_MODELS` | ✅ plumbing shipped |
 
 ## Posture 1 — AI off: impacts
@@ -51,7 +51,7 @@ Most enterprises want control over *where the data goes*, not "no AI ever":
 - **Own gateway** — set `ANTHROPIC_BASE_URL` to the customer's proxy / private endpoint (their region, their logging/DLP). No traffic to the public Anthropic endpoint. (Shipped — one env, all client sites honour it.)
 - **Bring-your-own key** — the customer's Anthropic account/billing/agreement.
 - **Anthropic ZDR + no-training** contractual terms (arrange at account level; document in the DPA).
-- **Pre-egress redaction** (`aiRedaction`, ENT-06 — deferred) — pseudonymise names/systems before the prompt leaves; restore in the output.
+- **Pre-egress redaction** (`aiRedaction`, ENT-06 — shipped for the structured narrators) — when on, identifiable names (people/teams/systems, diagram/scenario/run names) are pseudonymised to `Entity_N` tokens **before** the prompt leaves the tenant and restored in the reply, so the AI vendor never sees them. The mapping is a **known-vocabulary** exact swap (`app/lib/ai/redaction.ts`, `makeRedactor`) — reliable, no NER guesswork — applied to **staff narrative** (client sends the pool/lane/system labels), **mining Explain** (resource + run/reference names; activity labels kept as process vocabulary) and **sim Assess** (scenario + team names). OrgAdmin toggles it in Org Settings → Data & AI Governance. *Best-effort / not yet covered:* free-text raw AI-Generate prompts and the audio transcript, where names aren't known ahead of time (NER-hard); the transcript already role-anonymises people in its own system prompt.
 
 ## Posture 3 — On-prem / local LLM
 
@@ -80,4 +80,4 @@ Every AI call goes through `makeAnthropic()` (`app/lib/ai/anthropicClient.ts`) u
 Best as the **"on-prem AI" option of the dedicated single-tenant instance tier** (Workstream B). For everyone else, Posture 2 (contained) is easier and higher quality.
 
 ## Summary
-Diagramatix can meet an enterprise anywhere on the spectrum: **off** (deterministic platform, no AI egress), **contained** (proxy / BYO-key / ZDR / redaction), or **on-prem** (local model, no external AI). Postures 1 and the proxy/local-model parts of 2 & 3 are shipped; redaction (ENT-06) and the dedicated-instance packaging remain.
+Diagramatix can meet an enterprise anywhere on the spectrum: **off** (deterministic platform, no AI egress), **contained** (proxy / BYO-key / ZDR / redaction), or **on-prem** (local model, no external AI). Postures 1 and 2 (proxy/key + structured-narrator redaction) and the local-model plumbing of 3 are shipped; the free-text/transcript redaction tail and the dedicated-instance packaging remain.

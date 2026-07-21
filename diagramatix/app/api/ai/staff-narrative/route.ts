@@ -11,7 +11,8 @@
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
+import { gateOrgPolicy, orgRedactionEnabled } from "@/app/lib/auth/orgPolicy";
+import { makeRedactor } from "@/app/lib/ai/redaction";
 import { prisma } from "@/app/lib/db";
 import {
   generateStaffNarrative,
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
       { status: 503 },
     );
   }
-  const { technicalDescription } = await req.json();
+  const { technicalDescription, entityHints } = await req.json();
   if (typeof technicalDescription !== "string" || !technicalDescription.trim()) {
     return NextResponse.json({ error: "technicalDescription is required" }, { status: 400 });
   }
@@ -58,11 +59,18 @@ export async function POST(req: Request) {
     briefing = buildStaffNarrativeBriefing(dr?.rules);
   } catch { /* proceed with hard-coded default */ }
 
+  // ENT-06: when the org opts in, pseudonymise the named people/teams/systems
+  // (sent by the client as entityHints — the pool/lane/participant/system labels)
+  // before the description egresses, and restore them in the narrative.
+  const redactor = (await orgRedactionEnabled(session)) && Array.isArray(entityHints)
+    ? makeRedactor(entityHints as (string | null | undefined)[])
+    : undefined;
+
   const result = await generateStaffNarrative({
     apiKey,
     technicalDescription,
     briefing,
-  });
+  }, redactor);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

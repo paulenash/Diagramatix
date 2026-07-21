@@ -8,6 +8,7 @@
  */
 import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import type { Redactor } from "@/app/lib/ai/redaction";
 import type { RunMetrics } from "./results";
 
 // Model resolved centrally via getAiGenerateModel() (was pinned to claude-opus-4-8)
@@ -126,19 +127,22 @@ export type SimAssessmentResult =
   | { ok: true; assessment: string; model: string }
   | { ok: false; status: number; error: string };
 
-export async function generateSimAssessment(args: { apiKey: string; facts: ComparisonFacts }): Promise<SimAssessmentResult> {
+export async function generateSimAssessment(args: { apiKey: string; facts: ComparisonFacts }, redactor?: Redactor): Promise<SimAssessmentResult> {
   const model = await getAiGenerateModel();
   const client = makeAnthropic(args.apiKey);
+  // ENT-06: pseudonymise scenario/team names in the facts JSON before egress,
+  // restore them in the reply. redactor is undefined (no-op) unless the org opts in.
+  const payload = JSON.stringify(args.facts, null, 2);
   try {
     const message = await client.messages.create({
       model,
       max_tokens: 512,
       system: ASSESS_SYSTEM,
-      messages: [{ role: "user", content: JSON.stringify(args.facts, null, 2) }],
+      messages: [{ role: "user", content: redactor ? redactor.redact(payload) : payload }],
     });
     const block = message.content.find((b) => b.type === "text");
     if (!block || block.type !== "text") return { ok: false, status: 500, error: "No response from AI" };
-    return { ok: true, assessment: block.text.trim(), model };
+    return { ok: true, assessment: redactor ? redactor.restore(block.text.trim()) : block.text.trim(), model };
   } catch (err) {
     return { ok: false, status: 500, error: `Assessment failed: ${err instanceof Error ? err.message : String(err)}` };
   }

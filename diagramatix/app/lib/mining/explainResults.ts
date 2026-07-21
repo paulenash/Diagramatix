@@ -7,6 +7,7 @@
  * deterministic mining; the numbers come from the run, the model just narrates.
  */
 import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
+import type { Redactor } from "@/app/lib/ai/redaction";
 import type { Variant, MiningStats, Performance } from "./types";
 import type { ConformanceResult } from "./transitionConformance";
 
@@ -116,15 +117,19 @@ export function summariseMiningResults(input: Omit<ExplainInput, "apiKey" | "mod
   return out.join("\n");
 }
 
-export async function explainMiningResults(input: ExplainInput): Promise<string> {
+export async function explainMiningResults(input: ExplainInput, redactor?: Redactor): Promise<string> {
   const client = makeAnthropic(input.apiKey);
+  // ENT-06: pseudonymise identifiable names in the prompt before egress, restore
+  // them in the reply. redactor is undefined (no-op) unless the org opts in.
+  const prompt = buildExplainPrompt(input);
   const message = await client.messages.create({
     model: input.model,
     max_tokens: 1400,
     system: SYSTEM,
-    messages: [{ role: "user", content: buildExplainPrompt(input) }],
+    messages: [{ role: "user", content: redactor ? redactor.redact(prompt) : prompt }],
   });
   const block = message.content.find((b) => b.type === "text");
   if (!block || block.type !== "text") throw new Error("No AI response");
-  return block.text.trim();
+  const text = block.text.trim();
+  return redactor ? redactor.restore(text) : text;
 }

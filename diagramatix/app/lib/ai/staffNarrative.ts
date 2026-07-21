@@ -9,6 +9,7 @@
  */
 import { makeAnthropic } from "@/app/lib/ai/anthropicClient";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import type { Redactor } from "@/app/lib/ai/redaction";
 
 // Model is resolved centrally via getAiGenerateModel() (the admin AI-model
 // setting) so an enterprise sees and controls a single model across all AI
@@ -90,7 +91,7 @@ export async function generateStaffNarrative(args: {
   apiKey: string;
   technicalDescription: string;
   briefing: string;
-}): Promise<StaffNarrativeResult> {
+}, redactor?: Redactor): Promise<StaffNarrativeResult> {
   const { apiKey, technicalDescription, briefing } = args;
   const trimmed = technicalDescription.trim();
   if (!trimmed) {
@@ -100,17 +101,21 @@ export async function generateStaffNarrative(args: {
   const model = await getAiGenerateModel();
   const client = makeAnthropic(apiKey);
   try {
+    // ENT-06: pseudonymise the named people/teams/systems in the technical
+    // description before egress, restore them in the narrative. redactor is
+    // undefined (no-op) unless the org opts in.
     const message = await client.messages.create({
       model,
       max_tokens: 2048,
       system: systemPrompt,
-      messages: [{ role: "user", content: trimmed }],
+      messages: [{ role: "user", content: redactor ? redactor.redact(trimmed) : trimmed }],
     });
     const textBlock = message.content.find((b) => b.type === "text");
     if (!textBlock || textBlock.type !== "text") {
       return { ok: false, status: 500, error: "No response from AI" };
     }
-    return { ok: true, narrative: textBlock.text.trim(), model };
+    const narrative = redactor ? redactor.restore(textBlock.text.trim()) : textBlock.text.trim();
+    return { ok: true, narrative, model };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, status: 500, error: `Staff narrative generation failed: ${msg}` };

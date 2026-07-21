@@ -94,6 +94,7 @@ export async function GET(_req: Request, { params }: Params) {
       allowSharePoint: true,
       allowSupportDiagram: true,
       requireSso: true,
+      aiRedaction: true,
       createdAt: true,
       _count: { select: { members: true, projects: true, diagrams: true } },
     },
@@ -158,6 +159,8 @@ export async function PUT(req: Request, { params }: Params) {
   }
   // Access policy: require SSO (A3d) — same OrgAdmin/SuperAdmin gate as above.
   if (typeof bodyRec.requireSso === "boolean") updates.requireSso = bodyRec.requireSso;
+  // AI privacy: pre-egress redaction (ENT-06) — same OrgAdmin/SuperAdmin gate.
+  if (typeof bodyRec.aiRedaction === "boolean") updates.aiRedaction = bodyRec.aiRedaction;
 
   // SuperAdmin-only fields. Done with a separate isSuperuser check
   // rather than another gate() call because gate() conflates
@@ -209,6 +212,7 @@ export async function PUT(req: Request, { params }: Params) {
       allowSharePoint: true,
       allowSupportDiagram: true,
       requireSso: true,
+      aiRedaction: true,
       createdAt: true,
       _count: { select: { members: true, projects: true, diagrams: true } },
     },

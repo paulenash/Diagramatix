@@ -23,6 +23,7 @@ export interface OrgDetail {
   allowSharePoint: boolean;
   allowSupportDiagram: boolean;
   requireSso: boolean;
+  aiRedaction: boolean;
   createdAt: string;
   memberCount: number;
   projectCount: number;
@@ -96,6 +97,7 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
     allowSharePoint: org.allowSharePoint, allowSupportDiagram: org.allowSupportDiagram,
   });
   const [requireSso, setRequireSso] = useState(org.requireSso);
+  const [aiRedaction, setAiRedaction] = useState(org.aiRedaction);
   useEffect(() => {
     setName(org.name);
     setAllowCrossOrg(org.allowCrossOrgSharing);
@@ -104,7 +106,8 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
       allowSharePoint: org.allowSharePoint, allowSupportDiagram: org.allowSupportDiagram,
     });
     setRequireSso(org.requireSso);
-  }, [org.id, org.name, org.allowCrossOrgSharing, org.allowAi, org.allowVoiceAi, org.allowExternalExport, org.allowSharePoint, org.allowSupportDiagram, org.requireSso]);
+    setAiRedaction(org.aiRedaction);
+  }, [org.id, org.name, org.allowCrossOrgSharing, org.allowAi, org.allowVoiceAi, org.allowExternalExport, org.allowSharePoint, org.allowSupportDiagram, org.requireSso, org.aiRedaction]);
 
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
@@ -137,7 +140,7 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
   // SuperAdmin and OrgAdmin; name/entityType are SuperAdmin-only (the
   // server re-checks).
   const saveField = useCallback(
-    async (patch: Partial<{ name: string; entityType: OrgEntityType; allowCrossOrgSharing: boolean; requireSso: boolean } & Record<PolicyKey, boolean>>) => {
+    async (patch: Partial<{ name: string; entityType: OrgEntityType; allowCrossOrgSharing: boolean; requireSso: boolean; aiRedaction: boolean } & Record<PolicyKey, boolean>>) => {
       setSaving(true);
       setSavedMessage(null);
       try {
@@ -456,6 +459,32 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
                 title={requireSso ? "SSO required" : "Password login allowed"}
               >
                 <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${requireSso ? "translate-x-5" : "translate-x-0.5"}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* ── AI privacy — pre-egress redaction (ENT-06) ───────────── */}
+          <div className="bg-white rounded-md border border-gray-200">
+            <div className="flex items-start justify-between gap-4 px-5 py-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-800">Pseudonymise names before AI</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  When ON and AI is allowed, identifiable names (people, teams, systems, diagram and
+                  scenario names) are replaced with neutral placeholders <em>before</em> a prompt leaves
+                  your tenant for Anthropic, then restored in the reply — so the AI vendor never sees the
+                  real names. Applies to staff narratives, mining explanations and simulation assessments.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={aiRedaction}
+                disabled={saving}
+                onClick={() => { const next = !aiRedaction; setAiRedaction(next); saveField({ aiRedaction: next }); }}
+                className={`shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${aiRedaction ? "bg-blue-600" : "bg-gray-300"}`}
+                title={aiRedaction ? "Names pseudonymised before egress" : "Names sent as-is"}
+              >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${aiRedaction ? "translate-x-5" : "translate-x-0.5"}`} />
               </button>
             </div>
           </div>

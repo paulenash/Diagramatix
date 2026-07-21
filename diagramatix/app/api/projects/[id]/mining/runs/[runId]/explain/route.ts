@@ -9,9 +9,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
-import { orgPolicyAllows } from "@/app/lib/auth/orgPolicy";
+import { orgPolicyAllows, orgRedactionEnabled } from "@/app/lib/auth/orgPolicy";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { makeRedactor } from "@/app/lib/ai/redaction";
 import { explainMiningResults, summariseMiningResults } from "@/app/lib/mining/explainResults";
 import type { Variant, MiningStats, Performance } from "@/app/lib/mining/types";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
@@ -67,8 +68,19 @@ export async function POST(_req: Request, { params }: Params) {
   const userId = session?.user?.id;
   if (userId) { const block = await gateLimit(userId, "aiAttempts"); if (block) return block; }
 
+  // ENT-06: when the org opts in, pseudonymise identifiable names (resource names +
+  // the run/reference names) before the prompt egresses. Activity/state labels are
+  // process vocabulary and left intact so the explanation stays meaningful.
+  const perf = base.performance;
+  const resourceNames = perf
+    ? [...Object.keys(perf.resourceConcurrency ?? {}), ...Object.values(perf.activityResource ?? {})]
+    : [];
+  const redactor = (await orgRedactionEnabled(session))
+    ? makeRedactor([base.runName, base.referenceName, ...resourceNames])
+    : undefined;
+
   try {
-    const explanation = await explainMiningResults({ apiKey: apiKey!, model: await getAiGenerateModel(), ...base });
+    const explanation = await explainMiningResults({ apiKey: apiKey!, model: await getAiGenerateModel(), ...base }, redactor);
     if (userId) await recordUsage(userId, "aiAttempts");
     return NextResponse.json({ explanation });
   } catch (err) {

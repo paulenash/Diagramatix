@@ -9,7 +9,8 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
-import { orgPolicyAllows } from "@/app/lib/auth/orgPolicy";
+import { orgPolicyAllows, orgRedactionEnabled } from "@/app/lib/auth/orgPolicy";
+import { makeRedactor } from "@/app/lib/ai/redaction";
 import type { RunMetrics } from "@/app/lib/simulation/results";
 import { buildComparisonFacts, generateSimAssessment, summariseComparison } from "@/app/lib/simulation/assessFacts";
 
@@ -83,7 +84,13 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ assessment: summariseComparison(facts), facts, deterministic: true });
   }
 
-  const result = await generateSimAssessment({ apiKey: apiKey!, facts });
+  // ENT-06: when the org opts in, pseudonymise the scenario + team names in the
+  // facts before egress; the numbers are untouched and restored names come back.
+  const redactor = (await orgRedactionEnabled(session))
+    ? makeRedactor([facts.baseName, facts.tobeName, facts.bottleneck?.team])
+    : undefined;
+
+  const result = await generateSimAssessment({ apiKey: apiKey!, facts }, redactor);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
   return NextResponse.json({ assessment: result.assessment, model: result.model, facts });
 }

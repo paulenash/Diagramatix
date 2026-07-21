@@ -24,11 +24,12 @@ Phase A1 (governance foundations) is on `main`. Closed or partially closed:
 | **ENT-12 (no GDPR erasure)** | ✅ Closed (A3a) | self-service `DELETE /api/account` + orphan-org cleanup + audit |
 | **ENT-14 (AI prompt retained)** | ✅ Closed (A3b) | `aiComparison` stores prompt length only; text opt-in via env |
 | **ENT-04 (no SAML/MFA)** | 🟡 Partial (A3d) | per-org **requireSso** (force Entra) + domain-restricted registration; full SAML/OIDC + email verification + MFA still open |
+| **ENT-06 (identifiable content to AI)** | ✅ Mostly (A3c) | per-org **aiRedaction** — reversible pseudonymisation before egress on the structured narrators (staff-narrative, mining explain, sim assess); free-text raw prompts + transcript remain best-effort (transcript already role-anonymises in-prompt) |
 
 Also new: a customer-admin **"Data & AI Governance"** panel (org-settings) with per-capability
 toggles + **Apply Enterprise Mode**, and all AI now runs on the single admin-selected model.
-Remaining high-severity items (ENT-01/03/04/06) are Phase A2/A3. The rows below are the original
-assessment (pre-remediation).
+Remaining high-severity items (ENT-01/04) are Phase A2/A3; ENT-06 is mostly closed (A3c). The rows
+below are the original assessment (pre-remediation).
 
 ## Register
 

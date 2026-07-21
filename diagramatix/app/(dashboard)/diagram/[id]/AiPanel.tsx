@@ -240,6 +240,14 @@ export function AiPanel({
       setError("Diagram is empty — nothing to narrate yet.");
       return;
     }
+    // ENT-06 hints: the identifiable names (pools/lanes = orgs/teams/systems/roles,
+    // data objects/stores = systems/artefacts) the server pseudonymises before egress
+    // when the org enables AI redaction. Activity/task labels are process vocabulary,
+    // deliberately excluded so the narrative stays meaningful.
+    const NAME_TYPES = new Set(["pool", "lane", "sublane", "data-object", "data-store"]);
+    const entityHints = (currentElements ?? [])
+      .filter((e) => NAME_TYPES.has(e.type) && typeof e.label === "string" && e.label.trim())
+      .map((e) => e.label as string);
     setNarrativeGenerating(true);
     setError(null);
     setStatus("Generating the staff narrative (15–30 s)…");
@@ -247,7 +255,7 @@ export function AiPanel({
       const res = await fetch("/api/ai/staff-narrative", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ technicalDescription }),
+        body: JSON.stringify({ technicalDescription, entityHints }),
       });
       const json = await res.json();
       if (!res.ok) {

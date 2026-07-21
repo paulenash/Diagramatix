@@ -1006,6 +1006,20 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0246 | (buildStaffNarrativeBriefing) appends additional house-style rules under a heading for a new-style row | House-style additions not reaching the AI, or losing the default | If additions weren't appended under the heading alongside the default |
 | T0247 | (buildStaffNarrativeBriefing) uses a legacy full-briefing verbatim | A legacy briefing being doubled or wrapped instead of used as-is | If a legacy full briefing weren't returned verbatim |
 
+### `tests/ai/redaction.test.ts` + `redaction-wiring.test.ts` — pre-egress AI redaction (ENT-06)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0938 | redacts known names to opaque `Entity_N` tokens (no real name crosses the wire) | Identifiable content reaching the AI vendor when redaction is on | If `makeRedactor` stopped replacing a known literal |
+| T0939 | restore is an exact inverse (round-trips the model's reply) | The user seeing raw `Entity_N` tokens instead of real names | If restore dropped or mis-mapped a token |
+| T0940 | longest-first: an overlapping name isn't half-replaced | "Accounts Payable Clerk" becoming "\<token\> Clerk" | If the length-desc ordering were removed |
+| T0941 | boundary-aware: substrings of larger words are left alone | "IT" the team redacting inside "WAIT"/"ITEM" | If the alphanumeric flank guards were dropped |
+| T0942 | restore handles a possessive and doesn't clip `Entity_10` | `Entity_1` matching inside `Entity_10`; `Entity_1's` mis-restoring | If restore stopped being boundary-aware |
+| T0943 | filters junk (blank / single-char / pure-number) and dedupes | Noise tokens or unstable placeholder numbering | If `cleanEntities` stopped filtering/deduping |
+| T0944 | an empty vocabulary yields the identity redactor (no-op) | Needless work / accidental mangling when nothing is sensitive | If the empty-list short-circuit were removed |
+| T0945 | (wiring) staff-narrative sends tokens only, restores real names in the result | A future edit redacting the prompt but forgetting to restore, or sending raw | If the lib stopped redacting-before-send or restoring-after |
+| T0946 | (wiring) with no redactor, the raw description is sent unchanged | Redaction silently altering prompts when the org hasn't opted in | If the `redactor ?` guard were inverted/removed |
+
 ### `tests/staffNarrativeBriefing.test.ts` — Staff-narrative briefing assembly (no doubling)
 
 | Ref | Test | Protects you against | How it would break (go red) |
