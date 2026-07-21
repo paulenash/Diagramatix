@@ -21,6 +21,9 @@ Phase A1 (governance foundations) is on `main`. Closed or partially closed:
 | **ENT-02 (impersonation)** | ✅ Mostly (A2a/b) | HttpOnly+Secure cookies, audited start/stop, edit needs a reason + 1h time-box. Remaining: per-mutation logging |
 | **ENT-13 (30-day sessions)** | ✅ Closed (A2d) | configurable `maxAge` (7-day default) + rolling refresh |
 | **ENT-01 (SuperAdmin emails)** | 🟡 Detectable | now audit-logged (A2a); stored-role + MFA deferred to A2c |
+| **ENT-12 (no GDPR erasure)** | ✅ Closed (A3a) | self-service `DELETE /api/account` + orphan-org cleanup + audit |
+| **ENT-14 (AI prompt retained)** | ✅ Closed (A3b) | `aiComparison` stores prompt length only; text opt-in via env |
+| **ENT-04 (no SAML/MFA)** | 🟡 Partial (A3d) | per-org **requireSso** (force Entra) + domain-restricted registration; full SAML/OIDC + email verification + MFA still open |
 
 Also new: a customer-admin **"Data & AI Governance"** panel (org-settings) with per-capability
 toggles + **Apply Enterprise Mode**, and all AI now runs on the single admin-selected model.

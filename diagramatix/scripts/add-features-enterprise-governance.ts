@@ -34,9 +34,11 @@ const DETAILS = [
   "",
   "**Accountability.** An append-only **Audit Log** records every privileged action — administrator impersonation (with a required reason and a time-boxed session), data exports and backups, deletions and policy changes — so you can see who did what, when, to which tenant.",
   "",
-  "**Access & isolation.** Role-scoped administration (Organisation Admin vs system operator), tenant-isolated data, cross-organisation sharing off by default, and a configurable session lifetime.",
+  "**Access & isolation.** Role-scoped administration (Organisation Admin vs system operator), tenant-isolated data, cross-organisation sharing off by default, a configurable session lifetime, and the option to **require Microsoft single sign-on** for your organisation (plus a self-registration domain allowlist).",
   "",
-  "*On the roadmap:* single sign-on (SAML / OIDC) with MFA, self-service data erasure, dedicated single-tenant / in-region instances, and SOC 2 Type II.",
+  "**Privacy.** Self-service **account deletion** (right to erasure) that removes your data and cleans up behind you; AI prompt text isn't retained by default.",
+  "",
+  "*On the roadmap:* bring-your-own IdP (SAML / OIDC) with MFA, dedicated single-tenant / in-region instances, and SOC 2 Type II.",
 ].join("\n");
 
 async function main() {

@@ -9,7 +9,7 @@
 | Analysis + plan | docs 00–06 | ✅ shipped (`e21cf62b`) |
 | **A1** Governance foundations | policy engine, AI proxy seam, quick fixes | ✅ **shipped** (`98f3e996`, `2f54b363`, `b3b1c0c3`, status `e794779a`) |
 | **A2** Accountability | audit log, impersonation hardening, session policy, acting-view downgrade | 🟡 **mostly shipped** — A2c (SuperAdmin role + MFA) deferred |
-| **A3** Enterprise identity & privacy | SAML/OIDC+SCIM, GDPR erasure, AI redaction, dedicated-instance tier | ⬜ planned |
+| **A3** Enterprise identity & privacy | GDPR erasure, AI retention, require-SSO + reg. hardening (shipped); SAML/OIDC+SCIM, email-verify, AI redaction, dedicated-instance (deferred) | 🟡 **partly shipped** |
 | B | Deployment tiers (dedicated instance) | ⬜ planned |
 | C | Questionnaire pack + SOC 2 Type II | ⬜ planned |
 
@@ -70,6 +70,18 @@ Security-critical auth change; needs a dedicated session. Plan: replace the `SUP
 - A3: SAML/generic-OIDC + `requireSso` enforcement + SCIM; GDPR self-erasure (`DELETE /api/account`); pre-egress AI redaction (`aiRedaction` flag, prioritise narrative/transcript); least-privilege Graph scope option.
 - B: dedicated single-tenant instance (parameterise `azure-deploy.yml` per instance: region, keys, secrets; ops runbook).
 - C: questionnaire pack (data-flow from doc 01, sub-processor list, DPA, SIG/CAIQ answers) now; SOC 2 Type II via Vanta/Drata once pipeline justifies.
+
+## Phase A3 — Enterprise identity & privacy 🟡 (2026-07-20)
+
+- **A3a — GDPR self-service erasure** (`a2b385cd`, ENT-12): `DELETE /api/account` (type-your-email confirm) → `app/lib/account/eraseUser.ts` deletes the user (cascade) + removes any org they leave completely empty (Project/Diagram are `onDelete:Restrict` on the org, so a shared org is skipped, never errored). Blocked for SuperAdmins + while impersonating; audited (`user.self-delete`). "Delete my account" danger zone in the Account modal. Tests T0925-T0927.
+- **A3b — AI content retention** (`cf70552b`, ENT-14): the SuperAdmin model-comparison result no longer persists the raw prompt (customer content) — only its length; retaining the text is opt-in via `AI_COMPARE_STORE_PROMPT=1`.
+- **A3d — Identity hardening** (`66b1e4c6`, ENT-04 partial): `Org.requireSso` — when on, `verifyCredentials` blocks password login for that org's members (must use Microsoft SSO; returns null to preserve the timing/enum profile), toggle in Org Settings. `REGISTRATION_ALLOWED_DOMAINS` env — optional self-registration domain allowlist (`registerUser` → 403). Tests T0928-T0930.
+
+### Deferred — A3 mega-items (dedicated sessions)
+- **Full SSO/SAML + generic OIDC per-org + SCIM** (ENT-04 core) — a large auth-core feature (per-org IdP config, SAML library, callback routes). `requireSso` (A3d) already leverages the existing Entra SSO; this is the customer-brings-their-own-IdP piece.
+- **Email verification** on signup — a full token+email+verify+login-gate flow (reuse the password-reset token pattern).
+- **Reversible pre-egress AI redaction** (ENT-06) — pseudonymise people/team/system names before the prompt leaves the tenant, restore in the output (`aiRedaction` org flag). Complex (reversible mapping over free-text); prioritise staff-narrative + transcript.
+- **Dedicated single-tenant instance tier** (Workstream B) — parameterise `azure-deploy.yml` per instance (region, keys, secrets) + an ops runbook.
 
 ## Collateral kept in sync
 - **Feature catalog** — `scripts/add-features-enterprise-governance.ts` (a LIVING draft entry "Enterprise Governance & Security"; upserts-and-updates on every run, incl. on deploy). Lands as a **draft** — a SuperAdmin clicks Publish in `/dashboard/admin/features` to make it public.
