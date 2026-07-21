@@ -105,7 +105,9 @@ export async function planFlowchart(opts: PlanFlowchartOptions): Promise<PlanFlo
 
   const message = await client.messages.create({
     model,
-    max_tokens: 8192,
+    // See planBpmn: 8192 truncated larger plans mid-JSON on verbose models. 16000
+    // is the largest every offered model accepts.
+    max_tokens: 16000,
     system: systemPrompt,
     messages: [{ role: "user", content: userContent }],
   });

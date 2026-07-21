@@ -384,7 +384,11 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
 
   const message = await client.messages.create({
     model,
-    max_tokens: 8192,
+    // Output cap for the plan JSON. 8192 truncated larger diagrams mid-JSON on
+    // verbose models (Fable/Sonnet → parse-fail or "No response"), while concise
+    // models fit. 16000 is the largest every offered model (Claude + Kimi K3)
+    // accepts, giving big diagrams room to close the object.
+    max_tokens: 16000,
     system: systemPrompt,
     messages: [{ role: "user", content: userContent }],
   });
