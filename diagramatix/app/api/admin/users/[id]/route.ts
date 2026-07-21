@@ -39,6 +39,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser, SUPERUSER_EMAILS } from "@/app/lib/superuser";
+import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
 
 export async function DELETE(
   req: Request,
@@ -102,6 +103,12 @@ export async function DELETE(
   // Single delete — Prisma's onDelete:Cascade rules on the dependents
   // (Diagram, Project, OrgMember, DiagramTemplate, Prompt, DiagramRules,
   // UsageCounter) handle the rest. DiagramHistory cascades from Diagram.
+  await recordAudit({
+    actorUserId: session?.user?.id ?? null, actorEmail: session?.user?.email ?? null,
+    action: AUDIT.UserDelete, targetType: "user", targetId: target.id,
+    meta: { targetEmail: target.email, projects: target._count.projects, diagrams: target._count.diagrams },
+    ip: ipFromRequest(req),
+  });
   await prisma.user.delete({ where: { id } });
 
   return NextResponse.json({

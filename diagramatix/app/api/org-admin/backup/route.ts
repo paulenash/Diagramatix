@@ -26,6 +26,7 @@ import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { parseFullBackup, inspectFullBackup, type AdditiveSelection } from "@/app/lib/full-backup";
 import { buildOrgBackup, scopePayloadToOrg, restoreOrgBackupAdditive } from "@/app/lib/org-backup";
 import { streamBackup } from "@/app/lib/backupStream";
+import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
 import { previewOrgBackup } from "@/app/lib/backupPreview";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 
@@ -69,6 +70,12 @@ export async function GET(req: Request) {
   const safeOrg = (org?.name ?? "Org").replace(/[^a-zA-Z0-9_.-]+/g, "_");
   const today = new Date().toISOString().slice(0, 10);
   const filename = `Diagramatix-Org-backup-${safeOrg}-v${version}-${today}.diag-full`;
+
+  await recordAudit({
+    actorUserId: session?.user?.id ?? null, actorEmail: ctx.email, orgId: ctx.orgId,
+    action: AUDIT.ExportOrgBackup, targetType: "org", targetId: ctx.orgId,
+    meta: { stream: url.searchParams.get("stream") === "1" }, ip: ipFromRequest(req),
+  });
 
   // ?stream=1 → live NDJSON progress; plain GET returns the raw zip fallback.
   // userIds (CSV) optionally narrows the backup to selected members.

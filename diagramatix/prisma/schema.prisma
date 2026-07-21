@@ -1588,3 +1588,30 @@ model SchemaValidationIssue {
 
   @@index([resolved, lastSeen])
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Audit log — an append-only record of privileged / sensitive actions (who did
+// what, when, to which tenant), so SuperAdmin/impersonation/export/delete/policy
+// activity is attributable and reviewable. Phase A2 (ENT-03). Actor identity is
+// denormalised (email) so entries survive user deletion; `meta` is a JSON STRING
+// (not a Prisma Json column — avoids the Prisma-7 JSON-omit-on-write caveat) and
+// must never contain raw process/PII content — ids, counts, modes, hashes only.
+// ────────────────────────────────────────────────────────────────────────────
+model AuditLog {
+  id              String   @id @default(cuid())
+  at              DateTime @default(now())
+  actorUserId     String?  // who performed it (null = system / cron)
+  actorEmail      String?  // denormalised, survives user deletion
+  effectiveUserId String?  // impersonation target, when acting as another user
+  orgId           String?  // tenant context, when known
+  action          String   // dotted verb, e.g. "impersonate.start", "export.full-backup"
+  targetType      String?  // "user" | "org" | "diagram" | "project" | "share" | …
+  targetId        String?
+  meta            String   @default("{}") // JSON string — ids/counts/modes/hashes only
+  ip              String?
+
+  @@index([at])
+  @@index([actorUserId])
+  @@index([orgId])
+  @@index([action])
+}

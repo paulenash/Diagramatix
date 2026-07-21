@@ -18,6 +18,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
+import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
 import {
   buildFullBackup,
   parseFullBackup,
@@ -60,6 +61,14 @@ export async function GET(req: Request) {
   const safeEmail = exportedBy.replace(/[^a-zA-Z0-9_.-]+/g, "_");
   const today = new Date().toISOString().slice(0, 10);
   const version = appVersion();
+
+  // Total data-egress event — always audited (ENT-01/03). Whole-system unless scoped.
+  const scopeOrgId = url.searchParams.get("orgId");
+  await recordAudit({
+    actorUserId: session.user.id, actorEmail: exportedBy, orgId: scopeOrgId,
+    action: AUDIT.ExportFullBackup, targetType: scopeOrgId ? "org" : "system", targetId: scopeOrgId,
+    meta: { scoped: !!scopeOrgId, stream: url.searchParams.get("stream") === "1" }, ip: ipFromRequest(req),
+  });
 
   // ?stream=1 → live NDJSON progress; plain GET returns the raw zip fallback.
   // Optional scope: orgId (+ userIds CSV) → a self-contained SCOPED backup
@@ -164,6 +173,11 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+    await recordAudit({
+      actorUserId: session.user.id, actorEmail: session.user.email,
+      action: AUDIT.RestoreWipe, targetType: "system", targetId: null,
+      meta: { note: "TRUNCATE-and-restore of every table" }, ip: ipFromRequest(req),
+    });
     try {
       const result = await restoreFullBackupWipe(payload);
       return NextResponse.json({ ok: true, result });

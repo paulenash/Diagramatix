@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser, IMPERSONATE_COOKIE, IMPERSONATE_MODE_COOKIE } from "@/app/lib/superuser";
 import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
+import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
 
 /** POST — start impersonating a user */
 export async function POST(req: Request) {
@@ -73,19 +74,45 @@ export async function POST(req: Request) {
     maxAge: 60 * 60 * 8,
   });
 
+  await recordAudit({
+    actorUserId: session.user.id,
+    actorEmail: session.user.email,
+    effectiveUserId: userId,
+    action: AUDIT.ImpersonateStart,
+    targetType: "user",
+    targetId: userId,
+    meta: { mode: resolvedMode, targetEmail: target.email, viaSuperAdmin: su },
+    ip: ipFromRequest(req),
+  });
+
   return NextResponse.json({ ok: true, user: target, mode: resolvedMode });
 }
 
 /** DELETE — stop impersonating */
-export async function DELETE() {
+export async function DELETE(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const cookieStore = await cookies();
+  const prevTarget = cookieStore.get(IMPERSONATE_COOKIE)?.value ?? null;
+  const prevMode = cookieStore.get(IMPERSONATE_MODE_COOKIE)?.value ?? null;
   cookieStore.delete(IMPERSONATE_COOKIE);
   cookieStore.delete(IMPERSONATE_MODE_COOKIE);
+
+  if (prevTarget) {
+    await recordAudit({
+      actorUserId: session.user.id,
+      actorEmail: session.user.email,
+      effectiveUserId: prevTarget,
+      action: AUDIT.ImpersonateStop,
+      targetType: "user",
+      targetId: prevTarget,
+      meta: { mode: prevMode },
+      ip: ipFromRequest(req),
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

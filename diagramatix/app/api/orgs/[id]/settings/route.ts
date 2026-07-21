@@ -10,6 +10,7 @@ import {
 } from "@/app/lib/auth/orgContext";
 import { OrgEntityType } from "@/app/generated/prisma/enums";
 import { ORG_POLICY_KEYS } from "@/app/lib/auth/orgPolicy";
+import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -184,6 +185,12 @@ export async function PUT(req: Request, { params }: Params) {
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "No supported fields supplied" }, { status: 400 });
   }
+
+  await recordAudit({
+    actorUserId: session?.user?.id ?? null, actorEmail: session?.user?.email ?? null, orgId: id,
+    action: AUDIT.OrgSettingsUpdate, targetType: "org", targetId: id,
+    meta: { changed: updates }, ip: ipFromRequest(req),
+  });
 
   const updated = await prisma.org.update({
     where: { id },
