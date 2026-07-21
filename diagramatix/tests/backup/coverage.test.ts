@@ -81,6 +81,10 @@ const SCOPED_OMITTED = new Set<string>([
   // Diagram-JSON schema-validation findings are app-side observability, not
   // per-user/org data — carried by the SuperAdmin full backup only.
   "SchemaValidationIssue",
+  // The audit log is system-global security telemetry (who did what), not
+  // per-user/org data — deliberately NOT carried by a tenant backup. It's in the
+  // SuperAdmin full backup (catalog-driven).
+  "AuditLog",
   ...SIMULATOR_TABLES,
   ...RISK_CONTROL_TABLES,
   ...PCF_TABLES,
