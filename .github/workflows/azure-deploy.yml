@@ -245,6 +245,8 @@ jobs:
           # (its identity-access chapter). Feature lands as a DRAFT — Publish once.
           npx --yes tsx@4 scripts/add-features-enterprise-governance.ts || echo "add-features-enterprise-governance skipped"
           npx --yes tsx@4 scripts/add-tech-design-enterprise-governance.ts || echo "add-tech-design-enterprise-governance skipped"
+          # Tech Notes: the CI/CD deployment walk-through (this very pipeline).
+          npx --yes tsx@4 scripts/add-tech-design-deployment.ts || echo "add-tech-design-deployment skipped"
           # Populate the Portal's denormalised Diagram columns (pcf*/procedureDoc*/
           # entityRefs) for diagrams last saved before those columns existed. Idempotent.
           npx --yes tsx@4 scripts/backfill-diagram-pcf.ts || echo "backfill-diagram-pcf skipped"
