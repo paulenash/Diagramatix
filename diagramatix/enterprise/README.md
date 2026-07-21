@@ -24,6 +24,7 @@ Diagramatix stores and reasons about customers' **business processes** — pool/
 | [06-enterprise-readiness-plan.md](06-enterprise-readiness-plan.md) | **The go-to-market plan** — three workstreams (product controls, deployment tiers, compliance evidence) sequenced into a timeline where each phase unlocks a defensible sales claim. Start here for "what do we actually do." |
 | [07-implementation-log.md](07-implementation-log.md) | **Living build log** — what's shipped (commits, files, findings closed), how to add a new policy flag, and exactly where to continue. Read this first if resuming the work. |
 | [08-sso-vendor-decision.md](08-sso-vendor-decision.md) | **Decision record** — WorkOS vs Auth0 for the deferred per-org SSO/SAML/OIDC + SCIM item (ENT-04 core). Recommends WorkOS; pricing to re-verify. |
+| [09-ai-off-and-local-llm.md](09-ai-off-and-local-llm.md) | **AI posture guide** — impacts of turning AI off (and what still works), the "contained" options, and how to run a **local / self-hosted LLM** (setup + caveats). |
 
 > **Build status (2026-07-20):** Phase A1 (governance foundations) has shipped — a per-tenant
 > **Organisation Policy** engine with an "Enterprise Mode", an `ANTHROPIC_BASE_URL` proxy seam, and

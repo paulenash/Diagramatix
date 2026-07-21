@@ -85,6 +85,9 @@ Security-critical auth change; needs a dedicated session. Plan: replace the `SUP
 - **Reversible pre-egress AI redaction** (ENT-06) — pseudonymise people/team/system names before the prompt leaves the tenant, restore in the output (`aiRedaction` org flag). Complex (reversible mapping over free-text); prioritise staff-narrative + transcript.
 - **Dedicated single-tenant instance tier** (Workstream B) — parameterise `azure-deploy.yml` per instance (region, keys, secrets) + an ops runbook.
 
+## Local / on-prem LLM (`90ef4cb5`)
+On top of the `ANTHROPIC_BASE_URL` seam: **`AI_CUSTOM_MODELS`** (comma-separated `id|Label`) registers non-Claude models so they pass validation (`models.ts` `customModels()`/`allModels()`), appear in the SuperAdmin AI-Generate picker, and can be the default. Point `ANTHROPIC_BASE_URL` at a local Anthropic-compatible gateway (LiteLLM → vLLM/Ollama) and an air-gapped tenant runs AI Generate on a local model. Tests T0931-T0933. Full guide + AI-off impacts + posture spectrum in [09](09-ai-off-and-local-llm.md). Remaining for full on-prem: multimodal model for image/PDF ingestion (customer infra) + the dedicated-instance packaging (Workstream B).
+
 ## Collateral kept in sync
 - **Feature catalog** — `scripts/add-features-enterprise-governance.ts` (a LIVING draft entry "Enterprise Governance & Security"; upserts-and-updates on every run, incl. on deploy). Lands as a **draft** — a SuperAdmin clicks Publish in `/dashboard/admin/features` to make it public.
 - **Technical Design Notes** — `scripts/add-tech-design-enterprise-governance.ts` (a section under the `identity-access` chapter; upsert-by-heading, re-runs on deploy). Read at `/tech-notes`.
