@@ -2953,9 +2953,13 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
       // re-routed every archi connector (they touch their source/target
       // boundary so connectorHitsAnyElement is true) and RESET its endpoint
       // offset to 0.5 — making endpoints snap to centre and refuse to move.
-      if (conn.type === "messageBPMN" || conn.type === "associationBPMN" || conn.type.startsWith("archi-")) {
+      // A USER-SHAPED connector (pathShaped) owns its path — obstacle validation
+      // must NOT re-route it (that was undoing the endpoint-move re-anchor and
+      // "triggering re-routing" on a selected connector). Same exemption as
+      // message / association / ArchiMate connectors.
+      if (conn.type === "messageBPMN" || conn.type === "associationBPMN" || conn.type.startsWith("archi-") || conn.pathShaped) {
         if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
-          console.log(`[TRACE validateObstacles] skipping ${conn.type} ${conn.id} srcSide=${conn.sourceSide} tgtSide=${conn.targetSide} wpCount=${conn.waypoints.length}`);
+          console.log(`[TRACE validateObstacles] skipping ${conn.type} ${conn.id} srcSide=${conn.sourceSide} tgtSide=${conn.targetSide} wpCount=${conn.waypoints.length} pathShaped=${conn.pathShaped}`);
         }
         return conn;
       }
