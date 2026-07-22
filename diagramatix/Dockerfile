@@ -66,8 +66,9 @@ WORKDIR /app
 
 # OpenSSL for the Prisma query engine at runtime. libc6-compat for any
 # native modules that ship glibc binaries (pg's native bindings, bcryptjs
-# fallbacks, etc.).
-RUN apk add --no-cache libc6-compat openssl
+# fallbacks, etc.). ffmpeg for the SuperAdmin Screencast Studio server-side
+# transcode (webm→mp4) — see app/api/video/transcode.
+RUN apk add --no-cache libc6-compat openssl ffmpeg
 
 # Run as an unprivileged user. UID 1001 / GID 1001 follows the upstream
 # Next.js Docker example so log analyzers that expect it work unchanged.
