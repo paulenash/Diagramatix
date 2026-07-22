@@ -1479,6 +1479,29 @@ export function consolidateWaypoints(wps: Point[]): Point[] {
   return result;
 }
 
+/**
+ * Auto-repair: fuse adjacent SEGMENTS that a move has made parallel (or almost
+ * parallel) so the shared waypoint disappears and the two become one segment.
+ * Drops any interior waypoint whose incoming + outgoing segments are collinear
+ * within `tol` px (both horizontal ≈ same y, or both vertical ≈ same x). Cascades:
+ * one move can fuse several waypoints. Leaders + the two edge points are kept.
+ */
+export function fuseCollinearWaypoints(wp: Point[], tol = 6): Point[] {
+  if (wp.length <= 4) return wp; // [center, edge, edge, center] — nothing to fuse
+  const out: Point[] = [wp[0], wp[1]]; // source center + edge
+  for (let i = 2; i <= wp.length - 3; i++) {
+    const prev = out[out.length - 1];
+    const cur = wp[i];
+    const next = wp[i + 1];
+    const collinearH = Math.abs(prev.y - cur.y) <= tol && Math.abs(cur.y - next.y) <= tol;
+    const collinearV = Math.abs(prev.x - cur.x) <= tol && Math.abs(cur.x - next.x) <= tol;
+    if (collinearH || collinearV) continue; // fuse — drop the redundant waypoint
+    out.push(cur);
+  }
+  out.push(wp[wp.length - 2], wp[wp.length - 1]); // target edge + center
+  return out;
+}
+
 export function recomputeAllConnectors(
   connectors: Connector[],
   elements: DiagramElement[],

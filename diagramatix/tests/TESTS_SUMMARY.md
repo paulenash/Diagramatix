@@ -958,6 +958,9 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0974 | coverCrop crops the long axis to fill the inset without distortion (wide→crop sides, tall→crop top/bottom) | A squashed/stretched webcam inset | If coverCrop aspect logic regressed |
 | T0975 | ffmpeg webm→mp4 args = H.264/AAC + yuv420p + `-movflags +faststart` + `-y`, input first / output last | Transcoded mp4 not playing on social/QuickTime or not streamable | If the ffmpeg arg builder regressed |
 | T0976 | ffmpeg any→webm args = VP9/Opus with `-deadline realtime` for reasonable speed, input first / output last | A "convert to .webm" that's absurdly slow or wrong-codec | If ffmpegToWebmArgs regressed |
+| T0980 | auto-repair fuseCollinearWaypoints drops redundant collinear waypoints (segment fuse), keeps genuine corners + endpoints | A moved segment leaving a redundant waypoint / not merging with its parallel neighbour | If the collinear-fuse pass regressed |
+| T0981 | fuseCollinearWaypoints also fuses ALMOST-parallel segments (within tolerance) | A 1–3px near-parallel jog left behind after a segment move | If the fuse tolerance regressed |
+| T0982 | fuseCollinearWaypoints leaves a genuine perpendicular zig-zag intact | Real corners wrongly collapsed, flattening a deliberate route | If the fuse over-merged perpendicular corners |
 
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 

@@ -21,7 +21,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE } from "@/app/lib/diagram/routing";
+import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, fuseCollinearWaypoints } from "@/app/lib/diagram/routing";
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
@@ -7118,9 +7118,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // Free-form / imported message: a rectilinear connector — preserve the
         // dragged segments like any other, keeping its routingType so the
         // renderer + recompute keep treating it as rectilinear (not vertical).
+        // Auto-repair: fuse any adjacent segments the move made (nearly) parallel
+        // so the redundant shared waypoint disappears and they move as one.
         // R6.18: preserve label world position across the waypoint change.
-        const labelAdj = preserveLabelWorldPos(c, newWaypoints);
-        return { ...c, waypoints: newWaypoints, ...labelAdj };
+        const fused = fuseCollinearWaypoints(newWaypoints);
+        const labelAdj = preserveLabelWorldPos(c, fused);
+        return { ...c, waypoints: fused, ...labelAdj };
       });
       // Skip obstacle validation entirely. UPDATE_CONNECTOR_WAYPOINTS is
       // only fired by user-initiated waypoint changes (segment drag).
