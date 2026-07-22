@@ -1784,7 +1784,9 @@ export function recomputeAllConnectors(
     if (conn.routingType === "rectilinear") {
       const wp = conn.waypoints;
       const N = wp.length;
-      if (N >= 9) {
+      // Preserve when the user explicitly shaped the path (pathShaped), OR on the
+      // legacy heuristic (N >= 9 waypoints ≈ evidence of a manual reshape).
+      if (conn.pathShaped || N >= 9) {
         const newSrcCenter  = getConnectionPointBySide(source, conn.sourceSide);
         const newTgtCenter  = getConnectionPointBySide(target, conn.targetSide);
         const newSrcEdge    = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
@@ -1863,6 +1865,13 @@ export function recomputeAllConnectors(
           if (dx > 0.5 && dy > 0.5) { allOrthogonal = false; break; }
         }
         if (allOrthogonal && outwardOk && !pathHitsObstacles(candidate, obstacles)) {
+          return { ...conn, waypoints: candidate };
+        }
+        // Sticky-segment rule: if the USER shaped this path, KEEP their interior
+        // even when the re-fit isn't perfectly orthogonal / clear after a move —
+        // a re-route must never undo their work. Only unflagged (legacy N>=9)
+        // paths fall through to a full recompute below.
+        if (conn.pathShaped) {
           return { ...conn, waypoints: candidate };
         }
         // Interior routing hits obstacle, goes inward, or is non-orthogonal — fall through

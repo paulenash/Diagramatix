@@ -209,6 +209,11 @@ export interface Connector {
   // put it while the path + the other (un-pinned) end re-route freely.
   sourcePinned?: boolean;
   targetPinned?: boolean;
+  // Sticky segment: set true when the USER drags a connector SEGMENT (reshapes the
+  // path). A re-route then PRESERVES the user's interior waypoints and only re-fits
+  // the endpoint stubs — and never falls through to a full recompute that would
+  // discard the shape. Cleared by the "Reset routing" action.
+  pathShaped?: boolean;
   cp1RelOffset?: Point;   // cp1 offset from srcEdge — preserved across element moves
   cp2RelOffset?: Point;   // cp2 offset from tgtEdge — preserved across element moves
   labelAnchor?: "midpoint" | "source";  // where the label tethers to; default "midpoint"

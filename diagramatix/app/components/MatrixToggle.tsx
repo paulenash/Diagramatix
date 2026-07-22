@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useDraggable } from "./useDraggable";
+import { MATRIX_RUNNING_EVENT } from "./useMatrixRunning";
 
 /**
  * Global Matrix-rain screensaver. The little green "M" pinned to the
@@ -50,6 +51,13 @@ export function MatrixToggle() {
     window.addEventListener(CONFIG_EVENT, onConfig);
     return () => window.removeEventListener(CONFIG_EVENT, onConfig);
   }, []);
+
+  // Broadcast the cascade state so the camera + video controls can hide while
+  // the rain runs (a window flag too, for a listener that mounts mid-cascade).
+  useEffect(() => {
+    (window as unknown as { __dgxMatrixRunning?: boolean }).__dgxMatrixRunning = running;
+    window.dispatchEvent(new CustomEvent(MATRIX_RUNNING_EVENT, { detail: running }));
+  }, [running]);
 
   const setArmed = (next: boolean) => {
     setArmedState(next);
@@ -174,6 +182,7 @@ export function MatrixToggle() {
   return (
     <>
       {running && <canvas ref={canvasRef} className="fixed inset-0 z-[60] bg-black" />}
+      {!running && (
       <button
         data-no-capture
         {...handlers}
@@ -194,6 +203,7 @@ export function MatrixToggle() {
       >
         M
       </button>
+      )}
     </>
   );
 }

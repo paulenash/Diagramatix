@@ -7113,16 +7113,18 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const sharedX = newWaypoints[1]?.x;
           if (source && sharedX != null && source.width > 0) {
             const offset = Math.max(0.02, Math.min(0.98, (sharedX - source.x) / source.width));
-            return { ...c, waypoints: newWaypoints, sourceOffsetAlong: offset };
+            return { ...c, waypoints: newWaypoints, sourceOffsetAlong: offset, pathShaped: true };
           }
-          return { ...c, waypoints: newWaypoints };
+          return { ...c, waypoints: newWaypoints, pathShaped: true };
         }
         // Free-form / imported message: a rectilinear connector — preserve the
         // dragged segments like any other, keeping its routingType so the
         // renderer + recompute keep treating it as rectilinear (not vertical).
-        // R6.18: preserve label world position across the waypoint change
+        // R6.18: preserve label world position across the waypoint change.
+        // pathShaped: mark this connector user-shaped so a re-route keeps the
+        // interior + only re-fits the endpoint stubs (sticky-segment rule).
         const labelAdj = preserveLabelWorldPos(c, newWaypoints);
-        return { ...c, waypoints: newWaypoints, ...labelAdj };
+        return { ...c, waypoints: newWaypoints, pathShaped: true, ...labelAdj };
       });
       // Skip obstacle validation entirely. UPDATE_CONNECTOR_WAYPOINTS is
       // only fired by user-initiated waypoint changes (segment drag).

@@ -16,6 +16,7 @@ import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { screenNameFromPath } from "@/app/lib/help/screenName";
 import { getCurrentDiagramName } from "@/app/lib/help/currentDiagram";
 import { useDraggable } from "./useDraggable";
+import { useMatrixRunning } from "./useMatrixRunning";
 
 type Rect = { x: number; y: number; w: number; h: number };
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -37,6 +38,7 @@ export function ScreenCapture() {
   const email = session?.user?.email;
   const isSuper = !!email && SUPERUSER_EMAILS.has(email);
   const { pos, handlers, didDrag } = useDraggable("diagramatix.camera.btnPos", () => ({ left: 64, bottom: 16 }));
+  const matrixRunning = useMatrixRunning();
 
   const [frozen, setFrozen] = useState<string | null>(null);
   const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
@@ -186,6 +188,7 @@ export function ScreenCapture() {
 
   return (
     <div data-no-capture>
+      {!matrixRunning && (
       <button
         onPointerDown={(e) => { e.preventDefault(); handlers.onPointerDown(e); }}
         onPointerMove={handlers.onPointerMove}
@@ -200,6 +203,7 @@ export function ScreenCapture() {
           <circle cx="12" cy="13" r="4" />
         </svg>
       </button>
+      )}
 
       {saved && (
         <div className="fixed bottom-16 left-16 z-[72] max-w-xs px-3 py-2 rounded bg-green-600 text-white text-xs shadow-lg">{saved}</div>

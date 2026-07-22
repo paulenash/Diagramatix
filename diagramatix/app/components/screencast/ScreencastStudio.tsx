@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { insetRect, coverCrop, type InsetCorner } from "@/app/lib/video/composite";
 import { useDraggable } from "@/app/components/useDraggable";
+import { useMatrixRunning } from "@/app/components/useMatrixRunning";
 
 type Phase = "idle" | "setup" | "recording" | "paused" | "review";
 
@@ -80,6 +81,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   // Draggable launcher — sits just RIGHT of the camera button (which defaults to
   // left 64) and remembers where the user drags it. Smaller (32px) than the camera.
   const { pos, handlers, didDrag } = useDraggable("diagramatix.video.btnPos", () => ({ left: 112, bottom: 16 }), 44);
+  const matrixRunning = useMatrixRunning();
 
   // Refs the draw loop / recorder read without re-subscribing.
   const camOnRef = useRef(camOn); camOnRef.current = camOn;
@@ -340,6 +342,10 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
       <canvas ref={canvasRef} />
     </div>
   );
+
+  // Hide all visible chrome while the Matrix cascade runs (keep the offscreen
+  // media so an in-progress recording keeps compositing).
+  if (matrixRunning) return hidden;
 
   // Compact pill while recording so it barely intrudes on the captured screen.
   if (phase === "recording" || phase === "paused") {
