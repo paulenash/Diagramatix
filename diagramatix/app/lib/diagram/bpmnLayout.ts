@@ -2184,6 +2184,7 @@ export function layoutBpmnDiagram(
     // (skip over intermediate gateways that would otherwise distort
     // the midpoint with their own Y).
     const branchAnchorYs: number[] = [];
+    const branchAnchors: { cy: number; parentId?: string }[] = [];
     const branchParentIds = new Set<string | undefined>();
     for (const outConn of outConns) {
       const visited = new Set<string>();
@@ -2204,6 +2205,7 @@ export function layoutBpmnDiagram(
       }
       if (anchor) {
         branchAnchorYs.push(anchor.y + anchor.height / 2);
+        branchAnchors.push({ cy: anchor.y + anchor.height / 2, parentId: anchor.parentId });
         branchParentIds.add(anchor.parentId);
       }
     }
@@ -2213,17 +2215,38 @@ export function layoutBpmnDiagram(
     // anchors found, and at least one anchor in a different parent
     // from the decision (so we know lanes are actually spanned).
     if (branchAnchorYs.length < 2) continue;
-    const spansMultipleParents =
-      branchParentIds.size > 1 || (branchParentIds.size === 1 && !branchParentIds.has(dec.parentId));
+    // Fully cross-lane fan = NONE of the branches stays in the decision's own
+    // lane. The diamond would otherwise be clamped to its (upstream) lane, far
+    // above the branches. Instead RE-HOME the decision + its paired merge to the
+    // MIDDLE branch's lane and align them with that middle element, so the pair
+    // reads as owned by the lane its branches actually live in.
+    const fullyCrossLane = !branchParentIds.has(dec.parentId);
+    const spansMultipleParents = branchParentIds.size > 1 || fullyCrossLane;
     if (!spansMultipleParents) continue;
 
+    const mergeId = findPairedMerge(dec.id);
+    const merge = mergeId ? elMap.get(mergeId) : undefined;
+
+    if (fullyCrossLane) {
+      // Median branch by Y = the middle element (e.g. "Home Loan" of 3). Re-home
+      // the decision + merge to that lane and align them with the middle element,
+      // so the pair is owned by (and drawn inside) the lane its branches live in.
+      const sorted = [...branchAnchors].sort((a, b) => a.cy - b.cy);
+      const mid = sorted[Math.floor((sorted.length - 1) / 2)];
+      dec.y = mid.cy - dec.height / 2;
+      if (mid.parentId) dec.parentId = mid.parentId;
+      if (merge) {
+        merge.y = mid.cy - merge.height / 2;
+        if (mid.parentId) merge.parentId = mid.parentId;
+      }
+      continue;
+    }
+
+    // Partial cross-lane (some branches stay in the decision's lane): keep the
+    // diamond in place, centred on the average branch Y.
     const midY = branchAnchorYs.reduce((s, y) => s + y, 0) / branchAnchorYs.length;
     dec.y = midY - dec.height / 2;
-    const mergeId = findPairedMerge(dec.id);
-    if (mergeId) {
-      const merge = elMap.get(mergeId);
-      if (merge) merge.y = midY - merge.height / 2;
-    }
+    if (merge) merge.y = midY - merge.height / 2;
   }
 
   // R8.02: Auto-position Data Objects relative to their associated element.

@@ -952,6 +952,7 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0968 | Normal path unchanged (omitted === mode:"normal"); Test keeps element positions + non-sequence connectors identical to Normal | The experimental mode leaking into the normal product path or moving elements | If the mode branch coupled into placement or non-sequence connectors |
 | T0969 | Test-mode C3: an edge-mounted (boundary) event's sequence connector attaches at its OUTER face (away from the host), offset 0.5 | A boundary-event flow leaving from the inner face (into/across the host) | If the C3 boundary-event override regressed or lost precedence over C1/C2 |
 | T0970 | Test-mode C3 on a WIDE EP uses the mounted host EDGE (getBoundaryEventOuterSide closest-edge), matching Normal — not a centre-delta guess | Boundary events on a wide Expanded Subprocess picking the wrong face (e.g. "right" when mounted on "bottom" off-centre) | If C3 reverted to a centre-delta side pick or diverged from Normal's outer-edge helper |
+| T0971 | R8.01 fully cross-lane fan: a decision whose branches are ALL in other lanes (+ its paired merge) re-homes to the MIDDLE branch's lane and aligns vertically with that middle element | A cross-lane decision/merge clamped high in its upstream lane, far above its branches | If the fully-cross-lane re-home (median branch lane + Y) regressed |
 
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 
