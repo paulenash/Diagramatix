@@ -15,6 +15,8 @@
  *     C2.2 branch element down-and-right → gateway BOTTOM vertex.
  *     C2.3 element level (vertical overlap) → the side vertex facing it (right/left).
  *     Decision incoming / merge outgoing (the "stem") → the facing side vertex.
+ *   C3 Edge-mounted (boundary) events ALWAYS attach at their OUTER face — the side
+ *      pointing away from the host activity. Takes precedence over C1/C2.
  *
  * Obstacle avoidance is deliberately OFF — waypoints are simple orthogonal
  * (straight / L / Z / top-staple) paths between the chosen face midpoints.
@@ -70,8 +72,16 @@ function gatewayVertexSide(self: DiagramElement, other: DiagramElement, isFan: b
   return cy(other) < cy(self) ? "top" : "bottom";             // C2.1 up / C2.2 down
 }
 
+const isBoundaryEvent = (e: DiagramElement) => !!e.boundaryHostId;
+
 /** Endpoint side for one end of a sequence connector. */
-function pickSide(self: DiagramElement, other: DiagramElement, isSource: boolean, backward: boolean): Side {
+function pickSide(self: DiagramElement, other: DiagramElement, isSource: boolean, backward: boolean, byId: Map<string, DiagramElement>): Side {
+  // C3: an edge-mounted (boundary) event attaches at its OUTER face — the side
+  // pointing away from the host. Overrides C1/C2.
+  if (isBoundaryEvent(self)) {
+    const host = byId.get(self.boundaryHostId!);
+    if (host) return facingSide(host, self);                  // side of the event away from the host
+  }
   if (isGateway(self)) {
     const role = gatewayRole(self);
     const isFan = (role === "decision" && isSource) || (role === "merge" && !isSource);
@@ -118,8 +128,8 @@ export function buildTestConnectors(connectors: Connector[], elements: DiagramEl
     if (!src || !tgt || src.id === tgt.id) return conn;
 
     const backward = cx(tgt) < cx(src) - BACKWARD_EPS;
-    const sourceSide = pickSide(src, tgt, true, backward);
-    const targetSide = pickSide(tgt, src, false, backward);
+    const sourceSide = pickSide(src, tgt, true, backward, byId);
+    const targetSide = pickSide(tgt, src, false, backward, byId);
     const srcPt = faceMid(src, sourceSide);
     const tgtPt = faceMid(tgt, targetSide);
     const mid = orthogonalNoAvoid(srcPt, sourceSide, tgtPt, targetSide);

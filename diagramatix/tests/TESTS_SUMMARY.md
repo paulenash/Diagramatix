@@ -950,6 +950,7 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0966 | Test-mode decision incoming = left vertex; merge stem outgoing = right vertex | Gateway stem ends not using the facing side vertex | If the fan-vs-stem gateway logic regressed |
 | T0967 | every Test-mode sequence connector is orthogonal (each segment axis-aligned) | Non-orthogonal/ diagonal experimental connectors | If orthogonalNoAvoid produced a non-axis-aligned segment |
 | T0968 | Normal path unchanged (omitted === mode:"normal"); Test keeps element positions + non-sequence connectors identical to Normal | The experimental mode leaking into the normal product path or moving elements | If the mode branch coupled into placement or non-sequence connectors |
+| T0969 | Test-mode C3: an edge-mounted (boundary) event's sequence connector attaches at its OUTER face (away from the host), offset 0.5 | A boundary-event flow leaving from the inner face (into/across the host) | If the C3 boundary-event override regressed or lost precedence over C1/C2 |
 
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 

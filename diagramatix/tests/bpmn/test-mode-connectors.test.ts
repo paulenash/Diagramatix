@@ -48,6 +48,20 @@ const linConns: AiConnection[] = [
   { sourceId: "t3", targetId: "t1" }, // rework / back-edge
 ];
 
+// ── Boundary-event fixture: a timer on task h's edge → escalation task ──
+const beEls: AiElement[] = [
+  { id: "p", type: "pool", label: "P", poolType: "white-box", lanes: [{ id: "l", name: "L" }] },
+  { id: "s", type: "start-event", label: "S", pool: "p", lane: "l" },
+  { id: "h", type: "task", label: "Host", pool: "p", lane: "l" },
+  { id: "be", type: "intermediate-event", label: "Timer", pool: "p", lane: "l", boundaryHost: "h", boundarySide: "bottom" },
+  { id: "esc", type: "task", label: "Escalate", pool: "p", lane: "l" },
+  { id: "e", type: "end-event", label: "E", pool: "p", lane: "l" },
+];
+const beConns: AiConnection[] = [
+  { sourceId: "s", targetId: "h" }, { sourceId: "h", targetId: "e" },
+  { sourceId: "be", targetId: "esc" }, { sourceId: "esc", targetId: "e" },
+];
+
 const cxy = (o: Out, id: string) => { const e = byId(o, id); return { cx: e.x + e.width / 2, cy: e.y + e.height / 2 }; };
 
 describe("Test-mode BPMN connectors (C1/C2)", () => {
@@ -123,5 +137,17 @@ describe("Test-mode BPMN connectors (C1/C2)", () => {
     expect(test.elements).toEqual(normal.elements); // element positions untouched
     const nonSeq = (d: Out) => d.connectors.filter((c) => c.type !== "sequence");
     expect(nonSeq(test)).toEqual(nonSeq(normal)); // only sequence geometry changes
+  });
+
+  it("T0969 — C3 edge-mounted (boundary) event attaches at its OUTER face", () => {
+    const o = layoutBpmnDiagram(beEls, beConns, { mode: "test" });
+    const be = byId(o, "be"), h = byId(o, "h");
+    expect(be.boundaryHostId, "sanity: mounted as a boundary event").toBe("h");
+    const c = conn(o, "be", "esc");
+    const dx = (be.x + be.width / 2) - (h.x + h.width / 2);
+    const dy = (be.y + be.height / 2) - (h.y + h.height / 2);
+    const outer = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? "right" : "left") : (dy >= 0 ? "bottom" : "top");
+    expect(c.sourceSide).toBe(outer);       // outer face, away from the host
+    expect(c.sourceOffsetAlong).toBe(0.5);
   });
 });
