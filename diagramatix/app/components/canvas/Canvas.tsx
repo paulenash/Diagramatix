@@ -1772,7 +1772,7 @@ export function Canvas({
         pos.y >= currentEl.y - SAME_EL_MARGIN && pos.y <= currentEl.y + currentEl.height + SAME_EL_MARGIN) {
         const { side, offsetAlong } = pointToBoundaryOffset(pos, currentEl);
         onUpdateConnectorEndpoint(connectorId, endpoint, currentEl.id, side, offsetAlong);
-        onSelectConnector(null);
+        onSelectConnector(connectorId); // keep selected — only click-elsewhere ends the connector editing session
       } else if (!isMsgBPMN && innerTarget) {
         // Dropped on a child or boundary event inside an expanded subprocess.
         // Same data-side lock as the main targetEl branch: a Data Object
@@ -1807,7 +1807,7 @@ export function Canvas({
           }
           onUpdateConnectorEndpoint(connectorId, endpoint, innerTarget.id, newSide, 0.5);
         }
-        onSelectConnector(null);
+        onSelectConnector(connectorId); // keep selected — session ends only on click-elsewhere
       } else if (isMsgBPMN) {
         // messageBPMN endpoint reconnection — rules mirror the highlight logic:
         //   - If the moving end is currently on a Pool, the drop target must
@@ -1860,7 +1860,7 @@ export function Canvas({
             : ((srcCy <= tgtCy ? "top"    : "bottom") as Side);
           onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
         }
-        onSelectConnector(null);
+        onSelectConnector(connectorId); // keep selected — session ends only on click-elsewhere
       } else {
         // Dropped elsewhere — reconnect to a different element (non-messageBPMN)
         const isAssocBPMN = conn?.type === "associationBPMN";
@@ -1939,7 +1939,7 @@ export function Canvas({
             }
           }
         }
-        onSelectConnector(null);
+        onSelectConnector(connectorId); // keep selected — session ends only on click-elsewhere
       }
 
       setDraggingEndpoint(null);

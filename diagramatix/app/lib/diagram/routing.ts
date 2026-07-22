@@ -1479,6 +1479,42 @@ export function consolidateWaypoints(wps: Point[]): Point[] {
   return result;
 }
 
+/**
+ * Sticky-shape re-anchor: rebuild ONLY the stub connecting one endpoint to the
+ * user's preserved middle, keeping every middle bend exactly where it is. Used
+ * when a shaped (pathShaped) rectilinear connector's endpoint moves/nudges or its
+ * element moves — the middle never re-routes, only the endpoint-adjacent segment
+ * adapts (as an orthogonal L that exits perpendicular to the element's face).
+ *
+ * `wp` = [srcCenter, srcEdge, …middle…, tgtEdge, tgtCenter]. Returns null when the
+ * path is too short to have a preservable middle (caller falls back to normal).
+ */
+export function reanchorStub(
+  wp: Point[],
+  endpoint: "source" | "target",
+  el: DiagramElement,
+  side: Side,
+  offset: number,
+): Point[] | null {
+  const N = wp.length;
+  if (N < 5) return null; // need [center, edge, ≥1 middle, edge, center]
+  const newCenter = { x: el.x + el.width / 2, y: el.y + el.height / 2 };
+  const newEdge = sidePoint(el, side, offset);
+  const horizontal = side === "left" || side === "right";
+  if (endpoint === "source") {
+    const anchor = wp[2]; // first point of the preserved middle
+    const stub: Point[] = [];
+    if (horizontal) { if (Math.abs(newEdge.y - anchor.y) > 0.5) stub.push({ x: anchor.x, y: newEdge.y }); }
+    else { if (Math.abs(newEdge.x - anchor.x) > 0.5) stub.push({ x: newEdge.x, y: anchor.y }); }
+    return consolidateWaypoints([newCenter, newEdge, ...stub, ...wp.slice(2)]);
+  }
+  const anchor = wp[N - 3]; // last point of the preserved middle
+  const stub: Point[] = [];
+  if (horizontal) { if (Math.abs(newEdge.y - anchor.y) > 0.5) stub.push({ x: anchor.x, y: newEdge.y }); }
+  else { if (Math.abs(newEdge.x - anchor.x) > 0.5) stub.push({ x: newEdge.x, y: anchor.y }); }
+  return consolidateWaypoints([...wp.slice(0, N - 2), ...stub, newEdge, newCenter]);
+}
+
 export function recomputeAllConnectors(
   connectors: Connector[],
   elements: DiagramElement[],
@@ -1784,9 +1820,16 @@ export function recomputeAllConnectors(
     if (conn.routingType === "rectilinear") {
       const wp = conn.waypoints;
       const N = wp.length;
-      // Preserve when the user explicitly shaped the path (pathShaped), OR on the
-      // legacy heuristic (N >= 9 waypoints ≈ evidence of a manual reshape).
-      if (conn.pathShaped || N >= 9) {
+      // Sticky shape: a user-shaped path re-anchors ONLY its endpoint stubs to the
+      // current element edges — the middle is preserved EXACTLY, never re-routed.
+      // (reanchorStub returns null only for a too-short path → fall through.)
+      if (conn.pathShaped && N >= 5) {
+        let w = reanchorStub(wp, "source", source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5) ?? wp;
+        w = reanchorStub(w, "target", target, conn.targetSide, conn.targetOffsetAlong ?? 0.5) ?? w;
+        return { ...conn, waypoints: w, sourceInvisibleLeader: true, targetInvisibleLeader: true };
+      }
+      // Legacy heuristic preserve — N >= 9 waypoints ≈ evidence of a manual reshape.
+      if (N >= 9) {
         const newSrcCenter  = getConnectionPointBySide(source, conn.sourceSide);
         const newTgtCenter  = getConnectionPointBySide(target, conn.targetSide);
         const newSrcEdge    = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
@@ -1865,13 +1908,6 @@ export function recomputeAllConnectors(
           if (dx > 0.5 && dy > 0.5) { allOrthogonal = false; break; }
         }
         if (allOrthogonal && outwardOk && !pathHitsObstacles(candidate, obstacles)) {
-          return { ...conn, waypoints: candidate };
-        }
-        // Sticky-segment rule: if the USER shaped this path, KEEP their interior
-        // even when the re-fit isn't perfectly orthogonal / clear after a move —
-        // a re-route must never undo their work. Only unflagged (legacy N>=9)
-        // paths fall through to a full recompute below.
-        if (conn.pathShaped) {
           return { ...conn, waypoints: candidate };
         }
         // Interior routing hits obstacle, goes inward, or is non-orthogonal — fall through

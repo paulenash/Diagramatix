@@ -960,6 +960,7 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0976 | ffmpeg any→webm args = VP9/Opus with `-deadline realtime` for reasonable speed, input first / output last | A "convert to .webm" that's absurdly slow or wrong-codec | If ffmpegToWebmArgs regressed |
 | T0977 | sticky-segment: a `pathShaped` BPMN connector keeps its interior detour when the target element moves; the end re-fits to the moved element | Re-routing undoing a user's dragged connector segment | If the pathShaped preserve / no-discard logic regressed |
 | T0978 | an unflagged connector with < 9 waypoints is NOT preserved (re-routes) — proving the flag, not the count, protects a user's shape | A short user reshape silently lost, or every connector wrongly frozen | If the preserve trigger (pathShaped OR N≥9) regressed |
+| T0979 | reanchorStub re-fits ONLY the moved endpoint's stub to the new edge; every middle bend + the other end are kept exactly | Moving/nudging an endpoint on a shaped connector reshaping (or losing) the middle | If reanchorStub's stub-only re-anchor regressed |
 
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 

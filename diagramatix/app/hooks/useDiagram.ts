@@ -21,7 +21,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE } from "@/app/lib/diagram/routing";
+import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, reanchorStub } from "@/app/lib/diagram/routing";
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
@@ -6869,8 +6869,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             waypoints: selfLoopWaypoints(source, loopSide, srcOff, tgtOff, bulge),
             sourceInvisibleLeader: true, targetInvisibleLeader: true } as Connector;
         }
-        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
-          updated.type === "messageBPMN" && !state.relaxedLayout
+        // Sticky shape: when the connector is user-shaped, a moved endpoint
+        // re-anchors ONLY its own stub — the middle segments are preserved.
+        const stickyWp = updated.pathShaped && updated.routingType === "rectilinear" && updated.type !== "messageBPMN"
+          ? reanchorStub(conn.waypoints, endpoint, endpoint === "source" ? source : target, side, off)
+          : null;
+        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = stickyWp
+          ? { waypoints: stickyWp, sourceInvisibleLeader: true, targetInvisibleLeader: true }
+          : updated.type === "messageBPMN" && !state.relaxedLayout
             ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
@@ -7083,8 +7089,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const source = state.elements.find((el) => el.id === updated.sourceId);
         const target = state.elements.find((el) => el.id === updated.targetId);
         if (!source || !target) return conn;
-        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
-          updated.type === "messageBPMN" && !state.relaxedLayout
+        // Sticky shape: a nudged endpoint re-anchors ONLY its own stub.
+        const stickyWp = updated.pathShaped && updated.routingType === "rectilinear" && updated.type !== "messageBPMN"
+          ? reanchorStub(conn.waypoints, endpoint, endpoint === "source" ? source : target, rSide, rOff)
+          : null;
+        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = stickyWp
+          ? { waypoints: stickyWp, sourceInvisibleLeader: true, targetInvisibleLeader: true }
+          : updated.type === "messageBPMN" && !state.relaxedLayout
             ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
