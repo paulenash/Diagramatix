@@ -1479,42 +1479,6 @@ export function consolidateWaypoints(wps: Point[]): Point[] {
   return result;
 }
 
-/**
- * Sticky-shape re-anchor: rebuild ONLY the stub connecting one endpoint to the
- * user's preserved middle, keeping every middle bend exactly where it is. Used
- * when a shaped (pathShaped) rectilinear connector's endpoint moves/nudges or its
- * element moves — the middle never re-routes, only the endpoint-adjacent segment
- * adapts (as an orthogonal L that exits perpendicular to the element's face).
- *
- * `wp` = [srcCenter, srcEdge, …middle…, tgtEdge, tgtCenter]. Returns null when the
- * path is too short to have a preservable middle (caller falls back to normal).
- */
-export function reanchorStub(
-  wp: Point[],
-  endpoint: "source" | "target",
-  el: DiagramElement,
-  side: Side,
-  offset: number,
-): Point[] | null {
-  const N = wp.length;
-  if (N < 5) return null; // need [center, edge, ≥1 middle, edge, center]
-  const newCenter = { x: el.x + el.width / 2, y: el.y + el.height / 2 };
-  const newEdge = sidePoint(el, side, offset);
-  const horizontal = side === "left" || side === "right";
-  if (endpoint === "source") {
-    const anchor = wp[2]; // first point of the preserved middle
-    const stub: Point[] = [];
-    if (horizontal) { if (Math.abs(newEdge.y - anchor.y) > 0.5) stub.push({ x: anchor.x, y: newEdge.y }); }
-    else { if (Math.abs(newEdge.x - anchor.x) > 0.5) stub.push({ x: newEdge.x, y: anchor.y }); }
-    return consolidateWaypoints([newCenter, newEdge, ...stub, ...wp.slice(2)]);
-  }
-  const anchor = wp[N - 3]; // last point of the preserved middle
-  const stub: Point[] = [];
-  if (horizontal) { if (Math.abs(newEdge.y - anchor.y) > 0.5) stub.push({ x: anchor.x, y: newEdge.y }); }
-  else { if (Math.abs(newEdge.x - anchor.x) > 0.5) stub.push({ x: newEdge.x, y: anchor.y }); }
-  return consolidateWaypoints([...wp.slice(0, N - 2), ...stub, newEdge, newCenter]);
-}
-
 export function recomputeAllConnectors(
   connectors: Connector[],
   elements: DiagramElement[],
@@ -1820,15 +1784,6 @@ export function recomputeAllConnectors(
     if (conn.routingType === "rectilinear") {
       const wp = conn.waypoints;
       const N = wp.length;
-      // Sticky shape: a user-shaped path re-anchors ONLY its endpoint stubs to the
-      // current element edges — the middle is preserved EXACTLY, never re-routed.
-      // (reanchorStub returns null only for a too-short path → fall through.)
-      if (conn.pathShaped && N >= 5) {
-        let w = reanchorStub(wp, "source", source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5) ?? wp;
-        w = reanchorStub(w, "target", target, conn.targetSide, conn.targetOffsetAlong ?? 0.5) ?? w;
-        return { ...conn, waypoints: w, sourceInvisibleLeader: true, targetInvisibleLeader: true };
-      }
-      // Legacy heuristic preserve — N >= 9 waypoints ≈ evidence of a manual reshape.
       if (N >= 9) {
         const newSrcCenter  = getConnectionPointBySide(source, conn.sourceSide);
         const newTgtCenter  = getConnectionPointBySide(target, conn.targetSide);
@@ -1941,20 +1896,13 @@ export function recomputeAllConnectors(
         // the same delta vector so the path can't double back through the
         // source / target body, and overrides with `pickBoundaryEventSide`
         // for boundary-event endpoints (issues 2 + 8).
-        const sp = safeSidePair(source, target, elements);
-        // Sticky-endpoint rule: an end the USER moved/nudged (pinned) is NEVER
-        // re-picked by this fallback — keep its side + offset exactly. Only the
-        // un-pinned end (and the path) re-route.
-        const newSrcSide = conn.sourcePinned ? conn.sourceSide : sp.src;
-        const newTgtSide = conn.targetPinned ? conn.targetSide : sp.tgt;
+        const { src: newSrcSide, tgt: newTgtSide } = safeSidePair(source, target, elements);
         // Preserve the user-chosen offset along any side that ends up
         // unchanged. Without this, every drag step that trips this
         // fallback snaps the visible attachment point back to the
         // edge midpoint — even when the side itself wasn't the issue.
-        const newSrcOffset = conn.sourcePinned ? (conn.sourceOffsetAlong ?? 0.5)
-          : newSrcSide === conn.sourceSide ? (conn.sourceOffsetAlong ?? 0.5) : 0.5;
-        const newTgtOffset = conn.targetPinned ? (conn.targetOffsetAlong ?? 0.5)
-          : newTgtSide === conn.targetSide ? (conn.targetOffsetAlong ?? 0.5) : 0.5;
+        const newSrcOffset = newSrcSide === conn.sourceSide ? (conn.sourceOffsetAlong ?? 0.5) : 0.5;
+        const newTgtOffset = newTgtSide === conn.targetSide ? (conn.targetOffsetAlong ?? 0.5) : 0.5;
         const result2 = computeWaypoints(
           source, target, elements,
           newSrcSide, newTgtSide, conn.routingType, newSrcOffset, newTgtOffset,
@@ -1994,16 +1942,11 @@ export function recomputeAllConnectors(
     if (waypointInsideObs) {
       // Recalculate with optimal facing sides — boundary-event-aware and
       // self-avoidant via `safeSidePair`.
-      const rp = safeSidePair(source, target, elements);
-      // Sticky-endpoint rule (as above): keep a pinned end's side + offset.
-      const reSrcSide = conn.sourcePinned ? conn.sourceSide : rp.src;
-      const reTgtSide = conn.targetPinned ? conn.targetSide : rp.tgt;
+      const { src: reSrcSide, tgt: reTgtSide } = safeSidePair(source, target, elements);
       // Same offset-preservation as the exit/approach fallback above:
       // only re-centre the attachment when the side actually changes.
-      const reSrcOffset = conn.sourcePinned ? (conn.sourceOffsetAlong ?? 0.5)
-        : reSrcSide === conn.sourceSide ? (conn.sourceOffsetAlong ?? 0.5) : 0.5;
-      const reTgtOffset = conn.targetPinned ? (conn.targetOffsetAlong ?? 0.5)
-        : reTgtSide === conn.targetSide ? (conn.targetOffsetAlong ?? 0.5) : 0.5;
+      const reSrcOffset = reSrcSide === conn.sourceSide ? (conn.sourceOffsetAlong ?? 0.5) : 0.5;
+      const reTgtOffset = reTgtSide === conn.targetSide ? (conn.targetOffsetAlong ?? 0.5) : 0.5;
       const result3 = computeWaypoints(source, target, elements, reSrcSide, reTgtSide, conn.routingType, reSrcOffset, reTgtOffset);
       return { ...conn, waypoints: result3.waypoints,
         sourceInvisibleLeader: result3.sourceInvisibleLeader,

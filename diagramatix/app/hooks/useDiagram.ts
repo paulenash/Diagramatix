@@ -21,7 +21,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, reanchorStub } from "@/app/lib/diagram/routing";
+import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE } from "@/app/lib/diagram/routing";
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
@@ -2953,13 +2953,9 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
       // re-routed every archi connector (they touch their source/target
       // boundary so connectorHitsAnyElement is true) and RESET its endpoint
       // offset to 0.5 — making endpoints snap to centre and refuse to move.
-      // A USER-SHAPED connector (pathShaped) owns its path — obstacle validation
-      // must NOT re-route it (that was undoing the endpoint-move re-anchor and
-      // "triggering re-routing" on a selected connector). Same exemption as
-      // message / association / ArchiMate connectors.
-      if (conn.type === "messageBPMN" || conn.type === "associationBPMN" || conn.type.startsWith("archi-") || conn.pathShaped) {
+      if (conn.type === "messageBPMN" || conn.type === "associationBPMN" || conn.type.startsWith("archi-")) {
         if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
-          console.log(`[TRACE validateObstacles] skipping ${conn.type} ${conn.id} srcSide=${conn.sourceSide} tgtSide=${conn.targetSide} wpCount=${conn.waypoints.length} pathShaped=${conn.pathShaped}`);
+          console.log(`[TRACE validateObstacles] skipping ${conn.type} ${conn.id} srcSide=${conn.sourceSide} tgtSide=${conn.targetSide} wpCount=${conn.waypoints.length}`);
         }
         return conn;
       }
@@ -6846,13 +6842,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const [s, o] = clampParallelFace(movedEl, otherEl, side, off);
           side = s; off = o ?? 0.5;
         }
-        // Pin the moved end so a later re-route keeps it in place (sticky-endpoint rule).
         const updated = endpoint === "source"
-          ? { ...conn, sourceId: newElementId, sourceSide: side, sourceOffsetAlong: off, sourcePinned: true,
+          ? { ...conn, sourceId: newElementId, sourceSide: side, sourceOffsetAlong: off,
               sourceRoleOffset: undefined, sourceMultOffset: undefined,
               sourceConstraintOffset: undefined, sourceUniqueOffset: undefined, sourceQualifierOffset: undefined,
               associationNameOffset: undefined }
-          : { ...conn, targetId: newElementId, targetSide: side, targetOffsetAlong: off, targetPinned: true,
+          : { ...conn, targetId: newElementId, targetSide: side, targetOffsetAlong: off,
               targetRoleOffset: undefined, targetMultOffset: undefined,
               targetConstraintOffset: undefined, targetUniqueOffset: undefined, targetQualifierOffset: undefined,
               associationNameOffset: undefined };
@@ -6873,14 +6868,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             waypoints: selfLoopWaypoints(source, loopSide, srcOff, tgtOff, bulge),
             sourceInvisibleLeader: true, targetInvisibleLeader: true } as Connector;
         }
-        // Sticky shape: when the connector is user-shaped, a moved endpoint
-        // re-anchors ONLY its own stub — the middle segments are preserved.
-        const stickyWp = updated.pathShaped && updated.routingType === "rectilinear" && updated.type !== "messageBPMN"
-          ? reanchorStub(conn.waypoints, endpoint, endpoint === "source" ? source : target, side, off)
-          : null;
-        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = stickyWp
-          ? { waypoints: stickyWp, sourceInvisibleLeader: true, targetInvisibleLeader: true }
-          : updated.type === "messageBPMN" && !state.relaxedLayout
+        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
+          updated.type === "messageBPMN" && !state.relaxedLayout
             ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
@@ -7082,24 +7071,18 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const [s, o] = clampParallelFace(movedElN, otherElN, rSide, rOff);
           rSide = s; rOff = o ?? 0.5;
         }
-        // Pin the nudged end so a later re-route keeps it in place (sticky-endpoint rule).
         const updated = endpoint === "source"
-          ? { ...conn, sourceSide: rSide, sourceOffsetAlong: rOff, sourcePinned: true,
+          ? { ...conn, sourceSide: rSide, sourceOffsetAlong: rOff,
               sourceRoleOffset: undefined, sourceMultOffset: undefined,
               sourceConstraintOffset: undefined, sourceUniqueOffset: undefined, sourceQualifierOffset: undefined }
-          : { ...conn, targetSide: rSide, targetOffsetAlong: rOff, targetPinned: true,
+          : { ...conn, targetSide: rSide, targetOffsetAlong: rOff,
               targetRoleOffset: undefined, targetMultOffset: undefined,
               targetConstraintOffset: undefined, targetUniqueOffset: undefined, targetQualifierOffset: undefined };
         const source = state.elements.find((el) => el.id === updated.sourceId);
         const target = state.elements.find((el) => el.id === updated.targetId);
         if (!source || !target) return conn;
-        // Sticky shape: a nudged endpoint re-anchors ONLY its own stub.
-        const stickyWp = updated.pathShaped && updated.routingType === "rectilinear" && updated.type !== "messageBPMN"
-          ? reanchorStub(conn.waypoints, endpoint, endpoint === "source" ? source : target, rSide, rOff)
-          : null;
-        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = stickyWp
-          ? { waypoints: stickyWp, sourceInvisibleLeader: true, targetInvisibleLeader: true }
-          : updated.type === "messageBPMN" && !state.relaxedLayout
+        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
+          updated.type === "messageBPMN" && !state.relaxedLayout
             ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
@@ -7128,18 +7111,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const sharedX = newWaypoints[1]?.x;
           if (source && sharedX != null && source.width > 0) {
             const offset = Math.max(0.02, Math.min(0.98, (sharedX - source.x) / source.width));
-            return { ...c, waypoints: newWaypoints, sourceOffsetAlong: offset, pathShaped: true };
+            return { ...c, waypoints: newWaypoints, sourceOffsetAlong: offset };
           }
-          return { ...c, waypoints: newWaypoints, pathShaped: true };
+          return { ...c, waypoints: newWaypoints };
         }
         // Free-form / imported message: a rectilinear connector — preserve the
         // dragged segments like any other, keeping its routingType so the
         // renderer + recompute keep treating it as rectilinear (not vertical).
         // R6.18: preserve label world position across the waypoint change.
-        // pathShaped: mark this connector user-shaped so a re-route keeps the
-        // interior + only re-fits the endpoint stubs (sticky-segment rule).
         const labelAdj = preserveLabelWorldPos(c, newWaypoints);
-        return { ...c, waypoints: newWaypoints, pathShaped: true, ...labelAdj };
+        return { ...c, waypoints: newWaypoints, ...labelAdj };
       });
       // Skip obstacle validation entirely. UPDATE_CONNECTOR_WAYPOINTS is
       // only fired by user-initiated waypoint changes (segment drag).
