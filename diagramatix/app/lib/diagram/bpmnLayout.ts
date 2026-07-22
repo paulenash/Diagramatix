@@ -3620,7 +3620,12 @@ export function layoutBpmnDiagram(
         if (parent.type === "pool") break;
         cur = parent;
       }
-      const annotX = startCx - annotW / 2;
+      // Sit the annotation to the LEFT of the start event (right edge a gap left
+      // of its left edge), not centred on it: a process that opens with a message
+      // flow to a partner pool sends that connector straight UP from the start
+      // event, and a centred annotation lands on top of the connector + its label.
+      // Left-aligned clears that column and matches the BPMN top-left convention.
+      const annotX = startEl.x - 16 - annotW;
       const annotY = topOfContainer - annotH - 20;
       elements.push({
         id: annotId,
