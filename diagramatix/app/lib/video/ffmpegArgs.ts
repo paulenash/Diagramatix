@@ -24,3 +24,21 @@ export function ffmpegWebmToMp4Args(inputPath: string, outputPath: string): stri
     outputPath,
   ];
 }
+
+/**
+ * Transcode any input (mp4 or webm) → webm (VP9 + Opus). `realtime`/`cpu-used 5`
+ * + row multithreading keep VP9 — which is otherwise very slow — usable for a
+ * screencast-length clip. Only used for the optional "convert to .webm" action.
+ */
+export function ffmpegToWebmArgs(inputPath: string, outputPath: string): string[] {
+  return [
+    "-i", inputPath,
+    "-c:v", "libvpx-vp9",
+    "-b:v", "0", "-crf", "33",
+    "-deadline", "realtime", "-cpu-used", "5", "-row-mt", "1",
+    "-c:a", "libopus", "-b:a", "128k",
+    "-y",
+    outputPath,
+  ];
+}
+

@@ -15,7 +15,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ffmpegWebmToMp4Args } from "@/app/lib/video/ffmpegArgs";
+import { ffmpegWebmToMp4Args, ffmpegToWebmArgs } from "@/app/lib/video/ffmpegArgs";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -32,18 +32,22 @@ export async function POST(req: Request) {
   if (buf.length === 0) return NextResponse.json({ error: "Empty body" }, { status: 400 });
   if (buf.length > MAX_BYTES) return NextResponse.json({ error: "Recording too large to transcode" }, { status: 413 });
 
+  // Target format (?to=mp4|webm, default mp4) + input extension from Content-Type
+  // so ffmpeg demuxes correctly regardless of which way we're converting.
+  const to = new URL(req.url).searchParams.get("to") === "webm" ? "webm" : "mp4";
+  const inExt = (req.headers.get("content-type") ?? "").includes("mp4") ? "mp4" : "webm";
   const dir = await mkdtemp(join(tmpdir(), "dgx-video-"));
-  const inPath = join(dir, "in.webm");
-  const outPath = join(dir, "out.mp4");
+  const inPath = join(dir, `in.${inExt}`);
+  const outPath = join(dir, `out.${to}`);
   try {
     await writeFile(inPath, buf);
-    await runFfmpeg(ffmpegWebmToMp4Args(inPath, outPath));
-    const mp4 = await readFile(outPath);
-    return new NextResponse(new Uint8Array(mp4), {
+    await runFfmpeg(to === "webm" ? ffmpegToWebmArgs(inPath, outPath) : ffmpegWebmToMp4Args(inPath, outPath));
+    const out = await readFile(outPath);
+    return new NextResponse(new Uint8Array(out), {
       status: 200,
       headers: {
-        "Content-Type": "video/mp4",
-        "Content-Disposition": 'attachment; filename="screencast.mp4"',
+        "Content-Type": to === "webm" ? "video/webm" : "video/mp4",
+        "Content-Disposition": `attachment; filename="screencast.${to}"`,
         "Cache-Control": "no-store",
       },
     });

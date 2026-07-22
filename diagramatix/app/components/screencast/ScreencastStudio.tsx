@@ -16,12 +16,20 @@ import { useDraggable } from "@/app/components/useDraggable";
 
 type Phase = "idle" | "setup" | "recording" | "paused" | "review";
 
-function pickMime(): string {
-  const cands = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+// Prefer recording mp4 DIRECTLY (Edge/Chrome 126+) — instant, no server transcode,
+// and mp4 is what social/Buffer needs. Fall back to webm on browsers that can't.
+function pickMime(): { mime: string; ext: "mp4" | "webm" } {
+  const cands: { mime: string; ext: "mp4" | "webm" }[] = [
+    { mime: "video/mp4;codecs=avc1,mp4a", ext: "mp4" },
+    { mime: "video/mp4", ext: "mp4" },
+    { mime: "video/webm;codecs=vp9,opus", ext: "webm" },
+    { mime: "video/webm;codecs=vp8,opus", ext: "webm" },
+    { mime: "video/webm", ext: "webm" },
+  ];
   if (typeof MediaRecorder !== "undefined") {
-    for (const c of cands) if (MediaRecorder.isTypeSupported(c)) return c;
+    for (const c of cands) if (MediaRecorder.isTypeSupported(c.mime)) return c;
   }
-  return "video/webm";
+  return { mime: "video/webm", ext: "webm" };
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -40,8 +48,11 @@ function fmt(sec: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-const CORNERS: { id: InsetCorner; label: string }[] = [
-  { id: "br", label: "↘" }, { id: "bl", label: "↙" }, { id: "tr", label: "↗" }, { id: "tl", label: "↖" },
+const CORNERS: { id: InsetCorner; label: string; name: string }[] = [
+  { id: "br", label: "↘", name: "Webcam in bottom-right" },
+  { id: "bl", label: "↙", name: "Webcam in bottom-left" },
+  { id: "tr", label: "↗", name: "Webcam in top-right" },
+  { id: "tl", label: "↖", name: "Webcam in top-left" },
 ];
 
 export function ScreencastStudio({ enabled }: { enabled: boolean }) {
@@ -59,7 +70,12 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   const [elapsed, setElapsed] = useState(0);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [transcoding, setTranscoding] = useState(false);
+  const [convertElapsed, setConvertElapsed] = useState(0);
+  const [pendingTo, setPendingTo] = useState<"mp4" | "webm" | null>(null);
+  const [nativeExt, setNativeExt] = useState<"mp4" | "webm">("webm");
   const [error, setError] = useState<string | null>(null);
+  const convertAbortRef = useRef<AbortController | null>(null);
+  const convertTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Draggable launcher — sits just RIGHT of the camera button (which defaults to
   // left 64) and remembers where the user drags it. Smaller (32px) than the camera.
@@ -218,7 +234,9 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     const mixed = new MediaStream(tracks);
 
     chunksRef.current = [];
-    const rec = new MediaRecorder(mixed, { mimeType: pickMime() });
+    const chosen = pickMime();
+    setNativeExt(chosen.ext);
+    const rec = new MediaRecorder(mixed, { mimeType: chosen.mime });
     rec.ondataavailable = (ev) => { if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data); };
     rec.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: rec.mimeType || "video/webm" });
@@ -256,17 +274,35 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }, []);
 
-  const saveMp4 = useCallback(async () => {
-    const blob = recordedBlobRef.current; if (!blob) return;
-    setTranscoding(true); setError(null);
+  const saveConverted = useCallback(async (to: "mp4" | "webm") => {
+    const blob = recordedBlobRef.current; if (!blob || transcoding) return;
+    const ac = new AbortController();
+    convertAbortRef.current = ac;
+    const hardTimeout = setTimeout(() => ac.abort(), 5 * 60 * 1000); // never hang forever
+    setTranscoding(true); setPendingTo(to); setConvertElapsed(0); setError(null);
+    convertTimerRef.current = setInterval(() => setConvertElapsed((e) => e + 1), 1000);
     try {
-      const res = await fetch("/api/video/transcode", { method: "POST", headers: { "Content-Type": "video/webm" }, body: blob });
-      if (!res.ok) { const j = await res.json().catch(() => ({})); setError(j.error ?? "Transcode failed"); return; }
-      download(await res.blob(), "mp4");
+      const res = await fetch(`/api/video/transcode?to=${to}`, {
+        method: "POST",
+        headers: { "Content-Type": blob.type || "video/webm" },
+        body: blob,
+        signal: ac.signal,
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setError(j.error ?? `Conversion failed (HTTP ${res.status}). ffmpeg may be unavailable in this environment.`); return; }
+      download(await res.blob(), to);
     } catch (e) {
-      setError((e as Error).message);
-    } finally { setTranscoding(false); }
-  }, [download]);
+      setError(ac.signal.aborted ? "Conversion cancelled or timed out." : `Conversion error: ${(e as Error).message}`);
+    } finally {
+      clearTimeout(hardTimeout);
+      if (convertTimerRef.current) { clearInterval(convertTimerRef.current); convertTimerRef.current = null; }
+      convertAbortRef.current = null;
+      setTranscoding(false); setPendingTo(null);
+    }
+  }, [download, transcoding]);
+
+  const cancelConvert = useCallback(() => { convertAbortRef.current?.abort(); }, []);
+  // Reassuring progress that eases toward 90% over ~elapsed and completes on finish.
+  const convertPct = Math.min(90, Math.round(90 * (1 - Math.exp(-convertElapsed / 8))));
 
   const discardRecording = useCallback(() => {
     setRecordedUrl((old) => { if (old) URL.revokeObjectURL(old); return null; });
@@ -277,6 +313,8 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   const reRecord = useCallback(() => { discardRecording(); setPhase("setup"); void arm(); }, [discardRecording, arm]);
 
   const closeStudio = useCallback(() => {
+    convertAbortRef.current?.abort();
+    if (convertTimerRef.current) { clearInterval(convertTimerRef.current); convertTimerRef.current = null; }
     stop();
     cleanupRecording();
     previewStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -372,14 +410,17 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
                 <button onClick={() => setCamOn((v) => !v)} className={`px-1.5 py-1 rounded border ${camOn ? "border-green-300 text-green-700" : "border-gray-300 text-gray-600"}`} title="Toggle camera">{camOn ? "📷" : "🚫"}</button>
               </div>
               {camOn && (
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="flex gap-0.5">
-                    {CORNERS.map((c) => (
-                      <button key={c.id} onClick={() => setCorner(c.id)} className={`w-6 h-6 rounded border text-[11px] ${corner === c.id ? "bg-red-600 text-white border-red-600" : "border-gray-300 text-gray-600"}`} title={`Inset ${c.id}`}>{c.label}</button>
-                    ))}
+                <>
+                  <label className="block text-[10px] uppercase tracking-wide text-gray-600 mb-0.5">Webcam corner &amp; size</label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex gap-0.5">
+                      {CORNERS.map((c) => (
+                        <button key={c.id} onClick={() => setCorner(c.id)} className={`w-6 h-6 rounded border text-[11px] ${corner === c.id ? "bg-red-600 text-white border-red-600" : "border-gray-300 text-gray-600"}`} title={c.name} aria-label={c.name}>{c.label}</button>
+                      ))}
+                    </div>
+                    <input type="range" min={0.12} max={0.4} step={0.02} value={scale} onChange={(e) => setScale(Number(e.target.value))} className="flex-1" title="Webcam inset size" aria-label="Webcam inset size" />
                   </div>
-                  <input type="range" min={0.12} max={0.4} step={0.02} value={scale} onChange={(e) => setScale(Number(e.target.value))} className="flex-1" title="Inset size" />
-                </div>
+                </>
               )}
 
               <button onClick={start}
@@ -394,12 +435,23 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
             <>
               <video src={recordedUrl} controls className="w-full rounded border border-gray-200 mb-2 bg-black" />
               <div className="grid grid-cols-2 gap-1.5">
-                <button onClick={() => recordedBlobRef.current && download(recordedBlobRef.current, "webm")} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50">Save .webm</button>
-                <button onClick={saveMp4} disabled={transcoding} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50 disabled:opacity-50">{transcoding ? "Converting…" : "Save .mp4"}</button>
-                <button onClick={reRecord} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50">Re-record</button>
-                <button onClick={() => { discardRecording(); setPhase("setup"); void arm(); }} className="py-1.5 border border-red-300 text-red-700 font-medium rounded hover:bg-red-50">Discard</button>
+                <button onClick={() => recordedBlobRef.current && download(recordedBlobRef.current, nativeExt)} disabled={transcoding} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50 disabled:opacity-50" title="Save the recording as-is (instant, no conversion)">Save .{nativeExt}</button>
+                <button onClick={() => saveConverted(nativeExt === "mp4" ? "webm" : "mp4")} disabled={transcoding} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50 disabled:opacity-50" title="Convert on the server, then save">Save .{nativeExt === "mp4" ? "webm" : "mp4"}</button>
+                <button onClick={reRecord} disabled={transcoding} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50 disabled:opacity-50">Re-record</button>
+                <button onClick={() => { discardRecording(); setPhase("setup"); void arm(); }} disabled={transcoding} className="py-1.5 border border-red-300 text-red-700 font-medium rounded hover:bg-red-50 disabled:opacity-50">Discard</button>
               </div>
-              <p className="text-[10px] text-gray-600 mt-1">Buffer publishing arrives in the next slice; for now, save locally.</p>
+              {transcoding && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-[10px] text-gray-600 mb-0.5">
+                    <span>Converting to .{pendingTo}… {convertElapsed}s</span>
+                    <button onClick={cancelConvert} className="text-red-600 hover:underline">Cancel</button>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded overflow-hidden">
+                    <div className="h-full bg-blue-500 transition-[width] duration-500" style={{ width: `${convertPct}%` }} />
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-gray-600 mt-1">.{nativeExt} saves instantly (native recording); the other format converts on the server.</p>
             </>
           )}
 
