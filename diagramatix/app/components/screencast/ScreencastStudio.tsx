@@ -338,22 +338,22 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
         </button>
       )}
       {open && (
-        <div className="fixed bottom-16 left-4 z-[95] w-72 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-xs">
+        <div className="fixed bottom-16 left-4 z-[95] w-72 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-xs text-gray-800">
           <div className="flex items-center justify-between mb-2">
             <span className="font-semibold text-gray-800">🎥 Screencast Studio</span>
-            <button onClick={closeStudio} className="text-gray-400 hover:text-gray-700 text-base leading-none" title="Close">&times;</button>
+            <button onClick={closeStudio} className="text-gray-600 hover:text-gray-700 text-base leading-none" title="Close">&times;</button>
           </div>
 
           {phase !== "review" && (
             <>
-              <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Microphone</label>
+              <label className="block text-[10px] uppercase tracking-wide text-gray-600 mb-0.5">Microphone</label>
               <div className="flex items-center gap-1 mb-1">
                 <select value={micId} onChange={(e) => setMicId(e.target.value)} disabled={!micOn}
                   className="flex-1 border border-gray-300 rounded px-1 py-1 text-[11px] disabled:opacity-50">
                   <option value="">Default</option>
                   {mics.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0, 6)}`}</option>)}
                 </select>
-                <button onClick={() => setMicOn((v) => !v)} className={`px-1.5 py-1 rounded border ${micOn ? "border-green-300 text-green-700" : "border-gray-300 text-gray-400"}`} title="Toggle mic">{micOn ? "🎙" : "🔇"}</button>
+                <button onClick={() => setMicOn((v) => !v)} className={`px-1.5 py-1 rounded border ${micOn ? "border-green-300 text-green-700" : "border-gray-300 text-gray-600"}`} title="Toggle mic">{micOn ? "🎙" : "🔇"}</button>
               </div>
               {/* Mic test level meter (the selected device) */}
               {micOn && (
@@ -362,14 +362,14 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
                 </div>
               )}
 
-              <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Camera (inset)</label>
+              <label className="block text-[10px] uppercase tracking-wide text-gray-600 mb-0.5">Camera (inset)</label>
               <div className="flex items-center gap-1 mb-1">
                 <select value={camId} onChange={(e) => setCamId(e.target.value)} disabled={!camOn}
                   className="flex-1 border border-gray-300 rounded px-1 py-1 text-[11px] disabled:opacity-50">
                   <option value="">Default</option>
                   {cams.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Cam ${d.deviceId.slice(0, 6)}`}</option>)}
                 </select>
-                <button onClick={() => setCamOn((v) => !v)} className={`px-1.5 py-1 rounded border ${camOn ? "border-green-300 text-green-700" : "border-gray-300 text-gray-400"}`} title="Toggle camera">{camOn ? "📷" : "🚫"}</button>
+                <button onClick={() => setCamOn((v) => !v)} className={`px-1.5 py-1 rounded border ${camOn ? "border-green-300 text-green-700" : "border-gray-300 text-gray-600"}`} title="Toggle camera">{camOn ? "📷" : "🚫"}</button>
               </div>
               {camOn && (
                 <div className="flex items-center gap-2 mb-2">
@@ -386,7 +386,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
                 className="w-full py-1.5 bg-red-600 text-white rounded hover:bg-red-700 font-medium">
                 ● Start recording
               </button>
-              <p className="text-[10px] text-gray-400 mt-1">You&rsquo;ll be asked which screen/window/tab to capture. Recording keeps running as you navigate anywhere in Diagramatix.</p>
+              <p className="text-[10px] text-gray-600 mt-1">You&rsquo;ll be asked which screen/window/tab to capture. Recording keeps running as you navigate anywhere in Diagramatix.</p>
             </>
           )}
 
@@ -394,12 +394,12 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
             <>
               <video src={recordedUrl} controls className="w-full rounded border border-gray-200 mb-2 bg-black" />
               <div className="grid grid-cols-2 gap-1.5">
-                <button onClick={() => recordedBlobRef.current && download(recordedBlobRef.current, "webm")} className="py-1.5 border border-gray-300 rounded hover:bg-gray-50">Save .webm</button>
-                <button onClick={saveMp4} disabled={transcoding} className="py-1.5 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">{transcoding ? "Converting…" : "Save .mp4"}</button>
-                <button onClick={reRecord} className="py-1.5 border border-gray-300 rounded hover:bg-gray-50">Re-record</button>
-                <button onClick={() => { discardRecording(); setPhase("setup"); void arm(); }} className="py-1.5 border border-red-300 text-red-700 rounded hover:bg-red-50">Discard</button>
+                <button onClick={() => recordedBlobRef.current && download(recordedBlobRef.current, "webm")} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50">Save .webm</button>
+                <button onClick={saveMp4} disabled={transcoding} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50 disabled:opacity-50">{transcoding ? "Converting…" : "Save .mp4"}</button>
+                <button onClick={reRecord} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50">Re-record</button>
+                <button onClick={() => { discardRecording(); setPhase("setup"); void arm(); }} className="py-1.5 border border-red-300 text-red-700 font-medium rounded hover:bg-red-50">Discard</button>
               </div>
-              <p className="text-[10px] text-gray-400 mt-1">Buffer publishing arrives in the next slice; for now, save locally.</p>
+              <p className="text-[10px] text-gray-600 mt-1">Buffer publishing arrives in the next slice; for now, save locally.</p>
             </>
           )}
 
