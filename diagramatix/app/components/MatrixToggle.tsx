@@ -34,7 +34,7 @@ function readIdleSeconds(): number {
 export function MatrixToggle() {
   const [armed, setArmedState] = useState(false);
   const [running, setRunning] = useState(false);
-  const { pos, handlers, didDrag } = useDraggable("diagramatix.matrix.btnPos", () => ({ left: 16, top: window.innerHeight - 56 }));
+  const { pos, handlers, didDrag } = useDraggable("diagramatix.matrix.btnPos", () => ({ left: 16, bottom: 16 }));
   const [idleSeconds, setIdleSeconds] = useState(DEFAULT_IDLE_SECONDS);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -178,7 +178,7 @@ export function MatrixToggle() {
         data-no-capture
         {...handlers}
         onClick={() => { if (didDrag()) return; setArmed(!armed); }}
-        style={pos ? { left: pos.left, top: pos.top, touchAction: "none" } : { touchAction: "none" }}
+        style={pos ? { left: pos.left, bottom: pos.bottom, touchAction: "none" } : { touchAction: "none" }}
         className={`fixed ${pos ? "" : "bottom-4 left-4"} z-[70] w-10 h-10 flex items-center justify-center rounded-full border-2 font-mono font-bold text-lg transition-all bg-black cursor-grab active:cursor-grabbing ${
           armed
             ? "border-green-400 text-green-400 shadow-[0_0_15px_rgba(74,222,128,0.7)] hover:scale-110"

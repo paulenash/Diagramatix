@@ -36,7 +36,7 @@ export function ScreenCapture() {
   const pathname = usePathname();
   const email = session?.user?.email;
   const isSuper = !!email && SUPERUSER_EMAILS.has(email);
-  const { pos, handlers, didDrag } = useDraggable("diagramatix.camera.btnPos", () => ({ left: 64, top: window.innerHeight - 56 }));
+  const { pos, handlers, didDrag } = useDraggable("diagramatix.camera.btnPos", () => ({ left: 64, bottom: 16 }));
 
   const [frozen, setFrozen] = useState<string | null>(null);
   const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
@@ -192,7 +192,7 @@ export function ScreenCapture() {
         onPointerUp={(e) => { handlers.onPointerUp(e); if (!didDrag()) void capture(); }}
         title="Capture this screen for the User Guide (open a menu first to include it). Click to capture · drag to move · Alt+Shift+C"
         aria-label="Capture screen for User Guide"
-        style={pos ? { left: pos.left, top: pos.top, touchAction: "none" } : { touchAction: "none" }}
+        style={pos ? { left: pos.left, bottom: pos.bottom, touchAction: "none" } : { touchAction: "none" }}
         className={`fixed ${pos ? "" : "bottom-4 left-16"} z-[70] w-10 h-10 flex items-center justify-center rounded-full border-2 border-gray-300 bg-white text-gray-600 hover:border-orange-400 hover:text-orange-600 hover:scale-110 transition-all cursor-grab active:cursor-grabbing`}
       >
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
