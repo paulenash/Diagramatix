@@ -62,6 +62,8 @@ export const connectorSchema = z.object({
   labelWidth: z.number().optional(),
   sourceOffsetAlong: z.number().optional(),
   targetOffsetAlong: z.number().optional(),
+  sourcePinned: z.boolean().optional(),
+  targetPinned: z.boolean().optional(),
   cp1RelOffset: pointSchema.optional(),
   cp2RelOffset: pointSchema.optional(),
   labelAnchor: z.string().optional(),

@@ -6842,12 +6842,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const [s, o] = clampParallelFace(movedEl, otherEl, side, off);
           side = s; off = o ?? 0.5;
         }
+        // Pin the moved end so a later re-route keeps it in place (sticky-endpoint rule).
         const updated = endpoint === "source"
-          ? { ...conn, sourceId: newElementId, sourceSide: side, sourceOffsetAlong: off,
+          ? { ...conn, sourceId: newElementId, sourceSide: side, sourceOffsetAlong: off, sourcePinned: true,
               sourceRoleOffset: undefined, sourceMultOffset: undefined,
               sourceConstraintOffset: undefined, sourceUniqueOffset: undefined, sourceQualifierOffset: undefined,
               associationNameOffset: undefined }
-          : { ...conn, targetId: newElementId, targetSide: side, targetOffsetAlong: off,
+          : { ...conn, targetId: newElementId, targetSide: side, targetOffsetAlong: off, targetPinned: true,
               targetRoleOffset: undefined, targetMultOffset: undefined,
               targetConstraintOffset: undefined, targetUniqueOffset: undefined, targetQualifierOffset: undefined,
               associationNameOffset: undefined };
@@ -7071,11 +7072,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const [s, o] = clampParallelFace(movedElN, otherElN, rSide, rOff);
           rSide = s; rOff = o ?? 0.5;
         }
+        // Pin the nudged end so a later re-route keeps it in place (sticky-endpoint rule).
         const updated = endpoint === "source"
-          ? { ...conn, sourceSide: rSide, sourceOffsetAlong: rOff,
+          ? { ...conn, sourceSide: rSide, sourceOffsetAlong: rOff, sourcePinned: true,
               sourceRoleOffset: undefined, sourceMultOffset: undefined,
               sourceConstraintOffset: undefined, sourceUniqueOffset: undefined, sourceQualifierOffset: undefined }
-          : { ...conn, targetSide: rSide, targetOffsetAlong: rOff,
+          : { ...conn, targetSide: rSide, targetOffsetAlong: rOff, targetPinned: true,
               targetRoleOffset: undefined, targetMultOffset: undefined,
               targetConstraintOffset: undefined, targetUniqueOffset: undefined, targetQualifierOffset: undefined };
         const source = state.elements.find((el) => el.id === updated.sourceId);

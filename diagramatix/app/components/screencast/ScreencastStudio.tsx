@@ -79,7 +79,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
 
   // Draggable launcher — sits just RIGHT of the camera button (which defaults to
   // left 64) and remembers where the user drags it. Smaller (32px) than the camera.
-  const { pos, handlers, didDrag } = useDraggable("diagramatix.video.btnPos", () => ({ left: 112, top: window.innerHeight - 56 }), 32);
+  const { pos, handlers, didDrag } = useDraggable("diagramatix.video.btnPos", () => ({ left: 112, top: window.innerHeight - 56 }), 44);
 
   // Refs the draw loop / recorder read without re-subscribing.
   const camOnRef = useRef(camOn); camOnRef.current = camOn;
@@ -367,9 +367,9 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
           title="Screencast Studio — record this screen (SuperAdmin). Click to open · drag to move"
           aria-label="Open Screencast Studio"
           style={pos ? { left: pos.left, top: pos.top, touchAction: "none" } : { touchAction: "none" }}
-          className={`fixed ${pos ? "" : "bottom-4 left-28"} z-[70] w-8 h-8 flex items-center justify-center rounded-full border-2 border-gray-300 bg-white text-gray-600 hover:border-red-500 hover:text-red-600 hover:scale-110 transition-all cursor-grab active:cursor-grabbing`}
+          className={`fixed ${pos ? "" : "bottom-4 left-28"} z-[70] w-10 h-10 flex items-center justify-center rounded-full border-2 border-gray-300 bg-white text-gray-600 hover:border-red-500 hover:text-red-600 hover:scale-110 transition-all cursor-grab active:cursor-grabbing`}
         >
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M23 7l-7 5 7 5V7z" />
             <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
           </svg>

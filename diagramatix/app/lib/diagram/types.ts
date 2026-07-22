@@ -203,6 +203,12 @@ export interface Connector {
   labelWidth?: number;
   sourceOffsetAlong?: number;
   targetOffsetAlong?: number;
+  // Sticky endpoints: set true when the USER moves/nudges this end. A subsequent
+  // re-routing pass then KEEPS this end's side + offsetAlong (never snaps it back
+  // to an auto-picked side), so a manually-placed endpoint stays where the user
+  // put it while the path + the other (un-pinned) end re-route freely.
+  sourcePinned?: boolean;
+  targetPinned?: boolean;
   cp1RelOffset?: Point;   // cp1 offset from srcEdge — preserved across element moves
   cp2RelOffset?: Point;   // cp2 offset from tgtEdge — preserved across element moves
   labelAnchor?: "midpoint" | "source";  // where the label tethers to; default "midpoint"

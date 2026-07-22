@@ -1896,13 +1896,20 @@ export function recomputeAllConnectors(
         // the same delta vector so the path can't double back through the
         // source / target body, and overrides with `pickBoundaryEventSide`
         // for boundary-event endpoints (issues 2 + 8).
-        const { src: newSrcSide, tgt: newTgtSide } = safeSidePair(source, target, elements);
+        const sp = safeSidePair(source, target, elements);
+        // Sticky-endpoint rule: an end the USER moved/nudged (pinned) is NEVER
+        // re-picked by this fallback — keep its side + offset exactly. Only the
+        // un-pinned end (and the path) re-route.
+        const newSrcSide = conn.sourcePinned ? conn.sourceSide : sp.src;
+        const newTgtSide = conn.targetPinned ? conn.targetSide : sp.tgt;
         // Preserve the user-chosen offset along any side that ends up
         // unchanged. Without this, every drag step that trips this
         // fallback snaps the visible attachment point back to the
         // edge midpoint — even when the side itself wasn't the issue.
-        const newSrcOffset = newSrcSide === conn.sourceSide ? (conn.sourceOffsetAlong ?? 0.5) : 0.5;
-        const newTgtOffset = newTgtSide === conn.targetSide ? (conn.targetOffsetAlong ?? 0.5) : 0.5;
+        const newSrcOffset = conn.sourcePinned ? (conn.sourceOffsetAlong ?? 0.5)
+          : newSrcSide === conn.sourceSide ? (conn.sourceOffsetAlong ?? 0.5) : 0.5;
+        const newTgtOffset = conn.targetPinned ? (conn.targetOffsetAlong ?? 0.5)
+          : newTgtSide === conn.targetSide ? (conn.targetOffsetAlong ?? 0.5) : 0.5;
         const result2 = computeWaypoints(
           source, target, elements,
           newSrcSide, newTgtSide, conn.routingType, newSrcOffset, newTgtOffset,
@@ -1942,11 +1949,16 @@ export function recomputeAllConnectors(
     if (waypointInsideObs) {
       // Recalculate with optimal facing sides — boundary-event-aware and
       // self-avoidant via `safeSidePair`.
-      const { src: reSrcSide, tgt: reTgtSide } = safeSidePair(source, target, elements);
+      const rp = safeSidePair(source, target, elements);
+      // Sticky-endpoint rule (as above): keep a pinned end's side + offset.
+      const reSrcSide = conn.sourcePinned ? conn.sourceSide : rp.src;
+      const reTgtSide = conn.targetPinned ? conn.targetSide : rp.tgt;
       // Same offset-preservation as the exit/approach fallback above:
       // only re-centre the attachment when the side actually changes.
-      const reSrcOffset = reSrcSide === conn.sourceSide ? (conn.sourceOffsetAlong ?? 0.5) : 0.5;
-      const reTgtOffset = reTgtSide === conn.targetSide ? (conn.targetOffsetAlong ?? 0.5) : 0.5;
+      const reSrcOffset = conn.sourcePinned ? (conn.sourceOffsetAlong ?? 0.5)
+        : reSrcSide === conn.sourceSide ? (conn.sourceOffsetAlong ?? 0.5) : 0.5;
+      const reTgtOffset = conn.targetPinned ? (conn.targetOffsetAlong ?? 0.5)
+        : reTgtSide === conn.targetSide ? (conn.targetOffsetAlong ?? 0.5) : 0.5;
       const result3 = computeWaypoints(source, target, elements, reSrcSide, reTgtSide, conn.routingType, reSrcOffset, reTgtOffset);
       return { ...conn, waypoints: result3.waypoints,
         sourceInvisibleLeader: result3.sourceInvisibleLeader,
