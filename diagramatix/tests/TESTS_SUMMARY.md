@@ -944,6 +944,12 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0952 | Claude + unknown + null ids all resolve provider=anthropic | A Claude/unknown id being sent to the Moonshot endpoint | If providerForModel's default regressed |
 | T0960 | vision capability flags — Claude all true; default Kimi list (kimi-k3/k2.6 vision unset); env ids heuristic ("vision" in id → true, else unknown) | The optional Vision-model picker offering a text-only model, or wrongly flagging a capable default | If the `vision` flags or the env heuristic regressed |
 | T0962 | an unresolved Azure Key Vault reference (`@Microsoft.KeyVault(...)` left literal in the env var) is treated as no key — model hidden, not offered-then-401 | A silent 401 "Invalid Authentication" loop when the KV reference doesn't resolve (managed-identity access), with the model still shown | If `resolvedEnvSecret`'s KV-reference guard regressed |
+| T0963 | Test-mode C1.1 forward connector = facing-side midpoints (right→left), offset 0.5, endpoint on the source's right face | The experimental connector scheme mis-attaching forward sequence flows | If bpmnTestConnectors C1.1 facing-side logic regressed |
+| T0964 | Test-mode C1.2 backward (target left of source) = TOP side on BOTH ends, offset 0.5 | Rework/loop edges not routing over the top in Test mode | If the back-edge detection or C1.2 rule regressed |
+| T0965 | Test-mode C2 decision-gateway vertex per branch position (up→top / down→bottom / level→facing side), offset 0.5; stacked branches exercise both top and bottom | Decision branches attaching to the wrong diamond vertex | If gatewayVertexSide (C2.1/2.2/2.3) regressed |
+| T0966 | Test-mode decision incoming = left vertex; merge stem outgoing = right vertex | Gateway stem ends not using the facing side vertex | If the fan-vs-stem gateway logic regressed |
+| T0967 | every Test-mode sequence connector is orthogonal (each segment axis-aligned) | Non-orthogonal/ diagonal experimental connectors | If orthogonalNoAvoid produced a non-axis-aligned segment |
+| T0968 | Normal path unchanged (omitted === mode:"normal"); Test keeps element positions + non-sequence connectors identical to Normal | The experimental mode leaking into the normal product path or moving elements | If the mode branch coupled into placement or non-sequence connectors |
 
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 

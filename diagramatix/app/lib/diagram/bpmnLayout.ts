@@ -8,6 +8,7 @@ import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints, recomputeAllConnectors } from "./routing";
 import { autoSizeForType, wrapText, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
 import { snapImportedBounds, type Box } from "./importGeometry";
+import { buildTestConnectors } from "./bpmnTestConnectors";
 
 /** Word-wrap a black-box pool name into multiple lines, then size the pool
  *  FROM the wrapped result: the rotated label runs along the pool HEIGHT, so
@@ -485,6 +486,11 @@ export function layoutBpmnDiagram(
     /** Natural pixel dimensions of the imported image, so normalised bounds
      *  keep the vendor's aspect ratio when scaled to the canvas. */
     imageAspect?: { w: number; h: number };
+    /** EXPERIMENTAL SuperAdmin-only connector scheme. "test" re-derives every
+     *  sequence connector via the C1/C2 rules (bpmnTestConnectors) after normal
+     *  placement; element positions + all other connectors are untouched.
+     *  Default/omitted = "normal" (unchanged product behaviour). */
+    mode?: "normal" | "test";
   },
 ): DiagramData {
   // Image import with usable geometry → reproduce the drawn layout. Returns
@@ -3721,9 +3727,14 @@ export function layoutBpmnDiagram(
   }
 
   applyRepeatMarkers(elements, aiElements);
+  // EXPERIMENTAL (SuperAdmin): swap sequence-connector geometry for the C1/C2
+  // Test scheme. Element positions + non-sequence connectors are unchanged.
+  const outConnectors = opts?.mode === "test"
+    ? buildTestConnectors(finalConnectors, elements)
+    : finalConnectors;
   return {
     elements,
-    connectors: finalConnectors,
+    connectors: outConnectors,
     viewport: { x: 0, y: 0, zoom: 0.6 },
     fontSize: 12,
     connectorFontSize: 10,

@@ -63,8 +63,11 @@ export async function POST(req: Request) {
     captureGeometry?: boolean;
     imageAspect?: { w: number; h: number };
     pcfNodeId?: string;
+    layoutMode?: string;
   };
   const { prompt, diagramId, attachment, captureGeometry, imageAspect } = body;
+  // EXPERIMENTAL connector scheme — this route is already SuperAdmin-only.
+  const mode = body.layoutMode === "test" ? "test" as const : "normal" as const;
   // Need a diagram to fill, plus SOME input (a prompt or an attachment).
   if (!diagramId || (!prompt?.trim() && !attachment)) {
     return NextResponse.json({ error: "diagramId and at least a prompt or an attachment are required" }, { status: 400 });
@@ -125,7 +128,7 @@ export async function POST(req: Request) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const preserve = wantGeometry && res.plan.elements.some((e: any) => e.bounds);
       const data = layoutBpmnDiagram(res.plan.elements, res.plan.connections,
-        { preservePositions: preserve, imageAspect: aspect });
+        { preservePositions: preserve, imageAspect: aspect, mode });
       const issues = findConnectorConformance(data);
       const flag = issues.length ? ` (!${issues.length})` : "";
       const saved = await prisma.diagram.create({

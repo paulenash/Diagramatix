@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { validatePlan } from "@/app/lib/ai/planSchema";
 import { normaliseAiPlan } from "@/app/lib/ai/planBpmn";
+import { isSuperuser } from "@/app/lib/superuser";
 // Diagnostic writer — stderr only (no file I/O) to avoid Windows file-lock
 // contention under load.
 function trace(line: string) {
@@ -46,6 +47,11 @@ export async function POST(req: Request) {
     && aspectRaw.w > 0 && aspectRaw.h > 0
     ? { w: aspectRaw.w, h: aspectRaw.h }
     : undefined;
+  // EXPERIMENTAL connector scheme — honoured ONLY for a SuperAdmin session, so
+  // normal product users always get the standard layout regardless of the flag.
+  const mode = ((body as { layoutMode?: unknown } | null)?.layoutMode === "test" && isSuperuser(session))
+    ? "test" as const
+    : "normal" as const;
   if (plan == null) {
     return NextResponse.json({ error: "Missing 'plan' in request body" }, { status: 400 });
   }
@@ -71,7 +77,7 @@ export async function POST(req: Request) {
 
   try {
     const diagramData = layoutBpmnDiagram(normalised.elements, normalised.connections,
-      { promptLabel, preservePositions, imageAspect });
+      { promptLabel, preservePositions, imageAspect, mode });
     trace(`[apply-layout] ok in ${Date.now() - t0}ms: ${diagramData.elements.length} rendered elements, ${diagramData.connectors.length} connectors`);
     return NextResponse.json({
       diagramData,
