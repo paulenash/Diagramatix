@@ -25,6 +25,10 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
   // → diagram will fail. Surface it so the admin sets a vision model.
   const defaultIsTextOnly = models.find((m) => m.id === model)?.vision === false;
   const needsVision = defaultIsTextOnly && !visionModel;
+  // Kimi (Moonshot) models are ~3–4 min per generation and exceed Azure's ~230s
+  // request limit, so they time out in production. Warn when one is the default.
+  const defaultIsMoonshot = models.find((m) => m.id === model)?.provider === "moonshot";
+  const hasMoonshot = models.some((m) => m.provider === "moonshot");
   // Only vision-capable (or unknown) models are valid as the Vision model.
   const visionChoices = models.filter((m) => m.vision !== false);
 
@@ -71,10 +75,17 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
           className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"
         >
           {models.map((m) => (
-            <option key={m.id} value={m.id}>{m.label}{m.vision === false ? " — text only" : ""}</option>
+            <option key={m.id} value={m.id}>{m.label}{m.provider === "moonshot" ? " — slow (~4 min)" : ""}{m.vision === false ? " — text only" : ""}</option>
           ))}
         </select>
         <p className="text-[11px] text-gray-400 mt-2">Model id: <code>{model}</code></p>
+        {defaultIsMoonshot && (
+          <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-2">
+            ⚠ Kimi (Moonshot) models take <strong>~3–4 minutes per generation</strong> and exceed
+            Azure&rsquo;s ~230-second request limit, so they <strong>time out in production</strong>.
+            Best for local, single generations — not recommended as the production default or in Compare.
+          </p>
+        )}
       </div>
 
       {/* Vision model — used ONLY for image → diagram, when the default can't see. */}
@@ -122,7 +133,7 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
               <tr key={m.id} className={`border-b border-gray-50 ${m.id === model ? "bg-green-50/60" : ""}`}>
                 <td className="py-1.5 pr-2 font-medium text-gray-800 whitespace-nowrap">
                   {m.label}
-                  {m.provider === "moonshot" && <span className="ml-1 text-[9px] text-purple-600 bg-purple-50 border border-purple-200 rounded px-1">Kimi</span>}
+                  {m.provider === "moonshot" && <span className="ml-1 text-[9px] text-purple-600 bg-purple-50 border border-purple-200 rounded px-1" title="Kimi/Moonshot: ~3–4 min per generation; times out on Azure (~230s limit). Best for local single generations.">Kimi · slow</span>}
                   {m.id === model && <span className="ml-1 text-[9px] text-green-700">● default</span>}
                 </td>
                 {p ? (
