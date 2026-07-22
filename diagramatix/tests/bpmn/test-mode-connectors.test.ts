@@ -10,6 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
+import { getBoundaryEventOuterSide } from "@/app/lib/diagram/routing";
 
 type Out = ReturnType<typeof layoutBpmnDiagram>;
 const byId = (o: Out, id: string) => o.elements.find((x) => x.id === id)!;
@@ -59,6 +60,23 @@ const beEls: AiElement[] = [
 ];
 const beConns: AiConnection[] = [
   { sourceId: "s", targetId: "h" }, { sourceId: "h", targetId: "e" },
+  { sourceId: "be", targetId: "esc" }, { sourceId: "esc", targetId: "e" },
+];
+
+// ── EP fixture: boundary timer on a WIDE expanded subprocess → escalation ──
+const epEls: AiElement[] = [
+  { id: "p", type: "pool", label: "P", poolType: "white-box", lanes: [{ id: "l", name: "L" }] },
+  { id: "s", type: "start-event", label: "S", pool: "p", lane: "l" },
+  { id: "ep", type: "subprocess-expanded", label: "Handle", pool: "p", lane: "l" },
+  { id: "i1", type: "task", label: "Inner 1", pool: "p", lane: "l", parentSubprocess: "ep" },
+  { id: "i2", type: "task", label: "Inner 2", pool: "p", lane: "l", parentSubprocess: "ep" },
+  { id: "be", type: "intermediate-event", label: "Timer", pool: "p", lane: "l", boundaryHost: "ep", boundarySide: "bottom" },
+  { id: "esc", type: "task", label: "Escalate", pool: "p", lane: "l" },
+  { id: "e", type: "end-event", label: "E", pool: "p", lane: "l" },
+];
+const epConns: AiConnection[] = [
+  { sourceId: "s", targetId: "ep" }, { sourceId: "ep", targetId: "e" },
+  { sourceId: "i1", targetId: "i2" },
   { sourceId: "be", targetId: "esc" }, { sourceId: "esc", targetId: "e" },
 ];
 
@@ -149,5 +167,19 @@ describe("Test-mode BPMN connectors (C1/C2)", () => {
     const outer = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? "right" : "left") : (dy >= 0 ? "bottom" : "top");
     expect(c.sourceSide).toBe(outer);       // outer face, away from the host
     expect(c.sourceOffsetAlong).toBe(0.5);
+  });
+
+  it("T0970 — C3 on a wide EP uses the mounted host edge (matches Normal)", () => {
+    const normal = layoutBpmnDiagram(epEls, epConns);
+    const test = layoutBpmnDiagram(epEls, epConns, { mode: "test" });
+    const be = byId(test, "be");
+    expect(be.boundaryHostId, "sanity: mounted on the EP").toBe("ep");
+    // Fix: the outer side = the host EDGE the event is mounted on (closest-edge),
+    // NOT a centre-delta guess — which mis-picks on a wide EP.
+    const tSide = test.connectors.find((c) => c.sourceId === "be" && c.targetId === "esc")!.sourceSide;
+    expect(tSide).toBe(getBoundaryEventOuterSide(be, test.elements));
+    // And Test now agrees with Normal (which already routes this correctly).
+    const nSide = normal.connectors.find((c) => c.sourceId === "be" && c.targetId === "esc")!.sourceSide;
+    expect(tSide).toBe(nSide);
   });
 });

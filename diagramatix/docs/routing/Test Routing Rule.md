@@ -61,10 +61,13 @@ the gateway end as **fan** or **stem**:
 ## C3 — Edge-mounted (boundary) events
 
 An edge-mounted boundary event (an intermediate event with a `boundaryHostId`)
-**always** attaches its sequence connector at its **OUTER face** — the side pointing
-away from the host activity (`facingSide(host, event)`). This **takes precedence over
-C1 and C2**, so a boundary-event flow never leaves from the inner face touching the
-host. Applies to whichever end (source or target) is the boundary event.
+**always** attaches its sequence connector at its **OUTER face** — the **host edge it
+is mounted on**. Uses the shared `getBoundaryEventOuterSide` helper (the same
+closest-edge test Normal uses), which is correct even on a **wide Expanded
+Subprocess** where the event sits off-centre along an edge (a plain centre-delta test
+would mis-pick there). This **takes precedence over C1 and C2**, so a boundary-event
+flow never leaves from the inner face touching the host. Applies to whichever end
+(source or target) is the boundary event.
 
 ## Waypoints (orthogonal, no obstacle avoidance)
 

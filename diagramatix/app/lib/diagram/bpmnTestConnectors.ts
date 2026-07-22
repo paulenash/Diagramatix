@@ -22,6 +22,7 @@
  * (straight / L / Z / top-staple) paths between the chosen face midpoints.
  */
 import type { Connector, DiagramElement, Side, Point } from "./types";
+import { getBoundaryEventOuterSide } from "./routing";
 
 const BACKWARD_EPS = 4; // target this far left of source ⇒ a rework/loop back-edge
 const STAPLE_GAP = 40; // how far above both tops a backward "staple" rides
@@ -72,16 +73,14 @@ function gatewayVertexSide(self: DiagramElement, other: DiagramElement, isFan: b
   return cy(other) < cy(self) ? "top" : "bottom";             // C2.1 up / C2.2 down
 }
 
-const isBoundaryEvent = (e: DiagramElement) => !!e.boundaryHostId;
-
 /** Endpoint side for one end of a sequence connector. */
-function pickSide(self: DiagramElement, other: DiagramElement, isSource: boolean, backward: boolean, byId: Map<string, DiagramElement>): Side {
-  // C3: an edge-mounted (boundary) event attaches at its OUTER face — the side
-  // pointing away from the host. Overrides C1/C2.
-  if (isBoundaryEvent(self)) {
-    const host = byId.get(self.boundaryHostId!);
-    if (host) return facingSide(host, self);                  // side of the event away from the host
-  }
+function pickSide(self: DiagramElement, other: DiagramElement, isSource: boolean, backward: boolean, elements: DiagramElement[]): Side {
+  // C3: an edge-mounted (boundary) event attaches at its OUTER face — the HOST
+  // EDGE it is mounted on. Uses the shared closest-edge helper (same as Normal),
+  // which is correct even on a wide EP where the event sits off-centre along an
+  // edge — a plain centre-delta test would then mis-pick. Overrides C1/C2.
+  const outer = getBoundaryEventOuterSide(self, elements);
+  if (outer) return outer;
   if (isGateway(self)) {
     const role = gatewayRole(self);
     const isFan = (role === "decision" && isSource) || (role === "merge" && !isSource);
@@ -128,8 +127,8 @@ export function buildTestConnectors(connectors: Connector[], elements: DiagramEl
     if (!src || !tgt || src.id === tgt.id) return conn;
 
     const backward = cx(tgt) < cx(src) - BACKWARD_EPS;
-    const sourceSide = pickSide(src, tgt, true, backward, byId);
-    const targetSide = pickSide(tgt, src, false, backward, byId);
+    const sourceSide = pickSide(src, tgt, true, backward, elements);
+    const targetSide = pickSide(tgt, src, false, backward, elements);
     const srcPt = faceMid(src, sourceSide);
     const tgtPt = faceMid(tgt, targetSide);
     const mid = orthogonalNoAvoid(srcPt, sourceSide, tgtPt, targetSide);
