@@ -38,6 +38,7 @@ export const ARCHI_REL_NAME: Record<ArchimateConnectorType, string> = {
   "archi-access": "Access",
   "archi-influence": "Influence",
   "archi-association": "Association",
+  "archi-association-directed": "Association (directed)",
   "archi-triggering": "Triggering",
   "archi-flow": "Flow",
   "archi-specialisation": "Specialisation",
@@ -95,6 +96,9 @@ export function styleFor(type: ArchimateConnectorType, selected: boolean): Archi
     case "archi-association":
       // SOLID line, no arrowhead.
       return { ...base, endMarker: null };
+    case "archi-association-directed":
+      // v3.2 Directed Association — SOLID line + open (line) arrowhead at target.
+      return { ...base, endMarker: "arrow-open" };
     // Dynamic
     case "archi-triggering":
       // SOLID line + filled (solid) arrowhead. (Previously wrongly dashed.)

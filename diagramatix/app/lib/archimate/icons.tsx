@@ -287,92 +287,110 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       </g>
     );
   },
+  // Stakeholder — motivation role marker: a ball on a short stem.
   stakeholder: ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 16);
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <circle cx={cx - s * 0.1} cy={cy - s * 0.16} r={s * 0.08} fill={colour} />
-        <circle cx={cx + s * 0.1} cy={cy - s * 0.16} r={s * 0.08} fill={colour} />
-        <path d={`M ${cx - s * 0.22} ${cy + s * 0.2} Q ${cx} ${cy - s * 0.02} ${cx + s * 0.22} ${cy + s * 0.2}`} />
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinecap="round">
+        <circle cx={cx} cy={cy - s * 0.1} r={s * 0.12} />
+        <line x1={cx} y1={cy + s * 0.02} x2={cx} y2={cy + s * 0.2} />
+        <line x1={cx - s * 0.12} y1={cy + s * 0.2} x2={cx + s * 0.12} y2={cy + s * 0.2} />
       </g>
     );
   },
-  driver: ({ cx, cy, size, colour }) => (
-    <g stroke={colour} strokeWidth={Math.max(1, size / 16)} fill="none" transform={`translate(${cx}, ${cy})`}>
-      <circle cx={0} cy={0} r={size * 0.22} />
-      <line x1={0} y1={-size * 0.1} x2={0} y2={size * 0.12} />
-      <line x1={-size * 0.08} y1={0} x2={size * 0.08} y2={0} />
-    </g>
-  ),
+  // Driver — steering wheel: rim, hub, four spokes.
+  driver: ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 16), r = s * 0.22;
+    return (
+      <g stroke={colour} strokeWidth={sw} fill="none">
+        <circle cx={cx} cy={cy} r={r} />
+        <circle cx={cx} cy={cy} r={s * 0.05} fill={colour} stroke="none" />
+        <line x1={cx} y1={cy - r} x2={cx} y2={cy - s * 0.05} />
+        <line x1={cx} y1={cy + s * 0.05} x2={cx} y2={cy + r} />
+        <line x1={cx - r} y1={cy} x2={cx - s * 0.05} y2={cy} />
+        <line x1={cx + s * 0.05} y1={cy} x2={cx + r} y2={cy} />
+      </g>
+    );
+  },
+  // Assessment — magnifying glass.
   assessment: ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 16), r = s * 0.15;
+    const gx = cx - s * 0.05, gy = cy - s * 0.05;
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <circle cx={cx} cy={cy} r={s * 0.22} />
-        <path d={`M ${cx - s * 0.12} ${cy - s * 0.04} L ${cx - s * 0.04} ${cy + s * 0.06} L ${cx + s * 0.14} ${cy - s * 0.12}`} strokeWidth={Math.max(1, s / 14)} />
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinecap="round">
+        <circle cx={gx} cy={gy} r={r} />
+        <line x1={gx + r * 0.7} y1={gy + r * 0.7} x2={cx + s * 0.2} y2={cy + s * 0.2} strokeWidth={Math.max(1, s / 12)} />
       </g>
     );
   },
+  // Goal — concentric target circles.
   goal: ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 16);
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
+      <g stroke={colour} strokeWidth={sw} fill="none">
         <circle cx={cx} cy={cy} r={s * 0.22} />
-        <circle cx={cx} cy={cy} r={s * 0.1} fill={colour} />
+        <circle cx={cx} cy={cy} r={s * 0.12} />
+        <circle cx={cx} cy={cy} r={s * 0.03} fill={colour} stroke="none" />
       </g>
     );
   },
+  // Outcome — target hit by an arrow (upper-right).
   outcome: ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 16);
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <path d={`M ${cx - s * 0.22} ${cy - s * 0.1} L ${cx + s * 0.22} ${cy - s * 0.1} L ${cx + s * 0.1} ${cy + s * 0.2} L ${cx - s * 0.1} ${cy + s * 0.2} Z`} />
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx={cx} cy={cy} r={s * 0.2} />
+        <circle cx={cx} cy={cy} r={s * 0.09} />
+        <line x1={cx} y1={cy} x2={cx + s * 0.3} y2={cy - s * 0.3} />
+        <path d={`M ${cx + s * 0.12} ${cy - s * 0.3} L ${cx + s * 0.3} ${cy - s * 0.3} L ${cx + s * 0.3} ${cy - s * 0.12}`} />
       </g>
     );
   },
+  // Principle — law glyph: circle with a bold double bar.
   principle: ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 16), bar = Math.max(1, s / 10);
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
+      <g stroke={colour} strokeWidth={sw} fill="none">
         <circle cx={cx} cy={cy} r={s * 0.22} />
-        <line x1={cx - s * 0.08} y1={cy - s * 0.1} x2={cx + s * 0.08} y2={cy - s * 0.1} />
-        <line x1={cx - s * 0.08} y1={cy + s * 0.02} x2={cx + s * 0.08} y2={cy + s * 0.02} />
-        <line x1={cx - s * 0.04} y1={cy + s * 0.14} x2={cx + s * 0.04} y2={cy + s * 0.14} />
+        <line x1={cx - s * 0.1} y1={cy - s * 0.05} x2={cx + s * 0.1} y2={cy - s * 0.05} strokeWidth={bar} />
+        <line x1={cx - s * 0.1} y1={cy + s * 0.06} x2={cx + s * 0.1} y2={cy + s * 0.06} strokeWidth={bar} />
       </g>
     );
   },
+  // Requirement — tilted parallelogram.
   requirement: ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 16);
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <path d={`M ${cx - s * 0.22} ${cy - s * 0.12} L ${cx + s * 0.22} ${cy - s * 0.12} L ${cx + s * 0.22} ${cy + s * 0.12} L ${cx - s * 0.22} ${cy + s * 0.12} Z`} />
-      </g>
+      <path
+        d={`M ${cx - s * 0.14} ${cy - s * 0.12} L ${cx + s * 0.22} ${cy - s * 0.12} L ${cx + s * 0.14} ${cy + s * 0.12} L ${cx - s * 0.22} ${cy + s * 0.12} Z`}
+        fill="none" stroke={colour} strokeWidth={sw} strokeLinejoin="round"
+      />
     );
   },
+  // Constraint — requirement parallelogram with a bar through it.
   constraint: ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 16);
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <path d={`M ${cx - s * 0.22} ${cy - s * 0.12} L ${cx + s * 0.22} ${cy - s * 0.12} L ${cx + s * 0.22} ${cy + s * 0.12} L ${cx - s * 0.22} ${cy + s * 0.12} Z`} />
-        <line x1={cx - s * 0.18} y1={cy - s * 0.08} x2={cx + s * 0.18} y2={cy + s * 0.08} />
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinejoin="round">
+        <path d={`M ${cx - s * 0.14} ${cy - s * 0.12} L ${cx + s * 0.22} ${cy - s * 0.12} L ${cx + s * 0.14} ${cy + s * 0.12} L ${cx - s * 0.22} ${cy + s * 0.12} Z`} />
+        <line x1={cx - s * 0.2} y1={cy} x2={cx + s * 0.2} y2={cy} />
       </g>
     );
   },
+  // Meaning — cloud.
   meaning: ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 16);
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <path d={`M ${cx - s * 0.22} ${cy - s * 0.12} Q ${cx} ${cy - s * 0.3} ${cx + s * 0.22} ${cy - s * 0.12} Q ${cx + s * 0.1} ${cy + s * 0.22} ${cx - s * 0.22} ${cy - s * 0.12} Z`} />
-      </g>
+      <path
+        d={`M ${cx - s * 0.16} ${cy + s * 0.08} Q ${cx - s * 0.3} ${cy + s * 0.04} ${cx - s * 0.16} ${cy - s * 0.06} Q ${cx - s * 0.14} ${cy - s * 0.2} ${cx + s * 0.02} ${cy - s * 0.12} Q ${cx + s * 0.14} ${cy - s * 0.22} ${cx + s * 0.18} ${cy - s * 0.06} Q ${cx + s * 0.3} ${cy + s * 0.02} ${cx + s * 0.14} ${cy + s * 0.08} Z`}
+        fill="none" stroke={colour} strokeWidth={sw} strokeLinejoin="round"
+      />
     );
   },
+  // Value — motivation oval.
   value: ({ cx, cy, size, colour }) => {
-    const s = size;
-    return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <path d={`M ${cx} ${cy - s * 0.22} L ${cx + s * 0.22} ${cy} L ${cx} ${cy + s * 0.22} L ${cx - s * 0.22} ${cy} Z`} />
-      </g>
-    );
+    const s = size, sw = Math.max(1, s / 16);
+    return <ellipse cx={cx} cy={cy} rx={s * 0.24} ry={s * 0.15} fill="none" stroke={colour} strokeWidth={sw} />;
   },
   resource: ({ cx, cy, size, colour }) => {
     const s = size;
@@ -483,6 +501,144 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
         <path d={`M ${left} ${top} L ${right - fold} ${top} L ${right} ${top + fold} L ${right} ${bot} L ${left} ${bot} Z`} />
         <path d={`M ${right - fold} ${top} L ${right - fold} ${top + fold} L ${right} ${top + fold}`} />
       </g>
+    );
+  },
+  // ── Technology (v3.2): Path + Communication Network + Physical elements ──
+  // Path — a link: two end dots joined by a line.
+  path: ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 16);
+    return (
+      <g stroke={colour} strokeWidth={sw} fill="none">
+        <line x1={cx - s * 0.22} y1={cy} x2={cx + s * 0.22} y2={cy} />
+        <circle cx={cx - s * 0.22} cy={cy} r={s * 0.05} fill={colour} />
+        <circle cx={cx + s * 0.22} cy={cy} r={s * 0.05} fill={colour} />
+      </g>
+    );
+  },
+  // Communication Network — line with a bold middle + end nodes.
+  "communication-network": ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 12);
+    return (
+      <g stroke={colour} strokeWidth={sw} fill={colour}>
+        <line x1={cx - s * 0.24} y1={cy} x2={cx + s * 0.24} y2={cy} />
+        <circle cx={cx - s * 0.24} cy={cy} r={s * 0.06} />
+        <circle cx={cx} cy={cy} r={s * 0.06} />
+        <circle cx={cx + s * 0.24} cy={cy} r={s * 0.06} />
+      </g>
+    );
+  },
+  // Equipment — a machine: rounded box with a dial + controls.
+  equipment: ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 16);
+    return (
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinejoin="round">
+        <rect x={cx - s * 0.2} y={cy - s * 0.14} width={s * 0.4} height={s * 0.28} rx={s * 0.04} />
+        <circle cx={cx - s * 0.06} cy={cy} r={s * 0.07} />
+        <line x1={cx + s * 0.08} y1={cy - s * 0.06} x2={cx + s * 0.14} y2={cy - s * 0.06} />
+        <line x1={cx + s * 0.08} y1={cy + s * 0.04} x2={cx + s * 0.14} y2={cy + s * 0.04} />
+      </g>
+    );
+  },
+  // Facility — a factory with a sawtooth roof.
+  facility: ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 16);
+    const l = cx - s * 0.2, r = cx + s * 0.2, b = cy + s * 0.16, t = cy - s * 0.02;
+    return (
+      <path
+        d={`M ${l} ${b} L ${l} ${t} L ${cx - s * 0.06} ${cy - s * 0.14} L ${cx - s * 0.06} ${t} L ${cx + s * 0.08} ${cy - s * 0.14} L ${cx + s * 0.08} ${t} L ${r} ${cy - s * 0.14} L ${r} ${b} Z`}
+        fill="none" stroke={colour} strokeWidth={sw} strokeLinejoin="round"
+      />
+    );
+  },
+  // Distribution Network — three nodes in a triangle joined by lines.
+  "distribution-network": ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 16);
+    const a = { x: cx, y: cy - s * 0.18 }, b = { x: cx - s * 0.2, y: cy + s * 0.14 }, c = { x: cx + s * 0.2, y: cy + s * 0.14 };
+    return (
+      <g stroke={colour} strokeWidth={sw} fill={colour}>
+        <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
+        <line x1={a.x} y1={a.y} x2={c.x} y2={c.y} />
+        <line x1={b.x} y1={b.y} x2={c.x} y2={c.y} />
+        <circle cx={a.x} cy={a.y} r={s * 0.05} />
+        <circle cx={b.x} cy={b.y} r={s * 0.05} />
+        <circle cx={c.x} cy={c.y} r={s * 0.05} />
+      </g>
+    );
+  },
+  // Material — a filled rounded blob.
+  material: ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 16);
+    return (
+      <path
+        d={`M ${cx - s * 0.16} ${cy + s * 0.1} Q ${cx - s * 0.24} ${cy - s * 0.08} ${cx - s * 0.06} ${cy - s * 0.14} Q ${cx + s * 0.1} ${cy - s * 0.2} ${cx + s * 0.16} ${cy - s * 0.04} Q ${cx + s * 0.24} ${cy + s * 0.12} ${cx + s * 0.04} ${cy + s * 0.14} Q ${cx - s * 0.08} ${cy + s * 0.16} ${cx - s * 0.16} ${cy + s * 0.1} Z`}
+        fill={colour} stroke={colour} strokeWidth={sw} strokeLinejoin="round"
+      />
+    );
+  },
+  // ── Implementation & Migration (v3.2) ──
+  // Work Package — a horizontal effort arrow.
+  "work-package": ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 16);
+    return (
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <line x1={cx - s * 0.22} y1={cy} x2={cx + s * 0.18} y2={cy} />
+        <path d={`M ${cx + s * 0.06} ${cy - s * 0.1} L ${cx + s * 0.22} ${cy} L ${cx + s * 0.06} ${cy + s * 0.1}`} />
+      </g>
+    );
+  },
+  // Deliverable — a document with a wavy bottom.
+  deliverable: ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 16);
+    const l = cx - s * 0.18, r = cx + s * 0.18, t = cy - s * 0.16, b = cy + s * 0.08;
+    return (
+      <path
+        d={`M ${l} ${t} L ${r} ${t} L ${r} ${b} Q ${cx + s * 0.09} ${b + s * 0.12} ${cx} ${b} Q ${cx - s * 0.09} ${b - s * 0.12} ${l} ${b} Z`}
+        fill="none" stroke={colour} strokeWidth={sw} strokeLinejoin="round"
+      />
+    );
+  },
+  // Implementation Event — event body with a concave left edge.
+  "implementation-event": ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 16);
+    const l = cx - s * 0.22, r = cx + s * 0.22, t = cy - s * 0.12, b = cy + s * 0.12;
+    return (
+      <path
+        d={`M ${l} ${t} Q ${cx - s * 0.08} ${cy} ${l} ${b} L ${r - s * 0.08} ${b} Q ${r + s * 0.04} ${cy} ${r - s * 0.08} ${t} Z`}
+        fill="none" stroke={colour} strokeWidth={sw} strokeLinejoin="round"
+      />
+    );
+  },
+  // Plateau — three stacked bars.
+  plateau: ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 14);
+    return (
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinecap="round">
+        <line x1={cx - s * 0.2} y1={cy - s * 0.12} x2={cx + s * 0.2} y2={cy - s * 0.12} />
+        <line x1={cx - s * 0.2} y1={cy} x2={cx + s * 0.2} y2={cy} />
+        <line x1={cx - s * 0.2} y1={cy + s * 0.12} x2={cx + s * 0.2} y2={cy + s * 0.12} />
+      </g>
+    );
+  },
+  // Gap — a lens (two arcs).
+  gap: ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 16);
+    return (
+      <path
+        d={`M ${cx - s * 0.2} ${cy} Q ${cx} ${cy - s * 0.18} ${cx + s * 0.2} ${cy} Q ${cx} ${cy + s * 0.18} ${cx - s * 0.2} ${cy} Z`}
+        fill="none" stroke={colour} strokeWidth={sw} strokeLinejoin="round"
+      />
+    );
+  },
+  // ── Composite (v3.2) ──
+  // Grouping — dashed rectangle.
+  grouping: ({ cx, cy, size, colour }) => {
+    const s = size, sw = Math.max(1, s / 16);
+    return (
+      <rect
+        x={cx - s * 0.22} y={cy - s * 0.16} width={s * 0.44} height={s * 0.32}
+        rx={s * 0.02} fill="none" stroke={colour} strokeWidth={sw}
+        strokeDasharray={`${s * 0.06} ${s * 0.05}`}
+      />
     );
   },
 };

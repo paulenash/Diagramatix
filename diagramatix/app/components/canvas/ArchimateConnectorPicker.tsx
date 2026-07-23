@@ -28,10 +28,14 @@ interface Props {
   /** ArchiMate name of the target element. */
   targetName?: string;
   /** Called when the user commits a relationship. For Influence, `extras`
-   *  carries the chosen sign so Canvas can store it as the initial label. */
-  onSelect: (type: ArchimateConnectorType, extras?: { influenceSign?: "+" | "-" }) => void;
+   *  carries the chosen strength marker (one of ---, --, -, +, ++, +++, or
+   *  "" for none) so Canvas can store it on the connector. */
+  onSelect: (type: ArchimateConnectorType, extras?: { influenceStrength?: string }) => void;
   onCancel: () => void;
 }
+
+/** ArchiMate Influence strength/sense options (Paul). "" = no marker. */
+const INFLUENCE_STRENGTHS = ["---", "--", "-", "+", "++", "+++"] as const;
 
 interface Entry {
   type: ArchimateConnectorType;
@@ -48,6 +52,7 @@ const ENTRIES: Entry[] = [
   { type: "archi-access",         label: "Access",          group: "Dependency" },
   { type: "archi-influence",      label: "Influence",       group: "Dependency" },
   { type: "archi-association",    label: "Association",     group: "Dependency" },
+  { type: "archi-association-directed", label: "Association (directed)", group: "Dependency" },
   { type: "archi-triggering",     label: "Triggering",      group: "Dynamic" },
   { type: "archi-flow",           label: "Flow",            group: "Dynamic" },
   { type: "archi-specialisation", label: "Specialisation",  group: "Other" },
@@ -109,8 +114,7 @@ export function ArchimateConnectorPicker({ x, y, sourceName, targetName, onSelec
     function onKey(ev: KeyboardEvent) {
       if (awaitingInfluenceSign) {
         if (ev.key === "Escape") { ev.preventDefault(); setAwaitingInfluenceSign(false); }
-        else if (ev.key === "+" || ev.key === "=") { ev.preventDefault(); onSelect("archi-influence", { influenceSign: "+" }); }
-        else if (ev.key === "-" || ev.key === "_") { ev.preventDefault(); onSelect("archi-influence", { influenceSign: "-" }); }
+        else if (ev.key === "Enter") { ev.preventDefault(); onSelect("archi-influence", { influenceStrength: "" }); }
         return;
       }
       if (ev.key === "Escape") { ev.preventDefault(); onCancel(); }
@@ -140,7 +144,7 @@ export function ArchimateConnectorPicker({ x, y, sourceName, targetName, onSelec
     >
       <div className="flex items-center justify-between mb-1">
         <div className="text-xs font-semibold text-gray-700">
-          {awaitingInfluenceSign ? "Influence — pick sign" : "ArchiMate relationship"}
+          {awaitingInfluenceSign ? "Influence — pick strength" : "ArchiMate relationship"}
         </div>
         {!awaitingInfluenceSign && (
           <label className="flex items-center gap-1 text-[10px] text-gray-600 cursor-pointer select-none" title="Show relationships permitted via §5.7 derivation rules">
@@ -156,23 +160,26 @@ export function ArchimateConnectorPicker({ x, y, sourceName, targetName, onSelec
       </div>
       {awaitingInfluenceSign && (
         <div>
-          <div className="grid grid-cols-2 gap-2 mb-1">
-            <button
-              type="button"
-              autoFocus
-              onClick={() => onSelect("archi-influence", { influenceSign: "+" })}
-              className="rounded border border-gray-300 px-3 py-3 text-base font-semibold text-gray-900 hover:bg-blue-50 hover:border-blue-400"
-              title="Positive influence"
-            >+ Positive</button>
-            <button
-              type="button"
-              onClick={() => onSelect("archi-influence", { influenceSign: "-" })}
-              className="rounded border border-gray-300 px-3 py-3 text-base font-semibold text-gray-900 hover:bg-blue-50 hover:border-blue-400"
-              title="Negative influence"
-            >− Negative</button>
+          <div className="grid grid-cols-3 gap-2 mb-2">
+            {INFLUENCE_STRENGTHS.map((v, i) => (
+              <button
+                key={v}
+                type="button"
+                autoFocus={i === 3}
+                onClick={() => onSelect("archi-influence", { influenceStrength: v })}
+                className={`rounded border px-3 py-3 text-base font-semibold hover:bg-blue-50 hover:border-blue-400 ${
+                  v.startsWith("-") ? "border-red-300 text-red-700" : "border-green-300 text-green-700"
+                }`}
+                title={`${v.startsWith("-") ? "Negative" : "Positive"} influence, level ${v.length}`}
+              >{v}</button>
+            ))}
           </div>
           <div className="flex items-center justify-between text-[10px] text-gray-500 px-1">
-            <span>+ / − keys also work</span>
+            <button
+              type="button"
+              onClick={() => onSelect("archi-influence", { influenceStrength: "" })}
+              className="text-gray-600 hover:text-gray-900 underline"
+            >No marker</button>
             <button
               type="button"
               onClick={() => setAwaitingInfluenceSign(false)}

@@ -970,6 +970,11 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0989 | AI-telemetry: every AI_INVOCATION_POINTS value has a friendly label + values are unique | A new invocation point with no report label / a duplicate key | If a label was forgotten or a value duplicated |
 | T0990 | AI-telemetry seam: makeAiClient wrapper records a SUCCESS row with token usage + truncation flag, passing the response through | Token usage silently discarded again (as before this feature) | If the messages.create wrapper regressed |
 | T0991 | AI-telemetry seam: makeAiClient wrapper records a FAILURE row with an error code and rethrows | AI failures invisible in usage / the error swallowed | If the failure-path wrapper regressed |
+| T0992 | ArchiMate v3.2: every catalogue iconType in use has an ICON_DRAWERS drawer | A new element rendering as a blank box (missing glyph) | If a catalogue iconType lacks a drawer |
+| T0993 | ArchiMate v3.2: every ARCHI_SHAPE key exists in the catalogue | AI-generated ArchiMate element referencing a non-existent shapeKey (renders nothing) | If a layout key/catalogue key drifts |
+| T0994 | ArchiMate v3.2: new element types band correctly — Technology(+Physical)=11, Impl&Migration=12 | New layers laid out in the wrong row by AI generation | If ARCHI_BAND regressed |
+| T0995 | ArchiMate v3.2: catalogue is version 3.2, Technology has 17 types, Impl&Migration + Composite categories present, typo/dupe keys removed | The upgrade half-applied / dead duplicate masters back | If the catalogue regressed to 3.1 |
+| T0996 | ArchiMate v3.2: Directed Association relationship-name registered ("Association (directed)") | The new relationship missing its highlight label / picker entry | If the directed-association type was dropped |
 
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 

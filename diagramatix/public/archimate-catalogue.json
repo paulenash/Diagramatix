@@ -1,5 +1,5 @@
 {
-  "version": "3.1",
+  "version": "3.2",
   "generatedAt": "2026-04-23T00:58:26.530Z",
   "categories": [
     {
@@ -45,19 +45,6 @@
           "iconType": "role"
         },
         {
-          "key": "business-business-role-icon-2",
-          "name": "Business Role",
-          "variant": "icon",
-          "description": "A business role is the responsibility for performing specific behavior, to which an actor can be assigned, or the part an actor plays in a particular action or event.",
-          "category": "business",
-          "defaultWidth": 94,
-          "defaultHeight": 47,
-          "fill": "#ffff66",
-          "stroke": "#000000",
-          "shapeFamily": "custom",
-          "iconType": "role"
-        },
-        {
           "key": "business-business-collaboration-box",
           "name": "Business Collaboration",
           "variant": "box",
@@ -93,18 +80,6 @@
           "fill": "#ffff66",
           "stroke": "#000000",
           "shapeFamily": "rectangle",
-          "iconType": "interface"
-        },
-        {
-          "key": "business-business-interface-icon-2",
-          "name": "Business Interface",
-          "variant": "icon",
-          "description": "A business interface is a point of access where a business service is made available to the environment.",
-          "category": "business",
-          "defaultWidth": 40,
-          "defaultHeight": 27,
-          "fill": "#ffff66",
-          "shapeFamily": "custom",
           "iconType": "interface"
         },
         {
@@ -302,19 +277,6 @@
           "iconType": "stakeholder"
         },
         {
-          "key": "motivation-stakeholder-icon-2",
-          "name": "Stakeholder",
-          "variant": "icon",
-          "description": "A stakeholder is the role of an individual, team, or organization (or classes thereof) that represents their interests in the effects of the architecture.",
-          "category": "motivation",
-          "defaultWidth": 94,
-          "defaultHeight": 47,
-          "fill": "#ddd7e6",
-          "stroke": "#000000",
-          "shapeFamily": "custom",
-          "iconType": "stakeholder"
-        },
-        {
           "key": "motivation-driver-icon",
           "name": "Driver",
           "variant": "icon",
@@ -325,29 +287,6 @@
           "fill": "#ddd6e5",
           "shapeFamily": "rounded-rect",
           "iconType": "driver"
-        },
-        {
-          "key": "motivation-driver-icon-2",
-          "name": "Driver",
-          "variant": "icon",
-          "description": "A driver represents an external or internal condition that motivates an organization to define its goals and implement the changes necessary to achieve them.",
-          "category": "motivation",
-          "defaultWidth": 49,
-          "defaultHeight": 49,
-          "fill": "#ddd7e6",
-          "shapeFamily": "ellipse",
-          "iconType": "driver"
-        },
-        {
-          "key": "motivation-assessmen-icon",
-          "name": "Assessmen",
-          "variant": "icon",
-          "description": "An assessment represents the result of an analysis of the state of affairs of the enterprise with respect to some driver.",
-          "category": "motivation",
-          "defaultWidth": 113,
-          "defaultHeight": 76,
-          "fill": "#ddd6e5",
-          "shapeFamily": "rounded-rect"
         },
         {
           "key": "motivation-assessment-icon",
@@ -374,18 +313,6 @@
           "iconType": "goal"
         },
         {
-          "key": "motivation-goal-icon-2",
-          "name": "Goal",
-          "variant": "icon",
-          "description": "A goal represents a high-level statement of intent, direction, or desired end state for an organization and its stakeholders.",
-          "category": "motivation",
-          "defaultWidth": 49,
-          "defaultHeight": 49,
-          "fill": "#ddd7e6",
-          "shapeFamily": "ellipse",
-          "iconType": "goal"
-        },
-        {
           "key": "motivation-outcome-icon",
           "name": "Outcome",
           "variant": "icon",
@@ -395,18 +322,6 @@
           "defaultHeight": 76,
           "fill": "#ddd6e5",
           "shapeFamily": "rounded-rect",
-          "iconType": "outcome"
-        },
-        {
-          "key": "motivation-outcome-icon-2",
-          "name": "Outcome",
-          "variant": "icon",
-          "description": "An outcome represents an end result.",
-          "category": "motivation",
-          "defaultWidth": 48,
-          "defaultHeight": 49,
-          "fill": "#ddd7e6",
-          "shapeFamily": "ellipse",
           "iconType": "outcome"
         },
         {
@@ -422,18 +337,6 @@
           "iconType": "principle"
         },
         {
-          "key": "motivation-principle-icon-2",
-          "name": "Principle",
-          "variant": "icon",
-          "description": "A principle represents a statement of intent defining a general property that applies to any system in a certain context in the architecture",
-          "category": "motivation",
-          "defaultWidth": 49,
-          "defaultHeight": 49,
-          "fill": "#ddd7e6",
-          "shapeFamily": "rounded-rect",
-          "iconType": "principle"
-        },
-        {
           "key": "motivation-requirement-icon",
           "name": "Requirement",
           "variant": "icon",
@@ -443,18 +346,6 @@
           "defaultHeight": 76,
           "fill": "#ddd6e5",
           "shapeFamily": "rounded-rect",
-          "iconType": "requirement"
-        },
-        {
-          "key": "motivation-requirement-icon-2",
-          "name": "Requirement",
-          "variant": "icon",
-          "description": "A requirement represents a statement of need defining a property that applies to a specific system as described by the architecture.",
-          "category": "motivation",
-          "defaultWidth": 113,
-          "defaultHeight": 38,
-          "fill": "#ddd6e5",
-          "shapeFamily": "custom",
           "iconType": "requirement"
         },
         {
@@ -525,18 +416,6 @@
           "iconType": "resource"
         },
         {
-          "key": "strategy-resource-icon-2",
-          "name": "Resource",
-          "variant": "icon",
-          "description": "A resource represents an asset owned or controlled by an individual or organization.",
-          "category": "strategy",
-          "defaultWidth": 56,
-          "defaultHeight": 33,
-          "fill": "#f9c499",
-          "shapeFamily": "rectangle",
-          "iconType": "resource"
-        },
-        {
           "key": "strategy-capability-icon",
           "name": "Capability",
           "variant": "icon",
@@ -546,18 +425,6 @@
           "defaultHeight": 76,
           "fill": "#f9c499",
           "stroke": "#000000",
-          "shapeFamily": "rounded-rect",
-          "iconType": "capability"
-        },
-        {
-          "key": "strategy-capability-icon-2",
-          "name": "Capability",
-          "variant": "icon",
-          "description": "A capability represents an ability that an active structure element, such as an organization, person, or system, possesses.",
-          "category": "strategy",
-          "defaultWidth": 45,
-          "defaultHeight": 45,
-          "fill": "#f9c499",
           "shapeFamily": "rounded-rect",
           "iconType": "capability"
         },
@@ -575,18 +442,6 @@
           "iconType": "course-of-action"
         },
         {
-          "key": "strategy-course-of-action-icon-2",
-          "name": "Course of Action",
-          "variant": "icon",
-          "description": "A course of action is an approach or plan for configuring some capabilities and resources of the enterprise, undertaken to achieve a goal.",
-          "category": "strategy",
-          "defaultWidth": 49,
-          "defaultHeight": 40,
-          "fill": "#f9c499",
-          "shapeFamily": "ellipse",
-          "iconType": "course-of-action"
-        },
-        {
           "key": "strategy-value-stream-box",
           "name": "Value Stream",
           "variant": "box",
@@ -597,7 +452,7 @@
           "fill": "#f9c499",
           "stroke": "#000000",
           "shapeFamily": "rounded-rect",
-          "iconType": "value"
+          "iconType": "value-stream"
         },
         {
           "key": "strategy-value-stream-icon",
@@ -609,7 +464,7 @@
           "defaultHeight": 49,
           "fill": "#f9c499",
           "shapeFamily": "custom",
-          "iconType": "value"
+          "iconType": "value-stream"
         }
       ]
     },
@@ -707,18 +562,6 @@
           "iconType": "service"
         },
         {
-          "key": "application-application-service-icon-2",
-          "name": "Application Service",
-          "variant": "icon",
-          "description": "An application service represents an explicitly defined exposed application behavior.",
-          "category": "application",
-          "defaultWidth": 113,
-          "defaultHeight": 57,
-          "fill": "#8eccdb",
-          "shapeFamily": "rounded-rect",
-          "iconType": "service"
-        },
-        {
           "key": "application-application-function-icon",
           "name": "Application Function",
           "variant": "icon",
@@ -729,18 +572,6 @@
           "fill": "#8eccdb",
           "stroke": "#000000",
           "shapeFamily": "rounded-rect",
-          "iconType": "function"
-        },
-        {
-          "key": "application-application-function-icon-2",
-          "name": "Application Function",
-          "variant": "icon",
-          "description": "An application function represents automated behavior that can be performed by an application component.",
-          "category": "application",
-          "defaultWidth": 57,
-          "defaultHeight": 49,
-          "fill": "#8eccdb",
-          "shapeFamily": "custom",
           "iconType": "function"
         },
         {
@@ -955,6 +786,198 @@
           "fill": "#c5e0b4",
           "shapeFamily": "rectangle",
           "iconType": "artifact"
+        },
+        {
+          "key": "technology-path",
+          "name": "Path",
+          "variant": "box",
+          "description": "A path represents a link between two or more technology internal active structure elements, through which these elements can exchange data, energy, or material.",
+          "category": "technology",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#c5e0b4",
+          "shapeFamily": "rectangle",
+          "iconType": "path"
+        },
+        {
+          "key": "technology-communication-network",
+          "name": "Communication Network",
+          "variant": "box",
+          "description": "A communication network represents a set of structures and behaviors that connects devices or system software for transmission, routing, and reception of data.",
+          "category": "technology",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#c5e0b4",
+          "shapeFamily": "rectangle",
+          "iconType": "communication-network"
+        },
+        {
+          "key": "technology-equipment",
+          "name": "Equipment",
+          "variant": "box",
+          "description": "Equipment represents one or more physical machines, tools, or instruments that can create, use, store, move, or transform materials.",
+          "category": "technology",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#c5e0b4",
+          "shapeFamily": "rectangle",
+          "iconType": "equipment"
+        },
+        {
+          "key": "technology-facility",
+          "name": "Facility",
+          "variant": "box",
+          "description": "A facility represents a physical structure or environment.",
+          "category": "technology",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#c5e0b4",
+          "shapeFamily": "rectangle",
+          "iconType": "facility"
+        },
+        {
+          "key": "technology-distribution-network",
+          "name": "Distribution Network",
+          "variant": "box",
+          "description": "A distribution network represents a physical network used to transport materials or energy.",
+          "category": "technology",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#c5e0b4",
+          "shapeFamily": "rectangle",
+          "iconType": "distribution-network"
+        },
+        {
+          "key": "technology-material",
+          "name": "Material",
+          "variant": "box",
+          "description": "Material represents tangible physical matter or energy.",
+          "category": "technology",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#c5e0b4",
+          "shapeFamily": "rectangle",
+          "iconType": "material"
+        }
+      ]
+    },
+    {
+      "id": "implementation-migration",
+      "name": "Implementation & Migration",
+      "shapes": [
+        {
+          "key": "implementation-migration-work-package",
+          "name": "Work Package",
+          "variant": "box",
+          "description": "A work package represents a series of actions identified and designed to achieve specific results within specified time and resource constraints.",
+          "category": "implementation-migration",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#ffd7e6",
+          "shapeFamily": "rectangle",
+          "iconType": "work-package"
+        },
+        {
+          "key": "implementation-migration-deliverable",
+          "name": "Deliverable",
+          "variant": "box",
+          "description": "A deliverable represents a precisely defined result of a work package.",
+          "category": "implementation-migration",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#ffd7e6",
+          "shapeFamily": "rounded-rect",
+          "iconType": "deliverable"
+        },
+        {
+          "key": "implementation-migration-implementation-event",
+          "name": "Implementation Event",
+          "variant": "box",
+          "description": "An implementation event represents a state change related to implementation or migration.",
+          "category": "implementation-migration",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#ffd7e6",
+          "shapeFamily": "rectangle",
+          "iconType": "implementation-event"
+        },
+        {
+          "key": "implementation-migration-plateau",
+          "name": "Plateau",
+          "variant": "box",
+          "description": "A plateau represents a relatively stable state of the architecture that exists during a limited period of time.",
+          "category": "implementation-migration",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#ffd7e6",
+          "shapeFamily": "rectangle",
+          "iconType": "plateau"
+        },
+        {
+          "key": "implementation-migration-gap",
+          "name": "Gap",
+          "variant": "box",
+          "description": "A gap represents a statement of difference between two plateaus.",
+          "category": "implementation-migration",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#ffd7e6",
+          "shapeFamily": "ellipse",
+          "iconType": "gap"
+        }
+      ]
+    },
+    {
+      "id": "composite",
+      "name": "Composite",
+      "shapes": [
+        {
+          "key": "composite-grouping",
+          "name": "Grouping",
+          "variant": "box",
+          "description": "The grouping element aggregates or composes concepts that belong together based on some common characteristic.",
+          "category": "composite",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#f2f2f2",
+          "shapeFamily": "rounded-rect",
+          "iconType": "grouping"
+        },
+        {
+          "key": "composite-location",
+          "name": "Location",
+          "variant": "box",
+          "description": "A location represents a conceptual or physical place or position where concepts are located or performed.",
+          "category": "composite",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#f2f2f2",
+          "shapeFamily": "rectangle",
+          "iconType": "location"
+        },
+        {
+          "key": "composite-junction-and",
+          "name": "And-Junction",
+          "variant": "icon",
+          "description": "An And-Junction connects relationships of the same type, all of which apply.",
+          "category": "composite",
+          "defaultWidth": 20,
+          "defaultHeight": 20,
+          "fill": "#000000",
+          "shapeFamily": "ellipse",
+          "iconType": "junction-and"
+        },
+        {
+          "key": "composite-junction-or",
+          "name": "Or-Junction",
+          "variant": "icon",
+          "description": "An Or-Junction connects relationships of the same type, one or more of which apply.",
+          "category": "composite",
+          "defaultWidth": 20,
+          "defaultHeight": 20,
+          "fill": "#ffffff",
+          "shapeFamily": "ellipse",
+          "iconType": "junction-or"
         }
       ]
     }

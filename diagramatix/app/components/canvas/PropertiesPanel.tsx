@@ -42,6 +42,7 @@ const ARCHI_REL_META: Record<string, { type: string; group: ArchiRelGroup }> = {
   "archi-access":         { type: "Access",         group: "Dependency" },
   "archi-influence":      { type: "Influence",      group: "Dependency" },
   "archi-association":    { type: "Association",     group: "Dependency" },
+  "archi-association-directed": { type: "Association (directed)", group: "Dependency" },
   "archi-triggering":     { type: "Triggering",     group: "Other" },
   "archi-flow":           { type: "Flow",           group: "Other" },
   "archi-specialisation": { type: "Specialisation", group: "Other" },
@@ -1322,6 +1323,27 @@ export function PropertiesPanel({
             </div>
           );
         })()}
+        {connector.type === "archi-influence" && onUpdateConnectorLabel && (
+          <div className="mt-1.5">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Influence strength</label>
+            <div className="grid grid-cols-7 gap-1">
+              {["---", "--", "-", "+", "++", "+++", ""].map((v) => (
+                <button
+                  key={v || "none"}
+                  type="button"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={() => onUpdateConnectorLabel(connector.id, v)}
+                  className={`text-xs rounded border px-1 py-1 ${
+                    (connector.label ?? "") === v
+                      ? "bg-blue-100 border-blue-400 text-blue-800 font-semibold"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }`}
+                  title={v ? `${v.startsWith("-") ? "Negative" : "Positive"} influence, level ${v.length}` : "No marker"}
+                >{v || "∅"}</button>
+              ))}
+            </div>
+          </div>
+        )}
         {(() => {
           // Check if connector is between a Class and an Enumeration
           const srcEl = allElements?.find(e => e.id === connector.sourceId);

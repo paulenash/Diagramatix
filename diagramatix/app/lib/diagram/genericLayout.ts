@@ -821,7 +821,7 @@ export function layoutGenericDiagram(
 // ── ArchiMate layered-band layout ───────────────────────────────────
 // elementType → catalogue shapeKey (+ whether it is an icon-only shape).
 // Keys are the canonical entries in public/archimate-catalogue.json.
-const ARCHI_SHAPE: Record<string, { key: string; iconOnly: boolean }> = {
+export const ARCHI_SHAPE: Record<string, { key: string; iconOnly: boolean }> = {
   // Strategy (band 0)
   "strategy-resource":         { key: "strategy-resource-icon",          iconOnly: true  },
   "strategy-capability":       { key: "strategy-capability-icon",        iconOnly: true  },
@@ -875,18 +875,32 @@ const ARCHI_SHAPE: Record<string, { key: string; iconOnly: boolean }> = {
   "technology-event":           { key: "technology-event-box",           iconOnly: false },
   "technology-service":         { key: "technology-service-box",         iconOnly: false },
   "technology-artifact":        { key: "technology-artifact-box",        iconOnly: false },
+  // Technology v3.2: Path, Communication Network + Physical elements (band 11)
+  "technology-path":                 { key: "technology-path",                 iconOnly: false },
+  "technology-communication-network": { key: "technology-communication-network", iconOnly: false },
+  "equipment":                       { key: "technology-equipment",            iconOnly: false },
+  "facility":                        { key: "technology-facility",             iconOnly: false },
+  "distribution-network":            { key: "technology-distribution-network", iconOnly: false },
+  "material":                        { key: "technology-material",             iconOnly: false },
+  // Implementation & Migration (band 12)
+  "work-package":         { key: "implementation-migration-work-package",         iconOnly: false },
+  "deliverable":          { key: "implementation-migration-deliverable",          iconOnly: false },
+  "implementation-event": { key: "implementation-migration-implementation-event", iconOnly: false },
+  "plateau":              { key: "implementation-migration-plateau",              iconOnly: false },
+  "gap":                  { key: "implementation-migration-gap",                  iconOnly: false },
 };
 
 // Passive-structure objects that go in a SIDE COLUMN (left/right), placed next
 // to the element(s) they connect to, rather than in the vertical bands.
 const ARCHI_SIDE_COLUMN = new Set<string>(["business-object", "product", "contract", "representation"]);
 
-// The 12 vertical bands, top→bottom (item 5): Strategy, Motivation, then the 9
-// Business/Application rows, then Technology. Only non-empty bands are drawn.
-const ARCHI_NUM_BANDS = 12;
+// The 13 vertical bands, top→bottom: Strategy, Motivation, the 9 Business/
+// Application rows, Technology (incl. Physical), then Implementation & Migration
+// at the bottom. Only non-empty bands are drawn.
+const ARCHI_NUM_BANDS = 13;
 const ARCHI_DEFAULT_BAND = 7; // business behaviour — fallback for an unmapped type
 // elementType → band index. Side-column types are handled separately.
-const ARCHI_BAND: Record<string, number> = {
+export const ARCHI_BAND: Record<string, number> = {
   "strategy-resource": 0, "strategy-capability": 0, "strategy-course-of-action": 0, "strategy-value-stream": 0,
   "motivation-stakeholder": 1, "motivation-driver": 1, "motivation-assessment": 1, "motivation-goal": 1,
   "motivation-outcome": 1, "motivation-principle": 1, "motivation-requirement": 1, "motivation-constraint": 1,
@@ -903,6 +917,9 @@ const ARCHI_BAND: Record<string, number> = {
   "technology-node": 11, "technology-device": 11, "technology-system-software": 11, "technology-collaboration": 11,
   "technology-interface": 11, "technology-function": 11, "technology-process": 11, "technology-interaction": 11,
   "technology-event": 11, "technology-service": 11, "technology-artifact": 11,
+  "technology-path": 11, "technology-communication-network": 11,
+  "equipment": 11, "facility": 11, "distribution-network": 11, "material": 11,
+  "work-package": 12, "deliverable": 12, "implementation-event": 12, "plateau": 12, "gap": 12,
 };
 
 // relationship name → archi-* connector type
@@ -910,7 +927,9 @@ const ARCHI_REL: Record<string, string> = {
   composition: "archi-composition", aggregation: "archi-aggregation", assignment: "archi-assignment",
   realisation: "archi-realisation", realization: "archi-realisation",
   serving: "archi-serving", access: "archi-access", influence: "archi-influence",
-  association: "archi-association", triggering: "archi-triggering", flow: "archi-flow",
+  association: "archi-association", "directed-association": "archi-association-directed",
+  "association-directed": "archi-association-directed",
+  triggering: "archi-triggering", flow: "archi-flow",
   specialisation: "archi-specialisation", specialization: "archi-specialisation",
 };
 

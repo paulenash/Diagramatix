@@ -18,9 +18,10 @@ Business layer: "business-actor", "business-role", "business-interface", "busine
 Application layer: "application-component", "application-service", "application-interface", "application-collaboration", "application-process", "application-function", "application-interaction", "application-event", "data-object".
 Strategy layer (optional): "strategy-resource", "strategy-capability", "strategy-course-of-action", "strategy-value-stream".
 Motivation layer (optional): "motivation-stakeholder", "motivation-driver", "motivation-assessment", "motivation-goal", "motivation-outcome", "motivation-principle", "motivation-requirement", "motivation-constraint", "motivation-meaning", "motivation-value".
-Technology layer (optional): "technology-node", "technology-device", "technology-system-software", "technology-collaboration", "technology-interface", "technology-function", "technology-process", "technology-interaction", "technology-event", "technology-service", "technology-artifact".
+Technology layer (optional): "technology-node", "technology-device", "technology-system-software", "technology-collaboration", "technology-interface", "technology-function", "technology-process", "technology-interaction", "technology-event", "technology-service", "technology-artifact", "technology-path", "technology-communication-network", "equipment", "facility", "distribution-network", "material".
+Implementation & Migration layer (optional — only for roadmap/transition requests): "work-package", "deliverable", "implementation-event", "plateau", "gap".
 
-Connection "type" (ArchiMate relationship) must be one of: "composition", "aggregation", "assignment", "realisation", "serving", "access", "influence", "association", "triggering", "flow", "specialisation".
+Connection "type" (ArchiMate relationship) must be one of: "composition", "aggregation", "assignment", "realisation", "serving", "access", "influence", "association", "directed-association", "triggering", "flow", "specialisation".
 
 Relationship semantics — pick the most specific one:
 - A Business Process REALISES a Business Service ("realisation", source = process, target = service).

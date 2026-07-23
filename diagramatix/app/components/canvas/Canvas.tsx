@@ -7948,10 +7948,10 @@ export function Canvas({
             return key ? findArchimateShapeByKey(key)?.name : undefined;
           })()}
           onCancel={() => setPendingArchiConn(null)}
-          onSelect={(archiType: ArchimateConnectorType, extras?: { influenceSign?: "+" | "-" }) => {
+          onSelect={(archiType: ArchimateConnectorType, extras?: { influenceStrength?: string }) => {
             const p = pendingArchiConn;
             setPendingArchiConn(null);
-            const initialLabel = archiType === "archi-influence" && extras?.influenceSign ? extras.influenceSign : undefined;
+            const initialLabel = archiType === "archi-influence" && extras?.influenceStrength ? extras.influenceStrength : undefined;
             onAddConnector(
               p.sourceId,
               p.targetId,

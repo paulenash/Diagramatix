@@ -96,6 +96,7 @@ export type ArchimateConnectorType =
   | "archi-access"
   | "archi-influence"
   | "archi-association"
+  | "archi-association-directed" // v3.2 Directed Association (open arrow at target)
   // Dynamic
   | "archi-triggering"
   | "archi-flow"
@@ -197,6 +198,9 @@ export interface Connector {
   sourceInvisibleLeader: boolean;
   targetInvisibleLeader: boolean;
   waypoints: Point[];
+  // For an ArchiMate Influence relationship, `label` holds the strength/sense
+  // marker (one of ---, --, -, +, ++, +++, or blank) — it renders beside the line
+  // and is set via the connector picker / Properties panel.
   label?: string;
   labelOffsetX?: number;
   labelOffsetY?: number;
