@@ -281,8 +281,16 @@ export function ArchimateConnectorRenderer({
         );
       })()}
 
-      {/* label — minimal: show text; double-click to edit when handler provided */}
-      {labelText && !isEditingLabel && (
+      {/* label — minimal: show text; double-click to edit when handler provided.
+          For an Influence relationship the label IS the strength marker
+          (+/++/+++ or -/--/---); render it 3× larger so the sense/level reads
+          clearly on the connector. */}
+      {labelText && !isEditingLabel && (() => {
+        const isInfluence = archiType === "archi-influence";
+        const fs = (isInfluence ? 30 : 10) * fontScale;
+        const halfW = isInfluence ? Math.max(18, labelText.length * fs * 0.34) : 40;
+        const halfH = isInfluence ? fs * 0.62 : 8;
+        return (
         <g transform={`translate(${labelCx}, ${labelCy})`} style={{ pointerEvents: "auto", cursor: onUpdateLabel ? "text" : "default" }}
           onDoubleClick={(e) => {
             if (!onUpdateLabel) return;
@@ -291,12 +299,13 @@ export function ArchimateConnectorRenderer({
             setIsEditingLabel(true);
           }}
         >
-          <rect x={-40} y={-8} width={80} height={16} fill="white" opacity={0.85} />
-          <text textAnchor="middle" dominantBaseline="middle" fontSize={10 * fontScale} fill={style.strokeColor}>
+          <rect x={-halfW} y={-halfH} width={halfW * 2} height={halfH * 2} fill="white" opacity={0.85} />
+          <text textAnchor="middle" dominantBaseline="middle" fontSize={fs} fontWeight={isInfluence ? 700 : undefined} fill={style.strokeColor}>
             {labelText}
           </text>
         </g>
-      )}
+        );
+      })()}
       {isEditingLabel && onUpdateLabel && (
         <foreignObject x={labelCx - 50} y={labelCy - 10} width={100} height={20}>
           <input

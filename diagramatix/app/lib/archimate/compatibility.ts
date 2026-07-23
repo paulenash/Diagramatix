@@ -87,6 +87,7 @@ export function getAllowedRelationships(
     const all: ArchimateConnectorType[] = [
       "archi-composition", "archi-aggregation", "archi-assignment", "archi-realisation",
       "archi-serving", "archi-access", "archi-influence", "archi-association",
+      "archi-association-directed",
       "archi-triggering", "archi-flow", "archi-specialisation",
     ];
     for (const t of all) allowed.add(t);

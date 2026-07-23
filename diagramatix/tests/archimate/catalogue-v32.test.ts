@@ -51,4 +51,15 @@ describe("ArchiMate v3.2 catalogue + layout", () => {
   it("T0996 — Directed Association relationship-name is registered", () => {
     expect(ARCHI_REL_NAME["archi-association-directed"]).toBe("Association (directed)");
   });
+
+  it("T0997 — relationship matrix covers the new elements + Directed Association is universal", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const matrix: any = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "public/archimate-relationships.json"), "utf8"),
+    );
+    expect(matrix.universal).toContain("archi-association-directed");
+    const named = new Set(Object.values(matrix.categories).flat() as string[]);
+    for (const n of ["Path", "Communication Network", "Equipment", "Facility", "Distribution Network", "Material", "Work Package", "Deliverable", "Implementation Event", "Grouping", "Location", "Plateau", "Gap"])
+      expect(named.has(n), `matrix missing category for "${n}"`).toBe(true);
+  });
 });
