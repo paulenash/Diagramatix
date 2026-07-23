@@ -34,7 +34,7 @@ export function DiagramTypeBadge({ type, showLabel = false, showCode = true, cla
       {showCode && (
         <span
           className="inline-flex items-center justify-center rounded text-[7px] font-bold leading-none px-1 py-0.5 min-w-[18px] border"
-          style={{ backgroundColor: s.bgColor, color: s.textColor, borderColor: s.textColor }}
+          style={{ backgroundColor: s.bgColor, color: s.textColor, borderColor: s.boundaryColor }}
         >
           {s.code}
         </span>
@@ -43,7 +43,7 @@ export function DiagramTypeBadge({ type, showLabel = false, showCode = true, cla
         labelOnly ? (
           <span
             className="inline-flex items-center rounded border text-[10px] font-semibold leading-none px-1.5 py-0.5"
-            style={{ backgroundColor: s.bgColor, color: s.textColor, borderColor: s.textColor }}
+            style={{ backgroundColor: s.bgColor, color: s.textColor, borderColor: s.boundaryColor }}
           >
             {s.label}
           </span>

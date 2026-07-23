@@ -63,6 +63,13 @@ const CARDS: MenuCard[] = [
     feature: "ai",
   },
   {
+    href: "/dashboard/ai-usage?from=/dashboard/org-admin",
+    title: "AI Usage",
+    description:
+      "Your Org's AI usage — invocations, tokens, retries & estimated cost, broken down by model, provider & invocation point.",
+    feature: "ai",
+  },
+  {
     href: "/dashboard/admin/entity-lists?from=/dashboard/org-admin",
     title: "Entity Lists",
     description:

@@ -13,7 +13,7 @@ export async function effectiveDiagramTypeStyles(): Promise<DiagramTypeStyle[]> 
   return DEFAULT_DIAGRAM_TYPE_STYLES.map((d) => {
     const o = byKey.get(d.typeKey);
     return o
-      ? { ...d, code: o.code, bgColor: o.bgColor, textColor: o.textColor, sortOrder: o.sortOrder }
+      ? { ...d, code: o.code, bgColor: o.bgColor, textColor: o.textColor, boundaryColor: o.boundaryColor ?? d.boundaryColor, sortOrder: o.sortOrder }
       : d;
   }).sort((a, b) => a.sortOrder - b.sortOrder);
 }

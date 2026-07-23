@@ -10,6 +10,8 @@ import { refineFlowchartBpmnPlan } from "@/app/lib/ai/refineFlowchartBpmn";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
+import { enterAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
+import { AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -18,6 +20,7 @@ export async function POST(req: Request) {
   }
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
+  await enterAiRouteContext(session, AI_INVOCATION_POINTS.FlowchartToBpmnRefine);
 
   const model = await getAiGenerateModel();
   const apiKey = aiApiKey(model);

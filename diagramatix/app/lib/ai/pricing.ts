@@ -19,7 +19,9 @@ export interface ModelPrice {
 // Keyed by exact model id. Any id not listed (e.g. `kimi-latest`, which floats to
 // Moonshot's current flagship, or a local/custom model) resolves to undefined and
 // the UI shows "varies" rather than a wrong fixed number.
-const PRICING: Record<string, ModelPrice> = {
+// Exported so the editable rate catalog (app/lib/ai/aiRates.ts) can seed + overlay
+// these as the defaults — this stays the single source of the default numbers.
+export const PRICING: Record<string, ModelPrice> = {
   // Claude — Anthropic list pricing
   "claude-fable-5": { in: 10, out: 50 },
   "claude-opus-4-8": { in: 5, out: 25 },

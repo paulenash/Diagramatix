@@ -13,6 +13,8 @@ import { prisma } from "@/app/lib/db";
 import { refineQuestions } from "@/app/lib/ai/refineQuestions";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
+import { enterAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
+import { AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
@@ -24,6 +26,7 @@ export async function POST(req: Request) {
   }
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
+  await enterAiRouteContext(session, AI_INVOCATION_POINTS.BpmnRefine);
 
   const model = await getAiGenerateModel();
   const apiKey = aiApiKey(model);

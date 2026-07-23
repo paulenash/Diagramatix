@@ -26,6 +26,9 @@ export interface DiagramTypeStyle {
   bgColor: string;
   /** Readable text/foreground colour (hex). */
   textColor: string;
+  /** Boundary/border colour (hex) — a dark colour, contrasting with both the
+   *  pastel background and the text colour, used for the badge/chip border. */
+  boundaryColor: string;
   /** Display order in the admin editor + pickers. */
   sortOrder: number;
 }
@@ -37,15 +40,19 @@ export interface DiagramTypeStyle {
  * `basic` is a legacy alias for `context` and is resolved to the context style
  * — it is deliberately NOT a separately-editable row.
  */
+// boundaryColor: a dark colour per type, in the spirit of the text colours but a
+// DIFFERENT hue that contrasts with BOTH the pastel background and the text (so the
+// border reads as a distinct third colour). Purple + yellow avoided (reserved for
+// sharing / publish elsewhere).
 export const DEFAULT_DIAGRAM_TYPE_STYLES: DiagramTypeStyle[] = [
-  { typeKey: "context",         label: "Context",            code: "CO", bgColor: "#ccfbf1", textColor: "#093e3a", sortOrder: 0 },
-  { typeKey: "value-chain",     label: "Value Chain",        code: "VC", bgColor: "#ffedd5", textColor: "#c2410c", sortOrder: 1 },
-  { typeKey: "process-context", label: "Process Context",    code: "PC", bgColor: "#e1feea", textColor: "#748b04", sortOrder: 2 },
-  { typeKey: "archimate",       label: "Archimate",          code: "AM", bgColor: "#fce7f3", textColor: "#be185c", sortOrder: 3 },
-  { typeKey: "bpmn",            label: "BPMN",               code: "BP", bgColor: "#dcfefc", textColor: "#19a455", sortOrder: 4 },
-  { typeKey: "flowchart",       label: "Standard Flowchart", code: "FC", bgColor: "#f3f4f6", textColor: "#333333", sortOrder: 5 },
-  { typeKey: "state-machine",   label: "State Machine",      code: "SM", bgColor: "#efe6e7", textColor: "#bf6612", sortOrder: 6 },
-  { typeKey: "domain",          label: "Domain",             code: "DM", bgColor: "#d1fae5", textColor: "#047857", sortOrder: 7 },
+  { typeKey: "context",         label: "Context",            code: "CO", bgColor: "#ccfbf1", textColor: "#093e3a", boundaryColor: "#7f1d1d", sortOrder: 0 },
+  { typeKey: "value-chain",     label: "Value Chain",        code: "VC", bgColor: "#ffedd5", textColor: "#c2410c", boundaryColor: "#c2110c", sortOrder: 1 },
+  { typeKey: "process-context", label: "Process Context",    code: "PC", bgColor: "#e1feea", textColor: "#743366", boundaryColor: "#0c4a6e", sortOrder: 2 },
+  { typeKey: "archimate",       label: "Archimate",          code: "AM", bgColor: "#fce7f3", textColor: "#be185c", boundaryColor: "#ff0ff0", sortOrder: 3 },
+  { typeKey: "bpmn",            label: "BPMN",               code: "BP", bgColor: "#dcfefc", textColor: "#19a455", boundaryColor: "#11a4ff", sortOrder: 4 },
+  { typeKey: "flowchart",       label: "Standard Flowchart", code: "FC", bgColor: "#f3f4f6", textColor: "#000000", boundaryColor: "#7c2d12", sortOrder: 5 },
+  { typeKey: "state-machine",   label: "State Machine",      code: "SM", bgColor: "#efe6e7", textColor: "#2289ff", boundaryColor: "#666666", sortOrder: 6 },
+  { typeKey: "domain",          label: "Domain",             code: "DM", bgColor: "#d1fae5", textColor: "#047857", boundaryColor: "#0c4a6e", sortOrder: 7 },
 ];
 
 /** Canonical editable keys (excludes the `basic` alias). */
@@ -66,6 +73,7 @@ function neutralStyle(typeKey: string): DiagramTypeStyle {
     code: (typeKey.replace(/[^a-z]/gi, "").slice(0, 2) || "??").toUpperCase(),
     bgColor: "#f1f5f9", // slate-100
     textColor: "#475569", // slate-600
+    boundaryColor: "#334155", // slate-700
     sortOrder: 99,
   };
 }
@@ -77,7 +85,7 @@ export function canonicalDiagramTypeKey(typeKey: string): string {
 
 export type DiagramTypeStyleOverrides = Record<
   string,
-  Partial<Pick<DiagramTypeStyle, "code" | "bgColor" | "textColor" | "sortOrder">>
+  Partial<Pick<DiagramTypeStyle, "code" | "bgColor" | "textColor" | "boundaryColor" | "sortOrder">>
 >;
 
 /**
@@ -98,6 +106,7 @@ export function resolveDiagramTypeStyle(
     code: ov.code ?? base.code,
     bgColor: ov.bgColor ?? base.bgColor,
     textColor: ov.textColor ?? base.textColor,
+    boundaryColor: ov.boundaryColor ?? base.boundaryColor,
     sortOrder: ov.sortOrder ?? base.sortOrder,
   };
 }

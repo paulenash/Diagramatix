@@ -28,7 +28,7 @@ function fetchOverrides(): Promise<DiagramTypeStyleOverrides> {
     .then((data: { styles?: DiagramTypeStyle[] }) => {
       const ov: DiagramTypeStyleOverrides = {};
       for (const s of data.styles ?? []) {
-        ov[s.typeKey] = { code: s.code, bgColor: s.bgColor, textColor: s.textColor, sortOrder: s.sortOrder };
+        ov[s.typeKey] = { code: s.code, bgColor: s.bgColor, textColor: s.textColor, boundaryColor: s.boundaryColor, sortOrder: s.sortOrder };
       }
       cache = ov;
       return ov;

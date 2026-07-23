@@ -824,11 +824,12 @@ model BubbleHelp {
 // absent, so the table is purely an override layer.
 model DiagramTypeStyle {
   id        String   @id @default(cuid())
-  typeKey   String   @unique // "bpmn" | "context" | "process-context" | …
-  code      String   // 2-char badge code, e.g. "BP"
-  bgColor   String   // pastel background hex, e.g. "#dbeafe"
-  textColor String   // foreground hex, e.g. "#1d4ed8"
-  sortOrder Int      @default(0)
+  typeKey       String   @unique // "bpmn" | "context" | "process-context" | …
+  code          String   // 2-char badge code, e.g. "BP"
+  bgColor       String   // pastel background hex, e.g. "#dbeafe"
+  textColor     String   // foreground hex, e.g. "#1d4ed8"
+  boundaryColor String? // boundary/border hex, e.g. "#7f1d1d" (null → code default)
+  sortOrder     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -1620,4 +1621,56 @@ model AuditLog {
   @@index([actorUserId])
   @@index([orgId])
   @@index([action])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// AI usage telemetry — one append-only row per logical AI invocation, written at
+// the makeAiClient seam (app/lib/ai/aiTelemetry.ts). Powers the AI Usage tile
+// (OrgAdmin + SuperAdmin) and cost reporting. Like AuditLog it keeps actor/org as
+// plain nullable strings (no FK relation) so purging a user/org leaves usage
+// history intact, and is all-scalar so a plain prisma.create works (no pgPool).
+// ────────────────────────────────────────────────────────────────────────────
+model AiInvocation {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+  provider         String // "anthropic" | "moonshot"
+  model            String // exact model id, e.g. "claude-haiku-4-5-20251001"
+  userId           String? // caller (null = system / cron)
+  orgId            String? // tenant context, when known
+  invocationPoint  String // code label, e.g. "bpmn.plan" (see AI_INVOCATION_POINTS)
+  status           String // "success" | "failure"
+  inputTokens      Int      @default(0)
+  outputTokens     Int      @default(0)
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+  retries          Int      @default(0) // observed SDK retry attempts (429/5xx/network)
+  truncated        Boolean  @default(false) // stop_reason === "max_tokens"
+  errorCode        String? // on failure: HTTP status or error name
+  latencyMs        Int?
+
+  @@index([createdAt])
+  @@index([orgId])
+  @@index([userId])
+  @@index([provider, model])
+  @@index([invocationPoint])
+  @@index([status])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Editable cost-per-token catalog (USD per 1M tokens), per provider+model. The
+// static defaults live in app/lib/ai/pricing.ts; a SuperAdmin can override any
+// rate here and app/lib/ai/aiRates.ts serves defaults overlaid with these rows.
+// Currency is USD-only today (Paul, 2026-07-23) — the field exists so AUD/FX can
+// be added later without a migration.
+// ────────────────────────────────────────────────────────────────────────────
+model AiModelRate {
+  id          String   @id @default(cuid())
+  provider    String
+  model       String
+  inputPer1M  Float // USD per 1M input tokens
+  outputPer1M Float // USD per 1M output tokens
+  currency    String   @default("USD")
+  updatedAt   DateTime @updatedAt
+
+  @@unique([provider, model])
 }

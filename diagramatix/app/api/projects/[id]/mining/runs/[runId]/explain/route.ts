@@ -13,6 +13,7 @@ import { orgPolicyAllows, orgRedactionEnabled } from "@/app/lib/auth/orgPolicy";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
+import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { makeRedactor } from "@/app/lib/ai/redaction";
 import { explainMiningResults, summariseMiningResults } from "@/app/lib/mining/explainResults";
 import type { Variant, MiningStats, Performance } from "@/app/lib/mining/types";
@@ -26,8 +27,10 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
   const { id, runId } = await params;
+  let orgId: string | null = null;
   try {
-    await requireProjectAccess(session, await cookies(), id, "view");
+    const ctx = await requireProjectAccess(session, await cookies(), id, "view");
+    orgId = ctx.projectOrgId ?? null;
   } catch (err) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
@@ -69,6 +72,7 @@ export async function POST(_req: Request, { params }: Params) {
 
   const userId = session?.user?.id;
   if (userId) { const block = await gateLimit(userId, "aiAttempts"); if (block) return block; }
+  enterAiContext({ userId, orgId, invocationPoint: AI_INVOCATION_POINTS.MiningExplain });
 
   // ENT-06: when the org opts in, pseudonymise identifiable names (resource names +
   // the run/reference names) before the prompt egresses. Activity/state labels are

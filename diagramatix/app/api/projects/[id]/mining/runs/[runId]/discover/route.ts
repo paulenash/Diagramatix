@@ -19,6 +19,7 @@ import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
+import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { discoverProcess } from "@/app/lib/mining/discoverProcess";
 import { generateProcessViaAi } from "@/app/lib/mining/aiProcess";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
@@ -64,6 +65,7 @@ export async function POST(req: Request, { params }: Params) {
     const apiKey = aiApiKey(model);
     if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
     if (userId) { const block = await gateLimit(userId, "aiAttempts"); if (block) return block; }
+    enterAiContext({ userId, orgId, invocationPoint: AI_INVOCATION_POINTS.MiningDiscover });
 
     // General + bpmn default rules → GREEN (AI-enforceable) only.
     let rules = "";

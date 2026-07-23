@@ -14,6 +14,7 @@ import {
 import { pickBestModel } from "@/app/lib/ai/pickBestModel";
 import { allModels, resolvedEnvSecret } from "@/app/lib/ai/models";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
+import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 
 /**
  * SuperAdmin "Full model comparison" for a BPMN AI prompt.
@@ -93,6 +94,8 @@ export async function POST(req: Request) {
     select: { id: true, name: true, userId: true, orgId: true, projectId: true, data: true },
   });
   if (!current) return NextResponse.json({ error: "Diagram not found" }, { status: 404 });
+  // One telemetry row per model is written at the seam; label them all "compare".
+  enterAiContext({ userId: session.user.id, orgId: current.orgId, invocationPoint: AI_INVOCATION_POINTS.BpmnCompare });
 
   // Same green-rule loading as the generate-bpmn route, so each model gets the
   // same brief as production.

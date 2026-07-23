@@ -41,7 +41,10 @@ export const BoundsSchema = z.object({
 export const AiElementSchema = z.object({
   id: z.string().min(1),
   type: z.enum(ELEMENT_TYPES),
-  label: z.string(),
+  // Optional + defaulted: gateways, start/end/intermediate events and merges are
+  // legitimately unlabelled in BPMN, and the model omits `label` for them. Missing
+  // → "" so a valid diagram isn't blocked over an absent gateway/event label.
+  label: z.string().optional().default(""),
   taskType: z.string().optional(),
   gatewayType: z.string().optional(),
   eventType: z.string().optional(),

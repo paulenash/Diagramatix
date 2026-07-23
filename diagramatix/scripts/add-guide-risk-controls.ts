@@ -34,6 +34,19 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
     ].join("\n"),
   },
   {
+    heading: "KRIs vs. KPIs — what's the difference?",
+    body: [
+      "Both are indicators, but they answer different questions. A **KPI (key performance indicator)** measures **performance** — is a process meeting its target? It's usually **lagging**: it reports what has already happened. A **KRI (key risk indicator)** measures **exposure to a risk** — how likely something is to go wrong — and is ideally **leading**: an early warning *before* the harm lands.",
+      "",
+      "- **KPI** — *“Are we hitting our targets?”* e.g. invoices processed per day, average approval time, on-time delivery %.",
+      "- **KRI** — *“Is a risk building toward trouble?”* e.g. % of overdue controls, staff turnover in a critical team, transaction error rate, transactions over a threshold.",
+      "",
+      "The **same underlying metric can be both**, depending on how you frame it — *loan processing time* is a KPI when you ask “are we fast enough for the SLA?”, and a KRI when you ask “is it creeping toward a breach?”. A good KRI carries a **threshold and tolerance** (green / amber / red) so crossing it triggers action — that's what makes it an early warning rather than just a number.",
+      "",
+      "In the catalog this shows up in how they link: a **KRI *monitors*** a Risk or Control, while a **KPI *measures*** a Control or Risk. Attach them to the relevant steps so the exported matrix and the Analytics tab can report against them.",
+    ].join("\n"),
+  },
+  {
     heading: "The catalog — org master vs. project copy",
     body: [
       "Like Entity Lists, the catalog follows an **org-master → project-copy** pattern:",

@@ -6,6 +6,8 @@ import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
+import { enterAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
+import { AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
@@ -17,6 +19,7 @@ export async function POST(req: Request) {
   }
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
+  await enterAiRouteContext(session, AI_INVOCATION_POINTS.BpmnGenerate);
 
   const { prompt, attachment, pcfNodeId } = await req.json();
   if (!prompt?.trim()) {

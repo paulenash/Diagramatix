@@ -961,6 +961,15 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0980 | auto-repair fuseCollinearWaypoints drops redundant collinear waypoints (segment fuse), keeps genuine corners + endpoints | A moved segment leaving a redundant waypoint / not merging with its parallel neighbour | If the collinear-fuse pass regressed |
 | T0981 | fuseCollinearWaypoints also fuses ALMOST-parallel segments (within tolerance) | A 1–3px near-parallel jog left behind after a segment move | If the fuse tolerance regressed |
 | T0982 | fuseCollinearWaypoints leaves a genuine perpendicular zig-zag intact | Real corners wrongly collapsed, flattening a deliberate route | If the fuse over-merged perpendicular corners |
+| T0983 | AI-usage: providerOf maps kimi/moonshot ids → moonshot, else anthropic | A Kimi model mis-attributed to the wrong provider in usage/cost | If the pricing provider mapping regressed |
+| T0984 | AI-usage: costFrom multiplies tokens × per-1M rate (undefined rate → 0) | Wrong estimated cost shown next to token figures | If the cost maths regressed |
+| T0985 | AI-usage: effectiveRates = pricing.ts defaults overlaid by AiModelRate DB rows (DB wins), incl. new models | A SuperAdmin rate override ignored, or a custom model priced as "varies" forever | If the rate-catalog overlay regressed |
+| T0986 | AI-telemetry: recordAiInvocation merges the route's AsyncLocalStorage context (user/org/point) into the row | Usage rows missing user/org/invocation-point attribution | If the ALS context merge regressed |
+| T0987 | AI-telemetry: outside any context, user/org are null and point is "unknown" (never lose provider/model/tokens) | A telemetry write throwing / dropped when no route context is set | If the fail-safe defaulting regressed |
+| T0988 | AI-telemetry: recordAiInvocation never throws even if the DB write fails | A telemetry failure breaking a real AI generation | If the never-throw guard regressed |
+| T0989 | AI-telemetry: every AI_INVOCATION_POINTS value has a friendly label + values are unique | A new invocation point with no report label / a duplicate key | If a label was forgotten or a value duplicated |
+| T0990 | AI-telemetry seam: makeAiClient wrapper records a SUCCESS row with token usage + truncation flag, passing the response through | Token usage silently discarded again (as before this feature) | If the messages.create wrapper regressed |
+| T0991 | AI-telemetry seam: makeAiClient wrapper records a FAILURE row with an error code and rethrows | AI failures invisible in usage / the error swallowed | If the failure-path wrapper regressed |
 
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 

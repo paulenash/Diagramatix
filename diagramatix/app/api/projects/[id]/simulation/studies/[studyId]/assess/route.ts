@@ -13,6 +13,7 @@ import { orgPolicyAllows, orgRedactionEnabled } from "@/app/lib/auth/orgPolicy";
 import { makeRedactor } from "@/app/lib/ai/redaction";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
+import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import type { RunMetrics } from "@/app/lib/simulation/results";
 import { buildComparisonFacts, generateSimAssessment, summariseComparison } from "@/app/lib/simulation/assessFacts";
 
@@ -51,8 +52,10 @@ async function runMetrics(runId: string, studyId: string, projectId: string): Pr
 export async function POST(req: Request, { params }: Params) {
   const session = await auth();
   const { id, studyId } = await params;
+  let orgId: string | null = null;
   try {
-    await requireProjectAccess(session, await cookies(), id, "view");
+    const ctx = await requireProjectAccess(session, await cookies(), id, "view");
+    orgId = ctx.projectOrgId ?? null;
   } catch (err) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
@@ -93,6 +96,7 @@ export async function POST(req: Request, { params }: Params) {
     ? makeRedactor([facts.baseName, facts.tobeName, facts.bottleneck?.team])
     : undefined;
 
+  enterAiContext({ userId: session?.user?.id ?? null, orgId, invocationPoint: AI_INVOCATION_POINTS.SimulationAssess });
   const result = await generateSimAssessment({ apiKey: apiKey!, facts }, redactor);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
   return NextResponse.json({ assessment: result.assessment, model: result.model, facts });

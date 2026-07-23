@@ -4,6 +4,8 @@ import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { prisma } from "@/app/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { makeAiClient, aiApiKey } from "@/app/lib/ai/anthropicClient";
+import { enterAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
+import { AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import { buildGenericSystemPrompt } from "@/app/lib/ai/generateDiagramPrompt";
@@ -16,6 +18,7 @@ export async function POST(req: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
+  await enterAiRouteContext(session, AI_INVOCATION_POINTS.DiagramGenerate);
 
   const { prompt, diagramType, attachment, pcfNodeId } = await req.json();
   if (!prompt?.trim()) return NextResponse.json({ error: "Prompt required" }, { status: 400 });

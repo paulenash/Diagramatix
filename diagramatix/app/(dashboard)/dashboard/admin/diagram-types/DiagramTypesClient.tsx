@@ -9,6 +9,26 @@ import {
 } from "@/app/lib/diagram/diagramTypeStyles";
 import { invalidateDiagramTypeStyleCache } from "@/app/hooks/useDiagramTypeStyles";
 
+/** Built-in defaults keyed by type, for the per-colour "revert to default" arrows. */
+const DEFAULTS_BY_KEY: Record<string, DiagramTypeStyle> = Object.fromEntries(
+  DEFAULT_DIAGRAM_TYPE_STYLES.map((s) => [s.typeKey, s]),
+);
+
+/** A small ↺ button that reverts one colour of one type to its built-in default. */
+function RevertArrow({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title="Revert to default"
+      className="text-gray-400 hover:text-blue-600 disabled:opacity-30 disabled:hover:text-gray-400 text-sm leading-none px-0.5 cursor-pointer disabled:cursor-default"
+    >
+      ↺
+    </button>
+  );
+}
+
 export function DiagramTypesClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -60,7 +80,7 @@ export function DiagramTypesClient() {
         setError(`Code for ${s.label} must be 1–3 characters`);
         return;
       }
-      if (!isHexColor(s.bgColor) || !isHexColor(s.textColor)) {
+      if (!isHexColor(s.bgColor) || !isHexColor(s.textColor) || !isHexColor(s.boundaryColor)) {
         setError(`Colours for ${s.label} must be valid #rrggbb hex`);
         return;
       }
@@ -78,6 +98,7 @@ export function DiagramTypesClient() {
             code: s.code.trim().toUpperCase(),
             bgColor: s.bgColor,
             textColor: s.textColor,
+            boundaryColor: s.boundaryColor,
           })),
         }),
       });
@@ -162,17 +183,18 @@ export function DiagramTypesClient() {
           ) : (
             <div className="space-y-2">
               {/* Column headers */}
-              <div className="hidden sm:grid grid-cols-[1.4fr_0.7fr_1.3fr_1.3fr_0.9fr] gap-3 px-2 text-[10px] uppercase tracking-wide text-gray-400 font-medium">
+              <div className="hidden sm:grid grid-cols-[1.3fr_0.6fr_1.1fr_1.1fr_1.1fr_0.9fr] gap-3 px-2 text-[10px] uppercase tracking-wide text-gray-400 font-medium">
                 <span>Diagram type</span>
                 <span>Code</span>
                 <span>Background</span>
                 <span>Text colour</span>
+                <span>Boundary</span>
                 <span>Preview</span>
               </div>
               {styles.map((s) => (
                 <div
                   key={s.typeKey}
-                  className="grid grid-cols-2 sm:grid-cols-[1.4fr_0.7fr_1.3fr_1.3fr_0.9fr] gap-3 items-center border border-gray-200 rounded bg-gray-50 px-2 py-2"
+                  className="grid grid-cols-2 sm:grid-cols-[1.3fr_0.6fr_1.1fr_1.1fr_1.1fr_0.9fr] gap-3 items-center border border-gray-200 rounded bg-gray-50 px-2 py-2"
                 >
                   <span className="text-sm text-gray-800 font-medium">{s.label}</span>
 
@@ -184,7 +206,7 @@ export function DiagramTypesClient() {
                     className="w-14 text-xs font-bold text-center border border-gray-300 rounded px-1 py-1 uppercase"
                   />
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <input
                       type="color"
                       value={isHexColor(s.bgColor) ? s.bgColor : "#ffffff"}
@@ -195,11 +217,12 @@ export function DiagramTypesClient() {
                       type="text"
                       value={s.bgColor}
                       onChange={(e) => update(s.typeKey, { bgColor: e.target.value })}
-                      className="w-20 text-[11px] font-mono border border-gray-300 rounded px-1 py-1"
+                      className="w-[4.5rem] text-[11px] font-mono border border-gray-300 rounded px-1 py-1"
                     />
+                    <RevertArrow onClick={() => update(s.typeKey, { bgColor: DEFAULTS_BY_KEY[s.typeKey]?.bgColor })} disabled={s.bgColor === DEFAULTS_BY_KEY[s.typeKey]?.bgColor} />
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <input
                       type="color"
                       value={isHexColor(s.textColor) ? s.textColor : "#000000"}
@@ -210,13 +233,30 @@ export function DiagramTypesClient() {
                       type="text"
                       value={s.textColor}
                       onChange={(e) => update(s.typeKey, { textColor: e.target.value })}
-                      className="w-20 text-[11px] font-mono border border-gray-300 rounded px-1 py-1"
+                      className="w-[4.5rem] text-[11px] font-mono border border-gray-300 rounded px-1 py-1"
                     />
+                    <RevertArrow onClick={() => update(s.typeKey, { textColor: DEFAULTS_BY_KEY[s.typeKey]?.textColor })} disabled={s.textColor === DEFAULTS_BY_KEY[s.typeKey]?.textColor} />
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="color"
+                      value={isHexColor(s.boundaryColor) ? s.boundaryColor : "#334155"}
+                      onChange={(e) => update(s.typeKey, { boundaryColor: e.target.value })}
+                      className="w-7 h-7 rounded border border-gray-300 cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={s.boundaryColor}
+                      onChange={(e) => update(s.typeKey, { boundaryColor: e.target.value })}
+                      className="w-[4.5rem] text-[11px] font-mono border border-gray-300 rounded px-1 py-1"
+                    />
+                    <RevertArrow onClick={() => update(s.typeKey, { boundaryColor: DEFAULTS_BY_KEY[s.typeKey]?.boundaryColor })} disabled={s.boundaryColor === DEFAULTS_BY_KEY[s.typeKey]?.boundaryColor} />
                   </div>
 
                   <span
-                    className="inline-flex items-center gap-1 justify-self-start rounded px-1.5 py-0.5"
-                    style={{ backgroundColor: isHexColor(s.bgColor) ? s.bgColor : "#fff", color: isHexColor(s.textColor) ? s.textColor : "#000" }}
+                    className="inline-flex items-center gap-1 justify-self-start rounded border-2 px-1.5 py-0.5"
+                    style={{ backgroundColor: isHexColor(s.bgColor) ? s.bgColor : "#fff", color: isHexColor(s.textColor) ? s.textColor : "#000", borderColor: isHexColor(s.boundaryColor) ? s.boundaryColor : "#334155" }}
                   >
                     <span className="text-[10px] font-bold">{s.code || "??"}</span>
                     <span className="text-[10px] font-medium">{s.label}</span>

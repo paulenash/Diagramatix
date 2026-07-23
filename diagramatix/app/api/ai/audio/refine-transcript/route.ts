@@ -10,6 +10,8 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { makeAiClient, aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { enterAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
+import { AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 
@@ -28,6 +30,7 @@ export async function POST(req: Request) {
   }
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
+  await enterAiRouteContext(session, AI_INVOCATION_POINTS.DictationRefine);
   const model = await getAiGenerateModel();
   const apiKey = aiApiKey(model);
   const { transcript, diagramType } = await req.json().catch(() => ({ transcript: "" }));

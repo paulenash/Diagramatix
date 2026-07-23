@@ -30,6 +30,7 @@ interface StyleInput {
   code?: string;
   bgColor?: string;
   textColor?: string;
+  boundaryColor?: string;
 }
 
 const EDITABLE = new Set(EDITABLE_DIAGRAM_TYPE_KEYS);
@@ -71,6 +72,10 @@ export async function PUT(req: Request) {
     if (!isHexColor(s.bgColor) || !isHexColor(s.textColor)) {
       return NextResponse.json({ error: `Colours for ${s.typeKey} must be #rrggbb hex` }, { status: 400 });
     }
+    // boundaryColor is optional for backward-compat; when present it must be hex.
+    if (s.boundaryColor !== undefined && !isHexColor(s.boundaryColor)) {
+      return NextResponse.json({ error: `Boundary colour for ${s.typeKey} must be #rrggbb hex` }, { status: 400 });
+    }
   }
 
   const defaultsByKey = new Map(DEFAULT_DIAGRAM_TYPE_STYLES.map((d) => [d.typeKey, d]));
@@ -83,12 +88,14 @@ export async function PUT(req: Request) {
           code: s.code!.trim().toUpperCase(),
           bgColor: s.bgColor!,
           textColor: s.textColor!,
+          boundaryColor: s.boundaryColor ?? defaultsByKey.get(s.typeKey!)?.boundaryColor ?? null,
           sortOrder: defaultsByKey.get(s.typeKey!)?.sortOrder ?? 0,
         },
         update: {
           code: s.code!.trim().toUpperCase(),
           bgColor: s.bgColor!,
           textColor: s.textColor!,
+          boundaryColor: s.boundaryColor ?? defaultsByKey.get(s.typeKey!)?.boundaryColor ?? null,
         },
       }),
     ),

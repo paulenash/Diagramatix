@@ -12,12 +12,13 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* Diagramatix is a LIGHT-only design — every component's text colour is
+ * hardcoded for a light background. The stock create-next-app globals.css shipped
+ * a `@media (prefers-color-scheme: dark)` override that flipped --background to
+ * near-black on any device with OS dark mode ON, so every screen that didn't set
+ * its own light bg fell through to black with unreadable dark text. Removed so the
+ * app is light + readable everywhere by default, regardless of the OS setting.
+ * (If a real dark theme is ever built, reintroduce with proper inverted text.) */
 
 body {
   background: var(--background);
