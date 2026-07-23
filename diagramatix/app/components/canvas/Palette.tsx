@@ -505,8 +505,10 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
       outline = <rect x={1} y={1} width={w - 2} height={h - 2} fill={fill} stroke={stroke} strokeWidth={1.2} />;
   }
   // Box variant: outlined rectangle with the icon glyph in the top-right
-  // corner (matching the canvas rendering — 20% larger markers)
-  const cornerSize = 17;
+  // corner (matching the canvas rendering — 20% larger markers; Motivation
+  // glyphs are compact so they get a larger corner box).
+  const MOTIVATION_ICONS = new Set(["stakeholder", "driver", "assessment", "goal", "outcome", "principle", "requirement", "constraint", "meaning", "value"]);
+  const cornerSize = entry.iconType && MOTIVATION_ICONS.has(entry.iconType) ? 22 : 17;
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
       {outline}

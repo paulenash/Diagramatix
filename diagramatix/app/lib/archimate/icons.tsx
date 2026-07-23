@@ -433,9 +433,14 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
         <circle cx={cx} cy={cy} r={s * 0.2} />
         <circle cx={cx} cy={cy} r={s * 0.1} />
         <circle cx={cx} cy={cy} r={s * 0.03} fill={colour} stroke="none" />
-        {/* curved arrow sweeping up into the outer ring at ~lower-left */}
-        <path d={`M ${cx - s * 0.36} ${cy + s * 0.12} Q ${cx - s * 0.32} ${cy + s * 0.3} ${cx - s * 0.14} ${cy + s * 0.16}`} />
-        <path d={`M ${cx - s * 0.2} ${cy + s * 0.1} L ${cx - s * 0.14} ${cy + s * 0.16} L ${cx - s * 0.2} ${cy + s * 0.22}`} fill={colour} stroke={colour} />
+        {/* curved shaft from the lower-left sweeping up to the outer ring */}
+        <path d={`M ${cx - s * 0.38} ${cy + s * 0.3} Q ${cx - s * 0.34} ${cy + s * 0.14} ${cx - s * 0.22} ${cy + s * 0.22}`} />
+        {/* SOLID arrowhead at the ring's lower-left, pointing straight in
+            (radially toward the centre). */}
+        <path
+          d={`M ${cx - s * 0.12} ${cy + s * 0.12} L ${cx - s * 0.3} ${cy + s * 0.16} L ${cx - s * 0.16} ${cy + s * 0.3} Z`}
+          fill={colour} stroke={colour}
+        />
       </g>
     );
   },
@@ -646,11 +651,13 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
   // a square, set in the catalogue.)
   gap: ({ cx, cy, size, colour }) => {
     const s = size, sw = Math.max(1, s / 16);
+    // Two equal horizontal lines ~40% longer than the circle diameter (0.4s),
+    // so they extend beyond the circle on both sides. Half-length = 0.28s.
     return (
       <g stroke={colour} strokeWidth={sw} fill="none">
         <circle cx={cx} cy={cy} r={s * 0.2} />
-        <line x1={cx - s * 0.18} y1={cy - s * 0.06} x2={cx + s * 0.18} y2={cy - s * 0.06} />
-        <line x1={cx - s * 0.18} y1={cy + s * 0.06} x2={cx + s * 0.18} y2={cy + s * 0.06} />
+        <line x1={cx - s * 0.28} y1={cy - s * 0.07} x2={cx + s * 0.28} y2={cy - s * 0.07} />
+        <line x1={cx - s * 0.28} y1={cy + s * 0.07} x2={cx + s * 0.28} y2={cy + s * 0.07} />
       </g>
     );
   },

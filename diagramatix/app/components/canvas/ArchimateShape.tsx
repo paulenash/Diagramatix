@@ -34,6 +34,14 @@ function lightenHex(hex: string, amount: number): string {
   return `#${[mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
+// Motivation glyphs are drawn compact, so they need a larger corner box than the
+// other element markers to read at the same visual weight.
+const MOTIVATION_ICONS = new Set([
+  "stakeholder", "driver", "assessment", "goal", "outcome",
+  "principle", "requirement", "constraint", "meaning", "value",
+]);
+const glyphSizeFor = (iconType?: string) => (iconType && MOTIVATION_ICONS.has(iconType) ? 36 : 27);
+
 // ────────────────────────────────────────────────────────────────────
 // Outline renderers per shape family
 // ────────────────────────────────────────────────────────────────────
@@ -160,7 +168,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
       // plain rectangle, so overlay its ArchiMate glyph in the top-right corner
       // — otherwise it renders as a blank box.
       const cornerGlyph = entry.iconType !== "service" && entry.iconType !== "event";
-      const glyphSize = 27; // 20% larger markers
+      const glyphSize = glyphSizeFor(entry.iconType); // 20% larger; Motivation larger still
       const gx = el.x + el.width - glyphSize / 2 - 6;
       const gy = el.y + glyphSize / 2 + 6;
       return (
@@ -189,7 +197,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
 
   // Standard box rendering — outline + corner icon glyph
   const d = drawOutline(entry.shapeFamily, el.x, el.y, el.width, el.height);
-  const iconBoxSize = 27; // 20% larger markers
+  const iconBoxSize = glyphSizeFor(entry.iconType); // 20% larger; Motivation larger still
   const iconCx = el.x + el.width - iconBoxSize / 2 - 6;
   const iconCy = el.y + iconBoxSize / 2 + 6;
   return (
