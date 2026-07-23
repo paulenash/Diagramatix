@@ -976,6 +976,7 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0995 | ArchiMate v3.2: catalogue is version 3.2, Technology has 17 types, Impl&Migration + Composite categories present, typo/dupe keys removed | The upgrade half-applied / dead duplicate masters back | If the catalogue regressed to 3.1 |
 | T0996 | ArchiMate v3.2: Directed Association relationship-name registered ("Association (directed)") | The new relationship missing its highlight label / picker entry | If the directed-association type was dropped |
 | T0997 | ArchiMate v3.2: relationship compatibility matrix covers every new element + Directed Association is universal | New elements only offering Association in the picker / Directed Association always disabled | If the relationships matrix wasn't updated for new elements |
+| T0998 | ArchiMate: Realisation is directly allowed (not derived) for elements that realise a Service (Process/Function/Component → Service) | A Process→Service Realisation hidden behind "show derived" | If the realise-a-Service overrides were dropped |
 
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 

@@ -62,4 +62,20 @@ describe("ArchiMate v3.2 catalogue + layout", () => {
     for (const n of ["Path", "Communication Network", "Equipment", "Facility", "Distribution Network", "Material", "Work Package", "Deliverable", "Implementation Event", "Grouping", "Location", "Plateau", "Gap"])
       expect(named.has(n), `matrix missing category for "${n}"`).toBe(true);
   });
+
+  it("T0998 — Realisation is directly allowed for elements that realise a Service", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const matrix: any = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "public/archimate-relationships.json"), "utf8"),
+    );
+    const realisesService: [string, string][] = [
+      ["Business Process", "Business Service"],
+      ["Business Function", "Business Service"],
+      ["Application Function", "Application Service"],
+      ["Application Component", "Application Service"],
+      ["Technology Process", "Technology Service"],
+    ];
+    for (const [src, tgt] of realisesService)
+      expect(matrix.overrides?.[src]?.[tgt]?.allowed ?? [], `${src} → ${tgt}`).toContain("archi-realisation");
+  });
 });

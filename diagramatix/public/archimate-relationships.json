@@ -356,6 +356,90 @@
           "archi-realisation"
         ]
       }
+    },
+    "Business Process": {
+      "Business Service": {
+        "allowed": [
+          "archi-realisation"
+        ]
+      }
+    },
+    "Business Function": {
+      "Business Service": {
+        "allowed": [
+          "archi-realisation"
+        ]
+      }
+    },
+    "Business Interaction": {
+      "Business Service": {
+        "allowed": [
+          "archi-realisation"
+        ]
+      }
+    },
+    "Application Process": {
+      "Application Service": {
+        "allowed": [
+          "archi-realisation"
+        ]
+      }
+    },
+    "Application Function": {
+      "Application Service": {
+        "allowed": [
+          "archi-realisation"
+        ]
+      }
+    },
+    "Application Interaction": {
+      "Application Service": {
+        "allowed": [
+          "archi-realisation"
+        ]
+      }
+    },
+    "Technology Process": {
+      "Technology Service": {
+        "allowed": [
+          "archi-realisation"
+        ]
+      }
+    },
+    "Technology Function": {
+      "Technology Service": {
+        "allowed": [
+          "archi-realisation"
+        ]
+      }
+    },
+    "Technology Interaction": {
+      "Technology Service": {
+        "allowed": [
+          "archi-realisation"
+        ]
+      }
+    },
+    "Application Collaboration": {
+      "Application Service": {
+        "allowed": [
+          "archi-realisation"
+        ]
+      }
+    },
+    "System Software": {
+      "Technology Service": {
+        "allowed": [
+          "archi-realisation"
+        ]
+      }
+    },
+    "Device": {
+      "Technology Service": {
+        "allowed": [
+          "archi-realisation"
+        ]
+      }
     }
   }
 }
