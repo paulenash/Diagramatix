@@ -188,19 +188,21 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   }
 
   // Junction (And/Or) — the whole shape IS a small circle; draw the junction
-  // glyph filling the element, no box outline / corner glyph.
+  // glyph (small — 60% smaller than the element bounds), no box / corner / label.
   if (entry.iconType && entry.iconType.startsWith("junction")) {
     const jcx = el.x + el.width / 2;
     const jcy = el.y + el.height / 2;
-    const jsize = Math.min(el.width, el.height) * 2.4;
+    const jsize = Math.min(el.width, el.height) * 0.96;
     return <g>{drawIcon ? drawIcon({ cx: jcx, cy: jcy, size: jsize, colour: stroke }) : null}</g>;
   }
 
-  // Standard box rendering — outline + corner icon glyph
+  // Standard box rendering — outline + corner icon glyph. The compact-glyph
+  // categories get their marker nudged 10px toward the top-right corner.
   const d = drawOutline(entry.shapeFamily, el.x, el.y, el.width, el.height);
   const iconBoxSize = glyphSizeFor(entry.category); // larger for compact-glyph categories
-  const iconCx = el.x + el.width - iconBoxSize / 2 - 6;
-  const iconCy = el.y + iconBoxSize / 2 + 6;
+  const nudge = LARGE_GLYPH_CATEGORIES.has(entry.category) ? 10 : 0;
+  const iconCx = el.x + el.width - iconBoxSize / 2 - 6 + nudge;
+  const iconCy = el.y + iconBoxSize / 2 + 6 - nudge;
   return (
     <g>
       <path d={d} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} />

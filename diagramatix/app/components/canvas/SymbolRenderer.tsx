@@ -3014,7 +3014,8 @@ export function SymbolRenderer({
         element.type === 'uml-note' ||
         element.type === 'uml-pain-point' ||
         element.type === 'uml-issue'
-      ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge') && (() => {
+      ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge')
+        && !(element.type === 'archimate-shape' && typeof element.properties?.shapeKey === 'string' && (element.properties.shapeKey as string).includes('junction')) && (() => {
         const isChevron = element.type === 'chevron' || element.type === 'chevron-collapsed';
         const isArchi = element.type === 'archimate-shape';
         // Chevrons can carry a dark theme shade — pick white vs near-black
