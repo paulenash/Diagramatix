@@ -334,15 +334,18 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       </g>
     );
   },
-  // Outcome — target hit by an arrow (upper-right).
+  // Outcome — a target with an arrow flying IN from the upper-right and
+  // striking the centre (solid arrowhead pointing into the bullseye).
   outcome: ({ cx, cy, size, colour }) => {
     const s = size, sw = Math.max(1, s / 16);
     return (
       <g stroke={colour} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round">
         <circle cx={cx} cy={cy} r={s * 0.2} />
         <circle cx={cx} cy={cy} r={s * 0.09} />
-        <line x1={cx} y1={cy} x2={cx + s * 0.3} y2={cy - s * 0.3} />
-        <path d={`M ${cx + s * 0.12} ${cy - s * 0.3} L ${cx + s * 0.3} ${cy - s * 0.3} L ${cx + s * 0.3} ${cy - s * 0.12}`} />
+        {/* shaft from the upper-right toward the centre */}
+        <line x1={cx + s * 0.34} y1={cy - s * 0.34} x2={cx + s * 0.1} y2={cy - s * 0.1} />
+        {/* solid arrowhead pointing down-left into the target centre */}
+        <path d={`M ${cx + s * 0.02} ${cy - s * 0.02} L ${cx + s * 0.2} ${cy - s * 0.08} L ${cx + s * 0.08} ${cy - s * 0.2} Z`} fill={colour} stroke={colour} />
       </g>
     );
   },

@@ -34,13 +34,14 @@ function lightenHex(hex: string, amount: number): string {
   return `#${[mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
-// Motivation glyphs are drawn compact, so they need a larger corner box than the
-// other element markers to read at the same visual weight.
-const MOTIVATION_ICONS = new Set([
-  "stakeholder", "driver", "assessment", "goal", "outcome",
-  "principle", "requirement", "constraint", "meaning", "value",
+// Glyphs in these categories are drawn compact, so they need a larger corner box
+// than the Business / Application markers to read at the same visual weight.
+// (Keyed by CATEGORY, not iconType, because Technology + Business share icon
+// types like "collaboration" / "interface" / "process".)
+const LARGE_GLYPH_CATEGORIES = new Set([
+  "motivation", "technology", "implementation-migration", "composite",
 ]);
-const glyphSizeFor = (iconType?: string) => (iconType && MOTIVATION_ICONS.has(iconType) ? 36 : 27);
+const glyphSizeFor = (category?: string) => (category && LARGE_GLYPH_CATEGORIES.has(category) ? 36 : 27);
 
 // ────────────────────────────────────────────────────────────────────
 // Outline renderers per shape family
@@ -168,7 +169,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
       // plain rectangle, so overlay its ArchiMate glyph in the top-right corner
       // — otherwise it renders as a blank box.
       const cornerGlyph = entry.iconType !== "service" && entry.iconType !== "event";
-      const glyphSize = glyphSizeFor(entry.iconType); // 20% larger; Motivation larger still
+      const glyphSize = glyphSizeFor(entry.category); // larger for compact-glyph categories
       const gx = el.x + el.width - glyphSize / 2 - 6;
       const gy = el.y + glyphSize / 2 + 6;
       return (
@@ -197,7 +198,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
 
   // Standard box rendering — outline + corner icon glyph
   const d = drawOutline(entry.shapeFamily, el.x, el.y, el.width, el.height);
-  const iconBoxSize = glyphSizeFor(entry.iconType); // 20% larger; Motivation larger still
+  const iconBoxSize = glyphSizeFor(entry.category); // larger for compact-glyph categories
   const iconCx = el.x + el.width - iconBoxSize / 2 - 6;
   const iconCy = el.y + iconBoxSize / 2 + 6;
   return (
