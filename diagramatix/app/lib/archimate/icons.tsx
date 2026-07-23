@@ -392,39 +392,61 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
     const s = size, sw = Math.max(1, s / 16);
     return <ellipse cx={cx} cy={cy} rx={s * 0.24} ry={s * 0.15} fill="none" stroke={colour} strokeWidth={sw} />;
   },
+  // Resource — a battery on its side: body rect, a small terminal on the right
+  // face, and three vertical bars near the left face.
   resource: ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 16);
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <rect x={cx - s * 0.22} y={cy - s * 0.12} width={s * 0.44} height={s * 0.24} />
-        <line x1={cx - s * 0.22} y1={cy} x2={cx + s * 0.22} y2={cy} />
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinejoin="round">
+        <rect x={cx - s * 0.22} y={cy - s * 0.13} width={s * 0.38} height={s * 0.26} />
+        <rect x={cx + s * 0.16} y={cy - s * 0.06} width={s * 0.06} height={s * 0.12} fill={colour} />
+        <line x1={cx - s * 0.16} y1={cy - s * 0.08} x2={cx - s * 0.16} y2={cy + s * 0.08} />
+        <line x1={cx - s * 0.11} y1={cy - s * 0.08} x2={cx - s * 0.11} y2={cy + s * 0.08} />
+        <line x1={cx - s * 0.06} y1={cy - s * 0.08} x2={cx - s * 0.06} y2={cy + s * 0.08} />
       </g>
     );
   },
+  // Capability — six squares stacked as a right-justified staircase: 3 on the
+  // bottom, 2 in the middle, 1 on top.
   capability: ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 18);
+    const sq = s * 0.13, step = sq + s * 0.02;
+    const x0 = cx - s * 0.2, x1 = x0 + step, x2 = x0 + 2 * step;
+    const yB = cy + s * 0.06, yM = yB - step, yT = yB - 2 * step;
+    const cells: [number, number][] = [
+      [x0, yB], [x1, yB], [x2, yB],   // bottom row
+      [x1, yM], [x2, yM],             // middle row (right-justified)
+      [x2, yT],                       // top row
+    ];
     return (
-      <path
-        d={`M ${cx - s * 0.2} ${cy} L ${cx - s * 0.1} ${cy + s * 0.2} L ${cx + s * 0.2} ${cy - s * 0.1}`}
-        fill="none" stroke={colour} strokeWidth={Math.max(1, s / 14)}
-      />
+      <g stroke={colour} strokeWidth={sw} fill="none">
+        {cells.map(([rx, ry], i) => <rect key={i} x={rx} y={ry} width={sq} height={sq} />)}
+      </g>
     );
   },
+  // Course of Action — a bullseye (dot + two concentric circles) with a solid
+  // curved arrow at the lower-left pointing at the outer ring.
   "course-of-action": ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 16);
     return (
-      <path
-        d={`M ${cx - s * 0.22} ${cy - s * 0.12} L ${cx + s * 0.05} ${cy - s * 0.12} L ${cx + s * 0.05} ${cy - s * 0.22} L ${cx + s * 0.22} ${cy} L ${cx + s * 0.05} ${cy + s * 0.22} L ${cx + s * 0.05} ${cy + s * 0.12} L ${cx - s * 0.22} ${cy + s * 0.12} Z`}
-        fill="none" stroke={colour} strokeWidth={Math.max(1, s / 16)}
-      />
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx={cx} cy={cy} r={s * 0.2} />
+        <circle cx={cx} cy={cy} r={s * 0.1} />
+        <circle cx={cx} cy={cy} r={s * 0.03} fill={colour} stroke="none" />
+        {/* curved arrow sweeping up into the outer ring at ~lower-left */}
+        <path d={`M ${cx - s * 0.36} ${cy + s * 0.12} Q ${cx - s * 0.32} ${cy + s * 0.3} ${cx - s * 0.14} ${cy + s * 0.16}`} />
+        <path d={`M ${cx - s * 0.2} ${cy + s * 0.1} L ${cx - s * 0.14} ${cy + s * 0.16} L ${cx - s * 0.2} ${cy + s * 0.22}`} fill={colour} stroke={colour} />
+      </g>
     );
   },
+  // Value Stream — the chevron/ribbon of the Value Stream (Process) element:
+  // flat top & bottom, pointed right, concave notch on the left.
   "value-stream": ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 16);
     return (
       <path
-        d={`M ${cx - s * 0.3} ${cy - s * 0.1} L ${cx + s * 0.1} ${cy - s * 0.2} L ${cx + s * 0.3} ${cy} L ${cx + s * 0.1} ${cy + s * 0.2} L ${cx - s * 0.3} ${cy + s * 0.1} L ${cx - s * 0.16} ${cy} Z`}
-        fill="none" stroke={colour} strokeWidth={Math.max(1, s / 16)}
+        d={`M ${cx - s * 0.28} ${cy - s * 0.16} L ${cx + s * 0.08} ${cy - s * 0.16} L ${cx + s * 0.28} ${cy} L ${cx + s * 0.08} ${cy + s * 0.16} L ${cx - s * 0.28} ${cy + s * 0.16} L ${cx - s * 0.14} ${cy} Z`}
+        fill="none" stroke={colour} strokeWidth={sw} strokeLinejoin="round"
       />
     );
   },
@@ -608,25 +630,28 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       />
     );
   },
-  // Plateau — three stacked bars.
+  // Plateau — three stacked bars offset to the right like a staircase (bottom
+  // bar leftmost, top bar rightmost).
   plateau: ({ cx, cy, size, colour }) => {
-    const s = size, sw = Math.max(1, s / 14);
+    const s = size, sw = Math.max(1, s / 12);
     return (
       <g stroke={colour} strokeWidth={sw} fill="none" strokeLinecap="round">
-        <line x1={cx - s * 0.2} y1={cy - s * 0.12} x2={cx + s * 0.2} y2={cy - s * 0.12} />
-        <line x1={cx - s * 0.2} y1={cy} x2={cx + s * 0.2} y2={cy} />
-        <line x1={cx - s * 0.2} y1={cy + s * 0.12} x2={cx + s * 0.2} y2={cy + s * 0.12} />
+        <line x1={cx - s * 0.06} y1={cy - s * 0.12} x2={cx + s * 0.22} y2={cy - s * 0.12} />
+        <line x1={cx - s * 0.14} y1={cy} x2={cx + s * 0.14} y2={cy} />
+        <line x1={cx - s * 0.22} y1={cy + s * 0.12} x2={cx + s * 0.06} y2={cy + s * 0.12} />
       </g>
     );
   },
-  // Gap — a lens (two arcs).
+  // Gap — a circle with two horizontal lines through it. (The element outline is
+  // a square, set in the catalogue.)
   gap: ({ cx, cy, size, colour }) => {
     const s = size, sw = Math.max(1, s / 16);
     return (
-      <path
-        d={`M ${cx - s * 0.2} ${cy} Q ${cx} ${cy - s * 0.18} ${cx + s * 0.2} ${cy} Q ${cx} ${cy + s * 0.18} ${cx - s * 0.2} ${cy} Z`}
-        fill="none" stroke={colour} strokeWidth={sw} strokeLinejoin="round"
-      />
+      <g stroke={colour} strokeWidth={sw} fill="none">
+        <circle cx={cx} cy={cy} r={s * 0.2} />
+        <line x1={cx - s * 0.18} y1={cy - s * 0.06} x2={cx + s * 0.18} y2={cy - s * 0.06} />
+        <line x1={cx - s * 0.18} y1={cy + s * 0.06} x2={cx + s * 0.18} y2={cy + s * 0.06} />
+      </g>
     );
   },
   // ── Composite (v3.2) ──

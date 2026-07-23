@@ -52,6 +52,11 @@ function drawOutline(
       const pad = w * 0.15;
       return `M ${x + pad} ${y} L ${x + w - pad} ${y} L ${x + w} ${y + h / 2} L ${x + w - pad} ${y + h} L ${x + pad} ${y + h} L ${x} ${y + h / 2} Z`;
     }
+    case "octagon": {
+      // Rectangle with the four corners cut off — the ArchiMate Motivation shape.
+      const c = Math.min(w, h) * 0.22;
+      return `M ${x + c} ${y} L ${x + w - c} ${y} L ${x + w} ${y + c} L ${x + w} ${y + h - c} L ${x + w - c} ${y + h} L ${x + c} ${y + h} L ${x} ${y + h - c} L ${x} ${y + c} Z`;
+    }
     case "rectangle":
     case "custom":
     default:
@@ -155,7 +160,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
       // plain rectangle, so overlay its ArchiMate glyph in the top-right corner
       // — otherwise it renders as a blank box.
       const cornerGlyph = entry.iconType !== "service" && entry.iconType !== "event";
-      const glyphSize = 22.5;
+      const glyphSize = 27; // 20% larger markers
       const gx = el.x + el.width - glyphSize / 2 - 6;
       const gy = el.y + glyphSize / 2 + 6;
       return (
@@ -173,9 +178,18 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
     );
   }
 
+  // Junction (And/Or) — the whole shape IS a small circle; draw the junction
+  // glyph filling the element, no box outline / corner glyph.
+  if (entry.iconType && entry.iconType.startsWith("junction")) {
+    const jcx = el.x + el.width / 2;
+    const jcy = el.y + el.height / 2;
+    const jsize = Math.min(el.width, el.height) * 2.4;
+    return <g>{drawIcon ? drawIcon({ cx: jcx, cy: jcy, size: jsize, colour: stroke }) : null}</g>;
+  }
+
   // Standard box rendering — outline + corner icon glyph
   const d = drawOutline(entry.shapeFamily, el.x, el.y, el.width, el.height);
-  const iconBoxSize = 22.5;
+  const iconBoxSize = 27; // 20% larger markers
   const iconCx = el.x + el.width - iconBoxSize / 2 - 6;
   const iconCy = el.y + iconBoxSize / 2 + 6;
   return (

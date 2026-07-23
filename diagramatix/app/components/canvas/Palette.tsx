@@ -469,9 +469,11 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
   const w = 64, h = 38;
   const drawIcon = entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined;
 
-  // Icon-only variant: render the icon glyph itself AS the shape (no box
-  // outline, bigger icon) so the user sees the compact iconic form.
-  if (iconOnly && drawIcon) {
+  // Junction (And/Or) — the whole shape is the small circle glyph.
+  const isJunction = !!entry.iconType && entry.iconType.startsWith("junction");
+  // Icon-only variant (or a junction): render the icon glyph itself AS the shape
+  // (no box outline, bigger icon) so the user sees the compact iconic form.
+  if ((iconOnly || isJunction) && drawIcon) {
     return (
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
         {drawIcon({ cx: w / 2, cy: h / 2, size: Math.min(w, h) * 1.4, colour: iconColour })}
@@ -493,12 +495,18 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
       outline = <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.2} />;
       break;
     }
+    case "octagon": {
+      const c = Math.min(w, h) * 0.22;
+      const pts = `${c},1 ${w - c},1 ${w - 1},${c} ${w - 1},${h - c} ${w - c},${h - 1} ${c},${h - 1} 1,${h - c} 1,${c}`;
+      outline = <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+      break;
+    }
     default:
       outline = <rect x={1} y={1} width={w - 2} height={h - 2} fill={fill} stroke={stroke} strokeWidth={1.2} />;
   }
   // Box variant: outlined rectangle with the icon glyph in the top-right
-  // corner (matching the canvas rendering)
-  const cornerSize = 14;
+  // corner (matching the canvas rendering — 20% larger markers)
+  const cornerSize = 17;
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
       {outline}
@@ -578,8 +586,8 @@ function ArchimatePalette({
   return (
     <div className="border-r border-gray-200 bg-white flex flex-col shrink-0" style={{ width: 220 }}>
       <div className="px-2 py-1.5 border-b border-gray-200 flex items-center justify-between">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          ArchiMate
+        <p className="text-xs font-semibold text-gray-500 tracking-wide">
+          ARCHIMATE v3.2
         </p>
         <button onClick={() => setCollapsed(true)} title="Collapse shapes"
           className="text-gray-400 hover:text-gray-600 text-xs">

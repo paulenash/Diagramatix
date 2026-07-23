@@ -17,7 +17,7 @@ export interface ArchimateShapeEntry {
   defaultHeight: number;
   fill?: string;
   stroke?: string;
-  shapeFamily: "rectangle" | "rounded-rect" | "ellipse" | "hexagon" | "custom";
+  shapeFamily: "rectangle" | "rounded-rect" | "ellipse" | "hexagon" | "octagon" | "custom";
   iconType?: string;
 }
 

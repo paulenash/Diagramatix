@@ -273,7 +273,7 @@
           "defaultWidth": 113,
           "defaultHeight": 76,
           "fill": "#ddd6e5",
-          "shapeFamily": "rounded-rect",
+          "shapeFamily": "octagon",
           "iconType": "stakeholder"
         },
         {
@@ -285,7 +285,7 @@
           "defaultWidth": 113,
           "defaultHeight": 76,
           "fill": "#ddd6e5",
-          "shapeFamily": "rounded-rect",
+          "shapeFamily": "octagon",
           "iconType": "driver"
         },
         {
@@ -297,7 +297,7 @@
           "defaultWidth": 49,
           "defaultHeight": 33,
           "fill": "#ddd7e6",
-          "shapeFamily": "custom",
+          "shapeFamily": "octagon",
           "iconType": "assessment"
         },
         {
@@ -309,7 +309,7 @@
           "defaultWidth": 113,
           "defaultHeight": 76,
           "fill": "#ddd6e5",
-          "shapeFamily": "rounded-rect",
+          "shapeFamily": "octagon",
           "iconType": "goal"
         },
         {
@@ -321,7 +321,7 @@
           "defaultWidth": 113,
           "defaultHeight": 76,
           "fill": "#ddd6e5",
-          "shapeFamily": "rounded-rect",
+          "shapeFamily": "octagon",
           "iconType": "outcome"
         },
         {
@@ -333,7 +333,7 @@
           "defaultWidth": 113,
           "defaultHeight": 76,
           "fill": "#ddd6e5",
-          "shapeFamily": "rounded-rect",
+          "shapeFamily": "octagon",
           "iconType": "principle"
         },
         {
@@ -345,7 +345,7 @@
           "defaultWidth": 113,
           "defaultHeight": 76,
           "fill": "#ddd6e5",
-          "shapeFamily": "rounded-rect",
+          "shapeFamily": "octagon",
           "iconType": "requirement"
         },
         {
@@ -357,7 +357,7 @@
           "defaultWidth": 113,
           "defaultHeight": 76,
           "fill": "#ddd6e5",
-          "shapeFamily": "rounded-rect",
+          "shapeFamily": "octagon",
           "iconType": "constraint"
         },
         {
@@ -369,7 +369,7 @@
           "defaultWidth": 113,
           "defaultHeight": 38,
           "fill": "#ddd6e5",
-          "shapeFamily": "custom",
+          "shapeFamily": "octagon",
           "iconType": "constraint"
         },
         {
@@ -381,7 +381,7 @@
           "defaultWidth": 113,
           "defaultHeight": 76,
           "fill": "#ddd6e5",
-          "shapeFamily": "custom",
+          "shapeFamily": "octagon",
           "iconType": "meaning"
         },
         {
@@ -393,7 +393,7 @@
           "defaultWidth": 113,
           "defaultHeight": 57,
           "fill": "#ddd6e5",
-          "shapeFamily": "ellipse",
+          "shapeFamily": "octagon",
           "iconType": "value"
         }
       ]
@@ -922,7 +922,7 @@
           "defaultWidth": 113,
           "defaultHeight": 76,
           "fill": "#ffd7e6",
-          "shapeFamily": "ellipse",
+          "shapeFamily": "rectangle",
           "iconType": "gap"
         }
       ]
