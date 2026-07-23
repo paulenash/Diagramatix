@@ -187,13 +187,22 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
     );
   }
 
-  // Junction (And/Or) — the whole shape IS a small circle; draw the junction
-  // glyph (small — 60% smaller than the element bounds), no box / corner / label.
+  // Junction (And/Or) — a small BLACK circle that fills its (fixed-size) element
+  // bounds, so its circular edge IS the connection boundary. No box / corner /
+  // label. And-Junction is filled; Or-Junction is an open ring.
   if (entry.iconType && entry.iconType.startsWith("junction")) {
     const jcx = el.x + el.width / 2;
     const jcy = el.y + el.height / 2;
-    const jsize = Math.min(el.width, el.height) * 0.96;
-    return <g>{drawIcon ? drawIcon({ cx: jcx, cy: jcy, size: jsize, colour: stroke }) : null}</g>;
+    const r = Math.min(el.width, el.height) / 2 - 1;
+    const filled = entry.iconType === "junction-and" || entry.iconType === "junction";
+    return (
+      <circle
+        cx={jcx} cy={jcy} r={Math.max(2, r)}
+        fill={filled ? "#000000" : "#ffffff"}
+        stroke="#000000"
+        strokeWidth={filled ? 1 : Math.max(1.5, Math.min(el.width, el.height) / 8)}
+      />
+    );
   }
 
   // Standard box rendering — outline + corner icon glyph. The compact-glyph

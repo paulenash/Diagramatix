@@ -2445,7 +2445,10 @@ export function SymbolRenderer({
   const isWhiteBoxPool = element.type === "pool" &&
     ((element.properties.poolType as string | undefined) ?? "black-box") === "white-box";
   const isContainer = isBoundary || element.type === "composite-state" || isPoolLane; // gets resize handles
-  const canResize = element.type !== "lane" && element.type !== "flowchart-vswimlane"; // lanes + vertical swimlanes use custom boundary handles
+  // ArchiMate Junctions are a fixed-size node (a small circle) — no resize handles.
+  const isArchiJunction = element.type === "archimate-shape" &&
+    typeof element.properties?.shapeKey === "string" && (element.properties.shapeKey as string).includes("junction");
+  const canResize = element.type !== "lane" && element.type !== "flowchart-vswimlane" && !isArchiJunction; // lanes + vertical swimlanes use custom boundary handles
   const isBoundaryStartOrEnd = !!element.boundaryHostId &&
     (element.type === "start-event" || element.type === "end-event");
   const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && element.type !== "flowchart-parallel" && element.type !== "flowchart-decision" && element.type !== "flowchart-vswimlane" && !isBoundaryStartOrEnd;

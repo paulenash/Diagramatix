@@ -203,13 +203,19 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       </g>
     );
   },
+  // Component — main body rectangle with two "tab" rectangles straddling its
+  // left edge: each tab is 25% of the body height and sits 40% inside / 60%
+  // outside the body, drawn on top of it.
   component: ({ cx, cy, size, colour }) => {
-    const s = size;
+    const s = size, sw = Math.max(1, s / 16);
+    const mainLeft = cx - s * 0.1, mainTop = cy - s * 0.22, mainW = s * 0.42, mainH = s * 0.44;
+    const tabW = s * 0.14, tabH = mainH * 0.25;
+    const tabX = mainLeft - tabW * 0.6; // 60% outside, 40% inside
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <rect x={cx - s * 0.2} y={cy - s * 0.2} width={s * 0.5} height={s * 0.4} />
-        <rect x={cx - s * 0.3} y={cy - s * 0.12} width={s * 0.12} height={s * 0.08} />
-        <rect x={cx - s * 0.3} y={cy + s * 0.04} width={s * 0.12} height={s * 0.08} />
+      <g stroke={colour} strokeWidth={sw} fill="none">
+        <rect x={mainLeft} y={mainTop} width={mainW} height={mainH} />
+        <rect x={tabX} y={mainTop + mainH * 0.12} width={tabW} height={tabH} />
+        <rect x={tabX} y={mainTop + mainH * 0.55} width={tabW} height={tabH} />
       </g>
     );
   },

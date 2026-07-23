@@ -336,6 +336,11 @@
           "archi-assignment",
           "archi-realisation"
         ]
+      },
+      "Application Component": {
+        "derived": [
+          "archi-realisation"
+        ]
       }
     },
     "Artifact": {
@@ -432,12 +437,24 @@
         "allowed": [
           "archi-realisation"
         ]
+      },
+      "Application Component": {
+        "derived": [
+          "archi-realisation"
+        ]
       }
     },
     "Device": {
       "Technology Service": {
         "allowed": [
           "archi-realisation"
+        ]
+      }
+    },
+    "Application Event": {
+      "Application Component": {
+        "allowed": [
+          "archi-triggering"
         ]
       }
     }
