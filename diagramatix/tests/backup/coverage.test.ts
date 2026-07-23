@@ -85,6 +85,11 @@ const SCOPED_OMITTED = new Set<string>([
   // per-user/org data — deliberately NOT carried by a tenant backup. It's in the
   // SuperAdmin full backup (catalog-driven).
   "AuditLog",
+  // AI usage telemetry (AiInvocation) is system-global observability like AuditLog,
+  // and the model cost-rate catalog (AiModelRate) is global admin config like
+  // AppSetting / DiagramTypeStyle — neither is per-user/org data. Carried by the
+  // SuperAdmin full backup (catalog-driven) only.
+  "AiInvocation", "AiModelRate",
   ...SIMULATOR_TABLES,
   ...RISK_CONTROL_TABLES,
   ...PCF_TABLES,
