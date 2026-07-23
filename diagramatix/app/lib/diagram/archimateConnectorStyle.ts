@@ -26,6 +26,23 @@
  */
 import type { ArchimateConnectorType } from "./types";
 
+/** Human display name for each ArchiMate relationship type — shown as the
+ *  connector label when a connector is highlighted (individually or via the
+ *  tree-traversal highlight). */
+export const ARCHI_REL_NAME: Record<ArchimateConnectorType, string> = {
+  "archi-composition": "Composition",
+  "archi-aggregation": "Aggregation",
+  "archi-assignment": "Assignment",
+  "archi-realisation": "Realisation",
+  "archi-serving": "Serving",
+  "archi-access": "Access",
+  "archi-influence": "Influence",
+  "archi-association": "Association",
+  "archi-triggering": "Triggering",
+  "archi-flow": "Flow",
+  "archi-specialisation": "Specialisation",
+};
+
 export type ArchimateMarkerKind =
   | "arrow-filled"
   | "arrow-open"

@@ -819,34 +819,90 @@ export function layoutGenericDiagram(
 }
 
 // ── ArchiMate layered-band layout ───────────────────────────────────
-// elementType → catalogue shapeKey (+ whether it is an icon-only shape)
+// elementType → catalogue shapeKey (+ whether it is an icon-only shape).
+// Keys are the canonical entries in public/archimate-catalogue.json.
 const ARCHI_SHAPE: Record<string, { key: string; iconOnly: boolean }> = {
-  "business-actor":            { key: "business-business-actor-box",            iconOnly: false },
-  "business-role":             { key: "business-business-role-icon",            iconOnly: true  },
-  "business-interface":        { key: "business-business-interface-icon",       iconOnly: true  },
-  "business-collaboration":    { key: "business-business-collaboration-box",    iconOnly: false },
-  "business-service":          { key: "business-business-service-box",          iconOnly: false },
-  "business-process":          { key: "business-business-process-box",          iconOnly: false },
-  "business-function":         { key: "business-business-function-box",         iconOnly: false },
-  "business-interaction":      { key: "business-business-interaction-box",      iconOnly: false },
-  "business-event":            { key: "business-business-event-box",            iconOnly: false },
-  "product":                   { key: "business-product-icon",                  iconOnly: true  },
-  "application-component":     { key: "application-application-component-box",     iconOnly: false },
-  "application-service":       { key: "application-application-service-icon",      iconOnly: true  },
+  // Strategy (band 0)
+  "strategy-resource":         { key: "strategy-resource-icon",          iconOnly: true  },
+  "strategy-capability":       { key: "strategy-capability-icon",        iconOnly: true  },
+  "strategy-course-of-action": { key: "strategy-course-of-action-icon",  iconOnly: true  },
+  "strategy-value-stream":     { key: "strategy-value-stream-box",        iconOnly: false },
+  // Motivation (band 1)
+  "motivation-stakeholder":    { key: "motivation-stakeholder-icon",     iconOnly: true  },
+  "motivation-driver":         { key: "motivation-driver-icon",          iconOnly: true  },
+  "motivation-assessment":     { key: "motivation-assessment-icon",      iconOnly: true  },
+  "motivation-goal":           { key: "motivation-goal-icon",            iconOnly: true  },
+  "motivation-outcome":        { key: "motivation-outcome-icon",         iconOnly: true  },
+  "motivation-principle":      { key: "motivation-principle-icon",       iconOnly: true  },
+  "motivation-requirement":    { key: "motivation-requirement-icon",     iconOnly: true  },
+  "motivation-constraint":     { key: "motivation-constraint-box",        iconOnly: false },
+  "motivation-meaning":        { key: "motivation-meaning-icon",         iconOnly: true  },
+  "motivation-value":          { key: "motivation-value-icon",           iconOnly: true  },
+  // Business active structure + behaviour (bands 2–7)
+  "business-actor":            { key: "business-business-actor-box",         iconOnly: false },
+  "business-role":             { key: "business-business-role-icon",         iconOnly: true  },
+  "business-collaboration":    { key: "business-business-collaboration-box", iconOnly: false },
+  "business-service":          { key: "business-business-service-box",       iconOnly: false },
+  "business-interface":        { key: "business-business-interface-icon",    iconOnly: true  },
+  "business-process":          { key: "business-business-process-box",       iconOnly: false },
+  "business-function":         { key: "business-business-function-box",      iconOnly: false },
+  "business-interaction":      { key: "business-business-interaction-box",   iconOnly: false },
+  "business-event":            { key: "business-business-event-box",         iconOnly: false },
+  // Business passive structure → SIDE COLUMN
+  "business-object":           { key: "business-business-object-icon",       iconOnly: true  },
+  "product":                   { key: "business-product-icon",               iconOnly: true  },
+  "contract":                  { key: "business-contract-icon",              iconOnly: true  },
+  "representation":            { key: "business-representation-icon",        iconOnly: true  },
+  // Application (bands 8–10)
   "application-interface":     { key: "application-application-interface-box",     iconOnly: false },
+  "application-service":       { key: "application-application-service-icon",      iconOnly: true  },
+  "application-process":       { key: "application-application-process-icon",      iconOnly: true  },
+  "application-function":      { key: "application-application-function-icon",     iconOnly: true  },
+  "application-interaction":   { key: "application-application-interaction-box",   iconOnly: false },
+  "application-event":         { key: "application-application-event-box",         iconOnly: false },
+  "application-component":     { key: "application-application-component-box",     iconOnly: false },
   "application-collaboration": { key: "application-application-collaboration-box", iconOnly: false },
   "data-object":               { key: "application-data-object-icon",              iconOnly: true  },
+  // Technology (band 11)
+  "technology-node":            { key: "technology-node-box",            iconOnly: false },
+  "technology-device":          { key: "technology-device-box",          iconOnly: false },
+  "technology-system-software": { key: "technology-system-software-box", iconOnly: false },
+  "technology-collaboration":   { key: "technology-collaboration-box",   iconOnly: false },
+  "technology-interface":       { key: "technology-interface-box",       iconOnly: false },
+  "technology-function":        { key: "technology-function-box",        iconOnly: false },
+  "technology-process":         { key: "technology-process-box",         iconOnly: false },
+  "technology-interaction":     { key: "technology-interaction-box",     iconOnly: false },
+  "technology-event":           { key: "technology-event-box",           iconOnly: false },
+  "technology-service":         { key: "technology-service-box",         iconOnly: false },
+  "technology-artifact":        { key: "technology-artifact-box",        iconOnly: false },
 };
 
-// elementType → vertical band (0 = top). Business active-structure on top,
-// then business services, business behaviour, application services/interfaces,
-// then application components / data at the bottom.
+// Passive-structure objects that go in a SIDE COLUMN (left/right), placed next
+// to the element(s) they connect to, rather than in the vertical bands.
+const ARCHI_SIDE_COLUMN = new Set<string>(["business-object", "product", "contract", "representation"]);
+
+// The 12 vertical bands, top→bottom (item 5): Strategy, Motivation, then the 9
+// Business/Application rows, then Technology. Only non-empty bands are drawn.
+const ARCHI_NUM_BANDS = 12;
+const ARCHI_DEFAULT_BAND = 7; // business behaviour — fallback for an unmapped type
+// elementType → band index. Side-column types are handled separately.
 const ARCHI_BAND: Record<string, number> = {
-  "business-actor": 0, "business-role": 0, "business-interface": 0, "business-collaboration": 0,
-  "business-service": 1,
-  "business-process": 2, "business-function": 2, "business-interaction": 2, "business-event": 2, "product": 2,
-  "application-service": 3, "application-interface": 3,
-  "application-component": 4, "application-collaboration": 4, "data-object": 4,
+  "strategy-resource": 0, "strategy-capability": 0, "strategy-course-of-action": 0, "strategy-value-stream": 0,
+  "motivation-stakeholder": 1, "motivation-driver": 1, "motivation-assessment": 1, "motivation-goal": 1,
+  "motivation-outcome": 1, "motivation-principle": 1, "motivation-requirement": 1, "motivation-constraint": 1,
+  "motivation-meaning": 1, "motivation-value": 1,
+  "business-actor": 2,
+  "business-role": 3,
+  "business-collaboration": 4,
+  "business-service": 5,
+  "business-interface": 6,
+  "business-process": 7, "business-function": 7, "business-interaction": 7, "business-event": 7,
+  "application-interface": 8, "application-service": 8,
+  "application-process": 9, "application-function": 9, "application-interaction": 9, "application-event": 9,
+  "application-component": 10, "application-collaboration": 10, "data-object": 10,
+  "technology-node": 11, "technology-device": 11, "technology-system-software": 11, "technology-collaboration": 11,
+  "technology-interface": 11, "technology-function": 11, "technology-process": 11, "technology-interaction": 11,
+  "technology-event": 11, "technology-service": 11, "technology-artifact": 11,
 };
 
 // relationship name → archi-* connector type
@@ -864,7 +920,7 @@ function layoutArchimateDiagram(
 ): DiagramData {
   const BAND_GAP_Y = 80;   // vertical gap between bands
   const EL_GAP_X = 40;     // horizontal gap between elements in a band
-  const NUM_BANDS = 5;
+  const NUM_BANDS = ARCHI_NUM_BANDS;
 
   // A4.08: split a leading element code (e.g. "V01.01") onto its own top
   // line. Pattern: 1–3 letters, 1–2 digits, a separator (.,:;-), 1–2 digits.
@@ -893,6 +949,7 @@ function layoutArchimateDiagram(
 
   type Placed = { ai: NonNullable<AiParsed["elements"]>[number]; shapeKey: string; iconOnly: boolean; label: string; w: number; h: number; cx: number };
   const bands: Placed[][] = Array.from({ length: NUM_BANDS }, () => []);
+  const sideItems: Placed[] = []; // passive-structure → side column
   const byId = new Map<string, Placed>();
   for (const ai of aiElements) {
     const spec = ARCHI_SHAPE[ai.type];
@@ -900,7 +957,8 @@ function layoutArchimateDiagram(
     const label = formatLabel(ai.label ?? ai.name ?? "");
     const sz = boxSize(label);
     const p: Placed = { ai, shapeKey: spec.key, iconOnly: spec.iconOnly, label, w: sz.w, h: sz.h, cx: 0 };
-    bands[ARCHI_BAND[ai.type] ?? 2].push(p);
+    if (ARCHI_SIDE_COLUMN.has(ai.type)) sideItems.push(p);
+    else bands[ARCHI_BAND[ai.type] ?? ARCHI_DEFAULT_BAND].push(p);
     byId.set(ai.id, p);
   }
 
@@ -947,12 +1005,12 @@ function layoutArchimateDiagram(
     band.splice(0, band.length, ...ordered); // keep band in placement order
   };
 
-  let anchorIdx = 2;
+  let anchorIdx = ARCHI_DEFAULT_BAND;
   for (let i = 0; i < NUM_BANDS; i++) if (bands[i].length > bands[anchorIdx].length) anchorIdx = i;
   if (bands[anchorIdx].length === 0) anchorIdx = bands.findIndex(b => b.length > 0);
   if (anchorIdx >= 0) {
     placeSequential(bands[anchorIdx]);
-    const order = [0, 1, 2, 3, 4]
+    const order = Array.from({ length: NUM_BANDS }, (_, i) => i)
       .filter(i => i !== anchorIdx && bands[i].length)
       .sort((a, b) => Math.abs(a - anchorIdx) - Math.abs(b - anchorIdx));
     for (const bi of order) placeBarycentre(bands[bi]);
@@ -964,6 +1022,9 @@ function layoutArchimateDiagram(
   const shift = START_X - (Number.isFinite(minLeft) ? minLeft : 0);
 
   const elements: DiagramElement[] = [];
+  // Final centre of every BANDED element — the side column places its objects
+  // relative to these.
+  const posById = new Map<string, { cx: number; cy: number; w: number; h: number }>();
   let y = START_Y;
   for (const band of bands) {
     if (band.length === 0) continue;
@@ -980,8 +1041,51 @@ function layoutArchimateDiagram(
           ? { shapeKey: e.shapeKey, archimateIconOnly: true }
           : { shapeKey: e.shapeKey },
       });
+      posById.set(e.ai.id, { cx: e.cx + shift, cy: y + rowH / 2, w: e.w, h: e.h });
     }
     y += rowH + BAND_GAP_Y;
+  }
+
+  // Side column (item 5): Business Objects / Products / Contracts /
+  // Representations sit LEFT or RIGHT of the bands, next to the element(s) they
+  // connect to (nearest side by the connected elements' average X). Same-side
+  // items are stacked by Y and pushed apart so they don't overlap.
+  if (sideItems.length) {
+    let layMinX = Infinity, layMaxX = -Infinity;
+    for (const pos of posById.values()) { layMinX = Math.min(layMinX, pos.cx - pos.w / 2); layMaxX = Math.max(layMaxX, pos.cx + pos.w / 2); }
+    if (!Number.isFinite(layMinX)) { layMinX = START_X; layMaxX = START_X + 200; }
+    const midX = (layMinX + layMaxX) / 2;
+    const SIDE_GAP = 60;
+    const left: { p: Placed; cy: number }[] = [];
+    const right: { p: Placed; cy: number }[] = [];
+    for (const p of sideItems) {
+      const nbrs = (adj.get(p.ai.id) ?? []).map(id => posById.get(id)).filter((n): n is { cx: number; cy: number; w: number; h: number } => !!n);
+      const cy = nbrs.length ? nbrs.reduce((s, n) => s + n.cy, 0) / nbrs.length : START_Y;
+      const cx = nbrs.length ? nbrs.reduce((s, n) => s + n.cx, 0) / nbrs.length : midX;
+      (cx <= midX ? left : right).push({ p, cy });
+    }
+    const placeSide = (list: { p: Placed; cy: number }[], atX: number, anchorLeft: boolean) => {
+      list.sort((a, b) => a.cy - b.cy);
+      let prevBottom = -Infinity;
+      for (const it of list) {
+        let top = it.cy - it.p.h / 2;
+        if (top < prevBottom + EL_GAP_X) top = prevBottom + EL_GAP_X;
+        prevBottom = top + it.p.h;
+        elements.push({
+          id: it.p.ai.id,
+          type: "archimate-shape",
+          x: anchorLeft ? atX : atX - it.p.w,
+          y: top,
+          width: it.p.w, height: it.p.h,
+          label: it.p.label,
+          properties: it.p.iconOnly
+            ? { shapeKey: it.p.shapeKey, archimateIconOnly: true }
+            : { shapeKey: it.p.shapeKey },
+        });
+      }
+    };
+    placeSide(left, layMinX - SIDE_GAP, false); // right edge sits at layMinX − gap
+    placeSide(right, layMaxX + SIDE_GAP, true); // left edge sits at layMaxX + gap
   }
 
   // Connectors. Pass 1: pick the facing side for each end. Pass 2: where

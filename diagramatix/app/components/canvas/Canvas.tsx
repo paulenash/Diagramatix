@@ -1019,6 +1019,12 @@ export function Canvas({
   // successful connector creation.
   const [pendingConnSourceId, setPendingConnSourceId] = useState<string | null>(null);
 
+  // ArchiMate tree-highlight: elements shift-click-pruned out of the highlight
+  // tree (item 6). Seeds are the normal `selectedElementIds`; this set blocks the
+  // BFS from traversing into / including these elements. Cleared on a fresh
+  // (non-shift) element click and when the sticky highlight is exited.
+  const [archiExcludedIds, setArchiExcludedIds] = useState<Set<string>>(new Set());
+
   // Force-connect override (Shift+Ctrl+Click drag): bypasses all validation
   const [forceConnect, setForceConnect] = useState<{
     sourceId: string;
@@ -2253,7 +2259,10 @@ export function Canvas({
         // bubble itself decides if it should render based on the
         // toggle + admin-configured map.
         if (!didPanDrag) {
-          onSetSelectedElements(new Set());
+          // ArchiMate keeps its tree-highlight STICKY on a background click —
+          // only a double-click on empty canvas exits it (item 4). We still
+          // deselect any connector so the user can pick a different one.
+          if (diagramType !== "archimate") onSetSelectedElements(new Set());
           onSelectConnector(null);
           if (pendingConnSourceId) setPendingConnSourceId(null);
           if (forceConnect) setForceConnect(null);
@@ -2288,9 +2297,10 @@ export function Canvas({
         setLassoRect(null);
 
         if (!didDrag) {
-          // Simple click on background — clear selection
+          // Simple click on background — clear selection (ArchiMate keeps its
+          // sticky tree-highlight; only double-click empty canvas exits it).
           if (!ev.shiftKey) {
-            onSetSelectedElements(new Set());
+            if (diagramType !== "archimate") onSetSelectedElements(new Set());
             onSelectConnector(null);
           }
           return;
@@ -4591,19 +4601,46 @@ export function Canvas({
   // draggingConnector clears and this recomputes from data.connectors — so the
   // newly connected element is automatically folded into the highlight.
   if (((diagramType === "process-context" && pcHighlightEnabled) || diagramType === "archimate") && selectedElementIds.size >= 1 && !draggingConnector) {
+    // ArchiMate traverses the connection tree RECURSIVELY (item 1); every other
+    // opt-in type (process-context) keeps the original one-hop behaviour. The
+    // BFS is loop-safe via the `visited` set, and treats `archiExcludedIds` as
+    // blocked so a shift-click prune (item 6) drops an element + everything only
+    // reachable through it, while loop-reachable nodes survive.
+    const maxDepth = diagramType === "archimate" ? Infinity : 1;
+    const excluded = diagramType === "archimate" ? archiExcludedIds : new Set<string>();
+    // Adjacency: element id → connectors touching it.
+    const adjacency = new Map<string, Connector[]>();
     for (const c of data.connectors) {
-      const srcSel = selectedElementIds.has(c.sourceId);
-      const tgtSel = selectedElementIds.has(c.targetId);
-      if (srcSel || tgtSel) {
-        assocHighlightConnIds.add(c.id);
-        if (!srcSel) assocHighlightElIds.add(c.sourceId);
-        if (!tgtSel) assocHighlightElIds.add(c.targetId);
+      (adjacency.get(c.sourceId) ?? adjacency.set(c.sourceId, []).get(c.sourceId)!).push(c);
+      if (c.targetId !== c.sourceId)
+        (adjacency.get(c.targetId) ?? adjacency.set(c.targetId, []).get(c.targetId)!).push(c);
+    }
+    const visited = new Set<string>();
+    let frontier: string[] = [];
+    for (const id of selectedElementIds) if (!excluded.has(id)) { visited.add(id); frontier.push(id); }
+    let depth = 0;
+    while (frontier.length && depth < maxDepth) {
+      const next: string[] = [];
+      for (const id of frontier) {
+        for (const c of adjacency.get(id) ?? []) {
+          const other = c.sourceId === id ? c.targetId : c.sourceId;
+          if (excluded.has(other) || visited.has(other)) continue;
+          visited.add(other);
+          next.push(other);
+          assocHighlightElIds.add(other); // non-seed reached element → green ring
+        }
       }
+      frontier = next;
+      depth++;
+    }
+    // Every connector whose BOTH ends are in the tree lights up — this also
+    // catches loop / cross edges the frontier walk didn't traverse.
+    for (const c of data.connectors) {
+      if (visited.has(c.sourceId) && visited.has(c.targetId)) assocHighlightConnIds.add(c.id);
     }
     assocActive = assocHighlightConnIds.size > 0;
     if (assocActive) {
-      for (const id of selectedElementIds) assocActiveElIds.add(id);
-      for (const id of assocHighlightElIds) assocActiveElIds.add(id);
+      for (const id of visited) assocActiveElIds.add(id);
     }
   }
   const ASSOC_KEEP_VISIBLE = new Set(["system-boundary", "system-boundary-body"]);
@@ -4859,6 +4896,18 @@ export function Canvas({
             if (diagramType === "domain" && (el.type === "uml-class" || el.type === "uml-enumeration")) {
               if (tryStartUmlRowEditAt(el, w.y)) { e.stopPropagation(); e.preventDefault(); }
               return;
+            }
+          }
+          // ArchiMate: a double-click on EMPTY canvas exits the sticky
+          // tree-highlight (item 4) — clears the seed selection + any prune.
+          if (diagramType === "archimate") {
+            const overEl = data.elements.some(
+              (el) => w.x >= el.x && w.x <= el.x + el.width && w.y >= el.y && w.y <= el.y + el.height,
+            );
+            if (!overEl) {
+              onSetSelectedElements(new Set());
+              onSelectConnector(null);
+              setArchiExcludedIds(new Set());
             }
           }
         }}
@@ -5789,6 +5838,16 @@ export function Canvas({
               onSelect={(ev) => {
                 // Force-connect override (Shift+Ctrl+Click)
                 if (handleForceConnectSelect(el.id, ev)) return;
+                // ArchiMate tree-highlight interaction: SHIFT-click prunes this
+                // element out of the highlight tree (item 6); a plain click
+                // (re)seeds the tree from this element and clears any prune.
+                if (diagramType === "archimate") {
+                  if (ev?.shiftKey && !ev?.ctrlKey) {
+                    setArchiExcludedIds((prev) => { const n = new Set(prev); if (n.has(el.id)) n.delete(el.id); else n.add(el.id); return n; });
+                    return;
+                  }
+                  setArchiExcludedIds(new Set());
+                }
                 // Group-Connect-to-Gateway: capture pre-click multi-selection
                 if (
                   el.type === "gateway" &&
@@ -6275,7 +6334,9 @@ export function Canvas({
               key={`archi-${conn.id}`}
               connector={conn}
               selected={conn.id === selectedConnectorId}
-              onSelect={() => { onSelectConnector(conn.id); onSetSelectedElements(new Set()); }}
+              // ArchiMate: selecting a connector to adjust it must NOT clear the
+              // sticky element tree-highlight (item 4) — keep the seeds.
+              onSelect={() => { onSelectConnector(conn.id); if (diagramType !== "archimate") onSetSelectedElements(new Set()); }}
               svgToWorld={clientToWorld}
               onUpdateWaypoints={onUpdateConnectorWaypoints}
               onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}

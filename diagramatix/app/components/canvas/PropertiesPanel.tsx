@@ -18,6 +18,10 @@ import type {
 } from "@/app/lib/diagram/types";
 import { RichTextEditor } from "./RichTextEditor";
 import { SimulationSection } from "./SimulationSection";
+import { useSharePointAvailable } from "@/app/lib/auth/useOrgPolicy";
+
+const SP_UNAVAILABLE_TITLE =
+  "SharePoint isn't available — Microsoft/Azure isn't configured for this deployment, or your organisation has SharePoint turned off.";
 import { RiskControlSection, type RiskCatalogItem } from "./RiskControlSection";
 import { PcfClassifySection } from "./PcfClassifySection";
 import type { PcfClassification } from "@/app/lib/diagram/types";
@@ -765,6 +769,8 @@ export function PropertiesPanel({
   rcSectionOpen,
   onRcSectionToggle,
 }: Props) {
+  // Grey out SharePoint actions when the deployment/org doesn't offer SharePoint.
+  const sharePointAvailable = useSharePointAvailable();
   const [labelDraft, setLabelDraft] = useState("");
   // Auto-grow textarea ref for task/subprocess Name editing — height
   // tracks content up to 6 lines, then scrolls.
@@ -2389,13 +2395,17 @@ export function PropertiesPanel({
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => onPreviewSharePointFile?.(sp)}
-                            className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                            disabled={!sharePointAvailable}
+                            title={sharePointAvailable ? undefined : SP_UNAVAILABLE_TITLE}
+                            className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
                           >
                             Preview
                           </button>
                           <button
                             onClick={() => onLinkSharePointFile?.(element.id)}
-                            className="px-2 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+                            disabled={!sharePointAvailable}
+                            title={sharePointAvailable ? undefined : SP_UNAVAILABLE_TITLE}
+                            className="px-2 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                           >
                             Change…
                           </button>
@@ -2412,7 +2422,9 @@ export function PropertiesPanel({
                   return (
                     <button
                       onClick={() => onLinkSharePointFile?.(element.id)}
-                      className="w-full px-2 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+                      disabled={!sharePointAvailable}
+                      title={sharePointAvailable ? undefined : SP_UNAVAILABLE_TITLE}
+                      className="w-full px-2 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                     >
                       Link SharePoint file…
                     </button>

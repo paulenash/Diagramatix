@@ -35,7 +35,8 @@ import { getRiskControl } from "@/app/lib/diagram/riskControl";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { featureVars, tonesFor } from "@/app/lib/theme/featureColors";
-import { useOrgPolicy } from "@/app/lib/auth/useOrgPolicy";
+import { useOrgPolicy, useSharePointAvailable } from "@/app/lib/auth/useOrgPolicy";
+import { setNoObstacleAvoidance } from "@/app/lib/diagram/routing";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { InfoDialog } from "@/app/components/InfoDialog";
@@ -984,6 +985,7 @@ export function DiagramEditor({
   const usesPlanPanel = diagramType === "bpmn" || diagramType === "flowchart";
   const featureScheme = useFeatureColors();
   const orgPolicy = useOrgPolicy(); // enterprise governance — hide AI when the org disables it
+  const sharePointAvailable = useSharePointAvailable(); // grey SharePoint menus when unconfigured / org-disabled
   // The Simulator (Matrix-style process simulation) is offered for BPMN.
   const supportsSimulator = diagramType === "bpmn";
   const [showSendReview, setShowSendReview] = useState(false);
@@ -1101,6 +1103,10 @@ export function DiagramEditor({
   const [audioPhase, setAudioPhase] = useState<null | "transcribing" | "reading" | "tidying">(null);
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
+  // SuperAdmin experiment (item 7): route ALL connectors as plain rectilinear,
+  // no obstacle avoidance. The routing flag is a module global, so we set it
+  // from this diagram's stored value on mount (below) and on every toggle.
+  const [noObstacleAvoidance, setNoObstacleAvoidanceState] = useState(false);
   // Value Display and Bottleneck Display are ON by default. The user can
   // turn them off, in which case the explicit "false" value is read back
   // from localStorage on subsequent loads. Absence of the key keeps the
@@ -1122,6 +1128,11 @@ export function DiagramEditor({
   });
   useEffect(() => {
     if (localStorage.getItem(`debug-${projectId}`) === "true") setDebugMode(true);
+    // Sync the routing module flag to THIS diagram's stored experiment value
+    // (explicitly both ways, so a leftover from another diagram is cleared).
+    const noObs = localStorage.getItem(`noObstacles-${diagramId}`) === "true";
+    setNoObstacleAvoidanceState(noObs);
+    setNoObstacleAvoidance(noObs);
     if (localStorage.getItem(`valueDisplay-${diagramId}`) === "false") setShowValueDisplay(false);
     if (localStorage.getItem(`bottleneck-${diagramId}`) === "false") setShowBottleneck(false);
   }, [projectId, diagramId]);
@@ -1136,6 +1147,10 @@ export function DiagramEditor({
   // live (updates as the toggle flips — handy for demoing Org Settings).
   const policyBindsMe = !isAdmin || superAdminHidden;
   const aiAllowedHere = orgPolicy.allowAi || !policyBindsMe;
+  // "Effectively a SuperAdmin right now" — a real SuperAdmin who has NOT toggled
+  // the logo down to a lower (OrgAdmin / Normal) view mode. Gate SuperAdmin-only
+  // menu options on this so they vanish when a SuperAdmin drops into a lower view.
+  const isActingAdmin = isAdmin && !superAdminHidden;
   type TemplateRow = { id: string; name: string; group: string | null };
   const [userTemplates, setUserTemplates] = useState<TemplateRow[]>([]);
   const [builtInTemplates, setBuiltInTemplates] = useState<TemplateRow[]>([]);
@@ -3416,14 +3431,14 @@ export function DiagramEditor({
                                 {diagramType === "bpmn" && (
                                   <>
                                     <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.6`; a.rel = "noopener"; a.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Export using the Diagramatix v1.6 stencil — recipient needs the v1.6 stencil installed in Visio.">Visio (for stencil v1.6)</button>
-                                    {isAdmin && (
-                                      <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=bpmn-m`; a.rel = "noopener"; a.click(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="Admin only — BPMN_M export needs further work before general release.">Visio (for stencil BPMN_M)</button>
+                                    {isActingAdmin && (
+                                      <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=bpmn-m`; a.rel = "noopener"; a.click(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="SuperAdmin only — BPMN_M export needs further work before general release.">Visio (for stencil BPMN_M)</button>
                                     )}
                                     <a href="/BPMN%20Diagramatix%20Shapes%20v1.6.vssx" download onClick={closeFm} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download the BPMN Diagramatix v1.6 stencil (.vssx) to use in Visio">Visio Stencil</a>
                                   </>
                                 )}
-                                {diagramType === "domain" && isAdmin && (
-                                  <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}`; a.rel = "noopener"; a.click(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="Admin only — UML domain Visio export needs further work before general release.">Visio (UML)</button>
+                                {diagramType === "domain" && isActingAdmin && (
+                                  <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}`; a.rel = "noopener"; a.click(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="SuperAdmin only — UML domain Visio export needs further work before general release.">Visio (UML)</button>
                                 )}
                                 {(diagramType === "bpmn" || diagramType === "archimate") && (
                                   <button disabled={diagramType === "archimate"} onClick={() => { if (isAdmin) { setTemplateExportPrompt(true); } else { handleExportTemplates("user"); closeFm(); } }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent" title={diagramType === "archimate" ? "ArchiMate templates aren't available yet" : "Export your templates as a .diag_tems file"}>Templates</button>
@@ -3456,7 +3471,9 @@ export function DiagramEditor({
                       <div className="relative">
                         <button
                           onClick={() => setMenuDest(menuDest === "sharepoint" ? null : "sharepoint")}
-                          className={`flex w-full items-center justify-between px-3 py-2 text-xs ${menuDest === "sharepoint" ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-700 hover:bg-gray-50"}`}
+                          disabled={!sharePointAvailable}
+                          title={sharePointAvailable ? undefined : "SharePoint isn't available — Microsoft/Azure isn't configured for this deployment, or your organisation has SharePoint turned off."}
+                          className={`flex w-full items-center justify-between px-3 py-2 text-xs disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent ${menuDest === "sharepoint" ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-700 hover:bg-gray-50"}`}
                         >
                           <span>SharePoint</span><span className="text-gray-400">▸</span>
                         </button>
@@ -4962,12 +4979,21 @@ export function DiagramEditor({
           displayMode={displayMode}
           onDisplayModeChange={handleToggleDisplayMode}
           debugMode={debugMode}
-          isAdmin={isAdmin}
+          isAdmin={isActingAdmin}
           onDebugModeChange={(on) => {
             setDebugMode(on);
             if (typeof window !== "undefined") {
               localStorage.setItem(`debug-${projectId}`, on ? "true" : "false");
             }
+          }}
+          noObstacleAvoidance={noObstacleAvoidance}
+          onNoObstacleAvoidanceChange={(on) => {
+            setNoObstacleAvoidanceState(on);
+            setNoObstacleAvoidance(on);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`noObstacles-${diagramId}`, on ? "true" : "false");
+            }
+            rerouteAll(); // re-route every connector under the new flag
           }}
           showValueDisplay={showValueDisplay}
           onShowValueDisplayChange={(on) => {

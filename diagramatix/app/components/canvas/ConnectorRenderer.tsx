@@ -719,6 +719,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         <ArchimateConnectorRenderer
           connector={connector}
           selected={selected}
+          highlight={highlight}
           onSelect={onSelect}
           svgToWorld={svgToWorld}
           onUpdateWaypoints={onUpdateWaypoints}

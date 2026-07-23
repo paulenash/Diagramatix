@@ -437,11 +437,20 @@ function segmentHitsObstacle(p1: Point, p2: Point, obs: Bounds, margin = 4): boo
   return false;
 }
 
+// SuperAdmin experiment: when ON, ALL connectors route as plain rectilinear
+// (straight L/Z) with NO obstacle avoidance. Obstacle collection is the single
+// driver of every detour, so short-circuiting the hit test here disables the
+// whole avoidance system — routes fall back to their direct L-shape everywhere.
+let NO_OBSTACLE_AVOIDANCE = false;
+export function setNoObstacleAvoidance(on: boolean): void { NO_OBSTACLE_AVOIDANCE = on; }
+export function getNoObstacleAvoidance(): boolean { return NO_OBSTACLE_AVOIDANCE; }
+
 // Check if any segment of a path hits any obstacle. `margin` widens the
 // obstacle's hit rect — pass a generous value (e.g. ½ Task height) when
 // you want the path to maintain visible clearance, not just avoid
 // crossing the rect interior.
 function pathHitsObstacles(path: Point[], obstacles: Bounds[], margin = 4): boolean {
+  if (NO_OBSTACLE_AVOIDANCE) return false; // experiment: no detours anywhere
   for (let i = 0; i < path.length - 1; i++) {
     for (const obs of obstacles) {
       if (segmentHitsObstacle(path[i], path[i + 1], obs, margin)) return true;

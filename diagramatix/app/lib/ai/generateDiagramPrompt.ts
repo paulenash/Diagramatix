@@ -11,11 +11,14 @@
  */
 
 export const DIAGRAM_PROMPTS: Record<string, string> = {
-  archimate: `You are an ArchiMate 3 Business & Application layer modelling expert. Output ONLY valid JSON with "elements" and "connections" arrays. Do NOT output coordinates — positions are applied by the tool.
+  archimate: `You are an ArchiMate 3 modelling expert. Focus on the Business & Application layers; use Strategy, Motivation or Technology elements only when the request clearly involves them. Output ONLY valid JSON with "elements" and "connections" arrays. Do NOT output coordinates — positions are applied by the tool.
 
 Element "type" must be one of —
-Business layer: "business-actor", "business-role", "business-interface", "business-collaboration", "business-service", "business-process", "business-function", "business-interaction", "business-event", "product".
-Application layer: "application-component", "application-service", "application-interface", "application-collaboration", "data-object".
+Business layer: "business-actor", "business-role", "business-interface", "business-collaboration", "business-service", "business-process", "business-function", "business-interaction", "business-event", "business-object", "product", "contract", "representation".
+Application layer: "application-component", "application-service", "application-interface", "application-collaboration", "application-process", "application-function", "application-interaction", "application-event", "data-object".
+Strategy layer (optional): "strategy-resource", "strategy-capability", "strategy-course-of-action", "strategy-value-stream".
+Motivation layer (optional): "motivation-stakeholder", "motivation-driver", "motivation-assessment", "motivation-goal", "motivation-outcome", "motivation-principle", "motivation-requirement", "motivation-constraint", "motivation-meaning", "motivation-value".
+Technology layer (optional): "technology-node", "technology-device", "technology-system-software", "technology-collaboration", "technology-interface", "technology-function", "technology-process", "technology-interaction", "technology-event", "technology-service", "technology-artifact".
 
 Connection "type" (ArchiMate relationship) must be one of: "composition", "aggregation", "assignment", "realisation", "serving", "access", "influence", "association", "triggering", "flow", "specialisation".
 

@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { HelpViewer, type RenderedChapter } from "./HelpViewer";
 import { HelpSidebar, type GuideIndexEntry } from "./HelpSidebar";
-import { isSuperuser } from "@/app/lib/superuser";
+import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { prisma } from "@/app/lib/db";
 import { renderHelpMarkdown } from "@/app/lib/help/renderMarkdown";
 
@@ -17,12 +17,15 @@ export default async function HelpPage({
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const realIsAdmin = isSuperuser(session);
+  // Respect the 3-way view-mode toggle (dgx_sa_mode): a SuperAdmin who has cycled
+  // the logo down to OrgAdmin / Normal view must NOT see SuperAdmin guide content
+  // OR the admin-only chrome (preview toggle, edit hint).
+  const actingAdmin = await isActingSuperuser(session);
   const { c, view, q, cat } = await searchParams;
-  // SuperAdmin can preview the standard (User / OrgAdmin) view. `isAdmin` is the
-  // EFFECTIVE flag used for filtering.
-  const previewStandard = realIsAdmin && view === "standard";
-  const isAdmin = realIsAdmin && !previewStandard;
+  // A SuperAdmin (in superadmin view mode) can also preview the standard view via
+  // the in-page toggle. `isAdmin` is the EFFECTIVE flag used for filtering.
+  const previewStandard = actingAdmin && view === "standard";
+  const isAdmin = actingAdmin && !previewStandard;
   const viewQs = previewStandard ? "&view=standard" : "";
 
   // One query feeds BOTH the searchable sidebar index and the current chapter's
@@ -40,7 +43,7 @@ export default async function HelpPage({
       <div className="min-h-screen dgx-dashboard-bg flex items-center justify-center">
         <p className="text-sm text-gray-500">
           The User Guide has no content yet.
-          {realIsAdmin && " Add chapters at SuperAdmin → User Guide."}
+          {actingAdmin && " Add chapters at SuperAdmin → User Guide."}
         </p>
       </div>
     );
@@ -86,7 +89,7 @@ export default async function HelpPage({
           </Link>
           <h1 className="text-lg font-semibold text-gray-900">User Guide</h1>
         </div>
-        {realIsAdmin ? (
+        {actingAdmin ? (
           <div className="flex items-center gap-2 text-xs">
             <span className="text-gray-400">Viewing as:</span>
             <Link

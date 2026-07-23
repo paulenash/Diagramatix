@@ -22,6 +22,7 @@ import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/
 import { waypointsToSvgPath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
 import {
   styleFor,
+  ARCHI_REL_NAME,
   type ArchimateMarkerKind as MarkerKind,
   type ArchimateStyle as Style,
 } from "@/app/lib/diagram/archimateConnectorStyle";
@@ -29,6 +30,8 @@ import {
 interface Props {
   connector: Connector;
   selected: boolean;
+  /** Lit by the tree-traversal highlight — shows the relationship-type name. */
+  highlight?: boolean;
   onSelect: () => void;
   svgToWorld?: (clientX: number, clientY: number) => Point;
   onUpdateWaypoints?: (id: string, waypoints: Point[]) => void;
@@ -117,7 +120,7 @@ export function isArchimateConnectorType(t: string): t is ArchimateConnectorType
 // Main renderer
 // ────────────────────────────────────────────────────────────────────
 export function ArchimateConnectorRenderer({
-  connector, selected, onSelect,
+  connector, selected, highlight, onSelect,
   svgToWorld, onUpdateWaypoints, onWaypointsDragEnd,
   onUpdateLabel,
 }: Props) {
@@ -238,17 +241,45 @@ export function ArchimateConnectorRenderer({
         const p1 = visibleWaypoints[segIdx];
         const p2 = visibleWaypoints[segIdx + 1];
         const isHoriz = Math.abs(p1.y - p2.y) < 1;
+        const mx = (p1.x + p2.x) / 2;
+        const my = (p1.y + p2.y) / 2;
         return (
-          <line
-            key={segIdx}
-            x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
-            stroke="transparent"
-            strokeWidth={10}
-            style={{ cursor: isHoriz ? "ns-resize" : "ew-resize" }}
-            onMouseDown={(e) => handleSegmentMouseDown(e, segIdx)}
-          />
+          <g key={segIdx}>
+            <line
+              x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
+              stroke="transparent"
+              strokeWidth={10}
+              style={{ cursor: isHoriz ? "ns-resize" : "ew-resize" }}
+              onMouseDown={(e) => handleSegmentMouseDown(e, segIdx)}
+            />
+            {/* Visible mid-segment handle, matching BPMN sequence connectors. */}
+            <circle
+              cx={mx} cy={my} r={4}
+              fill="#2563eb" stroke="white" strokeWidth={1.5}
+              style={{ cursor: isHoriz ? "ns-resize" : "ew-resize" }}
+              onMouseDown={(e) => handleSegmentMouseDown(e, segIdx)}
+            />
+          </g>
         );
       })}
+
+      {/* Relationship-type name (Serving, Assignment, …) — shown ONLY when the
+          connector is highlighted (via the tree traversal) or selected. */}
+      {(highlight || selected) && !isEditingLabel && (() => {
+        const relName = ARCHI_REL_NAME[archiType] ?? "";
+        if (!relName) return null;
+        const relW = relName.length * 6 + 12;
+        // Nudge above the user label if one is also showing, so they don't collide.
+        const dy = labelText ? -18 : 0;
+        return (
+          <g transform={`translate(${labelCx}, ${labelCy + dy})`} style={{ pointerEvents: "none" }}>
+            <rect x={-relW / 2} y={-8} width={relW} height={16} rx={3} fill="white" opacity={0.9} stroke={style.strokeColor} strokeWidth={0.5} />
+            <text textAnchor="middle" dominantBaseline="middle" fontSize={9 * fontScale} fontStyle="italic" fill={style.strokeColor}>
+              {relName}
+            </text>
+          </g>
+        );
+      })()}
 
       {/* label — minimal: show text; double-click to edit when handler provided */}
       {labelText && !isEditingLabel && (
