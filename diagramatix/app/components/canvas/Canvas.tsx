@@ -4606,7 +4606,10 @@ export function Canvas({
     // BFS is loop-safe via the `visited` set, and treats `archiExcludedIds` as
     // blocked so a shift-click prune (item 6) drops an element + everything only
     // reachable through it, while loop-reachable nodes survive.
-    const maxDepth = diagramType === "archimate" ? Infinity : 1;
+    // ArchiMate highlights 2 levels out (element → neighbours → their neighbours),
+    // then stops — an unbounded walk lights the whole connected graph. Other
+    // opt-in types (process-context) keep the original one-hop highlight.
+    const maxDepth = diagramType === "archimate" ? 2 : 1;
     const excluded = diagramType === "archimate" ? archiExcludedIds : new Set<string>();
     // Adjacency: element id → connectors touching it.
     const adjacency = new Map<string, Connector[]>();
