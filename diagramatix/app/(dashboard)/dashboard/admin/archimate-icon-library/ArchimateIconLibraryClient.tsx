@@ -737,8 +737,8 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
                           {row.label}
                           {!ic && <span className="ml-1 text-[10px] text-gray-400">(current)</span>}
                         </span>
-                        {/* add / remove the separate icon-only version (only for the primary row of an element that has an icon master) */}
-                        {!row.iconOnly && row.hasIconCounterpart && (
+                        {/* add / remove the separate icon-only version in the Symbols Panel */}
+                        {!row.iconOnly && (
                           <label className="flex items-center gap-1 text-[10px] text-gray-500 shrink-0" title="Show a separate icon-only version in the Symbols Panel">
                             <input type="checkbox" checked={separate.has(s.name)} onChange={() => toggleSeparate(s.name)} /> icon
                           </label>

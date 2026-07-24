@@ -7,22 +7,21 @@ const mk = (name: string, key: string, variant: "box" | "icon"): ArchimateShapeE
 });
 
 describe("Symbols-panel element rows (Icon Library)", () => {
-  const shapes = [mk("Business Actor", "a-box", "box"), mk("Business Actor", "a-icon", "icon"), mk("Business Object", "bo", "box")];
+  const shapes = [mk("Business Actor", "a-box", "box"), mk("Business Actor", "a-icon", "icon"), mk("Node", "node-box", "box")];
 
   // T1016 — one row per element (box preferred); a separate icon-only row appears
-  // only for names in the configured set + that have an icon counterpart.
+  // for names in the configured set. Icon row uses the dedicated icon master if
+  // present, else reuses the element's own key (so any element can be icon-only).
   it("T1016: buildElementRows = one row per element + configurable icon rows", () => {
     const none = buildElementRows(shapes, new Set());
-    expect(none.map((r) => r.label)).toEqual(["Business Actor", "Business Object"]); // no icon rows
-    expect(none[0].hasIconCounterpart).toBe(true);   // actor HAS an icon master
-    expect(none[1].hasIconCounterpart).toBe(false);  // object does not
+    expect(none.map((r) => r.label)).toEqual(["Business Actor", "Node"]); // no icon rows
 
-    const withActor = buildElementRows(shapes, new Set(["Business Actor"]));
-    expect(withActor.map((r) => `${r.label}:${r.iconOnly}`)).toEqual([
-      "Business Actor:false", "Business Actor (icon):true", "Business Object:false",
+    const both = buildElementRows(shapes, new Set(["Business Actor", "Node"]));
+    expect(both.map((r) => `${r.label}:${r.iconOnly}`)).toEqual([
+      "Business Actor:false", "Business Actor (icon):true", "Node:false", "Node (icon):true",
     ]);
-    // the primary row keeps the box key; the icon row uses the icon key
-    expect(withActor[0].entry.key).toBe("a-box");
-    expect(withActor[1].entry.key).toBe("a-icon");
+    expect(both[0].entry.key).toBe("a-box");    // primary = box
+    expect(both[1].entry.key).toBe("a-icon");   // icon row uses the dedicated icon master
+    expect(both[3].entry.key).toBe("node-box"); // no icon master → reuses the element's own key
   });
 });
