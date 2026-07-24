@@ -78,4 +78,21 @@ describe("ArchiMate v3.2 catalogue + layout", () => {
     for (const [src, tgt] of realisesService)
       expect(matrix.overrides?.[src]?.[tgt]?.allowed ?? [], `${src} → ${tgt}`).toContain("archi-realisation");
   });
+
+  it("T1012 — core elements realise Strategy elements (Process → Capability)", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const matrix: any = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "public/archimate-relationships.json"), "utf8"),
+    );
+    // Business Process is behaviour; Capability is strategy.
+    expect((matrix.categories.behaviour as string[])).toContain("Business Process");
+    expect((matrix.categories.strategy as string[])).toContain("Capability");
+    // behaviour → strategy AND active → strategy allow Realisation (a core element
+    // realises a Capability / Course of Action / Value Stream).
+    for (const from of ["behaviour", "active"]) {
+      const rule = (matrix.categoryRules as { from: string; to: string; allowed?: string[] }[])
+        .find((r) => r.from === from && r.to === "strategy");
+      expect(rule?.allowed ?? [], `${from} → strategy`).toContain("archi-realisation");
+    }
+  });
 });

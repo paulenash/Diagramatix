@@ -221,6 +221,20 @@
       ]
     },
     {
+      "from": "behaviour",
+      "to": "strategy",
+      "allowed": [
+        "archi-realisation"
+      ]
+    },
+    {
+      "from": "active",
+      "to": "strategy",
+      "allowed": [
+        "archi-realisation"
+      ]
+    },
+    {
       "from": "strategy",
       "to": "strategy",
       "allowed": [
