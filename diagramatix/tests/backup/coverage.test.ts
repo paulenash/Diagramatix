@@ -78,6 +78,10 @@ const SCOPED_OMITTED = new Set<string>([
   // Global key-value app settings (e.g. the AI-Generate model) are system
   // config, not per-user/org data — carried by the SuperAdmin full backup only.
   "AppSetting",
+  // The ArchiMate custom-icon library is global admin content (vector icons +
+  // source image), like HelpImage / DiagramTypeStyle — not per-user/org data.
+  // Carried by the SuperAdmin full backup (catalog-driven) only.
+  "ArchimateIconLibrary",
   // Diagram-JSON schema-validation findings are app-side observability, not
   // per-user/org data — carried by the SuperAdmin full backup only.
   "SchemaValidationIssue",
