@@ -178,6 +178,8 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   const [marq, setMarq] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [underlay, setUnderlay] = useState<string | null>(null);
+  const [bgGlyph, setBgGlyph] = useState<{ iconType: string; label: string } | null>(null); // built-in glyph as trace background
+  const [cat, setCat] = useState<ArchimateCatalogue | null>(null);
   const [busy, setBusy] = useState(false);
   const [askName, setAskName] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -188,6 +190,8 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   const move = useRef<{ start: { x: number; y: number }; snap: Map<number, IconPrimitive> } | null>(null); // group move
   const marqRef = useRef<{ x0: number; y0: number; additive: boolean } | null>(null); // lasso
 
+  useEffect(() => { loadArchimateCatalogue().then(setCat).catch(() => {}); }, []);
+
   function clearSel() { setSel(null); setSelSet(new Set()); }
   function selectOne(i: number) { setSel(i); setSelSet(new Set([i])); }
   function toggleSel(i: number) {
@@ -196,12 +200,12 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   }
   function resetNew() {
     setSelectedId(null); setName(""); setCategory(""); setDefW(""); setDefH("");
-    setPrimitives([]); clearSel(); setSourceFile(null); setUnderlay(null);
+    setPrimitives([]); clearSel(); setSourceFile(null); setUnderlay(null); setBgGlyph(null);
   }
   function loadIcon(ic: LibIcon) {
     setSelectedId(ic.id); setName(ic.name); setCategory(ic.category ?? "");
     setDefW(ic.defaultWidth ? String(ic.defaultWidth) : ""); setDefH(ic.defaultHeight ? String(ic.defaultHeight) : "");
-    setPrimitives(ic.primitives); clearSel(); setSourceFile(null);
+    setPrimitives(ic.primitives); clearSel(); setSourceFile(null); setBgGlyph(null);
     setUnderlay(ic.hasSource ? `/api/admin/archimate-icon-library/${ic.id}/source` : null);
   }
 
@@ -254,7 +258,7 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   })() : null;
 
   async function onUpload(file: File) {
-    setUnderlay(URL.createObjectURL(file)); setSourceFile(file);
+    setUnderlay(URL.createObjectURL(file)); setSourceFile(file); setBgGlyph(null);
     setBusy(true); setErr(null);
     try {
       const data = await fileToBase64(file);
@@ -337,8 +341,28 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
             <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ""; }} />
           </label>
+          {/* Load a current built-in glyph as a trace background to improve upon */}
+          <select value={bgGlyph?.iconType ?? ""} className="px-1 py-1 text-xs border border-gray-300 rounded max-w-[160px]"
+            onChange={(e) => {
+              const it = e.target.value;
+              if (!it) { setBgGlyph(null); return; }
+              const label = e.target.selectedOptions[0]?.text ?? it;
+              setBgGlyph({ iconType: it, label }); setUnderlay(null); setSourceFile(null);
+              if (!name.trim()) setName(`${label} (custom)`);
+            }}>
+            <option value="">Load default glyph…</option>
+            {cat?.categories.map((c) => {
+              const opts = c.shapes.filter((s) => s.iconType && ICON_DRAWERS[s.iconType!]);
+              if (!opts.length) return null;
+              return (
+                <optgroup key={c.id} label={CATEGORY_LABELS[c.id] ?? c.name}>
+                  {opts.map((s) => <option key={s.key} value={s.iconType!}>{s.name}</option>)}
+                </optgroup>
+              );
+            })}
+          </select>
           {busy && <span className="text-xs text-amber-600">Working…</span>}
-          {underlay && <button onClick={() => { setUnderlay(null); setSourceFile(null); }} className="text-xs text-gray-500 hover:text-gray-700">clear underlay</button>}
+          {(underlay || bgGlyph) && <button onClick={() => { setUnderlay(null); setSourceFile(null); setBgGlyph(null); }} className="text-xs text-gray-500 hover:text-gray-700">clear background</button>}
           <span className="ml-auto text-[11px] text-gray-400">add:</span>
           {PRIM_TYPES.map((t) => (
             <button key={t} onClick={() => addPrim(t)} className="px-1.5 py-1 text-[11px] border border-gray-300 rounded hover:bg-gray-50 capitalize">{t}</button>
@@ -348,6 +372,10 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
         <svg ref={svgRef} viewBox="0 0 100 100" className="w-full max-w-[560px] mx-auto block border border-gray-100 rounded bg-[repeating-linear-gradient(45deg,#f3f4f6,#f3f4f6_6px,#fff_6px,#fff_12px)] touch-none"
           onPointerMove={onSvgMove} onPointerUp={endPointer} onPointerLeave={endPointer}>
           {underlay && <image href={underlay} x="0" y="0" width="100" height="100" opacity={0.25} preserveAspectRatio="xMidYMid meet" />}
+          {/* current built-in glyph as a faint trace background */}
+          {bgGlyph && ICON_DRAWERS[bgGlyph.iconType] && (
+            <g opacity={0.3} pointerEvents="none">{ICON_DRAWERS[bgGlyph.iconType]!({ cx: 50, cy: 50, size: 76, colour: "#6b7280" })}</g>
+          )}
           {/* background catcher: empty-area drag starts a lasso */}
           <rect x={0} y={0} width={100} height={100} fill="transparent"
             onPointerDown={(e) => { const c = toBox(e); if (!c) return; marqRef.current = { x0: c.x, y0: c.y, additive: e.shiftKey }; setMarq({ x0: c.x, y0: c.y, x1: c.x, y1: c.y }); }} />
@@ -535,7 +563,7 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    loadArchimateCatalogue().then((c) => { setCat(c); if (c.categories[0]) setExpanded(new Set([c.categories[0].id])); }).catch(() => setErr("Catalogue load failed"));
+    loadArchimateCatalogue().then((c) => setCat(c)).catch(() => setErr("Catalogue load failed")); // start all categories collapsed
     fetch("/api/admin/archimate-icons-custom").then((r) => (r.ok ? r.json() : { assignments: {} })).then((j) => { const a = j.assignments ?? {}; setAssignments(a); setSaved(JSON.stringify(a)); }).catch(() => {});
   }, [setErr]);
 
