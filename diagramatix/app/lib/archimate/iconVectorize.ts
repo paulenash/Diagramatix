@@ -24,6 +24,7 @@ Each primitive is one of:
 - {"type":"triangle","x1":..,"y1":..,"x2":..,"y2":..,"x3":..,"y3":..}
 - {"type":"circle","cx":..,"cy":..,"r":..}
 - {"type":"ellipse","cx":..,"cy":..,"rx":..,"ry":..}
+- {"type":"arc","cx":..,"cy":..,"r":..,"a0":..,"a1":..} (a circular arc/semi-circle; a0/a1 are endpoint angles in degrees, drawn a0→a1)
 
 Every primitive also carries: "z" (integer paint order, ascending = on top), "strokeWidth" (normalised, ~6 typical), "filled" (boolean), and optionally "colourRole" ("stroke" default, "fill" for solid shapes; use "fixed" with "colour":"#rrggbb" ONLY for a detail that must stay a specific colour — normally avoid it, the icon is recoloured to the theme).
 

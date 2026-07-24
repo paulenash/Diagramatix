@@ -38,6 +38,7 @@ describe("Custom icon shapes (Icon Library)", () => {
     expect(draw([{ type: "circle", cx: 50, cy: 50, r: 10, z: 0, strokeWidth: 6, filled: false }])).toContain("<circle");
     expect(draw([{ type: "ellipse", cx: 50, cy: 50, rx: 20, ry: 10, z: 0, strokeWidth: 6, filled: false }])).toContain("<ellipse");
     expect(draw([{ type: "path", closed: false, segments: [{ t: "M", x: 0, y: 0 }, { t: "L", x: 50, y: 50 }], z: 0, strokeWidth: 6, filled: false }])).toContain("<path");
+    expect(draw([{ type: "arc", cx: 50, cy: 50, r: 20, a0: 180, a1: 360, z: 0, strokeWidth: 6, filled: false }])).toContain("<path"); // arc → path with A command
     // z-order: rect z0 must render before circle z1
     const m = draw([
       { type: "circle", cx: 50, cy: 50, r: 10, z: 1, strokeWidth: 6, filled: false },

@@ -34,6 +34,7 @@ function defaultPrim(type: IconPrimitive["type"], z: number): IconPrimitive {
     case "triangle": return { ...base, type: "triangle", x1: 50, y1: 28, x2: 72, y2: 66, x3: 28, y3: 66 };
     case "circle": return { ...base, type: "circle", cx: 50, cy: 50, r: 22 };
     case "ellipse": return { ...base, type: "ellipse", cx: 50, cy: 50, rx: 28, ry: 18 };
+    case "arc": return { ...base, type: "arc", cx: 50, cy: 52, r: 24, a0: 180, a1: 360 };
   }
 }
 
@@ -65,6 +66,22 @@ function handlesFor(p: IconPrimitive): Handle[] {
       { id: "rx", x: p.cx + p.rx, y: p.cy, apply: (q, x, y) => { const r = q as typeof p; return { ...r, rx: Math.max(1, Math.abs(x - r.cx)) }; } },
       { id: "ry", x: p.cx, y: p.cy + p.ry, apply: (q, x, y) => { const r = q as typeof p; return { ...r, ry: Math.max(1, Math.abs(y - r.cy)) }; } },
     ];
+    case "arc": {
+      const rad = Math.PI / 180;
+      const e0x = p.cx + p.r * Math.cos(p.a0 * rad), e0y = p.cy + p.r * Math.sin(p.a0 * rad);
+      const e1x = p.cx + p.r * Math.cos(p.a1 * rad), e1y = p.cy + p.r * Math.sin(p.a1 * rad);
+      const midA = p.a0 + ((((p.a1 - p.a0) % 360) + 360) % 360) / 2;
+      const rmx = p.cx + p.r * Math.cos(midA * rad), rmy = p.cy + p.r * Math.sin(midA * rad);
+      const angOf = (x: number, y: number, r: typeof p) => round1((Math.atan2(y - r.cy, x - r.cx) / rad + 360) % 360);
+      return [
+        { id: "c", x: p.cx, y: p.cy, apply: (q, x, y) => ({ ...(q as typeof p), cx: x, cy: y }) },
+        // endpoints slide around the virtual circle (angle changes, radius fixed)
+        { id: "e0", x: e0x, y: e0y, apply: (q, x, y) => { const r = q as typeof p; return { ...r, a0: angOf(x, y, r) }; } },
+        { id: "e1", x: e1x, y: e1y, apply: (q, x, y) => { const r = q as typeof p; return { ...r, a1: angOf(x, y, r) }; } },
+        // radius handle resizes the virtual circle
+        { id: "r", x: rmx, y: rmy, control: true, apply: (q, x, y) => { const r = q as typeof p; return { ...r, r: Math.max(1, dist(x, y, r.cx, r.cy)) }; } },
+      ];
+    }
     case "path": {
       const hs: Handle[] = [];
       p.segments.forEach((s, si) => {
@@ -84,7 +101,7 @@ function handlesFor(p: IconPrimitive): Handle[] {
   }
 }
 
-const PRIM_TYPES: IconPrimitive["type"][] = ["line", "path", "rect", "triangle", "circle", "ellipse"];
+const PRIM_TYPES: IconPrimitive["type"][] = ["line", "path", "rect", "triangle", "circle", "ellipse", "arc"];
 
 // ── Translate a primitive by (dx,dy) in the 0..100 box ───────────────
 function translatePrim(p: IconPrimitive, dx: number, dy: number): IconPrimitive {
@@ -95,6 +112,7 @@ function translatePrim(p: IconPrimitive, dx: number, dy: number): IconPrimitive 
     case "triangle": return { ...p, x1: r1(p.x1 + dx), y1: r1(p.y1 + dy), x2: r1(p.x2 + dx), y2: r1(p.y2 + dy), x3: r1(p.x3 + dx), y3: r1(p.y3 + dy) };
     case "circle": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
     case "ellipse": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
+    case "arc": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
     case "path": return { ...p, segments: p.segments.map((s) => {
       if (s.t === "M" || s.t === "L") return { ...s, x: r1(s.x + dx), y: r1(s.y + dy) };
       if (s.t === "Q") return { ...s, cx: r1(s.cx + dx), cy: r1(s.cy + dy), x: r1(s.x + dx), y: r1(s.y + dy) };
@@ -112,6 +130,7 @@ function primBBox(p: IconPrimitive): { minX: number; minY: number; maxX: number;
     case "triangle": pts.push([p.x1, p.y1], [p.x2, p.y2], [p.x3, p.y3]); break;
     case "circle": pts.push([p.cx - p.r, p.cy - p.r], [p.cx + p.r, p.cy + p.r]); break;
     case "ellipse": pts.push([p.cx - p.rx, p.cy - p.ry], [p.cx + p.rx, p.cy + p.ry]); break;
+    case "arc": pts.push([p.cx - p.r, p.cy - p.r], [p.cx + p.r, p.cy + p.r]); break;
     case "path": for (const s of p.segments) {
       if ("x" in s) pts.push([s.x, s.y]);
       if (s.t === "Q") pts.push([s.cx, s.cy]);
@@ -391,6 +410,10 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
               <circle cx={(groupBox.minX + groupBox.maxX) / 2} cy={(groupBox.minY + groupBox.maxY) / 2} r={2.4} fill="#3b82f6" stroke="#fff" strokeWidth={0.7} className="cursor-move"
                 onPointerDown={(e) => { const c = toBox(e); if (!c) return; e.stopPropagation(); (e.target as Element).setPointerCapture?.(e.pointerId); move.current = { start: c, snap: new Map([...selSet].map((i) => [i, primitives[i]])) }; }} />
             </g>
+          )}
+          {/* virtual circle guide for a selected arc — the endpoints ride this circle */}
+          {selSet.size === 1 && selPrim?.type === "arc" && (
+            <circle cx={selPrim.cx} cy={selPrim.cy} r={selPrim.r} fill="none" stroke="#f59e0b" strokeWidth={0.4} strokeDasharray="1.5 1.5" pointerEvents="none" opacity={0.7} />
           )}
           {/* single-primitive vertex + control handles */}
           {handles.map((h) => (

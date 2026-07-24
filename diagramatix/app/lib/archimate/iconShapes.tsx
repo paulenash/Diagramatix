@@ -65,8 +65,13 @@ export interface RectPrim extends BasePrim { type: "rect"; x: number; y: number;
 export interface TrianglePrim extends BasePrim { type: "triangle"; x1: number; y1: number; x2: number; y2: number; x3: number; y3: number; }
 export interface CirclePrim extends BasePrim { type: "circle"; cx: number; cy: number; r: number; }
 export interface EllipsePrim extends BasePrim { type: "ellipse"; cx: number; cy: number; rx: number; ry: number; rotation?: number; }
+/** An arc of a circle — a0/a1 are the endpoint angles in DEGREES; the endpoints
+ *  always lie on the circle (cx,cy,r), so moving an endpoint slides it around
+ *  the "virtual circle". Drawn from a0 → a1 in the positive (increasing-angle)
+ *  direction; `filled` closes the chord for a circular segment. */
+export interface ArcPrim extends BasePrim { type: "arc"; cx: number; cy: number; r: number; a0: number; a1: number; }
 
-export type IconPrimitive = LinePrim | PathPrim | RectPrim | TrianglePrim | CirclePrim | EllipsePrim;
+export type IconPrimitive = LinePrim | PathPrim | RectPrim | TrianglePrim | CirclePrim | EllipsePrim | ArcPrim;
 
 export interface CustomIcon { primitives: IconPrimitive[]; }
 
@@ -170,6 +175,11 @@ function validateOne(raw: unknown, i: number): IconPrimitive | null {
       const cx = coord(o.cx), cy = coord(o.cy);
       if (cx === null || cy === null) return null;
       return { ...base, type: "ellipse", cx, cy, rx: num(o.rx, 0, 0, 140), ry: num(o.ry, 0, 0, 140), rotation: isFiniteNum(o.rotation) ? o.rotation : undefined };
+    }
+    case "arc": {
+      const cx = coord(o.cx), cy = coord(o.cy);
+      if (cx === null || cy === null) return null;
+      return { ...base, type: "arc", cx, cy, r: num(o.r, 0, 0, 140), a0: isFiniteNum(o.a0) ? o.a0 : 0, a1: isFiniteNum(o.a1) ? o.a1 : 180 };
     }
     default: return null;
   }
@@ -306,6 +316,16 @@ export function drawCustomIcon(
         const ecx = mx(p.cx), ecy = my(p.cy);
         const el = <ellipse cx={ecx} cy={ecy} rx={mlen(p.rx)} ry={mlen(p.ry)} {...common} />;
         return p.rotation ? <g key={key} transform={`rotate(${p.rotation} ${ecx} ${ecy})`}>{el}</g> : <g key={key}>{el}</g>;
+      }
+      case "arc": {
+        const a0 = p.a0 * DEG, a1 = p.a1 * DEG;
+        const sx = mx(p.cx + p.r * Math.cos(a0)), sy = my(p.cy + p.r * Math.sin(a0));
+        const ex = mx(p.cx + p.r * Math.cos(a1)), ey = my(p.cy + p.r * Math.sin(a1));
+        const span = (((p.a1 - p.a0) % 360) + 360) % 360;
+        const large = span > 180 ? 1 : 0;
+        const rr = mlen(p.r);
+        const d = `M ${sx} ${sy} A ${rr} ${rr} 0 ${large} 1 ${ex} ${ey}${p.filled ? " Z" : ""}`;
+        return <path key={key} d={d} {...common} />;
       }
     }
   });
