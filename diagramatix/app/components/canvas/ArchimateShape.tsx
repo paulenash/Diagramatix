@@ -210,7 +210,8 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   const d = drawOutline(entry.shapeFamily, el.x, el.y, el.width, el.height);
   const iconBoxSize = glyphSizeFor(entry.category); // larger for compact-glyph categories
   const nudge = LARGE_GLYPH_CATEGORIES.has(entry.category) ? 10 : 0;
-  const iconCx = el.x + el.width - iconBoxSize / 2 - 6 + nudge;
+  const xTweak = entry.category === "technology" ? -2 : 0; // Technology markers 2px left
+  const iconCx = el.x + el.width - iconBoxSize / 2 - 6 + nudge + xTweak;
   const iconCy = el.y + iconBoxSize / 2 + 6 - nudge;
   return (
     <g>
