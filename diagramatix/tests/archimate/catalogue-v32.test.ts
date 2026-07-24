@@ -95,4 +95,33 @@ describe("ArchiMate v3.2 catalogue + layout", () => {
       expect(rule?.allowed ?? [], `${from} → strategy`).toContain("archi-realisation");
     }
   });
+
+  it("T1013 — the 9 cross-category gaps + Realisation promotions are present", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const matrix: any = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "public/archimate-relationships.json"), "utf8"),
+    );
+    const rules = matrix.categoryRules as { from: string; to: string; allowed?: string[]; derived?: string[] }[];
+    const allowed = (from: string, to: string) => rules.find((r) => r.from === from && r.to === to)?.allowed ?? [];
+
+    // Gaps 1-9
+    expect(allowed("behaviour", "behaviour"), "1 serving b→b").toContain("archi-serving");   // 1
+    expect(allowed("passive", "passive"), "2 realise p→p").toContain("archi-realisation");    // 2
+    expect(allowed("active", "passive"), "3 assign a→p").toContain("archi-assignment");        // 3
+    expect(allowed("behaviour", "motivation"), "4 realise b→m").toContain("archi-realisation"); // 4
+    expect(allowed("active", "motivation"), "4 realise a→m").toContain("archi-realisation");     // 4
+    expect(allowed("behaviour", "passive"), "5 realise b→p").toContain("archi-realisation");    // 5
+    expect(allowed("behaviour", "motivation"), "6 serve b→m(stakeholder)").toContain("archi-serving"); // 6
+    expect(allowed("interface", "behaviour"), "7 serve i→b").toContain("archi-serving");        // 7
+    expect(allowed("active", "active"), "7 serve a→a").toContain("archi-serving");              // 7
+    expect(allowed("strategy", "strategy"), "8 assign s→s").toContain("archi-assignment");      // 8
+    expect(allowed("strategy", "motivation"), "9 influence s→m").toContain("archi-influence");  // 9
+
+    // Between-layer Realisation is now first-class (allowed), not derived.
+    for (const [from, to] of [["active", "behaviour"], ["behaviour", "behaviour"], ["strategy", "strategy"]]) {
+      expect(allowed(from, to), `realise ${from}→${to} allowed`).toContain("archi-realisation");
+      const derived = rules.find((r) => r.from === from && r.to === to)?.derived ?? [];
+      expect(derived, `realise ${from}→${to} not derived`).not.toContain("archi-realisation");
+    }
+  });
 });

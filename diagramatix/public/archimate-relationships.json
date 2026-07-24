@@ -91,7 +91,8 @@
       "to": "active",
       "allowed": [
         "archi-composition",
-        "archi-aggregation"
+        "archi-aggregation",
+        "archi-serving"
       ]
     },
     {
@@ -106,9 +107,7 @@
       "from": "active",
       "to": "behaviour",
       "allowed": [
-        "archi-assignment"
-      ],
-      "derived": [
+        "archi-assignment",
         "archi-realisation"
       ]
     },
@@ -116,7 +115,8 @@
       "from": "interface",
       "to": "behaviour",
       "allowed": [
-        "archi-assignment"
+        "archi-assignment",
+        "archi-serving"
       ]
     },
     {
@@ -141,9 +141,8 @@
         "archi-triggering",
         "archi-flow",
         "archi-composition",
-        "archi-aggregation"
-      ],
-      "derived": [
+        "archi-aggregation",
+        "archi-serving",
         "archi-realisation"
       ]
     },
@@ -165,7 +164,8 @@
       "from": "behaviour",
       "to": "passive",
       "allowed": [
-        "archi-access"
+        "archi-access",
+        "archi-realisation"
       ]
     },
     {
@@ -187,7 +187,8 @@
       "to": "passive",
       "allowed": [
         "archi-composition",
-        "archi-aggregation"
+        "archi-aggregation",
+        "archi-realisation"
       ]
     },
     {
@@ -241,9 +242,8 @@
         "archi-composition",
         "archi-aggregation",
         "archi-triggering",
-        "archi-flow"
-      ],
-      "derived": [
+        "archi-flow",
+        "archi-assignment",
         "archi-realisation"
       ]
     },
@@ -259,6 +259,52 @@
       "to": "active",
       "allowed": [
         "archi-assignment"
+      ]
+    },
+    {
+      "from": "active",
+      "to": "passive",
+      "allowed": [
+        "archi-assignment"
+      ]
+    },
+    {
+      "from": "behaviour",
+      "to": "motivation",
+      "allowed": [
+        "archi-realisation",
+        "archi-serving",
+        "archi-influence"
+      ]
+    },
+    {
+      "from": "active",
+      "to": "motivation",
+      "allowed": [
+        "archi-realisation",
+        "archi-serving",
+        "archi-influence"
+      ]
+    },
+    {
+      "from": "passive",
+      "to": "motivation",
+      "allowed": [
+        "archi-influence"
+      ]
+    },
+    {
+      "from": "interface",
+      "to": "motivation",
+      "allowed": [
+        "archi-influence"
+      ]
+    },
+    {
+      "from": "strategy",
+      "to": "motivation",
+      "allowed": [
+        "archi-influence"
       ]
     },
     {
