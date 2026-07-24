@@ -234,9 +234,10 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
 
   function endPointer() {
     if (marqRef.current && marq) {
+      const additive = marqRef.current.additive; // capture before we null the ref
       const box = { minX: Math.min(marq.x0, marq.x1), minY: Math.min(marq.y0, marq.y1), maxX: Math.max(marq.x0, marq.x1), maxY: Math.max(marq.y0, marq.y1) };
       const hit = primitives.map((p, i) => [i, primBBox(p)] as const).filter(([, b]) => rectsIntersect(b, box)).map(([i]) => i);
-      setSelSet((prev) => { const n = marqRef.current!.additive ? new Set(prev) : new Set<number>(); hit.forEach((i) => n.add(i)); return n; });
+      setSelSet((prev) => { const n = additive ? new Set(prev) : new Set<number>(); hit.forEach((i) => n.add(i)); return n; });
       if (hit.length) setSel(hit[hit.length - 1]);
     }
     drag.current = null; move.current = null; marqRef.current = null; setMarq(null);
