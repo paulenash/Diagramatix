@@ -205,6 +205,7 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   const [cat, setCat] = useState<ArchimateCatalogue | null>(null);
   const [busy, setBusy] = useState(false);
   const [askName, setAskName] = useState(false);
+  const [askCopy, setAskCopy] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [alert, setAlert] = useState<string | null>(null);
 
@@ -297,7 +298,7 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
     } catch { setErr("Vectorize network error"); } finally { setBusy(false); }
   }
 
-  async function doSave(finalName: string) {
+  async function doSave(finalName: string, asNew = false) {
     setBusy(true); setErr(null);
     try {
       const fd = new FormData();
@@ -307,12 +308,13 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
       if (defW) fd.set("defaultWidth", defW);
       if (defH) fd.set("defaultHeight", defH);
       if (sourceFile) fd.set("file", sourceFile);
-      const url = selectedId ? `/api/admin/archimate-icon-library/${selectedId}` : "/api/admin/archimate-icon-library";
-      const res = await fetch(url, { method: selectedId ? "PUT" : "POST", body: fd });
+      const isUpdate = !asNew && !!selectedId;   // asNew always POSTs a fresh icon
+      const url = isUpdate ? `/api/admin/archimate-icon-library/${selectedId}` : "/api/admin/archimate-icon-library";
+      const res = await fetch(url, { method: isUpdate ? "PUT" : "POST", body: fd });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(j.error ?? "Save failed"); return; }
       setName(finalName);
-      if (!selectedId && j.id) setSelectedId(j.id);
+      if (!isUpdate && j.id) setSelectedId(j.id); // select the newly-created (or copied) icon
       invalidateArchimateCustomIconCache();
       await reload();
     } catch { setErr("Save network error"); } finally { setBusy(false); }
@@ -455,6 +457,7 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
         </div>
         <div className="mt-3 flex items-center gap-2">
           <button onClick={onSaveClick} disabled={busy || !primitives.length} className="px-3 py-1.5 text-sm text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50">{selectedId ? "Save" : "Save new"}</button>
+          {selectedId && <button onClick={() => setAskCopy(true)} disabled={busy || !primitives.length} className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50" title="Duplicate these shapes into a new icon under a different name">Save as copy…</button>}
           {selectedId && <button onClick={() => setConfirmDel(true)} className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50">Delete</button>}
           <div className="ml-auto flex items-center gap-3">
             <PreviewBox primitives={primitives} label="glyph" size={27} />
@@ -522,6 +525,7 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
       </div>
 
       {askName && <PromptDialog title="Name this icon" placeholder="e.g. Business Object (custom)" onConfirm={(v) => { setAskName(false); if (v.trim()) doSave(v.trim()); }} onCancel={() => setAskName(false)} />}
+      {askCopy && <PromptDialog title="Save as a copy" message="Create a NEW icon from these shapes (the original is untouched). Rename it, then you can retag its category and assign it elsewhere." defaultValue={`${name} copy`} placeholder="New icon name" confirmLabel="Create copy" onConfirm={(v) => { setAskCopy(false); if (v.trim()) doSave(v.trim(), true); }} onCancel={() => setAskCopy(false)} />}
       {confirmDel && <ConfirmDialog title="Delete icon" message="Delete this library icon? Any element assigned to it reverts to the built-in glyph." onConfirm={doDelete} onCancel={() => setConfirmDel(false)} />}
       {alert && <AlertDialog message={alert} onClose={() => setAlert(null)} />}
     </div>
