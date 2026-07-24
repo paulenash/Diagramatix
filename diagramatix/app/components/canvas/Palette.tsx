@@ -14,6 +14,8 @@ import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 import { useArchimateCustomIcon } from "@/app/lib/archimate/useArchimateCustomIcon";
 import { effectiveCustomIcon } from "@/app/lib/archimate/customIcon";
 import { drawCustomIcon } from "@/app/lib/archimate/iconShapes";
+import { useArchimateSeparateIcons } from "@/app/lib/archimate/useArchimateSeparateIcons";
+import { buildElementRows } from "@/app/lib/archimate/paletteRows";
 
 interface Props {
   diagramType: DiagramType;
@@ -543,6 +545,7 @@ function ArchimatePalette({
   setCollapsed: (v: boolean) => void;
 }) {
   const [catalogue, setCatalogue] = useState<ArchimateCatalogue | null>(null);
+  const separateIcons = useArchimateSeparateIcons();
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({ business: true });
   // User-adjustable category order. Persisted to localStorage so it sticks
   // across reloads. Initialised from the catalogue's natural order on first
@@ -619,31 +622,10 @@ function ArchimatePalette({
             .filter((c): c is typeof catalogue.categories[number] => !!c);
           return orderedCategories;
         })().map((cat, catIdx, orderedArr) => {
-          // One palette entry per distinct element name. When both a
-          // "(box)" and an "icon" master exist for the same element, prefer
-          // the box form. For Actor, Business Service, and Business Event
-          // we ALSO surface the icon-variant as a separate drag source so
-          // users can pick the compact icon-only shape.
-          const ICON_AS_SEPARATE = new Set<string>(["Business Actor", "Business Service", "Business Event"]);
-          const byName = new Map<string, { primary: ArchimateShapeEntry; iconCounterpart?: ArchimateShapeEntry }>();
-          for (const s of cat.shapes) {
-            const existing = byName.get(s.name);
-            if (!existing) {
-              byName.set(s.name, { primary: s });
-            } else if (existing.primary.variant === "icon" && s.variant === "box") {
-              byName.set(s.name, { primary: s, iconCounterpart: existing.primary });
-            } else if (existing.primary.variant === "box" && s.variant === "icon") {
-              byName.set(s.name, { primary: existing.primary, iconCounterpart: s });
-            }
-          }
-          type PaletteItem = { entry: ArchimateShapeEntry; iconOnly: boolean; label: string };
-          const items: PaletteItem[] = [];
-          for (const [name, pair] of byName) {
-            items.push({ entry: pair.primary, iconOnly: false, label: name });
-            if (pair.iconCounterpart && ICON_AS_SEPARATE.has(name)) {
-              items.push({ entry: pair.iconCounterpart, iconOnly: true, label: `${name} (icon)` });
-            }
-          }
+          // One palette entry per distinct element name (box form preferred),
+          // plus a separate icon-only entry for the SuperAdmin-configured set.
+          // Shared with the Icon Library assignment list so the two always match.
+          const items = buildElementRows(cat.shapes, separateIcons);
           const open = !!openCategories[cat.id];
           const canUp = catIdx > 0;
           const canDown = catIdx < orderedArr.length - 1;

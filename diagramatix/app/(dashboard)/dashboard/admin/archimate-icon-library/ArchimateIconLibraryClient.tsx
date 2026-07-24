@@ -13,6 +13,8 @@ import { loadArchimateCatalogue, type ArchimateCatalogue } from "@/app/lib/archi
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 import { invalidateArchimateCustomIconCache } from "@/app/lib/archimate/useArchimateCustomIcon";
 import { invalidateArchimateIconBufferCache } from "@/app/lib/archimate/useArchimateIconBuffers";
+import { invalidateArchimateSeparateIconCache } from "@/app/lib/archimate/useArchimateSeparateIcons";
+import { buildElementRows } from "@/app/lib/archimate/paletteRows";
 import { builtinCategoryBuffer, type CategoryBuffers } from "@/app/lib/archimate/iconLayout";
 import { PromptDialog } from "@/app/components/PromptDialog";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -598,6 +600,7 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
   const [saved, setSaved] = useState("{}");
   const [buffers, setBuffers] = useState<CategoryBuffers>({});
   const [savedBuffers, setSavedBuffers] = useState("{}");
+  const [separate, setSeparate] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
@@ -605,7 +608,19 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
     loadArchimateCatalogue().then((c) => setCat(c)).catch(() => setErr("Catalogue load failed")); // start all categories collapsed
     fetch("/api/admin/archimate-icons-custom").then((r) => (r.ok ? r.json() : { assignments: {} })).then((j) => { const a = j.assignments ?? {}; setAssignments(a); setSaved(JSON.stringify(a)); }).catch(() => {});
     fetch("/api/admin/archimate-icon-buffers").then((r) => (r.ok ? r.json() : { buffers: {} })).then((j) => { const b = j.buffers ?? {}; setBuffers(b); setSavedBuffers(JSON.stringify(b)); }).catch(() => {});
+    fetch("/api/admin/archimate-separate-icons").then((r) => (r.ok ? r.json() : { names: [] })).then((j) => setSeparate(new Set<string>(Array.isArray(j?.names) ? j.names : []))).catch(() => {});
   }, [setErr]);
+
+  // Add / remove an element's separate icon-only version (updates the palette).
+  async function toggleSeparate(name: string) {
+    const next = new Set(separate);
+    next.has(name) ? next.delete(name) : next.add(name);
+    setSeparate(next); // optimistic
+    try {
+      const res = await fetch("/api/admin/archimate-separate-icons", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ names: [...next] }) });
+      if (res.ok) { const j = await res.json(); setSeparate(new Set<string>(j.names ?? [...next])); invalidateArchimateSeparateIconCache(); }
+    } catch { /* keep optimistic */ }
+  }
 
   const dirty = JSON.stringify(assignments) !== saved;
   const buffersDirty = JSON.stringify(buffers) !== savedBuffers;
@@ -693,10 +708,9 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
           const open = expanded.has(c.id);
           const shapes = c.shapes.filter((s) => s.iconType && !s.iconType.startsWith("junction"));
           if (!shapes.length) return null;
-          // Elements that have both a box AND an icon-only variant get a variant
-          // tag so the two rows are distinguishable (they're independently assignable).
-          const nameCount = new Map<string, number>();
-          for (const s of shapes) nameCount.set(s.name, (nameCount.get(s.name) ?? 0) + 1);
+          // One row per element (matching the Symbols Panel): box/primary + a
+          // separate icon-only row for the configured set.
+          const rows = buildElementRows(shapes, separate);
           return (
             <div key={c.id} className="border-b border-gray-100 last:border-b-0">
               <button onClick={() => toggle(c.id)} className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
@@ -704,13 +718,13 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
               </button>
               {open && (
                 <div className="px-3 pb-2">
-                  {shapes.map((s) => {
+                  {rows.map((row) => {
+                    const s = row.entry;
                     const assignedId = assignments[s.key];
                     const ic = assignedId ? iconById[assignedId] : undefined;
                     const builtIn = s.iconType ? ICON_DRAWERS[s.iconType] : undefined;
-                    const variant = (nameCount.get(s.name) ?? 0) > 1 ? (s.variant === "icon" ? "icon" : "box") : null;
                     return (
-                      <div key={s.key} className="flex items-center gap-2 py-1">
+                      <div key={`${s.key}:${row.iconOnly ? "icon" : "box"}`} className="flex items-center gap-2 py-1">
                         {/* 2× glyph — the assigned custom icon, else the CURRENT built-in glyph */}
                         <svg viewBox="0 0 24 24" className="w-12 h-12 shrink-0"><title>{ic ? "custom" : "current (built-in)"}</title>
                           {ic
@@ -720,11 +734,16 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
                               : <rect x="4" y="4" width="16" height="16" fill="none" stroke="#ddd" strokeDasharray="2 2" />}
                         </svg>
                         <span className="flex-1 text-xs text-gray-700 truncate">
-                          {s.name}
-                          {variant && <span className={`ml-1 text-[10px] px-1 rounded ${variant === "icon" ? "bg-indigo-50 text-indigo-600" : "bg-gray-100 text-gray-500"}`}>{variant}</span>}
+                          {row.label}
                           {!ic && <span className="ml-1 text-[10px] text-gray-400">(current)</span>}
                         </span>
-                        <select value={assignedId ?? ""} onChange={(e) => setAssign(s.key, e.target.value)} className="border border-gray-300 rounded px-1 py-0.5 text-xs max-w-[160px]">
+                        {/* add / remove the separate icon-only version (only for the primary row of an element that has an icon master) */}
+                        {!row.iconOnly && row.hasIconCounterpart && (
+                          <label className="flex items-center gap-1 text-[10px] text-gray-500 shrink-0" title="Show a separate icon-only version in the Symbols Panel">
+                            <input type="checkbox" checked={separate.has(s.name)} onChange={() => toggleSeparate(s.name)} /> icon
+                          </label>
+                        )}
+                        <select value={assignedId ?? ""} onChange={(e) => setAssign(s.key, e.target.value)} className="border border-gray-300 rounded px-1 py-0.5 text-xs max-w-[150px]">
                           <option value="">Default (built-in)</option>
                           {icons.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
                         </select>
