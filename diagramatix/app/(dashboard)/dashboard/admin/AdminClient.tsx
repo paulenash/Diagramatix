@@ -781,6 +781,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "diagram-types", title: "Diagram Types", description: "The 2-character codes and pastel colours shown per diagram type.", href: "/dashboard/admin/diagram-types?from=/dashboard/admin" },
   { id: "diagram-type-sort", title: "Diagram Type Sort Order", description: "The order diagram types are listed across the app and in the project Diagram Type sort.", href: "/dashboard/diagram-type-sort-order?from=/dashboard/admin" },
   { id: "archimate-icons", title: "ArchiMate Icon Maintenance", description: "Fine-tune the corner-glyph position (offset from top-right) and size of every ArchiMate element — per element, in pixels or %.", href: "/dashboard/admin/archimate-icons" },
+  { id: "archimate-icon-library", title: "ArchiMate Icon Library", description: "Upload an icon image → AI-trace it into editable vector shapes → edit → save to a library → assign to an element type. Recolours to theme, crisp at any zoom.", href: "/dashboard/admin/archimate-icon-library" },
   { id: "prompts", title: "AI Prompt Maintenance", description: "Maintain your own saved AI generation prompts.", href: "/dashboard/prompts?from=/dashboard/admin", feature: "ai" },
   { id: "notifications", title: "Notifications & Feedback", description: "Inspect any user's notification feed — filter by Org & User.", href: "/notifications?from=/dashboard/admin" },
 ];

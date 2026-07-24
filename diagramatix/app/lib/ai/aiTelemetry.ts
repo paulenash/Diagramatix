@@ -27,6 +27,7 @@ export const AI_INVOCATION_POINTS = {
   SimulationAssess: "simulation.assess", // as-is/to-be assessment
   StaffNarrative: "staff.narrative",
   DictationRefine: "dictation.refine", // transcript clean-up / anonymise
+  IconVectorize: "icon.vectorize", // ArchiMate icon image → editable vector primitives
 } as const;
 
 export type AiInvocationPoint =
@@ -50,6 +51,7 @@ export const AI_INVOCATION_POINT_LABELS: Record<string, string> = {
   [AI_INVOCATION_POINTS.SimulationAssess]: "Simulation Assessment",
   [AI_INVOCATION_POINTS.StaffNarrative]: "Staff Narrative",
   [AI_INVOCATION_POINTS.DictationRefine]: "Dictation Refine",
+  [AI_INVOCATION_POINTS.IconVectorize]: "ArchiMate Icon Vectorize",
 };
 
 /** Friendly label for a stored invocation-point value (falls back to the raw value). */

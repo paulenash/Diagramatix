@@ -1565,6 +1565,28 @@ model HelpImage {
   @@index([createdAt])
 }
 
+// A reusable custom ArchiMate element icon, authored in the SuperAdmin ArchiMate
+// Icon Library. `primitives` is JSON.stringify(IconPrimitive[]) — a String (not a
+// Json column) so create/update stay ordinary Prisma calls; validateIconPrimitives
+// re-parses on every read. `sourceBytes` is the original uploaded image, kept only
+// as the editing underlay (like HelpImage: bytes in the DB, container public/ is
+// read-only). Assigned to element types via AppSetting["archimate.icon.custom"].
+model ArchimateIconLibrary {
+  id           String   @id @default(cuid())
+  name         String
+  category     String?
+  primitives   String
+  defaultWidth  Int?    // preferred corner-glyph box size (px) when assigned; null = category default
+  defaultHeight Int?
+  sourceBytes  Bytes?
+  sourceMime   String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Global key-value application settings (SuperAdmin-tunable, single row per key).
 // First use: "ai.generate.model" = the Claude model AI Generate uses. Kept

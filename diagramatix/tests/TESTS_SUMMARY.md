@@ -977,6 +977,19 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T0996 | ArchiMate v3.2: Directed Association relationship-name registered ("Association (directed)") | The new relationship missing its highlight label / picker entry | If the directed-association type was dropped |
 | T0997 | ArchiMate v3.2: relationship compatibility matrix covers every new element + Directed Association is universal | New elements only offering Association in the picker / Directed Association always disabled | If the relationships matrix wasn't updated for new elements |
 | T0998 | ArchiMate: Realisation is directly allowed (not derived) for elements that realise a Service (Process/Function/Component → Service) | A Process→Service Realisation hidden behind "show derived" | If the realise-a-Service overrides were dropped |
+| T0999 | ArchiMate Icon Maintenance: default corner-glyph layout matches the built-in per-category geometry (27/36 box) | A silent shift in every glyph's default position/size | If defaultIconLayout regressed |
+| T1000 | ArchiMate Icon Maintenance: Technology default nudges the glyph 2px right (xTweak) | Technology markers drifting off their tuned spot | If the category tweak was dropped |
+| T1001 | ArchiMate Icon Maintenance: effective layout overlays a partial override on the default | A partial edit wiping the untouched fields | If effectiveIconLayout merge regressed |
+| T1002 | ArchiMate Icon Maintenance: overrides are per element key, not shared by iconType | Editing one element's glyph moving another that shares a drawer | If keying regressed to iconType |
+| T1003 | Icon Library: validateIconPrimitives drops malformed primitives and keeps the valid remainder | Bad AI/DB primitive data crashing or rendering garbage | If the validator trust boundary regressed |
+| T1004 | Icon Library: validator coerces filled/z, drops bad colourRole, clamps strokeWidth | Unnormalised primitive fields reaching the renderer | If field normalisation regressed |
+| T1005 | Icon Library: drawCustomIcon emits the right SVG node per primitive + sorts by z | Custom icons rendering the wrong shapes / wrong paint order | If the renderer or z-sort regressed |
+| T1006 | Icon Library: arrowheads emit a marker; orientable angle override changes it | Missing/incorrect arrowheads on custom icons | If the arrowhead renderer regressed |
+| T1007 | Icon Library: normalised coords map into {cx,cy,size} + strokeWidth scales with a floor | Custom glyphs mis-positioned or hairline/blown-out strokes | If the coordinate/stroke mapping regressed |
+| T1008 | Icon Library: effectiveCustomIcon returns the assigned icon or null (fallback to built-in) | A dangling assignment crashing a render instead of falling back | If the assignment resolver regressed |
+| T1009 | Icon Library: assignment is per element key, not shared by iconType | Assigning one element's icon changing another that shares a drawer | If assignment keying regressed |
+| T1010 | Icon Library: parseVectorizeResponse strips fences, parses, validates (good+malformed → only good) | AI vectorize output failing to load or trusting bad shapes | If the vectorize parser regressed |
+| T1011 | Icon Library: defaultIconLayout baseSize replaces the category default + per-element override wins | An assigned icon's preferred size ignored, or override precedence wrong | If the baseSize/precedence logic regressed |
 
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 

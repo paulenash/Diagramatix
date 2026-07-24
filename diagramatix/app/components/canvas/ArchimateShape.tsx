@@ -23,6 +23,9 @@ import { getThemeFor, type ArchimateCategoryTheme } from "@/app/lib/archimate/th
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 import { effectiveIconLayout, type IconLayout } from "@/app/lib/archimate/iconLayout";
 import { useArchimateIconLayout } from "@/app/lib/archimate/useArchimateIconLayout";
+import { useArchimateCustomIcon } from "@/app/lib/archimate/useArchimateCustomIcon";
+import { effectiveCustomIcon } from "@/app/lib/archimate/customIcon";
+import { drawCustomIcon } from "@/app/lib/archimate/iconShapes";
 import { ArchimateDepthCtx } from "./SymbolRenderer";
 
 const STROKE_WIDTH = 2.4;               // 2× the previous 1.2
@@ -93,6 +96,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   const shapeKey = el.properties?.shapeKey as string | undefined;
   const [, forceRender] = useState(0);
   const iconOverrides = useArchimateIconLayout();
+  const { assignments: customAssignments, iconsById } = useArchimateCustomIcon();
 
   // Ensure the catalogue is loaded — trigger a re-render once it arrives
   useEffect(() => {
@@ -137,7 +141,14 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   }
 
   const iconOnly = !!el.properties?.archimateIconOnly;
-  const drawIcon = entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined;
+  // A SuperAdmin-assigned custom library icon replaces the built-in drawer for
+  // this element type (and carries a preferred glyph size). Junctions have their
+  // own branch below and never use `drawIcon`, so they're excluded automatically.
+  const custom = effectiveCustomIcon(entry.key, customAssignments, iconsById);
+  const customBaseSize = custom ? { width: custom.defaultWidth, height: custom.defaultHeight } : undefined;
+  const drawIcon: ((o: { cx: number; cy: number; size: number; colour: string }) => ReactNode) | undefined =
+    custom ? (o) => drawCustomIcon(custom.primitives, o)
+    : (entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined);
 
   // A Business Process linked to a BPMN diagram in the same project shows a
   // green corner glyph — mirrors the green marker on a linked BPMN subprocess.
@@ -186,7 +197,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
       // plain rectangle, so overlay its ArchiMate glyph in the top-right corner
       // — otherwise it renders as a blank box.
       const cornerGlyph = entry.iconType !== "service" && entry.iconType !== "event";
-      const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides);
+      const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides, customBaseSize);
       return (
         <g>
           <path d={bg} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} strokeLinejoin="round" />
@@ -224,7 +235,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   // from the effective icon layout (category default, overlaid with any saved
   // SuperAdmin override from ArchiMate Icon Maintenance).
   const d = drawOutline(entry.shapeFamily, el.x, el.y, el.width, el.height);
-  const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides);
+  const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides, customBaseSize);
   return (
     <g>
       <path d={d} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} />

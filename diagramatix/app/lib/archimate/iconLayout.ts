@@ -32,30 +32,42 @@ export interface IconLayout {
  *  which have different default sizes) can be positioned independently. */
 export type IconLayoutOverrides = Record<string, Partial<IconLayout>>;
 
+/** Optional base glyph-box size (px) — e.g. an assigned custom icon's preferred
+ *  size — replacing the 27/36 category default. Null/undefined fields fall back. */
+export interface IconBaseSize { width?: number | null; height?: number | null; }
+
 /** The built-in default layout for an icon, from its category. Mirrors the
  *  geometry ArchimateShape used before overrides existed (category size + the
- *  10px top-right nudge for compact categories + the Technology 2px-left tweak). */
-export function defaultIconLayout(category: string | undefined): IconLayout {
+ *  10px top-right nudge for compact categories + the Technology 2px-left tweak).
+ *  A `baseSize` (e.g. an assigned custom icon's preferred size) replaces the
+ *  category default box; offsets recompute from it with the same formula so the
+ *  glyph stays anchored near the top-right corner as it grows. */
+export function defaultIconLayout(category: string | undefined, baseSize?: IconBaseSize): IconLayout {
   const large = !!category && LARGE_GLYPH_CATEGORIES.has(category);
   const size = large ? 36 : 27;
   const nudge = large ? 10 : 0;
   const xTweak = category === "technology" ? -2 : 0;
+  const w = baseSize?.width != null && baseSize.width > 0 ? baseSize.width : size;
+  const h = baseSize?.height != null && baseSize.height > 0 ? baseSize.height : size;
   return {
-    xOffset: size / 2 + 6 - nudge - xTweak,
-    yOffset: size / 2 + 6 - nudge,
-    width: size,
-    height: size,
+    xOffset: w / 2 + 6 - nudge - xTweak,
+    yOffset: h / 2 + 6 - nudge,
+    width: w,
+    height: h,
   };
 }
 
-/** The effective layout for an icon = its default, overlaid with any override.
- *  Keyed by the catalogue element `key`. */
+/** The effective layout for an icon = its default (optionally re-based to an
+ *  assigned custom icon's preferred size), overlaid with any per-element
+ *  override. Keyed by the catalogue element `key`. Precedence: per-element
+ *  override > baseSize > category default. */
 export function effectiveIconLayout(
   shapeKey: string | undefined,
   category: string | undefined,
   overrides: IconLayoutOverrides | undefined,
+  baseSize?: IconBaseSize,
 ): IconLayout {
-  const d = defaultIconLayout(category);
+  const d = defaultIconLayout(category, baseSize);
   const o = (shapeKey && overrides?.[shapeKey]) || {};
   return {
     xOffset: o.xOffset ?? d.xOffset,

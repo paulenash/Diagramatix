@@ -11,6 +11,9 @@ import { painPointStarPoints } from "./SymbolRenderer";
 import { loadArchimateCatalogue, type ArchimateCatalogue, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
 import { getThemeFor } from "@/app/lib/archimate/themes";
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
+import { useArchimateCustomIcon } from "@/app/lib/archimate/useArchimateCustomIcon";
+import { effectiveCustomIcon } from "@/app/lib/archimate/customIcon";
+import { drawCustomIcon } from "@/app/lib/archimate/iconShapes";
 
 interface Props {
   diagramType: DiagramType;
@@ -467,7 +470,12 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
   const iconColour = theme?.iconColour ?? stroke;
   // Larger preview so the icon glyph is clearly identifiable
   const w = 64, h = 38;
-  const drawIcon = entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined;
+  // A SuperAdmin-assigned custom library icon replaces the built-in drawer here too.
+  const { assignments, iconsById } = useArchimateCustomIcon();
+  const custom = effectiveCustomIcon(entry.key, assignments, iconsById);
+  const drawIcon = custom
+    ? (o: { cx: number; cy: number; size: number; colour: string }) => drawCustomIcon(custom.primitives, o)
+    : (entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined);
 
   // Junction (And/Or) — the whole shape is the small circle glyph.
   const isJunction = !!entry.iconType && entry.iconType.startsWith("junction");
@@ -509,7 +517,11 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
   // Implementation & Migration / Composite glyphs are compact so they get a
   // larger corner box (keyed by category, matching ArchimateShape).
   const LARGE_GLYPH_CATEGORIES = new Set(["motivation", "technology", "implementation-migration", "composite"]);
-  const cornerSize = LARGE_GLYPH_CATEGORIES.has(entry.category) ? 22 : 17;
+  // Preview corner box ≈ 0.63× the real canvas box (17≈27·0.63). An assigned custom
+  // icon with a preferred size scales the preview box to match.
+  const cornerSize = custom?.defaultWidth
+    ? Math.round(custom.defaultWidth * 0.63)
+    : (LARGE_GLYPH_CATEGORIES.has(entry.category) ? 22 : 17);
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
       {outline}
