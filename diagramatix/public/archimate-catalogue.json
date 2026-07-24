@@ -961,8 +961,8 @@
           "variant": "icon",
           "description": "An And-Junction connects relationships of the same type, all of which apply.",
           "category": "composite",
-          "defaultWidth": 17,
-          "defaultHeight": 17,
+          "defaultWidth": 8,
+          "defaultHeight": 8,
           "fill": "#000000",
           "shapeFamily": "ellipse",
           "iconType": "junction-and"
@@ -973,8 +973,8 @@
           "variant": "icon",
           "description": "An Or-Junction connects relationships of the same type, one or more of which apply.",
           "category": "composite",
-          "defaultWidth": 17,
-          "defaultHeight": 17,
+          "defaultWidth": 8,
+          "defaultHeight": 8,
           "fill": "#ffffff",
           "shapeFamily": "ellipse",
           "iconType": "junction-or"

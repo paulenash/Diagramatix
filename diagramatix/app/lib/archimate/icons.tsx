@@ -204,18 +204,19 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
     );
   },
   // Component — main body rectangle with two "tab" rectangles straddling its
-  // left edge: each tab is 25% of the body height and sits 40% inside / 60%
-  // outside the body, drawn on top of it.
+  // left edge: each tab is 25% of the body height, sits 40% inside / 60% outside,
+  // is drawn ON TOP (white fill occludes the body's left edge), with a thinner
+  // (60%) line than the body.
   component: ({ cx, cy, size, colour }) => {
     const s = size, sw = Math.max(1, s / 16);
     const mainLeft = cx - s * 0.1, mainTop = cy - s * 0.22, mainW = s * 0.42, mainH = s * 0.44;
-    const tabW = s * 0.14, tabH = mainH * 0.25;
+    const tabW = s * 0.14 * 1.2, tabH = mainH * 0.25; // 20% wider (both inside + outside)
     const tabX = mainLeft - tabW * 0.6; // 60% outside, 40% inside
     return (
-      <g stroke={colour} strokeWidth={sw} fill="none">
-        <rect x={mainLeft} y={mainTop} width={mainW} height={mainH} />
-        <rect x={tabX} y={mainTop + mainH * 0.12} width={tabW} height={tabH} />
-        <rect x={tabX} y={mainTop + mainH * 0.55} width={tabW} height={tabH} />
+      <g stroke={colour}>
+        <rect x={mainLeft} y={mainTop} width={mainW} height={mainH} strokeWidth={sw} fill="none" />
+        <rect x={tabX} y={mainTop + mainH * 0.12} width={tabW} height={tabH} strokeWidth={sw * 0.6} fill="#ffffff" />
+        <rect x={tabX} y={mainTop + mainH * 0.55} width={tabW} height={tabH} strokeWidth={sw * 0.6} fill="#ffffff" />
       </g>
     );
   },
