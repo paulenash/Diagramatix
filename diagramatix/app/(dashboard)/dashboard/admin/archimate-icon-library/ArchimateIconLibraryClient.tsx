@@ -10,6 +10,7 @@ import {
   type ArrowSpec,
 } from "@/app/lib/archimate/iconShapes";
 import { loadArchimateCatalogue, type ArchimateCatalogue } from "@/app/lib/archimate/catalogue";
+import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 import { invalidateArchimateCustomIconCache } from "@/app/lib/archimate/useArchimateCustomIcon";
 import { PromptDialog } from "@/app/components/PromptDialog";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -85,6 +86,44 @@ function handlesFor(p: IconPrimitive): Handle[] {
 
 const PRIM_TYPES: IconPrimitive["type"][] = ["line", "path", "rect", "triangle", "circle", "ellipse"];
 
+// ── Translate a primitive by (dx,dy) in the 0..100 box ───────────────
+function translatePrim(p: IconPrimitive, dx: number, dy: number): IconPrimitive {
+  const r1 = (n: number) => round1(n);
+  switch (p.type) {
+    case "line": return { ...p, x1: r1(p.x1 + dx), y1: r1(p.y1 + dy), x2: r1(p.x2 + dx), y2: r1(p.y2 + dy) };
+    case "rect": return { ...p, x: r1(p.x + dx), y: r1(p.y + dy) };
+    case "triangle": return { ...p, x1: r1(p.x1 + dx), y1: r1(p.y1 + dy), x2: r1(p.x2 + dx), y2: r1(p.y2 + dy), x3: r1(p.x3 + dx), y3: r1(p.y3 + dy) };
+    case "circle": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
+    case "ellipse": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
+    case "path": return { ...p, segments: p.segments.map((s) => {
+      if (s.t === "M" || s.t === "L") return { ...s, x: r1(s.x + dx), y: r1(s.y + dy) };
+      if (s.t === "Q") return { ...s, cx: r1(s.cx + dx), cy: r1(s.cy + dy), x: r1(s.x + dx), y: r1(s.y + dy) };
+      return { ...s, c1x: r1(s.c1x + dx), c1y: r1(s.c1y + dy), c2x: r1(s.c2x + dx), c2y: r1(s.c2y + dy), x: r1(s.x + dx), y: r1(s.y + dy) };
+    }) };
+  }
+}
+
+// ── Bounding box of a primitive (ignores stroke width) ───────────────
+function primBBox(p: IconPrimitive): { minX: number; minY: number; maxX: number; maxY: number } {
+  const pts: [number, number][] = [];
+  switch (p.type) {
+    case "line": pts.push([p.x1, p.y1], [p.x2, p.y2]); break;
+    case "rect": pts.push([p.x, p.y], [p.x + p.w, p.y + p.h]); break;
+    case "triangle": pts.push([p.x1, p.y1], [p.x2, p.y2], [p.x3, p.y3]); break;
+    case "circle": pts.push([p.cx - p.r, p.cy - p.r], [p.cx + p.r, p.cy + p.r]); break;
+    case "ellipse": pts.push([p.cx - p.rx, p.cy - p.ry], [p.cx + p.rx, p.cy + p.ry]); break;
+    case "path": for (const s of p.segments) {
+      if ("x" in s) pts.push([s.x, s.y]);
+      if (s.t === "Q") pts.push([s.cx, s.cy]);
+      if (s.t === "C") { pts.push([s.c1x, s.c1y], [s.c2x, s.c2y]); }
+    } break;
+  }
+  const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+  return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
+}
+const rectsIntersect = (a: { minX: number; minY: number; maxX: number; maxY: number }, b: { minX: number; minY: number; maxX: number; maxY: number }) =>
+  a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
+
 export function ArchimateIconLibraryClient() {
   const [tab, setTab] = useState<"editor" | "assign">("editor");
   const [icons, setIcons] = useState<LibIcon[]>([]);
@@ -134,7 +173,9 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   const [defW, setDefW] = useState<string>("");
   const [defH, setDefH] = useState<string>("");
   const [primitives, setPrimitives] = useState<IconPrimitive[]>([]);
-  const [sel, setSel] = useState<number | null>(null);
+  const [sel, setSel] = useState<number | null>(null);          // primary (style/vertex controls)
+  const [selSet, setSelSet] = useState<Set<number>>(new Set()); // group selection (lasso/move)
+  const [marq, setMarq] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [underlay, setUnderlay] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -143,16 +184,24 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   const [alert, setAlert] = useState<string | null>(null);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const drag = useRef<{ apply: Handle["apply"] } | null>(null);
+  const drag = useRef<{ apply: Handle["apply"] } | null>(null);         // single vertex drag
+  const move = useRef<{ start: { x: number; y: number }; snap: Map<number, IconPrimitive> } | null>(null); // group move
+  const marqRef = useRef<{ x0: number; y0: number; additive: boolean } | null>(null); // lasso
 
+  function clearSel() { setSel(null); setSelSet(new Set()); }
+  function selectOne(i: number) { setSel(i); setSelSet(new Set([i])); }
+  function toggleSel(i: number) {
+    setSelSet((prev) => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; });
+    setSel(i);
+  }
   function resetNew() {
     setSelectedId(null); setName(""); setCategory(""); setDefW(""); setDefH("");
-    setPrimitives([]); setSel(null); setSourceFile(null); setUnderlay(null);
+    setPrimitives([]); clearSel(); setSourceFile(null); setUnderlay(null);
   }
   function loadIcon(ic: LibIcon) {
     setSelectedId(ic.id); setName(ic.name); setCategory(ic.category ?? "");
     setDefW(ic.defaultWidth ? String(ic.defaultWidth) : ""); setDefH(ic.defaultHeight ? String(ic.defaultHeight) : "");
-    setPrimitives(ic.primitives); setSel(null); setSourceFile(null);
+    setPrimitives(ic.primitives); clearSel(); setSourceFile(null);
     setUnderlay(ic.hasSource ? `/api/admin/archimate-icon-library/${ic.id}/source` : null);
   }
 
@@ -166,17 +215,43 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   }, []);
 
   const onSvgMove = useCallback((e: React.PointerEvent) => {
-    if (!drag.current || sel === null) return;
     const c = toBox(e); if (!c) return;
-    const apply = drag.current.apply;
-    setPrimitives((prev) => prev.map((p, i) => (i === sel ? apply(p, c.x, c.y) : p)));
+    if (drag.current && sel !== null) {                     // single-vertex drag
+      const apply = drag.current.apply;
+      setPrimitives((prev) => prev.map((p, i) => (i === sel ? apply(p, c.x, c.y) : p)));
+    } else if (move.current) {                              // group translate
+      const { start, snap } = move.current;
+      const dx = c.x - start.x, dy = c.y - start.y;
+      setPrimitives((prev) => prev.map((p, i) => (snap.has(i) ? translatePrim(snap.get(i)!, dx, dy) : p)));
+    } else if (marqRef.current) {                           // lasso rubber-band
+      setMarq({ x0: marqRef.current.x0, y0: marqRef.current.y0, x1: c.x, y1: c.y });
+    }
   }, [sel, toBox]);
+
+  function endPointer() {
+    if (marqRef.current && marq) {
+      const box = { minX: Math.min(marq.x0, marq.x1), minY: Math.min(marq.y0, marq.y1), maxX: Math.max(marq.x0, marq.x1), maxY: Math.max(marq.y0, marq.y1) };
+      const hit = primitives.map((p, i) => [i, primBBox(p)] as const).filter(([, b]) => rectsIntersect(b, box)).map(([i]) => i);
+      setSelSet((prev) => { const n = marqRef.current!.additive ? new Set(prev) : new Set<number>(); hit.forEach((i) => n.add(i)); return n; });
+      if (hit.length) setSel(hit[hit.length - 1]);
+    }
+    drag.current = null; move.current = null; marqRef.current = null; setMarq(null);
+  }
+
+  // Move the whole selection by (dx,dy) — "closer to / further from" any edge.
+  const nudge = (dx: number, dy: number) => setPrimitives((prev) => prev.map((p, i) => (selSet.has(i) ? translatePrim(p, dx, dy) : p)));
 
   const patchSel = (patch: Partial<IconPrimitive>) =>
     setPrimitives((prev) => prev.map((p, i) => (i === sel ? { ...p, ...patch } as IconPrimitive : p)));
 
   const selPrim = sel !== null ? primitives[sel] : undefined;
-  const handles = selPrim ? handlesFor(selPrim) : [];
+  // Vertex handles only when exactly one primitive is selected; a group shows a
+  // bounding box + move handle instead.
+  const handles = selSet.size === 1 && selPrim ? handlesFor(selPrim) : [];
+  const groupBox = selSet.size > 0 ? (() => {
+    const bs = [...selSet].map((i) => primBBox(primitives[i])).filter(Boolean);
+    return { minX: Math.min(...bs.map((b) => b.minX)), minY: Math.min(...bs.map((b) => b.minY)), maxX: Math.max(...bs.map((b) => b.maxX)), maxY: Math.max(...bs.map((b) => b.maxY)) };
+  })() : null;
 
   async function onUpload(file: File) {
     setUnderlay(URL.createObjectURL(file)); setSourceFile(file);
@@ -229,8 +304,8 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
     } finally { setBusy(false); }
   }
 
-  const addPrim = (t: IconPrimitive["type"]) => { setPrimitives((p) => [...p, defaultPrim(t, p.length)]); setSel(primitives.length); };
-  const delPrim = (i: number) => { setPrimitives((p) => p.filter((_, k) => k !== i)); setSel(null); };
+  const addPrim = (t: IconPrimitive["type"]) => { const idx = primitives.length; setPrimitives((p) => [...p, defaultPrim(t, p.length)]); selectOne(idx); };
+  const delPrim = (i: number) => { setPrimitives((p) => p.filter((_, k) => k !== i)); clearSel(); };
   const moveZ = (i: number, dir: -1 | 1) => setPrimitives((prev) => {
     const j = i + dir; if (j < 0 || j >= prev.length) return prev;
     const next = [...prev]; [next[i], next[j]] = [next[j], next[i]];
@@ -246,7 +321,7 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
           {icons.map((ic) => (
             <button key={ic.id} onClick={() => loadIcon(ic)}
               className={`w-full flex items-center gap-2 p-1.5 rounded border text-left ${selectedId === ic.id ? "border-red-400 bg-red-50" : "border-gray-200 hover:bg-gray-50"}`}>
-              <svg viewBox="0 0 40 40" className="w-8 h-8 shrink-0"><rect x="1" y="1" width="38" height="38" fill="#fafafa" stroke="#eee" />{drawCustomIcon(ic.primitives, { cx: 20, cy: 20, size: 34, colour: "#334155" })}</svg>
+              <svg viewBox="0 0 40 40" className="w-16 h-16 shrink-0"><rect x="1" y="1" width="38" height="38" fill="#fafafa" stroke="#eee" />{drawCustomIcon(ic.primitives, { cx: 20, cy: 20, size: 34, colour: "#334155" })}</svg>
               <span className="text-xs text-gray-700 truncate">{ic.name}</span>
             </button>
           ))}
@@ -270,17 +345,48 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
           ))}
         </div>
 
-        <svg ref={svgRef} viewBox="0 0 100 100" className="w-full max-w-[420px] mx-auto block border border-gray-100 rounded bg-[repeating-linear-gradient(45deg,#fafafa,#fafafa_6px,#fff_6px,#fff_12px)]"
-          onPointerMove={onSvgMove} onPointerUp={() => (drag.current = null)} onPointerLeave={() => (drag.current = null)}>
-          {underlay && <image href={underlay} x="0" y="0" width="100" height="100" opacity={0.2} preserveAspectRatio="xMidYMid meet" />}
+        <svg ref={svgRef} viewBox="0 0 100 100" className="w-full max-w-[560px] mx-auto block border border-gray-100 rounded bg-[repeating-linear-gradient(45deg,#f3f4f6,#f3f4f6_6px,#fff_6px,#fff_12px)] touch-none"
+          onPointerMove={onSvgMove} onPointerUp={endPointer} onPointerLeave={endPointer}>
+          {underlay && <image href={underlay} x="0" y="0" width="100" height="100" opacity={0.25} preserveAspectRatio="xMidYMid meet" />}
+          {/* background catcher: empty-area drag starts a lasso */}
+          <rect x={0} y={0} width={100} height={100} fill="transparent"
+            onPointerDown={(e) => { const c = toBox(e); if (!c) return; marqRef.current = { x0: c.x, y0: c.y, additive: e.shiftKey }; setMarq({ x0: c.x, y0: c.y, x1: c.x, y1: c.y }); }} />
           {drawCustomIcon(primitives, { cx: 50, cy: 50, size: 100, colour: EDIT_COLOUR })}
-          {/* selectable hit-areas: click any primitive's bbox centre marker */}
+          {/* group bounding box + move handle */}
+          {groupBox && (
+            <g>
+              <rect x={groupBox.minX} y={groupBox.minY} width={Math.max(0, groupBox.maxX - groupBox.minX)} height={Math.max(0, groupBox.maxY - groupBox.minY)}
+                fill="rgba(59,130,246,0.06)" stroke="#3b82f6" strokeWidth={0.6} strokeDasharray="2 1.5"
+                className="cursor-move"
+                onPointerDown={(e) => { const c = toBox(e); if (!c) return; e.stopPropagation(); (e.target as Element).setPointerCapture?.(e.pointerId); move.current = { start: c, snap: new Map([...selSet].map((i) => [i, primitives[i]])) }; }} />
+              <circle cx={(groupBox.minX + groupBox.maxX) / 2} cy={(groupBox.minY + groupBox.maxY) / 2} r={2.4} fill="#3b82f6" stroke="#fff" strokeWidth={0.7} className="cursor-move"
+                onPointerDown={(e) => { const c = toBox(e); if (!c) return; e.stopPropagation(); (e.target as Element).setPointerCapture?.(e.pointerId); move.current = { start: c, snap: new Map([...selSet].map((i) => [i, primitives[i]])) }; }} />
+            </g>
+          )}
+          {/* single-primitive vertex + control handles */}
           {handles.map((h) => (
             <circle key={h.id} cx={h.x} cy={h.y} r={2} className="cursor-move"
               fill={h.control ? "#f59e0b" : "#ef4444"} stroke="#fff" strokeWidth={0.6}
               onPointerDown={(e) => { e.stopPropagation(); (e.target as Element).setPointerCapture?.(e.pointerId); drag.current = { apply: h.apply }; }} />
           ))}
+          {/* lasso rubber-band */}
+          {marq && (
+            <rect x={Math.min(marq.x0, marq.x1)} y={Math.min(marq.y0, marq.y1)} width={Math.abs(marq.x1 - marq.x0)} height={Math.abs(marq.y1 - marq.y0)}
+              fill="rgba(59,130,246,0.08)" stroke="#3b82f6" strokeWidth={0.5} strokeDasharray="1.5 1" pointerEvents="none" />
+          )}
         </svg>
+        <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-gray-500">
+          <span>{selSet.size ? `${selSet.size} selected` : "drag on empty space to lasso; Shift-click list to multi-select"}</span>
+          {selSet.size > 0 && (
+            <span className="flex items-center gap-1">
+              · move:
+              <button onClick={() => nudge(0, -2)} className="px-1 border border-gray-300 rounded" title="up">↑</button>
+              <button onClick={() => nudge(0, 2)} className="px-1 border border-gray-300 rounded" title="down">↓</button>
+              <button onClick={() => nudge(-2, 0)} className="px-1 border border-gray-300 rounded" title="left">←</button>
+              <button onClick={() => nudge(2, 0)} className="px-1 border border-gray-300 rounded" title="right">→</button>
+            </span>
+          )}
+        </div>
 
         {/* Meta */}
         <div className="mt-3 grid grid-cols-2 gap-2">
@@ -306,8 +412,8 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
         <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 px-1">Shapes ({primitives.length})</div>
         <div className="space-y-1 max-h-[240px] overflow-y-auto">
           {primitives.map((p, i) => (
-            <div key={i} className={`flex items-center gap-1 px-1.5 py-1 rounded border text-[11px] ${sel === i ? "border-red-400 bg-red-50" : "border-gray-200"}`}>
-              <button onClick={() => setSel(i)} className="flex-1 text-left capitalize">{i + 1}. {p.type}</button>
+            <div key={i} className={`flex items-center gap-1 px-1.5 py-1 rounded border text-[11px] ${sel === i ? "border-red-400 bg-red-50" : selSet.has(i) ? "border-blue-300 bg-blue-50" : "border-gray-200"}`}>
+              <button onClick={(e) => (e.shiftKey ? toggleSel(i) : selectOne(i))} className="flex-1 text-left capitalize">{i + 1}. {p.type}</button>
               <button onClick={() => moveZ(i, -1)} title="down" className="text-gray-400 hover:text-gray-700">▾</button>
               <button onClick={() => moveZ(i, 1)} title="up" className="text-gray-400 hover:text-gray-700">▴</button>
               <button onClick={() => delPrim(i)} title="delete" className="text-gray-400 hover:text-red-600">✕</button>
@@ -393,7 +499,7 @@ function PathSegAdder({ prim, patch }: { prim: Extract<IconPrimitive, { type: "p
 function PreviewBox({ primitives, label, size }: { primitives: IconPrimitive[]; label: string; size: number }) {
   return (
     <div className="text-center">
-      <svg viewBox="0 0 40 40" className="w-10 h-10 border border-gray-100 rounded"><rect x="1" y="1" width="38" height="38" fill="#fff" stroke="#f0f0f0" />{drawCustomIcon(primitives, { cx: 20, cy: 20, size, colour: "#2563eb" })}</svg>
+      <svg viewBox="0 0 40 40" className="w-20 h-20 border border-gray-100 rounded"><rect x="1" y="1" width="38" height="38" fill="#fff" stroke="#f0f0f0" />{drawCustomIcon(primitives, { cx: 20, cy: 20, size, colour: "#2563eb" })}</svg>
       <div className="text-[9px] text-gray-400">{label}</div>
     </div>
   );
@@ -404,7 +510,7 @@ function ElementPreview({ primitives, w, h }: { primitives: IconPrimitive[]; w: 
   const cx = bx + bw - (w / 2 + 6), cy = by + (h / 2 + 6);
   return (
     <div className="text-center">
-      <svg viewBox="0 0 108 78" className="w-[108px] h-[78px] border border-gray-100 rounded">
+      <svg viewBox="0 0 108 78" className="w-[216px] h-[156px] border border-gray-100 rounded">
         <rect x={bx} y={by} width={bw} height={bh} fill="#eff6ff" stroke="#2563eb" strokeWidth={1.5} />
         {drawCustomIcon(primitives, { cx, cy, size: w, colour: "#2563eb" })}
       </svg>
@@ -475,10 +581,18 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
                   {shapes.map((s) => {
                     const assignedId = assignments[s.key];
                     const ic = assignedId ? iconById[assignedId] : undefined;
+                    const builtIn = s.iconType ? ICON_DRAWERS[s.iconType] : undefined;
                     return (
                       <div key={s.key} className="flex items-center gap-2 py-1">
-                        <svg viewBox="0 0 24 24" className="w-6 h-6 shrink-0">{ic ? drawCustomIcon(ic.primitives, { cx: 12, cy: 12, size: 22, colour: "#334155" }) : <rect x="4" y="4" width="16" height="16" fill="none" stroke="#ddd" strokeDasharray="2 2" />}</svg>
-                        <span className="flex-1 text-xs text-gray-700 truncate">{s.name}</span>
+                        {/* 2× glyph — the assigned custom icon, else the CURRENT built-in glyph */}
+                        <svg viewBox="0 0 24 24" className="w-12 h-12 shrink-0"><title>{ic ? "custom" : "current (built-in)"}</title>
+                          {ic
+                            ? drawCustomIcon(ic.primitives, { cx: 12, cy: 12, size: 22, colour: "#334155" })
+                            : builtIn
+                              ? builtIn({ cx: 12, cy: 12, size: 18, colour: "#94a3b8" })
+                              : <rect x="4" y="4" width="16" height="16" fill="none" stroke="#ddd" strokeDasharray="2 2" />}
+                        </svg>
+                        <span className="flex-1 text-xs text-gray-700 truncate">{s.name}{!ic && <span className="ml-1 text-[10px] text-gray-400">(current)</span>}</span>
                         <select value={assignedId ?? ""} onChange={(e) => setAssign(s.key, e.target.value)} className="border border-gray-300 rounded px-1 py-0.5 text-xs max-w-[160px]">
                           <option value="">Default (built-in)</option>
                           {icons.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
