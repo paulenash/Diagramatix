@@ -37,6 +37,10 @@ interface BasePrim {
   z: number;
   strokeWidth: number;
   filled: boolean;
+  /** How a filled shape is painted: "ink" (theme colour, default) or "background"
+   *  (the element's background colour — an OPAQUE mask that hides shapes beneath
+   *  while reading as blank). Ignored when filled is false (transparent). */
+  fillRole?: "ink" | "background";
   colourRole?: ColourRole;
   /** Required only when colourRole === "fixed" (#rrggbb). */
   colour?: string;
@@ -111,6 +115,7 @@ function validateBase(o: Record<string, unknown>, i: number): BasePrim {
     strokeWidth: num(o.strokeWidth, DEFAULT_STROKE_WIDTH, 0, 40),
     filled: !!o.filled,
   };
+  if (o.fillRole === "background" || o.fillRole === "ink") base.fillRole = o.fillRole;
   const role = o.colourRole;
   if (role === "stroke" || role === "fill" || role === "fixed") base.colourRole = role;
   if (base.colourRole === "fixed") {
@@ -257,8 +262,9 @@ function arrowNode(
  */
 export function drawCustomIcon(
   primitives: IconPrimitive[],
-  { cx, cy, size, colour }: { cx: number; cy: number; size: number; colour: string },
+  { cx, cy, size, colour, bg }: { cx: number; cy: number; size: number; colour: string; bg?: string },
 ): React.ReactNode {
+  const paper = bg ?? "#ffffff"; // opaque mask colour for "background" fills
   const mx = (n: number) => cx + ((n - 50) / 100) * size;
   const my = (n: number) => cy + ((n - 50) / 100) * size;
   const mlen = (n: number) => (n / 100) * size;
@@ -270,7 +276,7 @@ export function drawCustomIcon(
     const paint = p.colourRole === "fixed" && p.colour ? p.colour : colour;
     const sw = msw(p.strokeWidth);
     const stroke = p.strokeWidth > 0 ? paint : "none";
-    const fill = p.filled ? paint : "none";
+    const fill = !p.filled ? "none" : (p.fillRole === "background" ? paper : paint);
     const common = { stroke, strokeWidth: sw, fill, strokeLinejoin: "round" as const, strokeLinecap: "round" as const };
     const key = `p${i}`;
 

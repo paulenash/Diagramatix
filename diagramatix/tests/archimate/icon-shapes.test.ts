@@ -56,6 +56,15 @@ describe("Custom icon shapes (Icon Library)", () => {
     expect(a0).not.toEqual(a90);
   });
 
+  // T1014 — fill modes: none=transparent, ink=theme colour, background=opaque mask (bg).
+  it("T1014: fillRole background paints the bg (mask); ink paints the theme colour", () => {
+    const rect = (extra: Partial<IconPrimitive>) => ({ type: "rect", x: 10, y: 10, w: 20, h: 20, z: 0, strokeWidth: 0, filled: true, ...extra } as IconPrimitive);
+    const opts = { cx: 50, cy: 50, size: 100, colour: "#111111", bg: "#abcdef" };
+    expect(renderToStaticMarkup(drawCustomIcon([rect({ fillRole: "background" })], opts) as React.ReactElement)).toContain('fill="#abcdef"');
+    expect(renderToStaticMarkup(drawCustomIcon([rect({ fillRole: "ink" })], opts) as React.ReactElement)).toContain('fill="#111111"');
+    expect(renderToStaticMarkup(drawCustomIcon([rect({ filled: false })], opts) as React.ReactElement)).toContain('fill="none"');
+  });
+
   // T1007 — normalised coords map into {cx,cy,size}; strokeWidth scales with a floor.
   it("T1007: coordinate mapping + strokeWidth scaling", () => {
     // circle at normalised centre (50,50) → element centre (cx,cy)

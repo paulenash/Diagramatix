@@ -147,7 +147,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   const custom = effectiveCustomIcon(entry.key, customAssignments, iconsById);
   const customBaseSize = custom ? { width: custom.defaultWidth, height: custom.defaultHeight } : undefined;
   const drawIcon: ((o: { cx: number; cy: number; size: number; colour: string }) => ReactNode) | undefined =
-    custom ? (o) => drawCustomIcon(custom.primitives, o)
+    custom ? (o) => drawCustomIcon(custom.primitives, { ...o, bg: fill }) // bg = element fill → "background" masks blend
     : (entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined);
 
   // A Business Process linked to a BPMN diagram in the same project shows a

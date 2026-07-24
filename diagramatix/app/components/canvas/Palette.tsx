@@ -474,7 +474,7 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
   const { assignments, iconsById } = useArchimateCustomIcon();
   const custom = effectiveCustomIcon(entry.key, assignments, iconsById);
   const drawIcon = custom
-    ? (o: { cx: number; cy: number; size: number; colour: string }) => drawCustomIcon(custom.primitives, o)
+    ? (o: { cx: number; cy: number; size: number; colour: string }) => drawCustomIcon(custom.primitives, { ...o, bg: fill })
     : (entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined);
 
   // Junction (And/Or) — the whole shape is the small circle glyph.

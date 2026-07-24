@@ -477,8 +477,19 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
         {selPrim && (
           <div className="mt-3 border-t border-gray-100 pt-2 space-y-2">
             <div className="text-[11px] font-medium text-gray-500 uppercase">Selected {selPrim.type}</div>
-            <label className="flex items-center gap-2 text-xs text-gray-600">
-              <input type="checkbox" checked={selPrim.filled} onChange={(e) => patchSel({ filled: e.target.checked })} /> Filled
+            <label className="flex items-center gap-2 text-xs text-gray-600">Fill
+              <select
+                value={selPrim.filled ? (selPrim.fillRole ?? "ink") : "none"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "none") patchSel({ filled: false });
+                  else patchSel({ filled: true, fillRole: v as "ink" | "background" });
+                }}
+                className="border border-gray-300 rounded px-1 py-0.5 text-xs">
+                <option value="none">None (transparent)</option>
+                <option value="background">Background (mask)</option>
+                <option value="ink">Theme (ink)</option>
+              </select>
             </label>
             <label className="flex items-center gap-2 text-xs text-gray-600">Stroke
               <input type="number" step="0.5" value={selPrim.strokeWidth} onChange={(e) => patchSel({ strokeWidth: parseFloat(e.target.value) || 0 })} className="w-16 border border-gray-300 rounded px-1 py-0.5 text-xs" />
@@ -564,7 +575,7 @@ function ElementPreview({ primitives, w, h }: { primitives: IconPrimitive[]; w: 
     <div className="text-center">
       <svg viewBox="0 0 108 78" className="w-[216px] h-[156px] border border-gray-100 rounded">
         <rect x={bx} y={by} width={bw} height={bh} fill="#eff6ff" stroke="#2563eb" strokeWidth={1.5} />
-        {drawCustomIcon(primitives, { cx, cy, size: w, colour: "#2563eb" })}
+        {drawCustomIcon(primitives, { cx, cy, size: w, colour: "#2563eb", bg: "#eff6ff" })}
       </svg>
       <div className="text-[9px] text-gray-400">on element</div>
     </div>
