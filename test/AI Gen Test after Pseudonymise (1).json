@@ -1,0 +1,918 @@
+{
+  "schemaVersion": "1.41",
+  "appVersion": "1.41.1758",
+  "exportedAt": "2026-07-21T07:44:34.194Z",
+  "project": {
+    "name": "(single diagram)",
+    "description": "",
+    "ownerName": "",
+    "colorConfig": {}
+  },
+  "diagrams": [
+    {
+      "originalId": "cmrubsryt000001mv4j3rjfz0",
+      "name": "AI Gen Test after Pseudonymise",
+      "type": "bpmn",
+      "data": {
+        "elements": [
+          {
+            "id": "pEnq",
+            "type": "pool",
+            "x": 50,
+            "y": 50,
+            "width": 1628,
+            "height": 78,
+            "label": "Enquirer",
+            "properties": {
+              "poolType": "black-box",
+              "isSystem": false,
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "id": "p1",
+            "type": "pool",
+            "x": 50,
+            "y": 218,
+            "width": 1628,
+            "height": 331.5,
+            "label": "Company",
+            "properties": {
+              "poolType": "white-box"
+            }
+          },
+          {
+            "id": "lFO",
+            "type": "lane",
+            "x": 86,
+            "y": 218,
+            "width": 1592,
+            "height": 331.5,
+            "label": "Front Office Team",
+            "properties": {},
+            "parentId": "p1"
+          },
+          {
+            "id": "start1",
+            "type": "start-event",
+            "x": 158,
+            "y": 348,
+            "width": 36,
+            "height": 36,
+            "label": "Email Received",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            },
+            "parentId": "lFO",
+            "eventType": "message"
+          },
+          {
+            "id": "t1",
+            "type": "task",
+            "x": 264,
+            "y": 333.5,
+            "width": 102,
+            "height": 65,
+            "label": "Check Email",
+            "properties": {},
+            "parentId": "lFO",
+            "taskType": "user"
+          },
+          {
+            "id": "sp1",
+            "type": "subprocess-expanded",
+            "x": 452,
+            "y": 338.5,
+            "width": 656,
+            "height": 131,
+            "label": "Continue Until Information Complete Or Two Days Elapsed",
+            "properties": {},
+            "parentId": "lFO",
+            "repeatType": "loop"
+          },
+          {
+            "id": "t2",
+            "type": "task",
+            "x": 1130,
+            "y": 286,
+            "width": 102,
+            "height": 65,
+            "label": "Complete Reply\nTo Enquirer",
+            "properties": {},
+            "parentId": "lFO",
+            "taskType": "user"
+          },
+          {
+            "id": "mrg1",
+            "type": "gateway",
+            "x": 1292,
+            "y": 381,
+            "width": 40,
+            "height": 40,
+            "label": "",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "merge"
+            },
+            "parentId": "lFO",
+            "gatewayType": "none"
+          },
+          {
+            "id": "t3",
+            "type": "task",
+            "x": 1422,
+            "y": 368.5,
+            "width": 102,
+            "height": 65,
+            "label": "Send Reply\nTo Enquirer",
+            "properties": {},
+            "parentId": "lFO",
+            "taskType": "user"
+          },
+          {
+            "id": "end1",
+            "type": "end-event",
+            "x": 1592,
+            "y": 383,
+            "width": 36,
+            "height": 36,
+            "label": "Reply Sent",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            },
+            "parentId": "lFO"
+          },
+          {
+            "id": "pSys",
+            "type": "pool",
+            "x": 50,
+            "y": 639.5,
+            "width": 1628,
+            "height": 114,
+            "label": "Ask & Receive",
+            "properties": {
+              "poolType": "black-box",
+              "isSystem": true,
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "id": "spStart",
+            "type": "start-event",
+            "x": 482,
+            "y": 389,
+            "width": 36,
+            "height": 36,
+            "label": "",
+            "properties": {},
+            "parentId": "sp1"
+          },
+          {
+            "id": "spT1",
+            "type": "task",
+            "x": 588,
+            "y": 374.5,
+            "width": 102,
+            "height": 65,
+            "label": "Ask Enquirer\nFor Details",
+            "properties": {},
+            "parentId": "sp1",
+            "taskType": "send"
+          },
+          {
+            "id": "spT2",
+            "type": "task",
+            "x": 729,
+            "y": 371.5,
+            "width": 102,
+            "height": 65,
+            "label": "Receive And\nEvaluate Reply",
+            "properties": {},
+            "parentId": "sp1",
+            "taskType": "receive"
+          },
+          {
+            "id": "spEnd",
+            "type": "end-event",
+            "x": 946.6666666666666,
+            "y": 389,
+            "width": 36,
+            "height": 36,
+            "label": "",
+            "properties": {},
+            "parentId": "sp1"
+          },
+          {
+            "id": "bTimer",
+            "type": "intermediate-event",
+            "x": 986.3333333333334,
+            "y": 320.5,
+            "width": 36,
+            "height": 36,
+            "label": "Two Days Elapsed",
+            "properties": {
+              "interruptionType": "interrupting",
+              "boundarySide": "top",
+              "labelOffsetX": 0,
+              "labelOffsetY": -70
+            },
+            "boundaryHostId": "sp1",
+            "eventType": "timer"
+          },
+          {
+            "id": "_ai_gen_annotation",
+            "type": "text-annotation",
+            "x": 96,
+            "y": 154,
+            "width": 160,
+            "height": 44,
+            "label": "AI Generated\nRecorded Enquiry Process 1",
+            "properties": {}
+          }
+        ],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.6
+        },
+        "connectors": [
+          {
+            "id": "conn-spT1-spT2",
+            "sourceId": "spT1",
+            "targetId": "spT2",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 639,
+                "y": 407
+              },
+              {
+                "x": 690,
+                "y": 407
+              },
+              {
+                "x": 714,
+                "y": 407
+              },
+              {
+                "x": 750.6666666666666,
+                "y": 407
+              },
+              {
+                "x": 774.6666666666666,
+                "y": 407
+              },
+              {
+                "x": 825.6666666666666,
+                "y": 407
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-spT2-spEnd",
+            "sourceId": "spT2",
+            "targetId": "spEnd",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 825.6666666666666,
+                "y": 407
+              },
+              {
+                "x": 876.6666666666666,
+                "y": 407
+              },
+              {
+                "x": 900.6666666666666,
+                "y": 407
+              },
+              {
+                "x": 928.6666666666666,
+                "y": 407
+              },
+              {
+                "x": 946.6666666666666,
+                "y": 407
+              },
+              {
+                "x": 964.6666666666666,
+                "y": 407
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-pEnq-spT2",
+            "sourceId": "pEnq",
+            "targetId": "spT2",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 864,
+                "y": 89
+              },
+              {
+                "x": 825.6666666666666,
+                "y": 128
+              },
+              {
+                "x": 825.6666666666666,
+                "y": 374.5
+              },
+              {
+                "x": 825.6666666666666,
+                "y": 407
+              }
+            ],
+            "label": "Reply with details",
+            "sourceOffsetAlong": 0.4764537264537264,
+            "targetOffsetAlong": 0.5,
+            "labelOffsetX": 0,
+            "labelOffsetY": -92.25,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-start1-t1",
+            "sourceId": "start1",
+            "targetId": "t1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 176,
+                "y": 366
+              },
+              {
+                "x": 194,
+                "y": 366
+              },
+              {
+                "x": 212,
+                "y": 366
+              },
+              {
+                "x": 240,
+                "y": 366
+              },
+              {
+                "x": 264,
+                "y": 366
+              },
+              {
+                "x": 315,
+                "y": 366
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-spStart-spT1",
+            "sourceId": "spStart",
+            "targetId": "spT1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 407
+              },
+              {
+                "x": 518,
+                "y": 407
+              },
+              {
+                "x": 536,
+                "y": 407
+              },
+              {
+                "x": 564,
+                "y": 407
+              },
+              {
+                "x": 588,
+                "y": 407
+              },
+              {
+                "x": 639,
+                "y": 407
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-spT1-pEnq",
+            "sourceId": "spT1",
+            "targetId": "pEnq",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 639,
+                "y": 407
+              },
+              {
+                "x": 639,
+                "y": 374.5
+              },
+              {
+                "x": 639,
+                "y": 128
+              },
+              {
+                "x": 864,
+                "y": 89
+              }
+            ],
+            "label": "Request for details",
+            "targetOffsetAlong": 0.3617936117936118,
+            "labelOffsetX": 0,
+            "labelOffsetY": -92.25,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-t1-pSys",
+            "sourceId": "t1",
+            "targetId": "pSys",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 315,
+                "y": 366
+              },
+              {
+                "x": 315,
+                "y": 398.5
+              },
+              {
+                "x": 315,
+                "y": 639.5
+              },
+              {
+                "x": 864,
+                "y": 696.5
+              }
+            ],
+            "label": "Email details",
+            "targetOffsetAlong": 0.16277641277641278,
+            "labelOffsetX": 0,
+            "labelOffsetY": 61.5,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-t3-pSys",
+            "sourceId": "t3",
+            "targetId": "pSys",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1473,
+                "y": 401
+              },
+              {
+                "x": 1473,
+                "y": 433.5
+              },
+              {
+                "x": 1473,
+                "y": 639.5
+              },
+              {
+                "x": 864,
+                "y": 696.5
+              }
+            ],
+            "label": "Reply details",
+            "targetOffsetAlong": 0.8740786240786241,
+            "labelOffsetX": 0,
+            "labelOffsetY": -33.625,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-bTimer-t2",
+            "sourceId": "bTimer",
+            "targetId": "t2",
+            "sourceSide": "top",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1004.3333333333334,
+                "y": 338.5
+              },
+              {
+                "x": 1004.3333333333334,
+                "y": 320.5
+              },
+              {
+                "x": 1004.3333333333334,
+                "y": 302.5
+              },
+              {
+                "x": 1106,
+                "y": 302.5
+              },
+              {
+                "x": 1106,
+                "y": 318.5
+              },
+              {
+                "x": 1106,
+                "y": 318.5
+              },
+              {
+                "x": 1130,
+                "y": 318.5
+              },
+              {
+                "x": 1181,
+                "y": 318.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t2-mrg1",
+            "sourceId": "t2",
+            "targetId": "mrg1",
+            "sourceSide": "right",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1181,
+                "y": 318.5
+              },
+              {
+                "x": 1232,
+                "y": 318.5
+              },
+              {
+                "x": 1312,
+                "y": 318.5
+              },
+              {
+                "x": 1312,
+                "y": 381
+              },
+              {
+                "x": 1312,
+                "y": 401
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-sp1-mrg1",
+            "sourceId": "sp1",
+            "targetId": "mrg1",
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 780,
+                "y": 404
+              },
+              {
+                "x": 1108,
+                "y": 404
+              },
+              {
+                "x": 1132,
+                "y": 404
+              },
+              {
+                "x": 1132,
+                "y": 451
+              },
+              {
+                "x": 1312,
+                "y": 451
+              },
+              {
+                "x": 1312,
+                "y": 441
+              },
+              {
+                "x": 1312,
+                "y": 421
+              },
+              {
+                "x": 1312,
+                "y": 401
+              }
+            ],
+            "label": "Information complete",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "labelWidth": 80,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-mrg1-t3",
+            "sourceId": "mrg1",
+            "targetId": "t3",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1312,
+                "y": 401
+              },
+              {
+                "x": 1332,
+                "y": 401
+              },
+              {
+                "x": 1352,
+                "y": 401
+              },
+              {
+                "x": 1398,
+                "y": 401
+              },
+              {
+                "x": 1422,
+                "y": 401
+              },
+              {
+                "x": 1473,
+                "y": 401
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-t3-pEnq",
+            "sourceId": "t3",
+            "targetId": "pEnq",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1473,
+                "y": 401
+              },
+              {
+                "x": 1473,
+                "y": 368.5
+              },
+              {
+                "x": 1473,
+                "y": 128
+              },
+              {
+                "x": 864,
+                "y": 89
+              }
+            ],
+            "label": "Reply",
+            "targetOffsetAlong": 0.8740786240786241,
+            "labelOffsetX": 0,
+            "labelOffsetY": -11.625,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-t3-end1",
+            "sourceId": "t3",
+            "targetId": "end1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1473,
+                "y": 401
+              },
+              {
+                "x": 1524,
+                "y": 401
+              },
+              {
+                "x": 1548,
+                "y": 401
+              },
+              {
+                "x": 1574,
+                "y": 401
+              },
+              {
+                "x": 1592,
+                "y": 401
+              },
+              {
+                "x": 1610,
+                "y": 401
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-_ai_gen_annotation-start1",
+            "sourceId": "_ai_gen_annotation",
+            "targetId": "start1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "associationBPMN",
+            "directionType": "non-directed",
+            "routingType": "direct",
+            "sourceInvisibleLeader": false,
+            "targetInvisibleLeader": false,
+            "waypoints": [
+              {
+                "x": 176,
+                "y": 198
+              },
+              {
+                "x": 176,
+                "y": 348
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "dgyiwj88",
+            "type": "sequence",
+            "sourceId": "t1",
+            "targetId": "spT2",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "targetOffsetAlong": 0.5,
+            "waypoints": [
+              {
+                "x": 315,
+                "y": 366
+              },
+              {
+                "x": 366,
+                "y": 366
+              },
+              {
+                "x": 390,
+                "y": 366
+              },
+              {
+                "x": 390,
+                "y": 449.5
+              },
+              {
+                "x": 705,
+                "y": 449.5
+              },
+              {
+                "x": 705,
+                "y": 404
+              },
+              {
+                "x": 729,
+                "y": 404
+              },
+              {
+                "x": 780,
+                "y": 404
+              }
+            ],
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "label": ""
+          },
+          {
+            "id": "8y7elriu",
+            "type": "sequence",
+            "sourceId": "spT2",
+            "targetId": "sp1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceOffsetAlong": 0.5,
+            "waypoints": [
+              {
+                "x": 780,
+                "y": 404
+              },
+              {
+                "x": 831,
+                "y": 404
+              },
+              {
+                "x": 835,
+                "y": 404
+              },
+              {
+                "x": 448,
+                "y": 404
+              },
+              {
+                "x": 448,
+                "y": 404
+              },
+              {
+                "x": 452,
+                "y": 404
+              },
+              {
+                "x": 780,
+                "y": 404
+              }
+            ],
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "label": "",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "labelWidth": 80
+          }
+        ]
+      },
+      "colorConfig": {},
+      "displayMode": "normal"
+    }
+  ]
+}

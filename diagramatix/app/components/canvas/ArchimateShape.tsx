@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState, useContext, type ReactNode } from "react";
 import type { DiagramElement } from "@/app/lib/diagram/types";
 import {
   loadArchimateCatalogue,
@@ -21,6 +21,8 @@ import {
 } from "@/app/lib/archimate/catalogue";
 import { getThemeFor, type ArchimateCategoryTheme } from "@/app/lib/archimate/themes";
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
+import { effectiveIconLayout, type IconLayout } from "@/app/lib/archimate/iconLayout";
+import { useArchimateIconLayout } from "@/app/lib/archimate/useArchimateIconLayout";
 import { ArchimateDepthCtx } from "./SymbolRenderer";
 
 const STROKE_WIDTH = 2.4;               // 2× the previous 1.2
@@ -34,14 +36,28 @@ function lightenHex(hex: string, amount: number): string {
   return `#${[mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
-// Glyphs in these categories are drawn compact, so they need a larger corner box
-// than the Business / Application markers to read at the same visual weight.
-// (Keyed by CATEGORY, not iconType, because Technology + Business share icon
-// types like "collaboration" / "interface" / "process".)
-const LARGE_GLYPH_CATEGORIES = new Set([
-  "motivation", "technology", "implementation-migration", "composite",
-]);
-const glyphSizeFor = (category?: string) => (category && LARGE_GLYPH_CATEGORIES.has(category) ? 36 : 27);
+// Corner-glyph default geometry (size + top-right nudge + Technology tweak) now
+// lives in iconLayout.ts so the SuperAdmin Icon Maintenance tool and this renderer
+// share one source of truth; effectiveIconLayout() overlays any saved override.
+
+/** Render a corner glyph at its effective layout. The drawers paint a square of
+ *  `size`; when width ≠ height we scale vertically about the glyph centre so a
+ *  non-square override still positions correctly. */
+function renderGlyph(
+  drawIcon: (a: { cx: number; cy: number; size: number; colour: string }) => ReactNode,
+  el: DiagramElement,
+  layout: IconLayout,
+  colour: string,
+): ReactNode {
+  const cx = el.x + el.width - layout.xOffset;
+  const cy = el.y + layout.yOffset;
+  const glyph = drawIcon({ cx, cy, size: layout.width, colour });
+  if (layout.height === layout.width) return glyph;
+  const scaleY = layout.height / layout.width;
+  return (
+    <g transform={`translate(${cx} ${cy}) scale(1 ${scaleY}) translate(${-cx} ${-cy})`}>{glyph}</g>
+  );
+}
 
 // ────────────────────────────────────────────────────────────────────
 // Outline renderers per shape family
@@ -76,6 +92,7 @@ function drawOutline(
 export function ArchimateShape({ el }: { el: DiagramElement }) {
   const shapeKey = el.properties?.shapeKey as string | undefined;
   const [, forceRender] = useState(0);
+  const iconOverrides = useArchimateIconLayout();
 
   // Ensure the catalogue is loaded — trigger a re-render once it arrives
   useEffect(() => {
@@ -169,13 +186,11 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
       // plain rectangle, so overlay its ArchiMate glyph in the top-right corner
       // — otherwise it renders as a blank box.
       const cornerGlyph = entry.iconType !== "service" && entry.iconType !== "event";
-      const glyphSize = glyphSizeFor(entry.category); // larger for compact-glyph categories
-      const gx = el.x + el.width - glyphSize / 2 - 6;
-      const gy = el.y + glyphSize / 2 + 6;
+      const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides);
       return (
         <g>
           <path d={bg} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} strokeLinejoin="round" />
-          {cornerGlyph && drawIcon ? drawIcon({ cx: gx, cy: gy, size: glyphSize, colour: glyphColour }) : null}
+          {cornerGlyph && drawIcon ? renderGlyph(drawIcon, el, layout, glyphColour) : null}
         </g>
       );
     }
@@ -205,18 +220,15 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
     );
   }
 
-  // Standard box rendering — outline + corner icon glyph. The compact-glyph
-  // categories get their marker nudged 10px toward the top-right corner.
+  // Standard box rendering — outline + corner icon glyph. Position + size come
+  // from the effective icon layout (category default, overlaid with any saved
+  // SuperAdmin override from ArchiMate Icon Maintenance).
   const d = drawOutline(entry.shapeFamily, el.x, el.y, el.width, el.height);
-  const iconBoxSize = glyphSizeFor(entry.category); // larger for compact-glyph categories
-  const nudge = LARGE_GLYPH_CATEGORIES.has(entry.category) ? 10 : 0;
-  const xTweak = entry.category === "technology" ? -2 : 0; // Technology markers 2px left
-  const iconCx = el.x + el.width - iconBoxSize / 2 - 6 + nudge + xTweak;
-  const iconCy = el.y + iconBoxSize / 2 + 6 - nudge;
+  const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides);
   return (
     <g>
       <path d={d} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} />
-      {drawIcon ? drawIcon({ cx: iconCx, cy: iconCy, size: iconBoxSize, colour: glyphColour }) : null}
+      {drawIcon ? renderGlyph(drawIcon, el, layout, glyphColour) : null}
     </g>
   );
 }
