@@ -3035,7 +3035,10 @@ export function Canvas({
         // Icon-only variants use their own fixed aspect so the glyph
         // renders at a sensible scale.
         let w: number, h: number;
-        if (iconOnly) {
+        if (entry.iconType && entry.iconType.startsWith("junction")) {
+          // Junctions are a fixed small node — use the catalogue's own size.
+          w = entry.defaultWidth; h = entry.defaultHeight;
+        } else if (iconOnly) {
           if (entry.iconType === "actor") { w = 48; h = 86; }       // portrait stick figure
           else if (entry.iconType === "service") { w = 120; h = 60; } // rounded-rect
           else { w = 120; h = 60; }                                   // event + fallbacks
