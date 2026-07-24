@@ -693,6 +693,10 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
           const open = expanded.has(c.id);
           const shapes = c.shapes.filter((s) => s.iconType && !s.iconType.startsWith("junction"));
           if (!shapes.length) return null;
+          // Elements that have both a box AND an icon-only variant get a variant
+          // tag so the two rows are distinguishable (they're independently assignable).
+          const nameCount = new Map<string, number>();
+          for (const s of shapes) nameCount.set(s.name, (nameCount.get(s.name) ?? 0) + 1);
           return (
             <div key={c.id} className="border-b border-gray-100 last:border-b-0">
               <button onClick={() => toggle(c.id)} className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
@@ -704,6 +708,7 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
                     const assignedId = assignments[s.key];
                     const ic = assignedId ? iconById[assignedId] : undefined;
                     const builtIn = s.iconType ? ICON_DRAWERS[s.iconType] : undefined;
+                    const variant = (nameCount.get(s.name) ?? 0) > 1 ? (s.variant === "icon" ? "icon" : "box") : null;
                     return (
                       <div key={s.key} className="flex items-center gap-2 py-1">
                         {/* 2× glyph — the assigned custom icon, else the CURRENT built-in glyph */}
@@ -714,7 +719,11 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
                               ? builtIn({ cx: 12, cy: 12, size: 18, colour: "#94a3b8" })
                               : <rect x="4" y="4" width="16" height="16" fill="none" stroke="#ddd" strokeDasharray="2 2" />}
                         </svg>
-                        <span className="flex-1 text-xs text-gray-700 truncate">{s.name}{!ic && <span className="ml-1 text-[10px] text-gray-400">(current)</span>}</span>
+                        <span className="flex-1 text-xs text-gray-700 truncate">
+                          {s.name}
+                          {variant && <span className={`ml-1 text-[10px] px-1 rounded ${variant === "icon" ? "bg-indigo-50 text-indigo-600" : "bg-gray-100 text-gray-500"}`}>{variant}</span>}
+                          {!ic && <span className="ml-1 text-[10px] text-gray-400">(current)</span>}
+                        </span>
                         <select value={assignedId ?? ""} onChange={(e) => setAssign(s.key, e.target.value)} className="border border-gray-300 rounded px-1 py-0.5 text-xs max-w-[160px]">
                           <option value="">Default (built-in)</option>
                           {icons.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
