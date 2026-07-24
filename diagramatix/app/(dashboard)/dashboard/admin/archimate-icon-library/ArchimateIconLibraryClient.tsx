@@ -12,6 +12,8 @@ import {
 import { loadArchimateCatalogue, type ArchimateCatalogue } from "@/app/lib/archimate/catalogue";
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 import { invalidateArchimateCustomIconCache } from "@/app/lib/archimate/useArchimateCustomIcon";
+import { invalidateArchimateIconBufferCache } from "@/app/lib/archimate/useArchimateIconBuffers";
+import { builtinCategoryBuffer, type CategoryBuffers } from "@/app/lib/archimate/iconLayout";
 import { PromptDialog } from "@/app/components/PromptDialog";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
@@ -594,15 +596,38 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
   const [cat, setCat] = useState<ArchimateCatalogue | null>(null);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState("{}");
+  const [buffers, setBuffers] = useState<CategoryBuffers>({});
+  const [savedBuffers, setSavedBuffers] = useState("{}");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     loadArchimateCatalogue().then((c) => setCat(c)).catch(() => setErr("Catalogue load failed")); // start all categories collapsed
     fetch("/api/admin/archimate-icons-custom").then((r) => (r.ok ? r.json() : { assignments: {} })).then((j) => { const a = j.assignments ?? {}; setAssignments(a); setSaved(JSON.stringify(a)); }).catch(() => {});
+    fetch("/api/admin/archimate-icon-buffers").then((r) => (r.ok ? r.json() : { buffers: {} })).then((j) => { const b = j.buffers ?? {}; setBuffers(b); setSavedBuffers(JSON.stringify(b)); }).catch(() => {});
   }, [setErr]);
 
   const dirty = JSON.stringify(assignments) !== saved;
+  const buffersDirty = JSON.stringify(buffers) !== savedBuffers;
+
+  // Effective buffer value for a category = saved override, else the built-in default.
+  const bufVal = (catId: string, side: "top" | "right") => buffers[catId]?.[side] ?? builtinCategoryBuffer(catId)[side];
+  function setBuf(catId: string, side: "top" | "right", v: number) {
+    setBuffers((prev) => ({ ...prev, [catId]: { ...prev[catId], [side]: v } }));
+  }
+  function resetBuf(catId: string) {
+    setBuffers((prev) => { const n = { ...prev }; delete n[catId]; return n; });
+  }
+  async function saveBuffers() {
+    setBusy(true); setErr(null);
+    try {
+      const res = await fetch("/api/admin/archimate-icon-buffers", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ buffers }) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(j.error ?? "Save failed"); return; }
+      const b = j.buffers ?? {}; setBuffers(b); setSavedBuffers(JSON.stringify(b));
+      invalidateArchimateIconBufferCache();
+    } catch { setErr("Network error"); } finally { setBusy(false); }
+  }
   const iconById = useMemo(() => Object.fromEntries(icons.map((i) => [i.id, i])), [icons]);
 
   function setAssign(key: string, id: string) {
@@ -629,6 +654,40 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
         or set the icon&rsquo;s preferred size in the editor.
       </p>
       {!icons.length && <p className="text-xs text-amber-600 mb-3">Create an icon in the Editor tab first.</p>}
+
+      {/* Per-category glyph edge buffers */}
+      <div className="mb-4 bg-white border border-gray-200 rounded-lg p-3 max-w-2xl">
+        <div className="text-xs font-medium text-gray-700 mb-1">Category glyph buffers</div>
+        <p className="text-[11px] text-gray-500 mb-2">
+          The gap (px) from an element&rsquo;s <strong>top</strong> / <strong>right</strong> edge to the glyph, applied to every element in that category. Negative = the glyph overhangs the edge. Blank inputs show the current built-in default.
+        </p>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-[10px] text-gray-400 uppercase tracking-wide">
+            <span className="w-40">Category</span><span className="w-24 text-center">Top</span><span className="w-24 text-center">Right</span><span className="w-16 text-center">Default</span>
+          </div>
+          {cat?.categories.map((c) => {
+            const bi = builtinCategoryBuffer(c.id);
+            const overridden = buffers[c.id] && (buffers[c.id].top !== undefined || buffers[c.id].right !== undefined);
+            return (
+              <div key={c.id} className="flex items-center gap-2">
+                <span className="w-40 text-xs text-gray-700">{CATEGORY_LABELS[c.id] ?? c.name}</span>
+                <input type="number" step="0.5" value={bufVal(c.id, "top")} onChange={(e) => setBuf(c.id, "top", parseFloat(e.target.value) || 0)}
+                  className="w-24 border border-gray-300 rounded px-1 py-0.5 text-xs text-center tabular-nums" />
+                <input type="number" step="0.5" value={bufVal(c.id, "right")} onChange={(e) => setBuf(c.id, "right", parseFloat(e.target.value) || 0)}
+                  className="w-24 border border-gray-300 rounded px-1 py-0.5 text-xs text-center tabular-nums" />
+                <span className="w-16 text-center text-[10px] text-gray-400">{bi.top}/{bi.right}</span>
+                {overridden && <button onClick={() => resetBuf(c.id)} title="reset to default" className="text-gray-400 hover:text-gray-700 text-xs">↺</button>}
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-2 flex items-center gap-3">
+          <button onClick={saveBuffers} disabled={!buffersDirty || busy} className="px-3 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50">Save buffers</button>
+          {!buffersDirty && <span className="text-[11px] text-green-700">✓ Saved</span>}
+          {buffersDirty && <span className="text-[11px] text-amber-600">Unsaved</span>}
+        </div>
+      </div>
+
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-w-2xl">
         {cat?.categories.map((c) => {
           const open = expanded.has(c.id);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { effectiveCustomIcon, type CustomIconsById } from "@/app/lib/archimate/customIcon";
-import { defaultIconLayout, effectiveIconLayout } from "@/app/lib/archimate/iconLayout";
+import { defaultIconLayout, effectiveIconLayout, builtinCategoryBuffer } from "@/app/lib/archimate/iconLayout";
 import type { IconPrimitive } from "@/app/lib/archimate/iconShapes";
 
 const prims: IconPrimitive[] = [{ type: "circle", cx: 50, cy: 50, r: 10, z: 0, strokeWidth: 6, filled: false }];
@@ -31,5 +31,19 @@ describe("Custom icon assignment", () => {
     expect(effectiveIconLayout("k", "business", {}, { width: 50, height: 50 }).width).toBe(50);
     // per-element override beats baseSize
     expect(effectiveIconLayout("k", "business", { k: { width: 99 } }, { width: 50, height: 50 }).width).toBe(99);
+  });
+
+  // T1015 — per-category edge buffers: built-in values + override drives the offset.
+  it("T1015: category buffers set the top/right edge gap", () => {
+    // built-in: small = 6/6; motivation nudged to -4/-4; technology -4/-2
+    expect(builtinCategoryBuffer("business")).toEqual({ top: 6, right: 6 });
+    expect(builtinCategoryBuffer("motivation")).toEqual({ top: -4, right: -4 });
+    expect(builtinCategoryBuffer("technology")).toEqual({ top: -4, right: -2 });
+    // a buffer override → xOffset = w/2 + right, yOffset = h/2 + top
+    const l = defaultIconLayout("business", undefined, { business: { top: 10, right: 2 } });
+    expect(l.xOffset).toBe(27 / 2 + 2);
+    expect(l.yOffset).toBe(27 / 2 + 10);
+    // no override → built-in default preserved (behaviour-preserving refactor)
+    expect(defaultIconLayout("business").xOffset).toBe(27 / 2 + 6);
   });
 });

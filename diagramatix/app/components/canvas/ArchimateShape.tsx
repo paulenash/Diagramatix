@@ -23,6 +23,7 @@ import { getThemeFor, type ArchimateCategoryTheme } from "@/app/lib/archimate/th
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 import { effectiveIconLayout, type IconLayout } from "@/app/lib/archimate/iconLayout";
 import { useArchimateIconLayout } from "@/app/lib/archimate/useArchimateIconLayout";
+import { useArchimateIconBuffers } from "@/app/lib/archimate/useArchimateIconBuffers";
 import { useArchimateCustomIcon } from "@/app/lib/archimate/useArchimateCustomIcon";
 import { effectiveCustomIcon } from "@/app/lib/archimate/customIcon";
 import { drawCustomIcon } from "@/app/lib/archimate/iconShapes";
@@ -96,6 +97,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   const shapeKey = el.properties?.shapeKey as string | undefined;
   const [, forceRender] = useState(0);
   const iconOverrides = useArchimateIconLayout();
+  const categoryBuffers = useArchimateIconBuffers();
   const { assignments: customAssignments, iconsById } = useArchimateCustomIcon();
 
   // Ensure the catalogue is loaded — trigger a re-render once it arrives
@@ -197,7 +199,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
       // plain rectangle, so overlay its ArchiMate glyph in the top-right corner
       // — otherwise it renders as a blank box.
       const cornerGlyph = entry.iconType !== "service" && entry.iconType !== "event";
-      const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides, customBaseSize);
+      const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides, customBaseSize, categoryBuffers);
       return (
         <g>
           <path d={bg} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} strokeLinejoin="round" />
@@ -235,7 +237,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   // from the effective icon layout (category default, overlaid with any saved
   // SuperAdmin override from ArchiMate Icon Maintenance).
   const d = drawOutline(entry.shapeFamily, el.x, el.y, el.width, el.height);
-  const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides, customBaseSize);
+  const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides, customBaseSize, categoryBuffers);
   return (
     <g>
       <path d={d} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} />
