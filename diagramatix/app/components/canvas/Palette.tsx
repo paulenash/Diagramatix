@@ -548,6 +548,13 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
   );
 }
 
+// Symbols Panel labels drop the layer prefix (Business/Application/Technology) —
+// the category section already conveys the layer, so "Service" reads cleaner than
+// "Business Service". Display-only; the catalogue + Icon Library keep full names.
+function paletteLabel(label: string): string {
+  return label.replace(/^(Application|Technology|Business)\s+/, "");
+}
+
 function ArchimatePalette({
   onDragStart, collapsed, setCollapsed,
 }: {
@@ -681,7 +688,7 @@ function ArchimatePalette({
                     >
                       <ArchimateShapePreview entry={item.entry} iconOnly={item.iconOnly} />
                       <span className="text-[10px] text-gray-700 leading-tight text-center w-full truncate">
-                        {item.label}
+                        {paletteLabel(item.label)}
                       </span>
                     </div>
                   ))}

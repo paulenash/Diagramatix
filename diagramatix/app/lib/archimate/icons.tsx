@@ -149,9 +149,13 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
     const right = cx + s * 0.30;
     const radius = (bot - top) / 2;
     const archStart = right - radius;
+    // Left boundary: an inward isosceles triangle (apex pointing right, only the
+    // two equal sides drawn), depth 60% of the bulge radius — replaces the old
+    // left semicircle scoop.
+    const apexX = left + 0.6 * radius;
     return (
       <path
-        d={`M ${left} ${top} L ${archStart} ${top} A ${radius} ${radius} 0 0 1 ${archStart} ${bot} L ${left} ${bot} A ${radius} ${radius} 0 0 0 ${left} ${top} Z`}
+        d={`M ${left} ${top} L ${archStart} ${top} A ${radius} ${radius} 0 0 1 ${archStart} ${bot} L ${left} ${bot} L ${apexX} ${cy} L ${left} ${top} Z`}
         fill="none" stroke={colour} strokeWidth={Math.max(1, s / 16)}
         strokeLinejoin="round"
       />

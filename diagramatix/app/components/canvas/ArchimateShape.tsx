@@ -182,15 +182,18 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
         const r = el.height / 2;
         bg = `M ${el.x + r} ${el.y} L ${el.x + el.width - r} ${el.y} A ${r} ${r} 0 0 1 ${el.x + el.width - r} ${el.y + el.height} L ${el.x + r} ${el.y + el.height} A ${r} ${r} 0 0 1 ${el.x + r} ${el.y} Z`;
       } else if (entry.iconType === "event") {
-        // ArchiMate 3.2: inward semi-circle scoop on the left + bulge on
-        // the right. Both arcs use the element height as diameter.
+        // Right bulge (semicircle) + an inward isosceles-triangle notch on the
+        // left (apex pointing right; only the two equal sides drawn). Notch depth
+        // = 60% of the bulge radius.
         const top = el.y;
         const bot = el.y + el.height;
         const left = el.x;
         const right = el.x + el.width;
         const radius = el.height / 2;
         const archStart = right - radius;
-        bg = `M ${left} ${top} L ${archStart} ${top} A ${radius} ${radius} 0 0 1 ${archStart} ${bot} L ${left} ${bot} A ${radius} ${radius} 0 0 0 ${left} ${top} Z`;
+        const apexX = left + 0.6 * radius;
+        const midY = (top + bot) / 2;
+        bg = `M ${left} ${top} L ${archStart} ${top} A ${radius} ${radius} 0 0 1 ${archStart} ${bot} L ${left} ${bot} L ${apexX} ${midY} L ${left} ${top} Z`;
       } else if (entry.iconType === "value-stream") {
         // Value Stream — a right-pointing chevron; the shape IS the element.
         // Tip depth matches routing's chevronPolygon so connectors dock to it.
