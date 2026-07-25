@@ -28,6 +28,11 @@ export const AI_INVOCATION_POINTS = {
   StaffNarrative: "staff.narrative",
   DictationRefine: "dictation.refine", // transcript clean-up / anonymise
   IconVectorize: "icon.vectorize", // ArchiMate icon image → editable vector primitives
+  // Offline SuperAdmin harness scripts (npm run ai:report / ai:compare). They call
+  // planBpmn directly — outside any route — so without their own label the seam
+  // records them as "unknown". Distinct labels keep real user usage clean.
+  ScriptConformanceReport: "script.ai-conformance", // npm run ai:report
+  ScriptModelCompare: "script.ai-model-compare", // npm run ai:compare
 } as const;
 
 export type AiInvocationPoint =
@@ -52,6 +57,8 @@ export const AI_INVOCATION_POINT_LABELS: Record<string, string> = {
   [AI_INVOCATION_POINTS.StaffNarrative]: "Staff Narrative",
   [AI_INVOCATION_POINTS.DictationRefine]: "Dictation Refine",
   [AI_INVOCATION_POINTS.IconVectorize]: "ArchiMate Icon Vectorize",
+  [AI_INVOCATION_POINTS.ScriptConformanceReport]: "AI Conformance Report (script)",
+  [AI_INVOCATION_POINTS.ScriptModelCompare]: "AI Model Compare (script)",
 };
 
 /** Friendly label for a stored invocation-point value (falls back to the raw value). */

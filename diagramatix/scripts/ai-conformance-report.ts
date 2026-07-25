@@ -2,6 +2,7 @@ import "dotenv/config";
 import { writeFileSync } from "node:fs";
 import { prisma } from "../app/lib/db";
 import { planBpmn } from "../app/lib/ai/planBpmn";
+import { enterAiContext, AI_INVOCATION_POINTS } from "../app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "../app/lib/ai/splitRules";
 import { layoutBpmnDiagram } from "../app/lib/diagram/bpmnLayout";
 import {
@@ -170,6 +171,10 @@ async function main() {
     console.error("Set ANTHROPIC_API_KEY to run the AI conformance harness (it makes real model calls).");
     process.exit(2);
   }
+
+  // Label this harness's AI calls so the usage report shows "AI Conformance
+  // Report (script)" instead of "unknown" (no route sets the context here).
+  enterAiContext({ invocationPoint: AI_INVOCATION_POINTS.ScriptConformanceReport });
 
   const aiRules = await loadGreenRules().catch(() => "");
   console.log(`[ai-report] ${BPMN_PROMPTS.length} prompts · green rules ${aiRules.length} chars`);

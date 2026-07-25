@@ -2,6 +2,7 @@ import "dotenv/config";
 import { writeFileSync } from "node:fs";
 import { prisma } from "../app/lib/db";
 import { planBpmn } from "../app/lib/ai/planBpmn";
+import { enterAiContext, AI_INVOCATION_POINTS } from "../app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "../app/lib/ai/splitRules";
 import { layoutBpmnDiagram } from "../app/lib/diagram/bpmnLayout";
 import { findConnectorConformance, summariseConformance } from "../app/lib/diagram/checks/connectorConformance";
@@ -55,6 +56,9 @@ async function main() {
   if (!owner) { console.error("no owner user"); process.exit(1); }
   const orgId = (await prisma.orgMember.findFirst({ where: { userId: owner.id }, select: { orgId: true }, orderBy: { createdAt: "asc" } }))?.orgId;
   if (!orgId) { console.error("owner has no org"); process.exit(1); }
+  // Attribute this harness's AI calls to the owner + a distinct label, so the
+  // usage report shows "AI Model Compare (script)" rather than "unknown".
+  enterAiContext({ userId: owner.id, orgId, invocationPoint: AI_INVOCATION_POINTS.ScriptModelCompare });
   let project = await prisma.project.findFirst({ where: { userId: owner.id, name: PROJECT }, select: { id: true } });
   if (!project) project = await prisma.project.create({ data: { name: PROJECT, description: "npm run ai:compare — diagrams 18-20 across models. Recreated each run.", userId: owner.id, orgId, ownerName: owner.name ?? "" }, select: { id: true } });
   await prisma.diagram.deleteMany({ where: { projectId: project.id } });
