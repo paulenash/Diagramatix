@@ -5,7 +5,7 @@
  * production default (Haiku 4.5).
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { AI_MODELS, DEFAULT_AI_MODEL, isKnownAiModel, resolveAiModel, aiModelLabel, allModels, moonshotModels, providerForModel, modelVision } from "@/app/lib/ai/models";
+import { AI_MODELS, DEFAULT_AI_MODEL, isKnownAiModel, resolveAiModel, aiModelLabel, allModels, moonshotModels, googleModels, providerForModel, modelVision } from "@/app/lib/ai/models";
 
 describe("AI model list + resolver", () => {
   it("T0577 — the production default is Haiku 4.5 and is a known model", () => {
@@ -104,5 +104,52 @@ describe("Moonshot (Kimi) provider registry", () => {
     process.env.MOONSHOT_MODELS = "some-vision-model|V, plain-text-model|T";
     expect(moonshotModels().find((m) => m.id === "some-vision-model")?.vision).toBe(true);
     expect(moonshotModels().find((m) => m.id === "plain-text-model")?.vision).toBeUndefined();
+  });
+});
+
+describe("Google (Gemini) provider registry", () => {
+  const saved = { key: process.env.GOOGLE_API_KEY, base: process.env.GOOGLE_BASE_URL, models: process.env.GOOGLE_MODELS };
+  afterEach(() => {
+    if (saved.key === undefined) delete process.env.GOOGLE_API_KEY; else process.env.GOOGLE_API_KEY = saved.key;
+    if (saved.base === undefined) delete process.env.GOOGLE_BASE_URL; else process.env.GOOGLE_BASE_URL = saved.base;
+    if (saved.models === undefined) delete process.env.GOOGLE_MODELS; else process.env.GOOGLE_MODELS = saved.models;
+  });
+
+  it("T1029 — no Gemini models unless BOTH GOOGLE_API_KEY and GOOGLE_BASE_URL are set", () => {
+    // Gemini has no public Anthropic-compatible endpoint, so the gateway URL is
+    // mandatory — the models stay hidden (and the picker Claude-only) until both exist.
+    process.env.GOOGLE_API_KEY = "sk-goog";
+    delete process.env.GOOGLE_BASE_URL;
+    expect(googleModels()).toEqual([]);
+    expect(allModels()).toEqual(AI_MODELS);
+    delete process.env.GOOGLE_API_KEY;
+    process.env.GOOGLE_BASE_URL = "http://gw";
+    expect(googleModels()).toEqual([]);
+    expect(isKnownAiModel("gemini-2.5-pro")).toBe(false);
+  });
+
+  it("T1030 — an unresolved Key Vault reference is treated as no key (not offered)", () => {
+    process.env.GOOGLE_API_KEY = "@Microsoft.KeyVault(VaultName=dgx-kv;SecretName=google-api-key)";
+    process.env.GOOGLE_BASE_URL = "http://gw";
+    expect(googleModels()).toEqual([]);
+    process.env.GOOGLE_API_KEY = "sk-real";
+    expect(googleModels().length).toBeGreaterThan(0);
+  });
+
+  it("T1031 — configured: default lineup or GOOGLE_MODELS, tagged provider=google, vision default true", () => {
+    process.env.GOOGLE_API_KEY = "sk-goog";
+    process.env.GOOGLE_BASE_URL = "http://gw";
+    delete process.env.GOOGLE_MODELS;
+    const def = googleModels();
+    expect(def.length).toBeGreaterThan(0);
+    expect(def.every((m) => m.provider === "google")).toBe(true);
+    expect(def.some((m) => m.id === "gemini-2.5-pro")).toBe(true);
+    expect(providerForModel("gemini-2.5-pro")).toBe("google");
+    // GOOGLE_MODELS override (id|Label); gemini ids default to vision, "-text" opts out.
+    process.env.GOOGLE_MODELS = "gemini-3-pro|Gemini 3 Pro, my-gemini-text|Text only";
+    const g = googleModels();
+    expect(g.find((m) => m.id === "gemini-3-pro")).toEqual({ id: "gemini-3-pro", label: "Gemini 3 Pro", provider: "google", vision: true });
+    expect(g.find((m) => m.id === "my-gemini-text")?.vision).toBe(false);
+    expect(allModels().slice(0, AI_MODELS.length)).toEqual(AI_MODELS); // Claude still first
   });
 });

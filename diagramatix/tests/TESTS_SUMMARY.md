@@ -1024,6 +1024,10 @@ Which key + endpoint a model's provider uses. Pure (reads env, no network), so i
 | T0954 | a Kimi model uses MOONSHOT_API_KEY + the international endpoint; the Anthropic key is NOT used for it | Kimi calls going to Anthropic (or leaking the Anthropic key/endpoint) | If the moonshot branch or key selection regressed |
 | T0955 | MOONSHOT_BASE_URL overrides the endpoint (e.g. mainland China) | Data-residency control over the Moonshot endpoint being ignored | If the base-URL override regressed |
 | T0956 | aiApiKey is undefined when the selected provider's key is missing | A route proceeding without a key (and a confusing downstream error) | If aiApiKey stopped returning undefined on a missing key |
+| T1028 | a Gemini model uses GOOGLE_API_KEY + GOOGLE_BASE_URL with Bearer auth (not x-api-key), never the Anthropic key | Gemini calls hitting Anthropic, or sending the wrong auth header (401) | If the google branch in aiClientConfig/makeAiClient regressed |
+| T1029 | no Gemini models unless BOTH GOOGLE_API_KEY and GOOGLE_BASE_URL are set (gateway URL mandatory) | A Gemini model showing in the picker that can't resolve (no gateway) | If googleModels() stopped requiring the base URL |
+| T1030 | an unresolved Key Vault reference for GOOGLE_API_KEY is treated as no key | A broken Gemini entry that 401s every call | If resolvedEnvSecret's KV-reference guard regressed |
+| T1031 | configured: default lineup or GOOGLE_MODELS, tagged provider=google, vision default true ("-text" opts out); Claude still first | Wrong provider tag / vision flag, or Gemini pushing Claude out of first place | If googleModels() parsing or allModels() ordering regressed |
 
 ### `tests/theme/contrast.test.ts` — feature-tile contrast guarantee
 

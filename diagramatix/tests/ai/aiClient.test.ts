@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { aiClientConfig, aiApiKey, makeAiClient } from "@/app/lib/ai/anthropicClient";
 
-const ENV_KEYS = ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "MOONSHOT_API_KEY", "MOONSHOT_BASE_URL", "MOONSHOT_MODELS"] as const;
+const ENV_KEYS = ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "MOONSHOT_API_KEY", "MOONSHOT_BASE_URL", "MOONSHOT_MODELS", "GOOGLE_API_KEY", "GOOGLE_BASE_URL", "GOOGLE_MODELS"] as const;
 
 describe("aiClientConfig / aiApiKey — provider routing", () => {
   const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
@@ -47,6 +47,22 @@ describe("aiClientConfig / aiApiKey — provider routing", () => {
   it("T0956 — aiApiKey is undefined when the selected provider's key is missing", () => {
     delete process.env.ANTHROPIC_API_KEY;
     expect(aiApiKey("claude-haiku-4-5-20251001")).toBeUndefined();
+  });
+
+  it("T1028 — a Google (Gemini) model uses GOOGLE_API_KEY + GOOGLE_BASE_URL, Bearer auth", () => {
+    // Gemini is reached via an Anthropic-compatible gateway (e.g. LiteLLM); the
+    // models only resolve when BOTH the key and the gateway URL are set.
+    process.env.GOOGLE_API_KEY = "sk-goog";
+    process.env.GOOGLE_BASE_URL = "http://litellm.internal:4000";
+    process.env.ANTHROPIC_API_KEY = "sk-ant"; // must NOT be used for a Gemini model
+    expect(aiApiKey("gemini-2.5-pro")).toBe("sk-goog");
+    expect(aiClientConfig("gemini-2.5-pro")).toEqual({ apiKey: "sk-goog", baseURL: "http://litellm.internal:4000" });
+    // A caller-passed anthropic key is ignored for a Gemini model.
+    expect(aiClientConfig("gemini-2.5-pro", "sk-ant").apiKey).toBe("sk-goog");
+    // Bearer auth (like Moonshot), not x-api-key.
+    const g = makeAiClient("gemini-2.5-pro");
+    expect(g.authToken).toBe("sk-goog");
+    expect(g.apiKey).toBeNull();
   });
 
   it("T0961 — a Moonshot client authenticates with Bearer (authToken), not x-api-key", () => {

@@ -5,10 +5,11 @@
  * STATIC snapshot — providers change prices; verify and bump the date on refresh:
  *   Claude — anthropic.com/pricing (these are the current list rates)
  *   Kimi / Moonshot — platform.kimi.ai (international USD)
+ *   Gemini / Google — ai.google.dev/pricing (your gateway may bill differently)
  *
  * Pure data + helpers, safe to import on the client.
  */
-export const PRICING_SNAPSHOT_DATE = "2026-07-25";
+export const PRICING_SNAPSHOT_DATE = "2026-07-26";
 
 export interface ModelPrice {
   in: number; // USD per 1M input tokens
@@ -37,6 +38,10 @@ export const PRICING: Record<string, ModelPrice> = {
   "kimi-k2.5": { in: 0.6, out: 3 },
   "kimi-k2-0711-preview": { in: 0.6, out: 2.5 },
   "moonshot-v1-128k": { in: 2, out: 5 },
+  // Google Gemini — ai.google.dev/pricing (paid tier, standard context). Verify;
+  // a gateway (e.g. LiteLLM in front of Vertex) may rate these differently.
+  "gemini-2.5-pro": { in: 1.25, out: 10, note: "≤200k context; higher above" },
+  "gemini-2.5-flash": { in: 0.3, out: 2.5 },
 };
 
 /** The reference price for a model id, or undefined when unknown / floating. */

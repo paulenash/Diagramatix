@@ -22,9 +22,11 @@ const MOONSHOT_DEFAULT_BASE_URL = "https://api.moonshot.ai/anthropic";
 
 /** The key env var that serves a given model's provider. */
 export function aiApiKey(model: string | null | undefined): string | undefined {
-  return providerForModel(model) === "moonshot"
-    ? resolvedEnvSecret(process.env.MOONSHOT_API_KEY)
-    : resolvedEnvSecret(process.env.ANTHROPIC_API_KEY);
+  switch (providerForModel(model)) {
+    case "moonshot": return resolvedEnvSecret(process.env.MOONSHOT_API_KEY);
+    case "google":   return resolvedEnvSecret(process.env.GOOGLE_API_KEY);
+    default:         return resolvedEnvSecret(process.env.ANTHROPIC_API_KEY);
+  }
 }
 
 /**
@@ -38,10 +40,20 @@ export function aiClientConfig(
   model: string | null | undefined,
   fallbackApiKey?: string,
 ): { apiKey: string; baseURL?: string } {
-  if (providerForModel(model) === "moonshot") {
+  const provider = providerForModel(model);
+  if (provider === "moonshot") {
     return {
       apiKey: resolvedEnvSecret(process.env.MOONSHOT_API_KEY) ?? "",
       baseURL: process.env.MOONSHOT_BASE_URL?.trim() || MOONSHOT_DEFAULT_BASE_URL,
+    };
+  }
+  if (provider === "google") {
+    // Gemini is served via a required Anthropic-compatible gateway — no public
+    // default endpoint, so GOOGLE_BASE_URL must be set (googleModels() already
+    // hides the models until it is).
+    return {
+      apiKey: resolvedEnvSecret(process.env.GOOGLE_API_KEY) ?? "",
+      baseURL: process.env.GOOGLE_BASE_URL?.trim() || undefined,
     };
   }
   const baseURL = process.env.ANTHROPIC_BASE_URL?.trim();
@@ -73,11 +85,12 @@ export function makeAiClient(model: string | null | undefined, fallbackApiKey?: 
   const telemetry = { fetch: countingFetch, maxRetries: 2 };
 
   let client: Anthropic;
-  if (provider === "moonshot") {
-    // Moonshot's Anthropic-compatible endpoint authenticates via
-    // `Authorization: Bearer <key>` (like Claude Code's ANTHROPIC_AUTH_TOKEN), NOT
-    // Anthropic's native `x-api-key` header. So hand the key to the SDK as
-    // `authToken` (Bearer) and null out apiKey to suppress the x-api-key header.
+  if (provider === "moonshot" || provider === "google") {
+    // Both are reached via an Anthropic-compatible endpoint that authenticates
+    // with `Authorization: Bearer <key>` (Moonshot's endpoint; a LiteLLM-style
+    // gateway for Gemini) — NOT Anthropic's native `x-api-key` header. So hand the
+    // key to the SDK as `authToken` (Bearer) and null out apiKey to suppress the
+    // x-api-key header.
     client = new Anthropic({ authToken: apiKey, apiKey: null, baseURL, ...telemetry });
   } else {
     client = baseURL

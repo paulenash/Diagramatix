@@ -9,7 +9,7 @@
  *  default, and how every built-in Claude model is treated). Moonshot/Kimi is
  *  reached via its Anthropic-compatible endpoint, so it reuses the same SDK +
  *  Messages-API shape — only the base URL + key differ (see anthropicClient.ts). */
-export type AiProvider = "anthropic" | "moonshot";
+export type AiProvider = "anthropic" | "moonshot" | "google";
 
 export interface AiModel {
   id: string;
@@ -111,8 +111,43 @@ export function moonshotModels(): AiModel[] {
     .filter((m): m is AiModel => m !== null);
 }
 
-/** Claude models, plus Moonshot/Kimi (when configured), plus any local/custom models. */
-export const allModels = (): AiModel[] => [...AI_MODELS, ...moonshotModels(), ...customModels()];
+/**
+ * Google Gemini models, offered ONLY when BOTH `GOOGLE_API_KEY` and
+ * `GOOGLE_BASE_URL` are set. Gemini is NOT Anthropic-Messages-API native, so
+ * `GOOGLE_BASE_URL` MUST point at an Anthropic-compatible gateway (e.g. LiteLLM
+ * Proxy) that fronts Gemini — the app then reuses the same SDK + Messages-API
+ * shape, Bearer-authenticated (see anthropicClient.ts), exactly like Moonshot.
+ * Requiring the base URL (no public default exists) keeps the picker from showing
+ * a Gemini model that can't actually resolve. Ids come from `GOOGLE_MODELS` (same
+ * `id|Label` syntax) — use the exact model names your gateway exposes — else a
+ * small curated default. Gemini is multimodal, so vision defaults to true.
+ * Server-only (env is stripped client-side → [] there; the client gets the list
+ * as a prop). */
+const DEFAULT_GOOGLE_MODELS: AiModel[] = [
+  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "google", vision: true },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "google", vision: true },
+];
+
+export function googleModels(): AiModel[] {
+  if (!resolvedEnvSecret(process.env.GOOGLE_API_KEY) || !process.env.GOOGLE_BASE_URL?.trim()) return [];
+  const raw = process.env.GOOGLE_MODELS?.trim();
+  if (!raw) return DEFAULT_GOOGLE_MODELS;
+  return raw
+    .split(",")
+    .map((entry): AiModel | null => {
+      const [rawId, ...rest] = entry.split("|");
+      const id = rawId.trim();
+      if (!id) return null;
+      // Gemini models are multimodal; a "…-text…" id opts out, else default true.
+      const vision = /(-text\b|text-only)/i.test(id) ? false : true;
+      return { id, label: rest.join("|").trim() || id, provider: "google", vision };
+    })
+    .filter((m): m is AiModel => m !== null);
+}
+
+/** Claude models, plus Moonshot/Kimi and Google/Gemini (each when configured),
+ *  plus any local/custom models. */
+export const allModels = (): AiModel[] => [...AI_MODELS, ...moonshotModels(), ...googleModels(), ...customModels()];
 
 export const isKnownAiModel = (id: string | null | undefined): boolean =>
   !!id && allModels().some((m) => m.id === id);

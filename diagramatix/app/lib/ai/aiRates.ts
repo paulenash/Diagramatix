@@ -16,12 +16,14 @@ export interface EffectiveRate {
 
 /**
  * Provider for a model id, for pricing purposes — pure/prefix-based (kimi* /
- * moonshot* → moonshot, else anthropic), so it works on the client and doesn't
- * depend on env-gated model registration (providerForModel in models.ts returns
- * "anthropic" for kimi ids when no MOONSHOT_API_KEY is set).
+ * moonshot* → moonshot, gemini* → google, else anthropic), so it works on the
+ * client and doesn't depend on env-gated model registration (providerForModel in
+ * models.ts returns "anthropic" for kimi/gemini ids when the provider key isn't set).
  */
 export function providerOf(model: string): string {
-  return /^(kimi|moonshot)/i.test(model) ? "moonshot" : "anthropic";
+  if (/^(kimi|moonshot)/i.test(model)) return "moonshot";
+  if (/^gemini/i.test(model)) return "google";
+  return "anthropic";
 }
 
 /** The built-in default rates, from the pricing.ts snapshot. */

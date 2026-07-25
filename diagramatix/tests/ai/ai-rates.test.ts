@@ -15,9 +15,11 @@ import { PRICING } from "@/app/lib/ai/pricing";
 beforeEach(() => { rateRows.length = 0; });
 
 describe("aiRates", () => {
-  it("T0983 — providerOf maps kimi/moonshot ids to moonshot, else anthropic", () => {
+  it("T0983 — providerOf maps kimi/moonshot → moonshot, gemini → google, else anthropic", () => {
     expect(providerOf("kimi-k3")).toBe("moonshot");
     expect(providerOf("moonshot-v1-128k")).toBe("moonshot");
+    expect(providerOf("gemini-2.5-pro")).toBe("google");
+    expect(providerOf("gemini-2.5-flash")).toBe("google");
     expect(providerOf("claude-opus-4-8")).toBe("anthropic");
     expect(providerOf("some-local-model")).toBe("anthropic");
   });
