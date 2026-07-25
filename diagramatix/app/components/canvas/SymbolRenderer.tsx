@@ -2256,6 +2256,43 @@ export function SymbolRenderer({
 
     setLabelHighlighted(false);
     const wasSelected = selected;
+
+    // ArchiMate gesture split: SHIFT is reserved for the tree-highlight, but
+    // only on a stationary shift-CLICK. A drag — with or without Shift — moves
+    // the shape, and dragging it clear of its container severs the parent link
+    // (handled by the reducer). So when the user shift-presses an archimate
+    // shape we defer: if the pointer moves it's a drag (select + move, NO
+    // highlight); if it's released in place it's a shift-click (seed the
+    // highlight). This stops the old shift-drag-to-extract gesture from also
+    // firing the highlight — the two no longer collide, and a plain drag pulls
+    // a shape out of its container without any modifier key.
+    if (element.type === "archimate-shape" && e.shiftKey && !e.ctrlKey && !multiSelected) {
+      const startClientX = e.clientX;
+      const startClientY = e.clientY;
+      const mdEvent = e;
+      const MOVE_THRESHOLD = 4;
+      let dragged = false;
+      const onPreMove = (ev: MouseEvent) => {
+        if (dragged) return;
+        if (Math.hypot(ev.clientX - startClientX, ev.clientY - startClientY) > MOVE_THRESHOLD) {
+          dragged = true;
+          window.removeEventListener("mousemove", onPreMove);
+          window.removeEventListener("mouseup", onPreUp);
+          onSelect();                 // select only — no Shift ⇒ no tree-highlight
+          beginElementDrag(mdEvent);  // move / extract
+        }
+      };
+      const onPreUp = () => {
+        if (dragged) return;
+        window.removeEventListener("mousemove", onPreMove);
+        window.removeEventListener("mouseup", onPreUp);
+        onSelect(mdEvent);            // shift-click in place ⇒ seed the tree-highlight
+      };
+      window.addEventListener("mousemove", onPreMove);
+      window.addEventListener("mouseup", onPreUp);
+      return;
+    }
+
     onSelect(e);
 
     // Task/Subprocess click model:

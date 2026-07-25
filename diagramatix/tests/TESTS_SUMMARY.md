@@ -1005,6 +1005,15 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T1024 | Project re-numbering: folder + diagram names are code-prefixed | Folder/diagram names not showing their code | If name prefixing regressed |
 | T1025 | Project re-numbering: RenumberDiff shape + counters correct | Preview/apply reading wrong diff fields | If the diff contract changed |
 
+### `tests/diagram/archimate-containment.test.ts` — ArchiMate plain-drag containment
+
+Extracting an ArchiMate shape from a container is a plain click-and-drag (no Shift — Shift is reserved for the tree-highlight). These drive the real reducer.
+
+| # | What it checks | User-visible bug it prevents | Fails when |
+|---|---|---|---|
+| T1026 | Plain drag of a child OUT of an archimate container clears parentId | Shape stays stuck inside its container unless you hold Shift | If extraction ever required a modifier again |
+| T1027 | Full cycle: plain drag IN adopts (container flag + child renders on top), plain drag OUT extracts | Dropped-in shape not adopted, or child hidden behind container so it can't be grabbed | If adoption/z-order/severing regressed |
+
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 
 Which key + endpoint a model's provider uses. Pure (reads env, no network), so it pins the routing that decides where a prompt egresses.
