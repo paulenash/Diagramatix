@@ -490,6 +490,17 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
     );
   }
 
+  // Value Stream — a right-pointing chevron (matches the canvas shape).
+  if (entry.iconType === "value-stream") {
+    const tip = Math.min(h / 2, w * 0.22);
+    const pts = `1,1 ${w - tip},1 ${w - 1},${h / 2} ${w - tip},${h - 1} 1,${h - 1} ${1 + tip},${h / 2}`;
+    return (
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+        <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.2} strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
   let outline: React.ReactNode;
   switch (entry.shapeFamily) {
     case "ellipse":

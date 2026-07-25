@@ -233,6 +233,16 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
     );
   }
 
+  // Value Stream — a right-pointing chevron; the chevron IS the element (name
+  // rendered inside by SymbolRenderer). The tip depth matches routing's
+  // chevronPolygon so connectors dock to this outline, not the bounding box.
+  if (entry.iconType === "value-stream") {
+    const x = el.x, y = el.y, w = el.width, h = el.height;
+    const tip = Math.min(h / 2, w * 0.22);
+    const dv = `M ${x} ${y} L ${x + w - tip} ${y} L ${x + w} ${y + h / 2} L ${x + w - tip} ${y + h} L ${x} ${y + h} L ${x + tip} ${y + h / 2} Z`;
+    return <path d={dv} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} strokeLinejoin="round" />;
+  }
+
   // Standard box rendering — outline + corner icon glyph. Position + size come
   // from the effective icon layout (category default, overlaid with any saved
   // SuperAdmin override from ArchiMate Icon Maintenance).

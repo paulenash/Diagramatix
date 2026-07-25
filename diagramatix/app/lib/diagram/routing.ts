@@ -248,8 +248,11 @@ function closestPackageEdgePoint(from: Point, el: DiagramElement): Point {
   return snapToPackageSilhouette(closestEdgePoint(from, getBounds(el)), el);
 }
 
-/** Edge attachment point honouring per-type silhouettes (package L-shape, etc.). */
+/** Edge attachment point honouring per-type silhouettes (package L-shape, Value
+ *  Stream chevron, etc.). */
 function edgePointFor(from: Point, el: DiagramElement): Point {
+  const shaped = projectToShapeBoundary(from, el);
+  if (shaped) return shaped;
   return el.type === "uml-package" ? closestPackageEdgePoint(from, el) : closestEdgePoint(from, getBounds(el));
 }
 
@@ -286,6 +289,68 @@ function ellipseEdgePoint(from: Point, el: { x: number; y: number; width: number
   if (dx === 0 && dy === 0) return { x: cx, y: cy - ry };
   const t = 1 / Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
   return { x: cx + dx * t, y: cy + dy * t };
+}
+
+// ── Shape-aware boundaries ───────────────────────────────────────────
+// Some ArchiMate elements have a non-rectangular silhouette; a connector should
+// dock to that outline, not the bounding box. This is the reusable hook: an
+// element that has a special polygon boundary returns one from `shapePolygon`,
+// and `polygonEdgePoint` projects a reference point onto it (mirrors how
+// `ellipseEdgePoint` projects onto circular types). Gated per element so plain
+// rectangles are completely unaffected.
+
+/** Is this element a Value Stream (rendered as a right-pointing chevron)? */
+function isValueStream(el: DiagramElement): boolean {
+  return el.type === "archimate-shape" &&
+    typeof el.properties?.shapeKey === "string" &&
+    (el.properties.shapeKey as string).includes("value-stream");
+}
+
+/** The chevron tip depth — MUST match ArchimateShape's value-stream rendering. */
+function chevronTip(w: number, h: number): number {
+  return Math.min(h / 2, w * 0.22);
+}
+
+/** Value Stream chevron outline (6 points), clockwise from top-left. */
+function chevronPolygon(el: DiagramElement): Point[] {
+  const { x, y } = el;
+  const w = el.width, h = el.height;
+  const tip = chevronTip(w, h);
+  return [
+    { x, y },                         // top-left
+    { x: x + w - tip, y },            // top, before the point
+    { x: x + w, y: y + h / 2 },       // right tip
+    { x: x + w - tip, y: y + h },     // bottom, after the point
+    { x, y: y + h },                  // bottom-left
+    { x: x + tip, y: y + h / 2 },     // left notch (concave)
+  ];
+}
+
+/** Ray from `center` toward `from`; return the nearest polygon-boundary crossing. */
+function polygonEdgePoint(from: Point, poly: Point[], center: Point): Point {
+  const dx = from.x - center.x, dy = from.y - center.y;
+  if (dx === 0 && dy === 0) return poly[0];
+  let best: Point | null = null, bestT = Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const ex = b.x - a.x, ey = b.y - a.y;
+    const det = -dx * ey + ex * dy;
+    if (Math.abs(det) < 1e-9) continue;
+    const t = (-(a.x - center.x) * ey + ex * (a.y - center.y)) / det;
+    const s = (dx * (a.y - center.y) - dy * (a.x - center.x)) / det;
+    if (t > 1e-6 && s >= -1e-6 && s <= 1 + 1e-6 && t < bestT) {
+      bestT = t; best = { x: center.x + dx * t, y: center.y + dy * t };
+    }
+  }
+  return best ?? from;
+}
+
+/** If `el` has a special silhouette, project `ref` onto it; else null (use bbox). */
+function projectToShapeBoundary(ref: Point, el: DiagramElement): Point | null {
+  if (isValueStream(el)) {
+    return polygonEdgePoint(ref, chevronPolygon(el), { x: el.x + el.width / 2, y: el.y + el.height / 2 });
+  }
+  return null;
 }
 
 function boundsOverlapWithMargin(b: Bounds, margin: number): (p: Point) => boolean {
@@ -995,8 +1060,8 @@ export function computeWaypoints(
     // Project onto circle boundary for circular elements
     const srcIsCirc = CIRC_TYPES.has(source.type);
     const tgtIsCirc = CIRC_TYPES.has(target.type);
-    const srcEdge = srcIsCirc ? ellipseEdgePoint(srcEdgeRaw, source) : srcEdgeRaw;
-    const tgtEdge = tgtIsCirc ? ellipseEdgePoint(tgtEdgeRaw, target) : tgtEdgeRaw;
+    const srcEdge = srcIsCirc ? ellipseEdgePoint(srcEdgeRaw, source) : (projectToShapeBoundary(srcEdgeRaw, source) ?? srcEdgeRaw);
+    const tgtEdge = tgtIsCirc ? ellipseEdgePoint(tgtEdgeRaw, target) : (projectToShapeBoundary(tgtEdgeRaw, target) ?? tgtEdgeRaw);
     const dist   = euclideanDist(srcEdge, tgtEdge);
     const curveOffset = Math.max(60, dist / 3);
     // For circular elements, control point extends along the radial normal (outward from centre)
@@ -1019,8 +1084,10 @@ export function computeWaypoints(
   }
 
   // Rectilinear: use offset-aware side points for perpendicular exit/entry
-  const srcEdge = sidePoint(source, sourceSide, sourceOffsetAlong);
-  const tgtEdge = sidePoint(target, targetSide, targetOffsetAlong);
+  const srcEdgeRect = sidePoint(source, sourceSide, sourceOffsetAlong);
+  const tgtEdgeRect = sidePoint(target, targetSide, targetOffsetAlong);
+  const srcEdge = projectToShapeBoundary(srcEdgeRect, source) ?? srcEdgeRect;
+  const tgtEdge = projectToShapeBoundary(tgtEdgeRect, target) ?? tgtEdgeRect;
   // Sequence-flow obstacle set: only BPMN flow-node-like shapes act as
   // obstacles. Edge-mounted (boundary) events are intentionally NOT obstacles
   // so connectors can still attach to them. Data Objects and Data Stores
@@ -1649,8 +1716,8 @@ export function recomputeAllConnectors(
       let tgtEdge: Point;
       if (involvesData) {
         // Boundary point along the ray from this element's centre toward the other's centre
-        srcEdge = closestEdgePoint({ x: tgtCx, y: tgtCy }, getBounds(source));
-        tgtEdge = closestEdgePoint({ x: srcCx, y: srcCy }, getBounds(target));
+        srcEdge = projectToShapeBoundary({ x: tgtCx, y: tgtCy }, source) ?? closestEdgePoint({ x: tgtCx, y: tgtCy }, getBounds(source));
+        tgtEdge = projectToShapeBoundary({ x: srcCx, y: srcCy }, target) ?? closestEdgePoint({ x: srcCx, y: srcCy }, getBounds(target));
         // Derive persisted side/offset from the boundary point
         srcSide = sideFromPoint(source, srcEdge);
         tgtSide = sideFromPoint(target, tgtEdge);
@@ -1686,8 +1753,8 @@ export function recomputeAllConnectors(
     if (conn.type === "review-comment-link") {
       const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
       const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
-      const srcEdge = closestEdgePoint({ x: tgtCx, y: tgtCy }, getBounds(source));
-      const tgtEdge = closestEdgePoint({ x: srcCx, y: srcCy }, getBounds(target));
+      const srcEdge = projectToShapeBoundary({ x: tgtCx, y: tgtCy }, source) ?? closestEdgePoint({ x: tgtCx, y: tgtCy }, getBounds(source));
+      const tgtEdge = projectToShapeBoundary({ x: srcCx, y: srcCy }, target) ?? closestEdgePoint({ x: srcCx, y: srcCy }, getBounds(target));
       const srcSide = sideFromPoint(source, srcEdge);
       const tgtSide = sideFromPoint(target, tgtEdge);
       return { ...conn,
@@ -1705,8 +1772,8 @@ export function recomputeAllConnectors(
       const tgtEdgeRaw = sidePoint(target, conn.targetSide, conn.targetOffsetAlong ?? 0.5);
       // Project onto circle boundary for circular elements — otherwise the
       // endpoint snaps to the bounding rect when an attached element moves.
-      const srcEdge = CIRC_TYPES.has(source.type) ? ellipseEdgePoint(srcEdgeRaw, source) : srcEdgeRaw;
-      const tgtEdge = CIRC_TYPES.has(target.type) ? ellipseEdgePoint(tgtEdgeRaw, target) : tgtEdgeRaw;
+      const srcEdge = CIRC_TYPES.has(source.type) ? ellipseEdgePoint(srcEdgeRaw, source) : (projectToShapeBoundary(srcEdgeRaw, source) ?? srcEdgeRaw);
+      const tgtEdge = CIRC_TYPES.has(target.type) ? ellipseEdgePoint(tgtEdgeRaw, target) : (projectToShapeBoundary(tgtEdgeRaw, target) ?? tgtEdgeRaw);
       const startPt = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
       const endPt   = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
       let cp1 = { x: srcEdge.x + conn.cp1RelOffset.x, y: srcEdge.y + conn.cp1RelOffset.y };
