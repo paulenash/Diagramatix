@@ -12,11 +12,15 @@
 import type { ArchimateShapeEntry } from "./catalogue";
 
 export const ARCHIMATE_SEPARATE_ICON_KEY = "archimate.icon.separate";
-/** Elements that surface a separate icon-only palette entry by default. Kept to
- *  the three that have a proper icon-only form today (label placement decided);
- *  others are opt-in per element via the Assign tab once their icon design (text
- *  box size + inside-like-Service vs underneath-like-Actor) is settled. */
-export const DEFAULT_SEPARATE_ICONS = ["Business Actor", "Business Service", "Business Event"];
+/** Elements that surface a separate icon-only palette entry by default. These have
+ *  a proper icon-only form: Actor (figure + label below), and the Service (stadium)
+ *  / Event (scoop) family — Business + Application + Technology all share the
+ *  service/event iconType so they render the same icon-only shape with the name
+ *  inside. Other elements stay opt-in via the Assign tab. */
+export const DEFAULT_SEPARATE_ICONS = [
+  "Business Actor", "Business Service", "Business Event",
+  "Application Service", "Application Event", "Technology Service", "Technology Event",
+];
 
 export interface PaletteRow {
   entry: ArchimateShapeEntry;
