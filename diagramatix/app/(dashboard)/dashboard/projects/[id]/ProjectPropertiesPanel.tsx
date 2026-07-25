@@ -26,7 +26,7 @@ interface Hit { id: string; pcfId: number; hierarchyId: string; name: string; le
 export function ProjectPropertiesPanel({
   projectId, name, description, ownerName, pcf, readOnly,
   onName, onDescription, onOwner, onPcf, save, onViewCoverage,
-  numberingSummary, onOpenNumbering,
+  numberingSummary, onOpenNumbering, showNonApqc, onToggleNonApqc,
 }: {
   projectId: string;
   name: string; description: string; ownerName: string;
@@ -40,6 +40,8 @@ export function ProjectPropertiesPanel({
   onViewCoverage?: () => void;
   numberingSummary?: string;
   onOpenNumbering?: () => void;
+  showNonApqc?: boolean;
+  onToggleNonApqc?: () => void;
 }) {
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [editingPcf, setEditingPcf] = useState(false);
@@ -178,6 +180,11 @@ export function ProjectPropertiesPanel({
           {numberingSummary && <p className="text-[11px] text-gray-600 mb-1">{numberingSummary}</p>}
           {!readOnly && (
             <button onClick={onOpenNumbering} className="text-[11px] text-indigo-600 hover:text-indigo-800">＃ Configure / Renumber…</button>
+          )}
+          {onToggleNonApqc && (
+            <label className="mt-1 flex items-center gap-1.5 text-[11px] text-gray-600 cursor-pointer">
+              <input type="checkbox" checked={!!showNonApqc} onChange={onToggleNonApqc} /> Show non-APQC (highlight)
+            </label>
           )}
         </div>
       )}

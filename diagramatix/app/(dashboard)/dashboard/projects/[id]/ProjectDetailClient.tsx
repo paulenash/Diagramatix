@@ -16,7 +16,9 @@ import { ProjectPropertiesPanel } from "./ProjectPropertiesPanel";
 import { NumberingDialog, type NumberingConfig } from "./NumberingDialog";
 import { resolveNumberingConfig } from "@/app/lib/numbering/renumber";
 import { PcfCoveragePanel } from "./PcfCoveragePanel";
-import { APQC_ATTRIBUTION, anyDiagramHasPcf } from "@/app/lib/pcf/attribution";
+import { APQC_ATTRIBUTION, anyDiagramHasPcf, dataHasPcf } from "@/app/lib/pcf/attribution";
+import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
+import { tonesFor } from "@/app/lib/theme/featureColors";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -431,6 +433,19 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   const [numberingConfig, setNumberingConfig] = useState<NumberingConfig>(() =>
     resolveNumberingConfig((project as { numberingConfig?: unknown }).numberingConfig, numberingHasPcf));
   const [showNumbering, setShowNumbering] = useState(false);
+  // "Show non-APQC" — highlight non-APQC diagrams/folders in the live APQC colour.
+  const featureScheme = useFeatureColors();
+  const apqcTone = tonesFor(featureScheme, "apqc");
+  const highlightNonApqc = numberingConfig.showNonApqc && numberingHasPcf;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const diagramIsApqc = (d: { data?: unknown }) => dataHasPcf(d.data as any);
+  function toggleShowNonApqc() {
+    const next = { ...numberingConfig, showNonApqc: !numberingConfig.showNonApqc };
+    setNumberingConfig(next);
+    fetch(`/api/projects/${project.id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ numberingConfig: next }),
+    }).catch(() => {});
+  }
 
   const [showNewDiagram, setShowNewDiagram] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -1902,7 +1917,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     // APQC colour coding: a seeded folder ("1.1.1 … (10017)") gets its PCF
     // level's main colour on the folder icon; non-PCF folders stay amber.
     const pcfLvl = folder ? pcfLevelFromCode(folderCode(folder.name)) : 0;
-    const folderIconFill = isRoot ? "#3b82f6" : pcfLvl ? pcfLevelStyle(pcfLvl, pcfColors).main : "#fbbf24";
+    const isNonApqcFolder = !isRoot && !pcfLvl;
+    const folderIconFill = isRoot ? "#3b82f6" : pcfLvl ? pcfLevelStyle(pcfLvl, pcfColors).main : (highlightNonApqc ? apqcTone.text : "#fbbf24");
 
     return (
       <div key={folderId}>
@@ -1912,7 +1928,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             : isSelected ? "bg-blue-100 text-blue-800"
             : "text-gray-700 hover:bg-gray-100"
           }`}
-          style={{ paddingLeft: depth * 12 + 4 }}
+          style={{ paddingLeft: depth * 12 + 4, ...(highlightNonApqc && isNonApqcFolder ? { boxShadow: `inset 3px 0 0 ${apqcTone.text}` } : {}) }}
           onClick={() => { setSelectedFolderId(folderId); setSelectedTreeItem(isRoot ? null : folderId); }}
           onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("bg-blue-50"); }}
           onDragLeave={(e) => { e.currentTarget.classList.remove("bg-blue-50"); }}
@@ -2053,7 +2069,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                     ? "bg-blue-200 text-blue-900 ring-1 ring-blue-400"
                     : selectedTreeItem === d.id ? "bg-blue-100 text-blue-800" : "text-gray-600 hover:bg-gray-50"
                 } ${dragDiagramId === d.id ? "opacity-40" : ""}`}
-                style={{ paddingLeft: (depth + 1) * 12 + 4 }}
+                style={{ paddingLeft: (depth + 1) * 12 + 4, ...(highlightNonApqc && !diagramIsApqc(d) ? { boxShadow: `inset 3px 0 0 ${apqcTone.text}` } : {}) }}
                 onClick={(e) => {
                   e.stopPropagation();
                   const ctrl = e.ctrlKey || e.metaKey;
@@ -2620,6 +2636,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                   onCardClick={handleDiagramCardClick}
                   selected={selectedDiagramIds.has(d.id)}
                   colorConfig={projectColorConfig}
+                  nonApqc={highlightNonApqc && !diagramIsApqc(d)}
+                  apqcColor={apqcTone.text}
                 />
               ))}
             </div>
@@ -2646,6 +2664,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               ? `${numberingConfig.mode === "apqc" ? "APQC-preserving" : "Full"}${numberingConfig.prefix ? ` · ${numberingConfig.prefix}` : ""} · applied`
               : "Not yet numbered"}
             onOpenNumbering={() => setShowNumbering(true)}
+            showNonApqc={numberingConfig.showNonApqc}
+            onToggleNonApqc={numberingHasPcf ? toggleShowNonApqc : undefined}
           />
         )}
       </div>
@@ -3805,6 +3825,8 @@ function DiagramCard({
   onCardClick,
   selected,
   colorConfig,
+  nonApqc,
+  apqcColor,
 }: {
   diagram: DiagramSummary;
   otherProjects: OtherProject[];
@@ -3818,6 +3840,8 @@ function DiagramCard({
   ) => void;
   selected: boolean;
   colorConfig?: SymbolColorConfig;
+  nonApqc?: boolean;
+  apqcColor?: string;
 }) {
   const [showMove, setShowMove] = useState(false);
   // Colour-code the tile with a soft tint of the diagram-type colour.
@@ -3830,7 +3854,7 @@ function DiagramCard({
         shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey,
       })}
       title={diagram.name}
-      style={{ backgroundColor: tileTint }}
+      style={{ backgroundColor: tileTint, ...(nonApqc && apqcColor && !selected ? { boxShadow: `0 0 0 2px ${apqcColor}` } : {}) }}
       className={`rounded-md px-2 py-1.5 hover:shadow-sm cursor-pointer group transition-all relative ${
         selected
           ? "border-2 border-blue-500 ring-2 ring-blue-200"
