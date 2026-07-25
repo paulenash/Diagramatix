@@ -13,7 +13,6 @@ import { loadArchimateCatalogue, type ArchimateCatalogue } from "@/app/lib/archi
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 import { invalidateArchimateCustomIconCache } from "@/app/lib/archimate/useArchimateCustomIcon";
 import { invalidateArchimateIconBufferCache } from "@/app/lib/archimate/useArchimateIconBuffers";
-import { invalidateArchimateSeparateIconCache, useArchimateSeparateIcons } from "@/app/lib/archimate/useArchimateSeparateIcons";
 import { buildElementRows } from "@/app/lib/archimate/paletteRows";
 import { builtinCategoryBuffer, type CategoryBuffers } from "@/app/lib/archimate/iconLayout";
 import { PromptDialog } from "@/app/components/PromptDialog";
@@ -203,7 +202,6 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   const [underlay, setUnderlay] = useState<string | null>(null);
   const [bgGlyph, setBgGlyph] = useState<{ iconType: string; label: string; id?: string } | null>(null); // built-in glyph as trace background
   const [cat, setCat] = useState<ArchimateCatalogue | null>(null);
-  const separateIcons = useArchimateSeparateIcons();
   const [busy, setBusy] = useState(false);
   const [askName, setAskName] = useState(false);
   const [askCopy, setAskCopy] = useState(false);
@@ -224,11 +222,11 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   const bgRows = useMemo(() => {
     if (!cat) return [] as { id: string; iconType: string; label: string; catId: string; catName: string }[];
     return cat.categories.flatMap((c) =>
-      buildElementRows(c.shapes, separateIcons)
+      buildElementRows(c.shapes, NO_ICONS)
         .filter((r) => r.entry.iconType && ICON_DRAWERS[r.entry.iconType])
         .map((r) => ({ id: `${r.entry.key}:${r.iconOnly ? "i" : "b"}`, iconType: r.entry.iconType!, label: r.label, catId: c.id, catName: c.name })),
     );
-  }, [cat, separateIcons]);
+  }, [cat]);
 
   function clearSel() { setSel(null); setSelSet(new Set()); }
   function selectOne(i: number) { setSel(i); setSelSet(new Set([i])); }
@@ -628,13 +626,16 @@ const CATEGORY_LABELS: Record<string, string> = {
   technology: "Technology", "implementation-migration": "Implementation & Migration", composite: "Composite",
 };
 
+// The Glyph tool maintains glyphs for the NON-icon (box) elements only; icon-only
+// versions are a fixed built-in set published by the palette, not edited here.
+const NO_ICONS = new Set<string>();
+
 function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string | null) => void }) {
   const [cat, setCat] = useState<ArchimateCatalogue | null>(null);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState("{}");
   const [buffers, setBuffers] = useState<CategoryBuffers>({});
   const [savedBuffers, setSavedBuffers] = useState("{}");
-  const [separate, setSeparate] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
@@ -642,19 +643,7 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
     loadArchimateCatalogue().then((c) => setCat(c)).catch(() => setErr("Catalogue load failed")); // start all categories collapsed
     fetch("/api/admin/archimate-icons-custom").then((r) => (r.ok ? r.json() : { assignments: {} })).then((j) => { const a = j.assignments ?? {}; setAssignments(a); setSaved(JSON.stringify(a)); }).catch(() => {});
     fetch("/api/admin/archimate-icon-buffers").then((r) => (r.ok ? r.json() : { buffers: {} })).then((j) => { const b = j.buffers ?? {}; setBuffers(b); setSavedBuffers(JSON.stringify(b)); }).catch(() => {});
-    fetch("/api/admin/archimate-separate-icons").then((r) => (r.ok ? r.json() : { names: [] })).then((j) => setSeparate(new Set<string>(Array.isArray(j?.names) ? j.names : []))).catch(() => {});
   }, [setErr]);
-
-  // Add / remove an element's separate icon-only version (updates the palette).
-  async function toggleSeparate(name: string) {
-    const next = new Set(separate);
-    next.has(name) ? next.delete(name) : next.add(name);
-    setSeparate(next); // optimistic
-    try {
-      const res = await fetch("/api/admin/archimate-separate-icons", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ names: [...next] }) });
-      if (res.ok) { const j = await res.json(); setSeparate(new Set<string>(j.names ?? [...next])); invalidateArchimateSeparateIconCache(); }
-    } catch { /* keep optimistic */ }
-  }
 
   const dirty = JSON.stringify(assignments) !== saved;
   const buffersDirty = JSON.stringify(buffers) !== savedBuffers;
@@ -697,12 +686,11 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
   return (
     <div className="mt-4">
       <p className="text-xs text-gray-500 mb-3">
-        Assign a library icon to an element type — it renders as that element&rsquo;s corner glyph
-        everywhere (canvas + palette), for all users. Fine-tune position/size in
+        Assign a library glyph to a standard (non-icon) ArchiMate element — it renders as that
+        element&rsquo;s corner glyph everywhere (canvas + palette), for all users. Fine-tune position/size in
         <Link href="/dashboard/admin/archimate-icons" className="text-red-600 hover:underline"> ArchiMate Icon Maintenance</Link>,
-        or set the icon&rsquo;s preferred size in the editor. Tick <strong>icon version</strong> on an
-        element to also publish a separate icon-only form to the Symbols Panel — it appears as an
-        indented <strong>↳ … (icon)</strong> row you can assign independently.
+        or set the glyph&rsquo;s preferred size in the editor. (Icon-only element forms — Actor, the
+        Service/Event family — are built-in and maintained separately.)
       </p>
       {!icons.length && <p className="text-xs text-amber-600 mb-3">Create an icon in the Editor tab first.</p>}
 
@@ -744,9 +732,8 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
           const open = expanded.has(c.id);
           const shapes = c.shapes.filter((s) => s.iconType && !s.iconType.startsWith("junction"));
           if (!shapes.length) return null;
-          // One row per element (matching the Symbols Panel): box/primary + a
-          // separate icon-only row for the configured set.
-          const rows = buildElementRows(shapes, separate);
+          // One row per NON-icon (box/primary) element — glyph maintenance only.
+          const rows = buildElementRows(shapes, NO_ICONS);
           return (
             <div key={c.id} className="border-b border-gray-100 last:border-b-0">
               <button onClick={() => toggle(c.id)} className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
@@ -774,13 +761,6 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
                           {row.label}
                           {!ic && <span className="ml-1 text-[10px] text-gray-400">(current)</span>}
                         </span>
-                        {/* Only on the main element row: publish/remove a separate icon-only
-                            version in the Symbols Panel (ticking it adds the "↳ … (icon)" row). */}
-                        {!row.iconOnly && (
-                          <label className="flex items-center gap-1 text-[10px] text-gray-500 shrink-0" title="Publish a separate icon-only version of this element to the Symbols Panel (adds an indented '(icon)' row below)">
-                            <input type="checkbox" checked={separate.has(s.name)} onChange={() => toggleSeparate(s.name)} /> icon version
-                          </label>
-                        )}
                         <select value={assignedId ?? ""} onChange={(e) => setAssign(s.key, e.target.value)} className="border border-gray-300 rounded px-1 py-0.5 text-xs max-w-[150px]">
                           <option value="">Default (built-in)</option>
                           {icons.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}

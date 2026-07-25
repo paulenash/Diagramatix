@@ -14,8 +14,7 @@ import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 import { useArchimateCustomIcon } from "@/app/lib/archimate/useArchimateCustomIcon";
 import { effectiveCustomIcon } from "@/app/lib/archimate/customIcon";
 import { drawCustomIcon } from "@/app/lib/archimate/iconShapes";
-import { useArchimateSeparateIcons } from "@/app/lib/archimate/useArchimateSeparateIcons";
-import { buildElementRows } from "@/app/lib/archimate/paletteRows";
+import { buildElementRows, DEFAULT_SEPARATE_ICONS } from "@/app/lib/archimate/paletteRows";
 
 interface Props {
   diagramType: DiagramType;
@@ -545,7 +544,8 @@ function ArchimatePalette({
   setCollapsed: (v: boolean) => void;
 }) {
   const [catalogue, setCatalogue] = useState<ArchimateCatalogue | null>(null);
-  const separateIcons = useArchimateSeparateIcons();
+  // Built-in icon-only versions (fixed set — not editable from the Glyph tool).
+  const separateIcons = new Set(DEFAULT_SEPARATE_ICONS);
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({ business: true });
   // User-adjustable category order. Persisted to localStorage so it sticks
   // across reloads. Initialised from the catalogue's natural order on first
