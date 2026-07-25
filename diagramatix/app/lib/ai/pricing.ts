@@ -8,7 +8,7 @@
  *
  * Pure data + helpers, safe to import on the client.
  */
-export const PRICING_SNAPSHOT_DATE = "2026-07-22";
+export const PRICING_SNAPSHOT_DATE = "2026-07-25";
 
 export interface ModelPrice {
   in: number; // USD per 1M input tokens
@@ -24,6 +24,7 @@ export interface ModelPrice {
 export const PRICING: Record<string, ModelPrice> = {
   // Claude — Anthropic list pricing
   "claude-fable-5": { in: 10, out: 50 },
+  "claude-opus-5": { in: 5, out: 25 },
   "claude-opus-4-8": { in: 5, out: 25 },
   "claude-sonnet-5": { in: 3, out: 15, note: "intro $2 / $10 through 2026-08-31" },
   "claude-haiku-4-5-20251001": { in: 1, out: 5 },

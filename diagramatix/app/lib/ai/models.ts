@@ -40,6 +40,7 @@ export function resolvedEnvSecret(raw: string | null | undefined): string | unde
 
 export const AI_MODELS: AiModel[] = [
   { id: "claude-fable-5", label: "Fable 5", vision: true },
+  { id: "claude-opus-5", label: "Opus 5", vision: true },
   { id: "claude-opus-4-8", label: "Opus 4.8", vision: true },
   { id: "claude-sonnet-5", label: "Sonnet 5", vision: true },
   { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", vision: true },
