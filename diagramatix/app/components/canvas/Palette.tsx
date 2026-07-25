@@ -466,9 +466,11 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
 
 function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateShapeEntry; iconOnly?: boolean }) {
   const theme = getThemeFor(entry.category);
-  const fill = theme?.fill ?? entry.fill ?? "#f5f5f5";
-  const stroke = theme?.stroke ?? entry.stroke ?? "#666";
-  const iconColour = theme?.iconColour ?? stroke;
+  // Location renders in a light, dull purple (matches the canvas ArchimateShape).
+  const isLocation = entry.iconType === "location";
+  const fill = (isLocation ? "#f0eaf6" : theme?.fill) ?? entry.fill ?? "#f5f5f5";
+  const stroke = (isLocation ? "#8f77a6" : theme?.stroke) ?? entry.stroke ?? "#666";
+  const iconColour = (isLocation ? "#8f77a6" : theme?.iconColour) ?? stroke;
   // Larger preview so the icon glyph is clearly identifiable
   const w = 64, h = 38;
   // A SuperAdmin-assigned custom library icon replaces the built-in drawer here too.
@@ -483,7 +485,7 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
   // Icon-only Value Stream — a right-pointing chevron OUTLINE, modelled on the
   // Business Service icon: ~20% smaller, no fill, Business-Service boundary weight.
   if (iconOnly && entry.iconType === "value-stream") {
-    const mx = w * 0.1, my = h * 0.1, W = w * 0.8, H = h * 0.8;
+    const mx = w * 0.18, my = h * 0.18, W = w * 0.64, H = h * 0.64;
     const tip = Math.min(H / 2, W * 0.22);
     const x0 = mx, x1 = mx + W, y0 = my, y1 = my + H, ym = my + H / 2;
     const pts = `${x0},${y0} ${x1 - tip},${y0} ${x1},${ym} ${x1 - tip},${y1} ${x0},${y1} ${x0 + tip},${ym}`;
@@ -498,7 +500,7 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
   // (no box outline, bigger icon) so the user sees the compact iconic form.
   if ((iconOnly || isJunction) && drawIcon) {
     return (
-      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} overflow="visible">
         {drawIcon({ cx: w / 2, cy: h / 2, size: Math.min(w, h) * 1.4, colour: iconColour })}
       </svg>
     );
@@ -676,7 +678,7 @@ function ArchimatePalette({
                 </div>
               </div>
               {open && (
-                <div className="px-1 pb-1 grid grid-cols-2 gap-1">
+                <div className="px-1 pt-2 pb-1 grid grid-cols-2 gap-1">
                   {items.map(item => (
                     <div
                       key={`${item.entry.key}:${item.iconOnly ? "icon" : "box"}`}
