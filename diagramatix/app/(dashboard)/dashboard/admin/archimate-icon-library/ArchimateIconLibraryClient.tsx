@@ -209,6 +209,8 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   const [askCopy, setAskCopy] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [alert, setAlert] = useState<string | null>(null);
+  const [showRounded, setShowRounded] = useState(false);
+  const [showDiagonal, setShowDiagonal] = useState(false);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const drag = useRef<{ apply: Handle["apply"] } | null>(null);         // single vertex drag
@@ -472,9 +474,16 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
           <button onClick={onSaveClick} disabled={busy || !primitives.length} className="px-3 py-1.5 text-sm text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50">{selectedId ? "Save" : "Save new"}</button>
           {selectedId && <button onClick={() => setAskCopy(true)} disabled={busy || !primitives.length} className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50" title="Duplicate these shapes into a new icon under a different name">Save as copy…</button>}
           {selectedId && <button onClick={() => setConfirmDel(true)} className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50">Delete</button>}
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-start gap-3">
+            <div className="flex flex-col gap-0.5 text-[10px] text-gray-500 pt-1">
+              <span className="text-gray-400">corners:</span>
+              <label className="flex items-center gap-1"><input type="checkbox" checked={showRounded} onChange={(e) => setShowRounded(e.target.checked)} /> rounded</label>
+              <label className="flex items-center gap-1"><input type="checkbox" checked={showDiagonal} onChange={(e) => setShowDiagonal(e.target.checked)} /> diagonal</label>
+            </div>
             <PreviewBox primitives={primitives} label="glyph" size={27} />
-            <ElementPreview primitives={primitives} w={Number(defW) || 27} h={Number(defH) || Number(defW) || 27} />
+            <ElementPreview primitives={primitives} w={Number(defW) || 27} h={Number(defH) || Number(defW) || 27} corner="square" />
+            {showRounded && <ElementPreview primitives={primitives} w={Number(defW) || 27} h={Number(defH) || Number(defW) || 27} corner="rounded" />}
+            {showDiagonal && <ElementPreview primitives={primitives} w={Number(defW) || 27} h={Number(defH) || Number(defW) || 27} corner="diagonal" />}
           </div>
         </div>
       </div>
@@ -588,17 +597,25 @@ function PreviewBox({ primitives, label, size }: { primitives: IconPrimitive[]; 
     </div>
   );
 }
-function ElementPreview({ primitives, w, h }: { primitives: IconPrimitive[]; w: number; h: number }) {
+type Corner = "square" | "rounded" | "diagonal";
+// A sample element box outline whose TOP-RIGHT corner is square / rounded / cut.
+function boxPath(bx: number, by: number, bw: number, bh: number, corner: Corner): string {
+  const x1 = bx, y1 = by, x2 = bx + bw, y2 = by + bh, r = 14;
+  if (corner === "rounded") return `M ${x1} ${y1} L ${x2 - r} ${y1} Q ${x2} ${y1} ${x2} ${y1 + r} L ${x2} ${y2} L ${x1} ${y2} Z`;
+  if (corner === "diagonal") return `M ${x1} ${y1} L ${x2 - r} ${y1} L ${x2} ${y1 + r} L ${x2} ${y2} L ${x1} ${y2} Z`;
+  return `M ${x1} ${y1} L ${x2} ${y1} L ${x2} ${y2} L ${x1} ${y2} Z`;
+}
+function ElementPreview({ primitives, w, h, corner = "square" }: { primitives: IconPrimitive[]; w: number; h: number; corner?: Corner }) {
   // Draw the glyph as a top-right corner marker on a sample element box.
   const bx = 6, by = 10, bw = 96, bh = 58;
   const cx = bx + bw - (w / 2 + 6), cy = by + (h / 2 + 6);
   return (
     <div className="text-center">
-      <svg viewBox="0 0 108 78" className="w-[216px] h-[156px] border border-gray-100 rounded">
-        <rect x={bx} y={by} width={bw} height={bh} fill="#eff6ff" stroke="#2563eb" strokeWidth={1.5} />
+      <svg viewBox="0 0 108 78" className="w-[150px] h-[108px] border border-gray-100 rounded">
+        <path d={boxPath(bx, by, bw, bh, corner)} fill="#eff6ff" stroke="#2563eb" strokeWidth={1.5} strokeLinejoin="round" />
         {drawCustomIcon(primitives, { cx, cy, size: w, colour: "#2563eb", bg: "#eff6ff" })}
       </svg>
-      <div className="text-[9px] text-gray-400">on element</div>
+      <div className="text-[9px] text-gray-400">on element{corner === "square" ? "" : ` (${corner})`}</div>
     </div>
   );
 }
