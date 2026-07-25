@@ -13,7 +13,7 @@ import { loadArchimateCatalogue, type ArchimateCatalogue } from "@/app/lib/archi
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 import { invalidateArchimateCustomIconCache } from "@/app/lib/archimate/useArchimateCustomIcon";
 import { invalidateArchimateIconBufferCache } from "@/app/lib/archimate/useArchimateIconBuffers";
-import { invalidateArchimateSeparateIconCache } from "@/app/lib/archimate/useArchimateSeparateIcons";
+import { invalidateArchimateSeparateIconCache, useArchimateSeparateIcons } from "@/app/lib/archimate/useArchimateSeparateIcons";
 import { buildElementRows } from "@/app/lib/archimate/paletteRows";
 import { builtinCategoryBuffer, type CategoryBuffers } from "@/app/lib/archimate/iconLayout";
 import { PromptDialog } from "@/app/components/PromptDialog";
@@ -201,8 +201,9 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   const [marq, setMarq] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [underlay, setUnderlay] = useState<string | null>(null);
-  const [bgGlyph, setBgGlyph] = useState<{ iconType: string; label: string } | null>(null); // built-in glyph as trace background
+  const [bgGlyph, setBgGlyph] = useState<{ iconType: string; label: string; id?: string } | null>(null); // built-in glyph as trace background
   const [cat, setCat] = useState<ArchimateCatalogue | null>(null);
+  const separateIcons = useArchimateSeparateIcons();
   const [busy, setBusy] = useState(false);
   const [askName, setAskName] = useState(false);
   const [askCopy, setAskCopy] = useState(false);
@@ -215,6 +216,17 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   const marqRef = useRef<{ x0: number; y0: number; additive: boolean } | null>(null); // lasso
 
   useEffect(() => { loadArchimateCatalogue().then(setCat).catch(() => {}); }, []);
+
+  // "Load default glyph" options = only what's published on the Symbols Panel
+  // (the palette rows), labelled with "(icon)" for the icon-only variants.
+  const bgRows = useMemo(() => {
+    if (!cat) return [] as { id: string; iconType: string; label: string; catId: string; catName: string }[];
+    return cat.categories.flatMap((c) =>
+      buildElementRows(c.shapes, separateIcons)
+        .filter((r) => r.entry.iconType && ICON_DRAWERS[r.entry.iconType])
+        .map((r) => ({ id: `${r.entry.key}:${r.iconOnly ? "i" : "b"}`, iconType: r.entry.iconType!, label: r.label, catId: c.id, catName: c.name })),
+    );
+  }, [cat, separateIcons]);
 
   function clearSel() { setSel(null); setSelSet(new Set()); }
   function selectOne(i: number) { setSel(i); setSelSet(new Set([i])); }
@@ -368,21 +380,22 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ""; }} />
           </label>
           {/* Load a current built-in glyph as a trace background to improve upon */}
-          <select value={bgGlyph?.iconType ?? ""} className="px-1 py-1 text-xs border border-gray-300 rounded max-w-[160px]"
+          <select value={bgGlyph?.id ?? ""} className="px-1 py-1 text-xs border border-gray-300 rounded max-w-[180px]"
             onChange={(e) => {
-              const it = e.target.value;
-              if (!it) { setBgGlyph(null); return; }
-              const label = e.target.selectedOptions[0]?.text ?? it;
-              setBgGlyph({ iconType: it, label }); setUnderlay(null); setSourceFile(null);
-              if (!name.trim()) setName(`${label} (custom)`);
+              const id = e.target.value;
+              if (!id) { setBgGlyph(null); return; }
+              const row = bgRows.find((r) => r.id === id);
+              if (!row) return;
+              setBgGlyph({ iconType: row.iconType, label: row.label, id }); setUnderlay(null); setSourceFile(null);
+              if (!name.trim()) setName(`${row.label} (custom)`);
             }}>
             <option value="">Load default glyph…</option>
             {cat?.categories.map((c) => {
-              const opts = c.shapes.filter((s) => s.iconType && ICON_DRAWERS[s.iconType!]);
+              const opts = bgRows.filter((r) => r.catId === c.id);
               if (!opts.length) return null;
               return (
                 <optgroup key={c.id} label={CATEGORY_LABELS[c.id] ?? c.name}>
-                  {opts.map((s) => <option key={s.key} value={s.iconType!}>{s.name}</option>)}
+                  {opts.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
                 </optgroup>
               );
             })}
@@ -670,7 +683,9 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
         Assign a library icon to an element type — it renders as that element&rsquo;s corner glyph
         everywhere (canvas + palette), for all users. Fine-tune position/size in
         <Link href="/dashboard/admin/archimate-icons" className="text-red-600 hover:underline"> ArchiMate Icon Maintenance</Link>,
-        or set the icon&rsquo;s preferred size in the editor.
+        or set the icon&rsquo;s preferred size in the editor. Tick <strong>icon version</strong> on an
+        element to also publish a separate icon-only form to the Symbols Panel — it appears as an
+        indented <strong>↳ … (icon)</strong> row you can assign independently.
       </p>
       {!icons.length && <p className="text-xs text-amber-600 mb-3">Create an icon in the Editor tab first.</p>}
 
@@ -728,7 +743,7 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
                     const ic = assignedId ? iconById[assignedId] : undefined;
                     const builtIn = s.iconType ? ICON_DRAWERS[s.iconType] : undefined;
                     return (
-                      <div key={`${s.key}:${row.iconOnly ? "icon" : "box"}`} className="flex items-center gap-2 py-1">
+                      <div key={`${s.key}:${row.iconOnly ? "icon" : "box"}`} className={`flex items-center gap-2 py-1 ${row.iconOnly ? "pl-6" : ""}`}>
                         {/* 2× glyph — the assigned custom icon, else the CURRENT built-in glyph */}
                         <svg viewBox="0 0 24 24" className="w-12 h-12 shrink-0"><title>{ic ? "custom" : "current (built-in)"}</title>
                           {ic
@@ -738,13 +753,15 @@ function AssignPanel({ icons, setErr }: { icons: LibIcon[]; setErr: (s: string |
                               : <rect x="4" y="4" width="16" height="16" fill="none" stroke="#ddd" strokeDasharray="2 2" />}
                         </svg>
                         <span className="flex-1 text-xs text-gray-700 truncate">
+                          {row.iconOnly && <span className="text-gray-300 mr-1">↳</span>}
                           {row.label}
                           {!ic && <span className="ml-1 text-[10px] text-gray-400">(current)</span>}
                         </span>
-                        {/* add / remove the separate icon-only version in the Symbols Panel */}
+                        {/* Only on the main element row: publish/remove a separate icon-only
+                            version in the Symbols Panel (ticking it adds the "↳ … (icon)" row). */}
                         {!row.iconOnly && (
-                          <label className="flex items-center gap-1 text-[10px] text-gray-500 shrink-0" title="Show a separate icon-only version in the Symbols Panel">
-                            <input type="checkbox" checked={separate.has(s.name)} onChange={() => toggleSeparate(s.name)} /> icon
+                          <label className="flex items-center gap-1 text-[10px] text-gray-500 shrink-0" title="Publish a separate icon-only version of this element to the Symbols Panel (adds an indented '(icon)' row below)">
+                            <input type="checkbox" checked={separate.has(s.name)} onChange={() => toggleSeparate(s.name)} /> icon version
                           </label>
                         )}
                         <select value={assignedId ?? ""} onChange={(e) => setAssign(s.key, e.target.value)} className="border border-gray-300 rounded px-1 py-0.5 text-xs max-w-[150px]">
