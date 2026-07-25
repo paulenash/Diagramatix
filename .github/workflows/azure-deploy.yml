@@ -257,6 +257,11 @@ jobs:
           # Populate the Portal's denormalised Diagram columns (pcf*/procedureDoc*/
           # entityRefs) for diagrams last saved before those columns existed. Idempotent.
           npx --yes tsx@4 scripts/backfill-diagram-pcf.ts || echo "backfill-diagram-pcf skipped"
+          # One-off (idempotent, cutoff-bounded): relabel the historical "unknown"
+          # AiInvocation rows that were the offline AI harness scripts before they
+          # set a telemetry context. Only touches null-user rows before the fixed
+          # cutoff, so a genuine future "unknown" stays visible.
+          npx --yes tsx@4 scripts/relabel-unknown-ai-invocations.ts || echo "relabel-unknown-ai-invocations skipped"
 
       - name: Update App Service container image
         # `az webapp config container set` rewrites the container

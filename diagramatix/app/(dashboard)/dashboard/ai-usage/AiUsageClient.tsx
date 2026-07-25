@@ -295,7 +295,7 @@ function TimeSeries({ series }: { series: Array<{ day: string; success: number; 
         const h = (total / max) * 100;
         const okH = total > 0 ? (s.success / total) * 100 : 0;
         return (
-          <div key={s.day} className="flex flex-col items-center gap-1 shrink-0" style={{ width: 14 }} title={`${s.day}\n${s.success} ok, ${s.failure} failed\n${fmtTokens(s.inTokens + s.outTokens)} tokens · ${fmtCost(s.cost)}`}>
+          <div key={s.day} className="flex flex-col items-center justify-end gap-1 shrink-0 h-full" style={{ width: 14 }} title={`${s.day}\n${s.success} ok, ${s.failure} failed\n${fmtTokens(s.inTokens + s.outTokens)} tokens · ${fmtCost(s.cost)}`}>
             <div className="w-full bg-gray-100 rounded-sm flex flex-col justify-end" style={{ height: `${Math.max(3, h)}%` }}>
               <div className="w-full bg-red-400" style={{ height: `${100 - okH}%` }} />
               <div className="w-full bg-green-400" style={{ height: `${okH}%` }} />
