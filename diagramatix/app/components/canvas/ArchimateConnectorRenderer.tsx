@@ -58,6 +58,16 @@ function MarkerArrowOpen({ id, color }: { id: string; color: string }) {
     </marker>
   );
 }
+
+// HALF open arrowhead — a single barb. orient="auto" puts local +y screen-down for
+// a left→right path, so the (0,8) leg is the BOTTOM side (directed Association).
+function MarkerArrowOpenHalf({ id, color }: { id: string; color: string }) {
+  return (
+    <marker id={id} markerWidth={10} markerHeight={8} refX={9} refY={4} orient="auto" overflow="visible">
+      <polyline points="0,8 10,4" fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
+    </marker>
+  );
+}
 // Diamond markers used as marker-START (the ArchiMate "whole" end sits at the
 // SOURCE per the 3.x spec). orient="auto" points the marker's +x along the path
 // (toward the target); refX=1 places the diamond's left tip on the source
@@ -104,6 +114,7 @@ function renderMarker(kind: Style["startMarker"] | Style["endMarker"], id: strin
   switch (kind) {
     case "arrow-filled":    return <MarkerArrowFilled id={id} color={color} />;
     case "arrow-open":      return <MarkerArrowOpen id={id} color={color} />;
+    case "arrow-open-half": return <MarkerArrowOpenHalf id={id} color={color} />;
     case "diamond-filled":  return <MarkerDiamondFilled id={id} color={color} />;
     case "diamond-open":    return <MarkerDiamondOpen id={id} color={color} />;
     case "triangle-open":   return <MarkerTriangleOpen id={id} color={color} />;

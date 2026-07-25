@@ -5566,6 +5566,48 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         return { ...state, elements: updatePoolTypes(elements) };
       }
 
+      // ArchiMate envelopment: resizing an archimate-shape to enclose other
+      // archimate-shapes adopts each newly-enclosed element into the SMALLEST
+      // enclosing shape — mirrors the EP case above so the depth-based container
+      // lightening (and children rendering ON TOP) updates at drag-release. Fixes
+      // the case where enveloped elements previously stayed un-parented (and were
+      // hidden behind the resized container).
+      if (resizedEl?.type === "archimate-shape") {
+        const reparented = state.elements.map(el => {
+          if (el.id === id || el.type !== "archimate-shape") return el;
+          const cx = el.x + el.width / 2;
+          const cy = el.y + el.height / 2;
+          const insideThis =
+            cx >= resizedEl.x && cx <= resizedEl.x + resizedEl.width &&
+            cy >= resizedEl.y && cy <= resizedEl.y + resizedEl.height;
+          if (!insideThis) return el;
+          const newParent = state.elements
+            .filter(b =>
+              b.type === "archimate-shape" &&
+              b.id !== el.id &&
+              containerAccepts(b.type, el.type) &&
+              !wouldCreateCycle(state.elements, el.id, b.id) &&
+              cx >= b.x && cx <= b.x + b.width &&
+              cy >= b.y && cy <= b.y + b.height)
+            .sort((a, b) => a.width * a.height - b.width * b.height)[0];
+          if (!newParent || newParent.id === el.parentId) return el;
+          return { ...el, parentId: newParent.id };
+        });
+        // Re-order so the container's descendants render AFTER it (on top). ArchiMate
+        // shapes render in array order (not the depth-sorted container pass), so an
+        // enveloping shape would otherwise paint over — and hide — the elements it
+        // just adopted. Splice every descendant to immediately after the container.
+        const kidIds = getAllDescendantIds(reparented, id);
+        if (kidIds.size > 0) {
+          const kids = reparented.filter(e => kidIds.has(e.id));
+          const rest = reparented.filter(e => !kidIds.has(e.id));
+          const ci = rest.findIndex(e => e.id === id);
+          const elements = [...rest.slice(0, ci + 1), ...kids, ...rest.slice(ci + 1)];
+          return { ...state, elements };
+        }
+        return { ...state, elements: reparented };
+      }
+
       const pool = state.elements.find(e => e.id === id);
       if (!pool || pool.type !== "pool") return state;
       const poolDescendantIds = getAllDescendantIds(state.elements, id);

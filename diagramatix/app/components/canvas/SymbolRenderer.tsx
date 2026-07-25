@@ -1985,6 +1985,13 @@ function getLabelPos(el: DiagramElement, archimateDepth: number = 0): { x: numbe
       // between the feet and the box bottom.
       return { x: el.x + el.width / 2, y: el.y + el.height + 2, baseline: "hanging" };
     }
+    // Value Stream chevron — the left notch eats into the centre, so nudge the
+    // label 10px right so it sits clear of the notch.
+    const isValueStreamIcon = iconOnly && typeof el.properties?.shapeKey === "string" &&
+      (el.properties.shapeKey as string).includes("value-stream");
+    if (isValueStreamIcon) {
+      return { x: el.x + el.width / 2 + 10, y: el.y + el.height / 2, baseline: "middle" };
+    }
     if (archimateDepth > 0) {
       return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };
     }

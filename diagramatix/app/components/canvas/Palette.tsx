@@ -480,14 +480,16 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
 
   // Junction (And/Or) — the whole shape is the small circle glyph.
   const isJunction = !!entry.iconType && entry.iconType.startsWith("junction");
-  // Icon-only Value Stream — the right-pointing chevron IS the shape (matches
-  // the canvas), thick outline in the category boundary colour.
+  // Icon-only Value Stream — a right-pointing chevron OUTLINE, modelled on the
+  // Business Service icon: ~20% smaller, no fill, Business-Service boundary weight.
   if (iconOnly && entry.iconType === "value-stream") {
-    const tip = Math.min(h / 2, w * 0.22);
-    const pts = `1,1 ${w - tip},1 ${w - 1},${h / 2} ${w - tip},${h - 1} 1,${h - 1} ${1 + tip},${h / 2}`;
+    const mx = w * 0.1, my = h * 0.1, W = w * 0.8, H = h * 0.8;
+    const tip = Math.min(H / 2, W * 0.22);
+    const x0 = mx, x1 = mx + W, y0 = my, y1 = my + H, ym = my + H / 2;
+    const pts = `${x0},${y0} ${x1 - tip},${y0} ${x1},${ym} ${x1 - tip},${y1} ${x0},${y1} ${x0 + tip},${ym}`;
     return (
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-        <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.4} strokeLinejoin="round" />
+        <polygon points={pts} fill="none" stroke={stroke} strokeWidth={2.8} strokeLinejoin="round" />
       </svg>
     );
   }

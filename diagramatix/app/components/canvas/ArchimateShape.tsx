@@ -122,11 +122,15 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
 
   // Resolve theme (category default or user override on this element)
   const theme: ArchimateCategoryTheme | undefined = getThemeFor(entry.category);
+  // Location renders in a light, dull purple (element box + symbol), distinct
+  // from the neutral-grey Composite category default.
+  const isLocation = entry.iconType === "location";
+  const locFill = "#f0eaf6", locInk = "#8f77a6";
   const elOverrideFill = el.properties?.fill as string | undefined;
   const elOverrideStroke = el.properties?.stroke as string | undefined;
-  let fill = elOverrideFill ?? theme?.fill ?? entry.fill ?? "#f5f5f5";
-  const stroke = elOverrideStroke ?? theme?.stroke ?? entry.stroke ?? "#666666";
-  const iconColour = (el.properties?.iconColour as string | undefined) ?? theme?.iconColour ?? stroke;
+  let fill = elOverrideFill ?? (isLocation ? locFill : theme?.fill) ?? entry.fill ?? "#f5f5f5";
+  const stroke = elOverrideStroke ?? (isLocation ? locInk : theme?.stroke) ?? entry.stroke ?? "#666666";
+  const iconColour = (el.properties?.iconColour as string | undefined) ?? (isLocation ? locInk : theme?.iconColour) ?? stroke;
 
   // Depth-based container fill: each level of nesting makes the parent
   // ~30% lighter (capped at 85% toward white). A leaf (depth 0) keeps

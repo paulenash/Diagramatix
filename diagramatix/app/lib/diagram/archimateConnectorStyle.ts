@@ -47,6 +47,7 @@ export const ARCHI_REL_NAME: Record<ArchimateConnectorType, string> = {
 export type ArchimateMarkerKind =
   | "arrow-filled"
   | "arrow-open"
+  | "arrow-open-half"
   | "triangle-open"
   | "diamond-filled"
   | "diamond-open"
@@ -97,8 +98,9 @@ export function styleFor(type: ArchimateConnectorType, selected: boolean): Archi
       // SOLID line, no arrowhead.
       return { ...base, endMarker: null };
     case "archi-association-directed":
-      // v3.2 Directed Association — SOLID line + open (line) arrowhead at target.
-      return { ...base, endMarker: "arrow-open" };
+      // v3.2 Directed Association — SOLID line + a HALF open arrowhead at target
+      // (a single barb; for a horizontal connector it sits on the bottom side).
+      return { ...base, endMarker: "arrow-open-half" };
     // Dynamic
     case "archi-triggering":
       // SOLID line + filled (solid) arrowhead. (Previously wrongly dashed.)

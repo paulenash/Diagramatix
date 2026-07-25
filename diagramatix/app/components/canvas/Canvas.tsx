@@ -3047,6 +3047,7 @@ export function Canvas({
         } else if (iconOnly) {
           if (entry.iconType === "actor") { w = 48; h = 86; }       // portrait stick figure
           else if (entry.iconType === "service") { w = 120; h = 60; } // rounded-rect
+          else if (entry.iconType === "value-stream") { w = 156; h = 60; } // chevron — 30% longer
           else { w = 120; h = 60; }                                   // event + fallbacks
         } else {
           w = 128; h = 76; // matches palette preview aspect
