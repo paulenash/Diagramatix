@@ -13,6 +13,8 @@ import { folderSubtree, folderCode } from "@/app/lib/pcf/bulkFolders";
 import { usePcfLevelColors } from "@/app/lib/pcf/usePcfLevelColors";
 import { pcfLevelStyle, pcfLevelFromCode } from "@/app/lib/pcf/levelColors";
 import { ProjectPropertiesPanel } from "./ProjectPropertiesPanel";
+import { NumberingDialog, type NumberingConfig } from "./NumberingDialog";
+import { resolveNumberingConfig } from "@/app/lib/numbering/renumber";
 import { PcfCoveragePanel } from "./PcfCoveragePanel";
 import { APQC_ATTRIBUTION, anyDiagramHasPcf } from "@/app/lib/pcf/attribution";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
@@ -424,6 +426,11 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     const p = project.pcf as ProjectPcf | null | undefined;
     return p && Object.keys(p).length ? p : null;
   });
+
+  const numberingHasPcf = !!projectPcf?.frameworkId;
+  const [numberingConfig, setNumberingConfig] = useState<NumberingConfig>(() =>
+    resolveNumberingConfig((project as { numberingConfig?: unknown }).numberingConfig, numberingHasPcf));
+  const [showNumbering, setShowNumbering] = useState(false);
 
   const [showNewDiagram, setShowNewDiagram] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -2635,12 +2642,26 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             onPcf={setProjectPcf}
             save={saveProjectField}
             onViewCoverage={projectPcf?.frameworkId ? () => setShowPcfCoverage(true) : undefined}
+            numberingSummary={numberingConfig.applied
+              ? `${numberingConfig.mode === "apqc" ? "APQC-preserving" : "Full"}${numberingConfig.prefix ? ` · ${numberingConfig.prefix}` : ""} · applied`
+              : "Not yet numbered"}
+            onOpenNumbering={() => setShowNumbering(true)}
           />
         )}
       </div>
 
       {showPcfCoverage && (
         <PcfCoveragePanel projectId={project.id} onClose={() => setShowPcfCoverage(false)} />
+      )}
+
+      {showNumbering && (
+        <NumberingDialog
+          projectId={project.id}
+          hasPcf={numberingHasPcf}
+          initialConfig={numberingConfig}
+          onClose={() => setShowNumbering(false)}
+          onApplied={() => { setNumberingConfig((c) => ({ ...c, applied: true })); router.refresh(); }}
+        />
       )}
 
       {/* SharePoint folder picker (project export) / file picker (project import) */}

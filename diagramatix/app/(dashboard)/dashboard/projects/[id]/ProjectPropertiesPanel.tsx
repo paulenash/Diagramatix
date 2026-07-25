@@ -26,6 +26,7 @@ interface Hit { id: string; pcfId: number; hierarchyId: string; name: string; le
 export function ProjectPropertiesPanel({
   projectId, name, description, ownerName, pcf, readOnly,
   onName, onDescription, onOwner, onPcf, save, onViewCoverage,
+  numberingSummary, onOpenNumbering,
 }: {
   projectId: string;
   name: string; description: string; ownerName: string;
@@ -37,6 +38,8 @@ export function ProjectPropertiesPanel({
   onPcf: (v: ProjectPcf | null) => void;
   save: (fields: Record<string, string>) => void;
   onViewCoverage?: () => void;
+  numberingSummary?: string;
+  onOpenNumbering?: () => void;
 }) {
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [editingPcf, setEditingPcf] = useState(false);
@@ -167,6 +170,17 @@ export function ProjectPropertiesPanel({
           </div>
         )}
       </div>
+
+      {/* Process Numbering */}
+      {onOpenNumbering && (
+        <div className="mt-4">
+          <div className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">Process Numbering</div>
+          {numberingSummary && <p className="text-[11px] text-gray-600 mb-1">{numberingSummary}</p>}
+          {!readOnly && (
+            <button onClick={onOpenNumbering} className="text-[11px] text-indigo-600 hover:text-indigo-800">＃ Configure / Renumber…</button>
+          )}
+        </div>
+      )}
     </aside>
   );
 }

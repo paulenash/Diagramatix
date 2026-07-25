@@ -278,6 +278,9 @@ model Project {
   // chosen in the Project Properties panel. Shape:
   //   { frameworkId, frameworkName, variant, version, rootHierarchyId?, rootName?, seededAt? }
   pcf         Json      @default("{}")
+  // Project re-numbering configuration. Shape (app/lib/numbering/renumber.ts):
+  //   { mode:"apqc"|"full", prefix:string, applied:boolean, showNonApqc:boolean, lastAppliedAt?:string }
+  numberingConfig Json  @default("{}")
   // When this project was created by adopting a ready-made example, which
   // feature it demonstrates ("simulation" | "mining" | "risk-control"). Drives
   // the feature-coloured dashboard tile. Null for ordinary projects.

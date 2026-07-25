@@ -990,6 +990,15 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T1009 | Icon Library: assignment is per element key, not shared by iconType | Assigning one element's icon changing another that shares a drawer | If assignment keying regressed |
 | T1010 | Icon Library: parseVectorizeResponse strips fences, parses, validates (good+malformed → only good) | AI vectorize output failing to load or trusting bad shapes | If the vectorize parser regressed |
 | T1011 | Icon Library: defaultIconLayout baseSize replaces the category default + per-element override wins | An assigned icon's preferred size ignored, or override precedence wrong | If the baseSize/precedence logic regressed |
+| T1017 | Project re-numbering: widthFor (≤9→1 digit, ≥10→2 zero-padded) + pad | Wrong digit width / padding in generated codes | If the width rule regressed |
+| T1018 | Project re-numbering: full-mode nested tree walk builds dotted codes; folders numbered before diagrams | Codes not reflecting the folder-tree position | If the tree walk regressed |
+| T1019 | Project re-numbering: full-mode alpha prefix attaches to the top-level number (ABC1…); empty prefix = bare | Prefix missing/misplaced in Option 2 codes | If prefix handling regressed |
+| T1020 | Project re-numbering: activity ordering is deterministic reading order (y-band then x) | Non-deterministic / unstable activity numbers | If spatial ordering regressed |
+| T1021 | Project re-numbering: APQC-mode re-normalisation closes gaps from deleted APQC activities | Deleted APQC activity leaving a hole in the numbering | If the contiguous re-number regressed |
+| T1022 | Project re-numbering: APQC-mode appends non-APQC activities within the level; BARE numbers past 9 (no zero-pad) | Non-APQC items mis-placed, or APQC codes wrongly zero-padded | If APQC append/format regressed |
+| T1023 | Project re-numbering: activity label line-1 = code\nname; strip-and-reapply is idempotent | Codes duplicating/stacking on re-run | If idempotence (stripLeadingCode) regressed |
+| T1024 | Project re-numbering: folder + diagram names are code-prefixed | Folder/diagram names not showing their code | If name prefixing regressed |
+| T1025 | Project re-numbering: RenumberDiff shape + counters correct | Preview/apply reading wrong diff fields | If the diff contract changed |
 
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 

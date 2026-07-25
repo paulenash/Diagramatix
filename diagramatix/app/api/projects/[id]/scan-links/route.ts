@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { extractCode, stripCodeTail, normalize } from "@/app/lib/numbering/codes";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -47,39 +48,6 @@ interface Candidate {
   parentElementLabel: string;
   candidateDiagramId: string;
   candidateDiagramName: string;
-}
-
-function normalize(s: string): string {
-  return s.replace(/\s+/g, " ").trim().toLowerCase();
-}
-
-/** Extract a leading "process code" from a name. Structure:
- *    AAAnnn.nn[.nn[.nn]]...
- *  where AAA is 1–3 letters, nnn is 1–3 digits for the leading group, and
- *  each subsequent dot-section is 1–3 digits. At least one dot-section is
- *  required, but the chain can be arbitrarily deep — covers "P1.2",
- *  "P03.1.1", "AR12.3.45", "ABC123.456.78.9". Anchored to the start and
- *  followed by a word boundary so codes embedded later in the name (or
- *  longer numeric runs that just happen to share a prefix) don't match.
- *  Returned uppercase for case-insensitive compare. */
-const CODE_RE = /^([A-Za-z]{1,3}\d{1,3}(?:\.\d{1,3})+)\b/;
-function extractCode(name: string): string | null {
-  const m = name.trim().match(CODE_RE);
-  return m ? m[1].toUpperCase() : null;
-}
-
-/** Drop the leading process code (if present) and any whitespace/punctuation
- *  separating it from the descriptive remainder. Honours `:` as an explicit
- *  code-to-text separator alongside whitespace, hyphens, underscores, and
- *  trailing dots — e.g. "P03.1.1: Change Structure" → "change structure",
- *  "P1.2 Collections Process" → "collections process". Returns "" when the
- *  name is only a code or empty after stripping. */
-function stripCodeTail(name: string): string {
-  const trimmed = name.trim();
-  const m = trimmed.match(CODE_RE);
-  const tail = (m ? trimmed.slice(m[0].length) : trimmed)
-    .replace(/^[\s\-:_.]+/, "");
-  return normalize(tail);
 }
 
 /** Levenshtein distance, classic O(n*m) DP. Capped check via early exit

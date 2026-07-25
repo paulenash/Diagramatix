@@ -364,6 +364,9 @@ export interface DiagramData {
    *  model represents. Keyed on the stable `pcfId` so it survives PCF version
    *  bumps; `nodeId`/`hierarchyId`/`name`/`variant` are cached for display. */
   pcf?: PcfClassification;
+  /** Diagram Name Code assigned by the Project re-numbering system (e.g. "ABC1.2").
+   *  The machine-readable source; `Diagram.name` is stored prefixed with it. */
+  nameCode?: string;
   /** The "primary procedure document" — the written SOP that accompanies this
    *  process. Set in Diagram Properties (a URL + display name; can be filled
    *  from the SharePoint picker). Rides autosave + is snapshotted at publish;
