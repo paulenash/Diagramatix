@@ -468,9 +468,12 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
   const theme = getThemeFor(entry.category);
   // Location renders in a light, dull purple (matches the canvas ArchimateShape).
   const isLocation = entry.iconType === "location";
-  const fill = (isLocation ? "#f0eaf6" : theme?.fill) ?? entry.fill ?? "#f5f5f5";
-  const stroke = (isLocation ? "#8f77a6" : theme?.stroke) ?? entry.stroke ?? "#666";
-  const iconColour = (isLocation ? "#8f77a6" : theme?.iconColour) ?? stroke;
+  // Grouping renders as a dark-grey dashed boundary with a transparent interior.
+  const isGrouping = entry.iconType === "grouping";
+  const fill = isGrouping ? "none" : (isLocation ? "#efd1e4" : theme?.fill) ?? entry.fill ?? "#f5f5f5";
+  const stroke = isGrouping ? "#555555" : (isLocation ? "#8f77a6" : theme?.stroke) ?? entry.stroke ?? "#666";
+  const iconColour = isGrouping ? "#555555" : (isLocation ? "#8f77a6" : theme?.iconColour) ?? stroke;
+  const dash = isGrouping ? "6 3" : undefined;
   // Larger preview so the icon glyph is clearly identifiable
   const w = 64, h = 38;
   // A SuperAdmin-assigned custom library icon replaces the built-in drawer here too.
@@ -509,25 +512,25 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
   let outline: React.ReactNode;
   switch (entry.shapeFamily) {
     case "ellipse":
-      outline = <ellipse cx={w / 2} cy={h / 2} rx={w / 2 - 1} ry={h / 2 - 1} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+      outline = <ellipse cx={w / 2} cy={h / 2} rx={w / 2 - 1} ry={h / 2 - 1} fill={fill} stroke={stroke} strokeWidth={1.2} strokeDasharray={dash} />;
       break;
     case "rounded-rect":
-      outline = <rect x={1} y={1} width={w - 2} height={h - 2} rx={6} ry={6} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+      outline = <rect x={1} y={1} width={w - 2} height={h - 2} rx={6} ry={6} fill={fill} stroke={stroke} strokeWidth={1.2} strokeDasharray={dash} />;
       break;
     case "hexagon": {
       const pad = w * 0.15;
       const pts = `${pad},1 ${w - pad},1 ${w - 1},${h / 2} ${w - pad},${h - 1} ${pad},${h - 1} 1,${h / 2}`;
-      outline = <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+      outline = <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.2} strokeDasharray={dash} />;
       break;
     }
     case "octagon": {
       const c = Math.min(w, h) * 0.22;
       const pts = `${c},1 ${w - c},1 ${w - 1},${c} ${w - 1},${h - c} ${w - c},${h - 1} ${c},${h - 1} 1,${h - c} 1,${c}`;
-      outline = <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+      outline = <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.2} strokeDasharray={dash} />;
       break;
     }
     default:
-      outline = <rect x={1} y={1} width={w - 2} height={h - 2} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+      outline = <rect x={1} y={1} width={w - 2} height={h - 2} fill={fill} stroke={stroke} strokeWidth={1.2} strokeDasharray={dash} />;
   }
   // Box variant: outlined rectangle with the icon glyph in the top-right
   // corner (matching the canvas rendering). Motivation / Technology /

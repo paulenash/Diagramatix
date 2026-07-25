@@ -125,7 +125,10 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   // Location renders in a light, dull purple (element box + symbol), distinct
   // from the neutral-grey Composite category default.
   const isLocation = entry.iconType === "location";
-  const locFill = "#f0eaf6", locInk = "#8f77a6";
+  const locFill = "#efd1e4", locInk = "#8f77a6";
+  // Grouping renders as a dark-grey dashed boundary with a fully transparent
+  // interior (ArchiMate notation) so enclosed elements show through.
+  const isGrouping = entry.iconType === "grouping";
   const elOverrideFill = el.properties?.fill as string | undefined;
   const elOverrideStroke = el.properties?.stroke as string | undefined;
   let fill = elOverrideFill ?? (isLocation ? locFill : theme?.fill) ?? entry.fill ?? "#f5f5f5";
@@ -253,8 +256,14 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides, customBaseSize, categoryBuffers);
   return (
     <g>
-      <path d={d} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} />
-      {drawIcon ? renderGlyph(drawIcon, el, layout, glyphColour) : null}
+      <path
+        d={d}
+        fill={isGrouping ? "none" : fill}
+        stroke={isGrouping ? "#555555" : stroke}
+        strokeWidth={STROKE_WIDTH}
+        strokeDasharray={isGrouping ? "8 4" : undefined}
+      />
+      {drawIcon ? renderGlyph(drawIcon, el, layout, isGrouping ? "#555555" : glyphColour) : null}
     </g>
   );
 }

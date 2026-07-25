@@ -42,17 +42,17 @@ export interface ArchimateCategoryTheme {
  */
 export const DEFAULT_ARCHIMATE_THEMES: ArchimateCategoryTheme[] = [
   // Filled in by us (phase 1 scope)
-  { id: "business",    name: "Business",    fill: "#ffff00", stroke: "#b49b00", iconColour: "#6b5b00" },
-  { id: "motivation",  name: "Motivation",  fill: "#e5d9ff", stroke: "#7a5db3", iconColour: "#4b2e89" },
+  { id: "business",    name: "Business",    fill: "#ffffaf", stroke: "#b49b00", iconColour: "#6b5b00" },
+  { id: "motivation",  name: "Motivation",  fill: "#ccccff", stroke: "#7a5db3", iconColour: "#4b2e89" },
   { id: "strategy",    name: "Strategy",    fill: "#f5deaa", stroke: "#b38037", iconColour: "#6b4a0e" },
-  { id: "application", name: "Application", fill: "#b5ffff", stroke: "#2a7a91", iconColour: "#0b4d5e" },
+  { id: "application", name: "Application", fill: "#afffff", stroke: "#2a7a91", iconColour: "#0b4d5e" },
   { id: "composite",   name: "Composite",   fill: "#eeeeee", stroke: "#888888", iconColour: "#444444" },
   // Placeholders — fill in when those categories are added
-  { id: "technology",                name: "Technology",                fill: "#c5e0b4", stroke: "#4f7a3a", iconColour: "#2d4a1f" },
+  { id: "technology",                name: "Technology",                fill: "#afffaf", stroke: "#4f7a3a", iconColour: "#2d4a1f" },
   // Physical elements live in the Technology category (ArchiMate 3.2), so they
   // inherit the Technology theme; this entry is kept only for reference.
-  { id: "physical",                  name: "Physical",                  fill: "#c5e0b4", stroke: "#4f7a3a", iconColour: "#2d4a1f" },
-  { id: "implementation-migration",  name: "Implementation & Migration", fill: "#ffd7e6", stroke: "#b3517a", iconColour: "#7a2e50" },
+  { id: "physical",                  name: "Physical",                  fill: "#afffaf", stroke: "#4f7a3a", iconColour: "#2d4a1f" },
+  { id: "implementation-migration",  name: "Implementation & Migration", fill: "#ffe0e0", stroke: "#b3517a", iconColour: "#7a2e50" },
 ];
 
 export function getThemeFor(categoryId: string, overrides?: Partial<Record<string, ArchimateCategoryTheme>>): ArchimateCategoryTheme | undefined {
