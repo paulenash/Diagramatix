@@ -35,6 +35,7 @@ import { getRiskControl } from "@/app/lib/diagram/riskControl";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { featureVars, tonesFor } from "@/app/lib/theme/featureColors";
+import { NUMBERABLE_TYPES } from "@/app/lib/numbering/renumber";
 import { useOrgPolicy, useSharePointAvailable } from "@/app/lib/auth/useOrgPolicy";
 import { setNoObstacleAvoidance } from "@/app/lib/diagram/routing";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -473,6 +474,8 @@ export function DiagramEditor({
     diagramFolderMap?: Record<string, string>;
     diagramOrder?: Record<string, string[]>;
   } | null>(null);
+  // Project-level "Show non-APQC" toggle — rings non-APQC activities on the canvas.
+  const [showNonApqc, setShowNonApqc] = useState(false);
   useEffect(() => {
     if (!projectId) return;
     fetch(`/api/projects/${projectId}`)
@@ -485,6 +488,7 @@ export function DiagramEditor({
           );
         }
         if (data?.folderTree) setFolderTree(data.folderTree);
+        setShowNonApqc(!!(data?.numberingConfig as { showNonApqc?: boolean } | undefined)?.showNonApqc);
       })
       .catch(() => {});
   }, [projectId, diagramId]);
@@ -1334,6 +1338,19 @@ export function DiagramEditor({
     }
     return m.size > 0 ? m : null;
   }, [rcSectionOpen, data.elements]);
+
+  // "Show non-APQC" — ring non-APQC activities (numberable elements with no PCF ref).
+  const nonApqcHighlightIds = useMemo<Set<string> | undefined>(() => {
+    if (!showNonApqc) return undefined;
+    const s = new Set<string>();
+    for (const el of data.elements) {
+      if (!NUMBERABLE_TYPES.has(el.type)) continue;
+      const p = el.properties as Record<string, unknown> | undefined;
+      const isApqc = !!p && (p.pcfHierarchyId != null || p.pcfId != null);
+      if (!isApqc) s.add(el.id);
+    }
+    return s.size > 0 ? s : undefined;
+  }, [showNonApqc, data.elements]);
 
   // "Highlight Entity List Changes" (drift): flag elements whose NAME isn't in the
   // project's adopted Entity Structure. pool/lane/sublane → Org Hierarchy (or a
@@ -3755,6 +3772,8 @@ export function DiagramEditor({
           pcHighlightEnabled={highlightEnabled}
           scanHighlightById={scanHighlight ?? undefined}
           riskHighlightById={riskHighlight ?? undefined}
+          nonApqcHighlightIds={nonApqcHighlightIds}
+          nonApqcColor={tonesFor(featureScheme, "apqc").text}
           entityDriftById={entityDrift ?? undefined}
           driftColor={tonesFor(featureScheme, "entityLists").text}
           scanHighlightConnectorById={scanConnectorHighlight ?? undefined}

@@ -291,6 +291,10 @@ interface Props {
   /** Risk & Control highlight: element id → whether it carries a Risk, a Control,
    *  or both. Shown while the Properties-Panel "Risk & Controls" section is open. */
   riskHighlightById?: Map<string, "risk" | "control" | "both">;
+  /** "Show non-APQC" highlight: ids of non-APQC activities to ring, in the APQC
+   *  feature colour. Driven by the project-level toggle. */
+  nonApqcHighlightIds?: Set<string>;
+  nonApqcColor?: string;
   onSetSelectedElements: (ids: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
   onSelectConnector: (id: string | null) => void;
   onMoveElements?: (ids: string[], dx: number, dy: number) => void;
@@ -551,6 +555,8 @@ export function Canvas({
   scanHighlightConnectorById,
   currentIssueIds,
   riskHighlightById,
+  nonApqcHighlightIds,
+  nonApqcColor,
   onSetSelectedElements,
   onSelectConnector,
   onMoveElements,
@@ -7059,6 +7065,18 @@ export function Canvas({
                 />
               ));
             })}
+
+          {/* "Show non-APQC" — ring non-APQC activities in the APQC colour. */}
+          {nonApqcHighlightIds && nonApqcHighlightIds.size > 0 && nonApqcColor && data.elements
+            .filter((el: DiagramElement) => nonApqcHighlightIds.has(el.id))
+            .map((el: DiagramElement) => (
+              <rect
+                key={`napqc-hl-${el.id}`}
+                x={el.x - 4} y={el.y - 4}
+                width={el.width + 8} height={el.height + 8}
+                fill="none" stroke={nonApqcColor} strokeWidth={2.5 / zoom} rx={4} strokeDasharray={`${6 / zoom} ${3 / zoom}`} pointerEvents="none"
+              />
+            ))}
 
         </g>
       </svg>
