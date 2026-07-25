@@ -191,14 +191,20 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
         const radius = el.height / 2;
         const archStart = right - radius;
         bg = `M ${left} ${top} L ${archStart} ${top} A ${radius} ${radius} 0 0 1 ${archStart} ${bot} L ${left} ${bot} A ${radius} ${radius} 0 0 0 ${left} ${top} Z`;
+      } else if (entry.iconType === "value-stream") {
+        // Value Stream — a right-pointing chevron; the shape IS the element.
+        // Tip depth matches routing's chevronPolygon so connectors dock to it.
+        const tip = Math.min(el.height / 2, el.width * 0.22);
+        const x = el.x, y = el.y, w = el.width, h = el.height;
+        bg = `M ${x} ${y} L ${x + w - tip} ${y} L ${x + w} ${y + h / 2} L ${x + w - tip} ${y + h} L ${x} ${y + h} L ${x + tip} ${y + h / 2} Z`;
       } else {
         bg = `M ${el.x} ${el.y} L ${el.x + el.width} ${el.y} L ${el.x + el.width} ${el.y + el.height} L ${el.x} ${el.y + el.height} Z`;
       }
-      // Service & Event ARE their own glyph shape. Every other icon-only type
-      // (interface, role, product, data-object, application-service, …) draws a
-      // plain rectangle, so overlay its ArchiMate glyph in the top-right corner
-      // — otherwise it renders as a blank box.
-      const cornerGlyph = entry.iconType !== "service" && entry.iconType !== "event";
+      // Service / Event / Value Stream ARE their own glyph shape. Every other
+      // icon-only type (interface, role, product, data-object, …) draws a plain
+      // rectangle, so overlay its ArchiMate glyph in the top-right corner —
+      // otherwise it renders as a blank box.
+      const cornerGlyph = entry.iconType !== "service" && entry.iconType !== "event" && entry.iconType !== "value-stream";
       const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides, customBaseSize, categoryBuffers);
       return (
         <g>
@@ -231,16 +237,6 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
         strokeWidth={filled ? 1 : Math.max(1.5, Math.min(el.width, el.height) / 8)}
       />
     );
-  }
-
-  // Value Stream — a right-pointing chevron; the chevron IS the element (name
-  // rendered inside by SymbolRenderer). The tip depth matches routing's
-  // chevronPolygon so connectors dock to this outline, not the bounding box.
-  if (entry.iconType === "value-stream") {
-    const x = el.x, y = el.y, w = el.width, h = el.height;
-    const tip = Math.min(h / 2, w * 0.22);
-    const dv = `M ${x} ${y} L ${x + w - tip} ${y} L ${x + w} ${y + h / 2} L ${x + w - tip} ${y + h} L ${x} ${y + h} L ${x + tip} ${y + h / 2} Z`;
-    return <path d={dv} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} strokeLinejoin="round" />;
   }
 
   // Standard box rendering — outline + corner icon glyph. Position + size come

@@ -20,6 +20,7 @@ export const ARCHIMATE_SEPARATE_ICON_KEY = "archimate.icon.separate";
 export const DEFAULT_SEPARATE_ICONS = [
   "Business Actor", "Business Service", "Business Event",
   "Application Service", "Application Event", "Technology Service", "Technology Event",
+  "Value Stream",
 ];
 
 export interface PaletteRow {

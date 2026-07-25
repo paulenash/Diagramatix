@@ -299,9 +299,11 @@ function ellipseEdgePoint(from: Point, el: { x: number; y: number; width: number
 // `ellipseEdgePoint` projects onto circular types). Gated per element so plain
 // rectangles are completely unaffected.
 
-/** Is this element a Value Stream (rendered as a right-pointing chevron)? */
+/** Is this the icon-only Value Stream (rendered as a right-pointing chevron)?
+ *  Only the icon variant is a chevron; the box variant is a plain rectangle. */
 function isValueStream(el: DiagramElement): boolean {
   return el.type === "archimate-shape" &&
+    el.properties?.archimateIconOnly === true &&
     typeof el.properties?.shapeKey === "string" &&
     (el.properties.shapeKey as string).includes("value-stream");
 }

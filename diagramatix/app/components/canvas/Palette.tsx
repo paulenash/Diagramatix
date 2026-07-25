@@ -480,23 +480,24 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
 
   // Junction (And/Or) — the whole shape is the small circle glyph.
   const isJunction = !!entry.iconType && entry.iconType.startsWith("junction");
+  // Icon-only Value Stream — the right-pointing chevron IS the shape (matches
+  // the canvas), thick outline in the category boundary colour.
+  if (iconOnly && entry.iconType === "value-stream") {
+    const tip = Math.min(h / 2, w * 0.22);
+    const pts = `1,1 ${w - tip},1 ${w - 1},${h / 2} ${w - tip},${h - 1} 1,${h - 1} ${1 + tip},${h / 2}`;
+    return (
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+        <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.4} strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
   // Icon-only variant (or a junction): render the icon glyph itself AS the shape
   // (no box outline, bigger icon) so the user sees the compact iconic form.
   if ((iconOnly || isJunction) && drawIcon) {
     return (
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
         {drawIcon({ cx: w / 2, cy: h / 2, size: Math.min(w, h) * 1.4, colour: iconColour })}
-      </svg>
-    );
-  }
-
-  // Value Stream — a right-pointing chevron (matches the canvas shape).
-  if (entry.iconType === "value-stream") {
-    const tip = Math.min(h / 2, w * 0.22);
-    const pts = `1,1 ${w - tip},1 ${w - 1},${h / 2} ${w - tip},${h - 1} 1,${h - 1} ${1 + tip},${h / 2}`;
-    return (
-      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-        <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.2} strokeLinejoin="round" />
       </svg>
     );
   }
