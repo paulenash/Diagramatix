@@ -1,0 +1,21 @@
+# LiteLLM Proxy — Anthropic-compatible gateway fronting Google Gemini for
+# Diagramatix. The app calls POST /v1/messages (Anthropic Messages API); LiteLLM
+# translates each request to the Gemini API and returns an Anthropic-shaped reply.
+#
+# `model_name` values MUST match the ids Diagramatix sends (the app's GOOGLE_MODELS
+# env), so keep the two in sync. Add a line here for every Gemini model you want.
+model_list:
+  - model_name: gemini-2.5-pro
+    litellm_params:
+      model: gemini/gemini-2.5-pro
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: gemini-2.5-flash
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+general_settings:
+  # Every request must present  Authorization: Bearer <LITELLM_MASTER_KEY>.
+  # That master key is what Diagramatix sends as GOOGLE_API_KEY — it is NOT your
+  # Google key (the Google key lives only in GEMINI_API_KEY, below/in secrets).
+  master_key: os.environ/LITELLM_MASTER_KEY
