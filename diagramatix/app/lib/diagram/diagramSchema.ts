@@ -149,6 +149,7 @@ const baseDiagramData = z.object({
   showIssues: z.boolean().optional(),
   showIssueDescriptions: z.boolean().optional(),
   parentDiagramIds: z.array(z.string()).optional(),
+  nameCode: z.string().optional(), // v1.42 — Diagram Name Code (Project re-numbering)
   processOwner: looseObj.optional(),
   pcf: looseObj.optional(),
   procedureDoc: looseObj.optional(),

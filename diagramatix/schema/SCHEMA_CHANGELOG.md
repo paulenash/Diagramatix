@@ -6,7 +6,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 - **`schemaVersion`** (major.minor) — the export *data-structure* version. Bumped only when fields are added, removed, or renamed. *Major* = breaking change; *minor* = additive (new optional fields). Carried on the `<xs:schema version="…">` attribute.
 - **`appVersion`** (major.minor.build) — the Diagramatix *application* version. The build number is the git commit count, so it changes every commit. Injected at runtime via `/api/schema`.
 
-**Current version:** `1.40`. Versioning began at **v1.0** (dual `schemaVersion` / `appVersion` stamping across every export + a versioned XSD root); **v1.2** was the first release of the enumerated XSD content that every later version evolves from. The XSD's own inline history block starts at **v1.10**; the earlier **v1.0–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`../app/lib/diagram/types.ts`](../app/lib/diagram/types.ts) and git.
+**Current version:** `1.42`. Versioning began at **v1.0** (dual `schemaVersion` / `appVersion` stamping across every export + a versioned XSD root); **v1.2** was the first release of the enumerated XSD content that every later version evolves from. The XSD's own inline history block starts at **v1.10**; the earlier **v1.0–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`../app/lib/diagram/types.ts`](../app/lib/diagram/types.ts) and git.
 
 > **When to bump `schemaVersion`:** ONLY when the persisted **data structure** actually changes — either the Diagram JSON export shape (the XSD) **or** the physical database as described by the **Logical DDL** ([`../app/lib/diagram/ddlGenerate.ts`](../app/lib/diagram/ddlGenerate.ts)). The version number tracks that structure; a feature-only release that touches neither does **not** bump it. *(Historically some releases advanced the number to mark a "feature window" without a shape change — those are the "No" rows below; the rule going forward is shape-change-only.)*
 
@@ -20,6 +20,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 
 | Version | Title | Schema shape change? |
 |---|---|---|
+| **1.42** | Project re-numbering system (hierarchical folder/diagram/activity codes; APQC-preserving or full renumber; preview + apply) + ArchiMate 3.2 directed Association | **Yes** — new optional `<dgx:data nameCode>` (Diagram Name Code) + new `ConnectorType` `archi-association-directed`; also open key `properties.nameCode` (Activity Name Code, no XSD change) |
 | **1.41** | Issues — dark-green Pain Point twin (`uml-issue`, auto-numbered + description); both markers offered on every diagram type; domain routing settled on sticky (A/B toggle removed); Database selector SuperAdmin-only | **Yes** — new `SymbolType` `uml-issue` + optional diagram-level `showIssues` / `showIssueDescriptions` booleans |
 | **1.40** | Pain Point "Display Pain Points" master toggle (nests the description toggle under it) | **Yes** — new optional diagram-level `showPainPoints` boolean |
 | **1.39** | Pain Points overhaul — auto-numbered `uml-pain-point` icons (number = label, shown large) + optional multi-line description; auto-connect restricted to BPMN/flowchart | **Yes** — new optional diagram-level `showPainPointDescriptions` boolean (+ `properties.description`, open PropertiesType) |
@@ -66,6 +67,22 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 ---
 
 ## Details (newest first)
+
+### v1.42 — Project re-numbering + ArchiMate directed Association  · **shape change**
+The **Project re-numbering system** assigns hierarchical codes to a project's folders,
+diagrams and activities — either **APQC-preserving** (keep the APQC structure, renumber
+each diagram's activities contiguously) or a **full renumber** from the root
+(`{PREFIX}n.m.k`, ≤9→1 digit / ≥10→2 zero-padded, prefix on the top-level number), with a
+preview of every old→new change before apply. Two export-shape additions:
+- **`DiagramData.nameCode`** (optional string) — the **Diagram Name Code**; `Diagram.name`
+  is stored prefixed with it. New optional `nameCode` attribute on `<dgx:data>`, emitted +
+  parsed in XML (`xmlExport.ts`) and in the Zod `baseDiagramData`.
+- **`ConnectorType` `archi-association-directed`** — ArchiMate 3.2 directed Association;
+  added to the XSD `ConnectorTypeEnum` (exporting a diagram that used it previously failed
+  validation) and to the Logical DDL `ref_connector_type` (with the rest of the `archi-*`
+  set, closing a pre-existing lookup gap).
+- The **Activity Name Code** rides `element.properties.nameCode` — the open `PropertiesType`,
+  so no XSD change (documented alongside the other known keys).
 
 ### v1.41 — Issues (dark-green Pain Point twin)  · **shape change**
 Adds **`uml-issue`** to `SymbolTypeEnum` — a full behavioural twin of `uml-pain-point`

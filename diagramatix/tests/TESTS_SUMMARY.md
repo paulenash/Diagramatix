@@ -990,6 +990,11 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T1009 | Icon Library: assignment is per element key, not shared by iconType | Assigning one element's icon changing another that shares a drawer | If assignment keying regressed |
 | T1010 | Icon Library: parseVectorizeResponse strips fences, parses, validates (good+malformed → only good) | AI vectorize output failing to load or trusting bad shapes | If the vectorize parser regressed |
 | T1011 | Icon Library: defaultIconLayout baseSize replaces the category default + per-element override wins | An assigned icon's preferred size ignored, or override precedence wrong | If the baseSize/precedence logic regressed |
+| T1012 | ArchiMate relationships: core elements Realise Strategy (Process → Capability) allowed | Process→Capability offering only Association | If the behaviour/active→strategy Realisation rule was dropped |
+| T1013 | ArchiMate relationships: the 9 cross-category gaps + cross-level Realisation promoted to "allowed" | Missing serving/realisation/assignment/influence pairs; Realisation stuck behind "derived" | If the matrix rules regressed |
+| T1014 | Icon Library: fillRole "background" paints the bg (opaque mask); "ink" paints the theme colour; none = transparent | A masking rectangle showing ink or letting lines through | If the 3-way fill regressed |
+| T1015 | Icon Library: category glyph buffers set the top/right edge gap; precedence (override > baseSize > default) | Category buffer edits ignored or mis-ordered | If the buffer/precedence logic regressed |
+| T1016 | Symbols Panel: buildElementRows = one row per element (box preferred) + configurable icon-only rows | Duplicate box/icon rows, or the palette not matching the assignment list | If the shared row builder regressed |
 | T1017 | Project re-numbering: widthFor (≤9→1 digit, ≥10→2 zero-padded) + pad | Wrong digit width / padding in generated codes | If the width rule regressed |
 | T1018 | Project re-numbering: full-mode nested tree walk builds dotted codes; folders numbered before diagrams | Codes not reflecting the folder-tree position | If the tree walk regressed |
 | T1019 | Project re-numbering: full-mode alpha prefix attaches to the top-level number (ABC1…); empty prefix = bare | Prefix missing/misplaced in Option 2 codes | If prefix handling regressed |

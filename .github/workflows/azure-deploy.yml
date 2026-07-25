@@ -248,6 +248,12 @@ jobs:
           npx --yes tsx@4 scripts/add-tech-design-enterprise-governance.ts || echo "add-tech-design-enterprise-governance skipped"
           # Tech Notes: the CI/CD deployment walk-through (this very pipeline).
           npx --yes tsx@4 scripts/add-tech-design-deployment.ts || echo "add-tech-design-deployment skipped"
+          # ArchiMate Icon Library + Project Re-numbering — Features (draft), User
+          # Guide (Project Numbering), Tech Notes (icons + numbering). Tech-design
+          # one runs after add-tech-design-notes.ts (needs the base chapters).
+          npx --yes tsx@4 scripts/add-features-icon-numbering.ts || echo "add-features-icon-numbering skipped"
+          npx --yes tsx@4 scripts/add-guide-numbering.ts || echo "add-guide-numbering skipped"
+          npx --yes tsx@4 scripts/add-tech-design-icons-numbering.ts || echo "add-tech-design-icons-numbering skipped"
           # Populate the Portal's denormalised Diagram columns (pcf*/procedureDoc*/
           # entityRefs) for diagrams last saved before those columns existed. Idempotent.
           npx --yes tsx@4 scripts/backfill-diagram-pcf.ts || echo "backfill-diagram-pcf skipped"

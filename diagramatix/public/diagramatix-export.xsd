@@ -595,6 +595,9 @@
          as captions (auto-enabled with the first Issue). -->
     <xs:attribute name="showIssues" type="xs:boolean" use="optional"/>
     <xs:attribute name="showIssueDescriptions" type="xs:boolean" use="optional"/>
+    <!-- schema 1.42 — Diagram Name Code assigned by the Project re-numbering
+         system (Diagram.name is stored prefixed with it). -->
+    <xs:attribute name="nameCode" type="xs:string" use="optional"/>
   </xs:complexType>
 
   <!-- ============================================================ -->
@@ -1235,6 +1238,8 @@
       <xs:enumeration value="archi-access"/>
       <xs:enumeration value="archi-influence"/>
       <xs:enumeration value="archi-association"/>
+      <!-- schema 1.42 — ArchiMate 3.2 directed Association. -->
+      <xs:enumeration value="archi-association-directed"/>
       <!-- Dynamic -->
       <xs:enumeration value="archi-triggering"/>
       <xs:enumeration value="archi-flow"/>

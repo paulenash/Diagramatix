@@ -1016,5 +1016,13 @@ export interface TemplateData {
  *             false = hidden) and `showIssueDescriptions` (auto-enabled with the
  *             first Issue). Both Pain Points and Issues are now offered on EVERY
  *             diagram type's palette (type-agnostic).
+ *
+ *  v1.42 (2026-07-25): Two export-shape changes. (1) New OPTIONAL `DiagramData.nameCode`
+ *             (string) — the "Diagram Name Code" assigned by the Project re-numbering
+ *             system; now emitted/parsed in XML and present in the XSD. (2) New ArchiMate
+ *             connector type `archi-association-directed` (directed Association) added to
+ *             the XSD `ConnectorTypeEnum` (previously would fail validation on export).
+ *             Also OPTIONAL open key `element.properties.nameCode` (Activity Name Code) —
+ *             rides the loose PropertiesType, no XSD change.
  */
-export const SCHEMA_VERSION = "1.41";
+export const SCHEMA_VERSION = "1.42";
