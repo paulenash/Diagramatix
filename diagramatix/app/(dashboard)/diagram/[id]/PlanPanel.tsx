@@ -146,6 +146,9 @@ export function PlanPanel({
   const toggleCompareModel = (id: string) =>
     setPickedModels((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const [prompt, setPrompt] = useState("");
+  // SuperAdmin "Models to compare" picker — collapsed to a button; opens as a popup
+  // so the checkbox list doesn't eat vertical space / overlap other controls.
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   // Chosen generate model (used at Plan time; remembered for the annotation on Apply).
   const [model, setModel] = useState<string>("");
   useEffect(() => { setModel((m) => m || currentAiModelId || ""); }, [currentAiModelId]);
@@ -992,26 +995,54 @@ export function PlanPanel({
           )}
           {isSuperuser && !superAdminHidden && diagramType === "bpmn" && (
             <div className="mt-1 shrink-0">
-              {/* Tick the models to run head-to-head (Claude + Kimi + custom). */}
+              {/* Collapsed "Models to compare" button — opens a popup with the
+                  checkbox list (Claude + Kimi + custom) so it doesn't take vertical
+                  space or overlap the Compare button. */}
               {availModels.length > 0 && (
-                <div className="mb-1 border border-gray-200 rounded p-1.5">
-                  <div className="flex items-center justify-between mb-1">
+                <div className="relative mb-1">
+                  <button
+                    type="button"
+                    onClick={() => setModelPickerOpen((v) => !v)}
+                    title={pickedModels.size
+                      ? `Selected: ${availModels.filter((m) => pickedModels.has(m.id)).map((m) => m.label).join(", ")}`
+                      : "No models selected — click to choose"}
+                    className="w-full flex items-center justify-between border border-gray-200 rounded px-2 py-1 hover:bg-gray-50"
+                  >
                     <span className="text-[9px] uppercase tracking-wide text-gray-400">Models to compare</span>
-                    <div className="flex gap-1.5">
-                      <button type="button" onClick={() => setPickedModels(new Set(availModels.map((m) => m.id)))}
-                        className="text-[9px] text-gray-500 hover:text-gray-700 underline">All</button>
-                      <button type="button" onClick={() => setPickedModels(new Set())}
-                        className="text-[9px] text-gray-500 hover:text-gray-700 underline">None</button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
-                    {availModels.map((m) => (
-                      <label key={m.id} className="flex items-center gap-1 text-[10px] text-gray-700 cursor-pointer">
-                        <input type="checkbox" checked={pickedModels.has(m.id)} onChange={() => toggleCompareModel(m.id)} className="w-3 h-3" />
-                        <span className="truncate">{m.label}</span>
-                      </label>
-                    ))}
-                  </div>
+                    <span className="flex items-center gap-1 text-[10px] text-gray-700">
+                      <span className={pickedModels.size ? "" : "text-gray-400"}>
+                        {pickedModels.size ? `${pickedModels.size} selected` : "none"}
+                      </span>
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform ${modelPickerOpen ? "rotate-180" : ""}`} aria-hidden><path d="M6 9l6 6 6-6" /></svg>
+                    </span>
+                  </button>
+                  {modelPickerOpen && (
+                    <>
+                      {/* click-away backdrop */}
+                      <div className="fixed inset-0 z-40" onClick={() => setModelPickerOpen(false)} />
+                      <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg p-1.5">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[9px] uppercase tracking-wide text-gray-400">Select models</span>
+                          <div className="flex gap-1.5">
+                            <button type="button" onClick={() => setPickedModels(new Set(availModels.map((m) => m.id)))}
+                              className="text-[9px] text-gray-500 hover:text-gray-700 underline">All</button>
+                            <button type="button" onClick={() => setPickedModels(new Set())}
+                              className="text-[9px] text-gray-500 hover:text-gray-700 underline">None</button>
+                            <button type="button" onClick={() => setModelPickerOpen(false)}
+                              className="text-[9px] text-blue-600 hover:text-blue-800 underline">Done</button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 max-h-52 overflow-y-auto">
+                          {availModels.map((m) => (
+                            <label key={m.id} className="flex items-center gap-1 text-[10px] text-gray-700 cursor-pointer">
+                              <input type="checkbox" checked={pickedModels.has(m.id)} onChange={() => toggleCompareModel(m.id)} className="w-3 h-3" />
+                              <span className="truncate">{m.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
               <button onClick={() => handleCompare()} disabled={comparing || (!prompt.trim() && !attachment) || !diagramId || pickedModels.size === 0}
