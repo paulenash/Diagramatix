@@ -5,7 +5,8 @@ import { useSession } from "next-auth/react";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
 import { arrayBufferToBase64 } from "@/app/lib/base64";
-import type { DiagramData, DiagramElement, Connector, DiagramType, AiFeedback } from "@/app/lib/diagram/types";
+import type { DiagramData, DiagramElement, Connector, DiagramType, AiFeedback, AiApplyMeta } from "@/app/lib/diagram/types";
+import { ModelSelect, type AllowedModel } from "./ModelSelect";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
 import { ClarificationDialog } from "@/app/components/ClarificationDialog";
@@ -26,9 +27,17 @@ interface SavedPrompt { id: string; name: string; text: string; }
 
 interface Props {
   diagramType: string;
-  onApplyDiagram: (data: DiagramData) => void;
+  onApplyDiagram: (data: DiagramData, meta?: AiApplyMeta) => void;
   onAddToDiagram: (elements: DiagramElement[], connectors: Connector[]) => void;
   onClose: () => void;
+  /** Regenerate prefill — seed the prompt textarea + model on open, then call
+   *  onPrefillConsumed so it's applied once. */
+  initialPrompt?: string;
+  initialModel?: string;
+  onPrefillConsumed?: () => void;
+  /** Cost-gated generate models the user may pick + the current default id. */
+  aiModels?: AllowedModel[];
+  currentAiModelId?: string;
   /** Reports the panel's `generating` state to the parent so a
    *  full-canvas overlay can be rendered while Sonnet runs. */
   onGeneratingChange?: (generating: boolean) => void;
@@ -67,6 +76,7 @@ export function AiPanel({
   diagramType, onApplyDiagram, onAddToDiagram, onClose, onGeneratingChange,
   isAdmin, currentElements, currentConnectors, onNarrativeGeneratingChange,
   onAudioPhaseChange, aiFeedback, onAiFeedback, diagramId, onComparison, pcf,
+  initialPrompt, initialModel, onPrefillConsumed, aiModels = [], currentAiModelId,
 }: Props) {
   const { data: authSession } = useSession();
   const aiColor = tonesFor(useFeatureColors(), "ai").text;
@@ -78,6 +88,18 @@ export function AiPanel({
   const [comparing, setComparing] = useState(false);
   const [clarifyOpen, setClarifyOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
+  // Chosen generate model (defaults to the current global default once known).
+  const [model, setModel] = useState<string>("");
+  useEffect(() => { setModel((m) => m || currentAiModelId || ""); }, [currentAiModelId]);
+  // Regenerate prefill: seed prompt + model once, then mark consumed.
+  useEffect(() => {
+    if (initialPrompt !== undefined) {
+      setPrompt(initialPrompt);
+      if (initialModel) setModel(initialModel);
+      onPrefillConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt, initialModel]);
   const [generating, setGenerating] = useState(false);
   const [narrativeGenerating, setNarrativeGenerating] = useState(false);
   // Notify the parent so it can render a full-canvas Diagramatix overlay.
@@ -296,8 +318,8 @@ export function AiPanel({
       // Use BPMN-specific endpoint (with layout engine) for BPMN, generic for others
       const endpoint = diagramType === "bpmn" ? "/api/ai/generate-bpmn" : "/api/ai/generate-diagram";
       const body = diagramType === "bpmn"
-        ? { prompt: effPrompt, mode: "generate", attachment: attachment ?? undefined, pcfNodeId: pcf?.nodeId }
-        : { prompt: effPrompt, diagramType, attachment: attachment ?? undefined, pcfNodeId: pcf?.nodeId };
+        ? { prompt: effPrompt, mode: "generate", attachment: attachment ?? undefined, pcfNodeId: pcf?.nodeId, model: model || undefined }
+        : { prompt: effPrompt, diagramType, attachment: attachment ?? undefined, pcfNodeId: pcf?.nodeId, model: model || undefined };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -338,7 +360,14 @@ export function AiPanel({
       if (mode === "add") {
         onAddToDiagram(result.diagramData.elements, result.diagramData.connectors);
       } else {
-        onApplyDiagram(result.diagramData);
+        const sel = editingPromptId ? savedPrompts.find((p) => p.id === editingPromptId) : undefined;
+        onApplyDiagram(result.diagramData, {
+          promptText: effPrompt,
+          model: (result.model as string) || model || "",
+          selectedPromptId: sel?.id,
+          selectedPromptName: sel?.name,
+          selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
@@ -372,7 +401,14 @@ export function AiPanel({
       }
       const result = await res.json();
       if (result.diagramData?.elements) {
-        onApplyDiagram(result.diagramData); // fill with the best output
+        const sel = editingPromptId ? savedPrompts.find((p) => p.id === editingPromptId) : undefined;
+        onApplyDiagram(result.diagramData, { // fill with the best output
+          promptText: effPrompt,
+          model: (result.comparison?.chosenModelId as string) || "",
+          selectedPromptId: sel?.id,
+          selectedPromptName: sel?.name,
+          selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
+        });
       }
       onComparison?.(result.comparison);
       const chosen = result.comparison?.chosenModel;
@@ -645,6 +681,14 @@ export function AiPanel({
           <p className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 mb-1.5" title="Generation is aligned to this APQC PCF standard process's decomposition">
             ◎ Aligning to APQC PCF: <span className="font-mono">{pcf.hierarchyId}</span> {pcf.name}
           </p>
+        )}
+
+        {aiModels.length > 0 && (
+          <div className="flex items-center gap-2 text-[10px] text-gray-600">
+            <span className="shrink-0">AI Model</span>
+            <ModelSelect value={model} onChange={setModel} models={aiModels} disabled={generating}
+              className="flex-1 text-[11px] border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50" />
+          </div>
         )}
 
         <div className="flex gap-1.5">

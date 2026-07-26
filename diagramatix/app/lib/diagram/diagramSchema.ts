@@ -154,6 +154,8 @@ const baseDiagramData = z.object({
   pcf: looseObj.optional(),
   procedureDoc: looseObj.optional(),
   aiFeedback: looseObj.optional(),
+  aiGeneration: looseObj.optional(), // v1.43 — linked AI Prompt (annotation + Regenerate)
+  showAiPromptAnnotation: z.boolean().optional(), // v1.43 — show/hide the AI-Prompt annotation
 });
 
 /** Referential integrity — each problem surfaces as its own issue. */

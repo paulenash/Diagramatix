@@ -6,7 +6,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 - **`schemaVersion`** (major.minor) — the export *data-structure* version. Bumped only when fields are added, removed, or renamed. *Major* = breaking change; *minor* = additive (new optional fields). Carried on the `<xs:schema version="…">` attribute.
 - **`appVersion`** (major.minor.build) — the Diagramatix *application* version. The build number is the git commit count, so it changes every commit. Injected at runtime via `/api/schema`.
 
-**Current version:** `1.42`. Versioning began at **v1.0** (dual `schemaVersion` / `appVersion` stamping across every export + a versioned XSD root); **v1.2** was the first release of the enumerated XSD content that every later version evolves from. The XSD's own inline history block starts at **v1.10**; the earlier **v1.0–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`../app/lib/diagram/types.ts`](../app/lib/diagram/types.ts) and git.
+**Current version:** `1.43`. Versioning began at **v1.0** (dual `schemaVersion` / `appVersion` stamping across every export + a versioned XSD root); **v1.2** was the first release of the enumerated XSD content that every later version evolves from. The XSD's own inline history block starts at **v1.10**; the earlier **v1.0–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`../app/lib/diagram/types.ts`](../app/lib/diagram/types.ts) and git.
 
 > **When to bump `schemaVersion`:** ONLY when the persisted **data structure** actually changes — either the Diagram JSON export shape (the XSD) **or** the physical database as described by the **Logical DDL** ([`../app/lib/diagram/ddlGenerate.ts`](../app/lib/diagram/ddlGenerate.ts)). The version number tracks that structure; a feature-only release that touches neither does **not** bump it. *(Historically some releases advanced the number to mark a "feature window" without a shape change — those are the "No" rows below; the rule going forward is shape-change-only.)*
 
@@ -20,6 +20,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 
 | Version | Title | Schema shape change? |
 |---|---|---|
+| **1.43** | AI-Prompt link — persist the prompt that generated a diagram (any type): on-canvas "AI Prompt: … Generated on: …" annotation, Diagram-Properties linked-prompt + Regenerate, show/hide toggle | **No XSD change** — new optional `DiagramData.aiGeneration` (link + snapshot) + `showAiPromptAnnotation` boolean; JSON metadata only (like `aiFeedback`), not in the BPMN XML interchange |
 | **1.42** | Project re-numbering system (hierarchical folder/diagram/activity codes; APQC-preserving or full renumber; preview + apply) + ArchiMate 3.2 directed Association | **Yes** — new optional `<dgx:data nameCode>` (Diagram Name Code) + new `ConnectorType` `archi-association-directed`; also open key `properties.nameCode` (Activity Name Code, no XSD change) |
 | **1.41** | Issues — dark-green Pain Point twin (`uml-issue`, auto-numbered + description); both markers offered on every diagram type; domain routing settled on sticky (A/B toggle removed); Database selector SuperAdmin-only | **Yes** — new `SymbolType` `uml-issue` + optional diagram-level `showIssues` / `showIssueDescriptions` booleans |
 | **1.40** | Pain Point "Display Pain Points" master toggle (nests the description toggle under it) | **Yes** — new optional diagram-level `showPainPoints` boolean |
@@ -67,6 +68,16 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 ---
 
 ## Details (newest first)
+
+### v1.43 — AI-Prompt link + annotation + Regenerate  · JSON metadata only
+Every AI generation (any diagram type) now records the prompt that produced the diagram.
+`DiagramData` gains an optional **`aiGeneration`** `{ promptId, promptName, promptText, model,
+generatedAt, autoNamed? }` — a link to the named `Prompt` row (its current `text` is the
+"current version") plus a snapshot for the on-canvas **"AI Prompt: `<name>` - Generated on:
+`<dd-mm-yyyy h:mm am|pm>`"** annotation (placed left-of and vertically-centred on the diagram,
+overwritten on each regeneration). A companion optional **`showAiPromptAnnotation`** boolean
+(absent/true = shown) toggles that annotation from Diagram Properties. Both live in the saved
+JSON, **not** the BPMN XML interchange — no XSD shape change (same treatment as `aiFeedback`).
 
 ### v1.42 — Project re-numbering + ArchiMate directed Association  · **shape change**
 The **Project re-numbering system** assigns hierarchical codes to a project's folders,

@@ -1029,6 +1029,25 @@ Which key + endpoint a model's provider uses. Pure (reads env, no network), so i
 | T1030 | an unresolved Key Vault reference for GOOGLE_API_KEY is treated as no key | A broken Gemini entry that 401s every call | If resolvedEnvSecret's KV-reference guard regressed |
 | T1031 | configured: default lineup or GOOGLE_MODELS, tagged provider=google, vision default true ("-text" opts out); Claude still first | Wrong provider tag / vision flag, or Gemini pushing Claude out of first place | If googleModels() parsing or allModels() ordering regressed |
 
+### `tests/ai/prompt-annotation.test.ts` — AI-Prompt annotation (persist the generating prompt)
+
+The on-canvas "AI Prompt: … Generated on: …" note for AI-generated diagrams — heading format, placement (left of + vertically centred on the diagram), overwrite.
+
+| # | What it checks | User-visible bug it prevents | Fails when |
+|---|---|---|---|
+| T1032 | `formatGeneratedOn` → `dd-mm-yyyy h:mm am\|pm` (no leading-zero hour, padded date/minute, lower-case meridiem); `promptHeading` shape | Wrong / ambiguous timestamp in the prompt annotation | If the date/time formatter regressed |
+| T1033 | `buildPromptAnnotation` sits left-of + vertically-centred on the content bbox; `stripPromptAnnotations` removes ours + legacy R56 + script notes (overwrite) | Annotation overlapping the diagram, or duplicate prompt notes piling up on regenerate | If placement or the strip id-set regressed |
+| T1033b | `contentBBox` is null for an empty / annotation-only diagram | Divide-by-nothing placement crash on an empty generate | If bbox null-guarding regressed |
+
+### `tests/ai/model-access.test.ts` — cost-gated generate-model access
+
+A normal user may pick the current default model + anything equal-or-cheaper; a SuperAdmin-in-SA-mode gets all. Enforced in the routes, so a crafted request can't smuggle a pricier model.
+
+| # | What it checks | User-visible bug it prevents | Fails when |
+|---|---|---|---|
+| T1034 | `allowedGenerateModels`: normal = current + only ≤-cost; SA-mode = everything | A normal user picking (and being billed for) a pricier model than allowed | If the cost gate / SA-mode branch regressed |
+| T1035 | `isModelAllowed` mirrors the list; unpriced/unknown ids rejected for a normal user | The route honouring a smuggled expensive/unknown model | If the route guard (`chooseModel`/`isModelAllowed`) regressed |
+
 ### `tests/theme/contrast.test.ts` — feature-tile contrast guarantee
 
 `readableTextOn` keeps a palette's configured text when legible, but rescues an unreadable combination so admin tiles never render dark-on-dark (or light-on-light) under a customised Feature-Colours palette.

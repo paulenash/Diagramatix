@@ -24,7 +24,8 @@ const SP_UNAVAILABLE_TITLE =
   "SharePoint isn't available — Microsoft/Azure isn't configured for this deployment, or your organisation has SharePoint turned off.";
 import { RiskControlSection, type RiskCatalogItem } from "./RiskControlSection";
 import { PcfClassifySection } from "./PcfClassifySection";
-import type { PcfClassification } from "@/app/lib/diagram/types";
+import type { PcfClassification, AiGeneration } from "@/app/lib/diagram/types";
+import { ModelSelect, type AllowedModel } from "@/app/(dashboard)/diagram/[id]/ModelSelect";
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { umlAttributeTypeList } from "@/app/lib/diagram/umlTypes";
 import { getCachedCatalogue, findShapeByKey, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
@@ -47,6 +48,32 @@ const ARCHI_REL_META: Record<string, { type: string; group: ArchiRelGroup }> = {
   "archi-flow":           { type: "Flow",           group: "Other" },
   "archi-specialisation": { type: "Specialisation", group: "Other" },
 };
+
+/** Diagram-Properties "Regenerate from prompt" control: pick a (cost-gated) model
+ *  and re-run the linked prompt's CURRENT text over the current diagram. */
+function RegenerateControl({ models, initialModel, onRegenerate }: {
+  models: AllowedModel[];
+  initialModel: string;
+  onRegenerate?: (model: string) => void;
+}) {
+  const [model, setModel] = useState<string>(initialModel);
+  useEffect(() => { setModel((m) => m || initialModel); }, [initialModel]);
+  if (!onRegenerate) return null;
+  return (
+    <div className="mt-1 flex items-center gap-1">
+      <ModelSelect value={model} onChange={setModel} models={models}
+        className="flex-1 min-w-0 text-[9px] border border-gray-300 rounded px-1 py-0.5 bg-white" />
+      <button
+        type="button"
+        onClick={() => onRegenerate(model)}
+        className="text-[9px] px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 shrink-0"
+        title="Regenerate this diagram from the linked prompt's current text with the chosen model"
+      >
+        Regenerate
+      </button>
+    </div>
+  );
+}
 
 interface Props {
   element: DiagramElement | null;
@@ -102,6 +129,17 @@ interface Props {
    *  directly. */
   sessionParentId?: string;
   onNavigateToDiagram?: (diagramId: string) => void;
+  /** Link + snapshot of the AI Prompt that last generated this diagram (Diagram
+   *  Properties shows the prompt name link + a Regenerate control). */
+  aiGeneration?: AiGeneration;
+  /** Cost-gated generate models the user may pick for a regeneration. */
+  aiModels?: AllowedModel[];
+  currentAiModelId?: string;
+  /** Regenerate the diagram from the linked prompt's CURRENT text with `model`. */
+  onRegenerate?: (model: string) => void;
+  /** Whether the on-canvas AI-Prompt annotation is shown (absent/true = shown). */
+  showAiPromptAnnotation?: boolean;
+  onToggleAiPromptAnnotation?: (show: boolean) => void;
   onFlipForkJoin?: (id: string) => void;
   onConvertTaskSubprocess?: (id: string) => void;
   onConvertProcessCollapsed?: (id: string) => void;
@@ -733,6 +771,12 @@ export function PropertiesPanel({
   parentDiagramIds,
   sessionParentId,
   onNavigateToDiagram,
+  aiGeneration,
+  aiModels = [],
+  currentAiModelId,
+  onRegenerate,
+  showAiPromptAnnotation,
+  onToggleAiPromptAnnotation,
   onFlipForkJoin,
   onConvertTaskSubprocess,
   onConvertProcessCollapsed,
@@ -977,6 +1021,36 @@ export function PropertiesPanel({
             </div>
           );
         })()}
+        {aiGeneration && (
+          <div className="mb-1 border-t border-gray-100 pt-1">
+            <div className="flex items-start gap-1">
+              <span className="text-[9px] text-gray-500 w-12 shrink-0 pt-0.5">AI Prompt</span>
+              <div className="flex-1 min-w-0">
+                <a
+                  href={`/dashboard/prompts?promptId=${encodeURIComponent(aiGeneration.promptId)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="text-[9px] text-blue-600 hover:underline truncate block"
+                  title={`Open the current version of "${aiGeneration.promptName}" in AI Prompt Maintenance`}
+                >
+                  {aiGeneration.promptName}
+                </a>
+                {onToggleAiPromptAnnotation && (
+                  <label className="mt-0.5 flex items-center gap-1 text-[9px] text-gray-600 cursor-pointer">
+                    <input type="checkbox" className="w-3 h-3"
+                      checked={showAiPromptAnnotation !== false}
+                      onChange={(e) => onToggleAiPromptAnnotation(e.target.checked)} />
+                    Show prompt annotation
+                  </label>
+                )}
+                <RegenerateControl
+                  models={aiModels}
+                  initialModel={currentAiModelId || aiGeneration.model}
+                  onRegenerate={onRegenerate}
+                />
+              </div>
+            </div>
+          </div>
+        )}
         <InlineField label="Version">
           <input type="text" className="w-full text-[9px] border border-gray-300 rounded px-1 py-0"
             defaultValue={diagramTitle?.version ?? ""} key={`ver-${diagramName}`}

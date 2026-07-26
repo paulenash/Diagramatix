@@ -16,7 +16,8 @@ import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { AI_MODELS, type AiModel } from "@/app/lib/ai/models";
 import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
 import { arrayBufferToBase64 } from "@/app/lib/base64";
-import type { Connector, DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import type { Connector, DiagramData, DiagramElement, AiApplyMeta } from "@/app/lib/diagram/types";
+import { ModelSelect, type AllowedModel } from "./ModelSelect";
 import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
 import type { DiagramType } from "@/app/lib/diagram/types";
 import { usePlanState, type Plan } from "./ai-plan/usePlanState";
@@ -58,9 +59,16 @@ function Spinner({ className = "w-3 h-3 text-current" }: { className?: string })
 
 interface Props {
   diagramType: string;
-  onApplyDiagram: (data: DiagramData) => void;
+  onApplyDiagram: (data: DiagramData, meta?: AiApplyMeta) => void;
   onClose: () => void;
   isAdmin?: boolean;
+  /** Regenerate prefill — seed the prompt + model on open, then onPrefillConsumed. */
+  initialPrompt?: string;
+  initialModel?: string;
+  onPrefillConsumed?: () => void;
+  /** Cost-gated generate models the user may pick + the current default id. */
+  aiModels?: AllowedModel[];
+  currentAiModelId?: string;
   currentElements?: DiagramElement[];
   currentConnectors?: Connector[];
   /** Fired whenever the panel's local busy state changes. Lets the
@@ -103,6 +111,7 @@ export function PlanPanel({
   diagramId,
   onComparison,
   pcf,
+  initialPrompt, initialModel, onPrefillConsumed, aiModels = [], currentAiModelId,
 }: Props) {
   const { data: authSession } = useSession();
   const aiColor = tonesFor(useFeatureColors(), "ai").text;
@@ -140,6 +149,17 @@ export function PlanPanel({
   const toggleCompareModel = (id: string) =>
     setPickedModels((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const [prompt, setPrompt] = useState("");
+  // Chosen generate model (used at Plan time; remembered for the annotation on Apply).
+  const [model, setModel] = useState<string>("");
+  useEffect(() => { setModel((m) => m || currentAiModelId || ""); }, [currentAiModelId]);
+  useEffect(() => {
+    if (initialPrompt !== undefined) {
+      setPrompt(initialPrompt);
+      if (initialModel) setModel(initialModel);
+      onPrefillConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt, initialModel]);
   const [clarifyOpen, setClarifyOpen] = useState(false);
   // "Refine" — AI-generated clarifying questions that enrich the prompt before Plan.
   const [refineQs, setRefineQs] = useState<RefineQuestion[] | null>(null);
@@ -197,7 +217,16 @@ export function PlanPanel({
         return;
       }
       const result = await res.json();
-      if (result.diagramData?.elements) onApplyDiagram(result.diagramData);
+      if (result.diagramData?.elements) {
+        const sel = editingPromptId ? savedPrompts.find((p) => p.id === editingPromptId) : undefined;
+        onApplyDiagram(result.diagramData, {
+          promptText: effPrompt,
+          model: (result.comparison?.chosenModelId as string) || "",
+          selectedPromptId: sel?.id,
+          selectedPromptName: sel?.name,
+          selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
+        });
+      }
       onComparison?.(result.comparison);
       setCompareStatus(result.comparison?.chosenModel
         ? `Filled with the best result (${result.comparison.chosenModel}). All model diagrams saved — open "AI Comparison Results" to compare.`
@@ -667,6 +696,7 @@ export function PlanPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: effPrompt, attachment: attachment ?? undefined, pcfNodeId: pcf?.nodeId,
+          model: model || undefined,
           // Reproduce original layout is a BPMN-only capability — never sent for
           // flowcharts (leave non-BPMN image ingestion exactly as it was).
           captureGeometry: !isFlowchart && attachment?.type === "image" ? preserveLayout : false,
@@ -793,7 +823,17 @@ export function PlanPanel({
         setStatus(null);
         return;
       }
-      onApplyDiagram(json.diagramData);
+      {
+        const sel = editingPromptId ? savedPrompts.find((p) => p.id === editingPromptId) : undefined;
+        const effPrompt = prompt.trim();
+        onApplyDiagram(json.diagramData, {
+          promptText: effPrompt,
+          model: (json.model as string) || model || "",
+          selectedPromptId: sel?.id,
+          selectedPromptName: sel?.name,
+          selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
+        });
+      }
       if (isFlowchart) {
         setStatus(`Applied: ${json.elementCount} elements, ${json.connectionCount} flowlines`);
       } else {
@@ -1158,6 +1198,14 @@ export function PlanPanel({
                 Staff Narrative
               </button>
             </div>
+          </div>
+        )}
+
+        {aiModels.length > 0 && (
+          <div className="shrink-0 flex items-center gap-2 text-[10px] text-gray-600 mb-1.5">
+            <span className="shrink-0">AI Model</span>
+            <ModelSelect value={model} onChange={setModel} models={aiModels} disabled={busy !== null}
+              className="flex-1 text-[11px] border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50" />
           </div>
         )}
 

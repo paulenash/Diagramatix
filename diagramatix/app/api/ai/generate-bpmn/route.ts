@@ -5,6 +5,8 @@ import { prisma } from "@/app/lib/db";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { chooseModel } from "@/app/lib/ai/modelAccess";
+import { isSuperuser } from "@/app/lib/superuser";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { enterAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
@@ -21,13 +23,16 @@ export async function POST(req: Request) {
   if (_pol) return _pol;
   await enterAiRouteContext(session, AI_INVOCATION_POINTS.BpmnGenerate);
 
-  const { prompt, attachment, pcfNodeId } = await req.json();
+  const { prompt, attachment, pcfNodeId, model: requestedModel } = await req.json();
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
 
   // Image input uses the Vision-model override when set; else the main model.
-  const model = await resolveGenerateModel(attachment?.type === "image");
+  // A caller may override with a cost-gated model (SuperAdmin → any); a disallowed
+  // request silently falls back to the default.
+  const defaultModel = await resolveGenerateModel(attachment?.type === "image");
+  const model = chooseModel(requestedModel, defaultModel, isSuperuser(session));
   const apiKey = aiApiKey(model);
   if (!apiKey) {
     return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
@@ -80,6 +85,7 @@ export async function POST(req: Request) {
     await recordUsage(session.user.id, "aiAttempts");
     return NextResponse.json({
       diagramData,
+      model,
       elementCount: plan.elements.length,
       connectionCount: plan.connections.length,
     });

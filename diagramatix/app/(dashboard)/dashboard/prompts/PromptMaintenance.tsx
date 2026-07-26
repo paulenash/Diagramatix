@@ -58,6 +58,21 @@ export function PromptMaintenance() {
 
   useEffect(() => { loadPrompts(); }, [loadPrompts]);
 
+  // Deep-link from a diagram's "Generated from: <prompt>" link — open that prompt
+  // for editing once the list loads (switching to its diagram-type tab).
+  const focusPromptId = searchParams.get("promptId");
+  const [focusDone, setFocusDone] = useState(false);
+  useEffect(() => {
+    if (focusDone || !focusPromptId || prompts.length === 0) return;
+    const p = prompts.find((x) => x.id === focusPromptId);
+    if (p) {
+      setActiveType(p.diagramType);
+      setEditingId(p.id); setEditName(p.name); setEditText(p.text); setShowNew(false);
+    }
+    setFocusDone(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusPromptId, prompts, focusDone]);
+
   async function handleSave() {
     if (!editName.trim() || !editText.trim()) return;
     setSaving(true);

@@ -377,6 +377,48 @@ export interface DiagramData {
    *  the AI-tidy pass). Preserved so the user can revisit and answer them
    *  later; answering them feeds a clarification round back into generation. */
   aiFeedback?: AiFeedback;
+  /** Link + snapshot of the AI Prompt that last generated this diagram. Set on
+   *  every AI generation (all generable types). `promptId` points at the live
+   *  `Prompt` row (its current `text` is the "current version" the Regenerate
+   *  button re-runs); `promptName`/`promptText` are the snapshot rendered in the
+   *  on-canvas "AI Prompt: … Generated on: …" annotation. Absent = not AI-generated. */
+  aiGeneration?: AiGeneration;
+  /** Show the on-canvas AI-Prompt annotation. Absent/true = shown; explicit false =
+   *  hidden (the annotation element is removed from `elements` and rebuilt from
+   *  `aiGeneration` when re-shown). Toggleable in Diagram Properties, any type. */
+  showAiPromptAnnotation?: boolean;
+}
+
+export interface AiGeneration {
+  /** The linked `Prompt` row id (its current `text` = the current version). */
+  promptId: string;
+  /** Prompt name at generation time — the annotation heading + Properties link label. */
+  promptName: string;
+  /** Exact prompt text sent — the annotation body (snapshot; may differ from the
+   *  live Prompt if it's been edited since). */
+  promptText: string;
+  /** Model id used for this generation (e.g. "claude-haiku-4-5-20251001"). */
+  model: string;
+  /** ISO timestamp of the generation; formatted to "dd-mm-yyyy h:mm am|pm" in the annotation. */
+  generatedAt: string;
+  /** True when `promptId` is a Prompt WE auto-created for this diagram (so a
+   *  regeneration updates it in place). False/absent when the user generated from
+   *  their own saved Prompt (which we link to but never overwrite). */
+  autoNamed?: boolean;
+}
+
+/** Metadata a generate/regenerate panel hands back with the laid-out diagram, so
+ *  the editor can link/auto-save the Prompt and (re)write the AI-Prompt annotation. */
+export interface AiApplyMeta {
+  /** The exact prompt text sent to the model. */
+  promptText: string;
+  /** The model id used (server default, or the user's cost-gated choice). */
+  model: string;
+  /** If the user generated from a saved Prompt, its id/name and whether the text
+   *  was left unchanged (→ link to it; edited/absent → auto-create/update ours). */
+  selectedPromptId?: string;
+  selectedPromptName?: string;
+  selectedPromptUnchanged?: boolean;
 }
 
 export interface ProcessOwner {
@@ -1024,5 +1066,13 @@ export interface TemplateData {
  *             the XSD `ConnectorTypeEnum` (previously would fail validation on export).
  *             Also OPTIONAL open key `element.properties.nameCode` (Activity Name Code) —
  *             rides the loose PropertiesType, no XSD change.
+ *
+ *  v1.43 (2026-07-26): New OPTIONAL `DiagramData.aiGeneration` — a link + snapshot of the
+ *             AI Prompt that last generated the diagram ({promptId, promptName, promptText,
+ *             model, generatedAt, autoNamed?}). Drives the on-canvas "AI Prompt: … Generated
+ *             on: …" annotation, the Diagram-Properties linked-prompt link, and the Regenerate
+ *             button. Plus OPTIONAL `showAiPromptAnnotation` boolean (show/hide that
+ *             annotation). Both are JSON metadata only (like `aiFeedback`) — NOT in the BPMN
+ *             XML interchange, so no XSD shape change.
  */
-export const SCHEMA_VERSION = "1.42";
+export const SCHEMA_VERSION = "1.43";

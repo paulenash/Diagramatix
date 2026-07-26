@@ -11,6 +11,8 @@ import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription
 import { buildGenericSystemPrompt } from "@/app/lib/ai/generateDiagramPrompt";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
 import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
+import { chooseModel } from "@/app/lib/ai/modelAccess";
+import { isSuperuser } from "@/app/lib/superuser";
 
 
 export async function POST(req: Request) {
@@ -20,13 +22,15 @@ export async function POST(req: Request) {
   if (_pol) return _pol;
   await enterAiRouteContext(session, AI_INVOCATION_POINTS.DiagramGenerate);
 
-  const { prompt, diagramType, attachment, pcfNodeId } = await req.json();
+  const { prompt, diagramType, attachment, pcfNodeId, model: requestedModel } = await req.json();
   if (!prompt?.trim()) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
   if (!diagramType) return NextResponse.json({ error: "diagramType required" }, { status: 400 });
 
   // Provider-aware + vision-aware: image input uses the Vision-model override when
-  // set; the selected model then decides the key/endpoint (Claude vs Kimi).
-  const model = await resolveGenerateModel(attachment?.type === "image");
+  // set; the selected model then decides the key/endpoint (Claude vs Kimi). A caller
+  // may override with a cost-gated model (SuperAdmin → any); disallowed → default.
+  const defaultModel = await resolveGenerateModel(attachment?.type === "image");
+  const model = chooseModel(requestedModel, defaultModel, isSuperuser(session));
   const apiKey = aiApiKey(model);
   if (!apiKey) return NextResponse.json({ error: "AI not configured for the selected model. Set ANTHROPIC_API_KEY or MOONSHOT_API_KEY." }, { status: 503 });
 
@@ -128,7 +132,7 @@ export async function POST(req: Request) {
     }
     // Record AFTER success so failed attempts don't burn the user's quota.
     await recordUsage(session.user.id, "aiAttempts");
-    return NextResponse.json({ parsed, diagramType });
+    return NextResponse.json({ parsed, diagramType, model });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: `AI failed: ${msg}` }, { status: 500 });

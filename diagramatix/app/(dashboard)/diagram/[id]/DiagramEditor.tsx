@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { APQC_ATTRIBUTION, dataHasPcf } from "@/app/lib/pcf/attribution";
 import {
   SCHEMA_VERSION,
+  type AiApplyMeta,
   type ConnectorType,
   type DiagramData,
   type DiagramType,
@@ -15,6 +16,8 @@ import {
   type SymbolType,
   type TemplateData,
 } from "@/app/lib/diagram/types";
+import { buildPromptAnnotation, contentBBox, stripPromptAnnotations } from "@/app/lib/ai/promptAnnotation";
+import { useAllowedModels } from "./ModelSelect";
 import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { setCurrentDiagramName } from "@/app/lib/help/currentDiagram";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
@@ -987,6 +990,86 @@ export function DiagramEditor({
   // BPMN and Standard Flowchart both use the 2-phase Plan panel (plan → edit →
   // apply deterministic layout). Other types use the legacy one-shot AI panel.
   const usesPlanPanel = diagramType === "bpmn" || diagramType === "flowchart";
+  // Regenerate prefill: when the user hits "Regenerate" in Diagram Properties we
+  // open the AI/Plan panel with the linked prompt's CURRENT text + a chosen model.
+  const [aiPrefill, setAiPrefill] = useState<{ prompt: string; model: string } | null>(null);
+
+  // Link/auto-save the Prompt that generated this diagram, returning its id+name.
+  // Rules (Paul, 2026-07-26 — "auto-save a Prompt every time"):
+  //   • generated from an UNCHANGED saved Prompt → link to it, never overwrite;
+  //   • else reuse this diagram's own auto-created Prompt (update its text) or
+  //     create one (auto-named from the diagram title). One linked prompt per diagram.
+  const ensureLinkedPrompt = useCallback(async (
+    meta: AiApplyMeta,
+  ): Promise<{ id: string; name: string; autoNamed: boolean } | null> => {
+    try {
+      if (meta.selectedPromptId && meta.selectedPromptUnchanged) {
+        return { id: meta.selectedPromptId, name: meta.selectedPromptName ?? "Saved prompt", autoNamed: false };
+      }
+      const prev = data.aiGeneration;
+      const autoName = `${(diagramName || "Untitled").trim()} — AI prompt`;
+      if (prev?.promptId && prev.autoNamed) {
+        await fetch(`/api/prompts/${prev.promptId}`, {
+          method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: meta.promptText }),
+        });
+        return { id: prev.promptId, name: prev.promptName, autoNamed: true };
+      }
+      const res = await fetch(`/api/prompts`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: autoName, text: meta.promptText, diagramType }),
+      });
+      if (!res.ok) return null;
+      const created = await res.json();
+      return { id: created.id as string, name: (created.name as string) ?? autoName, autoNamed: true };
+    } catch { return null; }
+  }, [data.aiGeneration, diagramName, diagramType]);
+
+  // Apply an AI-generated result — shared by AiPanel + PlanPanel. Replaces the
+  // diagram, and (when generation metadata is present) links the Prompt and
+  // (over)writes the left-of-centre "AI Prompt: … Generated on: …" annotation.
+  const applyAiResult = useCallback(async (aiData: DiagramData, meta?: AiApplyMeta) => {
+    let aiGeneration = data.aiGeneration;
+    if (meta) {
+      const linked = await ensureLinkedPrompt(meta);
+      if (linked) {
+        aiGeneration = {
+          promptId: linked.id, promptName: linked.name, promptText: meta.promptText,
+          model: meta.model, generatedAt: new Date().toISOString(), autoNamed: linked.autoNamed,
+        };
+      }
+    }
+    let elements = stripPromptAnnotations(aiData.elements);
+    if (aiGeneration && meta && data.showAiPromptAnnotation !== false) {
+      elements = [buildPromptAnnotation(
+        { name: aiGeneration.promptName, text: aiGeneration.promptText, generatedAt: aiGeneration.generatedAt },
+        contentBBox(elements),
+      ), ...elements];
+    }
+    setData({
+      ...data,
+      elements,
+      connectors: aiData.connectors,
+      viewport: aiData.viewport ?? data.viewport,
+      relaxedLayout: aiData.relaxedLayout,
+      aiGeneration,
+    });
+    requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("dgx:fitToContent")));
+  }, [data, setData, ensureLinkedPrompt]);
+
+  // Show/hide the on-canvas AI-Prompt annotation (any diagram type). Hiding removes
+  // the element; showing rebuilds it from aiGeneration, left-of-centre.
+  const toggleAiPromptAnnotation = useCallback((show: boolean) => {
+    const gen = data.aiGeneration;
+    let elements = stripPromptAnnotations(data.elements);
+    if (show && gen) {
+      elements = [buildPromptAnnotation(
+        { name: gen.promptName, text: gen.promptText, generatedAt: gen.generatedAt },
+        contentBBox(elements),
+      ), ...elements];
+    }
+    setData({ ...data, elements, showAiPromptAnnotation: show });
+  }, [data, setData]);
   const featureScheme = useFeatureColors();
   const orgPolicy = useOrgPolicy(); // enterprise governance — hide AI when the org disables it
   const sharePointAvailable = useSharePointAvailable(); // grey SharePoint menus when unconfigured / org-disabled
@@ -1155,6 +1238,22 @@ export function DiagramEditor({
   // the logo down to a lower (OrgAdmin / Normal) view mode. Gate SuperAdmin-only
   // menu options on this so they vanish when a SuperAdmin drops into a lower view.
   const isActingAdmin = isAdmin && !superAdminHidden;
+  // Generate models the current user may pick (cost-gated; SA-in-mode = all).
+  const { models: aiModels, current: currentAiModel } = useAllowedModels(isActingAdmin);
+  // "Regenerate" from Diagram Properties: pull the linked prompt's CURRENT text and
+  // open the AI/Plan panel prefilled with it + the chosen model.
+  const handleRegenerate = useCallback(async (model: string) => {
+    const gen = data.aiGeneration;
+    if (!gen) return;
+    let promptText = gen.promptText;
+    try {
+      const res = await fetch(`/api/prompts/${gen.promptId}`);
+      if (res.ok) { const p = await res.json(); if (typeof p.text === "string" && p.text.trim()) promptText = p.text; }
+    } catch { /* fall back to the snapshot text */ }
+    setAiPrefill({ prompt: promptText, model });
+    if (usesPlanPanel) { setShowPlanPanel(true); setShowAiPanel(false); }
+    else { setShowAiPanel(true); setShowPlanPanel(false); }
+  }, [data.aiGeneration, usesPlanPanel]);
   type TemplateRow = { id: string; name: string; group: string | null };
   const [userTemplates, setUserTemplates] = useState<TemplateRow[]>([]);
   const [builtInTemplates, setBuiltInTemplates] = useState<TemplateRow[]>([]);
@@ -3905,6 +4004,12 @@ export function DiagramEditor({
             parentDiagramIds={data.parentDiagramIds}
             sessionParentId={parentDiagram?.id}
             onNavigateToDiagram={handleDrillIntoSubprocess}
+            aiGeneration={data.aiGeneration}
+            aiModels={aiModels}
+            currentAiModelId={currentAiModel?.id}
+            onRegenerate={handleRegenerate}
+            showAiPromptAnnotation={data.showAiPromptAnnotation}
+            onToggleAiPromptAnnotation={toggleAiPromptAnnotation}
             onFlipForkJoin={flipForkJoin}
             onConvertTaskSubprocess={convertTaskSubprocess}
             onConvertProcessCollapsed={convertProcessCollapsed}
@@ -3917,27 +4022,16 @@ export function DiagramEditor({
           <AiPanel
             diagramType={diagramType}
             pcf={data.pcf}
-            onApplyDiagram={(aiData: DiagramData) => {
-              // Replace: set entire diagram data
-              setData({
-                ...data,
-                elements: aiData.elements,
-                connectors: aiData.connectors,
-                viewport: aiData.viewport ?? data.viewport,
-                // Take the flag from the GENERATED result only — an image import
-                // that reproduced the vendor's layout sets it true; a normal
-                // (auto-stack) generation clears it, so regenerating over a
-                // previously-imported diagram doesn't inherit free-form mode.
-                relaxedLayout: aiData.relaxedLayout,
-              });
-              requestAnimationFrame(() => {
-                window.dispatchEvent(new CustomEvent("dgx:fitToContent"));
-              });
-            }}
+            onApplyDiagram={(aiData: DiagramData, meta?: AiApplyMeta) => { void applyAiResult(aiData, meta); }}
             onAddToDiagram={(elements, connectors) => {
               applyTemplate(elements, connectors);
             }}
-            onClose={() => setShowAiPanel(false)}
+            initialPrompt={aiPrefill?.prompt}
+            initialModel={aiPrefill?.model}
+            onPrefillConsumed={() => setAiPrefill(null)}
+            aiModels={aiModels}
+            currentAiModelId={currentAiModel?.id}
+            onClose={() => { setShowAiPanel(false); setAiPrefill(null); }}
             onGeneratingChange={setAiPanelGenerating}
             isAdmin={isAdmin}
             currentElements={data.elements}
@@ -3998,27 +4092,13 @@ export function DiagramEditor({
             isAdmin={isAdmin}
             currentElements={data.elements}
             currentConnectors={data.connectors}
-            onApplyDiagram={(aiData: DiagramData) => {
-              setData({
-                ...data,
-                elements: aiData.elements,
-                connectors: aiData.connectors,
-                viewport: aiData.viewport ?? data.viewport,
-                // Take the flag from the GENERATED result only — an image import
-                // that reproduced the vendor's layout sets it true; a normal
-                // (auto-stack) generation clears it, so regenerating over a
-                // previously-imported diagram doesn't inherit free-form mode.
-                relaxedLayout: aiData.relaxedLayout,
-              });
-              // Wide AI-generated diagrams (especially BPMN with many
-              // columns) extend well past the current viewport — ask the
-              // canvas to re-fit so the user sees the whole thing instead
-              // of thinking "Apply Layout did nothing".
-              requestAnimationFrame(() => {
-                window.dispatchEvent(new CustomEvent("dgx:fitToContent"));
-              });
-            }}
-            onClose={() => setShowPlanPanel(false)}
+            onApplyDiagram={(aiData: DiagramData, meta?: AiApplyMeta) => { void applyAiResult(aiData, meta); }}
+            initialPrompt={aiPrefill?.prompt}
+            initialModel={aiPrefill?.model}
+            onPrefillConsumed={() => setAiPrefill(null)}
+            aiModels={aiModels}
+            currentAiModelId={currentAiModel?.id}
+            onClose={() => { setShowPlanPanel(false); setAiPrefill(null); }}
             onBusyChange={setAiBusy}
             onAudioPhaseChange={setAudioPhase}
             aiFeedback={data.aiFeedback}
