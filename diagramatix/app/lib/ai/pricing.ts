@@ -6,10 +6,11 @@
  *   Claude — anthropic.com/pricing (these are the current list rates)
  *   Kimi / Moonshot — platform.kimi.ai (international USD)
  *   Gemini / Google — ai.google.dev/pricing (your gateway may bill differently)
+ *   GPT / Phi (Microsoft) — azure.microsoft.com/pricing (Azure OpenAI + Foundry)
  *
  * Pure data + helpers, safe to import on the client.
  */
-export const PRICING_SNAPSHOT_DATE = "2026-07-26";
+export const PRICING_SNAPSHOT_DATE = "2026-07-27";
 
 export interface ModelPrice {
   in: number; // USD per 1M input tokens
@@ -42,6 +43,11 @@ export const PRICING: Record<string, ModelPrice> = {
   // a gateway (e.g. LiteLLM in front of Vertex) may rate these differently.
   "gemini-2.5-pro": { in: 1.25, out: 10, note: "≤200k context; higher above" },
   "gemini-2.5-flash": { in: 0.3, out: 2.5 },
+  // Microsoft — Azure OpenAI (GPT / o-series) + Microsoft's Phi. Azure list pricing;
+  // verify against your region/deployment (Azure bills you directly).
+  "gpt-4o": { in: 2.5, out: 10 },
+  "gpt-4o-mini": { in: 0.15, out: 0.6 },
+  "phi-4": { in: 0.125, out: 0.5 },
 };
 
 /** The reference price for a model id, or undefined when unknown / floating. */

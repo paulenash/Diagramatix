@@ -20,7 +20,10 @@ describe("aiRates", () => {
     expect(providerOf("moonshot-v1-128k")).toBe("moonshot");
     expect(providerOf("gemini-2.5-pro")).toBe("google");
     expect(providerOf("gemini-2.5-flash")).toBe("google");
-    expect(providerOf("claude-opus-4-8")).toBe("anthropic");
+    expect(providerOf("gpt-4o")).toBe("microsoft");
+    expect(providerOf("o3-mini")).toBe("microsoft");
+    expect(providerOf("phi-4")).toBe("microsoft");
+    expect(providerOf("claude-opus-4-8")).toBe("anthropic"); // "opus" ≠ o-series
     expect(providerOf("some-local-model")).toBe("anthropic");
   });
 

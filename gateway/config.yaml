@@ -1,10 +1,12 @@
-# LiteLLM Proxy — Anthropic-compatible gateway fronting Google Gemini for
-# Diagramatix. The app calls POST /v1/messages (Anthropic Messages API); LiteLLM
-# translates each request to the Gemini API and returns an Anthropic-shaped reply.
+# LiteLLM Proxy — one Anthropic-compatible gateway fronting Google Gemini AND
+# Microsoft (Azure OpenAI + Phi) for Diagramatix. The app calls POST /v1/messages
+# (Anthropic Messages API); LiteLLM translates each request to the right provider
+# and returns an Anthropic-shaped reply.
 #
-# `model_name` values MUST match the ids Diagramatix sends (the app's GOOGLE_MODELS
-# env), so keep the two in sync. Add a line here for every Gemini model you want.
+# Each `model_name` MUST match the id Diagramatix sends (GOOGLE_MODELS /
+# MICROSOFT_MODELS), so keep them in sync. Add a line per model you want.
 model_list:
+  # ── Google Gemini (set GEMINI_API_KEY in the gateway) ──────────────────────
   - model_name: gemini-2.5-pro
     litellm_params:
       model: gemini/gemini-2.5-pro
@@ -14,8 +16,35 @@ model_list:
       model: gemini/gemini-2.5-flash
       api_key: os.environ/GEMINI_API_KEY
 
+  # ── Microsoft — Azure OpenAI (GPT / o-series) ──────────────────────────────
+  # Replace <...deployment> with YOUR Azure OpenAI deployment names, and set
+  # AZURE_OPENAI_API_BASE / AZURE_OPENAI_API_KEY in the gateway. api_version tracks
+  # the Azure OpenAI REST version you deployed against.
+  - model_name: gpt-4o
+    litellm_params:
+      model: azure/gpt-4o-deployment
+      api_base: os.environ/AZURE_OPENAI_API_BASE
+      api_key: os.environ/AZURE_OPENAI_API_KEY
+      api_version: "2024-10-21"
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: azure/gpt-4o-mini-deployment
+      api_base: os.environ/AZURE_OPENAI_API_BASE
+      api_key: os.environ/AZURE_OPENAI_API_KEY
+      api_version: "2024-10-21"
+
+  # ── Microsoft — Phi (Azure AI Foundry serverless) ──────────────────────────
+  # Phi uses the azure_ai provider + its own Foundry endpoint/key.
+  - model_name: phi-4
+    litellm_params:
+      model: azure_ai/phi-4
+      api_base: os.environ/AZURE_PHI_API_BASE
+      api_key: os.environ/AZURE_PHI_API_KEY
+
 general_settings:
   # Every request must present  Authorization: Bearer <LITELLM_MASTER_KEY>.
-  # That master key is what Diagramatix sends as GOOGLE_API_KEY — it is NOT your
-  # Google key (the Google key lives only in GEMINI_API_KEY, below/in secrets).
+  # That master key is what Diagramatix sends as GOOGLE_API_KEY *and*
+  # MICROSOFT_API_KEY (one gateway, one master key) — it is NOT any provider key.
+  # The provider keys (GEMINI_API_KEY, AZURE_OPENAI_*, AZURE_PHI_*) live only in the
+  # gateway's own env/secrets.
   master_key: os.environ/LITELLM_MASTER_KEY

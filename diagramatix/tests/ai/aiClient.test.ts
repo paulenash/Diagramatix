@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { aiClientConfig, aiApiKey, makeAiClient } from "@/app/lib/ai/anthropicClient";
 
-const ENV_KEYS = ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "MOONSHOT_API_KEY", "MOONSHOT_BASE_URL", "MOONSHOT_MODELS", "GOOGLE_API_KEY", "GOOGLE_BASE_URL", "GOOGLE_MODELS"] as const;
+const ENV_KEYS = ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "MOONSHOT_API_KEY", "MOONSHOT_BASE_URL", "MOONSHOT_MODELS", "GOOGLE_API_KEY", "GOOGLE_BASE_URL", "GOOGLE_MODELS", "MICROSOFT_API_KEY", "MICROSOFT_BASE_URL", "MICROSOFT_MODELS"] as const;
 
 describe("aiClientConfig / aiApiKey — provider routing", () => {
   const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
@@ -62,6 +62,19 @@ describe("aiClientConfig / aiApiKey — provider routing", () => {
     // Bearer auth (like Moonshot), not x-api-key.
     const g = makeAiClient("gemini-2.5-pro");
     expect(g.authToken).toBe("sk-goog");
+    expect(g.apiKey).toBeNull();
+  });
+
+  it("T1036 — a Microsoft (GPT/Phi) model uses MICROSOFT_API_KEY + MICROSOFT_BASE_URL, Bearer auth", () => {
+    process.env.MICROSOFT_API_KEY = "sk-msft";
+    process.env.MICROSOFT_BASE_URL = "http://litellm.internal:4000";
+    process.env.ANTHROPIC_API_KEY = "sk-ant"; // must NOT be used for a GPT/Phi model
+    expect(aiApiKey("gpt-4o")).toBe("sk-msft");
+    expect(aiClientConfig("gpt-4o")).toEqual({ apiKey: "sk-msft", baseURL: "http://litellm.internal:4000" });
+    expect(aiApiKey("phi-4")).toBe("sk-msft");
+    expect(aiClientConfig("phi-4", "sk-ant").apiKey).toBe("sk-msft"); // caller anthropic key ignored
+    const g = makeAiClient("gpt-4o");
+    expect(g.authToken).toBe("sk-msft");
     expect(g.apiKey).toBeNull();
   });
 

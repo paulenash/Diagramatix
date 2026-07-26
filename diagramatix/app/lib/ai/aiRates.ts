@@ -23,6 +23,8 @@ export interface EffectiveRate {
 export function providerOf(model: string): string {
   if (/^(kimi|moonshot)/i.test(model)) return "moonshot";
   if (/^gemini/i.test(model)) return "google";
+  // Azure OpenAI (gpt-*, o1/o3/o4-*) + Microsoft's own Phi/MAI models.
+  if (/^(gpt|o[0-9]|phi|mai)/i.test(model)) return "microsoft";
   return "anthropic";
 }
 

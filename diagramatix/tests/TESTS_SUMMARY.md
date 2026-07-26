@@ -1025,9 +1025,12 @@ Which key + endpoint a model's provider uses. Pure (reads env, no network), so i
 | T0955 | MOONSHOT_BASE_URL overrides the endpoint (e.g. mainland China) | Data-residency control over the Moonshot endpoint being ignored | If the base-URL override regressed |
 | T0956 | aiApiKey is undefined when the selected provider's key is missing | A route proceeding without a key (and a confusing downstream error) | If aiApiKey stopped returning undefined on a missing key |
 | T1028 | a Gemini model uses GOOGLE_API_KEY + GOOGLE_BASE_URL with Bearer auth (not x-api-key), never the Anthropic key | Gemini calls hitting Anthropic, or sending the wrong auth header (401) | If the google branch in aiClientConfig/makeAiClient regressed |
+| T1036 | a Microsoft (GPT/Phi) model uses MICROSOFT_API_KEY + MICROSOFT_BASE_URL with Bearer auth, never the Anthropic key | GPT/Phi calls hitting Anthropic, or wrong auth header (401) | If the microsoft branch in aiClientConfig/makeAiClient regressed |
 | T1029 | no Gemini models unless BOTH GOOGLE_API_KEY and GOOGLE_BASE_URL are set (gateway URL mandatory) | A Gemini model showing in the picker that can't resolve (no gateway) | If googleModels() stopped requiring the base URL |
 | T1030 | an unresolved Key Vault reference for GOOGLE_API_KEY is treated as no key | A broken Gemini entry that 401s every call | If resolvedEnvSecret's KV-reference guard regressed |
 | T1031 | configured: default lineup or GOOGLE_MODELS, tagged provider=google, vision default true ("-text" opts out); Claude still first | Wrong provider tag / vision flag, or Gemini pushing Claude out of first place | If googleModels() parsing or allModels() ordering regressed |
+| T1037 | no Microsoft (Azure OpenAI + Phi) models unless BOTH MICROSOFT_API_KEY and MICROSOFT_BASE_URL are set | A GPT/Phi model showing that can't resolve (no gateway) | If microsoftModels() stopped requiring the base URL |
+| T1038 | configured: default lineup or MICROSOFT_MODELS, provider=microsoft; GPT/o vision, base Phi text ("…multimodal/vision" opts in); Claude first | Wrong provider tag / vision flag on GPT vs Phi, or ordering | If microsoftModels() parsing or allModels() ordering regressed |
 
 ### `tests/ai/prompt-annotation.test.ts` — AI-Prompt annotation (persist the generating prompt)
 

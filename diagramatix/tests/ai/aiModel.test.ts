@@ -5,7 +5,7 @@
  * production default (Haiku 4.5).
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { AI_MODELS, DEFAULT_AI_MODEL, isKnownAiModel, resolveAiModel, aiModelLabel, allModels, moonshotModels, googleModels, providerForModel, modelVision } from "@/app/lib/ai/models";
+import { AI_MODELS, DEFAULT_AI_MODEL, isKnownAiModel, resolveAiModel, aiModelLabel, allModels, moonshotModels, googleModels, microsoftModels, providerForModel, modelVision } from "@/app/lib/ai/models";
 
 describe("AI model list + resolver", () => {
   it("T0577 — the production default is Haiku 4.5 and is a known model", () => {
@@ -150,6 +150,45 @@ describe("Google (Gemini) provider registry", () => {
     const g = googleModels();
     expect(g.find((m) => m.id === "gemini-3-pro")).toEqual({ id: "gemini-3-pro", label: "Gemini 3 Pro", provider: "google", vision: true });
     expect(g.find((m) => m.id === "my-gemini-text")?.vision).toBe(false);
+    expect(allModels().slice(0, AI_MODELS.length)).toEqual(AI_MODELS); // Claude still first
+  });
+});
+
+describe("Microsoft (Azure OpenAI + Phi) provider registry", () => {
+  const saved = { key: process.env.MICROSOFT_API_KEY, base: process.env.MICROSOFT_BASE_URL, models: process.env.MICROSOFT_MODELS };
+  afterEach(() => {
+    if (saved.key === undefined) delete process.env.MICROSOFT_API_KEY; else process.env.MICROSOFT_API_KEY = saved.key;
+    if (saved.base === undefined) delete process.env.MICROSOFT_BASE_URL; else process.env.MICROSOFT_BASE_URL = saved.base;
+    if (saved.models === undefined) delete process.env.MICROSOFT_MODELS; else process.env.MICROSOFT_MODELS = saved.models;
+  });
+
+  it("T1037 — no Microsoft models unless BOTH MICROSOFT_API_KEY and MICROSOFT_BASE_URL are set", () => {
+    process.env.MICROSOFT_API_KEY = "sk-msft";
+    delete process.env.MICROSOFT_BASE_URL;
+    expect(microsoftModels()).toEqual([]);        // gateway URL required (OpenAI-shaped)
+    expect(allModels()).toEqual(AI_MODELS);
+    delete process.env.MICROSOFT_API_KEY;
+    process.env.MICROSOFT_BASE_URL = "http://gw";
+    expect(microsoftModels()).toEqual([]);
+    expect(isKnownAiModel("gpt-4o")).toBe(false);
+  });
+
+  it("T1038 — configured: default lineup or MICROSOFT_MODELS, tagged provider=microsoft; GPT vision, Phi text", () => {
+    process.env.MICROSOFT_API_KEY = "sk-msft";
+    process.env.MICROSOFT_BASE_URL = "http://gw";
+    delete process.env.MICROSOFT_MODELS;
+    const def = microsoftModels();
+    expect(def.length).toBeGreaterThan(0);
+    expect(def.every((m) => m.provider === "microsoft")).toBe(true);
+    expect(def.find((m) => m.id === "gpt-4o")?.vision).toBe(true);   // GPT is multimodal
+    expect(def.find((m) => m.id === "phi-4")?.vision).toBe(false);   // base Phi is text
+    expect(providerForModel("gpt-4o")).toBe("microsoft");
+    // Override: GPT/o default to vision, base Phi opts out, a "…-vision" Phi opts in.
+    process.env.MICROSOFT_MODELS = "o3-mini|o3-mini, phi-4|Phi-4, phi-4-multimodal|Phi-4 MM";
+    const m = microsoftModels();
+    expect(m.find((x) => x.id === "o3-mini")?.vision).toBe(true);
+    expect(m.find((x) => x.id === "phi-4")?.vision).toBe(false);
+    expect(m.find((x) => x.id === "phi-4-multimodal")?.vision).toBe(true);
     expect(allModels().slice(0, AI_MODELS.length)).toEqual(AI_MODELS); // Claude still first
   });
 });

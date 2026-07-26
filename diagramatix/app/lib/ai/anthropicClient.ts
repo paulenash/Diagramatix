@@ -23,9 +23,10 @@ const MOONSHOT_DEFAULT_BASE_URL = "https://api.moonshot.ai/anthropic";
 /** The key env var that serves a given model's provider. */
 export function aiApiKey(model: string | null | undefined): string | undefined {
   switch (providerForModel(model)) {
-    case "moonshot": return resolvedEnvSecret(process.env.MOONSHOT_API_KEY);
-    case "google":   return resolvedEnvSecret(process.env.GOOGLE_API_KEY);
-    default:         return resolvedEnvSecret(process.env.ANTHROPIC_API_KEY);
+    case "moonshot":  return resolvedEnvSecret(process.env.MOONSHOT_API_KEY);
+    case "google":    return resolvedEnvSecret(process.env.GOOGLE_API_KEY);
+    case "microsoft": return resolvedEnvSecret(process.env.MICROSOFT_API_KEY);
+    default:          return resolvedEnvSecret(process.env.ANTHROPIC_API_KEY);
   }
 }
 
@@ -54,6 +55,13 @@ export function aiClientConfig(
     return {
       apiKey: resolvedEnvSecret(process.env.GOOGLE_API_KEY) ?? "",
       baseURL: process.env.GOOGLE_BASE_URL?.trim() || undefined,
+    };
+  }
+  if (provider === "microsoft") {
+    // Azure OpenAI / Phi via a required Anthropic-compatible gateway (like Gemini).
+    return {
+      apiKey: resolvedEnvSecret(process.env.MICROSOFT_API_KEY) ?? "",
+      baseURL: process.env.MICROSOFT_BASE_URL?.trim() || undefined,
     };
   }
   const baseURL = process.env.ANTHROPIC_BASE_URL?.trim();
@@ -85,12 +93,12 @@ export function makeAiClient(model: string | null | undefined, fallbackApiKey?: 
   const telemetry = { fetch: countingFetch, maxRetries: 2 };
 
   let client: Anthropic;
-  if (provider === "moonshot" || provider === "google") {
-    // Both are reached via an Anthropic-compatible endpoint that authenticates
-    // with `Authorization: Bearer <key>` (Moonshot's endpoint; a LiteLLM-style
-    // gateway for Gemini) — NOT Anthropic's native `x-api-key` header. So hand the
-    // key to the SDK as `authToken` (Bearer) and null out apiKey to suppress the
-    // x-api-key header.
+  if (provider === "moonshot" || provider === "google" || provider === "microsoft") {
+    // All reached via an Anthropic-compatible endpoint that authenticates with
+    // `Authorization: Bearer <key>` (Moonshot's endpoint; a LiteLLM-style gateway
+    // for Gemini / Azure OpenAI / Phi) — NOT Anthropic's native `x-api-key` header.
+    // So hand the key to the SDK as `authToken` (Bearer) and null out apiKey to
+    // suppress the x-api-key header.
     client = new Anthropic({ authToken: apiKey, apiKey: null, baseURL, ...telemetry });
   } else {
     client = baseURL

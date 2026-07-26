@@ -9,7 +9,7 @@
  *  default, and how every built-in Claude model is treated). Moonshot/Kimi is
  *  reached via its Anthropic-compatible endpoint, so it reuses the same SDK +
  *  Messages-API shape — only the base URL + key differ (see anthropicClient.ts). */
-export type AiProvider = "anthropic" | "moonshot" | "google";
+export type AiProvider = "anthropic" | "moonshot" | "google" | "microsoft";
 
 export interface AiModel {
   id: string;
@@ -145,9 +145,46 @@ export function googleModels(): AiModel[] {
     .filter((m): m is AiModel => m !== null);
 }
 
-/** Claude models, plus Moonshot/Kimi and Google/Gemini (each when configured),
- *  plus any local/custom models. */
-export const allModels = (): AiModel[] => [...AI_MODELS, ...moonshotModels(), ...googleModels(), ...customModels()];
+/**
+ * Microsoft models — Azure OpenAI (GPT / o-series) and Microsoft's own Phi family —
+ * offered ONLY when BOTH `MICROSOFT_API_KEY` and `MICROSOFT_BASE_URL` are set. Like
+ * Gemini, these speak the OpenAI shape (NOT Anthropic Messages), so
+ * `MICROSOFT_BASE_URL` MUST point at an Anthropic-compatible gateway (e.g. LiteLLM
+ * Proxy — the same one that can front Gemini) that translates to Azure OpenAI / Phi;
+ * the app then reuses the SDK + Messages shape, Bearer-authenticated. Ids come from
+ * `MICROSOFT_MODELS` (same `id|Label` syntax) — use the exact model / deployment
+ * names your gateway exposes — else a small curated default. GPT/o-series are
+ * multimodal (vision true); base Phi is text (vision false; a "…multimodal/vision…"
+ * id opts back in). Kept distinct from the SharePoint/Entra `AZURE_*` vars on
+ * purpose. Server-only. */
+const DEFAULT_MICROSOFT_MODELS: AiModel[] = [
+  { id: "gpt-4o", label: "GPT-4o", provider: "microsoft", vision: true },
+  { id: "gpt-4o-mini", label: "GPT-4o mini", provider: "microsoft", vision: true },
+  { id: "phi-4", label: "Phi-4", provider: "microsoft", vision: false },
+];
+
+export function microsoftModels(): AiModel[] {
+  if (!resolvedEnvSecret(process.env.MICROSOFT_API_KEY) || !process.env.MICROSOFT_BASE_URL?.trim()) return [];
+  const raw = process.env.MICROSOFT_MODELS?.trim();
+  if (!raw) return DEFAULT_MICROSOFT_MODELS;
+  return raw
+    .split(",")
+    .map((entry): AiModel | null => {
+      const [rawId, ...rest] = entry.split("|");
+      const id = rawId.trim();
+      if (!id) return null;
+      // GPT / o-series are multimodal; base Phi is text unless the id says otherwise.
+      const vision = /^phi/i.test(id) && !/(multimodal|vision)/i.test(id) ? false : true;
+      return { id, label: rest.join("|").trim() || id, provider: "microsoft", vision };
+    })
+    .filter((m): m is AiModel => m !== null);
+}
+
+/** Claude models, plus Moonshot/Kimi, Google/Gemini and Microsoft/Azure (each when
+ *  configured), plus any local/custom models. */
+export const allModels = (): AiModel[] => [
+  ...AI_MODELS, ...moonshotModels(), ...googleModels(), ...microsoftModels(), ...customModels(),
+];
 
 export const isKnownAiModel = (id: string | null | undefined): boolean =>
   !!id && allModels().some((m) => m.id === id);

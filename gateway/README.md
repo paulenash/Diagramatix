@@ -69,6 +69,25 @@ az webapp config appsettings set -g dgx-prod-rg -n dgx-prod-app --settings \
 
 App Service restarts, and Gemini appears in every picker (including BPMN Compare).
 
+### Add Microsoft (Azure OpenAI + Phi) on the SAME gateway
+`config.yaml` already lists `gpt-4o` / `gpt-4o-mini` (Azure OpenAI) and `phi-4`
+(Foundry). To turn them on:
+1. Fill in your Azure **deployment names** in `config.yaml` (`azure/<deployment>`),
+   rebuild the image (`az acr build …`) and update the container app.
+2. Give the gateway the provider keys as **secrets** (not the app):
+   `AZURE_OPENAI_API_BASE`, `AZURE_OPENAI_API_KEY` (+ `AZURE_PHI_API_BASE`,
+   `AZURE_PHI_API_KEY` for Phi) — add them via `az containerapp update … --set-env-vars`
+   / `--secrets`, same pattern as `GEMINI_API_KEY`.
+3. Point the app at the gateway (one gateway → reuse the SAME master key/URL):
+   ```bash
+   az webapp config appsettings set -g dgx-prod-rg -n dgx-prod-app --settings \
+     MICROSOFT_BASE_URL="https://litellm-gateway.<hash>.australiaeast.azurecontainerapps.io" \
+     MICROSOFT_API_KEY="@Microsoft.KeyVault(VaultName=dgx-kv;SecretName=google-gateway-key)" \
+     MICROSOFT_MODELS="gpt-4o|GPT-4o,gpt-4o-mini|GPT-4o mini,phi-4|Phi-4"
+   ```
+   (`MICROSOFT_*` are DISTINCT from the `AZURE_*` SharePoint/Entra settings.) GPT +
+   Phi then appear in every picker too.
+
 ---
 
 ## Smoke test (either environment)
