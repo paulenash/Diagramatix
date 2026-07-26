@@ -342,9 +342,13 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
 
   if (!show) return null;
 
-  // Hidden media elements the compositor reads from.
+  // Hidden media elements the compositor reads from. `data-no-capture` is ESSENTIAL:
+  // the screen-capture tool (html-to-image) otherwise tries to snapshot these empty
+  // <video>s, fetches their blank poster URL (which resolves to the current page →
+  // app HTML → data:text/html), and the whole capture fails. Excluding them here is
+  // why the camera works whether or not this launcher is present.
   const hidden = (
-    <div style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }} aria-hidden>
+    <div data-no-capture style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }} aria-hidden>
       <video ref={screenVideoRef} muted playsInline />
       <video ref={camVideoRef} muted playsInline />
       <canvas ref={canvasRef} />
@@ -360,7 +364,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     return (
       <>
         {hidden}
-        <div className="fixed bottom-16 left-4 z-[95] flex items-center gap-2 rounded-full bg-black/85 text-white px-3 py-1.5 shadow-lg text-xs">
+        <div data-no-capture className="fixed bottom-16 left-4 z-[95] flex items-center gap-2 rounded-full bg-black/85 text-white px-3 py-1.5 shadow-lg text-xs">
           <span className={`inline-block w-2.5 h-2.5 rounded-full ${phase === "recording" ? "bg-red-500 animate-pulse" : "bg-amber-400"}`} />
           <span className="tabular-nums font-medium">{fmt(elapsed)}</span>
           <button onClick={pauseResume} className="ml-1 hover:text-amber-300" title={phase === "recording" ? "Pause" : "Resume"}>{phase === "recording" ? "⏸" : "▶"}</button>
@@ -375,6 +379,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
       {hidden}
       {!open && (
         <button
+          data-no-capture
           onPointerDown={(e) => { e.preventDefault(); handlers.onPointerDown(e); }}
           onPointerMove={handlers.onPointerMove}
           onPointerUp={(e) => { handlers.onPointerUp(e); if (!didDrag()) void openStudio(); }}
@@ -390,7 +395,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
         </button>
       )}
       {open && (
-        <div className="fixed bottom-16 left-4 z-[95] w-72 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-xs text-gray-800">
+        <div data-no-capture className="fixed bottom-16 left-4 z-[95] w-72 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-xs text-gray-800">
           <div className="flex items-center justify-between mb-2">
             <span className="font-semibold text-gray-800">🎥 Screencast Studio</span>
             <button onClick={closeStudio} className="text-gray-600 hover:text-gray-700 text-base leading-none" title="Close">&times;</button>

@@ -47,14 +47,6 @@ function elementSrc(el: Element): string {
     || (el as unknown as SVGImageElement).href?.baseVal
     || "";
 }
-/** Cross-origin (non-data) image URL — such images taint the capture canvas or
- *  fail to inline. Same-origin + data: URIs are safe. */
-function isCrossOriginImg(src: string): boolean {
-  if (!src || src.startsWith("data:")) return false;
-  try { return new URL(src, location.href).origin !== location.origin; }
-  catch { return false; }
-}
-
 /** Nodes that can't be rasterised and would REJECT the whole capture, so they're
  *  always excluded (realm-agnostic):
  *   • anything tagged data-no-capture (our own chrome),
@@ -72,81 +64,6 @@ function alwaysSkip(node: Node): boolean {
     if (s.startsWith("data:") && !s.startsWith("data:image/")) return true;
   }
   return false;
-}
-
-/** A non-image data: URI (e.g. an extension-injected `data:text/html` frame). */
-function isBadDataSrc(src: string): boolean {
-  return src.startsWith("data:") && !src.startsWith("data:image/");
-}
-
-/**
- * Prepare the live DOM so html-to-image can't choke on an un-inlinable resource,
- * then return a function that undoes it all. The decisive step is DETACHING every
- * <iframe>: browser extensions (Grammarly, password managers, ad blockers) inject
- * `data:text/html` frames whose inner <img>s html-to-image pulls in via an isRoot
- * path that bypasses the node filter — and being cross-realm they dodge
- * `instanceof`. If the iframe isn't in the tree, its contents can't be reached.
- * We also repoint any stray non-image data: <img> in the main doc / open shadow
- * roots at a transparent pixel. All pure DOM ops → realm-agnostic.
- */
-function prepareDomForCapture(): () => void {
-  const restores: Array<() => void> = [];
-
-  // 1) Detach every iframe (re-inserted afterwards — this reloads it, which is
-  //    fine: extension frames re-inject and app previews are rare during capture).
-  let detached = 0;
-  document.querySelectorAll("iframe").forEach((f) => {
-    const parent = f.parentNode;
-    if (!parent) return;
-    const next = f.nextSibling;
-    parent.removeChild(f);
-    detached++;
-    restores.push(() => { try { parent.insertBefore(f, next); } catch { /* ignore */ } });
-  });
-
-  // 2) Repoint any <img>/<image> that html-to-image would choke on (main doc +
-  //    open shadow roots): a non-image data: URI, OR a BROKEN image — one that has
-  //    finished loading at 0×0, which is what an <img> whose URL returned HTML /
-  //    a redirect (e.g. a session-expired resource → the app's login page) looks
-  //    like. Either way html-to-image re-fetches it, gets text/html, and fails.
-  let repointed = 0;
-  const scan = (root: ParentNode) => {
-    let els: Element[];
-    try { els = Array.from(root.querySelectorAll("img, image")); } catch { return; }
-    for (const el of els) {
-      const sr = (el as HTMLElement).shadowRoot;
-      if (sr) scan(sr);
-      const attr = el.hasAttribute("src") ? "src" : el.hasAttribute("href") ? "href" : null;
-      if (!attr) continue;
-      const val = el.getAttribute(attr) || "";
-      const imgEl = el as HTMLImageElement;
-      const broken = el.tagName.toUpperCase() === "IMG" && !!val && imgEl.complete && imgEl.naturalWidth === 0;
-      if (!isBadDataSrc(val) && !broken) continue;
-      el.setAttribute(attr, TRANSPARENT_PX);
-      el.setAttribute("data-no-capture", "");
-      repointed++;
-      restores.push(() => { el.setAttribute(attr, val); el.removeAttribute("data-no-capture"); });
-    }
-  };
-  scan(document);
-
-  if (detached || repointed) console.info(`[ScreenCapture] prep: detached ${detached} iframe(s), repointed ${repointed} data: image(s)`);
-  return () => { for (const r of restores) { try { r(); } catch { /* ignore */ } } };
-}
-
-/** Full detail of the element a DOM error Event fired on — tag, id, class, src —
- *  so we can pinpoint what html-to-image choked on. */
-function targetDetail(e: unknown): string {
-  const t = (e && typeof e === "object" ? (e as { target?: unknown }).target : null) as
-    | (Element & { src?: string; currentSrc?: string; href?: { baseVal?: string } })
-    | null;
-  if (!t || typeof (t as Element).tagName !== "string") {
-    return typeof e === "object" && e ? `(no target; keys: ${Object.keys(e).join(",")})` : String(e);
-  }
-  const el = t as Element & { src?: string; currentSrc?: string; href?: { baseVal?: string } };
-  const src = el.src || el.currentSrc || el.href?.baseVal || "";
-  const cls = typeof el.className === "string" && el.className ? `.${el.className.trim().split(/\s+/).join(".")}` : "";
-  return `${el.tagName}${el.id ? `#${el.id}` : ""}${cls}${src ? ` src=${String(src).slice(0, 180)}` : ""}`;
 }
 
 /** Turn any thrown value (Error, DOM Event from img.onerror, string, …) into a
@@ -206,54 +123,23 @@ export function ScreenCapture() {
     if (frozen) return;
     setError(null); setSaved(null); setToast(null);
     const w = window.innerWidth, h = window.innerHeight;
-    // Base options. `imagePlaceholder` makes a single un-inlinable image degrade to
-    // a transparent pixel instead of failing the whole capture. `cacheBust` is off:
-    // it re-fetches every image, which turns an otherwise-cached cross-origin image
-    // into a CORS fetch that can reject (a common "unknown" failure).
-    const baseOpts: Parameters<typeof htmlToImage.toPng>[1] = {
-      width: w,
-      height: h,
-      pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-      backgroundColor: "#ffffff",
-      skipFonts: true,
-      imagePlaceholder: TRANSPARENT_PX,
-      // Swallow a SINGLE image's load error instead of rejecting the whole capture.
-      // This is the catch-all: an <img> whose URL looks fine but whose bytes are
-      // non-image (e.g. a corrupt HelpImage record holding an HTML document → served
-      // as text/html → html-to-image turns it into data:text/html → fails to decode)
-      // no longer aborts the screenshot; that one image just renders blank.
-      onImageErrorHandler: () => {},
-      filter: (node) => !alwaysSkip(node),
-    };
-    // Cascade of increasingly-defensive filters. Attempt 1 relies on
-    // onImageErrorHandler (any single failing image just resolves). If the
-    // environment somehow still throws, attempt 2 drops cross-origin images, and
-    // attempt 3 drops EVERY image — which cannot fail on an image load, so a
-    // capture always completes (losing images rather than the whole screenshot).
-    const skippers: Array<(node: Node) => boolean> = [
-      (n) => alwaysSkip(n),
-      (n) => { const el = asElement(n); return alwaysSkip(n) || (!!el && isImageEl(el) && isCrossOriginImg(elementSrc(el))); },
-      (n) => { const el = asElement(n); return alwaysSkip(n) || (!!el && isImageEl(el)); }, // strip ALL images (realm-agnostic)
-    ];
-    // Detach iframes + neutralise stray data: images in the live DOM first — this
-    // is what actually fixes the capture, since html-to-image reaches those (via
-    // iframe bodies) in a way the node filter can't stop.
-    const restoreImages = prepareDomForCapture();
     try {
-      let dataUrl = "";
-      let lastErr: unknown = null;
-      for (let i = 0; i < skippers.length; i++) {
-        try {
-          dataUrl = await htmlToImage.toPng(document.body, { ...baseOpts, filter: (node) => !skippers[i](node) });
-          if (dataUrl && dataUrl.length >= 100) { if (i > 0) console.warn(`[ScreenCapture] succeeded on attempt ${i + 1}`); break; }
-          throw new Error("the capture came back empty");
-        } catch (err) {
-          lastErr = err;
-          console.warn(`[ScreenCapture] attempt ${i + 1}/${skippers.length} failed on ${targetDetail(err)}`);
-          dataUrl = "";
-        }
-      }
-      if (!dataUrl || dataUrl.length < 100) throw lastErr ?? new Error("the capture came back empty");
+      const dataUrl = await htmlToImage.toPng(document.body, {
+        width: w,
+        height: h,
+        pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+        backgroundColor: "#ffffff",
+        skipFonts: true,
+        // Degrade a single un-inlinable image to a transparent pixel, and swallow a
+        // lone image load error, rather than failing the whole capture.
+        imagePlaceholder: TRANSPARENT_PX,
+        onImageErrorHandler: () => {},
+        // Skip our own chrome (data-no-capture — includes the Screencast Studio's
+        // hidden <video>/<canvas> compositor, which otherwise aborts the capture),
+        // iframes, and non-image data: URIs. Realm-agnostic (tag + attribute).
+        filter: (node) => !alwaysSkip(node),
+      });
+      if (!dataUrl || dataUrl.length < 100) throw new Error("the capture came back empty");
       const im = new Image();
       im.onload = () => { imgRef.current = im; setNat({ w: im.naturalWidth, h: im.naturalHeight }); };
       im.onerror = () => setToast("The captured image could not be decoded.");
@@ -266,8 +152,6 @@ export function ScreenCapture() {
     } catch (e) {
       console.error("[ScreenCapture] capture failed:", e);
       setToast("Capture failed — " + describeCaptureError(e) + ".");
-    } finally {
-      restoreImages();
     }
   }, [frozen]);
 
