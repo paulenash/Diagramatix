@@ -80,32 +80,57 @@ function isBadDataSrc(src: string): boolean {
 }
 
 /**
- * BEFORE capture, point every <img>/<image> whose src is a non-image data: URI at
- * a transparent pixel — in the main document AND every same-origin iframe body
- * (html-to-image clones those, and browser extensions inject cross-realm
- * `data:text/html` <img>s there that the node filter can't stop, because
- * html-to-image pulls in iframe bodies via an isRoot path that bypasses `filter`).
- * Returns a function that restores the originals. Realm-agnostic: pure DOM ops.
+ * Prepare the live DOM so html-to-image can't choke on an un-inlinable resource,
+ * then return a function that undoes it all. The decisive step is DETACHING every
+ * <iframe>: browser extensions (Grammarly, password managers, ad blockers) inject
+ * `data:text/html` frames whose inner <img>s html-to-image pulls in via an isRoot
+ * path that bypasses the node filter — and being cross-realm they dodge
+ * `instanceof`. If the iframe isn't in the tree, its contents can't be reached.
+ * We also repoint any stray non-image data: <img> in the main doc / open shadow
+ * roots at a transparent pixel. All pure DOM ops → realm-agnostic.
  */
-function neutralizeBadImages(): () => void {
+function prepareDomForCapture(): () => void {
   const restores: Array<() => void> = [];
+
+  // 1) Detach every iframe (re-inserted afterwards — this reloads it, which is
+  //    fine: extension frames re-inject and app previews are rare during capture).
+  let detached = 0;
+  document.querySelectorAll("iframe").forEach((f) => {
+    const parent = f.parentNode;
+    if (!parent) return;
+    const next = f.nextSibling;
+    parent.removeChild(f);
+    detached++;
+    restores.push(() => { try { parent.insertBefore(f, next); } catch { /* ignore */ } });
+  });
+
+  // 2) Repoint any <img>/<image> that html-to-image would choke on (main doc +
+  //    open shadow roots): a non-image data: URI, OR a BROKEN image — one that has
+  //    finished loading at 0×0, which is what an <img> whose URL returned HTML /
+  //    a redirect (e.g. a session-expired resource → the app's login page) looks
+  //    like. Either way html-to-image re-fetches it, gets text/html, and fails.
+  let repointed = 0;
   const scan = (root: ParentNode) => {
     let els: Element[];
     try { els = Array.from(root.querySelectorAll("img, image")); } catch { return; }
     for (const el of els) {
+      const sr = (el as HTMLElement).shadowRoot;
+      if (sr) scan(sr);
       const attr = el.hasAttribute("src") ? "src" : el.hasAttribute("href") ? "href" : null;
       if (!attr) continue;
       const val = el.getAttribute(attr) || "";
-      if (!isBadDataSrc(val)) continue;
+      const imgEl = el as HTMLImageElement;
+      const broken = el.tagName.toUpperCase() === "IMG" && !!val && imgEl.complete && imgEl.naturalWidth === 0;
+      if (!isBadDataSrc(val) && !broken) continue;
       el.setAttribute(attr, TRANSPARENT_PX);
       el.setAttribute("data-no-capture", "");
+      repointed++;
       restores.push(() => { el.setAttribute(attr, val); el.removeAttribute("data-no-capture"); });
     }
   };
   scan(document);
-  document.querySelectorAll("iframe").forEach((f) => {
-    try { const d = (f as HTMLIFrameElement).contentDocument; if (d?.body) scan(d); } catch { /* cross-origin — html-to-image can't read it either */ }
-  });
+
+  if (detached || repointed) console.info(`[ScreenCapture] prep: detached ${detached} iframe(s), repointed ${repointed} data: image(s)`);
   return () => { for (const r of restores) { try { r(); } catch { /* ignore */ } } };
 }
 
@@ -210,10 +235,10 @@ export function ScreenCapture() {
       (n) => { const el = asElement(n); return alwaysSkip(n) || (!!el && isImageEl(el) && isCrossOriginImg(elementSrc(el))); },
       (n) => { const el = asElement(n); return alwaysSkip(n) || (!!el && isImageEl(el)); }, // strip ALL images (realm-agnostic)
     ];
-    // Neutralise extension-injected `data:text/html` images in the live DOM first —
-    // this is what actually fixes the capture, since html-to-image reaches those
-    // (via iframe bodies) in a way the node filter can't stop.
-    const restoreImages = neutralizeBadImages();
+    // Detach iframes + neutralise stray data: images in the live DOM first — this
+    // is what actually fixes the capture, since html-to-image reaches those (via
+    // iframe bodies) in a way the node filter can't stop.
+    const restoreImages = prepareDomForCapture();
     try {
       let dataUrl = "";
       let lastErr: unknown = null;
