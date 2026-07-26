@@ -35,6 +35,23 @@ function isCrossOriginImg(src: string): boolean {
   catch { return false; }
 }
 
+/** Nodes that can't be rasterised and would REJECT the whole capture, so they're
+ *  always excluded:
+ *   • anything tagged data-no-capture (our own chrome),
+ *   • <iframe>s — including the `data:text/html` frames browser extensions
+ *     (Grammarly, password managers, ad blockers) inject into <body>; html-to-image
+ *     tries to load them and fails,
+ *   • an <img> pointing at a NON-image data: URI (same extension trick). */
+function alwaysSkip(node: Node): boolean {
+  if (node instanceof HTMLElement && node.hasAttribute("data-no-capture")) return true;
+  if (node instanceof HTMLIFrameElement) return true;
+  if (node instanceof HTMLImageElement) {
+    const s = node.src || "";
+    if (s.startsWith("data:") && !s.startsWith("data:image/")) return true;
+  }
+  return false;
+}
+
 /** Turn any thrown value (Error, DOM Event from img.onerror, string, …) into a
  *  human-readable message so the toast is diagnostic instead of "unknown". */
 function describeCaptureError(e: unknown): string {
@@ -100,23 +117,20 @@ export function ScreenCapture() {
       backgroundColor: "#ffffff",
       skipFonts: true,
       imagePlaceholder: TRANSPARENT_PX,
-      filter: (node) => !(node instanceof HTMLElement && node.hasAttribute("data-no-capture")),
+      filter: (node) => !alwaysSkip(node),
     };
     try {
       let dataUrl: string;
       try {
         dataUrl = await htmlToImage.toPng(document.body, baseOpts);
       } catch (firstErr) {
-        // Fallback: also drop cross-origin <img> elements, which taint the capture
+        // Fallback: ALSO drop cross-origin <img> elements, which taint the capture
         // canvas or fail to inline. The screenshot loses those images but succeeds.
         console.warn("[ScreenCapture] first attempt failed, retrying without cross-origin images:", firstErr);
         dataUrl = await htmlToImage.toPng(document.body, {
           ...baseOpts,
-          filter: (node) => {
-            if (node instanceof HTMLElement && node.hasAttribute("data-no-capture")) return false;
-            if (node instanceof HTMLImageElement && isCrossOriginImg(node.src)) return false;
-            return true;
-          },
+          filter: (node) =>
+            !alwaysSkip(node) && !(node instanceof HTMLImageElement && isCrossOriginImg(node.src)),
         });
       }
       if (!dataUrl || dataUrl.length < 100) throw new Error("the capture came back empty");
