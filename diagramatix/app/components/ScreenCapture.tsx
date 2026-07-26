@@ -117,6 +117,12 @@ export function ScreenCapture() {
       backgroundColor: "#ffffff",
       skipFonts: true,
       imagePlaceholder: TRANSPARENT_PX,
+      // Swallow a SINGLE image's load error instead of rejecting the whole capture.
+      // This is the catch-all: an <img> whose URL looks fine but whose bytes are
+      // non-image (e.g. a corrupt HelpImage record holding an HTML document → served
+      // as text/html → html-to-image turns it into data:text/html → fails to decode)
+      // no longer aborts the screenshot; that one image just renders blank.
+      onImageErrorHandler: () => {},
       filter: (node) => !alwaysSkip(node),
     };
     try {
