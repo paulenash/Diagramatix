@@ -26,11 +26,13 @@ model_list:
       model: azure/gpt-5-mini
       api_base: os.environ/AZURE_OPENAI_API_BASE
       api_key: os.environ/AZURE_OPENAI_API_KEY
+      api_version: "2025-04-01-preview"
   - model_name: gpt-5.4-mini
     litellm_params:
       model: azure/gpt-5.4-mini
       api_base: os.environ/AZURE_OPENAI_API_BASE
       api_key: os.environ/AZURE_OPENAI_API_KEY
+      api_version: "2025-04-01-preview"
 
   # ── Microsoft — Phi (Azure AI Foundry serverless) — NOT YET DEPLOYED ────────
   # Phi is an AIServices-kind model, so it can't live in the OpenAI-kind
