@@ -699,6 +699,13 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   const [importLog, setImportLog] = useState<string[]>([]);
   const [importResult, setImportResult] = useState<"success" | "failed" | null>(null);
   const [importedProjectId, setImportedProjectId] = useState<string | null>(null);
+  // Append-import preview: parsed JSON export awaiting user Append/Cancel.
+  const [pendingAppend, setPendingAppend] = useState<{
+    exportData: Record<string, unknown>;
+    projectName: string;
+    folders: string[];
+    diagrams: string[];
+  } | null>(null);
   // Visio import status (per-master breakdown + warnings) — same shape
   // as the editor's modal so we can show the same diagnostic info here.
   const [visioImportStatus, setVisioImportStatus] = useState<VisioImportResult | null>(null);
@@ -1036,7 +1043,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       const blob = await r.blob();
       const file = new File([blob], sel.name);
       setSpBusy(false);
-      if (fmt === "json" || fmt === "xml") await handleImportFile(file, fmt);
+      if (fmt === "json") await handleAppendJsonFile(file);
+      else if (fmt === "xml") await handleImportFile(file, "xml");
       else if (fmt === "visio") await handleImportVisioFile(file);
       else await handleImportBpmnFile(file);
     } catch (err) {
@@ -1553,6 +1561,170 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     log(`\u2714 Import complete: ${successCount}/${diags.length} diagram(s) imported`);
     setImportResult("success");
     setImportedProjectId(newProject.id);
+  }
+
+  // Project-screen JSON import: parse + validate, then show a preview of the
+  // folders/diagrams so the user can Append into THIS project (not a new one).
+  async function handleAppendJsonFile(file: File) {
+    let exportData: Record<string, unknown> | null = null;
+    try {
+      exportData = JSON.parse(await file.text());
+    } catch (err) {
+      setImporting(true);
+      setImportLog([`\u2718 Failed to read file: ${err instanceof Error ? err.message : String(err)}`]);
+      setImportResult("failed");
+      return;
+    }
+    if (!exportData || !exportData.project || !exportData.diagrams) {
+      setImporting(true);
+      setImportLog(["\u2718 Invalid export file \u2014 missing required fields"]);
+      setImportResult("failed");
+      return;
+    }
+    const schemaVer: string = (exportData.schemaVersion as string) ?? (exportData.version as string) ?? "";
+    if (schemaVer) {
+      const fileMajor = parseInt(schemaVer.split(".")[0] ?? "0", 10);
+      const appMajor = parseInt(SCHEMA_VERSION.split(".")[0] ?? "0", 10);
+      if (fileMajor > appMajor) {
+        setImporting(true);
+        setImportLog([`\u2718 File schema version ${schemaVer} is newer than this app (${SCHEMA_VERSION}).`]);
+        setImportResult("failed");
+        return;
+      }
+    }
+    const sourceProject = (exportData.project as Record<string, unknown>) ?? {};
+    const importedFT = parseFolderTree(exportData.folderTree);
+    const diags = (exportData.diagrams as Array<Record<string, unknown>>) ?? [];
+    setPendingAppend({
+      exportData,
+      projectName: (sourceProject.name as string) ?? "Imported",
+      folders: (importedFT.folders ?? []).map(f => f.name),
+      diagrams: diags.map(d => (d.name as string) ?? "Untitled"),
+    });
+  }
+
+  // Append a parsed export into the CURRENT project: creates the diagrams here,
+  // then nests the imported folder tree under a new "<name> (imported)" folder.
+  async function runAppendImport(exportData: Record<string, unknown>) {
+    setPendingAppend(null);
+    setImporting(true);
+    setImportLog([]);
+    setImportResult(null);
+    setImportedProjectId(null);
+    const log = (msg: string) => setImportLog(prev => [...prev, msg]);
+
+    const sourceProject = (exportData.project as Record<string, unknown>) ?? {};
+    const diags = (exportData.diagrams as Array<Record<string, unknown>>) ?? [];
+    const importedFT = parseFolderTree(exportData.folderTree);
+    log(`Appending ${diags.length} diagram(s) into "${project.name}"\u2026`);
+
+    // 1. Create the diagrams under the current project.
+    const diagIdMap = new Map<string, string>();
+    let successCount = 0;
+    for (let i = 0; i < diags.length; i++) {
+      const diag = diags[i];
+      log(`  Diagram ${i + 1}/${diags.length}: "${diag.name as string}"`);
+      try {
+        const dRes = await fetch("/api/diagrams", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: diag.name,
+            type: diag.type ?? "context",
+            projectId: project.id,
+            data: diag.data,
+            colorConfig: diag.colorConfig,
+            displayMode: diag.displayMode,
+          }),
+        });
+        if (dRes.ok) {
+          const created = await dRes.json();
+          diagIdMap.set(diag.originalId as string, created.id);
+          successCount++;
+        } else {
+          log(`  \u2718 Failed: ${dRes.statusText}`);
+        }
+      } catch (err) {
+        log(`  \u2718 Failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    // 2. Merge the imported folder tree under a fresh container folder.
+    const stamp = Date.now().toString(36);
+    const containerId = `folder-${stamp}-${Math.random().toString(36).slice(2, 8)}`;
+    const containerName = `${(sourceProject.name as string) ?? "Imported"} (imported)`;
+    const importedFolders = importedFT.folders ?? [];
+    const folderIdMap = new Map<string, string>();
+    importedFolders.forEach((f, idx) => {
+      folderIdMap.set(f.id, `folder-${stamp}-${idx}-${Math.random().toString(36).slice(2, 6)}`);
+    });
+
+    const newFolders: FolderNode[] = [
+      { id: containerId, name: containerName, parentId: ROOT_ID },
+      ...importedFolders.map(f => ({
+        id: folderIdMap.get(f.id)!,
+        name: f.name,
+        parentId: (f.parentId == null || f.parentId === ROOT_ID)
+          ? containerId
+          : (folderIdMap.get(f.parentId) ?? containerId),
+        collapsed: f.collapsed,
+      })),
+    ];
+
+    const newDiagramFolderMap: Record<string, string> = {};
+    for (const diag of diags) {
+      const newDiagId = diagIdMap.get(diag.originalId as string);
+      if (!newDiagId) continue;
+      const oldFolder = importedFT.diagramFolderMap?.[diag.originalId as string];
+      const mapped = oldFolder ? folderIdMap.get(oldFolder) : undefined;
+      newDiagramFolderMap[newDiagId] = mapped ?? containerId;
+    }
+
+    const newDiagramOrder: Record<string, string[]> = {};
+    for (const [oldFolder, ids] of Object.entries(importedFT.diagramOrder ?? {})) {
+      const mappedFolder = oldFolder === ROOT_ID ? containerId : (folderIdMap.get(oldFolder) ?? containerId);
+      newDiagramOrder[mappedFolder] = (ids as string[]).map(id => diagIdMap.get(id)).filter(Boolean) as string[];
+    }
+    const newFolderOrder: Record<string, string[]> = {};
+    for (const [oldParent, ids] of Object.entries(importedFT.folderOrder ?? {})) {
+      if (oldParent === ROOT_ID) continue; // imported top-level folders re-home under the container
+      const mappedParent = folderIdMap.get(oldParent) ?? containerId;
+      newFolderOrder[mappedParent] = (ids as string[]).map(id => folderIdMap.get(id)).filter(Boolean) as string[];
+    }
+    const importedTopLevel = importedFolders
+      .filter(f => f.parentId == null || f.parentId === ROOT_ID)
+      .map(f => folderIdMap.get(f.id)!)
+      .filter(Boolean);
+    const currentRootOrder = (folderTree.folderOrder ?? {})[ROOT_ID]
+      ?? folderTree.folders.filter(f => (f.parentId ?? ROOT_ID) === ROOT_ID).map(f => f.id);
+
+    const merged: FolderTree = {
+      folders: [...folderTree.folders, ...newFolders],
+      diagramFolderMap: { ...folderTree.diagramFolderMap, ...newDiagramFolderMap },
+      diagramOrder: { ...(folderTree.diagramOrder ?? {}), ...newDiagramOrder },
+      folderOrder: {
+        ...(folderTree.folderOrder ?? {}),
+        ...newFolderOrder,
+        [containerId]: importedTopLevel,
+        [ROOT_ID]: [...currentRootOrder, containerId],
+      },
+    };
+
+    // 3. Persist the folder tree, then refresh diagrams from the API.
+    log("Updating folder structure\u2026");
+    try {
+      await fetch(`/api/projects/${project.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderTree: merged }),
+      });
+    } catch { /* best-effort */ }
+    setFolderTree(merged);
+    await refreshProjectData();
+
+    log("");
+    log(`\u2714 Append complete: ${successCount}/${diags.length} diagram(s) added to "${project.name}"`);
+    setImportResult("success");
   }
 
   async function handleCreateDiagram() {
@@ -2256,7 +2428,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                 className="hidden"
                 onChange={e => {
                   const f = e.target.files?.[0];
-                  if (f) handleImportFile(f, "json");
+                  if (f) handleAppendJsonFile(f);
                   e.target.value = "";
                 }}
               />
@@ -2379,7 +2551,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                                       </>
                                     ) : (
                                       <>
-                                        <button className={itemCls} onClick={() => { close(); importJsonInputRef.current?.click(); }}>JSON (Project)</button>
+                                        <button className={itemCls} onClick={() => { close(); importJsonInputRef.current?.click(); }}>JSON (Project Diagrams)</button>
                                         <button className={itemCls} onClick={() => { close(); importXmlInputRef.current?.click(); }}>XML</button>
                                         <button className={`${itemCls} disabled:opacity-50`} disabled={visioImportInProgress} onClick={() => { close(); setImportVisioError(""); importVisioInputRef.current?.click(); }} title="Import one or more pages from a Visio .vsdx file as separate diagrams">{visioImportInProgress ? "Visio (importing…)" : "Visio"}</button>
                                         <button className={`${itemCls} disabled:opacity-50`} disabled={visioImportInProgress} onClick={() => { close(); importBpmnInputRef.current?.click(); }} title="Import an OMG BPMN 2.0 .bpmn file as a new diagram">{visioImportInProgress ? "BPMN (importing…)" : "BPMN"}</button>
@@ -2415,7 +2587,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                                       </>
                                     ) : (
                                       <>
-                                        <button className={itemCls} onClick={() => { close(); setSpImportFmt("json"); }}>JSON (Project)</button>
+                                        <button className={itemCls} onClick={() => { close(); setSpImportFmt("json"); }}>JSON (Project Diagrams)</button>
                                         <button className={itemCls} onClick={() => { close(); setSpImportFmt("xml"); }}>XML</button>
                                         <button className={itemCls} onClick={() => { close(); setSpImportFmt("visio"); }}>Visio (.vsdx)</button>
                                         <button className={itemCls} onClick={() => { close(); setSpImportFmt("bpmn"); }}>BPMN</button>
@@ -2874,6 +3046,49 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       )}
 
       {/* Import progress modal */}
+      {/* Append-import preview — lets the user confirm before merging into this project */}
+      {pendingAppend && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[70vh]">
+            <div className="px-5 py-3 border-b border-gray-200">
+              <h2 className="text-sm font-semibold text-gray-900">Import into &ldquo;{project.name}&rdquo;?</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                These will be appended to this project inside a new folder
+                {" "}&ldquo;{pendingAppend.projectName} (imported)&rdquo;.
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-3 text-xs text-gray-700 space-y-3">
+              <div>
+                <p className="font-semibold text-gray-900 mb-1">Folders ({pendingAppend.folders.length})</p>
+                {pendingAppend.folders.length === 0
+                  ? <p className="text-gray-400 italic">None</p>
+                  : <ul className="list-disc list-inside space-y-0.5">{pendingAppend.folders.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 mb-1">Diagrams ({pendingAppend.diagrams.length})</p>
+                {pendingAppend.diagrams.length === 0
+                  ? <p className="text-gray-400 italic">None</p>
+                  : <ul className="list-disc list-inside space-y-0.5">{pendingAppend.diagrams.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
+              <button
+                onClick={() => setPendingAppend(null)}
+                className="px-4 py-1.5 text-xs rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => runAppendImport(pendingAppend.exportData)}
+                className="px-4 py-1.5 text-xs rounded-md text-white bg-blue-600 hover:bg-blue-700"
+              >
+                Append
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {(importing || importLog.length > 0) && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[70vh]">
