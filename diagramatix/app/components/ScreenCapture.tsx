@@ -125,21 +125,32 @@ export function ScreenCapture() {
       onImageErrorHandler: () => {},
       filter: (node) => !alwaysSkip(node),
     };
+    // Cascade of increasingly-defensive filters. Attempt 1 relies on
+    // onImageErrorHandler (any single failing image just resolves). If the
+    // environment somehow still throws, attempt 2 drops cross-origin images, and
+    // attempt 3 drops EVERY image — which cannot fail on an image load, so a
+    // capture always completes (losing images rather than the whole screenshot).
+    console.info("[ScreenCapture] capture start (v3 — onImageErrorHandler + image-strip fallback)");
+    const skippers: Array<(node: Node) => boolean> = [
+      (n) => alwaysSkip(n),
+      (n) => alwaysSkip(n) || (n instanceof HTMLImageElement && isCrossOriginImg(n.src)),
+      (n) => alwaysSkip(n) || n instanceof HTMLImageElement || n instanceof SVGImageElement,
+    ];
     try {
-      let dataUrl: string;
-      try {
-        dataUrl = await htmlToImage.toPng(document.body, baseOpts);
-      } catch (firstErr) {
-        // Fallback: ALSO drop cross-origin <img> elements, which taint the capture
-        // canvas or fail to inline. The screenshot loses those images but succeeds.
-        console.warn("[ScreenCapture] first attempt failed, retrying without cross-origin images:", firstErr);
-        dataUrl = await htmlToImage.toPng(document.body, {
-          ...baseOpts,
-          filter: (node) =>
-            !alwaysSkip(node) && !(node instanceof HTMLImageElement && isCrossOriginImg(node.src)),
-        });
+      let dataUrl = "";
+      let lastErr: unknown = null;
+      for (let i = 0; i < skippers.length; i++) {
+        try {
+          dataUrl = await htmlToImage.toPng(document.body, { ...baseOpts, filter: (node) => !skippers[i](node) });
+          if (dataUrl && dataUrl.length >= 100) { if (i > 0) console.warn(`[ScreenCapture] succeeded on attempt ${i + 1}`); break; }
+          throw new Error("the capture came back empty");
+        } catch (err) {
+          lastErr = err;
+          console.warn(`[ScreenCapture] attempt ${i + 1}/${skippers.length} failed:`, err);
+          dataUrl = "";
+        }
       }
-      if (!dataUrl || dataUrl.length < 100) throw new Error("the capture came back empty");
+      if (!dataUrl || dataUrl.length < 100) throw lastErr ?? new Error("the capture came back empty");
       const im = new Image();
       im.onload = () => { imgRef.current = im; setNat({ w: im.naturalWidth, h: im.naturalHeight }); };
       im.onerror = () => setToast("The captured image could not be decoded.");
