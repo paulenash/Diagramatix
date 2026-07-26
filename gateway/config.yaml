@@ -34,15 +34,16 @@ model_list:
       api_key: os.environ/AZURE_OPENAI_API_KEY
       api_version: "2025-04-01-preview"
 
-  # ── Microsoft — Phi (Azure AI Foundry serverless) — NOT YET DEPLOYED ────────
-  # Phi is an AIServices-kind model, so it can't live in the OpenAI-kind
-  # dgx-openai resource. Deploy Phi-4 as a Foundry serverless endpoint (its own
-  # target URI + key → AZURE_PHI_API_BASE / AZURE_PHI_API_KEY), then uncomment:
-  # - model_name: phi-4
-  #   litellm_params:
-  #     model: azure_ai/Phi-4
-  #     api_base: os.environ/AZURE_PHI_API_BASE
-  #     api_key: os.environ/AZURE_PHI_API_KEY
+  # ── Microsoft — Phi (Azure AI Services: dgx-aiservices) ────────────────────
+  # Phi is an AIServices-kind model (can't live in the OpenAI-kind dgx-openai), so
+  # it's served from the dgx-aiservices resource via the azure_ai provider.
+  # AZURE_PHI_API_BASE = https://dgx-aiservices.services.ai.azure.com ; the
+  # deployment name is "Phi-4".
+  - model_name: phi-4
+    litellm_params:
+      model: azure_ai/Phi-4
+      api_base: os.environ/AZURE_PHI_API_BASE
+      api_key: os.environ/AZURE_PHI_API_KEY
 
 general_settings:
   # Every request must present  Authorization: Bearer <LITELLM_MASTER_KEY>.
