@@ -23,7 +23,7 @@ import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { BackupProgressModal } from "@/app/components/BackupProgressModal";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
-import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
+import { useSuperAdminChrome, effectiveEntitlements, VIEW_MODE_TIER } from "@/app/hooks/useSuperAdminChrome";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { featureVars } from "@/app/lib/theme/featureColors";
 
@@ -253,15 +253,33 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("dgx_hide_examples") === "1";
   });
+  // SuperAdmin "presentation mode" — double-click the logo to cycle view modes
+  // (superadmin → orgadmin → expert → professional → introductory → back). No-op for non-SuperAdmins.
+  const { mode: adminViewMode, hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(!!isSu);
   // Per-tier feature entitlements (SuperAdmin → all true). When the snapshot is
   // absent (legacy/unseeded) default to all-on so nothing is hidden by accident.
-  const ent = usageSnapshot?.entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true };
+  // In a SuperAdmin tier-preview view, overlay that tier's feature set so APQC /
+  // Simulator / Mining / Risk & Controls hide exactly as they would for that tier.
+  const ent = effectiveEntitlements(
+    adminViewMode,
+    usageSnapshot?.entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true },
+  );
   const featureScheme = useFeatureColors();
   // The Hide-Examples toggle only makes sense if the profile includes at least
   // one feature that HAS an examples gallery (Simulator / Mining / Risk-Control).
   const hasAnyExampleFeature = ent.simulator || ent.processMining || ent.riskControl;
   const hasExamples = projects.some((p) => p.exampleType);
-  const visibleProjects = hideExamples && hasExamples ? projects.filter((p) => !p.exampleType) : projects;
+  // Identify APQC-generated projects (Project.pcf non-empty) so the Introductory
+  // tier view can hide them entirely.
+  const isApqcProject = (p: { pcf?: unknown }) =>
+    !!(p.pcf && typeof p.pcf === "object" && Object.keys(p.pcf as object).length > 0);
+  const visibleProjects = projects.filter((p) => {
+    // Hide example tiles when the user hid them, OR the tier has no example feature.
+    if (p.exampleType && ((hideExamples && hasExamples) || !hasAnyExampleFeature)) return false;
+    // Introductory tier: hide APQC-generated projects.
+    if (adminViewMode === "introductory" && isApqcProject(p)) return false;
+    return true;
+  });
   const toggleHideExamples = () => setHideExamples((v) => {
     const nv = !v;
     if (typeof window !== "undefined") window.localStorage.setItem("dgx_hide_examples", nv ? "1" : "0");
@@ -335,9 +353,6 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [simProject, setSimProject] = useState<{ id: string; name: string } | null>(null);
   // Project-level Process Mining — opened from a project's menu.
   const [miningProject, setMiningProject] = useState<{ id: string; name: string } | null>(null);
-  // SuperAdmin "presentation mode" — double-click the logo to hide SuperAdmin
-  // chrome and relabel the subscription tier to Expert. No-op for non-SuperAdmins.
-  const { mode: adminViewMode, hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(!!isSu);
   // The auto-collected "Support" project is SuperAdmin-only chrome: highlighted
   // red when shown, and hidden along with the rest of the SuperAdmin chrome when
   // the logo is double-clicked (presentation mode).
@@ -1499,7 +1514,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   <span className="text-xs opacity-70">→</span>
                 </>
               )}
-              <strong className="font-semibold">{superAdminHidden ? "Expert" : usageSnapshot.tier.name}</strong>
+              <strong className="font-semibold">{VIEW_MODE_TIER[adminViewMode] ?? usageSnapshot.tier.name}</strong>
               {usageSnapshot.comp && (
                 <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-purple-200 text-purple-800 font-medium">
                   comp · {Math.max(0, Math.ceil((new Date(usageSnapshot.comp.expiresAt).getTime() - Date.now()) / 86400000))}d

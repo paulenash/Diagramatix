@@ -87,6 +87,12 @@ interface Props {
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
   /** Project Risk & Control catalog items available to attach to a step. */
   riskCatalog?: RiskCatalogItem[];
+  /** Whether the Risk & Controls section is available (false hides it — e.g. a
+   *  SuperAdmin previewing a tier without the Risk & Controls feature). */
+  showRiskControls?: boolean;
+  /** Whether the Simulation section is available (false hides it — a tier without
+   *  the Simulator feature). */
+  showSimulation?: boolean;
   /** Create a new catalog Risk/Control from the diagram (undefined = not permitted). */
   onCreateRiskItem?: (kind: "Risk" | "Control", name: string) => Promise<RiskCatalogItem | null>;
   /** Controlled open state for the Risk & Controls section — owned by the editor
@@ -814,6 +820,8 @@ export function PropertiesPanel({
   onSetDiagramOwner,
   isAdmin: _isAdmin,
   riskCatalog,
+  showRiskControls,
+  showSimulation,
   onCreateRiskItem,
   rcSectionOpen,
   onRcSectionToggle,
@@ -3439,10 +3447,12 @@ export function PropertiesPanel({
         </div>
       </div>
     )}
-      {diagramType === "bpmn" && (
+      {diagramType === "bpmn" && showSimulation !== false && (
         <SimulationSection element={element} onUpdateProperties={onUpdateProperties} />
       )}
-      <RiskControlSection element={element} catalog={riskCatalog ?? []} onUpdateProperties={onUpdateProperties} onCreate={onCreateRiskItem} open={rcSectionOpen} onToggle={onRcSectionToggle} />
+      {showRiskControls !== false && (
+        <RiskControlSection element={element} catalog={riskCatalog ?? []} onUpdateProperties={onUpdateProperties} onCreate={onCreateRiskItem} open={rcSectionOpen} onToggle={onRcSectionToggle} />
+      )}
     </div>
   );
 }

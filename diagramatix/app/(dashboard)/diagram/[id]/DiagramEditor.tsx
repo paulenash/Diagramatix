@@ -46,7 +46,7 @@ import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { InfoDialog } from "@/app/components/InfoDialog";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
-import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
+import { useSuperAdminChrome, viewModeEntitlements } from "@/app/hooks/useSuperAdminChrome";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { AiPanel } from "./AiPanel";
 import { AiComparisonModal, type AiComparison } from "@/app/components/AiComparisonModal";
@@ -1246,9 +1246,14 @@ export function DiagramEditor({
 
   // Template state (BPMN only)
   const isAdmin = userEmail?.toLowerCase() === "paul@nashcc.com.au";
-  // SuperAdmin "presentation mode" — double-click the logo to hide the SuperAdmin
-  // chip + the SuperAdmin AI options. No-op for non-SuperAdmins.
-  const { hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(isAdmin);
+  // SuperAdmin "presentation mode" — double-click the logo to cycle view modes
+  // (superadmin → orgadmin → expert → professional → introductory). No-op for non-SuperAdmins.
+  const { mode: adminViewMode, hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(isAdmin);
+  // In a SuperAdmin tier-preview view, hide the tier's excluded features (Simulator
+  // / Risk & Controls) from the diagram's menus + panel. null → real access unchanged.
+  const viewEnt = viewModeEntitlements(adminViewMode);
+  const rcAllowed = viewEnt ? viewEnt.riskControl : true;
+  const simAllowed = viewEnt ? viewEnt.simulator : true;
   // Enterprise policy binds everyone EXCEPT an active (non-presenting) SuperAdmin.
   // So a SuperAdmin keeps AI; "Hide SuperAdmin" makes the org policy take effect
   // live (updates as the toggle flips — handy for demoing Org Settings).
@@ -3707,7 +3712,7 @@ export function DiagramEditor({
             </button>
             {clearMenuOpen && (
               <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50">
-                {supportsSimulator && (
+                {supportsSimulator && simAllowed && (
                   <button
                     onClick={() => { setClearMenuOpen(false); setShowSimulator(true); }}
                     className="w-full text-left px-3 py-2 text-xs text-green-700 hover:bg-green-50 font-mono tracking-wider"
@@ -3968,6 +3973,8 @@ export function DiagramEditor({
             onUpdateLabel={handleUpdateLabel}
             onUpdateProperties={updateProperties}
             riskCatalog={riskCatalog}
+            showRiskControls={rcAllowed}
+            showSimulation={simAllowed}
             onCreateRiskItem={riskLibraryId ? onCreateRiskItem : undefined}
             rcSectionOpen={rcSectionOpen}
             onRcSectionToggle={toggleRcSection}

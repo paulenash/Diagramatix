@@ -27,7 +27,7 @@ import { ProjectStructureSection } from "@/app/components/entityLists/ProjectStr
 import { RiskControlConsole } from "@/app/components/riskControls/RiskControlConsole";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
-import { useSuperAdminChrome } from "@/app/hooks/useSuperAdminChrome";
+import { useSuperAdminChrome, effectiveEntitlements } from "@/app/hooks/useSuperAdminChrome";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
@@ -383,14 +383,15 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
 
 export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft, entitlements }: Props) {
   const router = useRouter();
+  // SuperAdmin "presentation mode" — double-click the logo to cycle view modes
+  // (superadmin → orgadmin → expert → professional → introductory → back).
+  const { mode: adminViewMode, hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(!!isAdmin);
   // Per-tier feature access (SuperAdmin → all true). Absent → all-on so nothing
-  // is hidden by accident on a legacy/unseeded profile.
-  const ent = entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true };
+  // is hidden by accident on a legacy/unseeded profile. In a SuperAdmin tier-preview
+  // view, overlay that tier's feature set so the project menus gate accordingly.
+  const ent = effectiveEntitlements(adminViewMode, entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true });
   const aiAllowed = useAiAllowed(); // hide AI-generation entry points when the org disables AI
   const pcfColors = usePcfLevelColors();
-  // SuperAdmin "presentation mode" — double-click the logo to hide the SuperAdmin
-  // chip + the Org reassign dropdown. No-op for non-SuperAdmins.
-  const { hidden: superAdminHidden, toggle: toggleSuperAdminChrome } = useSuperAdminChrome(!!isAdmin);
   const [diagrams, setDiagrams] = useState(project.diagrams);
   const [projectName, setProjectName] = useState(project.name);
   // "Org Owner": the owning Org drives org-wide RCM numbering + the compliance

@@ -10,7 +10,9 @@ import { isSuperuser } from "@/app/lib/superuser";
 type Session = Parameters<typeof tryGetCurrentOrgId>[0];
 
 /** Cookie mirroring the SuperAdmin view mode (see app/hooks/useSuperAdminChrome.ts):
- *  "superadmin" | "orgadmin" | "user". Lets the server apply policy as the mode dictates. */
+ *  "superadmin" | "orgadmin" | "expert" | "professional" | "introductory". Lets the
+ *  server apply policy as the mode dictates. Any value other than "superadmin"
+ *  (or absent) is a demo view where the org policy applies. */
 export const SA_MODE_COOKIE = "dgx_sa_mode";
 
 /**
@@ -23,7 +25,7 @@ export const SA_MODE_COOKIE = "dgx_sa_mode";
 async function policyBindsCaller(session: Session): Promise<boolean> {
   if (!isSuperuser(session ?? null)) return true;
   const mode = (await cookies()).get(SA_MODE_COOKIE)?.value;
-  return mode === "orgadmin" || mode === "user"; // absent/"superadmin" → bypass
+  return mode != null && mode !== "superadmin"; // absent/"superadmin" → bypass; any demo view → applies
 }
 
 /**
@@ -37,7 +39,7 @@ async function policyBindsCaller(session: Session): Promise<boolean> {
 export async function isActingSuperuser(session: Session): Promise<boolean> {
   if (!isSuperuser(session ?? null)) return false;
   const mode = (await cookies()).get(SA_MODE_COOKIE)?.value;
-  return mode !== "orgadmin" && mode !== "user";
+  return mode == null || mode === "superadmin"; // any demo view (orgadmin / tier) → not acting superuser
 }
 
 export type OrgPolicyKey =
