@@ -3262,7 +3262,12 @@ export function SymbolRenderer({
           is active. EPs reuse the same pool mechanic per user spec
           ("Pools have to move their boundaries to Expanded Subprocesses"),
           giving consistent edge-hover-resize UX across both. */}
-      {(element.type === "pool" || element.type === "subprocess-expanded" || element.type === "process-group") && onResizeDragStart && (() => {
+      {(element.type === "pool" || element.type === "subprocess-expanded" || element.type === "process-group"
+        // Text annotations (incl. the AI-Prompt annotation) also resize by
+        // grabbing any edge — not just the small corner handles. Gated on
+        // selection so an unselected annotation still drags/moves freely.
+        || (element.type === "text-annotation" && selected && !multiSelected))
+        && onResizeDragStart && (() => {
         const HANDLE_W = 10;
         const horizontalGripLen = Math.min(40, element.height * 0.5); // E/W grips
         const verticalGripLen   = Math.min(40, element.width  * 0.5); // N/S grips

@@ -2775,6 +2775,21 @@ export function DiagramEditor({
           {version ? <span className="text-[10px] text-gray-900">v{SCHEMA_VERSION}.{version}</span> : null}
         </div>
 
+        {/* New Diagram — mirrors the Project screen's blue primary button. Opens the
+            project's New Diagram dialog (via ?new=1), honouring unsaved changes first. */}
+        {projectId && !readOnly && (
+          <button
+            onClick={async () => {
+              if ((await confirmSaveBeforeLeave()) === "cancel") return;
+              router.push(`/dashboard/projects/${projectId}?new=1`);
+            }}
+            className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
+            title="Create a new diagram in this project"
+          >
+            + New Diagram
+          </button>
+        )}
+
         <div className="flex-1" />
 
         {/* SuperAdmin shortcut — leftmost item in the header menu cluster,

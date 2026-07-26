@@ -448,6 +448,18 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   }
 
   const [showNewDiagram, setShowNewDiagram] = useState(false);
+  // Opened from the diagram editor's "+ New Diagram" button (?new=1): auto-open
+  // the New Diagram dialog, then strip the param so a refresh/Back doesn't re-open it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") === "1") {
+      setShowNewDiagram(true);
+      params.delete("new");
+      const qs = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    }
+  }, []);
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string; message: string; onConfirm: () => void;
   } | null>(null);
