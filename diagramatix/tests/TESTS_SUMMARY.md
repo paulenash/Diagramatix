@@ -1014,6 +1014,14 @@ Extracting an ArchiMate shape from a container is a plain click-and-drag (no Shi
 | T1026 | Plain drag of a child OUT of an archimate container clears parentId | Shape stays stuck inside its container unless you hold Shift | If extraction ever required a modifier again |
 | T1027 | Full cycle: plain drag IN adopts (container flag + child renders on top), plain drag OUT extracts | Dropped-in shape not adopted, or child hidden behind container so it can't be grabbed | If adoption/z-order/severing regressed |
 
+### `tests/diagram/archimate-generation-sizing.test.ts` — Rule A4.09 (generated boxes contain their name)
+
+An AI-generated ArchiMate box is sized to contain its wrapped name at the DEFAULT aspect ratio (128×76) — geometric rule enforced in `genericLayout` boxSize, not the prompt.
+
+| # | What it checks | User-visible bug it prevents | Fails when |
+|---|---|---|---|
+| T1040 | Short name → default aspect ratio + footprint; long name → box grows (aspect ratio held) so the wrapped name fits inside with nothing spilling sideways | A long-named generated ArchiMate element with text overflowing its outline, or wildly non-uniform box shapes | If boxSize stopped enforcing the default aspect ratio or the contain-the-text sizing (A4.09) |
+
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 
 Which key + endpoint a model's provider uses. Pure (reads env, no network), so it pins the routing that decides where a prompt egresses.

@@ -5,6 +5,7 @@
 
 import type { DiagramData, DiagramElement, Connector, Point, Side } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
+import { wrapText, AVG_CHAR_W_FACTOR } from "./textMetrics";
 import { computeWaypoints, spreadUmlEndpoints, deconflictUmlSegments, selfLoopWaypoints, SELF_LOOP_BULGE } from "./routing";
 import { sizeUmlNote } from "./umlAutoSize";
 import { parseConstraintText, parseEndRole } from "./umlConstraints";
@@ -954,16 +955,30 @@ function layoutArchimateDiagram(
   // width so long names wrap to extra lines, and honours explicit \n breaks
   // (e.g. the A4.08 number line). The glyph sits in the top-right corner, so
   // there is no fixed square footprint.
-  const PX_PER_CHAR = 8; // ~14px font
+  // Rule A4.09 — a generated ArchiMate box is sized to CONTAIN its wrapped name
+  // at the DEFAULT aspect ratio (128×76, matching the manual palette default), so
+  // generated shapes stay uniform and no text ever spills outside the outline.
+  // The name is wrapped with the SAME wrapText + interior padding the renderer
+  // uses (ARCHI_LABEL_PAD = 16, 12px font), then the box grows the deficient
+  // dimension only — it can never shrink below what the text needs.
+  const A409_DEFAULT_W = 128, A409_DEFAULT_H = 76;
+  const A409_ASPECT = A409_DEFAULT_W / A409_DEFAULT_H;
+  const A409_PAD_X = 16;          // must match SymbolRenderer's ARCHI_LABEL_PAD
+  const A409_FONT = 12, A409_LINE_H = 16, A409_PAD_Y = 16;
   function boxSize(label: string): { w: number; h: number } {
-    const segments = (label || "").split("\n");
-    const longest = Math.max(4, ...segments.map(s => s.length));
-    const w = Math.min(220, Math.max(140, longest * PX_PER_CHAR + 24));
-    const charsPerLine = Math.max(8, Math.floor((w - 20) / PX_PER_CHAR));
-    let lines = 0;
-    for (const s of segments) lines += Math.max(1, Math.ceil(Math.max(1, s.length) / charsPerLine));
-    lines = Math.min(4, Math.max(1, lines));
-    return { w, h: Math.max(56, lines * 20 + 20) };
+    const text = label || "";
+    let lines = wrapText(text, A409_DEFAULT_W - A409_PAD_X, A409_FONT);
+    // A single word wider than the default interior forces a wider box; re-wrap
+    // there so the line count reflects the real interior width.
+    const longestPx = Math.max(0, ...lines.map(l => l.length * A409_FONT * AVG_CHAR_W_FACTOR));
+    let baseW = Math.max(A409_DEFAULT_W, Math.ceil(longestPx) + A409_PAD_X);
+    if (baseW > A409_DEFAULT_W) lines = wrapText(text, baseW - A409_PAD_X, A409_FONT);
+    const baseH = Math.max(A409_DEFAULT_H, lines.length * A409_LINE_H + A409_PAD_Y);
+    // Enforce the default aspect ratio by growing the deficient dimension only.
+    let w = baseW, h = baseH;
+    if (w / h < A409_ASPECT) w = h * A409_ASPECT;
+    else h = w / A409_ASPECT;
+    return { w: Math.round(w), h: Math.round(h) };
   }
 
   type Placed = { ai: NonNullable<AiParsed["elements"]>[number]; shapeKey: string; iconOnly: boolean; label: string; w: number; h: number; cx: number };

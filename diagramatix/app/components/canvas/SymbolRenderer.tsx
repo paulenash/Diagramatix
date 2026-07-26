@@ -142,6 +142,9 @@ function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): s
 const CONNECTION_POINT_SIDES: Side[] = ["top", "right", "bottom", "left"];
 
 const HEADER_H = 28;
+// Horizontal padding subtracted from an ArchiMate box's width when wrapping its
+// name, so the text sits clear of the outline (and the top-right corner glyph).
+const ARCHI_LABEL_PAD = 16;
 
 function getConnectionPointPos(
   el: DiagramElement,
@@ -3070,11 +3073,17 @@ export function SymbolRenderer({
         // standard near-black.
         const chevronFill = isChevron ? (element.properties.fillColor as string | undefined) : undefined;
         const labelFill = chevronFill ? readableTextOn(chevronFill) : "#111827";
-        const labelLines = (element.label ?? "").split('\n');
         // The Value Chain element (process-group) name has its own configurable
         // font size (default 16); already display-mode-scaled by its provider.
         const fSize = element.type === 'process-group' ? valueChainFontSize : fs(isActorOrTeam ? 11 : 12);
         const lineH = fSize * 1.3;
+        // ArchiMate boxed shapes auto-wrap the name to the element interior — so a
+        // long name flows onto multiple lines inside the box and RE-wraps when the
+        // box is resized (same behaviour as a BPMN task). Icon-only Actor is the
+        // exception: it renders its label via the external-label branch above.
+        const labelLines = isArchi
+          ? wrapText(element.label ?? "", Math.max(24, element.width - ARCHI_LABEL_PAD), fSize)
+          : (element.label ?? "").split('\n');
         if ((isChevron || isArchi) && labelLines.length > 1) {
           // For ArchiMate the labelInfo anchor is either the centre of
           // the box (leaf) or the header strip (container) or the figure
