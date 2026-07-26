@@ -31,11 +31,15 @@ export function PromptMaintenance() {
   const searchParams = useSearchParams();
   const rawFrom = searchParams.get("from");
   const backHref = rawFrom && rawFrom.startsWith("/") && !rawFrom.startsWith("//") ? rawFrom : "/dashboard";
+  // Label the back link by where the user actually came from — including a Diagram
+  // (the "Generated from: <prompt>" link on a diagram passes ?from=/diagram/<id>).
   const backLabel = backHref === "/dashboard/admin"
     ? "SuperAdmin"
     : backHref === "/dashboard/org-admin"
       ? "OrgAdmin"
-      : "Dashboard";
+      : backHref.startsWith("/diagram/")
+        ? "Diagram"
+        : "Dashboard";
 
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);

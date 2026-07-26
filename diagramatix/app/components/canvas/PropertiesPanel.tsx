@@ -1027,10 +1027,11 @@ export function PropertiesPanel({
               <span className="text-[9px] text-gray-500 w-12 shrink-0 pt-0.5">AI Prompt</span>
               <div className="flex-1 min-w-0">
                 <a
-                  href={`/dashboard/prompts?promptId=${encodeURIComponent(aiGeneration.promptId)}`}
-                  target="_blank" rel="noopener noreferrer"
+                  href={`/dashboard/prompts?promptId=${encodeURIComponent(aiGeneration.promptId)}${
+                    currentDiagramId ? `&from=${encodeURIComponent(`/diagram/${currentDiagramId}`)}` : ""
+                  }`}
                   className="text-[9px] text-blue-600 hover:underline truncate block"
-                  title={`Open the current version of "${aiGeneration.promptName}" in AI Prompt Maintenance`}
+                  title={`Open the current version of "${aiGeneration.promptName}" in AI Prompt Maintenance (returns here)`}
                 >
                   {aiGeneration.promptName}
                 </a>

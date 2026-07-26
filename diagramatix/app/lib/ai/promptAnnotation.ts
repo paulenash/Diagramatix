@@ -10,6 +10,7 @@
  * and prepends a fresh one on each generation, so regeneration overwrites in place.
  */
 import type { DiagramElement } from "@/app/lib/diagram/types";
+import { wrapText } from "@/app/lib/diagram/textMetrics";
 
 /** Stable id so regeneration can find + overwrite the annotation. */
 export const AI_PROMPT_ANNOTATION_ID = "__ai_prompt_annotation";
@@ -24,8 +25,11 @@ const PROMPT_ANNOTATION_IDS = new Set([
 
 const ANNOTATION_WIDTH = 320;
 const GAP = 40; // px between the annotation's right edge and the diagram's left edge
-const LINE_H = 16;
-const PAD = 12;
+// Mirror SymbolRenderer's text-annotation render EXACTLY so the box fits the text:
+// it wraps to (width - PAD - 4) at 14px lines, 12px font, centred vertically.
+const RENDER_PAD = 10;
+const LINE_H = 14;
+const V_PAD = 12; // extra px above + below the text so the box sits OUTSIDE it
 
 /**
  * Format a Date as `dd-mm-yyyy h:mm am|pm` in LOCAL time — e.g. `16-07-2026 1:35 pm`.
@@ -81,13 +85,12 @@ export function promptHeading(name: string, generatedAt: string | Date): string 
 
 /** Rough box height for the wrapped label — enough to show heading + body without
  *  guessing the renderer's exact wrap, capped so a huge prompt doesn't dominate. */
-function estimateHeight(label: string): number {
-  const charsPerLine = Math.max(8, Math.floor((ANNOTATION_WIDTH - PAD * 2) / 6.6));
-  let lines = 0;
-  for (const raw of label.split("\n")) {
-    lines += raw.length === 0 ? 1 : Math.ceil(raw.length / charsPerLine);
-  }
-  return Math.min(600, Math.max(70, lines * LINE_H + PAD * 2));
+/** Box height that fully contains the wrapped label — using the SAME wrapText the
+ *  renderer uses (same width + font), so the box always sits OUTSIDE the text. No
+ *  cap: the whole prompt is shown, however long. */
+function boxHeight(label: string): number {
+  const lines = wrapText(label, ANNOTATION_WIDTH - RENDER_PAD - 4, 12);
+  return Math.max(70, lines.length * LINE_H + V_PAD * 2);
 }
 
 export interface PromptAnnotationInput {
@@ -107,7 +110,7 @@ export function buildPromptAnnotation(
   bbox: ContentBBox | null,
 ): DiagramElement {
   const label = `${promptHeading(input.name, input.generatedAt)}\n\n${input.text}`;
-  const height = estimateHeight(label);
+  const height = boxHeight(label);
   const x = bbox ? bbox.minX - ANNOTATION_WIDTH - GAP : 0;
   const y = bbox ? bbox.midY - height / 2 : 0;
   return {

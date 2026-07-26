@@ -4023,14 +4023,18 @@ export function DiagramEditor({
             diagramType={diagramType}
             pcf={data.pcf}
             onApplyDiagram={(aiData: DiagramData, meta?: AiApplyMeta) => { void applyAiResult(aiData, meta); }}
-            onAddToDiagram={(elements, connectors) => {
-              applyTemplate(elements, connectors);
-            }}
             initialPrompt={aiPrefill?.prompt}
             initialModel={aiPrefill?.model}
             onPrefillConsumed={() => setAiPrefill(null)}
             aiModels={aiModels}
             currentAiModelId={currentAiModel?.id}
+            noObstacleAvoidance={noObstacleAvoidance}
+            onNoObstacleAvoidanceChange={(on) => {
+              setNoObstacleAvoidanceState(on);
+              setNoObstacleAvoidance(on);
+              if (typeof window !== "undefined") localStorage.setItem(`noObstacles-${diagramId}`, on ? "true" : "false");
+              rerouteAll();
+            }}
             onClose={() => { setShowAiPanel(false); setAiPrefill(null); }}
             onGeneratingChange={setAiPanelGenerating}
             isAdmin={isAdmin}
@@ -5084,15 +5088,6 @@ export function DiagramEditor({
             if (typeof window !== "undefined") {
               localStorage.setItem(`debug-${projectId}`, on ? "true" : "false");
             }
-          }}
-          noObstacleAvoidance={noObstacleAvoidance}
-          onNoObstacleAvoidanceChange={(on) => {
-            setNoObstacleAvoidanceState(on);
-            setNoObstacleAvoidance(on);
-            if (typeof window !== "undefined") {
-              localStorage.setItem(`noObstacles-${diagramId}`, on ? "true" : "false");
-            }
-            rerouteAll(); // re-route every connector under the new flag
           }}
           showValueDisplay={showValueDisplay}
           onShowValueDisplayChange={(on) => {

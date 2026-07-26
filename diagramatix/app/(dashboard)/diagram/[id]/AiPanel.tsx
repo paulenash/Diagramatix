@@ -28,7 +28,6 @@ interface SavedPrompt { id: string; name: string; text: string; }
 interface Props {
   diagramType: string;
   onApplyDiagram: (data: DiagramData, meta?: AiApplyMeta) => void;
-  onAddToDiagram: (elements: DiagramElement[], connectors: Connector[]) => void;
   onClose: () => void;
   /** Regenerate prefill — seed the prompt textarea + model on open, then call
    *  onPrefillConsumed so it's applied once. */
@@ -38,6 +37,10 @@ interface Props {
   /** Cost-gated generate models the user may pick + the current default id. */
   aiModels?: AllowedModel[];
   currentAiModelId?: string;
+  /** ArchiMate only — "No Obstacle Avoidance" routing option, surfaced here so any
+   *  user can turn it on before generating a large/complex ArchiMate diagram. */
+  noObstacleAvoidance?: boolean;
+  onNoObstacleAvoidanceChange?: (on: boolean) => void;
   /** Reports the panel's `generating` state to the parent so a
    *  full-canvas overlay can be rendered while Sonnet runs. */
   onGeneratingChange?: (generating: boolean) => void;
@@ -73,10 +76,11 @@ interface Props {
 }
 
 export function AiPanel({
-  diagramType, onApplyDiagram, onAddToDiagram, onClose, onGeneratingChange,
+  diagramType, onApplyDiagram, onClose, onGeneratingChange,
   isAdmin, currentElements, currentConnectors, onNarrativeGeneratingChange,
   onAudioPhaseChange, aiFeedback, onAiFeedback, diagramId, onComparison, pcf,
   initialPrompt, initialModel, onPrefillConsumed, aiModels = [], currentAiModelId,
+  noObstacleAvoidance, onNoObstacleAvoidanceChange,
 }: Props) {
   const { data: authSession } = useSession();
   const aiColor = tonesFor(useFeatureColors(), "ai").text;
@@ -108,7 +112,6 @@ export function AiPanel({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [audioPhase, setAudioPhase] = useState<null | "transcribing" | "reading" | "tidying">(null);
-  const [mode, setMode] = useState<"replace" | "add">("replace");
 
   // Saved prompts
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
@@ -357,9 +360,7 @@ export function AiPanel({
         result.connectionCount = diagramData.connectors.length;
         setStatus(`Generated ${result.elementCount} elements, ${result.connectionCount} connections`);
       }
-      if (mode === "add") {
-        onAddToDiagram(result.diagramData.elements, result.diagramData.connectors);
-      } else {
+      {
         const sel = editingPromptId ? savedPrompts.find((p) => p.id === editingPromptId) : undefined;
         onApplyDiagram(result.diagramData, {
           promptText: effPrompt,
@@ -621,17 +622,6 @@ export function AiPanel({
           <AttachmentPreviewDialog attachment={attachment} onClose={() => setShowAttachPreview(false)} />
         )}
 
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1 text-[10px] text-gray-600">
-            <input type="radio" name="mode" checked={mode === "replace"} onChange={() => setMode("replace")} className="w-3 h-3" />
-            Replace
-          </label>
-          <label className="flex items-center gap-1 text-[10px] text-gray-600">
-            <input type="radio" name="mode" checked={mode === "add"} onChange={() => setMode("add")} className="w-3 h-3" />
-            Add to diagram
-          </label>
-        </div>
-
         {/* Throbber banner while generating — same on-brand
             DiagramatixThrobber the BPMN PlanPanel uses, for visual
             consistency across every AI Generation flow. */}
@@ -688,6 +678,22 @@ export function AiPanel({
             <span className="shrink-0">AI Model</span>
             <ModelSelect value={model} onChange={setModel} models={aiModels} disabled={generating}
               className="flex-1 text-[11px] border border-gray-300 rounded px-2 py-1 bg-white disabled:opacity-50" />
+          </div>
+        )}
+
+        {/* ArchiMate — "No Obstacle Avoidance" routing option (any user). */}
+        {diagramType === "archimate" && onNoObstacleAvoidanceChange && (
+          <div className="rounded border border-gray-200 bg-gray-50 px-2 py-1.5">
+            <label className="flex items-center gap-1.5 text-[11px] text-gray-700 cursor-pointer">
+              <input type="checkbox" className="w-3 h-3"
+                checked={noObstacleAvoidance ?? false}
+                onChange={(e) => onNoObstacleAvoidanceChange(e.target.checked)} />
+              No Obstacle Avoidance
+            </label>
+            <p className="text-[9px] text-gray-500 mt-0.5">
+              Best to turn this on when generating larger, complicated ArchiMate diagrams.
+              Small, simple diagrams don&apos;t need it on.
+            </p>
           </div>
         )}
 

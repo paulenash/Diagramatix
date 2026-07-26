@@ -15,10 +15,6 @@ interface Props {
   onDisplayModeChange: (mode: DisplayMode) => void;
   debugMode?: boolean;
   onDebugModeChange?: (on: boolean) => void;
-  /** SuperAdmin experiment: route all connectors as plain rectilinear (no
-   *  obstacle avoidance). Same admin gating as Debug Mode. */
-  noObstacleAvoidance?: boolean;
-  onNoObstacleAvoidanceChange?: (on: boolean) => void;
   /** When false, the Debug Mode toggle is hidden entirely. Restricted to
    *  admin users — the toggle reveals diagnostic internals (element ids,
    *  connector waypoints, etc.) that aren't useful for normal authors. */
@@ -70,8 +66,6 @@ export function DiagramColorModal({
   onDisplayModeChange,
   debugMode,
   onDebugModeChange,
-  noObstacleAvoidance,
-  onNoObstacleAvoidanceChange,
   isAdmin,
   showValueDisplay,
   onShowValueDisplayChange,
@@ -195,7 +189,12 @@ export function DiagramColorModal({
           </button>
         </div>
 
-        {/* 2. Colours header + actions */}
+        {/* 2 + 2b. Colours header + per-symbol rows. HIDDEN for ArchiMate: those
+            shapes render from the per-category themes + per-element overrides (set
+            via the Properties panel), NOT this diagram colorConfig — so the pickers
+            here did nothing for ArchiMate. */}
+        {diagramType !== "archimate" && (
+        <>
         <div className="flex items-center gap-2 px-5 py-1.5 border-b border-gray-200 flex-shrink-0">
           <span className="text-xs font-medium text-gray-700 flex-1">Colours</span>
           <button onClick={handleBlackAndWhite}
@@ -208,7 +207,6 @@ export function DiagramColorModal({
           </button>
         </div>
 
-        {/* 2b. Symbol colour rows */}
         <div className="flex-1 overflow-y-auto px-5 py-1.5 space-y-1">
           {symbols.map((symbolType) => {
             const def = getSymbolDefinition(symbolType);
@@ -233,6 +231,8 @@ export function DiagramColorModal({
             );
           })}
         </div>
+        </>
+        )}
 
         {/* 3. Font Sizes \u2014 every diagram type defines its own list of
             controls so labels match the element vocabulary the user
@@ -304,21 +304,7 @@ export function DiagramColorModal({
           </div>
         )}
 
-        {/* 4b. No Obstacle Avoidance — SuperAdmin experiment. Same effective
-            admin gating as Debug Mode (hidden in a lower view mode); routes all
-            connectors as plain rectilinear. Red to mark it privileged. */}
-        {onNoObstacleAvoidanceChange && isAdmin && (
-          <div className="flex items-center justify-between px-5 py-1.5 border-t border-gray-200 flex-shrink-0">
-            <span className="text-xs font-medium text-red-700" title="Experiment: route every connector as a plain rectilinear L/Z path, ignoring element obstacles.">
-              No Obstacle Avoidance
-            </span>
-            <label className="flex items-center cursor-pointer">
-              <input type="checkbox" checked={noObstacleAvoidance ?? false}
-                onChange={(e) => onNoObstacleAvoidanceChange(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-red-600 focus:ring-red-500" />
-            </label>
-          </div>
-        )}
+        {/* No Obstacle Avoidance moved to the ArchiMate AI Generate panel (any user). */}
 
         {/* 5. Value Display — BPMN-only (value-per-task overlays don't
             apply to other diagram types). */}

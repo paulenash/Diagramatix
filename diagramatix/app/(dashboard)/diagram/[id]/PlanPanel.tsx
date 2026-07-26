@@ -122,10 +122,10 @@ export function PlanPanel({
   const { hidden: superAdminHidden } = useSuperAdminChrome(isSuperuser || !!isAdmin);
   const [comparing, setComparing] = useState(false);
   const [compareStatus, setCompareStatus] = useState<string | null>(null);
-  // EXPERIMENTAL SuperAdmin-only connector scheme for AI generation (per run).
-  // Sent as `layoutMode` on Apply-Layout + Compare; the server honours "test"
-  // only for a SuperAdmin session, so normal users are never affected.
-  const [layoutMode, setLayoutMode] = useState<"normal" | "test">("normal");
+  // Connector routing is always the standard ("normal") scheme now — the old
+  // Normal/Test experiment toggle was removed. Kept as a const so the request
+  // bodies below (and the server, which only honoured "test") stay unchanged.
+  const layoutMode = "normal" as const;
   // SuperAdmin model comparison — the models offered (Claude + Kimi + custom) and
   // which are ticked. Loaded once when the compare section is visible; defaults to
   // all ticked. The compare run uses exactly the ticked subset.
@@ -987,23 +987,6 @@ export function PlanPanel({
           )}
           {isSuperuser && !superAdminHidden && diagramType === "bpmn" && (
             <div className="mt-1 shrink-0">
-              {/* EXPERIMENTAL connector scheme (SuperAdmin, per run). Governs both
-                  Plan → Apply Layout and Compare below; normal users never see it
-                  and always get Normal. */}
-              <div className="mb-1 border border-amber-200 bg-amber-50/60 rounded p-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] uppercase tracking-wide text-amber-700">Connector layout · experimental</span>
-                  <div className="inline-flex rounded border border-amber-300 overflow-hidden">
-                    <button type="button" onClick={() => setLayoutMode("normal")}
-                      className={`px-2 py-0.5 text-[10px] ${layoutMode === "normal" ? "bg-amber-600 text-white" : "text-amber-700 hover:bg-amber-100"}`}>Normal</button>
-                    <button type="button" onClick={() => setLayoutMode("test")}
-                      className={`px-2 py-0.5 text-[10px] border-l border-amber-300 ${layoutMode === "test" ? "bg-amber-600 text-white" : "text-amber-700 hover:bg-amber-100"}`}>Test</button>
-                  </div>
-                </div>
-                {layoutMode === "test" && (
-                  <p className="text-[9px] text-amber-700 mt-0.5">Experimental C1/C2 connector rules — applies to your Plan → Apply Layout and Compare. Normal users unaffected.</p>
-                )}
-              </div>
               {/* Tick the models to run head-to-head (Claude + Kimi + custom). */}
               {availModels.length > 0 && (
                 <div className="mb-1 border border-gray-200 rounded p-1.5">
