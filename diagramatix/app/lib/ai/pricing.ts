@@ -43,8 +43,12 @@ export const PRICING: Record<string, ModelPrice> = {
   // a gateway (e.g. LiteLLM in front of Vertex) may rate these differently.
   "gemini-2.5-pro": { in: 1.25, out: 10, note: "≤200k context; higher above" },
   "gemini-2.5-flash": { in: 0.3, out: 2.5 },
-  // Microsoft — Azure OpenAI (GPT / o-series) + Microsoft's Phi. Azure list pricing;
-  // verify against your region/deployment (Azure bills you directly).
+  // Microsoft — Azure OpenAI (GPT / o-series) + Microsoft's Phi. Azure bills you
+  // directly, so these only drive the cost-gate/bars — editable in the rate catalog.
+  // gpt-5-mini / gpt-5.4-mini are the deployed models (dgx-openai); estimates —
+  // verify against your Azure region pricing.
+  "gpt-5-mini": { in: 0.25, out: 2 },
+  "gpt-5.4-mini": { in: 0.25, out: 2 },
   "gpt-4o": { in: 2.5, out: 10 },
   "gpt-4o-mini": { in: 0.15, out: 0.6 },
   "phi-4": { in: 0.125, out: 0.5 },

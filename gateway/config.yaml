@@ -16,30 +16,31 @@ model_list:
       model: gemini/gemini-2.5-flash
       api_key: os.environ/GEMINI_API_KEY
 
-  # ── Microsoft — Azure OpenAI (GPT / o-series) ──────────────────────────────
-  # Replace <...deployment> with YOUR Azure OpenAI deployment names, and set
-  # AZURE_OPENAI_API_BASE / AZURE_OPENAI_API_KEY in the gateway. api_version tracks
-  # the Azure OpenAI REST version you deployed against.
-  - model_name: gpt-4o
+  # ── Microsoft — Azure OpenAI (dgx-openai, East US) ─────────────────────────
+  # `azure/<deployment-name>` = the deployment names created in dgx-openai. Set
+  # AZURE_OPENAI_API_BASE + AZURE_OPENAI_API_KEY in the gateway. api_version is left
+  # to LiteLLM's default (recent); if a model errors on api_version, pin a newer
+  # one here (the error message lists the valid values) and rebuild.
+  - model_name: gpt-5-mini
     litellm_params:
-      model: azure/gpt-4o-deployment
+      model: azure/gpt-5-mini
       api_base: os.environ/AZURE_OPENAI_API_BASE
       api_key: os.environ/AZURE_OPENAI_API_KEY
-      api_version: "2024-10-21"
-  - model_name: gpt-4o-mini
+  - model_name: gpt-5.4-mini
     litellm_params:
-      model: azure/gpt-4o-mini-deployment
+      model: azure/gpt-5.4-mini
       api_base: os.environ/AZURE_OPENAI_API_BASE
       api_key: os.environ/AZURE_OPENAI_API_KEY
-      api_version: "2024-10-21"
 
-  # ── Microsoft — Phi (Azure AI Foundry serverless) ──────────────────────────
-  # Phi uses the azure_ai provider + its own Foundry endpoint/key.
-  - model_name: phi-4
-    litellm_params:
-      model: azure_ai/phi-4
-      api_base: os.environ/AZURE_PHI_API_BASE
-      api_key: os.environ/AZURE_PHI_API_KEY
+  # ── Microsoft — Phi (Azure AI Foundry serverless) — NOT YET DEPLOYED ────────
+  # Phi is an AIServices-kind model, so it can't live in the OpenAI-kind
+  # dgx-openai resource. Deploy Phi-4 as a Foundry serverless endpoint (its own
+  # target URI + key → AZURE_PHI_API_BASE / AZURE_PHI_API_KEY), then uncomment:
+  # - model_name: phi-4
+  #   litellm_params:
+  #     model: azure_ai/Phi-4
+  #     api_base: os.environ/AZURE_PHI_API_BASE
+  #     api_key: os.environ/AZURE_PHI_API_KEY
 
 general_settings:
   # Every request must present  Authorization: Bearer <LITELLM_MASTER_KEY>.
