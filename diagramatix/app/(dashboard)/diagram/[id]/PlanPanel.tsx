@@ -127,21 +127,18 @@ export function PlanPanel({
   // bodies below (and the server, which only honoured "test") stay unchanged.
   const layoutMode = "normal" as const;
   // SuperAdmin model comparison — the models offered (Claude + Kimi + custom) and
-  // which are ticked. Loaded once when the compare section is visible; defaults to
-  // all ticked. The compare run uses exactly the ticked subset.
-  // Seed from the built-in Claude models so the checkbox list + a non-empty
-  // selection exist on FIRST render — the button's `pickedModels.size` gate would
-  // otherwise stay hard-disabled ("can't be used") until the async fetch below
-  // lands. The fetch then replaces this with the full list (Claude + Kimi).
+  // which are ticked. Loaded once when the compare section is visible. Defaults to
+  // NONE ticked — the SuperAdmin explicitly picks the models to compare (the run
+  // button stays disabled until at least one is chosen). `availModels` still seeds
+  // from the built-in Claude list so the checkbox rows render before the fetch lands.
   const [availModels, setAvailModels] = useState<AiModel[]>(AI_MODELS);
-  const [pickedModels, setPickedModels] = useState<Set<string>>(new Set(AI_MODELS.map((m) => m.id)));
+  const [pickedModels, setPickedModels] = useState<Set<string>>(new Set<string>());
   useEffect(() => {
     if (!isSuperuser || superAdminHidden || diagramType !== "bpmn") return;
     let on = true;
     fetch("/api/admin/ai-model").then((r) => (r.ok ? r.json() : null)).then((j) => {
       if (on && Array.isArray(j?.models)) {
         setAvailModels(j.models);
-        setPickedModels(new Set(j.models.map((m: AiModel) => m.id)));
       }
     }).catch(() => {});
     return () => { on = false; };

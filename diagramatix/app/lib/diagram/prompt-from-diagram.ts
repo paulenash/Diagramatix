@@ -1,4 +1,6 @@
-import type { Connector, DiagramElement, DiagramType } from "./types";
+import type { ArchimateConnectorType, Connector, DiagramElement, DiagramType } from "./types";
+import { findShapeByKey } from "@/app/lib/archimate/catalogue";
+import { ARCHI_REL_NAME } from "./archimateConnectorStyle";
 
 /**
  * Router: picks the per-diagram-type prompt generator. Falls back to the
@@ -12,7 +14,132 @@ export function buildPromptFromDiagram(
   if (diagramType === "context" || diagramType === "basic") {
     return buildContextPrompt(elements, connectors);
   }
+  if (diagramType === "archimate") {
+    return buildArchimatePrompt(elements, connectors);
+  }
   return buildBpmnPrompt(elements, connectors);
+}
+
+/** Plain-English meaning of each ArchiMate relationship, so the description (and
+ *  the Staff Narrative built from it) can explain what the connector represents,
+ *  not just name it. Keyed by the connector's ArchimateConnectorType. */
+const ARCHI_REL_MEANING: Record<ArchimateConnectorType, string> = {
+  "archi-composition": "the source is composed of the target — a whole–part link where the part belongs to, and cannot exist without, the whole",
+  "archi-aggregation": "the source aggregates the target — a whole–part link where the part can also exist on its own",
+  "archi-assignment": "the source is assigned to the target — an active element performs, or is allocated to, that behaviour / node",
+  "archi-realisation": "the source realises the target — it provides a concrete implementation of a more abstract element",
+  "archi-serving": "the source serves the target — it provides a service or functionality that the target uses",
+  "archi-access": "the source accesses the target — behaviour reads from and/or writes to that data / object",
+  "archi-influence": "the source influences the target — it affects the achievement of that (usually motivational) element",
+  "archi-association": "the source is associated with the target — an unspecified structural relationship",
+  "archi-association-directed": "the source is associated with the target, directed towards it",
+  "archi-triggering": "the source triggers the target — a temporal / causal flow that passes control on",
+  "archi-flow": "value or information flows from the source to the target",
+  "archi-specialisation": "the source is a specialisation (a more specific kind) of the target",
+};
+
+/**
+ * Reverse-engineer an ArchiMate diagram into a STRUCTURAL description prompt.
+ * ArchiMate models are structural, so this focuses on (1) every element with its
+ * ArchiMate type and layer, (2) what each container holds, and (3) every
+ * relationship with what it represents — the material a human (or the Staff
+ * Narrative generator) needs to talk through the model. Re-feedable into the
+ * ArchiMate AI generator.
+ */
+export function buildArchimatePrompt(elements: DiagramElement[], connectors: Connector[]): string {
+  const byId = new Map(elements.map((e) => [e.id, e]));
+  const labelOf = (e: DiagramElement | undefined): string =>
+    e ? (e.label?.trim() || "<unnamed>") : "<missing>";
+
+  // Real ArchiMate nodes (skip on-canvas notes like the AI-prompt annotation).
+  const nodes = elements.filter((e) => e.type === "archimate-shape");
+
+  // Resolve an element's ArchiMate type name + layer from the shape catalogue,
+  // falling back to a humanised shapeKey when the catalogue isn't loaded.
+  const kindOf = (e: DiagramElement): { typeName: string; layer: string } => {
+    const key = e.properties?.shapeKey as string | undefined;
+    const entry = key ? findShapeByKey(key) : undefined;
+    return {
+      typeName: entry?.name ?? (key ? cap(key) : "Element"),
+      layer: entry?.category ? cap(entry.category) : "Other",
+    };
+  };
+
+  const lines: string[] = [];
+  lines.push("# ArchiMate Model");
+  lines.push("");
+  lines.push("This is a structural model. Below are the elements (by layer), what each container holds, and every relationship with its meaning.");
+  lines.push("");
+
+  if (nodes.length === 0) {
+    lines.push("- (No ArchiMate elements in this diagram yet.)");
+    return lines.join("\n").trimEnd();
+  }
+
+  // ── Elements grouped by layer ──
+  lines.push("## Elements");
+  lines.push("");
+  const byLayer = new Map<string, DiagramElement[]>();
+  for (const n of nodes) {
+    const { layer } = kindOf(n);
+    if (!byLayer.has(layer)) byLayer.set(layer, []);
+    byLayer.get(layer)!.push(n);
+  }
+  for (const [layer, group] of byLayer) {
+    lines.push(`### ${layer} layer`);
+    for (const n of group) {
+      const { typeName } = kindOf(n);
+      const desc = (n.properties?.description as string | undefined)?.trim();
+      lines.push(`- "${labelOf(n)}" (${typeName})${desc ? ` — ${desc}` : ""}`);
+    }
+    lines.push("");
+  }
+
+  // ── Containers (nesting): what sits inside each element ──
+  const childrenOf = new Map<string, DiagramElement[]>();
+  for (const n of nodes) {
+    if (!n.parentId) continue;
+    if (!childrenOf.has(n.parentId)) childrenOf.set(n.parentId, []);
+    childrenOf.get(n.parentId)!.push(n);
+  }
+  lines.push("## Containers (what's inside each)");
+  lines.push("");
+  const containerIds = [...childrenOf.keys()].filter((id) => byId.get(id)?.type === "archimate-shape");
+  if (containerIds.length === 0) {
+    lines.push("- (No nested/grouping elements — the model is flat.)");
+  } else {
+    for (const cid of containerIds) {
+      const container = byId.get(cid)!;
+      const { typeName } = kindOf(container);
+      const kids = childrenOf.get(cid)!;
+      lines.push(`- "${labelOf(container)}" (${typeName}) contains:`);
+      for (const k of kids) {
+        const { typeName: kt } = kindOf(k);
+        lines.push(`  - "${labelOf(k)}" (${kt})`);
+      }
+    }
+  }
+  lines.push("");
+
+  // ── Relationships ──
+  lines.push("## Relationships");
+  lines.push("");
+  const archiRels = connectors.filter((c) => (c.type as string).startsWith("archi-"));
+  if (archiRels.length === 0) {
+    lines.push("- (No relationships drawn between elements.)");
+  } else {
+    for (const c of archiRels) {
+      const t = c.type as ArchimateConnectorType;
+      const relName = ARCHI_REL_NAME[t] ?? cap((c.type as string).replace(/^archi-/, ""));
+      const meaning = ARCHI_REL_MEANING[t] ?? "a relationship between the two elements";
+      const lbl = c.label?.trim();
+      lines.push(
+        `- "${labelOf(byId.get(c.sourceId))}" —[${relName}]→ "${labelOf(byId.get(c.targetId))}"${lbl ? ` (labelled "${lbl}")` : ""}: ${meaning}.`,
+      );
+    }
+  }
+
+  return lines.join("\n").trimEnd();
 }
 
 /**

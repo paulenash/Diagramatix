@@ -9,7 +9,7 @@
  * strips any prior prompt annotation (this one, or the legacy R56 / script notes)
  * and prepends a fresh one on each generation, so regeneration overwrites in place.
  */
-import type { DiagramElement } from "@/app/lib/diagram/types";
+import type { Connector, DiagramElement } from "@/app/lib/diagram/types";
 import { wrapText } from "@/app/lib/diagram/textMetrics";
 
 /** Stable id so regeneration can find + overwrite the annotation. */
@@ -75,6 +75,16 @@ export function contentBBox(elements: DiagramElement[]): ContentBBox | null {
  *  prepended without duplicating. */
 export function stripPromptAnnotations(elements: DiagramElement[]): DiagramElement[] {
   return elements.filter((e) => !PROMPT_ANNOTATION_IDS.has(e.id));
+}
+
+/** Remove any connector that hangs off a prompt-note element — e.g. the legacy
+ *  BPMN R56 association that linked the "AI Generated" note to the start event.
+ *  The note element is stripped by `stripPromptAnnotations`; this drops its
+ *  now-orphaned association so no dangling line is left on the canvas. */
+export function stripPromptAnnotationConnectors(connectors: Connector[]): Connector[] {
+  return connectors.filter(
+    (c) => !PROMPT_ANNOTATION_IDS.has(c.sourceId) && !PROMPT_ANNOTATION_IDS.has(c.targetId),
+  );
 }
 
 /** Heading line for the annotation (and the Properties link tooltip). */

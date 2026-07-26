@@ -10,8 +10,10 @@ import {
   contentBBox,
   buildPromptAnnotation,
   stripPromptAnnotations,
+  stripPromptAnnotationConnectors,
   AI_PROMPT_ANNOTATION_ID,
 } from "@/app/lib/ai/promptAnnotation";
+import type { Connector } from "@/app/lib/diagram/types";
 
 const el = (id: string, x: number, y: number, w = 100, h = 60, type = "task"): DiagramElement =>
   ({ id, type: type as DiagramElement["type"], x, y, width: w, height: h, label: id, properties: {} });
@@ -62,5 +64,14 @@ describe("AI Prompt annotation", () => {
   it("T1033b contentBBox is null for an empty / annotation-only diagram", () => {
     expect(contentBBox([])).toBeNull();
     expect(contentBBox([el(AI_PROMPT_ANNOTATION_ID, 0, 0, 320, 100, "text-annotation")])).toBeNull();
+  });
+
+  it("T1039b stripPromptAnnotationConnectors drops the legacy R56 note association, keeps real flow", () => {
+    const conns = [
+      { id: "conn-_ai_gen_annotation-start1", sourceId: "_ai_gen_annotation", targetId: "start1", type: "associationBPMN" },
+      { id: "s1", sourceId: "t1", targetId: "t2", type: "sequence" },
+    ] as Connector[];
+    const kept = stripPromptAnnotationConnectors(conns);
+    expect(kept.map((c) => c.id)).toEqual(["s1"]);
   });
 });

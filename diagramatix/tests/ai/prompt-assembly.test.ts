@@ -219,3 +219,42 @@ describe("reverse — buildBpmnPrompt describes a drawn diagram for re-generatio
     expect(prompt).toContain("No pools");
   });
 });
+
+// T1039 — ArchiMate is structural, so its reverse description must enumerate the
+// elements, what each container holds, and every relationship WITH its meaning —
+// never the BPMN "No pools" fallback (which is what regressed for Paul).
+describe("reverse — buildPromptFromDiagram describes an ArchiMate model structurally", () => {
+  const archiEls = [
+    { id: "grp", type: "archimate-shape", label: "Payments", x: 0, y: 0, width: 300, height: 200, properties: { shapeKey: "grouping" } },
+    { id: "role", type: "archimate-shape", label: "Customer", x: 20, y: 40, width: 120, height: 60, parentId: "grp", properties: { shapeKey: "business-role" } },
+    { id: "app", type: "archimate-shape", label: "Billing System", x: 20, y: 120, width: 120, height: 60, parentId: "grp", properties: { shapeKey: "application-component" } },
+  ] as never[];
+  const archiConns = [
+    { id: "r1", type: "archi-serving", sourceId: "app", targetId: "role", directionType: "directed" },
+  ] as never[];
+
+  it("routes ArchiMate to the structural builder — never the BPMN 'No pools' fallback", () => {
+    const prompt = buildPromptFromDiagram(archiEls, archiConns, "archimate" as never);
+    expect(prompt).not.toContain("No pools");
+    expect(prompt).toContain("# ArchiMate Model");
+  });
+
+  it("lists elements, container contents, and each relationship with its meaning", () => {
+    const prompt = buildPromptFromDiagram(archiEls, archiConns, "archimate" as never);
+    // Elements named (catalogue isn't loaded in tests → humanised shapeKey).
+    expect(prompt).toContain("Customer");
+    expect(prompt).toContain("Billing System");
+    // Container contents surfaced.
+    expect(prompt).toContain("contains:");
+    expect(prompt).toContain('"Payments"');
+    // Relationship named AND explained.
+    expect(prompt).toContain("Serving");
+    expect(prompt).toMatch(/serves the target/i);
+  });
+
+  it("handles an empty ArchiMate canvas without the BPMN fallback", () => {
+    const prompt = buildPromptFromDiagram([], [], "archimate" as never);
+    expect(prompt).toContain("No ArchiMate elements");
+    expect(prompt).not.toContain("No pools");
+  });
+});

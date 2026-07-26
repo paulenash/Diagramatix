@@ -1041,6 +1041,7 @@ The on-canvas "AI Prompt: … Generated on: …" note for AI-generated diagrams 
 | T1032 | `formatGeneratedOn` → `dd-mm-yyyy h:mm am\|pm` (no leading-zero hour, padded date/minute, lower-case meridiem); `promptHeading` shape | Wrong / ambiguous timestamp in the prompt annotation | If the date/time formatter regressed |
 | T1033 | `buildPromptAnnotation` sits left-of + vertically-centred on the content bbox; `stripPromptAnnotations` removes ours + legacy R56 + script notes (overwrite) | Annotation overlapping the diagram, or duplicate prompt notes piling up on regenerate | If placement or the strip id-set regressed |
 | T1033b | `contentBBox` is null for an empty / annotation-only diagram | Divide-by-nothing placement crash on an empty generate | If bbox null-guarding regressed |
+| T1039b | `stripPromptAnnotationConnectors` drops the legacy R56 note→start-event association, keeps real sequence flow | A dangling association line left on the canvas after AI generation (its note element already stripped) | If the annotation-connector strip regressed |
 
 ### `tests/ai/model-access.test.ts` — cost-gated generate-model access
 
@@ -1170,6 +1171,7 @@ A normal user may pick the current default model + anything equal-or-cheaper; a 
 | T0458 | (buildPromptFromDiagram) routes a BPMN diagram to the BPMN builder | The generic entry point not dispatching BPMN to the BPMN describer | If a BPMN diagram wasn't routed to buildBpmnPrompt |
 | T0459 | (buildBpmnPrompt) describes a plain linear flow (the engine wraps it in an auto-pool) | A poolless flow producing an empty/garbled description | If a laid-out linear flow wasn't described |
 | T0460 | (buildBpmnPrompt) emits the explicit 'No pools' fallback when there are genuinely no pools | A genuinely poolless raw diagram producing no structure note | If the no-pools fallback branch stopped emitting |
+| T1039 | (buildPromptFromDiagram) routes ArchiMate to the structural builder — never the BPMN "No pools" fallback; lists elements by layer, container contents ("contains:"), and each relationship WITH its meaning; empty canvas → "No ArchiMate elements" | ArchiMate Technical Description / Staff Narrative reporting "no pools — nothing to describe" instead of describing the model's elements + relationships | If ArchiMate wasn't routed to buildArchimatePrompt or the structural sections regressed |
 
 ---
 

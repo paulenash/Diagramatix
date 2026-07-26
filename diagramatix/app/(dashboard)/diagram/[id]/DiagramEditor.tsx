@@ -16,7 +16,7 @@ import {
   type SymbolType,
   type TemplateData,
 } from "@/app/lib/diagram/types";
-import { buildPromptAnnotation, contentBBox, stripPromptAnnotations } from "@/app/lib/ai/promptAnnotation";
+import { buildPromptAnnotation, contentBBox, stripPromptAnnotations, stripPromptAnnotationConnectors } from "@/app/lib/ai/promptAnnotation";
 import { useAllowedModels } from "./ModelSelect";
 import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { setCurrentDiagramName } from "@/app/lib/help/currentDiagram";
@@ -1051,7 +1051,10 @@ export function DiagramEditor({
     setData({
       ...data,
       elements,
-      connectors: aiData.connectors,
+      // Drop the legacy R56 association that linked the old "AI Generated" note
+      // to the start event — its note element is stripped above, so the line
+      // would otherwise dangle.
+      connectors: stripPromptAnnotationConnectors(aiData.connectors),
       viewport: aiData.viewport ?? data.viewport,
       relaxedLayout: aiData.relaxedLayout,
       aiGeneration,
