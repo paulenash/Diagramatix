@@ -27,6 +27,26 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 const TRANSPARENT_PX =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
+// IMPORTANT: detect by nodeType + tagName + getAttribute, NOT `instanceof`.
+// Browser extensions inject nodes from a DIFFERENT JS realm, so
+// `node instanceof HTMLImageElement` returns FALSE for them and they slip through
+// an instanceof-based filter — which is exactly what was aborting the capture (a
+// cross-realm <img src="data:text/html…"> that html-to-image then failed to load).
+function asElement(node: Node): Element | null {
+  return node && node.nodeType === 1 ? (node as Element) : null;
+}
+/** <img> or SVG <image> — by tag name so it works across realms. */
+function isImageEl(el: Element): boolean {
+  const t = el.tagName.toUpperCase();
+  return t === "IMG" || t === "IMAGE";
+}
+/** The image's source across both element kinds. */
+function elementSrc(el: Element): string {
+  return el.getAttribute("src")
+    || el.getAttribute("href")
+    || (el as unknown as SVGImageElement).href?.baseVal
+    || "";
+}
 /** Cross-origin (non-data) image URL — such images taint the capture canvas or
  *  fail to inline. Same-origin + data: URIs are safe. */
 function isCrossOriginImg(src: string): boolean {
@@ -36,20 +56,37 @@ function isCrossOriginImg(src: string): boolean {
 }
 
 /** Nodes that can't be rasterised and would REJECT the whole capture, so they're
- *  always excluded:
+ *  always excluded (realm-agnostic):
  *   • anything tagged data-no-capture (our own chrome),
- *   • <iframe>s — including the `data:text/html` frames browser extensions
- *     (Grammarly, password managers, ad blockers) inject into <body>; html-to-image
- *     tries to load them and fails,
- *   • an <img> pointing at a NON-image data: URI (same extension trick). */
+ *   • <iframe>/<object>/<embed> — incl. the `data:text/html` frames browser
+ *     extensions (Grammarly, password managers, ad blockers) inject into <body>,
+ *   • an <img>/<image> pointing at a NON-image data: URI (same extension trick). */
 function alwaysSkip(node: Node): boolean {
-  if (node instanceof HTMLElement && node.hasAttribute("data-no-capture")) return true;
-  if (node instanceof HTMLIFrameElement) return true;
-  if (node instanceof HTMLImageElement) {
-    const s = node.src || "";
+  const el = asElement(node);
+  if (!el) return false;
+  if (el.hasAttribute("data-no-capture")) return true;
+  const tag = el.tagName.toUpperCase();
+  if (tag === "IFRAME" || tag === "OBJECT" || tag === "EMBED") return true;
+  if (isImageEl(el)) {
+    const s = elementSrc(el);
     if (s.startsWith("data:") && !s.startsWith("data:image/")) return true;
   }
   return false;
+}
+
+/** Full detail of the element a DOM error Event fired on — tag, id, class, src —
+ *  so we can pinpoint what html-to-image choked on. */
+function targetDetail(e: unknown): string {
+  const t = (e && typeof e === "object" ? (e as { target?: unknown }).target : null) as
+    | (Element & { src?: string; currentSrc?: string; href?: { baseVal?: string } })
+    | null;
+  if (!t || typeof (t as Element).tagName !== "string") {
+    return typeof e === "object" && e ? `(no target; keys: ${Object.keys(e).join(",")})` : String(e);
+  }
+  const el = t as Element & { src?: string; currentSrc?: string; href?: { baseVal?: string } };
+  const src = el.src || el.currentSrc || el.href?.baseVal || "";
+  const cls = typeof el.className === "string" && el.className ? `.${el.className.trim().split(/\s+/).join(".")}` : "";
+  return `${el.tagName}${el.id ? `#${el.id}` : ""}${cls}${src ? ` src=${String(src).slice(0, 180)}` : ""}`;
 }
 
 /** Turn any thrown value (Error, DOM Event from img.onerror, string, …) into a
@@ -61,7 +98,10 @@ function describeCaptureError(e: unknown): string {
     const o = e as { message?: string; type?: string; target?: { src?: string; tagName?: string } };
     if (o.message) return o.message;
     const src = o.target?.src;
-    if (src) return `couldn't load an image (${src.slice(0, 90)})`;
+    if (src) {
+      if (src.startsWith("data:image/svg")) return "the assembled snapshot couldn't be rendered (too large or an unsupported style)";
+      return `couldn't load an image (${src.slice(0, 90)})`;
+    }
     if (o.type) return `${o.type} while embedding the page`;
   }
   return "unknown";
@@ -130,11 +170,10 @@ export function ScreenCapture() {
     // environment somehow still throws, attempt 2 drops cross-origin images, and
     // attempt 3 drops EVERY image — which cannot fail on an image load, so a
     // capture always completes (losing images rather than the whole screenshot).
-    console.info("[ScreenCapture] capture start (v3 — onImageErrorHandler + image-strip fallback)");
     const skippers: Array<(node: Node) => boolean> = [
       (n) => alwaysSkip(n),
-      (n) => alwaysSkip(n) || (n instanceof HTMLImageElement && isCrossOriginImg(n.src)),
-      (n) => alwaysSkip(n) || n instanceof HTMLImageElement || n instanceof SVGImageElement,
+      (n) => { const el = asElement(n); return alwaysSkip(n) || (!!el && isImageEl(el) && isCrossOriginImg(elementSrc(el))); },
+      (n) => { const el = asElement(n); return alwaysSkip(n) || (!!el && isImageEl(el)); }, // strip ALL images (realm-agnostic)
     ];
     try {
       let dataUrl = "";
@@ -146,7 +185,7 @@ export function ScreenCapture() {
           throw new Error("the capture came back empty");
         } catch (err) {
           lastErr = err;
-          console.warn(`[ScreenCapture] attempt ${i + 1}/${skippers.length} failed:`, err);
+          console.warn(`[ScreenCapture] attempt ${i + 1}/${skippers.length} failed on ${targetDetail(err)}`);
           dataUrl = "";
         }
       }

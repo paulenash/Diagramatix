@@ -11,9 +11,11 @@
  * Buffer publishing is a later slice.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import { insetRect, coverCrop, type InsetCorner } from "@/app/lib/video/composite";
 import { useDraggable } from "@/app/components/useDraggable";
 import { useMatrixRunning } from "@/app/components/useMatrixRunning";
+import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 
 type Phase = "idle" | "setup" | "recording" | "paused" | "review";
 
@@ -82,6 +84,12 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   // left 64) and remembers where the user drags it. Smaller (32px) than the camera.
   const { pos, handlers, didDrag } = useDraggable("diagramatix.video.btnPos", () => ({ left: 112, bottom: 16 }), 44);
   const matrixRunning = useMatrixRunning();
+  // Also detect the SuperAdmin from the CLIENT session (like the camera button) so
+  // the launcher appears even if the server-rendered `enabled` prop was stale/cached
+  // (the RSC layout occasionally renders without the session on a fresh login).
+  const { data: session } = useSession();
+  const clientSuper = !!session?.user?.email && SUPERUSER_EMAILS.has(session.user.email.toLowerCase());
+  const show = enabled || clientSuper;
 
   // Refs the draw loop / recorder read without re-subscribing.
   const camOnRef = useRef(camOn); camOnRef.current = camOn;
@@ -172,11 +180,11 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   }, [micId, camId, micOn, camOn]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!show) return;
     const onChange = () => void enumerate();
     navigator.mediaDevices?.addEventListener?.("devicechange", onChange);
     return () => navigator.mediaDevices?.removeEventListener?.("devicechange", onChange);
-  }, [enabled, enumerate]);
+  }, [show, enumerate]);
 
   const cleanupRecording = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
@@ -332,7 +340,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     stopLevelMeter();
   }, [cleanupRecording, stopLevelMeter]);
 
-  if (!enabled) return null;
+  if (!show) return null;
 
   // Hidden media elements the compositor reads from.
   const hidden = (
