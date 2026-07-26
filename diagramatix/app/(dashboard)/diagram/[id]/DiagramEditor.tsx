@@ -2781,7 +2781,8 @@ export function DiagramEditor({
           <button
             onClick={async () => {
               if ((await confirmSaveBeforeLeave()) === "cancel") return;
-              router.push(`/dashboard/projects/${projectId}?new=1`);
+              // Default the New Diagram dialog to THIS diagram's type.
+              router.push(`/dashboard/projects/${projectId}?new=1&type=${encodeURIComponent(diagramType)}`);
             }}
             className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
             title="Create a new diagram in this project"

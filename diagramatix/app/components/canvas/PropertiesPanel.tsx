@@ -57,7 +57,11 @@ function RegenerateControl({ models, initialModel, onRegenerate }: {
   onRegenerate?: (model: string) => void;
 }) {
   const [model, setModel] = useState<string>(initialModel);
-  useEffect(() => { setModel((m) => m || initialModel); }, [initialModel]);
+  // Re-sync when the diagram (and thus its recorded model) changes — so selecting
+  // a different diagram, or regenerating with a new model, updates the dropdown
+  // instead of showing a stale/first model. A user's in-progress pick persists
+  // because initialModel only changes value when the underlying diagram does.
+  useEffect(() => { setModel(initialModel); }, [initialModel]);
   if (!onRegenerate) return null;
   return (
     <div className="mt-1 flex items-center gap-1">
@@ -1049,7 +1053,10 @@ export function PropertiesPanel({
                 )}
                 <RegenerateControl
                   models={aiModels}
-                  initialModel={currentAiModelId || aiGeneration.model}
+                  // Prefer the model THIS diagram was actually generated with, so
+                  // the control reflects reality (falling back to the global
+                  // default only when the diagram has no recorded model).
+                  initialModel={aiGeneration.model || currentAiModelId || ""}
                   onRegenerate={onRegenerate}
                 />
               </div>

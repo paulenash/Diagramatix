@@ -569,6 +569,10 @@ export function PlanPanel({
 
   const hasPlan = plan.elements.length > 0 || plan.connections.length > 0;
   const lastSonnetResponseRef = useRef<string | null>(null);
+  // The model the PLAN route actually used (cost-gated / resolved server-side) —
+  // authoritative for aiGeneration.model, since the plan is what produced the
+  // content. The apply-layout step is pure layout and doesn't know the model.
+  const planModelRef = useRef<string>("");
 
   // Load the saved-prompts list on mount.
   const loadPromptList = useCallback(async () => {
@@ -707,6 +711,7 @@ export function PlanPanel({
         return;
       }
       setPlan(json.plan);
+      planModelRef.current = (json.model as string) || model || "";
       lastSonnetResponseRef.current = JSON.stringify(json.plan, null, 2);
       setStatus(`Plan received: ${json.elementCount} elements, ${json.connectionCount} connections`);
     } catch (err) {
@@ -825,7 +830,10 @@ export function PlanPanel({
         const effPrompt = prompt.trim();
         onApplyDiagram(json.diagramData, {
           promptText: effPrompt,
-          model: (json.model as string) || model || "",
+          // Record the model the PLAN actually used (apply-layout is pure layout
+          // and returns no model), so a regenerate with a different model is
+          // reflected accurately — not the first/default model.
+          model: (json.model as string) || planModelRef.current || model || "",
           selectedPromptId: sel?.id,
           selectedPromptName: sel?.name,
           selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,

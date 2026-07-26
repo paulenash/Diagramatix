@@ -455,7 +455,12 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     const params = new URLSearchParams(window.location.search);
     if (params.get("new") === "1") {
       setShowNewDiagram(true);
+      // Default the type to the one passed from the diagram screen (?type=<type>),
+      // if it's a valid diagram type.
+      const t = params.get("type");
+      if (t && DIAGRAM_TYPES.some((dt) => dt.value === t)) setNewType(t as DiagramType);
       params.delete("new");
+      params.delete("type");
       const qs = params.toString();
       window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
     }
