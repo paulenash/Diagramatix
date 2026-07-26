@@ -2365,7 +2365,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                                   <div className={flyCls} style={flyStyle}>
                                     {sect === "export" ? (
                                       <>
-                                        <button className={itemCls} onClick={() => { close(); handleExportProject("json"); }}>JSON</button>
+                                        <button className={itemCls} onClick={() => { close(); handleExportProject("json"); }}>JSON (Project)</button>
                                         <button className={itemCls} onClick={() => { close(); handleExportProject("xml"); }}>XML &amp; XSD</button>
                                         <button
                                           className={`${itemCls} disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -2379,7 +2379,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                                       </>
                                     ) : (
                                       <>
-                                        <button className={itemCls} onClick={() => { close(); importJsonInputRef.current?.click(); }}>JSON</button>
+                                        <button className={itemCls} onClick={() => { close(); importJsonInputRef.current?.click(); }}>JSON (Project)</button>
                                         <button className={itemCls} onClick={() => { close(); importXmlInputRef.current?.click(); }}>XML</button>
                                         <button className={`${itemCls} disabled:opacity-50`} disabled={visioImportInProgress} onClick={() => { close(); setImportVisioError(""); importVisioInputRef.current?.click(); }} title="Import one or more pages from a Visio .vsdx file as separate diagrams">{visioImportInProgress ? "Visio (importing…)" : "Visio"}</button>
                                         <button className={`${itemCls} disabled:opacity-50`} disabled={visioImportInProgress} onClick={() => { close(); importBpmnInputRef.current?.click(); }} title="Import an OMG BPMN 2.0 .bpmn file as a new diagram">{visioImportInProgress ? "BPMN (importing…)" : "BPMN"}</button>
@@ -2402,7 +2402,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                                   <div className={flyCls} style={flyStyle}>
                                     {sect === "export" ? (
                                       <>
-                                        <button className={itemCls} onClick={() => { close(); setSpExportFormat("json"); }}>JSON</button>
+                                        <button className={itemCls} onClick={() => { close(); setSpExportFormat("json"); }}>JSON (Project)</button>
                                         <button className={itemCls} onClick={() => { close(); setSpExportFormat("xml"); }}>XML &amp; XSD</button>
                                         <button
                                           className={`${itemCls} disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -2415,7 +2415,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                                       </>
                                     ) : (
                                       <>
-                                        <button className={itemCls} onClick={() => { close(); setSpImportFmt("json"); }}>JSON</button>
+                                        <button className={itemCls} onClick={() => { close(); setSpImportFmt("json"); }}>JSON (Project)</button>
                                         <button className={itemCls} onClick={() => { close(); setSpImportFmt("xml"); }}>XML</button>
                                         <button className={itemCls} onClick={() => { close(); setSpImportFmt("visio"); }}>Visio (.vsdx)</button>
                                         <button className={itemCls} onClick={() => { close(); setSpImportFmt("bpmn"); }}>BPMN</button>

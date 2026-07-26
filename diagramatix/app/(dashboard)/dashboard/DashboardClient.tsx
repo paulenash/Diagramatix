@@ -1660,7 +1660,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                                   <div className="absolute bg-white border border-gray-200 rounded shadow-lg py-1 z-[10001]" style={{ top: "100%", left: -100, minWidth: 150 }}>
                                     {dest === "local" ? (
                                       <>
-                                        <button onClick={() => { closeSys(); setImportFormat("json"); if (fileInputRef.current) { fileInputRef.current.accept = ".json"; fileInputRef.current.click(); } }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">JSON</button>
+                                        <button onClick={() => { closeSys(); setImportFormat("json"); if (fileInputRef.current) { fileInputRef.current.accept = ".json"; fileInputRef.current.click(); } }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">JSON (Project)</button>
                                         <button onClick={() => { closeSys(); setVisioImportError(""); visioInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Import one or more pages from a Visio .vsdx file into a new project">Visio</button>
                                         <button onClick={() => { closeSys(); openBpmnImportDialog(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Pick a folder of .bpmn files; each file becomes one diagram in a new project">BPMN</button>
                                         <button onClick={() => { closeSys(); setImportFormat("xml"); if (fileInputRef.current) { fileInputRef.current.accept = ".xml"; fileInputRef.current.click(); } }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">XML</button>
@@ -1670,7 +1670,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                                       </>
                                     ) : (
                                       <>
-                                        <button onClick={() => { closeSys(); setSpImportFmt("json"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">JSON</button>
+                                        <button onClick={() => { closeSys(); setSpImportFmt("json"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">JSON (Project)</button>
                                         <button onClick={() => { closeSys(); setSpImportFmt("visio"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">Visio</button>
                                         <button onClick={() => { closeSys(); setSpImportFmt("bpmn"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">BPMN</button>
                                         <button onClick={() => { closeSys(); setSpImportFmt("xml"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">XML</button>

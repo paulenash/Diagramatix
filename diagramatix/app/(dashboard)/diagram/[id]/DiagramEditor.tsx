@@ -993,6 +993,8 @@ export function DiagramEditor({
   // Regenerate prefill: when the user hits "Regenerate" in Diagram Properties we
   // open the AI/Plan panel with the linked prompt's CURRENT text + a chosen model.
   const [aiPrefill, setAiPrefill] = useState<{ prompt: string; model: string } | null>(null);
+  // Armed by applyAiResult after a generation; the next canvas click dismisses the AI panel.
+  const aiJustGeneratedRef = useRef(false);
 
   // Link/auto-save the Prompt that generated this diagram, returning its id+name.
   // Rules (Paul, 2026-07-26 — "auto-save a Prompt every time"):
@@ -1054,8 +1056,23 @@ export function DiagramEditor({
       relaxedLayout: aiData.relaxedLayout,
       aiGeneration,
     });
+    // Arm the "first canvas click dismisses the AI panel" behaviour (only for a real
+    // generation, i.e. when meta is present).
+    if (meta) aiJustGeneratedRef.current = true;
     requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("dgx:fitToContent")));
   }, [data, setData, ensureLinkedPrompt]);
+
+  // After an AI generation, the FIRST click on the canvas (select an element,
+  // click a connector, or click empty space) closes the still-open AI/Plan panel —
+  // revealing the Diagram Properties (and Element Properties if an element was
+  // clicked). Wraps the Canvas selection callbacks below.
+  const dismissAiPanelOnCanvasClick = useCallback(() => {
+    if (!aiJustGeneratedRef.current) return;
+    aiJustGeneratedRef.current = false;
+    setShowAiPanel(false);
+    setShowPlanPanel(false);
+    setAiPrefill(null);
+  }, []);
 
   // Show/hide the on-canvas AI-Prompt annotation (any diagram type). Hiding removes
   // the element; showing rebuilds it from aiGeneration, left-of-centre.
@@ -3877,8 +3894,8 @@ export function DiagramEditor({
           driftColor={tonesFor(featureScheme, "entityLists").text}
           scanHighlightConnectorById={scanConnectorHighlight ?? undefined}
           currentIssueIds={currentIssueIds.size > 0 ? currentIssueIds : undefined}
-          onSetSelectedElements={setSelectedElementIds}
-          onSelectConnector={setSelectedConnectorId}
+          onSetSelectedElements={(ids) => { dismissAiPanelOnCanvasClick(); setSelectedElementIds(ids); }}
+          onSelectConnector={(id) => { dismissAiPanelOnCanvasClick(); setSelectedConnectorId(id); }}
           onMoveElements={moveElements}
           onElementsMoveEnd={elementsMoveEnd}
           onSwapLane={swapLane}

@@ -883,11 +883,15 @@ export function PropertiesPanel({
     ta.style.height = next + "px";
   }, [labelDraft, element?.id]);
 
-  // Collapse title and panel when AI panel opens
+  // Collapse title + panel when the AI panel opens; RE-OPEN the panel when it
+  // closes (so after AI generation, dismissing the AI panel reveals the Diagram/
+  // Element Properties — titleOpen is then driven by selection in the effect below).
   useEffect(() => {
     if (forceCollapseTitle) {
       setTitleOpen(false);
       setPanelCollapsed(true);
+    } else {
+      setPanelCollapsed(false);
     }
   }, [forceCollapseTitle]);
 
