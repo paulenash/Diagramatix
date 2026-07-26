@@ -21,6 +21,35 @@ import { useMatrixRunning } from "./useMatrixRunning";
 type Rect = { x: number; y: number; w: number; h: number };
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+// A 1×1 transparent PNG. html-to-image swaps in this placeholder for any image it
+// can't fetch/inline, so one broken/cross-origin image degrades gracefully instead
+// of rejecting the WHOLE capture (the "Capture failed — unknown" case).
+const TRANSPARENT_PX =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+/** Cross-origin (non-data) image URL — such images taint the capture canvas or
+ *  fail to inline. Same-origin + data: URIs are safe. */
+function isCrossOriginImg(src: string): boolean {
+  if (!src || src.startsWith("data:")) return false;
+  try { return new URL(src, location.href).origin !== location.origin; }
+  catch { return false; }
+}
+
+/** Turn any thrown value (Error, DOM Event from img.onerror, string, …) into a
+ *  human-readable message so the toast is diagnostic instead of "unknown". */
+function describeCaptureError(e: unknown): string {
+  if (e instanceof Error) return e.message || e.name || "error";
+  if (typeof e === "string") return e || "error";
+  if (e && typeof e === "object") {
+    const o = e as { message?: string; type?: string; target?: { src?: string; tagName?: string } };
+    if (o.message) return o.message;
+    const src = o.target?.src;
+    if (src) return `couldn't load an image (${src.slice(0, 90)})`;
+    if (o.type) return `${o.type} while embedding the page`;
+  }
+  return "unknown";
+}
+
 const HANDLES: { id: string; cls: string; cursor: string }[] = [
   { id: "nw", cls: "left-0 top-0 -translate-x-1/2 -translate-y-1/2", cursor: "nwse-resize" },
   { id: "n", cls: "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2", cursor: "ns-resize" },
@@ -60,16 +89,36 @@ export function ScreenCapture() {
     if (frozen) return;
     setError(null); setSaved(null); setToast(null);
     const w = window.innerWidth, h = window.innerHeight;
+    // Base options. `imagePlaceholder` makes a single un-inlinable image degrade to
+    // a transparent pixel instead of failing the whole capture. `cacheBust` is off:
+    // it re-fetches every image, which turns an otherwise-cached cross-origin image
+    // into a CORS fetch that can reject (a common "unknown" failure).
+    const baseOpts: Parameters<typeof htmlToImage.toPng>[1] = {
+      width: w,
+      height: h,
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      backgroundColor: "#ffffff",
+      skipFonts: true,
+      imagePlaceholder: TRANSPARENT_PX,
+      filter: (node) => !(node instanceof HTMLElement && node.hasAttribute("data-no-capture")),
+    };
     try {
-      const dataUrl = await htmlToImage.toPng(document.body, {
-        width: w,
-        height: h,
-        pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-        cacheBust: true,
-        backgroundColor: "#ffffff",
-        skipFonts: true,
-        filter: (node) => !(node instanceof HTMLElement && node.hasAttribute("data-no-capture")),
-      });
+      let dataUrl: string;
+      try {
+        dataUrl = await htmlToImage.toPng(document.body, baseOpts);
+      } catch (firstErr) {
+        // Fallback: also drop cross-origin <img> elements, which taint the capture
+        // canvas or fail to inline. The screenshot loses those images but succeeds.
+        console.warn("[ScreenCapture] first attempt failed, retrying without cross-origin images:", firstErr);
+        dataUrl = await htmlToImage.toPng(document.body, {
+          ...baseOpts,
+          filter: (node) => {
+            if (node instanceof HTMLElement && node.hasAttribute("data-no-capture")) return false;
+            if (node instanceof HTMLImageElement && isCrossOriginImg(node.src)) return false;
+            return true;
+          },
+        });
+      }
       if (!dataUrl || dataUrl.length < 100) throw new Error("the capture came back empty");
       const im = new Image();
       im.onload = () => { imgRef.current = im; setNat({ w: im.naturalWidth, h: im.naturalHeight }); };
@@ -81,7 +130,8 @@ export function ScreenCapture() {
       const m = 0.12;
       setRect({ x: Math.round(w * m), y: Math.round(h * m), w: Math.round(w * (1 - 2 * m)), h: Math.round(h * (1 - 2 * m)) });
     } catch (e) {
-      setToast("Capture failed — " + ((e as Error).message ?? "unknown") + ".");
+      console.error("[ScreenCapture] capture failed:", e);
+      setToast("Capture failed — " + describeCaptureError(e) + ".");
     }
   }, [frozen]);
 
