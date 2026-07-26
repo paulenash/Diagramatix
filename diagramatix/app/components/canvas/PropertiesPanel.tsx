@@ -24,6 +24,7 @@ const SP_UNAVAILABLE_TITLE =
   "SharePoint isn't available — Microsoft/Azure isn't configured for this deployment, or your organisation has SharePoint turned off.";
 import { RiskControlSection, type RiskCatalogItem } from "./RiskControlSection";
 import { PcfClassifySection } from "./PcfClassifySection";
+import { PromptEditPopup } from "./PromptEditPopup";
 import type { PcfClassification, AiGeneration } from "@/app/lib/diagram/types";
 import { ModelSelect, type AllowedModel } from "@/app/(dashboard)/diagram/[id]/ModelSelect";
 import { isUmlConnType } from "@/app/lib/diagram/types";
@@ -862,6 +863,8 @@ export function PropertiesPanel({
   const [titleOpen, setTitleOpen] = useState(true);
   const [connectorOpen, setConnectorOpen] = useState(true);
   const [propsOpen, setPropsOpen] = useState(true);
+  // AI-Prompt editor popup (opened from the "AI Prompt" link) — movable, edit + save.
+  const [showPromptEdit, setShowPromptEdit] = useState(false);
   // Sub-sections inside the new "Diagram Properties" group. Each
   // collapses independently so the user can fold away parts they don't
   // care about. Defaults: title open, database/process-owner open,
@@ -1042,21 +1045,20 @@ export function PropertiesPanel({
             <div className="flex items-start gap-1">
               <span className="text-[9px] text-gray-500 w-12 shrink-0 pt-0.5">AI Prompt</span>
               <div className="flex-1 min-w-0">
-                <a
-                  href={`/dashboard/prompts?promptId=${encodeURIComponent(aiGeneration.promptId)}${
-                    currentDiagramId ? `&from=${encodeURIComponent(`/diagram/${currentDiagramId}`)}` : ""
-                  }`}
-                  className="text-[9px] text-blue-600 hover:underline truncate block"
-                  title={`Open the current version of "${aiGeneration.promptName}" in AI Prompt Maintenance (returns here)`}
+                <button
+                  type="button"
+                  onClick={() => setShowPromptEdit(true)}
+                  className="text-[9px] text-blue-600 hover:underline truncate block text-left w-full"
+                  title={`View / edit the current version of "${aiGeneration.promptName}"`}
                 >
                   {aiGeneration.promptName}
-                </a>
+                </button>
                 {onToggleAiPromptAnnotation && (
                   <label className="mt-0.5 flex items-center gap-1 text-[9px] text-gray-600 cursor-pointer">
                     <input type="checkbox" className="w-3 h-3"
-                      checked={showAiPromptAnnotation !== false}
+                      checked={showAiPromptAnnotation === true}
                       onChange={(e) => onToggleAiPromptAnnotation(e.target.checked)} />
-                    Show prompt annotation
+                    Show original generation prompt
                   </label>
                 )}
                 <RegenerateControl
@@ -1069,6 +1071,14 @@ export function PropertiesPanel({
                 />
               </div>
             </div>
+            {showPromptEdit && (
+              <PromptEditPopup
+                promptId={aiGeneration.promptId}
+                promptName={aiGeneration.promptName}
+                initialText={aiGeneration.promptText}
+                onClose={() => setShowPromptEdit(false)}
+              />
+            )}
           </div>
         )}
         <InlineField label="Version">

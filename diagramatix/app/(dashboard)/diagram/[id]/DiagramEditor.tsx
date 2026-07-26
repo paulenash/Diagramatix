@@ -1042,7 +1042,9 @@ export function DiagramEditor({
       }
     }
     let elements = stripPromptAnnotations(aiData.elements);
-    if (aiGeneration && meta && data.showAiPromptAnnotation !== false) {
+    // The on-canvas prompt annotation is OFF by default now — only add it when the
+    // user has explicitly ticked "Show original generation prompt".
+    if (aiGeneration && meta && data.showAiPromptAnnotation === true) {
       elements = [buildPromptAnnotation(
         { name: aiGeneration.promptName, text: aiGeneration.promptText, generatedAt: aiGeneration.generatedAt },
         contentBBox(elements),

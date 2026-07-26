@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   childLevelFor, ENTITY_NODE_LEVEL_LABELS, idsWithChildren, visibleSuggestions,
   type EntitySuggestion, type EntityNodeLevel,
@@ -39,6 +39,7 @@ export function EntityNameInput({
   const [placeParent, setPlaceParent] = useState<string | "">(""); // "" = top level
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set()); // hierarchy: collapsed ids
   const suppressBlur = useRef(false);
+  const listRef = useRef<HTMLDivElement>(null);
   const toggleCollapse = (id: string) => setCollapsed((prev) => {
     const nx = new Set(prev); if (nx.has(id)) nx.delete(id); else nx.add(id); return nx;
   });
@@ -60,6 +61,22 @@ export function EntityNameInput({
   );
 
   const exact = suggestions.find(s => s.name.toLowerCase() === value.trim().toLowerCase());
+
+  // On open, if the current name is already in the list, highlight its row and
+  // scroll it into view (its level is expanded by default) so the user sees where
+  // it sits. As soon as they start typing, the normal filter behaviour takes over.
+  useEffect(() => {
+    const dn = (defaultName ?? "").trim().toLowerCase();
+    if (!dn) return;
+    const idx = rows.findIndex(s => s.name.trim().toLowerCase() === dn);
+    if (idx < 0) return;
+    setHi(idx);
+    requestAnimationFrame(() => {
+      listRef.current?.querySelector<HTMLElement>(`[data-row-idx="${idx}"]`)?.scrollIntoView({ block: "nearest" });
+    });
+    // Run once on open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function commit() {
     const v = value.trim();
@@ -118,6 +135,7 @@ export function EntityNameInput({
         />
         {rows.length > 0 && (
           <div
+            ref={listRef}
             onMouseDown={() => { suppressBlur.current = true; }}
             onMouseUp={() => { suppressBlur.current = false; }}
             style={{
@@ -139,6 +157,7 @@ export function EntityNameInput({
             {rows.map((s, i) => (
               <div
                 key={s.id}
+                data-row-idx={i}
                 onMouseEnter={() => setHi(i)}
                 onClick={() => onCommit(s.name)}
                 style={{

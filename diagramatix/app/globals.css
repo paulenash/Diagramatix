@@ -35,6 +35,14 @@ body {
   input, textarea, select {
     color: #111827;
   }
+  /* Native text fields must ALWAYS allow click-drag text selection, even when
+   * nested inside a `select-none` (user-select:none) ancestor such as the diagram
+   * canvas — otherwise you can type but can't highlight part of the text to
+   * replace it. A direct rule beats the inherited `none`. */
+  input, textarea {
+    user-select: text;
+    -webkit-user-select: text;
+  }
 }
 
 /* Cursor scheme (G05). Inline `style={{ cursor }}` can't reach the
