@@ -9,7 +9,7 @@
  *  default, and how every built-in Claude model is treated). Moonshot/Kimi is
  *  reached via its Anthropic-compatible endpoint, so it reuses the same SDK +
  *  Messages-API shape — only the base URL + key differ (see anthropicClient.ts). */
-export type AiProvider = "anthropic" | "moonshot" | "google" | "microsoft";
+export type AiProvider = "anthropic" | "moonshot" | "google" | "microsoft" | "ollama";
 
 export interface AiModel {
   id: string;
@@ -180,10 +180,44 @@ export function microsoftModels(): AiModel[] {
     .filter((m): m is AiModel => m !== null);
 }
 
-/** Claude models, plus Moonshot/Kimi, Google/Gemini and Microsoft/Azure (each when
- *  configured), plus any local/custom models. */
+/**
+ * Ollama models — one or more LLMs hosted on a LOCAL Ollama server (e.g. a Linux
+ * box on your LAN). Offered ONLY when `OLLAMA_BASE_URL` is set. Like Gemini /
+ * Microsoft, Ollama does NOT speak the Anthropic Messages API, so `OLLAMA_BASE_URL`
+ * MUST point at an Anthropic-compatible gateway (LiteLLM Proxy) that fronts Ollama —
+ * run LiteLLM alongside Ollama on that box (see gateway/OLLAMA-SETUP.md). The app
+ * then reuses the same SDK + Messages shape, Bearer-authenticated (`OLLAMA_API_KEY`
+ * = the LiteLLM master key; optional if the gateway has no auth). Ids come from
+ * `OLLAMA_MODELS` (same `id|Label` syntax) and MUST match the gateway's model names
+ * — use an `ollama/<model>` prefix so pricing/telemetry tag them as local (free).
+ * Local models are text-only unless the id hints vision (llava / vision / multimodal).
+ * Because the server makes the call, the Ollama box only needs to be reachable from
+ * wherever Diagramatix runs: local dev reaches a LAN box directly; prod (Azure) would
+ * need the gateway exposed via a tunnel. Server-only. */
+const DEFAULT_OLLAMA_MODELS: AiModel[] = [
+  { id: "ollama/llama3.1", label: "Llama 3.1 (local)", provider: "ollama", vision: false },
+];
+
+export function ollamaModels(): AiModel[] {
+  if (!process.env.OLLAMA_BASE_URL?.trim()) return [];
+  const raw = process.env.OLLAMA_MODELS?.trim();
+  if (!raw) return DEFAULT_OLLAMA_MODELS;
+  return raw
+    .split(",")
+    .map((entry): AiModel | null => {
+      const [rawId, ...rest] = entry.split("|");
+      const id = rawId.trim();
+      if (!id) return null;
+      const vision = /(llava|vision|multimodal)/i.test(id);
+      return { id, label: rest.join("|").trim() || id, provider: "ollama", vision };
+    })
+    .filter((m): m is AiModel => m !== null);
+}
+
+/** Claude models, plus Moonshot/Kimi, Google/Gemini, Microsoft/Azure and local
+ *  Ollama (each when configured), plus any local/custom models. */
 export const allModels = (): AiModel[] => [
-  ...AI_MODELS, ...moonshotModels(), ...googleModels(), ...microsoftModels(), ...customModels(),
+  ...AI_MODELS, ...moonshotModels(), ...googleModels(), ...microsoftModels(), ...ollamaModels(), ...customModels(),
 ];
 
 export const isKnownAiModel = (id: string | null | undefined): boolean =>

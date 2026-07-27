@@ -1,0 +1,32 @@
+# LiteLLM Proxy — Anthropic-compatible gateway fronting a LOCAL Ollama server.
+# Run this ON THE SAME LINUX BOX as Ollama (or anywhere on the LAN that can reach
+# it). Diagramatix calls POST /v1/messages (Anthropic Messages API); LiteLLM
+# translates each request to Ollama and returns an Anthropic-shaped reply.
+#
+# Each `model_name` MUST match an id in Diagramatix's OLLAMA_MODELS env var. Keep
+# the `ollama/` prefix so Diagramatix tags them as local (free). `ollama_chat/<name>`
+# is the model actually installed via `ollama pull <name>`.
+model_list:
+  - model_name: ollama/llama3.1
+    litellm_params:
+      model: ollama_chat/llama3.1
+      api_base: http://localhost:11434
+
+  - model_name: ollama/qwen2.5-coder:14b
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder:14b
+      api_base: http://localhost:11434
+
+  # Add one block per model you `ollama pull`. A vision-capable model (e.g. llava)
+  # is auto-detected by Diagramatix from the id and enabled for image input.
+  # - model_name: ollama/llava
+  #   litellm_params:
+  #     model: ollama_chat/llava
+  #     api_base: http://localhost:11434
+
+general_settings:
+  # Every request must present  Authorization: Bearer <LITELLM_MASTER_KEY>.
+  # This is what Diagramatix sends as OLLAMA_API_KEY (NOT an Ollama key — Ollama
+  # itself has no auth). Set it in the gateway's env; omit this line to run without
+  # auth on a trusted LAN (then leave OLLAMA_API_KEY unset in Diagramatix).
+  master_key: os.environ/LITELLM_MASTER_KEY

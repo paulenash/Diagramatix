@@ -21,6 +21,7 @@ export interface EffectiveRate {
  * models.ts returns "anthropic" for kimi/gemini ids when the provider key isn't set).
  */
 export function providerOf(model: string): string {
+  if (/^ollama[/:]/i.test(model)) return "ollama"; // local Ollama (free) — check first
   if (/^(kimi|moonshot)/i.test(model)) return "moonshot";
   if (/^gemini/i.test(model)) return "google";
   // Azure OpenAI (gpt-*, o1/o3/o4-*) + Microsoft's own Phi/MAI models.

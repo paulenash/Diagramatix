@@ -64,6 +64,14 @@ export function aiClientConfig(
       baseURL: process.env.MICROSOFT_BASE_URL?.trim() || undefined,
     };
   }
+  if (provider === "ollama") {
+    // Local Ollama via a required Anthropic-compatible gateway (LiteLLM) — the key
+    // is the gateway's master key, optional if it has no auth. See gateway/OLLAMA-SETUP.md.
+    return {
+      apiKey: resolvedEnvSecret(process.env.OLLAMA_API_KEY) ?? "",
+      baseURL: process.env.OLLAMA_BASE_URL?.trim() || undefined,
+    };
+  }
   const baseURL = process.env.ANTHROPIC_BASE_URL?.trim();
   return {
     apiKey: fallbackApiKey ?? resolvedEnvSecret(process.env.ANTHROPIC_API_KEY) ?? "",
@@ -93,7 +101,7 @@ export function makeAiClient(model: string | null | undefined, fallbackApiKey?: 
   const telemetry = { fetch: countingFetch, maxRetries: 2 };
 
   let client: Anthropic;
-  if (provider === "moonshot" || provider === "google" || provider === "microsoft") {
+  if (provider === "moonshot" || provider === "google" || provider === "microsoft" || provider === "ollama") {
     // All reached via an Anthropic-compatible endpoint that authenticates with
     // `Authorization: Bearer <key>` (Moonshot's endpoint; a LiteLLM-style gateway
     // for Gemini / Azure OpenAI / Phi) — NOT Anthropic's native `x-api-key` header.

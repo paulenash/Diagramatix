@@ -14,6 +14,7 @@ import { pricingFor, typicalCost } from "./pricing";
 
 /** Representative USD cost of one generation with `id`, or null when unpriced. */
 export function modelCostUsd(id: string): number | null {
+  if (/^ollama[/:]/i.test(id)) return 0; // local Ollama runs on your own hardware — free
   const p = pricingFor(id);
   return p ? typicalCost(p) : null;
 }
