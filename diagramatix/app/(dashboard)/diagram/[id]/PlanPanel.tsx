@@ -1337,9 +1337,13 @@ export function PlanPanel({
             <span className="text-[11px] text-blue-800 font-medium">
               {busy === "apply"
                 ? "Running the layout engine…"
-                : busy === "narrative"
-                  ? "Asking Sonnet for a staff narrative — this usually takes 15–30 s…"
-                  : "Asking Sonnet for a plan — this usually takes 15–30 s…"}
+                : (() => {
+                    // Name the model actually in use (not always Sonnet now).
+                    const mLabel = aiModels.find((m) => m.id === (model || currentAiModelId))?.label || "the AI model";
+                    return busy === "narrative"
+                      ? `Asking ${mLabel} for a staff narrative — this usually takes 15–30 s…`
+                      : `Asking ${mLabel} for a plan — this usually takes 15–30 s…`;
+                  })()}
             </span>
           </div>
         )}

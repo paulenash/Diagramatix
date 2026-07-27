@@ -1023,6 +1023,14 @@ An AI-generated ArchiMate box is sized to contain its wrapped name at the DEFAUL
 |---|---|---|---|
 | T1040 | Short name → default aspect ratio + footprint; long name → box grows (aspect ratio held) so the wrapped name fits inside with nothing spilling sideways | A long-named generated ArchiMate element with text overflowing its outline, or wildly non-uniform box shapes | If boxSize stopped enforcing the default aspect ratio or the contain-the-text sizing (A4.09) |
 
+### `tests/ai/plan-json-extract.test.ts` — planBpmn JSON salvage
+
+The model's plan response is clipped to the first COMPLETE brace-matched object (string/escape-aware) and trailing commas are stripped on a retry, so a note the model appends after the JSON no longer corrupts the parse.
+
+| # | What it checks | User-visible bug it prevents | Fails when |
+|---|---|---|---|
+| T1042 | `extractBalancedJson` drops trailing notes (even with braces) + leading preamble, ignores braces inside strings, and returns the tail when truncated; `repairJsonCommas` strips trailing commas so a salvage parse succeeds | Image ingestion / BPMN generation failing with "Failed to parse AI response as JSON: Expected ',' or ']' … at position N" when a (verbose) model appends prose after the JSON | If the brace-matched extraction or the trailing-comma salvage regressed |
+
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 
 Which key + endpoint a model's provider uses. Pure (reads env, no network), so it pins the routing that decides where a prompt egresses.

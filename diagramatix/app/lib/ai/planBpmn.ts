@@ -328,6 +328,38 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
 }
 
 /**
+ * Extract the FIRST complete top-level JSON object from a model response by
+ * matching braces (string- and escape-aware). This beats a naive
+ * `indexOf("{")…lastIndexOf("}")` clip, which breaks when a model appends a note
+ * AFTER the JSON that itself contains a `}` — the clip then swallows that prose
+ * and JSON.parse fails right where the real object ended (the "Expected ',' or ']'
+ * at position N" failures). Returns the balanced slice, or the tail from the first
+ * `{` when unbalanced (genuinely truncated), or the input if there's no `{`.
+ */
+export function extractBalancedJson(s: string): string {
+  const start = s.indexOf("{");
+  if (start < 0) return s;
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+    } else if (ch === '"') inStr = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}") { depth--; if (depth === 0) return s.slice(start, i + 1); }
+  }
+  return s.slice(start);
+}
+
+/** Best-effort repair of common LLM JSON slips (trailing commas before a close).
+ *  Conservative: only touches `,` immediately before `}`/`]`, which is never valid. */
+export function repairJsonCommas(s: string): string {
+  return s.replace(/,(\s*[}\]])/g, "$1");
+}
+
+/**
  * Call Sonnet with the given prompt + attachment + rules, parse + normalise
  * the JSON response, and return the plan. Does not run the layout engine.
  */
@@ -402,28 +434,30 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
   if (jsonStr.startsWith("```")) {
     jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
   }
-  // Defence-in-depth: if any prose still leaked in front of or after the
-  // JSON object, clip to the outermost { … } pair before parsing.
-  const firstBrace = jsonStr.indexOf("{");
-  const lastBrace = jsonStr.lastIndexOf("}");
-  if (firstBrace >= 0 && lastBrace > firstBrace) {
-    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
-  }
+  // Defence-in-depth: extract the first complete { … } object by brace-matching,
+  // so any prose the model appended after the JSON (even if it contains braces)
+  // is dropped instead of corrupting the parse.
+  jsonStr = extractBalancedJson(jsonStr);
 
   let parsed: { elements: AiElement[]; connections: AiConnection[] };
   try {
     parsed = JSON.parse(jsonStr);
-  } catch (parseErr) {
-    // Raw model output can contain generated process content — gate it (ENT-16).
-    console.error("[planBpmn] JSON parse failed.", process.env.DEBUG_CONTENT_LOGS === "1"
-      ? `Raw response (first 1 KB): ${textBlock.text.slice(0, 1024)}`
-      : "(set DEBUG_CONTENT_LOGS=1 to log raw output)");
-    return {
-      ok: false,
-      status: 500,
-      error: `Failed to parse AI response as JSON: ${(parseErr as Error).message}`,
-      raw: jsonStr.substring(0, 500),
-    };
+  } catch {
+    // Best-effort salvage: strip trailing commas and retry once before failing.
+    try {
+      parsed = JSON.parse(repairJsonCommas(jsonStr));
+    } catch (parseErr) {
+      // Raw model output can contain generated process content — gate it (ENT-16).
+      console.error("[planBpmn] JSON parse failed.", process.env.DEBUG_CONTENT_LOGS === "1"
+        ? `Raw response (first 2 KB): ${textBlock.text.slice(0, 2048)}`
+        : "(set DEBUG_CONTENT_LOGS=1 to log raw output)");
+      return {
+        ok: false,
+        status: 500,
+        error: `Failed to parse AI response as JSON: ${(parseErr as Error).message}`,
+        raw: jsonStr.substring(0, 800),
+      };
+    }
   }
 
   if (!Array.isArray(parsed.elements) || !Array.isArray(parsed.connections)) {
