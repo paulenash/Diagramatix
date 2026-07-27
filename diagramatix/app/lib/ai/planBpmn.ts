@@ -460,18 +460,17 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
   // Give the big-output Claude models (Opus / Sonnet) more room; keep 16000 for the
   // rest (the largest Kimi K3 + Haiku accept). Salvage below covers any residual cut.
   const maxTokens = /(?:opus|sonnet)/i.test(model) ? 32000 : 16000;
-  // STREAM (then take the final message): the SDK rejects a non-streaming request
-  // once max_tokens is large enough that it could run past the 10-minute cap
-  // ("Streaming is required for operations that may take longer than 10 minutes").
-  // Streaming assembles the same Message and also survives long generations.
-  const message = await client.messages
-    .stream({
-      model,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userContent }],
-    })
-    .finalMessage();
+  // NOTE: max_tokens above ~21333 would trip the SDK's "Streaming is required for
+  // operations that may take longer than 10 minutes" guard — but makeAiClient sets
+  // an explicit client `timeout`, which skips that guard entirely (see messages.js:
+  // the check only runs when the client timeout is unset). So this stays a plain
+  // non-streaming create (keeping the telemetry wrapper intact).
+  const message = await client.messages.create({
+    model,
+    max_tokens: maxTokens,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userContent }],
+  });
 
   const textBlock = message.content.find(b => b.type === "text");
   if (!textBlock || textBlock.type !== "text") {

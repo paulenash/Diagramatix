@@ -98,7 +98,12 @@ export function makeAiClient(model: string | null | undefined, fallbackApiKey?: 
     attempts += 1;
     return fetch(input as Parameters<typeof fetch>[0], init);
   };
-  const telemetry = { fetch: countingFetch, maxRetries: 2 };
+  // An explicit client timeout (15 min) does double duty: it caps a genuinely hung
+  // request, AND — because the SDK only runs its "streaming is required for >10 min
+  // operations" guard when the client timeout is UNSET — it lets the large-output
+  // plan call (max_tokens 32000 for Opus/Sonnet, above the ~21k guard threshold)
+  // stay a plain non-streaming create with telemetry intact.
+  const telemetry = { fetch: countingFetch, maxRetries: 2, timeout: 15 * 60 * 1000 };
 
   let client: Anthropic;
   if (provider === "moonshot" || provider === "google" || provider === "microsoft" || provider === "ollama") {
