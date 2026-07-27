@@ -360,6 +360,46 @@ export function repairJsonCommas(s: string): string {
 }
 
 /**
+ * Salvage a TRUNCATED plan JSON (model hit its output cap mid-object): trim back to
+ * the last complete top-level array element (the last `}`/`]` at a clean boundary),
+ * drop a dangling comma, then append the closing brackets for everything still open.
+ * Yields a valid object with as many complete elements/connections as arrived — far
+ * better than a total parse failure. Returns null when there's nothing to salvage.
+ */
+export function closeTruncatedJson(s: string): string | null {
+  // Find the last index at which we're at depth-safe boundary (a `}` or `]` that
+  // isn't inside a string) — that's the end of a complete element.
+  let inStr = false, esc = false, lastClose = -1;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+    } else if (ch === '"') inStr = true;
+    else if (ch === "}" || ch === "]") lastClose = i;
+  }
+  if (lastClose < 0) return null;
+  let trimmed = s.slice(0, lastClose + 1).replace(/,\s*$/, "");
+  // Recompute the open-bracket stack over the trimmed slice and close it.
+  const stack: string[] = [];
+  inStr = false; esc = false;
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+    } else if (ch === '"') inStr = true;
+    else if (ch === "{") stack.push("}");
+    else if (ch === "[") stack.push("]");
+    else if (ch === "}" || ch === "]") stack.pop();
+  }
+  for (let i = stack.length - 1; i >= 0; i--) trimmed += stack[i];
+  return trimmed;
+}
+
+/**
  * Call Sonnet with the given prompt + attachment + rules, parse + normalise
  * the JSON response, and return the plan. Does not run the layout engine.
  */
@@ -414,13 +454,15 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
       "response MUST start with `{` and end with `}` — nothing else.",
   });
 
+  // Output cap for the plan JSON. Image ingestion with geometry capture (bounds +
+  // per-connector waypoints for every shape) is FAR larger than a text-only plan and
+  // was truncating verbose models (Opus) mid-JSON → "Unexpected end of JSON input".
+  // Give the big-output Claude models (Opus / Sonnet) more room; keep 16000 for the
+  // rest (the largest Kimi K3 + Haiku accept). Salvage below covers any residual cut.
+  const maxTokens = /(?:opus|sonnet)/i.test(model) ? 32000 : 16000;
   const message = await client.messages.create({
     model,
-    // Output cap for the plan JSON. 8192 truncated larger diagrams mid-JSON on
-    // verbose models (Fable/Sonnet → parse-fail or "No response"), while concise
-    // models fit. 16000 is the largest every offered model (Claude + Kimi K3)
-    // accepts, giving big diagrams room to close the object.
-    max_tokens: 16000,
+    max_tokens: maxTokens,
     system: systemPrompt,
     messages: [{ role: "user", content: userContent }],
   });
@@ -439,29 +481,35 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
   // is dropped instead of corrupting the parse.
   jsonStr = extractBalancedJson(jsonStr);
 
-  let parsed: { elements: AiElement[]; connections: AiConnection[] };
-  try {
-    parsed = JSON.parse(jsonStr);
-  } catch {
-    // Best-effort salvage: strip trailing commas and retry once before failing.
-    try {
-      parsed = JSON.parse(repairJsonCommas(jsonStr));
-    } catch (parseErr) {
-      // Raw model output can contain generated process content — gate it (ENT-16).
-      console.error("[planBpmn] JSON parse failed.", process.env.DEBUG_CONTENT_LOGS === "1"
-        ? `Raw response (first 2 KB): ${textBlock.text.slice(0, 2048)}`
-        : "(set DEBUG_CONTENT_LOGS=1 to log raw output)");
-      return {
-        ok: false,
-        status: 500,
-        error: `Failed to parse AI response as JSON: ${(parseErr as Error).message}`,
-        raw: jsonStr.substring(0, 800),
-      };
-    }
+  type Plan = { elements: AiElement[]; connections: AiConnection[] };
+  const tryParse = (str: string): Plan | null => {
+    try { return JSON.parse(str) as Plan; } catch { return null; }
+  };
+  // 1) as-is  2) trailing-comma repair  3) close a truncated object (salvage the
+  // complete elements/connections that did arrive).
+  const salvaged = closeTruncatedJson(jsonStr);
+  let parsed: Plan | null = tryParse(jsonStr) ?? tryParse(repairJsonCommas(jsonStr));
+  if (!parsed && salvaged) parsed = tryParse(salvaged) ?? tryParse(repairJsonCommas(salvaged));
+
+  if (!parsed) {
+    // Raw model output can contain generated process content — gate it (ENT-16).
+    console.error("[planBpmn] JSON parse failed.", process.env.DEBUG_CONTENT_LOGS === "1"
+      ? `Raw response (first 2 KB): ${textBlock.text.slice(0, 2048)}`
+      : "(set DEBUG_CONTENT_LOGS=1 to log raw output)");
+    return {
+      ok: false,
+      status: 500,
+      error: "Failed to parse AI response as JSON (the model likely returned an incomplete or malformed plan). Try again, or use a less verbose model.",
+      raw: jsonStr.substring(0, 800),
+    };
   }
 
-  if (!Array.isArray(parsed.elements) || !Array.isArray(parsed.connections)) {
-    return { ok: false, status: 500, error: "Invalid AI response structure" };
+  // A salvaged/truncated object may be missing one of the two top-level arrays —
+  // coerce so a partial-but-usable diagram still renders rather than erroring.
+  if (!Array.isArray(parsed.elements)) parsed.elements = [];
+  if (!Array.isArray(parsed.connections)) parsed.connections = [];
+  if (parsed.elements.length === 0) {
+    return { ok: false, status: 500, error: "The AI response had no usable elements — please try again." };
   }
 
   normaliseAiPlan(parsed);

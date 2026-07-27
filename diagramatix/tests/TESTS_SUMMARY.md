@@ -1030,6 +1030,7 @@ The model's plan response is clipped to the first COMPLETE brace-matched object 
 | # | What it checks | User-visible bug it prevents | Fails when |
 |---|---|---|---|
 | T1042 | `extractBalancedJson` drops trailing notes (even with braces) + leading preamble, ignores braces inside strings, and returns the tail when truncated; `repairJsonCommas` strips trailing commas so a salvage parse succeeds | Image ingestion / BPMN generation failing with "Failed to parse AI response as JSON: Expected ',' or ']' … at position N" when a (verbose) model appends prose after the JSON | If the brace-matched extraction or the trailing-comma salvage regressed |
+| T1043 | `closeTruncatedJson` trims a cut-off plan to its last complete element and closes the open brackets — mid-connections keeps the complete connections, mid-elements keeps the complete elements, complete JSON is untouched | "Unexpected end of JSON input" total failure when a verbose model (Opus) truncates the geometry-heavy image-ingestion plan at the token cap — now the arrived-complete part still renders | If the truncation salvage regressed (paired with the Opus/Sonnet max_tokens bump to 32000) |
 
 ### `tests/ai/aiClient.test.ts` — provider-aware client resolution (Moonshot/Kimi)
 

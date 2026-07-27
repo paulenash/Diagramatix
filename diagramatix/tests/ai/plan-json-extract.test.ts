@@ -6,7 +6,7 @@
  * and JSON.parse failed with "Expected ',' or ']' … at position N" (T1042).
  */
 import { describe, it, expect } from "vitest";
-import { extractBalancedJson, repairJsonCommas } from "@/app/lib/ai/planBpmn";
+import { extractBalancedJson, repairJsonCommas, closeTruncatedJson } from "@/app/lib/ai/planBpmn";
 
 describe("extractBalancedJson (T1042)", () => {
   it("drops a trailing note that itself contains braces", () => {
@@ -40,5 +40,29 @@ describe("repairJsonCommas (T1042)", () => {
     const bad = '{"elements":[{"id":"a"},],"connections":[],}';
     expect(() => JSON.parse(bad)).toThrow();
     expect(() => JSON.parse(repairJsonCommas(bad))).not.toThrow();
+  });
+});
+
+describe("closeTruncatedJson salvages a cut-off plan (T1043)", () => {
+  it("truncated mid-connections → keeps the complete ones + closes the object", () => {
+    // Model hit its output cap partway through the second connection.
+    const truncated = '{"elements":[{"id":"a","type":"task"}],"connections":[{"id":"c1","from":"a","to":"b"},{"id":"c2","fr';
+    const closed = closeTruncatedJson(truncated)!;
+    const p = JSON.parse(closed);
+    expect(p.elements).toHaveLength(1);
+    expect(p.connections).toHaveLength(1);   // only the complete connection survives
+    expect(p.connections[0].id).toBe("c1");
+  });
+
+  it("truncated mid-elements → keeps complete elements (connections may be absent)", () => {
+    const truncated = '{"elements":[{"id":"a","type":"task"},{"id":"b","type":"gatew';
+    const p = JSON.parse(closeTruncatedJson(truncated)!);
+    expect(p.elements).toHaveLength(1);
+    expect(p.elements[0].id).toBe("a");
+  });
+
+  it("does not corrupt already-complete JSON", () => {
+    const good = '{"elements":[{"id":"a"}],"connections":[]}';
+    expect(JSON.parse(closeTruncatedJson(good)!)).toEqual(JSON.parse(good));
   });
 });
