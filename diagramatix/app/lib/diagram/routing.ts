@@ -1627,7 +1627,7 @@ export function recomputeAllConnectors(
     //       rendered on top of everything). It stays segment-moveable: a
     //       user-reshaped interior (>=9 waypoints) is preserved, only the
     //       top/bottom endpoints are re-fitted on recompute.
-    if (relaxedLayout && rawConn.type === "messageBPMN") {
+    if (relaxedLayout && rawConn.type === "messageBPMN" && !rawConn.messageForcedVertical) {
       const conn = rawConn;
       const srcCy = source.y + source.height / 2;
       const tgtCy = target.y + target.height / 2;
@@ -1666,8 +1666,18 @@ export function recomputeAllConnectors(
     const conn = rawConn;
 
     // messageBPMN: always vertical when possible — single shared x for both
-    // edges. NOT for free-form/imported diagrams (handled as rectilinear above).
-    if (conn.type === "messageBPMN" && !relaxedLayout) {
+    // edges. Normal diagrams always use this; a free-form / imported (relaxed)
+    // diagram uses it ONLY for a message explicitly repaired to vertical
+    // (messageForcedVertical) — otherwise it's the rectilinear dogleg above.
+    if (conn.type === "messageBPMN" && (!relaxedLayout || conn.messageForcedVertical)) {
+      // For a forced-vertical repair, (re)pick the top/bottom sides by relative
+      // position so the spine runs the short way from the element to the pool.
+      let srcSide = conn.sourceSide, tgtSide = conn.targetSide;
+      if (conn.messageForcedVertical) {
+        const sCy = source.y + source.height / 2, tCy = target.y + target.height / 2;
+        srcSide = sCy <= tCy ? "bottom" : "top";
+        tgtSide = sCy <= tCy ? "top" : "bottom";
+      }
       const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
       const srcIsEvent = BPMN_EVENT_TYPES.has(source.type);
       const tgtIsEvent = target.type === "start-event" || target.type === "intermediate-event";
@@ -1678,7 +1688,9 @@ export function recomputeAllConnectors(
       } else if (srcIsEvent) {
         x = source.x + source.width / 2;
       } else {
-        // Use source offset, clamped to both element boundaries to stay vertical
+        // Use source offset, clamped to both element boundaries to stay vertical.
+        // For an element ↔ wide black-box pool, this pins x to the narrow element,
+        // so the line drops straight from the element onto the pool.
         const rawOffset = conn.sourceOffsetAlong ?? 0.5;
         const rawX = source.x + source.width * rawOffset;
         x = Math.max(source.x, Math.min(source.x + source.width, rawX));
@@ -1686,14 +1698,16 @@ export function recomputeAllConnectors(
         repairedSrcOffset = source.width > 0 ? (x - source.x) / source.width : 0.5;
       }
       // Both edges use the SAME x for perpendicularity
-      const srcEdge: Point = conn.sourceSide === "bottom"
+      const srcEdge: Point = srcSide === "bottom"
         ? { x, y: source.y + source.height } : { x, y: source.y };
-      const tgtEdge: Point = conn.targetSide === "top"
+      const tgtEdge: Point = tgtSide === "top"
         ? { x, y: target.y } : { x, y: target.y + target.height };
       const startPt = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
       const endPt   = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
       return { ...conn, waypoints: [startPt, srcEdge, tgtEdge, endPt],
+        routingType: "rectilinear",
         sourceInvisibleLeader: true, targetInvisibleLeader: true,
+        sourceSide: srcSide, targetSide: tgtSide,
         sourceOffsetAlong: repairedSrcOffset };
     }
 

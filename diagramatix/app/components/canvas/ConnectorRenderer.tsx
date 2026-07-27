@@ -738,7 +738,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   // segment-editable connector. A NORMAL message also stores routingType
   // "rectilinear" but must keep its vertical-spine drag — so gate on the
   // DIAGRAM flag, not the connector's routingType.
-  const isRectilinearMessage = isMessageBPMN && !!relaxedLayout;
+  // A relaxed/imported message is rectilinear (segment-editable) UNLESS the user
+  // repaired it to a vertical spine — then it behaves like a normal vertical
+  // message flow (draggable spine).
+  const isRectilinearMessage = isMessageBPMN && !!relaxedLayout && !connector.messageForcedVertical;
   const isReviewLink = connector.type === "review-comment-link";
   const isBottleneck = connector.type === "sequence" && !!connector.bottleneck && !!showBottleneck;
   const strokeColor = selected ? "#2563eb"

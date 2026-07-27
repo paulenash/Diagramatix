@@ -1781,6 +1781,34 @@ export function PropertiesPanel({
             </div>
           );
         })()}
+        {/* Imported (free-form) message flow: repair a messy rectilinear dogleg to a
+            clean vertical spine that drops straight from the element onto its pool,
+            and regains the draggable spine. Toggle back to rectilinear if wanted. */}
+        {connector.type === "messageBPMN" && relaxedLayout && onUpdateConnectorFields && (
+          <div className="mt-1 pt-1 border-t border-gray-100">
+            <div className="text-[9px] text-gray-400 mb-0.5">Message flow (imported layout)</div>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => onUpdateConnectorFields(connector.id, { messageForcedVertical: true })}
+                disabled={connector.messageForcedVertical === true}
+                className="flex-1 text-[10px] px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-default"
+                title="Redraw this message flow as a straight vertical line from the element onto its pool. It then becomes draggable along the element."
+              >
+                ↕ Make vertical
+              </button>
+              <button
+                type="button"
+                onClick={() => onUpdateConnectorFields(connector.id, { messageForcedVertical: false })}
+                disabled={!connector.messageForcedVertical}
+                className="flex-1 text-[10px] px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-default"
+                title="Revert to the imported rectilinear routing (segment-editable)."
+              >
+                ⌐ Rectilinear
+              </button>
+            </div>
+          </div>
+        )}
 {(() => {
           const isAssocPC = connector.type === "association" && diagramType === "process-context";
           const isAssocBPMN = connector.type === "associationBPMN";

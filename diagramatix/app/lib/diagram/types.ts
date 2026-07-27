@@ -198,6 +198,11 @@ export interface Connector {
   sourceInvisibleLeader: boolean;
   targetInvisibleLeader: boolean;
   waypoints: Point[];
+  /** messageBPMN on a free-form / imported (relaxedLayout) diagram: when true this
+   *  message flow is "repaired" to a clean VERTICAL spine (element ↔ black-box pool)
+   *  instead of the imported rectilinear dogleg, and regains the draggable vertical
+   *  spine. Ignored on non-relaxed diagrams (they're always vertical). */
+  messageForcedVertical?: boolean;
   // For an ArchiMate Influence relationship, `label` holds the strength/sense
   // marker (one of ---, --, -, +, ++, +++, or blank) — it renders beside the line
   // and is set via the connector picker / Properties panel.

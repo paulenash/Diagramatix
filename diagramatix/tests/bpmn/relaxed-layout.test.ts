@@ -95,3 +95,23 @@ describe("relaxedLayout routes messages rectilinearly (T0709)", () => {
     expect(["top", "bottom"]).toContain(c.targetSide);
   });
 });
+
+describe("messageForcedVertical repairs an imported message to a vertical spine (T1041)", () => {
+  const els = diagram().elements as DiagramElement[]; // t1 above-left, t2 below-right (non-aligned)
+
+  it("relaxed + messageForcedVertical → shared-x vertical spine (not the rectilinear dogleg)", () => {
+    const m = { ...diagram().connectors[0], messageForcedVertical: true } as Connector;
+    const [c] = recomputeAllConnectors([m], els, true);
+    // The two edge points share one x — a clean vertical drop.
+    expect(c.waypoints[1].x).toBe(c.waypoints[2].x);
+    // Sides are re-chosen by position: upper element's bottom → lower element's top.
+    expect(c.sourceSide).toBe("bottom");
+    expect(c.targetSide).toBe("top");
+  });
+
+  it("without the flag, the same relaxed message stays a non-aligned rectilinear dogleg", () => {
+    const m = { ...diagram().connectors[0] } as Connector;
+    const [c] = recomputeAllConnectors([m], els, true);
+    expect(c.waypoints[1].x).not.toBe(c.waypoints[c.waypoints.length - 2].x);
+  });
+});

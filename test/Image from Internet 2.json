@@ -1,0 +1,1133 @@
+{
+  "schemaVersion": "1.43",
+  "appVersion": "1.43.1868",
+  "exportedAt": "2026-07-27T01:44:55.623Z",
+  "project": {
+    "name": "(single diagram)",
+    "description": "",
+    "ownerName": "",
+    "colorConfig": {}
+  },
+  "diagrams": [
+    {
+      "originalId": "cms2jnt4r000u01mn6hndqdhm",
+      "name": "Image from Internet 2",
+      "type": "bpmn",
+      "data": {
+        "elements": [
+          {
+            "id": "poolClient",
+            "type": "pool",
+            "x": 101.2,
+            "y": 74.00688665710187,
+            "width": 1515.1999999999998,
+            "height": 146.32769010043043,
+            "label": "CLIENT",
+            "properties": {
+              "poolType": "black-box"
+            }
+          },
+          {
+            "id": "poolMain",
+            "type": "pool",
+            "x": 101.2,
+            "y": 315.21893830703016,
+            "width": 1515.1999999999998,
+            "height": 849.3865136298422,
+            "label": "APPLICATION HANDLING AND INVOICING",
+            "properties": {
+              "poolType": "white-box"
+            }
+          },
+          {
+            "id": "startApp",
+            "type": "start-event",
+            "x": 245.60000000000002,
+            "y": 701.5253945480632,
+            "width": 36,
+            "height": 36,
+            "label": "Application",
+            "properties": {},
+            "parentId": "poolMain",
+            "eventType": "message"
+          },
+          {
+            "id": "gwMerge",
+            "type": "gateway",
+            "x": 385.2,
+            "y": 699.5253945480632,
+            "width": 40,
+            "height": 40,
+            "label": "",
+            "properties": {},
+            "parentId": "poolMain",
+            "gatewayType": "exclusive"
+          },
+          {
+            "id": "taskCheck",
+            "type": "task",
+            "x": 590.1999999999999,
+            "y": 710.84175035868,
+            "width": 102,
+            "height": 65,
+            "label": "Checking for\nCorrectness",
+            "properties": {},
+            "parentId": "poolMain",
+            "taskType": "user"
+          },
+          {
+            "id": "dsBill",
+            "type": "data-store",
+            "x": 546.9878622689575,
+            "y": 885.7968668365423,
+            "width": 77.39928843247549,
+            "height": 53.371962698407465,
+            "label": "Bill of Goods",
+            "properties": {},
+            "parentId": "poolMain"
+          },
+          {
+            "id": "gwCorrect",
+            "type": "gateway",
+            "x": 816.9333333333333,
+            "y": 699.5253945480632,
+            "width": 40,
+            "height": 40,
+            "label": "Application Correct ?",
+            "properties": {
+              "labelOffsetX": -76.17232892217396,
+              "labelOffsetY": -69.17232892217385
+            },
+            "parentId": "poolMain",
+            "gatewayType": "exclusive"
+          },
+          {
+            "id": "taskRequestData",
+            "type": "task",
+            "x": 776.0597344804825,
+            "y": 470.2716749986373,
+            "width": 102,
+            "height": 65,
+            "label": "Request Specified\nData",
+            "properties": {},
+            "parentId": "poolMain",
+            "taskType": "user"
+          },
+          {
+            "id": "evEmailClient",
+            "type": "intermediate-event",
+            "x": 1072.5333333333335,
+            "y": 516.9962697274032,
+            "width": 36,
+            "height": 36,
+            "label": "Email Client",
+            "properties": {},
+            "parentId": "poolMain",
+            "eventType": "message"
+          },
+          {
+            "id": "gwEvent",
+            "type": "gateway",
+            "x": 1198,
+            "y": 514.9962697274033,
+            "width": 40,
+            "height": 40,
+            "label": "",
+            "properties": {},
+            "parentId": "poolMain",
+            "gatewayType": "event-based"
+          },
+          {
+            "id": "evSpecifiedApp",
+            "type": "intermediate-event",
+            "x": 1122.3999999999999,
+            "y": 398.9624103299856,
+            "width": 36,
+            "height": 36,
+            "label": "",
+            "properties": {},
+            "parentId": "poolMain",
+            "eventType": "message"
+          },
+          {
+            "id": "evRefusal",
+            "type": "intermediate-event",
+            "x": 1348,
+            "y": 516.9962697274032,
+            "width": 36,
+            "height": 36,
+            "label": "",
+            "properties": {},
+            "parentId": "poolMain",
+            "eventType": "message"
+          },
+          {
+            "id": "endClientRefusal",
+            "type": "end-event",
+            "x": 1460,
+            "y": 516.9962697274032,
+            "width": 36,
+            "height": 36,
+            "label": "Client Refusal",
+            "properties": {},
+            "parentId": "poolMain"
+          },
+          {
+            "id": "evTimer2Days",
+            "type": "intermediate-event",
+            "x": 1348,
+            "y": 701.5253945480631,
+            "width": 36,
+            "height": 36,
+            "label": "2 Days",
+            "properties": {},
+            "parentId": "poolMain",
+            "eventType": "timer"
+          },
+          {
+            "id": "endNoAnswer",
+            "type": "end-event",
+            "x": 1460,
+            "y": 701.5253945480632,
+            "width": 36,
+            "height": 36,
+            "label": "No Answer",
+            "properties": {},
+            "parentId": "poolMain"
+          },
+          {
+            "id": "taskFormNew1",
+            "type": "task",
+            "x": 785.9333333333334,
+            "y": 920.0446197991392,
+            "width": 102,
+            "height": 65,
+            "label": "Form a New\nApplication for shipment",
+            "properties": {},
+            "parentId": "poolMain",
+            "taskType": "user"
+          },
+          {
+            "id": "taskFormNew2",
+            "type": "task",
+            "x": 1039.5333333333333,
+            "y": 920.0446197991392,
+            "width": 102,
+            "height": 65,
+            "label": "Form a New\nApplication for shipment",
+            "properties": {},
+            "parentId": "poolMain",
+            "taskType": "send"
+          },
+          {
+            "id": "endClientInvoice",
+            "type": "end-event",
+            "x": 1072.5333333333333,
+            "y": 1104.3076040172168,
+            "width": 36,
+            "height": 36,
+            "label": "Client Invoice",
+            "properties": {},
+            "parentId": "poolMain",
+            "eventType": "message"
+          }
+        ],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.6
+        },
+        "connectors": [
+          {
+            "id": "conn-gwCorrect-taskRequestData",
+            "sourceId": "gwCorrect",
+            "targetId": "taskRequestData",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 836.9333333333333,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 836.9333333333333,
+                "y": 699.5253945480632
+              },
+              {
+                "x": 836.9333333333333,
+                "y": 679.5253945480632
+              },
+              {
+                "x": 836.9333333333333,
+                "y": 619.3985347733503
+              },
+              {
+                "x": 827.0597344804825,
+                "y": 619.3985347733503
+              },
+              {
+                "x": 827.0597344804825,
+                "y": 559.2716749986373
+              },
+              {
+                "x": 827.0597344804825,
+                "y": 535.2716749986373
+              },
+              {
+                "x": 827.0597344804825,
+                "y": 502.7716749986373
+              }
+            ],
+            "label": "No",
+            "labelOffsetX": 33.17182065965642,
+            "labelOffsetY": 37.57222726967041,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-taskRequestData-evEmailClient",
+            "sourceId": "taskRequestData",
+            "targetId": "evEmailClient",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 827.0597344804825,
+                "y": 502.7716749986373
+              },
+              {
+                "x": 878.0597344804825,
+                "y": 502.7716749986373
+              },
+              {
+                "x": 902.0597344804825,
+                "y": 502.7716749986373
+              },
+              {
+                "x": 978.296533906908,
+                "y": 502.7716749986373
+              },
+              {
+                "x": 978.296533906908,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1054.5333333333335,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1072.5333333333335,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1090.5333333333335,
+                "y": 534.9962697274032
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "hz5n6h1u",
+            "type": "sequence",
+            "sourceId": "evSpecifiedApp",
+            "targetId": "gwMerge",
+            "sourceSide": "left",
+            "targetSide": "top",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "waypoints": [
+              {
+                "x": 1140.3999999999999,
+                "y": 416.9624103299856
+              },
+              {
+                "x": 1122.3999999999999,
+                "y": 416.9624103299856
+              },
+              {
+                "x": 405.2,
+                "y": 416.9624103299856
+              },
+              {
+                "x": 405.2,
+                "y": 699.5253945480632
+              },
+              {
+                "x": 405.2,
+                "y": 719.5253945480632
+              }
+            ],
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "label": ""
+          },
+          {
+            "id": "conn-startApp-gwMerge",
+            "sourceId": "startApp",
+            "targetId": "gwMerge",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 263.6,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 281.6,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 299.6,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 365.2,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 385.2,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 405.2,
+                "y": 719.5253945480632
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwMerge-taskCheck",
+            "sourceId": "gwMerge",
+            "targetId": "taskCheck",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 405.2,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 425.2,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 445.2,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 505.69999999999993,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 505.69999999999993,
+                "y": 743.34175035868
+              },
+              {
+                "x": 566.1999999999999,
+                "y": 743.34175035868
+              },
+              {
+                "x": 590.1999999999999,
+                "y": 743.34175035868
+              },
+              {
+                "x": 641.1999999999999,
+                "y": 743.34175035868
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-taskCheck-gwCorrect",
+            "sourceId": "taskCheck",
+            "targetId": "gwCorrect",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 641.1999999999999,
+                "y": 743.34175035868
+              },
+              {
+                "x": 692.1999999999999,
+                "y": 743.34175035868
+              },
+              {
+                "x": 716.1999999999999,
+                "y": 743.34175035868
+              },
+              {
+                "x": 756.5666666666666,
+                "y": 743.34175035868
+              },
+              {
+                "x": 756.5666666666666,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 796.9333333333333,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 816.9333333333333,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 836.9333333333333,
+                "y": 719.5253945480632
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-taskCheck-dsBill",
+            "sourceId": "taskCheck",
+            "targetId": "dsBill",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.3954257449347284,
+            "targetOffsetAlong": 0.6131586611684969,
+            "type": "associationBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 641.1999999999999,
+                "y": 743.34175035868
+              },
+              {
+                "x": 630.5334259833422,
+                "y": 775.84175035868
+              },
+              {
+                "x": 594.4459063396085,
+                "y": 885.7968668365423
+              },
+              {
+                "x": 585.6875064851953,
+                "y": 912.4828481857461
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwCorrect-taskFormNew1",
+            "sourceId": "gwCorrect",
+            "targetId": "taskFormNew1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 836.9333333333333,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 836.9333333333333,
+                "y": 739.5253945480632
+              },
+              {
+                "x": 836.9333333333333,
+                "y": 759.5253945480632
+              },
+              {
+                "x": 836.9333333333334,
+                "y": 896.0446197991392
+              },
+              {
+                "x": 836.9333333333334,
+                "y": 920.0446197991392
+              },
+              {
+                "x": 836.9333333333334,
+                "y": 952.5446197991392
+              }
+            ],
+            "label": "Yes",
+            "labelOffsetX": 34.40040661001399,
+            "labelOffsetY": -64.40040661001399,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-taskFormNew1-taskFormNew2",
+            "sourceId": "taskFormNew1",
+            "targetId": "taskFormNew2",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 836.9333333333334,
+                "y": 952.5446197991392
+              },
+              {
+                "x": 887.9333333333334,
+                "y": 952.5446197991392
+              },
+              {
+                "x": 911.9333333333334,
+                "y": 952.5446197991392
+              },
+              {
+                "x": 1015.5333333333333,
+                "y": 952.5446197991392
+              },
+              {
+                "x": 1039.5333333333333,
+                "y": 952.5446197991392
+              },
+              {
+                "x": 1090.5333333333333,
+                "y": 952.5446197991392
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-taskFormNew2-endClientInvoice",
+            "sourceId": "taskFormNew2",
+            "targetId": "endClientInvoice",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1090.5333333333333,
+                "y": 952.5446197991392
+              },
+              {
+                "x": 1090.5333333333333,
+                "y": 985.0446197991392
+              },
+              {
+                "x": 1090.5333333333333,
+                "y": 1009.0446197991392
+              },
+              {
+                "x": 1090.5333333333333,
+                "y": 1086.3076040172168
+              },
+              {
+                "x": 1090.5333333333333,
+                "y": 1104.3076040172168
+              },
+              {
+                "x": 1090.5333333333333,
+                "y": 1122.3076040172168
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-evEmailClient-gwEvent",
+            "sourceId": "evEmailClient",
+            "targetId": "gwEvent",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1090.5333333333335,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1108.5333333333335,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1126.5333333333335,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1178,
+                "y": 534.9962697274033
+              },
+              {
+                "x": 1198,
+                "y": 534.9962697274033
+              },
+              {
+                "x": 1218,
+                "y": 534.9962697274033
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwEvent-evSpecifiedApp",
+            "sourceId": "gwEvent",
+            "targetId": "evSpecifiedApp",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1218,
+                "y": 534.9962697274033
+              },
+              {
+                "x": 1218,
+                "y": 514.9962697274033
+              },
+              {
+                "x": 1218,
+                "y": 494.9962697274033
+              },
+              {
+                "x": 1218,
+                "y": 473.9793400286944
+              },
+              {
+                "x": 1140.3999999999999,
+                "y": 473.9793400286944
+              },
+              {
+                "x": 1140.3999999999999,
+                "y": 452.9624103299856
+              },
+              {
+                "x": 1140.3999999999999,
+                "y": 434.9624103299856
+              },
+              {
+                "x": 1140.3999999999999,
+                "y": 416.9624103299856
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwEvent-evRefusal",
+            "sourceId": "gwEvent",
+            "targetId": "evRefusal",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1218,
+                "y": 534.9962697274033
+              },
+              {
+                "x": 1238,
+                "y": 534.9962697274033
+              },
+              {
+                "x": 1258,
+                "y": 534.9962697274033
+              },
+              {
+                "x": 1330,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1348,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1366,
+                "y": 534.9962697274032
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-evRefusal-endClientRefusal",
+            "sourceId": "evRefusal",
+            "targetId": "endClientRefusal",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1366,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1384,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1402,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1442,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1460,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1478,
+                "y": 534.9962697274032
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwEvent-evTimer2Days",
+            "sourceId": "gwEvent",
+            "targetId": "evTimer2Days",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1218,
+                "y": 534.9962697274033
+              },
+              {
+                "x": 1218,
+                "y": 554.9962697274033
+              },
+              {
+                "x": 1218,
+                "y": 719.5253945480631
+              },
+              {
+                "x": 1348,
+                "y": 719.5253945480631
+              },
+              {
+                "x": 1366,
+                "y": 719.5253945480631
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-evTimer2Days-endNoAnswer",
+            "sourceId": "evTimer2Days",
+            "targetId": "endNoAnswer",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1366,
+                "y": 719.5253945480631
+              },
+              {
+                "x": 1384,
+                "y": 719.5253945480631
+              },
+              {
+                "x": 1402,
+                "y": 719.5253945480631
+              },
+              {
+                "x": 1442,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 1460,
+                "y": 719.5253945480632
+              },
+              {
+                "x": 1478,
+                "y": 719.5253945480632
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-poolClient-evSpecifiedApp",
+            "sourceId": "poolClient",
+            "targetId": "evSpecifiedApp",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.6,
+            "targetOffsetAlong": 0.5,
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 858.8,
+                "y": 147.1707317073171
+              },
+              {
+                "x": 1010.3199999999999,
+                "y": 220.33457675753232
+              },
+              {
+                "x": 1014.0057578510729,
+                "y": 312.64849354375895
+              },
+              {
+                "x": 1140.3999999999999,
+                "y": 312.64849354375895
+              },
+              {
+                "x": 1140.3999999999999,
+                "y": 398.9624103299856
+              },
+              {
+                "x": 1140.3999999999999,
+                "y": 416.9624103299856
+              }
+            ],
+            "label": "Specified Application"
+          },
+          {
+            "id": "conn-evEmailClient-poolClient",
+            "sourceId": "evEmailClient",
+            "targetId": "poolClient",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.4,
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1090.5333333333335,
+                "y": 534.9962697274032
+              },
+              {
+                "x": 1090.5333333333335,
+                "y": 516.9962697274032
+              },
+              {
+                "x": 1090.5333333333335,
+                "y": 498.99626972740316
+              },
+              {
+                "x": 1090.5333333333335,
+                "y": 371.66542324246774
+              },
+              {
+                "x": 707.28,
+                "y": 371.66542324246774
+              },
+              {
+                "x": 707.28,
+                "y": 244.33457675753232
+              },
+              {
+                "x": 707.28,
+                "y": 220.33457675753232
+              },
+              {
+                "x": 858.8,
+                "y": 147.1707317073171
+              }
+            ],
+            "label": "Request to Client"
+          },
+          {
+            "id": "conn-poolClient-evRefusal",
+            "sourceId": "poolClient",
+            "targetId": "evRefusal",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.8,
+            "targetOffsetAlong": 0.5,
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 858.8,
+                "y": 147.1707317073171
+              },
+              {
+                "x": 1313.36,
+                "y": 220.33457675753232
+              },
+              {
+                "x": 1313.36,
+                "y": 244.33457675753232
+              },
+              {
+                "x": 1313.36,
+                "y": 371.66542324246774
+              },
+              {
+                "x": 1366,
+                "y": 371.66542324246774
+              },
+              {
+                "x": 1366,
+                "y": 498.99626972740316
+              },
+              {
+                "x": 1366,
+                "y": 516.9962697274032
+              },
+              {
+                "x": 1366,
+                "y": 534.9962697274032
+              }
+            ],
+            "label": "Refusal"
+          },
+          {
+            "id": "conn-taskFormNew2-poolClient",
+            "sourceId": "taskFormNew2",
+            "targetId": "poolClient",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.2,
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1090.5333333333333,
+                "y": 952.5446197991392
+              },
+              {
+                "x": 1090.5333333333333,
+                "y": 920.0446197991392
+              },
+              {
+                "x": 1090.5333333333333,
+                "y": 896.0446197991392
+              },
+              {
+                "x": 1090.5333333333333,
+                "y": 570.1895982783358
+              },
+              {
+                "x": 404.23999999999995,
+                "y": 570.1895982783358
+              },
+              {
+                "x": 404.23999999999995,
+                "y": 244.33457675753232
+              },
+              {
+                "x": 404.23999999999995,
+                "y": 220.33457675753232
+              },
+              {
+                "x": 858.8,
+                "y": 147.1707317073171
+              }
+            ],
+            "label": "Invoice for Client",
+            "labelOffsetX": -135.1444545393408,
+            "labelOffsetY": -28.771414049642317,
+            "labelWidth": 80
+          }
+        ],
+        "relaxedLayout": true,
+        "aiGeneration": {
+          "promptId": "cms2k7438000w01mn5vptbiv4",
+          "promptName": "Image from Internet 2 — AI prompt",
+          "promptText": "I have attached an image of a process diagram (Screenshot 2026-07-27 112338.jpg). Reverse-engineer the BPMN from it.",
+          "model": "claude-opus-5",
+          "generatedAt": "2026-07-27T01:39:32.717Z",
+          "autoNamed": true
+        }
+      },
+      "colorConfig": {},
+      "displayMode": "normal"
+    }
+  ]
+}

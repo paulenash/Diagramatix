@@ -7220,9 +7220,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       };
 
     case "UPDATE_CONNECTOR_FIELDS": {
-      // Changing routingType (e.g. a generalisation's "Direct" toggle) must
-      // re-route that connector so the new geometry shows immediately.
-      const reroute = "routingType" in action.payload.fields;
+      // Changing routingType (e.g. a generalisation's "Direct" toggle), or repairing
+      // a message flow to vertical, must re-route that connector so the new geometry
+      // shows immediately.
+      const reroute = "routingType" in action.payload.fields
+        || "messageForcedVertical" in action.payload.fields;
       return {
         ...state,
         connectors: state.connectors.map((c) => {
