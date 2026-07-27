@@ -31,7 +31,11 @@ jobs:
     # but NOT `CREATE DATABASE`, so the DB must already exist.
     services:
       postgres:
-        image: postgres:18
+        # Pull from AWS's ECR public mirror of the official Postgres image instead
+        # of Docker Hub — GitHub's shared runners share Docker Hub's anonymous
+        # pull-rate limit, which was failing the service-container pull ("Docker
+        # pull failed"). ECR Public mirrors the same tags with no such limit.
+        image: public.ecr.aws/docker/library/postgres:18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -53,12 +57,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Set up Node 20
-        uses: actions/setup-node@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: diagramatix/package-lock.json
 
@@ -97,7 +101,11 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:18
+        # Pull from AWS's ECR public mirror of the official Postgres image instead
+        # of Docker Hub — GitHub's shared runners share Docker Hub's anonymous
+        # pull-rate limit, which was failing the service-container pull ("Docker
+        # pull failed"). ECR Public mirrors the same tags with no such limit.
+        image: public.ecr.aws/docker/library/postgres:18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -121,12 +129,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Set up Node 20
-        uses: actions/setup-node@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: diagramatix/package-lock.json
 
@@ -150,8 +158,11 @@ jobs:
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: playwright-report
           path: diagramatix/playwright-report/
           retention-days: 7
+          # Don't warn when the report is absent (e.g. the DB service never came up,
+          # so Playwright produced nothing) — the failing test step is the real signal.
+          if-no-files-found: ignore
