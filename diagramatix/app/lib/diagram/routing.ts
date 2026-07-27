@@ -1681,16 +1681,23 @@ export function recomputeAllConnectors(
       const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
       const srcIsEvent = BPMN_EVENT_TYPES.has(source.type);
       const tgtIsEvent = target.type === "start-event" || target.type === "intermediate-event";
+      const srcIsPool = source.type === "pool";
+      const tgtIsPool = target.type === "pool";
       let x: number;
       let repairedSrcOffset = conn.sourceOffsetAlong;
-      if (tgtIsEvent) {
+      if (conn.messageForcedVertical && srcIsPool !== tgtIsPool) {
+        // Case 1 (Element ↔ Pool): the ELEMENT stays put — drop straight from its
+        // centre and move the POOL end to that same x.
+        const elem = srcIsPool ? target : source;
+        x = elem.x + elem.width / 2;
+        repairedSrcOffset = source.width > 0 ? (x - source.x) / source.width : 0.5;
+      } else if (tgtIsEvent) {
         x = target.x + target.width / 2;
       } else if (srcIsEvent) {
         x = source.x + source.width / 2;
       } else {
-        // Use source offset, clamped to both element boundaries to stay vertical.
-        // For an element ↔ wide black-box pool, this pins x to the narrow element,
-        // so the line drops straight from the element onto the pool.
+        // Case 2 (Pool ↔ Pool) or aligned Element ↔ Element: a shared x inside the
+        // overlap of both boundaries (source offset, clamped) keeps it vertical.
         const rawOffset = conn.sourceOffsetAlong ?? 0.5;
         const rawX = source.x + source.width * rawOffset;
         x = Math.max(source.x, Math.min(source.x + source.width, rawX));

@@ -1783,32 +1783,57 @@ export function PropertiesPanel({
         })()}
         {/* Imported (free-form) message flow: repair a messy rectilinear dogleg to a
             clean vertical spine that drops straight from the element onto its pool,
-            and regains the draggable spine. Toggle back to rectilinear if wanted. */}
-        {connector.type === "messageBPMN" && relaxedLayout && onUpdateConnectorFields && (
-          <div className="mt-1 pt-1 border-t border-gray-100">
-            <div className="text-[9px] text-gray-400 mb-0.5">Message flow (imported layout)</div>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => onUpdateConnectorFields(connector.id, { messageForcedVertical: true })}
-                disabled={connector.messageForcedVertical === true}
-                className="flex-1 text-[10px] px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-default"
-                title="Redraw this message flow as a straight vertical line from the element onto its pool. It then becomes draggable along the element."
-              >
-                ↕ Make vertical
-              </button>
-              <button
-                type="button"
-                onClick={() => onUpdateConnectorFields(connector.id, { messageForcedVertical: false })}
-                disabled={!connector.messageForcedVertical}
-                className="flex-1 text-[10px] px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-default"
-                title="Revert to the imported rectilinear routing (segment-editable)."
-              >
-                ⌐ Rectilinear
-              </button>
+            and regains the draggable spine. Three cases (Paul):
+              1. Element ↔ Pool  — move the POOL end under/over the element.
+              2. Pool ↔ Pool     — move either end to a shared x.
+              3. Element ↔ Element (different pools) — only possible if their x-ranges
+                 already overlap; otherwise NOT possible without moving the elements,
+                 so the action is shown as illegal (disabled + a note). */}
+        {connector.type === "messageBPMN" && relaxedLayout && onUpdateConnectorFields && (() => {
+          const s = allElements?.find((e) => e.id === connector.sourceId);
+          const t = allElements?.find((e) => e.id === connector.targetId);
+          const sPool = s?.type === "pool";
+          const tPool = t?.type === "pool";
+          // A pool end can always slide to align → cases 1 & 2 are always possible.
+          // Both-elements (case 3) needs their x-ranges to overlap for a shared x.
+          const xOverlap = s && t
+            ? Math.min(s.x + s.width, t.x + t.width) - Math.max(s.x, t.x)
+            : 1;
+          const canMakeVertical = !s || !t || sPool || tPool || xOverlap > 0;
+          const isVertical = connector.messageForcedVertical === true;
+          return (
+            <div className="mt-1 pt-1 border-t border-gray-100">
+              <div className="text-[9px] text-gray-400 mb-0.5">Message flow (imported layout)</div>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => onUpdateConnectorFields(connector.id, { messageForcedVertical: true })}
+                  disabled={isVertical || !canMakeVertical}
+                  className="flex-1 text-[10px] px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={canMakeVertical
+                    ? "Redraw this message flow as a straight vertical line onto its pool. It then becomes draggable."
+                    : "Not possible — both ends are elements in different pools that don't line up."}
+                >
+                  ↕ Make vertical
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onUpdateConnectorFields(connector.id, { messageForcedVertical: false })}
+                  disabled={!isVertical}
+                  className="flex-1 text-[10px] px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-default"
+                  title="Revert to the imported rectilinear routing (segment-editable)."
+                >
+                  ⌐ Rectilinear
+                </button>
+              </div>
+              {!canMakeVertical && (
+                <p className="text-[9px] text-red-500 mt-0.5">
+                  Can&rsquo;t make vertical — both ends are elements in different pools that aren&rsquo;t aligned. Move the elements to line them up first.
+                </p>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 {(() => {
           const isAssocPC = connector.type === "association" && diagramType === "process-context";
           const isAssocBPMN = connector.type === "associationBPMN";

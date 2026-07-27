@@ -97,19 +97,41 @@ describe("relaxedLayout routes messages rectilinearly (T0709)", () => {
 });
 
 describe("messageForcedVertical repairs an imported message to a vertical spine (T1041)", () => {
-  const els = diagram().elements as DiagramElement[]; // t1 above-left, t2 below-right (non-aligned)
+  // Case 1 — a task (element) above a wide black-box pool below it.
+  const case1 = (): { els: DiagramElement[]; msg: Connector } => ({
+    els: [
+      { id: "task", type: "task", x: 300, y: 100, width: 80, height: 50, label: "T", properties: {} },
+      { id: "pool", type: "pool", x: 50, y: 300, width: 900, height: 60, label: "Partner", properties: { poolType: "black-box" } },
+    ] as DiagramElement[],
+    msg: { id: "m", type: "messageBPMN", sourceId: "task", targetId: "pool",
+      sourceSide: "bottom", targetSide: "top", directionType: "directed",
+      routingType: "rectilinear", sourceOffsetAlong: 0.2, waypoints: [] } as unknown as Connector,
+  });
 
-  it("relaxed + messageForcedVertical → shared-x vertical spine (not the rectilinear dogleg)", () => {
-    const m = { ...diagram().connectors[0], messageForcedVertical: true } as Connector;
+  it("Case 1 (Element ↔ Pool): drops from the ELEMENT's centre, both edges share that x, pool end moves to it", () => {
+    const { els, msg } = case1();
+    const [c] = recomputeAllConnectors([{ ...msg, messageForcedVertical: true }], els, true);
+    const elemCx = 300 + 80 / 2; // 340
+    expect(c.waypoints[1].x).toBe(c.waypoints[2].x); // vertical
+    expect(c.waypoints[1].x).toBe(elemCx);           // at the element's centre
+    expect(c.sourceSide).toBe("bottom");             // element above → bottom
+    expect(c.targetSide).toBe("top");                // pool below → top
+  });
+
+  it("Case 2 (Pool ↔ Pool): produces a shared-x vertical spine", () => {
+    const els = [
+      { id: "p1", type: "pool", x: 50, y: 50, width: 900, height: 60, label: "A", properties: { poolType: "black-box" } },
+      { id: "p2", type: "pool", x: 50, y: 400, width: 900, height: 60, label: "B", properties: { poolType: "black-box" } },
+    ] as DiagramElement[];
+    const m = { id: "m", type: "messageBPMN", sourceId: "p1", targetId: "p2",
+      sourceSide: "bottom", targetSide: "top", directionType: "directed",
+      routingType: "rectilinear", sourceOffsetAlong: 0.4, waypoints: [], messageForcedVertical: true } as unknown as Connector;
     const [c] = recomputeAllConnectors([m], els, true);
-    // The two edge points share one x — a clean vertical drop.
     expect(c.waypoints[1].x).toBe(c.waypoints[2].x);
-    // Sides are re-chosen by position: upper element's bottom → lower element's top.
-    expect(c.sourceSide).toBe("bottom");
-    expect(c.targetSide).toBe("top");
   });
 
   it("without the flag, the same relaxed message stays a non-aligned rectilinear dogleg", () => {
+    const els = diagram().elements as DiagramElement[]; // two non-aligned tasks
     const m = { ...diagram().connectors[0] } as Connector;
     const [c] = recomputeAllConnectors([m], els, true);
     expect(c.waypoints[1].x).not.toBe(c.waypoints[c.waypoints.length - 2].x);
