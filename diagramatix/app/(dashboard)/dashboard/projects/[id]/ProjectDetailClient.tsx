@@ -2251,7 +2251,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             {childFolders.map(cf => renderFolder(cf.id, depth + 1))}
             {directDiagrams.map(d => (
               <div key={d.id}
-                draggable
+                draggable={editingId !== d.id}
                 onDragStart={() => setDragDiagramId(d.id)}
                 onDragEnd={() => setDragDiagramId(null)}
                 className={`flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer text-[10px] ${
