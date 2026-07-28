@@ -3718,6 +3718,42 @@ export function layoutBpmnDiagram(
   positionDataObjectsR802();
   fitLanesToChildren(true);   // FINAL pass: hug each lane to its content (±½ Task-height)
 
+  // ── R8.23: data-artifact label de-overlap ── two data objects / stores that
+  // each picked a slot relative to their OWN element can end up close enough that
+  // their (wider-than-box) labels collide (e.g. "Credit Report" + "Assessment
+  // Summary"). Nudge SAME-LANE data artifacts apart horizontally within the free
+  // band they occupy — labels overhang the box sideways, so widening the x-gap
+  // clears them without touching flow elements or lane heights. Clamp to the
+  // lane's right edge so nothing is pushed out of its pool.
+  {
+    const LABEL_PAD = 34;   // typical half-label overhang beyond the box each side
+    const LABEL_BELOW = 16; // label height below the box
+    const arts = elements
+      .filter(e => (e.type === "data-object" || e.type === "data-store"))
+      .sort((a, b) => a.y - b.y || a.x - b.x);
+    const foot = (e: DiagramElement) => ({ l: e.x - LABEL_PAD, r: e.x + e.width + LABEL_PAD, t: e.y, b: e.y + e.height + LABEL_BELOW });
+    for (let i = 0; i < arts.length; i++) {
+      for (let j = i + 1; j < arts.length; j++) {
+        const a = arts[i], b = arts[j];
+        if (a.parentId !== b.parentId) continue;            // only within the same lane/EP
+        const A = foot(a), B = foot(b);
+        const xOv = Math.min(A.r, B.r) - Math.max(A.l, B.l);
+        const yOv = Math.min(A.b, B.b) - Math.max(A.t, B.t);
+        if (xOv <= 0 || yOv <= 0) continue;
+        // Push the right-hand artifact right by the label overlap, clamped inside
+        // the lane. If it can't fit, push the left one left by the shortfall.
+        const right = b.x >= a.x ? b : a;
+        const left = right === b ? a : b;
+        const lane = right.parentId ? elMap.get(right.parentId) : undefined;
+        const laneRight = lane ? lane.x + lane.width - LABEL_PAD : Infinity;
+        const room = laneRight - (right.x + right.width);
+        const push = Math.min(xOv, Math.max(0, room));
+        right.x += push;
+        if (push < xOv) left.x -= (xOv - push);             // spill the remainder leftwards
+      }
+    }
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // Compute waypoints for all connectors
