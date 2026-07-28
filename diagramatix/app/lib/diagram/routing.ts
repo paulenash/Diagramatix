@@ -2018,7 +2018,13 @@ export function recomputeAllConnectors(
         // the same delta vector so the path can't double back through the
         // source / target body, and overrides with `pickBoundaryEventSide`
         // for boundary-event endpoints (issues 2 + 8).
-        const { src: newSrcSide, tgt: newTgtSide } = safeSidePair(source, target, elements);
+        const { src: autoSrcSide, tgt: autoTgtSide } = safeSidePair(source, target, elements);
+        // Respect a GATEWAY endpoint's chosen side — never auto-flip it to the side
+        // FACING the other element. A user nudges a gateway endpoint deliberately
+        // (and the layout sets it deliberately), so it must snap to the cardinal it
+        // was nudged towards, not the closest-to-the-other-element side (all gateways).
+        const newSrcSide = source.type === "gateway" ? conn.sourceSide : autoSrcSide;
+        const newTgtSide = target.type === "gateway" ? conn.targetSide : autoTgtSide;
         // Preserve the user-chosen offset along any side that ends up
         // unchanged. Without this, every drag step that trips this
         // fallback snaps the visible attachment point back to the
@@ -2064,7 +2070,11 @@ export function recomputeAllConnectors(
     if (waypointInsideObs) {
       // Recalculate with optimal facing sides — boundary-event-aware and
       // self-avoidant via `safeSidePair`.
-      const { src: reSrcSide, tgt: reTgtSide } = safeSidePair(source, target, elements);
+      const { src: autoReSrcSide, tgt: autoReTgtSide } = safeSidePair(source, target, elements);
+      // Respect a GATEWAY endpoint's chosen side here too (see the exit/approach
+      // fallback above) — don't snap it to the side facing the other element.
+      const reSrcSide = source.type === "gateway" ? conn.sourceSide : autoReSrcSide;
+      const reTgtSide = target.type === "gateway" ? conn.targetSide : autoReTgtSide;
       // Same offset-preservation as the exit/approach fallback above:
       // only re-centre the attachment when the side actually changes.
       const reSrcOffset = reSrcSide === conn.sourceSide ? (conn.sourceOffsetAlong ?? 0.5) : 0.5;
