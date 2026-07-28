@@ -943,11 +943,13 @@ export function PropertiesPanel({
     );
   }
 
-  // Collapsible section header
-  function SectionHeader({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
+  // Collapsible section header. `reserveRight` reserves space on the right so the
+  // TOP header's expand arrow clears the absolute-positioned "Collapse panel"
+  // button that sits in the panel's top-right corner (Paul 2026-07-29).
+  function SectionHeader({ label, open, onToggle, reserveRight }: { label: string; open: boolean; onToggle: () => void; reserveRight?: boolean }) {
     return (
       <button onClick={onToggle}
-        className="w-full flex items-center justify-between py-0.5 border-b border-gray-200 mb-1">
+        className={`w-full flex items-center justify-between py-0.5 border-b border-gray-200 mb-1${reserveRight ? " pr-6" : ""}`}>
         <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{label}</span>
         <span className="text-gray-400 text-[10px]">{open ? "\u25BC" : "\u25B6"}</span>
       </button>
@@ -1350,7 +1352,7 @@ export function PropertiesPanel({
     return (
       <div style={{ width: panelWidth }} className="border-l border-gray-200 bg-white p-2 overflow-y-auto relative shrink-0">{resizeHandle}
         <CollapseButton />
-        <SectionHeader label="Diagram Properties" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
+        <SectionHeader label="Diagram Properties" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} reserveRight />
         {titleOpen && TitleSection()}
         <p className="text-xs text-gray-500 font-medium mt-2">{multiSelectionCount} elements selected</p>
         <p className="text-[10px] text-gray-400 mt-0.5">Drag any selected element to move the group</p>
@@ -1362,7 +1364,7 @@ export function PropertiesPanel({
     return (
       <div style={{ width: panelWidth }} className="border-l border-gray-200 bg-white p-2 overflow-y-auto relative shrink-0">{resizeHandle}
         <CollapseButton />
-        <SectionHeader label="Diagram Properties" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
+        <SectionHeader label="Diagram Properties" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} reserveRight />
         {titleOpen && TitleSection()}
         <p className="text-[10px] text-gray-400 mt-2">Select an element to see properties</p>
       </div>
@@ -1373,7 +1375,7 @@ export function PropertiesPanel({
     return (
       <div style={{ width: panelWidth }} className="border-l border-gray-200 bg-white p-2 overflow-y-auto relative shrink-0">{resizeHandle}
         <CollapseButton />
-        <SectionHeader label="Diagram Properties" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
+        <SectionHeader label="Diagram Properties" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} reserveRight />
         {titleOpen && TitleSection()}
         <SectionHeader label="Connector" open={connectorOpen} onToggle={() => setConnectorOpen(!connectorOpen)} />
         {connectorOpen && <div className="space-y-1.5">
@@ -2194,7 +2196,7 @@ export function PropertiesPanel({
   return (
     <div style={{ width: panelWidth }} className="border-l border-gray-200 bg-white p-3 overflow-y-auto relative shrink-0">{resizeHandle}
       <CollapseButton />
-      <SectionHeader label="Diagram Properties" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
+      <SectionHeader label="Diagram Properties" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} reserveRight />
       {titleOpen && TitleSection()}
       <SectionHeader label="Properties" open={propsOpen} onToggle={() => setPropsOpen(!propsOpen)} />
       {propsOpen && <div className="space-y-1.5">
