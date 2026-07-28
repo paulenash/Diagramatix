@@ -53,10 +53,10 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
     },
     {
       "geom": {
-        "h": 0.4,
+        "h": 0,
         "w": 2.19,
         "x": 8.37,
-        "y": 4.1,
+        "y": 3.9,
       },
       "id": "conn-sp-e",
       "master": "111",
@@ -68,7 +68,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
         "h": null,
         "w": null,
         "x": 9.65,
-        "y": 4.29,
+        "y": 3.9,
       },
       "id": "e",
       "master": "1002",
