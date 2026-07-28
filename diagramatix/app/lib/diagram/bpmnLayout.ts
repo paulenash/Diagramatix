@@ -3802,6 +3802,28 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── Issue 7: a final End event sits NEAR its immediate predecessor ──
+  // A process-level End event with a SINGLE incoming sequence flow is aligned to
+  // its predecessor's row (Y) and follows the predecessor's lane, rather than
+  // floating at some lane's vertical centre. End events are NON_LANE_BOUND (they
+  // never stretch a lane) so this can't disturb lane heights. A multi-incoming
+  // End (a merge into it) keeps its balanced position. Runs before routing.
+  {
+    const seqIns = (id: string) => [...aiConnections, ...autoConns].filter(c => c.type !== "message" && c.targetId === id);
+    for (const e of elements) {
+      if (e.type !== "end-event" || e.boundaryHostId || e.parentId === undefined) continue;
+      const parent = elMap.get(e.parentId);
+      if (!parent || (parent.type !== "lane" && parent.type !== "pool")) continue; // top-level only, not EP-internal
+      const ins = seqIns(e.id);
+      if (ins.length !== 1) continue;
+      const pred = elMap.get(ins[0].sourceId);
+      if (!pred || pred.id === e.id || pred.boundaryHostId) continue;
+      // Follow the predecessor's lane, and align to its row.
+      if (pred.parentId && (elMap.get(pred.parentId)?.type === "lane")) e.parentId = pred.parentId;
+      e.y = pred.y + pred.height / 2 - e.height / 2;
+    }
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // Compute waypoints for all connectors
