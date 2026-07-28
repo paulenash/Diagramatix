@@ -3570,6 +3570,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       const def = getSymbolDefinition(action.payload.symbolType);
       let label = def.label;
+      // SMART GATEWAYS (set in the gateway branch below): a hint role stamped on
+      // a freshly-dropped gateway so it alternates with the nearest gateway to
+      // its left — a Decision to its left → this defaults to a Merge, and vice
+      // versa. Rendering/label placement read properties.gatewayRole.
+      let smartGatewayRole: "decision" | "merge" | null = null;
       if (action.payload.symbolType === "task") {
         const count = state.elements.filter((e) => e.type === "task").length;
         label = `Task ${count + 1}`;
@@ -3657,8 +3662,33 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "flowchart-decision") {
         label = "Decision?";
       } else if (action.payload.symbolType === "gateway") {
-        // Exclusive/Inclusive get "Decision?", Parallel/Event-based get no label
-        label = "Decision?";
+        // SMART GATEWAYS — alternate the default role from the NEAREST gateway to
+        // the left: its role is Decision → this one defaults to a Merge (no
+        // label); its role is Merge → this one defaults to a Decision
+        // ("Decision?"). No gateway to the left → default to a Decision.
+        const dropCx = action.payload.position.x;
+        const dropCy = action.payload.position.y;
+        const roleOf = (g: DiagramElement): "decision" | "merge" | null => {
+          const explicit = (g.properties as { gatewayRole?: string } | undefined)?.gatewayRole;
+          if (explicit === "decision" || explicit === "merge") return explicit;
+          let out = 0, inc = 0;
+          for (const c of state.connectors) { if (c.sourceId === g.id) out++; if (c.targetId === g.id) inc++; }
+          if (out >= 2 && inc <= 1) return "decision";
+          if (inc >= 2 && out <= 1) return "merge";
+          return null;
+        };
+        const nearestLeft = state.elements
+          .filter((e) => e.type === "gateway" && (e.x + e.width / 2) < dropCx)
+          .map((e) => ({ e, dist: Math.hypot(dropCx - (e.x + e.width / 2), dropCy - (e.y + e.height / 2)) }))
+          .sort((a, b) => a.dist - b.dist)[0];
+        const leftRole = nearestLeft ? roleOf(nearestLeft.e) : null;
+        if (leftRole === "decision") {
+          label = "";                 // default this new gateway to a Merge
+          smartGatewayRole = "merge";
+        } else {
+          label = "Decision?";        // default to a Decision (also the no-neighbour / merge-left case)
+          smartGatewayRole = "decision";
+        }
       }
       // Pools: place header near the drop point instead of centring the full width
       const isPool = action.payload.symbolType === "pool";
@@ -3702,7 +3732,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const baseProperties: Record<string, unknown> =
         action.payload.symbolType === "pool" ? { poolType: "black-box" }
         : action.payload.symbolType === "uml-class" ? { showAttributes: false, showOperations: false }
-        : action.payload.symbolType === "gateway" ? { labelOffsetX: -30, labelOffsetY: -54 }
+        : action.payload.symbolType === "gateway" ? { labelOffsetX: -30, labelOffsetY: -54, ...(smartGatewayRole ? { gatewayRole: smartGatewayRole } : {}) }
         : action.payload.symbolType === "data-store" ? { labelOffsetX: 0, labelOffsetY: 7 }
         : (action.payload.symbolType === "chevron" || action.payload.symbolType === "chevron-collapsed") ? { showDescription: true }
         : {};
