@@ -97,7 +97,7 @@ const POOL_HEADER_W = 36;
 const LANE_H = 120;
 const LANE_PAD_X = 54; // 1.5 × start-event width (36) — gap between pool/lane header right edge and the first start event
 const BLACK_BOX_H = 50;
-const POOL_GAP = 90; // gap between pool boundaries (3x original 30)
+const POOL_GAP = 98; // gap between pool boundaries = 1.5 × Task height (65) — plenty for a message label, no more (Paul 2026-07-29)
 const COL_SPACING = 160; // horizontal spacing between columns
 const TASK_W = 100; // standard task width for padding
 const START_X = 50;
@@ -3717,6 +3717,11 @@ export function layoutBpmnDiagram(
   // re-fit the lanes so any nudged data object is still enclosed.
   positionDataObjectsR802();
   fitLanesToChildren(true);   // FINAL pass: hug each lane to its content (±½ Task-height)
+  // The final lane hug shrinks a white-box pool, which would otherwise leave an
+  // over-wide vertical gap to the black-box pool below it (the gap grew to 268px
+  // in the repro). Re-stack all pools to the fixed POOL_GAP now so every inter-
+  // pool gap is exactly 1.5 × Task height — snug around the message labels.
+  restackPoolsR52();
 
   // ── R8.23: data-artifact label de-overlap ── two data objects / stores that
   // each picked a slot relative to their OWN element can end up close enough that
