@@ -439,12 +439,27 @@ export function pickBoundaryEventSide(
   if (!outer) return null;
   const host = allElements.find((h) => h.id === evt.boundaryHostId);
   if (!host) return outer;
+  const ecx = evt.x + evt.width / 2, ecy = evt.y + evt.height / 2;
   const ocx = other.x + other.width / 2;
   const ocy = other.y + other.height / 2;
   const otherInsideHost =
     ocx > host.x && ocx < host.x + host.width &&
     ocy > host.y && ocy < host.y + host.height;
-  return otherInsideHost ? oppositeSide(outer) : outer;
+  if (otherInsideHost) return oppositeSide(outer);
+  // Corner disambiguation: when the event sits near a host CORNER it is close to
+  // BOTH a horizontal (top/bottom) and a vertical (left/right) outer edge, so
+  // `outer` (nearest-edge, deterministic order) may face away from the target and
+  // force the connector to double back around the host. Pick the outer side whose
+  // axis the target lies farther along, so the connector exits TOWARD its target.
+  const TOL = Math.max(evt.width, evt.height);
+  const nearH = Math.min(Math.abs(ecy - host.y), Math.abs(ecy - (host.y + host.height))) <= TOL;
+  const nearV = Math.min(Math.abs(ecx - host.x), Math.abs(ecx - (host.x + host.width))) <= TOL;
+  if (nearH && nearV) {
+    const hOut: Side = Math.abs(ecy - host.y) <= Math.abs(ecy - (host.y + host.height)) ? "top" : "bottom";
+    const vOut: Side = Math.abs(ecx - host.x) <= Math.abs(ecx - (host.x + host.width)) ? "left" : "right";
+    return Math.abs(ocx - ecx) >= Math.abs(ocy - ecy) ? vOut : hOut;
+  }
+  return outer;
 }
 
 /**

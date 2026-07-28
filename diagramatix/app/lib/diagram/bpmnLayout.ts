@@ -5,7 +5,7 @@
 
 import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
-import { computeWaypoints, recomputeAllConnectors } from "./routing";
+import { computeWaypoints, recomputeAllConnectors, pickBoundaryEventSide } from "./routing";
 import { autoSizeForType, wrapText, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
 import { snapImportedBounds, type Box } from "./importGeometry";
 import { buildTestConnectors } from "./bpmnTestConnectors";
@@ -3150,6 +3150,9 @@ export function layoutBpmnDiagram(
       if (stored === "top" || stored === "bottom" || stored === "left" || stored === "right") {
         srcSide = stored;
       }
+      // NOTE: the corner-aware exit side (issue 2) is re-derived from FINAL
+      // geometry in the computedConnectors pass below (pickBoundaryEventSide) —
+      // it can't be decided here because the EP re-tighten hasn't run yet.
     }
 
     // Compute target offset for message connectors
@@ -3768,6 +3771,14 @@ export function layoutBpmnDiagram(
     const src = elMap.get(conn.sourceId);
     const tgt = elMap.get(conn.targetId);
     if (!src || !tgt) return conn;
+    // Issue 2: re-derive a boundary intermediate event's exit side from FINAL
+    // geometry (the build-time R7.02 side is stale once the EP re-tighten moved
+    // the event onto a corner). The corner-aware pickBoundaryEventSide exits the
+    // connector TOWARD its target instead of doubling back around the host.
+    if (conn.type === "sequence" && src.boundaryHostId && src.type === "intermediate-event") {
+      const s = pickBoundaryEventSide(src, tgt, elements);
+      if (s) conn.sourceSide = s as Connector["sourceSide"];
+    }
     const logSlow = () => {
       const dur = Date.now() - tConn;
       if (dur > 200) {
