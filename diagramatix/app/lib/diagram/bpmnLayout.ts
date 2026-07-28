@@ -1644,7 +1644,7 @@ export function layoutBpmnDiagram(
     ]);
     const PAD = 10;
     // Final-pass "hug": size each lane band to hug its content EXACTLY (shrink
-    // OR grow), leaving ½ a Task-height of clearance top & bottom. The initial
+    // OR grow), leaving 1 Task-height of clearance top & bottom. The initial
     // lane sizing reserves `maxStack × (taskH+30)`, which badly over-estimates
     // when a lane's activities spread across many columns instead of stacking
     // in one — leaving hundreds of px of dead space (the "Loan Assessment Team"
@@ -1652,7 +1652,7 @@ export function layoutBpmnDiagram(
     // as the very last layout mutation, right before connectors route once, so
     // there's no re-routing and same-lane horizontal flow is preserved (both
     // endpoints of a same-lane connector move by the same dy).
-    const HUG_VPAD = Math.round(0.5 * getSymbolDefinition("task").defaultHeight);
+    const HUG_VPAD = getSymbolDefinition("task").defaultHeight;   // 1 × Task-height
     const LANE_FLOOR = getSymbolDefinition("task").defaultHeight + HUG_VPAD * 2;
     for (const pool of elements.filter(e => e.type === "pool")) {
       const lanes = elements.filter(e => e.type === "lane" && e.parentId === pool.id).sort((a, b) => a.y - b.y);

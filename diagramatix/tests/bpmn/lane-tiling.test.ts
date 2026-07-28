@@ -134,15 +134,15 @@ describe("Lane tiling invariant", () => {
 
 describe("Lane hug — each lane sits close around its content (no dead space)", () => {
   // The final fitLanesToChildren(hug) pass sizes every lane band to its content
-  // plus ½ a Task-height (33px for a 65px Task) top & bottom, collapsing the
-  // maxStack over-reservation that left the real "Loan Assessment Team" lane
-  // 1151px tall for 486px of content. Only activities (not gateways/events)
-  // bound a lane, so we measure clearance to the outermost activity.
-  const HUG_VPAD = Math.round(0.5 * 65);          // ½ Task-height
+  // plus 1 Task-height (65px) top & bottom, collapsing the maxStack over-
+  // reservation that left the real "Loan Assessment Team" lane 1151px tall for
+  // 486px of content. Only activities (not gateways/events) bound a lane, so we
+  // measure clearance to the outermost activity.
+  const HUG_VPAD = 65;                            // 1 × Task-height
   const ACTIVITY = new Set(["task", "subprocess", "subprocess-expanded", "data-object", "data-store"]);
-  const CLEAR_TOL = HUG_VPAD + 4;                 // ½-Task pad + sub-pixel slack
+  const CLEAR_TOL = HUG_VPAD + 4;                 // 1-Task pad + sub-pixel slack
 
-  it("T1044 — a lane hugs its outermost activity to ±½ Task-height", () => {
+  it("T1044 — a lane hugs its outermost activity to ±1 Task-height", () => {
     const out = layoutBpmnDiagram(els, conns);
     const pool = out.elements.find((x) => x.id === "p")!;
     const lanes = out.elements.filter((x) => x.type === "lane" && x.parentId === pool.id);
