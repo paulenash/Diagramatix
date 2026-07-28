@@ -3770,6 +3770,34 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── Issue 5: move a data artifact OUT of an EP it sits inside (final tidy) ──
+  // A Data Object / Store placed inside an Expanded Subprocess crowds the EP's
+  // flow (e.g. "Lending Policy" wedged among the tasks). Move it vertically
+  // OUTSIDE the EP's nearest boundary — above the top or below the bottom — and
+  // re-home it to the EP's container so the EP interior stays clean. Data
+  // artifacts are NOT sequence-routing obstacles, so this can't perturb any
+  // connector; the association line to its element simply crosses the EP edge.
+  {
+    const isArt = (t: string) => t === "data-object" || t === "data-store";
+    const EPGAP = 20;
+    for (const art of elements) {
+      if (!isArt(art.type)) continue;
+      let cur: DiagramElement | undefined = art.parentId ? elMap.get(art.parentId) : undefined;
+      let ep: DiagramElement | undefined; let guard = 0;
+      while (cur && guard++ < 12) {
+        if (cur.type === "subprocess-expanded") { ep = cur; break; }
+        cur = cur.parentId ? elMap.get(cur.parentId) : undefined;
+      }
+      if (!ep) continue;
+      const acy = art.y + art.height / 2;
+      art.y = Math.abs(acy - ep.y) <= Math.abs(acy - (ep.y + ep.height))
+        ? ep.y - EPGAP - art.height          // nearer the top → above the EP
+        : ep.y + ep.height + EPGAP;           // else below the EP
+      art.x = Math.max(ep.x, Math.min(ep.x + ep.width - art.width, art.x)); // keep within the EP's x-span
+      art.parentId = ep.parentId;             // re-home to the EP's container (lane/pool)
+    }
+  }
+
   // ── Issue 3: place a boundary event's TERMINAL exit target next to the event ──
   // An element reached only from an EP edge-mounted event (e.g. an End event
   // "Lapse Application" off a "10 working days" timer) is placed by the column
