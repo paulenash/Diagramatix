@@ -1208,6 +1208,13 @@ export function computeWaypoints(
       if (el.type === "pool" || el.type === "lane") return false;
       // Only the BPMN flow-node types listed above are obstacles for sequence flow.
       if (!SEQ_OBSTACLE_TYPES.has(el.type)) return false;
+      // A boundary (edge-mounted) event's connector must NEVER re-enter the
+      // activity it is mounted on — it must exit outward and route AROUND the
+      // host, even when re-routed (Paul 2026-07-29). So the host stays an
+      // obstacle for that event's OWN connector, UNLESS the other endpoint is
+      // genuinely inside the host (then the connector must enter to reach it).
+      if (el.id === source.boundaryHostId && !tgtAncestors.has(el.id)) return true;
+      if (el.id === target.boundaryHostId && !srcAncestors.has(el.id)) return true;
       // EPs that contain source OR target (at any depth) are not obstacles —
       // sequence flow must be allowed to enter the EP to reach the
       // descendant endpoint. EPs that DON'T contain either endpoint stay
