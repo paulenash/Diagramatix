@@ -3078,7 +3078,14 @@ export function layoutBpmnDiagram(
         srcSide = sideFacing(src, _tgtCx, _tgtCy);
       }
       if (EVENT_TYPES.has(tgt.type) && !tgt.boundaryHostId) {
-        tgtSide = sideFacing(tgt, _srcCx, _srcCy);
+        const s = sideFacing(tgt, _srcCx, _srcCy);
+        // Issue 4: a connector FROM a Decision gateway always attaches to the
+        // target's nearest VERTICAL boundary (left/right), never top/bottom —
+        // so every branch reads horizontally out of the gateway. Overrides the
+        // generic R3.06 top/bottom choice for an above/below event target.
+        tgtSide = (isDecisionGateway(src) && (s === "top" || s === "bottom"))
+          ? (_srcCx <= _tgtCx ? "left" : "right")
+          : s;
       }
       // R6.18: a connector leaving an Event-based DECISION gateway must
       // enter its target event on the event's LEFT connection point —
