@@ -53,6 +53,11 @@ describe("EP-boundary interrupt (R8.19) + re-tighten (R8.20)", () => {
     const insideEp = (p: { x: number; y: number }) =>
       p.x > ep.x + 1 && p.x < ep.x + ep.width - 1 && p.y > ep.y + 1 && p.y < ep.y + ep.height - 1;
     expect(conn.waypoints.some(insideEp), "no event→End waypoint inside the EP").toBe(false);
+
+    // Issue 3: the terminal exit End event is placed NEAR the timer (a short
+    // straight connector), not stranded far away by the column engine.
+    const near = Math.hypot((lapse.x + lapse.width / 2) - cx, (lapse.y + lapse.height / 2) - cy);
+    expect(near, `Lapse should sit adjacent to the timer (dist ${Math.round(near)}px)`).toBeLessThanOrEqual(120);
   });
 
   it("T1053 — the EP hugs its rightmost real child (no dead gap on the right)", () => {

@@ -3763,6 +3763,38 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── Issue 3: place a boundary event's TERMINAL exit target next to the event ──
+  // An element reached only from an EP edge-mounted event (e.g. an End event
+  // "Lapse Application" off a "10 working days" timer) is placed by the column
+  // engine far from the event, giving a long detour connector. Move such a
+  // target — only a terminal one (no outgoing sequence flow, so nothing
+  // downstream is disturbed) — just OUTSIDE the event's outer side, aligned, so
+  // the connector is a short straight line out of the host. Runs before routing.
+  {
+    const seqConns = [...aiConnections, ...autoConns].filter(c => c.type !== "message");
+    const hasOutgoing = (id: string) => seqConns.some(c => c.sourceId === id);
+    const G = Math.round(0.6 * getSymbolDefinition("task").defaultHeight);
+    for (const ev of elements) {
+      if (!ev.boundaryHostId || ev.type !== "intermediate-event") continue;
+      const c = seqConns.find(x => x.sourceId === ev.id);
+      if (!c) continue;
+      const tgt = elMap.get(c.targetId);
+      const host = elMap.get(ev.boundaryHostId);
+      if (!tgt || !host) continue;
+      if (hasOutgoing(tgt.id)) continue;                 // only reposition a terminal target
+      const tcx = tgt.x + tgt.width / 2, tcy = tgt.y + tgt.height / 2;
+      const inside = tcx > host.x && tcx < host.x + host.width && tcy > host.y && tcy < host.y + host.height;
+      if (inside) continue;                              // must be an EP exit
+      const side = pickBoundaryEventSide(ev, tgt, elements);
+      const cy = ev.y + ev.height / 2 - tgt.height / 2;
+      const cx = ev.x + ev.width / 2 - tgt.width / 2;
+      if (side === "right")       { tgt.x = ev.x + ev.width + G; tgt.y = cy; }
+      else if (side === "left")   { tgt.x = ev.x - G - tgt.width; tgt.y = cy; }
+      else if (side === "bottom") { tgt.y = ev.y + ev.height + G; tgt.x = cx; }
+      else if (side === "top")    { tgt.y = ev.y - G - tgt.height; tgt.x = cx; }
+    }
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // Compute waypoints for all connectors
@@ -3778,6 +3810,14 @@ export function layoutBpmnDiagram(
     if (conn.type === "sequence" && src.boundaryHostId && src.type === "intermediate-event") {
       const s = pickBoundaryEventSide(src, tgt, elements);
       if (s) conn.sourceSide = s as Connector["sourceSide"];
+      // Also re-face the target's attachment toward the (final-position) event,
+      // so a target moved next to the event (issue 3) is entered on the facing
+      // side rather than a stale build-time side.
+      const ecx = src.x + src.width / 2, ecy = src.y + src.height / 2;
+      const tcx = tgt.x + tgt.width / 2, tcy = tgt.y + tgt.height / 2;
+      const dx = ecx - tcx, dy = ecy - tcy;
+      const nx = Math.abs(dx) / (tgt.width / 2 || 1), ny = Math.abs(dy) / (tgt.height / 2 || 1);
+      conn.targetSide = (nx >= ny ? (dx >= 0 ? "right" : "left") : (dy >= 0 ? "bottom" : "top")) as Connector["targetSide"];
     }
     const logSlow = () => {
       const dur = Date.now() - tConn;
