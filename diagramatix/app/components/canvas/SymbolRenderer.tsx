@@ -204,7 +204,12 @@ export const DatabaseCtx = createContext<string | undefined>(undefined);
  *  container fills and the label-at-top position. Computed in Canvas.tsx. */
 export const ArchimateDepthCtx = createContext<Map<string, number>>(new Map());
 
-function ValueBadge({ el, show: showProp }: { el: DiagramElement; show?: boolean }) {
+function ValueBadge({ el, show: showProp, onUpdateProperties, svgToWorld }: {
+  el: DiagramElement;
+  show?: boolean;
+  onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
+  svgToWorld?: (clientX: number, clientY: number) => { x: number; y: number };
+}) {
   const showCtx = useContext(ShowValueDisplayCtx);
   if (!(showProp ?? showCtx)) return null;
   const va = (el.properties.valueAnalysis as string | undefined) ?? "none";
@@ -217,8 +222,13 @@ function ValueBadge({ el, show: showProp }: { el: DiagramElement; show?: boolean
   const hasTimes = (ct !== undefined && ct !== 0) || (wt !== undefined && wt !== 0);
   if (!hasValue && !hasTimes) return null;
   const color = hasValue ? (VALUE_COLORS[va] ?? "#374151") : "#6b7280";
-  const x = el.x + el.width + 3;
-  const baseY = el.y + el.height;
+  // Placed UNDER the element, centred, with a moveable offset (dragged by the
+  // user → persisted as valueBadgeOffsetX/Y). Default is just below the bottom
+  // edge so it never overlaps the element body.
+  const ox = (el.properties.valueBadgeOffsetX as number | undefined) ?? 0;
+  const oy = (el.properties.valueBadgeOffsetY as number | undefined) ?? 0;
+  const cx = el.x + el.width / 2 + ox;
+  const topY = el.y + el.height + 12 + oy;
   let timesText = "";
   if (hasTimes) {
     const parts: string[] = [];
@@ -226,17 +236,46 @@ function ValueBadge({ el, show: showProp }: { el: DiagramElement; show?: boolean
     if (wt !== undefined && wt !== 0) parts.push(`WT=${wt}`);
     timesText = `(${parts.join(", ")}${unitLabel ? ":" + unitLabel : ""})`;
   }
+  const draggable = !!onUpdateProperties && !!svgToWorld;
+  function handleMouseDown(e: React.MouseEvent) {
+    if (!draggable) return;
+    e.stopPropagation();
+    const start = svgToWorld!(e.clientX, e.clientY);
+    const startOx = ox, startOy = oy;
+    document.body.style.cursor = "grabbing";
+    function onMove(ev: MouseEvent) {
+      const cur = svgToWorld!(ev.clientX, ev.clientY);
+      onUpdateProperties!(el.id, {
+        valueBadgeOffsetX: startOx + (cur.x - start.x),
+        valueBadgeOffsetY: startOy + (cur.y - start.y),
+      });
+    }
+    function onUp() {
+      document.body.style.cursor = "";
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+  const nLines = (hasValue ? 1 : 0) + (hasTimes ? 1 : 0);
   return (
-    <g>
+    <g
+      style={{ cursor: draggable ? "grab" : "default" }}
+      onMouseDown={handleMouseDown}
+    >
+      {/* Transparent drag hit-area under the element. */}
+      <rect x={cx - 45} y={topY - 9} width={90} height={nLines * 10 + 4}
+        fill="transparent" style={{ pointerEvents: draggable ? "auto" : "none" }} />
       {hasValue && (
-        <text x={x} y={baseY} fontSize={9} fontWeight="bold" fill={color}
-          textAnchor="start" dominantBaseline="auto">
+        <text x={cx} y={topY} fontSize={9} fontWeight="bold" fill={color}
+          textAnchor="middle" dominantBaseline="auto" style={{ pointerEvents: "none" }}>
           {va}
         </text>
       )}
       {hasTimes && (
-        <text x={x} y={baseY + (hasValue ? 10 : 0)} fontSize={8} fontWeight="bold" fill={color}
-          textAnchor="start" dominantBaseline="auto">
+        <text x={cx} y={topY + (hasValue ? 10 : 0)} fontSize={8} fontWeight="bold" fill={color}
+          textAnchor="middle" dominantBaseline="auto" style={{ pointerEvents: "none" }}>
           {timesText}
         </text>
       )}
@@ -2711,7 +2750,7 @@ export function SymbolRenderer({
 
       {/* Value analysis badge (task/subprocess only, when Value Display is on) */}
       {showValueDisplay && (element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") && (
-        <ValueBadge el={element} show={true} />
+        <ValueBadge el={element} show={true} onUpdateProperties={onUpdateProperties} svgToWorld={svgToWorld} />
       )}
 
       {/* Subprocess drill-through — hit area on the + marker (only when linked).
