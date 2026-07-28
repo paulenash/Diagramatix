@@ -7021,9 +7021,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             //   side="bottom": offset≈0 → RIGHT vertex, ≈0.5 → BOTTOM, ≈1 → LEFT
             //   side="left":   offset≈0 → BOTTOM vertex,≈0.5 → LEFT,   ≈1 → TOP
             const TOL = 0.05;
+            // Were we already sitting ON this side's cardinal vertex? If so, a
+            // small nudge that lands back within TOL of 0.5 must NOT re-snap — that
+            // was the "springs back to the top" bug: you could never leave a
+            // cardinal point. Only snap to THIS vertex when ARRIVING at it.
+            const wasAtVertex = Math.abs(offset - 0.5) <= TOL;
             let vertex: Side | null = null;
             if (Math.abs(newOffset - 0.5) <= TOL) {
-              vertex = side; // already on the cardinal vertex
+              if (!wasAtVertex) vertex = side; // arriving at this side's cardinal vertex
             } else if (newOffset <= TOL) {
               vertex = side === "top" ? "left"
                      : side === "right" ? "top"

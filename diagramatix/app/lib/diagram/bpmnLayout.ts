@@ -2260,8 +2260,10 @@ export function layoutBpmnDiagram(
   // Pre-existing parentId is preserved (data inherits the associated
   // element's lane parent so R57 below grows the lane to accommodate
   // the data object's new bounds).
-  const DATA_GAP = 30; // horizontal gap between data and element
-  const DATA_VGAP = 20; // vertical gap when above/below the element
+  // Gaps between a generated data object and its element — 50% longer than the
+  // original tight hug (30/20) so the association reads clearly (Paul 2026-07-28).
+  const DATA_GAP = 45; // horizontal gap between data and element
+  const DATA_VGAP = 30; // vertical gap when above/below the element
   // Track occupied quadrants per associated element so two data objects
   // sharing the same task don't stack on top of each other.
   // Run TWICE: here (so R57 / R6.05 grow the lane to fit the data object) and
