@@ -131,3 +131,32 @@ describe("Lane tiling invariant", () => {
     expect(Math.abs(bottom - (pool.y + pool.height)), "bottom lane flush to pool bottom").toBeLessThanOrEqual(TOL);
   });
 });
+
+describe("Lane hug — each lane sits close around its content (no dead space)", () => {
+  // The final fitLanesToChildren(hug) pass sizes every lane band to its content
+  // plus ½ a Task-height (33px for a 65px Task) top & bottom, collapsing the
+  // maxStack over-reservation that left the real "Loan Assessment Team" lane
+  // 1151px tall for 486px of content. Only activities (not gateways/events)
+  // bound a lane, so we measure clearance to the outermost activity.
+  const HUG_VPAD = Math.round(0.5 * 65);          // ½ Task-height
+  const ACTIVITY = new Set(["task", "subprocess", "subprocess-expanded", "data-object", "data-store"]);
+  const CLEAR_TOL = HUG_VPAD + 4;                 // ½-Task pad + sub-pixel slack
+
+  it("T1044 — a lane hugs its outermost activity to ±½ Task-height", () => {
+    const out = layoutBpmnDiagram(els, conns);
+    const pool = out.elements.find((x) => x.id === "p")!;
+    const lanes = out.elements.filter((x) => x.type === "lane" && x.parentId === pool.id);
+    for (const lane of lanes) {
+      const kids = out.elements.filter((e) => e.parentId === lane.id && ACTIVITY.has(e.type));
+      if (kids.length === 0) continue;            // event/gateway-only lane isn't hug-bound
+      const topAct = Math.min(...kids.map((k) => k.y));
+      const botAct = Math.max(...kids.map((k) => k.y + k.height));
+      const topGap = topAct - lane.y;
+      const botGap = (lane.y + lane.height) - botAct;
+      expect(topGap, `lane "${lane.label}" top gap ${Math.round(topGap)}px ≤ ${CLEAR_TOL}`).toBeLessThanOrEqual(CLEAR_TOL);
+      expect(botGap, `lane "${lane.label}" bottom gap ${Math.round(botGap)}px ≤ ${CLEAR_TOL}`).toBeLessThanOrEqual(CLEAR_TOL);
+      expect(topGap, `lane "${lane.label}" top gap must be non-negative`).toBeGreaterThanOrEqual(-TOL);
+      expect(botGap, `lane "${lane.label}" bottom gap must be non-negative`).toBeGreaterThanOrEqual(-TOL);
+    }
+  });
+});

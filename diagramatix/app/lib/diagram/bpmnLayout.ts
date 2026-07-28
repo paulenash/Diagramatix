@@ -1602,7 +1602,7 @@ export function layoutBpmnDiagram(
   // stay aligned, which kills the "lane does not fully contain child"
   // warnings the scanner reports. Floats (annotations, groups) are excluded
   // from the bounds check so a stray annotation can't bloat a lane.
-  function fitLanesToChildren() {
+  function fitLanesToChildren(hug = false) {
     // Float types never belong in a lane's bounds; neither do gateways or
     // events. BPMN lanes represent PERFORMERS — only activities (tasks /
     // subprocesses) need to fit inside their lane, so gateways and events
@@ -1614,6 +1614,17 @@ export function layoutBpmnDiagram(
       "start-event", "intermediate-event", "end-event",
     ]);
     const PAD = 10;
+    // Final-pass "hug": size each lane band to hug its content EXACTLY (shrink
+    // OR grow), leaving ½ a Task-height of clearance top & bottom. The initial
+    // lane sizing reserves `maxStack × (taskH+30)`, which badly over-estimates
+    // when a lane's activities spread across many columns instead of stacking
+    // in one — leaving hundreds of px of dead space (the "Loan Assessment Team"
+    // lane was 1151px tall for 486px of content). This collapses that. It runs
+    // as the very last layout mutation, right before connectors route once, so
+    // there's no re-routing and same-lane horizontal flow is preserved (both
+    // endpoints of a same-lane connector move by the same dy).
+    const HUG_VPAD = Math.round(0.5 * getSymbolDefinition("task").defaultHeight);
+    const LANE_FLOOR = getSymbolDefinition("task").defaultHeight + HUG_VPAD * 2;
     for (const pool of elements.filter(e => e.type === "pool")) {
       const lanes = elements.filter(e => e.type === "lane" && e.parentId === pool.id).sort((a, b) => a.y - b.y);
       if (lanes.length === 0) continue;
@@ -1631,15 +1642,23 @@ export function layoutBpmnDiagram(
           maxY = Math.max(maxY, el.y + el.height);
         }
         if (!isFinite(minY)) continue;
-        const neededTop = minY - PAD;
-        const neededBot = maxY + PAD;
-        if (neededTop < lane.y) {
-          const grow = lane.y - neededTop;
-          lane.y -= grow;
-          lane.height += grow;
-        }
-        if (neededBot > lane.y + lane.height) {
-          lane.height = neededBot - lane.y;
+        if (hug) {
+          const top = minY - HUG_VPAD;
+          let h = (maxY + HUG_VPAD) - top;
+          if (h < LANE_FLOOR) h = LANE_FLOOR;   // never thinner than one Task + clearance
+          lane.y = top;
+          lane.height = h;
+        } else {
+          const neededTop = minY - PAD;
+          const neededBot = maxY + PAD;
+          if (neededTop < lane.y) {
+            const grow = lane.y - neededTop;
+            lane.y -= grow;
+            lane.height += grow;
+          }
+          if (neededBot > lane.y + lane.height) {
+            lane.height = neededBot - lane.y;
+          }
         }
       }
       // 2. Re-stack contiguously from pool.y, carrying each lane's subtree.
@@ -3559,7 +3578,7 @@ export function layoutBpmnDiagram(
   // may have moved during the gateway / start-end tightening passes above), then
   // re-fit the lanes so any nudged data object is still enclosed.
   positionDataObjectsR802();
-  fitLanesToChildren();
+  fitLanesToChildren(true);   // FINAL pass: hug each lane to its content (±½ Task-height)
 
   phase(`connectors built (${connectors.length})`);
 
