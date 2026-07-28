@@ -97,7 +97,7 @@ const POOL_HEADER_W = 36;
 const LANE_H = 120;
 const LANE_PAD_X = 54; // 1.5 × start-event width (36) — gap between pool/lane header right edge and the first start event
 const BLACK_BOX_H = 50;
-const POOL_GAP = 90; // gap between pool boundaries (3x original 30)
+const POOL_GAP = 98; // gap between pool boundaries = 1.5 × Task height (65) — plenty for a message label, no more (Paul 2026-07-29)
 const COL_SPACING = 160; // horizontal spacing between columns
 const TASK_W = 100; // standard task width for padding
 const START_X = 50;
@@ -3717,6 +3717,12 @@ export function layoutBpmnDiagram(
   // re-fit the lanes so any nudged data object is still enclosed.
   positionDataObjectsR802();
   fitLanesToChildren(true);   // FINAL pass: hug each lane to its content (±½ Task-height)
+  // The final lane hug shrinks a white-box pool, which would otherwise leave an
+  // over-wide vertical gap to the black-box pool below it. Re-stack all pools to
+  // the fixed POOL_GAP now so every inter-pool gap is exactly 1.5 × Task height.
+  // (Message-flow labels are re-placed from the FINAL routed geometry below, so
+  // moving the pools here does NOT leave the labels stale.)
+  restackPoolsR52();
 
   // ── R8.23: data-artifact label de-overlap ── two data objects / stores that
   // each picked a slot relative to their OWN element can end up close enough that
@@ -3814,6 +3820,72 @@ export function layoutBpmnDiagram(
   });
 
   phase("waypoints computed — done");
+
+  // ── R05.09: message-flow label placement from FINAL routed geometry ──
+  // The build-time label offsets (R05.05) are stale — the L→R sweep, lane hug and
+  // pool restack all move elements AFTER them. Recompute every messageBPMN label
+  // here from its FINAL waypoints: it sits in the gap adjacent to the black-box
+  // pool it attaches to (half a POOL_GAP in, toward the other pool), CENTRED on
+  // its connector (offsetX = 0). Two labels on the same pool sharing a connector-x
+  // stagger in half-line steps. The anchor is the leader midpoint — identical to
+  // the runtime computeMsgBpmnLabelOffsets — so the stored offset renders true.
+  {
+    const containingPool = (el: DiagramElement): DiagramElement | undefined => {
+      if (el.type === "pool") return el;
+      let cur: DiagramElement | undefined = el;
+      for (let i = 0; i < 10 && cur; i++) {
+        if (!cur.parentId) break;
+        const p = elements.find(e => e.id === cur!.parentId);
+        if (!p) break;
+        if (p.type === "pool") return p;
+        cur = p;
+      }
+      return undefined;
+    };
+    const LINE_H = 14, W = 80, HALF = LINE_H / 2;
+    const track: { bbpId: string; cx: number }[] = [];
+    for (const conn of computedConnectors) {
+      if (conn.type !== "messageBPMN") continue;
+      const wps = conn.waypoints;
+      if (!wps || wps.length < 4) continue;
+      const src = elMap.get(conn.sourceId), tgt = elMap.get(conn.targetId);
+      if (!src || !tgt) continue;
+      const srcPool = containingPool(src), tgtPool = containingPool(tgt);
+      if (!srcPool || !tgtPool) continue;
+      // Anchor = midpoint of the leader endpoints (matches the renderer + the
+      // runtime re-anchor), NOT the far element edges.
+      const anchorY = (wps[1].y + wps[wps.length - 2].y) / 2;
+      const anchorX = (wps[1].x + wps[wps.length - 2].x) / 2;
+      const goingDown = conn.sourceSide === "bottom";
+      const srcPoolEdgeY = goingDown ? srcPool.y + srcPool.height : srcPool.y;
+      const tgtPoolEdgeY = goingDown ? tgtPool.y : tgtPool.y + tgtPool.height;
+      const srcBB = ((srcPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
+      const tgtBB = ((tgtPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
+      let bbpId: string | null = null, bbpEdgeY = 0, otherEdgeY = 0;
+      if (srcBB && !tgtBB) { bbpId = srcPool.id; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY; }
+      else if (tgtBB && !srcBB) { bbpId = tgtPool.id; bbpEdgeY = tgtPoolEdgeY; otherEdgeY = srcPoolEdgeY; }
+      else if (srcBB && tgtBB) { bbpId = srcPool.id; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY; }
+      if (bbpId) {
+        const gapDir = otherEdgeY >= bbpEdgeY ? 1 : -1;
+        const baseCentreY = bbpEdgeY + (POOL_GAP / 2) * gapDir;
+        const xClose = track.filter(l => l.bbpId === bbpId && Math.abs(l.cx - anchorX) < W).length;
+        const dir = xClose % 2 === 0 ? -1 : 1;
+        const mag = (Math.floor(xClose / 2) + 1) * HALF;
+        const edgeNear = bbpEdgeY + HALF * gapDir;
+        const edgeFar = bbpEdgeY + (POOL_GAP - HALF) * gapDir;
+        const lo = Math.min(edgeNear, edgeFar), hi = Math.max(edgeNear, edgeFar);
+        const cy = Math.max(lo, Math.min(hi, baseCentreY + dir * mag));
+        conn.labelOffsetX = 0;
+        conn.labelOffsetY = cy - anchorY - 7;
+        conn.labelWidth = W;
+        track.push({ bbpId, cx: anchorX });
+      } else {
+        const gapCentreY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
+        conn.labelOffsetX = 20;
+        conn.labelOffsetY = gapCentreY - anchorY - 7;
+      }
+    }
+  }
 
   // R56: "AI Generated" annotation attached to the process-level Start Event.
   // Injected post-layout so it doesn't go through the column/lane placement.
