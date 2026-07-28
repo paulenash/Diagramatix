@@ -65,4 +65,34 @@ describe("snapImportedBounds (T0710)", () => {
     const n = r.shapes.find((s) => s.id === "n")!;
     expect(n.poolId).toBe("p2");
   });
+
+  it("T1045 — nests a sub-lane within its parent lane, tiling the lane height", () => {
+    const shapes: ImportedShape[] = [
+      { id: "p", type: "pool", bounds: { x: 0.1, y: 0.1, w: 0.8, h: 0.8 } },
+      { id: "l", type: "lane", parentPool: "p", bounds: { x: 0.15, y: 0.12, w: 0.7, h: 0.76 } },
+      // Two sub-bands stacked inside lane "l".
+      { id: "sa", type: "sublane", parentLane: "l", parentPool: "p", bounds: { x: 0.15, y: 0.14, w: 0.7, h: 0.30 } },
+      { id: "sb", type: "sublane", parentLane: "l", parentPool: "p", bounds: { x: 0.15, y: 0.48, w: 0.7, h: 0.38 } },
+      { id: "n", type: "task", pool: "p", lane: "sa", bounds: { x: 0.3, y: 0.2, w: 0.1, h: 0.08 } },
+    ];
+    const r = snapImportedBounds(shapes);
+    const lane = r.shapes.find((s) => s.id === "l")!;
+    const sa = r.shapes.find((s) => s.id === "sa")!;
+    const sb = r.shapes.find((s) => s.id === "sb")!;
+    // Sub-lanes are emitted with the right parents.
+    expect(sa.type).toBe("sublane");
+    expect(sa.parentLaneId).toBe("l");
+    expect(sa.parentPoolId).toBe("p");
+    // They flush to the parent lane's x/width…
+    expect(sa.box.x).toBeCloseTo(lane.box.x, 5);
+    expect(sa.box.w).toBeCloseTo(lane.box.w, 5);
+    // …tile contiguously (sa bottom === sb top) and exactly cover the lane height.
+    expect(sa.box.y).toBeCloseTo(lane.box.y, 5);
+    expect(sa.box.y + sa.box.h).toBeCloseTo(sb.box.y, 5);
+    expect(sb.box.y + sb.box.h).toBeCloseTo(lane.box.y + lane.box.h, 5);
+    // A node whose centre is inside sub-band "sa" resolves to the sub-lane (innermost wins).
+    const n = r.shapes.find((s) => s.id === "n")!;
+    expect(n.laneId).toBe("sa");
+    expect(n.poolId).toBe("p");
+  });
 });

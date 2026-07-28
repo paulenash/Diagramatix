@@ -64,7 +64,7 @@ GEOMETRY CAPTURE — for THIS request, reproduce the DRAWN layout exactly as it 
 - A lane's box must lie inside its pool's box; a node's box must lie inside its lane/pool box.
 - For EVERY connection also report how it was drawn: "sourceSide" and "targetSide" (one of "left"/"right"/"top"/"bottom" — the side of each element the line attaches to), and "waypoints": an array of { "x", "y" } normalised 0..1 points tracing the line's route as drawn (corners of the polyline, in order from source to target). Message flows between pools are often rectilinear and connect elements that are NOT vertically aligned — capture them as drawn.
 - Keep boxes tight to the drawn shape. If you genuinely cannot see a shape's box, omit "bounds" for that element only (do NOT guess a filler box). Never invent elements to fill empty space.` : ""}
-- If the image is already a BPMN diagram: copy the structure faithfully. Read pool names, lane names, task labels, gateway labels and event labels off the image. Map every shape to its hyphenated type: rounded rectangle → "task" (or "subprocess" / "subprocess-expanded" if it contains its own sub-flow), diamond → "gateway", circle with thin border → "start-event", circle with thick border → "end-event", circle with double border → "intermediate-event", parallel horizontal lines → "pool" / "lane", dashed-rectangle around tasks → "group", document icon → "data-object", cylinder → "data-store", sticky-note → "text-annotation".
+- If the image is already a BPMN diagram: copy the structure faithfully. Read pool names, lane names, task labels, gateway labels and event labels off the image. Map every shape to its hyphenated type: rounded rectangle → "task" (or "subprocess" / "subprocess-expanded" if it contains its own sub-flow), diamond → "gateway", circle with thin border → "start-event", circle with thick border → "end-event", circle with double border → "intermediate-event", parallel horizontal lines → "pool" / "lane" (a lane visibly split into stacked sub-bands → the inner bands are SUB-lanes: give each a "parentLane"), dashed-rectangle around tasks → "group", document icon → "data-object", cylinder → "data-store", sticky-note → "text-annotation".
 - ${renderFlowchartMappingForPrompt()}
 - Read labels with OCR. Do NOT invent tasks, branches or roles that are not visible in the image. If a label is unreadable, use a short descriptive placeholder rather than guessing.
 - Where the user's text prompt adds detail beyond the image (extra rules, role names, message flows), apply it. Where the prompt CONTRADICTS the image, prefer the image.
@@ -80,6 +80,7 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
   * isSystem=false → external entities that are people or organisations (Customer, Client, Supplier, Government Department, etc.). Positioned ABOVE the main pool.
   * White-box pools do not need isSystem.
 - Lanes MUST have: parentPool (the pool id they belong to)
+- SUB-LANES: when a lane is itself divided into horizontal sub-bands (a lane nested inside another lane — common in imported diagrams), emit the OUTER band as a normal lane and EACH inner band as a lane that ALSO has "parentLane" set to the outer lane's id (keep "parentPool" too). A flow element that sits inside a sub-band sets "lane" to the SUB-lane's id (the innermost band that contains it), not the outer lane's id. Only nest when the image genuinely shows a lane split into sub-bands — do NOT invent sub-lanes.
 - Flow elements (tasks, gateways, events) MUST have: pool (pool id). Include "lane" ONLY if the prompt mentions specific roles, teams, or performers responsible for elements.
 - DO NOT create default/placeholder lanes (e.g. "Team", "Process Team", "Main Lane"). Only create lanes when the prompt implies multiple performers/roles. If no roles are mentioned, elements go directly in the pool with NO lane.
 - Tasks should have: taskType ("user", "service", "send", "receive", "manual", "none"). The DEFAULT marker is "none".
@@ -242,6 +243,9 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
   const laneRef = (e: AiElement) => e.parentPool ?? e.pool;
   const orphanLanes = parsed.elements.filter((e) => {
     if (e.type !== "lane") return false;
+    // A sub-lane (carries parentLane) is never an orphan — it inherits its pool
+    // from its parent lane in the sub-lane pass below, so don't wrap it.
+    if (e.parentLane) return false;
     const ref = laneRef(e);
     return !ref || !poolIds.has(ref);
   });
@@ -273,6 +277,30 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
       if (e.type === "pool" || e.type === "lane") continue;
       if ((e.lane && orphanLaneIds.has(e.lane)) || (e.pool && danglingPoolIds.has(e.pool))) {
         e.pool = POOL_ID;
+      }
+    }
+  }
+
+  // ── Sub-lanes ── a lane that declares `parentLane` (the id of another lane it
+  // nests inside) becomes a "sublane" so the layout renders it as a nested band.
+  // It keeps parentPool + parentLane. A dangling parentLane (points at a missing
+  // id, itself, or a non-lane) is dropped so the element stays a plain lane.
+  // Runs AFTER orphan-lane wrapping so parentPool is already settled. Idempotent.
+  {
+    const laneById = new Map(
+      parsed.elements.filter((e) => e.type === "lane").map((e) => [e.id, e]),
+    );
+    for (const el of parsed.elements) {
+      if (el.type !== "lane") continue;
+      const pl = el.parentLane;
+      if (pl && pl !== el.id && laneById.has(pl)) {
+        // Inherit the parent lane's pool when the model omitted it on the sub-lane.
+        const parent = laneById.get(pl)!;
+        if (!el.parentPool) el.parentPool = parent.parentPool;
+        if (!el.pool) el.pool = parent.pool ?? parent.parentPool;
+        (el as unknown as { type: string }).type = "sublane";
+      } else if (pl) {
+        delete el.parentLane;
       }
     }
   }

@@ -12,6 +12,7 @@ import { z } from "zod";
 export const ELEMENT_TYPES = [
   "pool",
   "lane",
+  "sublane",
   "start-event",
   "end-event",
   "intermediate-event",
@@ -57,6 +58,9 @@ export const AiElementSchema = z.object({
   boundaryHost: z.string().optional(),
   boundarySide: z.enum(BOUNDARY_SIDES).optional(),
   parentPool: z.string().optional(),
+  /** For a SUB-lane: the id of the parent lane it nests inside. normaliseAiPlan
+   *  turns a lane carrying this into a "sublane". */
+  parentLane: z.string().optional(),
   subprocessType: z.string().optional(),
   // Activity marker (task / subprocess): "loop" = Standard Loop marker,
   // "mi-parallel"/"mi-sequential" = Multi-Instance. Ad-hoc is set via

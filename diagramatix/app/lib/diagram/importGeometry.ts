@@ -29,6 +29,8 @@ export interface ImportedShape {
   lane?: string;
   /** lane → the pool it belongs to. */
   parentPool?: string;
+  /** sub-lane → the parent LANE it nests inside. */
+  parentLane?: string;
 }
 
 export interface CleanShape {
@@ -42,6 +44,8 @@ export interface CleanShape {
   laneId?: string;
   /** For a lane: its parent pool. */
   parentPoolId?: string;
+  /** For a sub-lane: the parent lane it nests inside. */
+  parentLaneId?: string;
 }
 
 export interface SnapResult {
@@ -89,7 +93,7 @@ function snap1D(values: number[], tol: number): Map<number, number> {
   return out;
 }
 
-const POOL_LANE = new Set(["pool", "lane"]);
+const POOL_LANE = new Set(["pool", "lane", "sublane"]);
 
 /**
  * Clean + snap imported normalised geometry.
@@ -112,6 +116,7 @@ export function snapImportedBounds(
 
   const pools = elements.filter((e) => e.type === "pool" && boxOf.has(e.id));
   const lanes = elements.filter((e) => e.type === "lane" && boxOf.has(e.id));
+  const sublanes = elements.filter((e) => e.type === "sublane" && boxOf.has(e.id));
   const nodes = elements.filter((e) => !POOL_LANE.has(e.type) && boxOf.has(e.id));
 
   // Unusable when no pool carries geometry, or almost nothing was boxed — the
@@ -146,6 +151,27 @@ export function snapImportedBounds(
     }
   }
 
+  // 3b. Sub-lanes: snap x/width to the PARENT LANE and tile within its height,
+  // preserving relative sub-band heights — same treatment as lanes-within-pool.
+  const sublaneParent = new Map<string, string>();   // subLaneId → parent laneId
+  for (const [lid] of laneParent) {
+    const lBox = boxOf.get(lid)!;
+    const own = sublanes
+      .filter((s) => s.parentLane === lid
+        || (!s.parentLane && contains(lBox, centreX(boxOf.get(s.id)!), centreY(boxOf.get(s.id)!))))
+      .sort((a, b) => boxOf.get(a.id)!.y - boxOf.get(b.id)!.y);
+    if (own.length === 0) continue;
+    const totalH = own.reduce((sm, s) => sm + boxOf.get(s.id)!.h, 0) || 1;
+    let cursor = lBox.y;
+    for (const s of own) {
+      const sb = boxOf.get(s.id)!;
+      const h = (sb.h / totalH) * lBox.h;
+      boxOf.set(s.id, { x: lBox.x, y: cursor, w: lBox.w, h });
+      cursor += h;
+      sublaneParent.set(s.id, lid);
+    }
+  }
+
   // 4. Column snapping: cluster node centre-x across the whole diagram.
   const nodeCx = nodes.map((n) => centreX(boxOf.get(n.id)!));
   const colSnap = snap1D(nodeCx, colTol);
@@ -162,13 +188,20 @@ export function snapImportedBounds(
     const b = boxOf.get(n.id)!;
     const cx = centreX(b), cy = centreY(b);
     // Which lane box actually contains the node centre? (geometry wins over the
-    // declared field — the drawn box is what the user sees).
-    let laneId: string | undefined = lanes.find((l) => contains(boxOf.get(l.id)!, cx, cy))?.id;
-    let poolId: string | undefined = laneId ? laneParent.get(laneId) : undefined;
+    // declared field — the drawn box is what the user sees). Prefer the INNERMOST
+    // band: a sub-lane containing the centre wins over its parent lane.
+    let laneId: string | undefined =
+      sublanes.find((s) => sublaneParent.has(s.id) && contains(boxOf.get(s.id)!, cx, cy))?.id
+      ?? lanes.find((l) => contains(boxOf.get(l.id)!, cx, cy))?.id;
+    // A lane id resolves to its pool; a sub-lane id resolves via its parent lane.
+    const parentLaneOf = (id: string) => sublaneParent.get(id);
+    let poolId: string | undefined = laneId
+      ? (parentLaneOf(laneId) ? laneParent.get(parentLaneOf(laneId)!) : laneParent.get(laneId))
+      : undefined;
     if (!poolId) poolId = poolOrder.find((pid) => contains(boxOf.get(pid)!, cx, cy));
     // Fall back to the declared membership when nothing contains the centre.
     if (!poolId && n.pool && poolIds.has(n.pool)) poolId = n.pool;
-    if (!laneId && n.lane && laneParent.has(n.lane)) laneId = n.lane;
+    if (!laneId && n.lane && (laneParent.has(n.lane) || sublaneParent.has(n.lane))) laneId = n.lane;
     poolOfNode.set(n.id, poolId);
     laneOfNode.set(n.id, laneId);
   }
@@ -194,6 +227,14 @@ export function snapImportedBounds(
   for (const l of lanes) {
     if (!laneParent.has(l.id)) continue; // orphan lane — dropped
     shapes.push({ id: l.id, type: "lane", box: boxOf.get(l.id)!, parentPoolId: laneParent.get(l.id) });
+  }
+  for (const s of sublanes) {
+    if (!sublaneParent.has(s.id)) continue; // orphan sub-lane — dropped
+    const parentLaneId = sublaneParent.get(s.id)!;
+    shapes.push({
+      id: s.id, type: "sublane", box: boxOf.get(s.id)!,
+      parentPoolId: laneParent.get(parentLaneId), parentLaneId,
+    });
   }
   for (const n of nodes) {
     shapes.push({

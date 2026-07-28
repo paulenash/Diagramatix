@@ -169,6 +169,35 @@ describe("normaliseAiPlan — pinned non-behaviours", () => {
     normaliseAiPlan(p);
     expect(p.connections).toEqual(before);
   });
+
+  it("T1046 — a lane with parentLane becomes a sub-lane (inheriting the parent's pool)", () => {
+    const p = plan([
+      { id: "pool", type: "pool", label: "P", poolType: "white-box" },
+      { id: "l", type: "lane", label: "Outer", parentPool: "pool" },
+      // Sub-lane: parentLane points at "l"; parentPool omitted → inherited.
+      { id: "sl", type: "lane", label: "Inner", parentLane: "l" },
+    ]);
+    normaliseAiPlan(p);
+    const sl = p.elements.find((e) => e.id === "sl")!;
+    const l = p.elements.find((e) => e.id === "l")!;
+    expect(sl.type).toBe("sublane");
+    expect(sl.parentLane).toBe("l");
+    expect(sl.parentPool).toBe("pool");   // inherited from the outer lane
+    expect(l.type).toBe("lane");          // outer lane untouched
+  });
+
+  it("T1047 — a dangling parentLane is dropped and the element stays a plain lane", () => {
+    const p = plan([
+      { id: "pool", type: "pool", label: "P", poolType: "white-box" },
+      { id: "l", type: "lane", label: "Real", parentPool: "pool" },
+      // parentLane points at a non-existent lane → dropped, stays a lane.
+      { id: "x", type: "lane", label: "Ghost", parentPool: "pool", parentLane: "missing" },
+    ]);
+    normaliseAiPlan(p);
+    const x = p.elements.find((e) => e.id === "x")!;
+    expect(x.type).toBe("lane");
+    expect(x.parentLane).toBeUndefined();
+  });
 });
 
 describe("normalise → layoutBpmnDiagram produces a structurally sound diagram", () => {

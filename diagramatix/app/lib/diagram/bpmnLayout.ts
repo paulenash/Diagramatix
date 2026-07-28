@@ -69,6 +69,7 @@ export interface AiElement {
   boundaryHost?: string;      // host element ID for edge-mounted events
   boundarySide?: "left" | "right" | "top" | "bottom"; // where on the host boundary
   parentPool?: string;        // for lanes — the pool they belong to
+  parentLane?: string;        // for a SUB-lane — the id of the parent lane it nests inside
   subprocessType?: string;    // "normal" | "event" | "transaction" | "call"
   repeatType?: string;        // activity marker: "loop" (standard loop) | "mi-parallel" | "mi-sequential" | "none"
   properties?: Record<string, unknown>; // additional properties pass-through (incl. adHoc: true for an ad-hoc Sub-Process)
@@ -152,7 +153,7 @@ function layoutBpmnPreserved(
   const snap = snapImportedBounds(
     aiElements.map((a) => ({
       id: a.id, type: a.type, bounds: a.bounds,
-      pool: a.pool, lane: a.lane, parentPool: a.parentPool,
+      pool: a.pool, lane: a.lane, parentPool: a.parentPool, parentLane: a.parentLane,
     })),
   );
   if (!snap.ok) return null;
@@ -190,6 +191,10 @@ function layoutBpmnPreserved(
       props.poolType = (ai.poolType as string | undefined) ?? "white-box";
     } else if (s.type === "lane") {
       parentId = s.parentPoolId;
+    } else if (s.type === "sublane") {
+      // A sub-lane nests inside its parent lane (fall back to the pool if the
+      // parent lane was dropped as an orphan).
+      parentId = s.parentLaneId ?? s.parentPoolId;
     } else {
       // An element inside an Expanded Subprocess must be parented to the EP (not
       // its lane/pool) so connector routing treats the EP as a containment box —
@@ -348,6 +353,15 @@ function layoutBpmnPreserved(
     pool.properties = { ...pool.properties, poolHeaderWidth: headerW };
   }
 
+  // ── Sub-lanes inherit their parent lane's (normalised) x + width ── the pool
+  // tidy-up above re-set each lane's x/width to the pool content column; a
+  // sub-lane must line up flush inside its parent lane, so mirror it.
+  for (const sub of elements) {
+    if (sub.type !== "sublane" || !sub.parentId) continue;
+    const parent = elements.find((e) => e.id === sub.parentId);
+    if (parent && parent.type === "lane") { sub.x = parent.x; sub.width = parent.width; }
+  }
+
   // ── Keep each lane's elements INSIDE its lane ── the drawn position can
   // straddle a lane boundary (e.g. a task whose top pokes into the lane above),
   // which is a lane assignment the plan is authoritative about. Clamp every
@@ -499,6 +513,21 @@ export function layoutBpmnDiagram(
   if (opts?.preservePositions) {
     const preserved = layoutBpmnPreserved(aiElements, aiConnections, opts.imageAspect);
     if (preserved) return preserved;
+  }
+
+  // Sub-lane inclusion is handled in the PRESERVED (image-geometry) path only.
+  // If we reach the auto-stack engine with sub-lanes present (a typed prompt),
+  // flatten each sub-lane to a normal lane under its pool so placement still
+  // works — nested-band auto-layout is a follow-up. Idempotent.
+  for (const el of aiElements) {
+    if (el.type !== "sublane") continue;
+    if (!el.parentPool && el.parentLane) {
+      const parent = aiElements.find((e) => e.id === el.parentLane);
+      if (parent?.parentPool) el.parentPool = parent.parentPool;
+    }
+    if (!el.pool) el.pool = el.parentPool;
+    el.type = "lane";
+    delete el.parentLane;
   }
 
   const elements: DiagramElement[] = [];
