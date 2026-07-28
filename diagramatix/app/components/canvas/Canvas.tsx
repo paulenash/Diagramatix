@@ -3486,10 +3486,33 @@ export function Canvas({
           onMoveElement(decision!.id, decision!.x, decY);
           onMoveElement(merge!.id, merge!.x, mrgY);
         }
-        for (const c of existing) onDeleteConnector(c.id);
-        for (const p of plans) {
-          onAddConnector(p.from, p.to, "sequence", defaultDirectionType, defaultRoutingType, p.fromSide, p.toSide, 0.5, 0.5, undefined, p.label);
+        // Retain existing connectors when re-wiring: if a plan re-draws a
+        // connection that already exists AND carries a NAME (e.g. a branch
+        // condition like "Approved"), keep that connector — preserving its name
+        // AND its label position — and just re-point its endpoint sides to the
+        // clean diamond geometry. Only genuinely-removed connectors are deleted,
+        // and only genuinely-new plans are created (unnamed branches still get
+        // their default optionN label as before).
+        const matchedPlanIdx = new Set<number>();
+        const preservedIds = new Set<string>();
+        for (const c of existing) {
+          if (!c.label || !c.label.trim()) continue;   // nothing worth retaining
+          const pi = plans.findIndex(
+            (p, i) => !matchedPlanIdx.has(i) && p.from === c.sourceId && p.to === c.targetId,
+          );
+          if (pi < 0) continue;
+          matchedPlanIdx.add(pi);
+          preservedIds.add(c.id);
+          // Re-point sides/offsets to the plan geometry; UPDATE_CONNECTOR_ENDPOINT
+          // keeps the connector id, label, and label offset intact.
+          onUpdateConnectorEndpoint(c.id, "source", plans[pi].from, plans[pi].fromSide, 0.5);
+          onUpdateConnectorEndpoint(c.id, "target", plans[pi].to, plans[pi].toSide, 0.5);
         }
+        for (const c of existing) if (!preservedIds.has(c.id)) onDeleteConnector(c.id);
+        plans.forEach((p, i) => {
+          if (matchedPlanIdx.has(i)) return;
+          onAddConnector(p.from, p.to, "sequence", defaultDirectionType, defaultRoutingType, p.fromSide, p.toSide, 0.5, 0.5, undefined, p.label);
+        });
         if (decision) onUpdateProperties?.(decision.id, { gatewayRole: "decision" });
         if (merge) {
           // Match the merge's marker to the decision/split gateway's marker
