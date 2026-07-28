@@ -2875,40 +2875,39 @@ export function layoutBpmnDiagram(
   // pool to a single uniform width = rightmost content across ALL pools + pad,
   // all sharing the same left x. Runs before routing so messages attach to the
   // final edges (the message pass recomputes offsetAlong against the partner).
-  {
+  function applyUniformPoolWidth() {
     const POOL_PAD = 50;
     const topPools = elements.filter(e => e.type === "pool" && !e.parentId);
-    if (topPools.length > 0) {
-      const byId = new Map(elements.map(e => [e.id, e]));
-      const descRight = (poolId: string): number => {
-        let r = -Infinity;
-        for (const e of elements) {
-          if (e.type === "pool" || e.type === "lane") continue;
-          let p: string | undefined = e.parentId, g = 0;
-          while (p && g++ < 20) { if (p === poolId) { r = Math.max(r, e.x + e.width); break; } p = byId.get(p)?.parentId; }
-        }
-        return r;
-      };
-      let maxRight = -Infinity;
-      for (const p of topPools) { const r = descRight(p.id); if (isFinite(r)) maxRight = Math.max(maxRight, r); }
-      if (isFinite(maxRight)) {
-        const leftX = Math.min(...topPools.map(p => p.x));
-        const targetRight = maxRight + POOL_PAD;
-        const syncLaneWidth = (parentId: string, innerLeft: number, innerWidth: number) => {
-          for (const lane of elements.filter(e => (e.type === "lane" || e.type === "sublane") && e.parentId === parentId)) {
-            lane.x = innerLeft;
-            lane.width = innerWidth;
-            syncLaneWidth(lane.id, innerLeft, innerWidth); // recurse into sub-lanes
-          }
-        };
-        for (const p of topPools) {
-          p.x = leftX;
-          p.width = targetRight - leftX;
-          syncLaneWidth(p.id, leftX + POOL_HEADER_W, p.width - POOL_HEADER_W);
-        }
+    if (topPools.length === 0) return;
+    const byId = new Map(elements.map(e => [e.id, e]));
+    const descRight = (poolId: string): number => {
+      let r = -Infinity;
+      for (const e of elements) {
+        if (e.type === "pool" || e.type === "lane") continue;
+        let p: string | undefined = e.parentId, g = 0;
+        while (p && g++ < 20) { if (p === poolId) { r = Math.max(r, e.x + e.width); break; } p = byId.get(p)?.parentId; }
       }
+      return r;
+    };
+    let maxRight = -Infinity;
+    for (const p of topPools) { const r = descRight(p.id); if (isFinite(r)) maxRight = Math.max(maxRight, r); }
+    if (!isFinite(maxRight)) return;
+    const leftX = Math.min(...topPools.map(p => p.x));
+    const targetRight = maxRight + POOL_PAD;
+    const syncLaneWidth = (parentId: string, innerLeft: number, innerWidth: number) => {
+      for (const lane of elements.filter(e => (e.type === "lane" || e.type === "sublane") && e.parentId === parentId)) {
+        lane.x = innerLeft;
+        lane.width = innerWidth;
+        syncLaneWidth(lane.id, innerLeft, innerWidth); // recurse into sub-lanes
+      }
+    };
+    for (const p of topPools) {
+      p.x = leftX;
+      p.width = targetRight - leftX;
+      syncLaneWidth(p.id, leftX + POOL_HEADER_W, p.width - POOL_HEADER_W);
     }
   }
+  applyUniformPoolWidth();
 
   // R6.12/R7.03: Drop ANY connector (sequence OR message) that touches an Event
   // Expanded Subprocess. Event subs are triggered by events, not by any kind
@@ -3634,6 +3633,84 @@ export function layoutBpmnDiagram(
       placed.push(labelRect(e, chosen[0], chosen[1], lw, lh));
     }
   }
+
+  // ── R8.21: Global left-to-right flow enforcement ── a wide element (e.g. an
+  // EP) gets its SAME-lane successors shifted right to clear it (R6.25 etc.), but
+  // that displacement is not propagated to CROSS-LANE flow successors — so a
+  // decision pushed right past a wide EP can end up RIGHT of the branch-target
+  // tasks it feeds in other lanes, reversing the flow. Enforce that every
+  // NON-LOOP sequence edge runs left-to-right: relax each edge s→t so
+  // t.x ≥ s.x + s.width + GAP, shifting t (with its descendants + boundary
+  // events) right and letting the shift cascade forward. Loop/back edges (the
+  // only legitimate right-to-left flow) are skipped. An element inside an EP
+  // rides with its EP; a boundary event rides with its host.
+  {
+    const LR_GAP = 60;
+    const elById = new Map(elements.map((e) => [e.id, e]));
+    const DATA_A = new Set(["data-object", "data-store", "text-annotation"]);
+    const isDataLink = (c: { sourceId: string; targetId: string }) =>
+      DATA_A.has(elById.get(c.sourceId)?.type ?? "") || DATA_A.has(elById.get(c.targetId)?.type ?? "");
+    const outEdges = new Map<string, string[]>();
+    const seqEdges: { s: string; t: string }[] = [];
+    for (const c of [...aiConnections, ...autoConns]) {
+      if (c.type === "message" || isDataLink(c)) continue;
+      if (!elById.has(c.sourceId) || !elById.has(c.targetId)) continue;
+      const a = outEdges.get(c.sourceId); if (a) a.push(c.targetId); else outEdges.set(c.sourceId, [c.targetId]);
+      seqEdges.push({ s: c.sourceId, t: c.targetId });
+    }
+    // Back-edge (cycle) detection — loops are the only legitimate R→L flow.
+    const backEdge = new Set<string>();
+    {
+      const WHITE = 0, GRAY = 1, BLACK = 2; const colour = new Map<string, number>();
+      const roots = elements.filter((e) => !DATA_A.has(e.type) && e.type !== "pool" && e.type !== "lane" && e.type !== "sublane").map((e) => e.id);
+      for (const root of roots) {
+        if ((colour.get(root) ?? WHITE) !== WHITE) continue;
+        const st: { id: string; i: number }[] = [{ id: root, i: 0 }]; colour.set(root, GRAY);
+        while (st.length) {
+          const f = st[st.length - 1]; const outs = outEdges.get(f.id) ?? [];
+          if (f.i >= outs.length) { colour.set(f.id, BLACK); st.pop(); continue; }
+          const t = outs[f.i++]; const tc = colour.get(t) ?? WHITE;
+          if (tc === GRAY) backEdge.add(`${f.id}->${t}`);
+          else if (tc === WHITE) { colour.set(t, GRAY); st.push({ id: t, i: 0 }); }
+        }
+      }
+    }
+    // The element that actually moves for a given node: ride up through EP parents
+    // and boundary hosts to the top-level flow element.
+    const topLevelOf = (id: string): string => {
+      let cur: DiagramElement | undefined = elById.get(id); let guard = 0;
+      while (cur && guard++ < 16) {
+        if (cur.boundaryHostId && elById.has(cur.boundaryHostId)) { cur = elById.get(cur.boundaryHostId); continue; }
+        const p = cur.parentId ? elById.get(cur.parentId) : undefined;
+        if (p && p.type === "subprocess-expanded") { cur = p; continue; }
+        break;
+      }
+      return cur?.id ?? id;
+    };
+    const kidsByParent = new Map<string, DiagramElement[]>();
+    for (const e of elements) { if (!e.parentId) continue; const a = kidsByParent.get(e.parentId); if (a) a.push(e); else kidsByParent.set(e.parentId, [e]); }
+    const descOf = (rootId: string): string[] => { const out: string[] = []; const st = [rootId]; while (st.length) { const c = st.pop()!; for (const k of kidsByParent.get(c) ?? []) { out.push(k.id); st.push(k.id); } } return out; };
+    const shiftRight = (rootId: string, dx: number) => {
+      const set = new Set<string>([rootId, ...descOf(rootId)]);
+      for (const e of elements) if (e.boundaryHostId && set.has(e.boundaryHostId)) set.add(e.id);
+      for (const e of elements) if (set.has(e.id)) e.x += dx;
+    };
+    const cap = seqEdges.length + 4;
+    for (let pass = 0; pass < cap; pass++) {
+      let moved = false;
+      for (const { s, t } of seqEdges) {
+        if (backEdge.has(`${s}->${t}`)) continue;
+        const sm = elById.get(topLevelOf(s)), tm = elById.get(topLevelOf(t));
+        if (!sm || !tm || sm.id === tm.id) continue;
+        const need = (sm.x + sm.width + LR_GAP) - tm.x;
+        if (need > 0.5) { shiftRight(tm.id, need); moved = true; }
+      }
+      if (!moved) break;
+    }
+  }
+  // Re-apply uniform pool width to enclose anything the L→R sweep pushed past the
+  // previous right edge (keeps R5.08: all pools one width, tight to content).
+  applyUniformPoolWidth();
 
   // Re-hug data objects to their associated element's FINAL position (activities
   // may have moved during the gateway / start-end tightening passes above), then
