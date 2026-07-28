@@ -1010,16 +1010,21 @@ export function DiagramEditor({
       }
       const prev = data.aiGeneration;
       const autoName = `${(diagramName || "Untitled").trim()} — AI prompt`;
+      // Auto-persist the generated plan (when the generator supplied one) onto
+      // the linked Prompt so the diagram retains its plan for re-layout /
+      // inspection without re-calling the model. Only auto-named prompts are
+      // (over)written — a user's own saved Prompt is never modified.
+      const planField = meta.planJson ? { planJson: meta.planJson } : {};
       if (prev?.promptId && prev.autoNamed) {
         await fetch(`/api/prompts/${prev.promptId}`, {
           method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: meta.promptText }),
+          body: JSON.stringify({ text: meta.promptText, ...planField }),
         });
         return { id: prev.promptId, name: prev.promptName, autoNamed: true };
       }
       const res = await fetch(`/api/prompts`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: autoName, text: meta.promptText, diagramType }),
+        body: JSON.stringify({ name: autoName, text: meta.promptText, diagramType, ...planField }),
       });
       if (!res.ok) return null;
       const created = await res.json();

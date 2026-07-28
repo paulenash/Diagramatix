@@ -424,6 +424,12 @@ export interface AiApplyMeta {
   selectedPromptId?: string;
   selectedPromptName?: string;
   selectedPromptUnchanged?: boolean;
+  /** The structured pre-layout plan (Plan-panel generators — BPMN/flowchart).
+   *  Auto-persisted onto the linked Prompt (`Prompt.planJson`) so the diagram
+   *  retains its generated plan for re-layout / inspection without re-calling
+   *  the model. Absent for one-shot generators (AiPanel) that have no separate
+   *  plan step. */
+  planJson?: { elements: unknown[]; connections: unknown[] };
 }
 
 export interface ProcessOwner {

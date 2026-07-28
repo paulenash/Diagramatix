@@ -840,6 +840,9 @@ export function PlanPanel({
           selectedPromptId: sel?.id,
           selectedPromptName: sel?.name,
           selectedPromptUnchanged: sel ? sel.text.trim() === effPrompt : undefined,
+          // Retain the generated plan on the linked Prompt (Prompt.planJson) so
+          // the diagram keeps its plan for re-layout / inspection.
+          planJson: plan,
         });
       }
       if (isFlowchart) {
