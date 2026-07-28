@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type {
   BpmnTaskType,
   FlowType,
@@ -8882,6 +8882,27 @@ export function useDiagram(initialData: DiagramData) {
   const preLabelEditRef   = useRef<Snapshot | null>(null);
   const labelEditingRef   = useRef<string | null>(null);
 
+  // Pointer-gesture coalescing for updateProperties. Dragging a label offset (or
+  // any property) fires updateProperties on every mousemove tick; without this
+  // each tick would push its own undo snapshot, so a single Ctrl+Z would only
+  // step back one pixel. A mouse-button-hold is ONE gesture → ONE undo entry:
+  // push the pre-drag snapshot on the first update of the gesture, coalesce the
+  // rest. A click-completed one-shot (toggle/colour) fires on React's onClick,
+  // AFTER the capture-phase mouseup below has cleared the flag, so it still
+  // pushes normally.
+  const pointerDownRef    = useRef(false);
+  const gesturePushedRef  = useRef(false);
+  useEffect(() => {
+    const down = () => { pointerDownRef.current = true; };
+    const up = () => { pointerDownRef.current = false; gesturePushedRef.current = false; };
+    window.addEventListener("mousedown", down, true);
+    window.addEventListener("mouseup", up, true);
+    return () => {
+      window.removeEventListener("mousedown", down, true);
+      window.removeEventListener("mouseup", up, true);
+    };
+  }, []);
+
   function snapshotData(): Snapshot {
     return { elements: dataRef.current.elements, connectors: dataRef.current.connectors };
   }
@@ -9024,7 +9045,13 @@ export function useDiagram(initialData: DiagramData) {
 
   const updateProperties = useCallback(
     (id: string, properties: Record<string, unknown>) => {
-      pushHistory(snapshotData());
+      // Coalesce a drag gesture into ONE undo entry (see pointerDownRef above):
+      // push the pre-drag snapshot on the first tick, skip the rest.
+      if (pointerDownRef.current) {
+        if (!gesturePushedRef.current) { pushHistory(snapshotData()); gesturePushedRef.current = true; }
+      } else {
+        pushHistory(snapshotData());
+      }
       dispatch({ type: "UPDATE_PROPERTIES", payload: { id, properties } });
     },
     []
