@@ -2980,8 +2980,15 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
       // sides off the same delta vector (avoiding self-clip through the
       // source / target body) and overrides with `pickBoundaryEventSide`
       // for boundary-event endpoints (issues 2 + 8).
-      let { src: newSrcSide, tgt: newTgtSide } = safeSidePair(source, target, elements);
-      let newSrcOff = 0.5, newTgtOff = 0.5;
+      const { src: autoSrcSide, tgt: autoTgtSide } = safeSidePair(source, target, elements);
+      // Respect a GATEWAY endpoint's chosen side + offset — don't obstacle-reroute it
+      // to the side FACING the other element. A nudged (or generated) gateway endpoint
+      // must snap to the cardinal it was nudged towards, not the closest-to-the-other-
+      // element side, even when the long route crosses something (Paul; all gateways).
+      let newSrcSide = source.type === "gateway" ? conn.sourceSide : autoSrcSide;
+      let newTgtSide = target.type === "gateway" ? conn.targetSide : autoTgtSide;
+      let newSrcOff = source.type === "gateway" ? (conn.sourceOffsetAlong ?? 0.5) : 0.5;
+      let newTgtOff = target.type === "gateway" ? (conn.targetOffsetAlong ?? 0.5) : 0.5;
       // A parallel bar stays perpendicular even when obstacle-avoidance re-sides.
       if (source.type === "flowchart-parallel") [newSrcSide, newSrcOff] = clampParallelFace(source, target, newSrcSide, newSrcOff) as [Side, number];
       if (target.type === "flowchart-parallel") [newTgtSide, newTgtOff] = clampParallelFace(target, source, newTgtSide, newTgtOff) as [Side, number];
