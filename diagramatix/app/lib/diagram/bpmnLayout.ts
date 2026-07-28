@@ -715,6 +715,29 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── EP-boundary interrupt normalization (R8.19) ── a boundary (edge-mounted)
+  // event whose host is INSIDE an Expanded Subprocess and whose outgoing flow
+  // LEAVES that EP is a loop-terminating interrupt (e.g. a "10 working days
+  // elapsed" timer that lapses the whole application). Such an event MUST sit on
+  // the EP's OUTER boundary — not on an interior task — so the connector to its
+  // external target runs fully OUTSIDE the EP. Re-home its boundaryHost to the EP
+  // itself: the exit-target column ranking (which reads the host's column) and the
+  // rim-snap placement then both treat the EP as the host. A boundary event whose
+  // exit stays INSIDE the EP keeps its interior-task host.
+  {
+    const byIdEp = new Map(aiElements.map(e => [e.id, e]));
+    for (const ev of aiElements) {
+      if (!ev.boundaryHost) continue;
+      const host = byIdEp.get(ev.boundaryHost);
+      const epId = host?.parentSubprocess;
+      if (!epId || byIdEp.get(epId)?.type !== "subprocess-expanded") continue; // host not EP-internal
+      const exitsEp = aiConnections.some(c =>
+        c.sourceId === ev.id && c.type !== "message" &&
+        byIdEp.get(c.targetId)?.parentSubprocess !== epId);
+      if (exitsEp) ev.boundaryHost = epId;
+    }
+  }
+
   // Separate pools from other elements
   const pools = aiElements.filter(e => e.type === "pool");
   const lanes = aiElements.filter(e => e.type === "lane");
@@ -2674,8 +2697,10 @@ export function layoutBpmnDiagram(
   // deepest-first, re-snap its boundary events, and grow ancestor lanes/pools
   // so the box stays enclosed. Connectors are routed AFTER this, so they go
   // straight to the corrected boxes — no re-routing ("place EPs + contents,
-  // then connect").
-  {
+  // then connect"). Extracted so it can re-run after the Start/End tightening
+  // pass (which drags an EP's internal end-event left, otherwise leaving the EP
+  // box slack on the right — R8.20).
+  function wrapEpsToChildren() {
     const EP_ARTIFACT = new Set(["data-object", "data-store", "text-annotation"]);
     const SIDE_PAD = 30, TOP_PAD = 36;
     const clampW = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -2728,6 +2753,7 @@ export function layoutBpmnDiagram(
       }
     }
   }
+  wrapEpsToChildren();
 
   // ── R6.25: a merge/join gateway sits to the RIGHT of every element feeding it ──
   // After EP wrapping, a wide parallel branch (e.g. an EP) can extend past the
@@ -3533,6 +3559,12 @@ export function layoutBpmnDiagram(
       if (e.x - maxRight > MAX_CONN) e.x = maxRight + MAX_CONN;
     }
   }
+
+  // ── R8.20: re-tighten EP boxes after Start/End tightening ── the pass above can
+  // drag an EP's internal End event LEFT to hug its predecessor, leaving the EP
+  // box slack on the right (a large empty gap). Re-hug every EP to its rightmost
+  // real child now (and re-snap its boundary events onto the corrected rim).
+  wrapEpsToChildren();
 
   // ── R8.16: nudge event labels clear of other elements + other event labels ──
   // Event labels (especially edge-mounted/boundary events) default to a fixed
