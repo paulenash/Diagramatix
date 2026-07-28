@@ -4044,7 +4044,14 @@ export function layoutBpmnDiagram(
       const lw = (g.properties.labelWidth as number) ?? 80;
       const lh = Math.max(1, wrapText(g.label.trim(), lw).length) * LH;
       const cx = g.x + g.width / 2, cy = g.y + g.height / 2;
-      const near = elements.filter(e => e.id !== g.id && OBST.has(e.type)
+      // Issue 6: a gateway INSIDE an EP (or any container) must IGNORE its own
+      // ancestor containers when placing its label — the label lives inside the
+      // EP, so the EP's own box isn't an obstacle for it (otherwise the label is
+      // shoved uselessly around its own container).
+      const ancestors = new Set<string>();
+      { let cur: DiagramElement | undefined = g; let guard = 0;
+        while (cur?.parentId && guard++ < 12) { ancestors.add(cur.parentId); cur = elements.find(e => e.id === cur!.parentId); } }
+      const near = elements.filter(e => e.id !== g.id && !ancestors.has(e.id) && OBST.has(e.type)
         && Math.abs((e.x + e.width / 2) - cx) < NEAR && Math.abs((e.y + e.height / 2) - cy) < NEAR);
       // Label-centre position + box for a given clock angle (deg, clockwise from
       // up) and an optional outward push (pad) added to the snug radius.
