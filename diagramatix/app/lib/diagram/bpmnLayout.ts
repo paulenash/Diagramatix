@@ -3779,7 +3779,8 @@ export function layoutBpmnDiagram(
   // connector; the association line to its element simply crosses the EP edge.
   {
     const isArt = (t: string) => t === "data-object" || t === "data-store";
-    const EPGAP = 20;
+    const EPGAP = 24;
+    const LINE_H = 14;
     for (const art of elements) {
       if (!isArt(art.type)) continue;
       let cur: DiagramElement | undefined = art.parentId ? elMap.get(art.parentId) : undefined;
@@ -3789,10 +3790,16 @@ export function layoutBpmnDiagram(
         cur = cur.parentId ? elMap.get(cur.parentId) : undefined;
       }
       if (!ep) continue;
+      // The artifact's LABEL sits BELOW its box, so placing the box above the EP
+      // still leaves the label overhanging toward (or into) the EP. Clear the
+      // WHOLE label + box off the EP boundary (issue 2): above → subtract the
+      // label height so box+label are fully above; below → the label already
+      // hangs further away from the EP.
+      const labelH = Math.max(1, (art.label ?? "").split("\n").length) * LINE_H + 6;
       const acy = art.y + art.height / 2;
       art.y = Math.abs(acy - ep.y) <= Math.abs(acy - (ep.y + ep.height))
-        ? ep.y - EPGAP - art.height          // nearer the top → above the EP
-        : ep.y + ep.height + EPGAP;           // else below the EP
+        ? ep.y - EPGAP - labelH - art.height  // above: box + label fully clear of the EP top
+        : ep.y + ep.height + EPGAP;            // below: box clears; label hangs further down
       art.x = Math.max(ep.x, Math.min(ep.x + ep.width - art.width, art.x)); // keep within the EP's x-span
       art.parentId = ep.parentId;             // re-home to the EP's container (lane/pool)
     }
