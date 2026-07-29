@@ -213,14 +213,16 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
   // (60%) line than the body.
   component: ({ cx, cy, size, colour }) => {
     const s = size, sw = Math.max(1, s / 16);
-    const mainLeft = cx - s * 0.1, mainTop = cy - s * 0.22, mainW = s * 0.42, mainH = s * 0.44;
+    // mainLeft shifted so the whole glyph (main box + protruding left tabs) is
+    // centred on cx. Tabs are outline-only (no fill) — no coloured rectangles.
+    const mainLeft = cx - s * 0.16, mainTop = cy - s * 0.22, mainW = s * 0.42, mainH = s * 0.44;
     const tabW = s * 0.14 * 1.2, tabH = mainH * 0.25; // 20% wider (both inside + outside)
     const tabX = mainLeft - tabW * 0.6; // 60% outside, 40% inside
     return (
-      <g stroke={colour}>
-        <rect x={mainLeft} y={mainTop} width={mainW} height={mainH} strokeWidth={sw} fill="none" />
-        <rect x={tabX} y={mainTop + mainH * 0.12} width={tabW} height={tabH} strokeWidth={sw * 0.6} fill="#ffffff" />
-        <rect x={tabX} y={mainTop + mainH * 0.55} width={tabW} height={tabH} strokeWidth={sw * 0.6} fill="#ffffff" />
+      <g stroke={colour} fill="none">
+        <rect x={mainLeft} y={mainTop} width={mainW} height={mainH} strokeWidth={sw} />
+        <rect x={tabX} y={mainTop + mainH * 0.12} width={tabW} height={tabH} strokeWidth={sw * 0.6} />
+        <rect x={tabX} y={mainTop + mainH * 0.55} width={tabW} height={tabH} strokeWidth={sw * 0.6} />
       </g>
     );
   },

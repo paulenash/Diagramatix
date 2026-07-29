@@ -2034,6 +2034,13 @@ function getLabelPos(el: DiagramElement, archimateDepth: number = 0): { x: numbe
     if (isValueStreamIcon) {
       return { x: el.x + el.width / 2 + 10, y: el.y + el.height / 2, baseline: "middle" };
     }
+    // Component / System Software icon (tabs inset the body on the left) — nudge the
+    // label 8px right so it centres in the body rather than over the tabs.
+    const isComponentIcon = iconOnly && typeof el.properties?.shapeKey === "string" &&
+      /(component|system-software)/.test(el.properties.shapeKey as string);
+    if (isComponentIcon) {
+      return { x: el.x + el.width / 2 + 8, y: el.y + el.height / 2, baseline: "middle" };
+    }
     if (archimateDepth > 0) {
       return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };
     }
@@ -3129,9 +3136,16 @@ export function SymbolRenderer({
           // baseline (icon-only Actor). Stack tspans relative to that
           // anchor, respecting the baseline.
           let topY: number;
+          const archiContainer = isArchi && (archimateDepthMap.get(element.id) ?? 0) > 0;
           if (isArchi && labelInfo.baseline === "hanging") {
             // Anchor is the TOP of the first line (e.g. icon-only Actor)
             topY = labelInfo.y;
+          } else if (archiContainer) {
+            // Container label sits at the TOP header strip; up-centring a wrapped
+            // (2+ line) name on the header anchor puts the top line too close to the
+            // top edge. Anchor the first line a fixed pad below the top instead.
+            // (A single-line label is unchanged — it takes the non-wrapped branch.)
+            topY = element.y + 8 + lineH / 2;
           } else {
             // Centre the block on the anchor (default + chevron behaviour)
             topY = labelInfo.y - ((labelLines.length - 1) * lineH) / 2;

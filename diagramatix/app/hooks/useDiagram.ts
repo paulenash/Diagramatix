@@ -27,6 +27,7 @@ import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
 import { autoSizeForType, getDefaultSize, wrapText, type AutosizeType } from "@/app/lib/diagram/textMetrics";
+import { archiFitSize } from "@/app/lib/diagram/genericLayout";
 
 /** Compute the autosize-driven dimensions for a task or subprocess based on
  *  its label and (optional) task marker. Returns the rounded element size
@@ -35,6 +36,16 @@ import { autoSizeForType, getDefaultSize, wrapText, type AutosizeType } from "@/
  *  Centred re-positioning (adjusting x/y to keep the centre put) is the
  *  caller's responsibility. */
 function autoSizeForElement(el: DiagramElement): { w: number; h: number } {
+  // ArchiMate shapes grow to fit their name the same way a Task/Sub-Process does
+  // (2-line-preferring; matches generation's archiFitSize). Icon-only Actor renders
+  // its label externally (below the figure), so it never autosizes.
+  if (el.type === "archimate-shape") {
+    const shapeKey = el.properties?.shapeKey as string | undefined;
+    if (el.properties?.archimateIconOnly && typeof shapeKey === "string" && shapeKey.includes("actor")) {
+      return { w: el.width, h: el.height };
+    }
+    return archiFitSize(el.label || "");
+  }
   if (el.type !== "task" && el.type !== "subprocess") {
     return { w: el.width, h: el.height };
   }
@@ -5745,7 +5756,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // Task / Sub-Process (collapsed): text-driven autosize, aspect-locked
       // to the type's default size. Centre stays put; attached connectors
       // recompute; lane reflow runs once via ensureContainersEncloseChildren.
-      if (labelEl && (labelEl.type === "task" || labelEl.type === "subprocess")) {
+      // ArchiMate LEAF shapes autosize too (containers are sized to their children,
+      // so skip anything that has children).
+      const labelIsArchiLeaf = labelEl?.type === "archimate-shape"
+        && !elements.some((e) => e.parentId === labelEl.id);
+      if (labelEl && (labelEl.type === "task" || labelEl.type === "subprocess" || labelIsArchiLeaf)) {
         const { w, h } = autoSizeForElement(labelEl);
         const resizedElements = elements.map((e) => {
           if (e.id !== labelEl.id) return e;
@@ -5775,7 +5790,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       let newH = target.height;
       let newX = target.x;
       let newY = target.y;
-      if (target.type === "task" || target.type === "subprocess") {
+      const liveIsArchiLeaf = target.type === "archimate-shape"
+        && !state.elements.some((e) => e.parentId === target.id);
+      if (target.type === "task" || target.type === "subprocess" || liveIsArchiLeaf) {
         const sz = autoSizeForElement(updatedTarget);
         newW = sz.w; newH = sz.h;
         newX = target.x - (newW - target.width) / 2;

@@ -158,4 +158,24 @@ describe("ArchiMate notation form (icon vs box)", () => {
     expect(at2("p1").properties.shapeKey).toBe("business-business-process-box");
     expect(at2("p1").properties.archimateIconOnly).toBeUndefined();
   });
+
+  it("T1081 — Location type + Node/System Software icon forms are ingested", () => {
+    const els2 = [
+      { id: "loc", type: "location", label: "Sydney HQ", bounds: { x: 0.02, y: 0.02, w: 0.9, h: 0.9 } },
+      { id: "n1", type: "technology-node", label: "App Server", notation: "icon", parent: "loc", bounds: { x: 0.08, y: 0.15, w: 0.3, h: 0.2 } },
+      { id: "ss1", type: "technology-system-software", label: "Linux", notation: "icon", parent: "loc", bounds: { x: 0.55, y: 0.15, w: 0.3, h: 0.2 } },
+    ];
+    const d = layoutGenericDiagram({ elements: els2, connections: [{ sourceId: "loc", targetId: "n1", type: "composition" }, { sourceId: "loc", targetId: "ss1", type: "composition" }] } as never, "archimate", { imageAspect: { w: 1000, h: 1000 } });
+    const g = (id: string) => d.elements.find((e) => e.id === id)!;
+    // Location renders as the composite-location master (place/site container).
+    expect(g("loc").properties.shapeKey).toBe("composite-location");
+    expect(g("loc").properties.archimateIsContainer).toBe(true);
+    // Node + System Software drawn in the image's expressed form → their -icon masters.
+    expect(g("n1").properties.shapeKey).toBe("technology-node-icon");
+    expect(g("n1").properties.archimateIconOnly).toBe(true);
+    expect(g("ss1").properties.shapeKey).toBe("technology-system-software-icon");
+    expect(g("ss1").properties.archimateIconOnly).toBe(true);
+    // Nested inside the location.
+    expect(g("n1").parentId).toBe("loc");
+  });
 });

@@ -186,13 +186,15 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
       if (entry.iconType === "component") {
         const tabW = Math.min(el.width * 0.16, 22);
         const tabH = Math.min(el.height * 0.22, 18);
-        const bodyLeft = el.x + tabW * 0.6;
-        const bodyW = el.width - tabW * 0.6;
+        const tabLen = tabW * 1.5;               // tabs 50% longer than before…
+        const bodyLeft = el.x + tabW;            // …body inset so the longer tabs stay in bounds
+        const bodyW = el.width - tabW;
+        const tabX = bodyLeft - tabW;            // = el.x; inside portion (right of bodyLeft) stays tabW/2
         return (
           <g stroke={stroke} strokeWidth={STROKE_WIDTH} strokeLinejoin="round">
             <rect x={bodyLeft} y={el.y} width={bodyW} height={el.height} fill={fill} />
-            <rect x={bodyLeft - tabW / 2} y={el.y + el.height * 0.20} width={tabW} height={tabH} fill={fill} />
-            <rect x={bodyLeft - tabW / 2} y={el.y + el.height * 0.55} width={tabW} height={tabH} fill={fill} />
+            <rect x={tabX} y={el.y + el.height * 0.20} width={tabLen} height={tabH} fill={fill} />
+            <rect x={tabX} y={el.y + el.height * 0.55} width={tabLen} height={tabH} fill={fill} />
           </g>
         );
       }

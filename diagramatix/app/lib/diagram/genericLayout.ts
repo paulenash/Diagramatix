@@ -900,6 +900,8 @@ export const ARCHI_SHAPE: Record<string, { key: string; iconOnly: boolean }> = {
   "implementation-event": { key: "implementation-migration-implementation-event", iconOnly: false },
   "plateau":              { key: "implementation-migration-plateau",              iconOnly: false },
   "gap":                  { key: "implementation-migration-gap",                  iconOnly: false },
+  // Composite — Location (a place/site; often a container of other elements)
+  "location":             { key: "composite-location",                           iconOnly: false },
 };
 
 // Passive-structure objects that go in a SIDE COLUMN (left/right), placed next
@@ -932,6 +934,7 @@ export const ARCHI_BAND: Record<string, number> = {
   "technology-path": 11, "technology-communication-network": 11,
   "equipment": 11, "facility": 11, "distribution-network": 11, "material": 11,
   "work-package": 12, "deliverable": 12, "implementation-event": 12, "plateau": 12, "gap": 12,
+  "location": 2, // Composite — placed with the business active-structure band when flat
 };
 
 // relationship name → archi-* connector type
@@ -1026,7 +1029,7 @@ function boxSize(label: string): { w: number; h: number } {
  *  height standard) to keep the name to 2 lines before any expansion, and only grow
  *  taller once 2 lines can't hold it even at ~3× width. Unlike boxSize this does NOT
  *  force the A4.09 aspect ratio (a 2-line name just makes a wider standard-height box). */
-function archiFitSize(label: string): { w: number; h: number } {
+export function archiFitSize(label: string): { w: number; h: number } {
   const text = label || "";
   const lineW = (l: string) => l.length * A409_FONT * AVG_CHAR_W_FACTOR;
   const MAX_W = A409_DEFAULT_W * 3;
