@@ -9,6 +9,7 @@ import { AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import { buildGenericSystemPrompt } from "@/app/lib/ai/generateDiagramPrompt";
+import { extractBalancedJson, repairJsonCommas, closeTruncatedJson } from "@/app/lib/ai/planBpmn";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
 import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { chooseModel } from "@/app/lib/ai/modelAccess";
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
 
     const message = await client.messages.create({
       model,
-      max_tokens: 8192,
+      max_tokens: 16384,
       system: systemPrompt,
       messages: [{ role: "user", content: userContent }],
     });
@@ -100,10 +101,24 @@ export async function POST(req: Request) {
     if (jsonStr.startsWith("```")) {
       jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
     }
-
-    let parsed;
-    try { parsed = JSON.parse(jsonStr); }
-    catch { return NextResponse.json({ error: "Failed to parse AI JSON", raw: jsonStr.substring(0, 500) }, { status: 500 }); }
+    // Robust parse (mirrors planBpmn): drop any prose the model appended by taking the
+    // first balanced { … } object, then try as-is → trailing-comma repair → salvage a
+    // truncated object. An ArchiMate image plan (bounds + notation + parent + connection
+    // sides per element) is verbose, so a busy viewpoint is the common trip point.
+    jsonStr = extractBalancedJson(jsonStr);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tryParse = (s: string): any => { try { return JSON.parse(s); } catch { return null; } };
+    const salvaged = closeTruncatedJson(jsonStr);
+    let parsed = tryParse(jsonStr) ?? tryParse(repairJsonCommas(jsonStr));
+    if (!parsed && salvaged) parsed = tryParse(salvaged) ?? tryParse(repairJsonCommas(salvaged));
+    if (!parsed) {
+      console.error("[generate-diagram] JSON parse failed.", process.env.DEBUG_CONTENT_LOGS === "1"
+        ? `Raw response (first 2 KB): ${textBlock.text.slice(0, 2048)}`
+        : "(set DEBUG_CONTENT_LOGS=1 to log raw output)");
+      return NextResponse.json({ error: "Failed to parse AI JSON", raw: jsonStr.substring(0, 500) }, { status: 500 });
+    }
+    if (!Array.isArray(parsed.elements)) parsed.elements = [];
+    if (!Array.isArray(parsed.connections)) parsed.connections = [];
 
     // Normalize process-context: auto-correct actors that should be systems or hourglasses
     if (diagramType === "process-context" && Array.isArray(parsed.elements)) {

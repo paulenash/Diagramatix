@@ -12,6 +12,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { makeAiClient } from "@/app/lib/ai/anthropicClient";
 import { buildGenericSystemPrompt } from "./generateDiagramPrompt";
+import { extractBalancedJson, repairJsonCommas, closeTruncatedJson } from "./planBpmn";
 
 export interface GenericPlanInput {
   apiKey: string;
@@ -55,9 +56,16 @@ export async function planGeneric(input: GenericPlanInput): Promise<GenericPlan>
   if (jsonStr.startsWith("```")) {
     jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
   }
-  try {
-    return JSON.parse(jsonStr) as GenericPlan;
-  } catch {
-    throw new Error("Failed to parse AI JSON");
-  }
+  // Robust parse (mirrors planBpmn / the generate-diagram route): take the first
+  // balanced { … } object (drop appended prose), then try as-is → trailing-comma
+  // repair → salvage a truncated object before giving up.
+  jsonStr = extractBalancedJson(jsonStr);
+  const tryParse = (s: string): GenericPlan | null => {
+    try { return JSON.parse(s) as GenericPlan; } catch { return null; }
+  };
+  const salvaged = closeTruncatedJson(jsonStr);
+  const parsed = tryParse(jsonStr) ?? tryParse(repairJsonCommas(jsonStr))
+    ?? (salvaged ? (tryParse(salvaged) ?? tryParse(repairJsonCommas(salvaged))) : null);
+  if (!parsed) throw new Error("Failed to parse AI JSON");
+  return parsed;
 }
