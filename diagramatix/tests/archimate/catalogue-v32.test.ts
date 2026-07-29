@@ -62,10 +62,10 @@ describe("ArchiMate v3.2 catalogue + layout", () => {
       expect(ARCHI_BAND[t]).toBe(12);
   });
 
-  it("T0995 — catalogue is v3.2, Technology has 19 masters (Node + System Software gained icon forms), new categories present, typo/dupes gone", () => {
+  it("T0995 — catalogue is v3.2, Technology has 18 masters (Node gained an icon form; System Software is box-only), new categories present, typo/dupes gone", () => {
     expect(catalogue.version).toBe("3.2");
-    // 17 box masters + the Node and System Software icon (expressed) forms = 19.
-    expect(catalogue.categories.find((c: { id: string }) => c.id === "technology").shapes.length).toBe(19);
+    // 17 box masters + the Node icon (expressed) form = 18.
+    expect(catalogue.categories.find((c: { id: string }) => c.id === "technology").shapes.length).toBe(18);
     expect(catalogue.categories.map((c: { id: string }) => c.id)).toEqual(
       expect.arrayContaining(["implementation-migration", "composite"]),
     );

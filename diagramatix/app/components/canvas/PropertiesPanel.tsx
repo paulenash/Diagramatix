@@ -2828,6 +2828,33 @@ export function PropertiesPanel({
                 {typeItems.map(it => <option key={it.key} value={it.key}>{it.label}</option>)}
               </select>
             </div>
+            {(() => {
+              // Representation swap — for a concept that has BOTH a box and an icon
+              // (expressed) master in the catalogue, let the user flip between them so a
+              // shape generated as the wrong form can be corrected. Keeps the element's
+              // current size/position; only the rendering + archimateIconOnly change.
+              const isIcon = shapeKey.endsWith("-icon");
+              const boxKey = isIcon ? shapeKey.replace(/-icon$/, "-box") : shapeKey;
+              const iconKey = isIcon ? shapeKey : shapeKey.replace(/-box$/, "-icon");
+              if (boxKey === iconKey || !findShapeByKey(boxKey) || !findShapeByKey(iconKey)) return null;
+              const btn = (active: boolean) =>
+                `flex-1 text-xs rounded px-2 py-1 border ${active ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`;
+              return (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Representation</label>
+                  <div className="flex gap-1" {...stop}>
+                    <button type="button" className={btn(!isIcon)}
+                      onClick={() => { if (isIcon) onUpdateProperties(element.id, { shapeKey: boxKey, archimateIconOnly: false }); }}>
+                      Box
+                    </button>
+                    <button type="button" className={btn(isIcon)}
+                      onClick={() => { if (!isIcon) onUpdateProperties(element.id, { shapeKey: iconKey, archimateIconOnly: true }); }}>
+                      Icon
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </>
         );
       })()}

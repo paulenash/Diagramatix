@@ -2039,7 +2039,7 @@ function getLabelPos(el: DiagramElement, archimateDepth: number = 0): { x: numbe
     const isComponentIcon = iconOnly && typeof el.properties?.shapeKey === "string" &&
       /(component|system-software)/.test(el.properties.shapeKey as string);
     if (isComponentIcon) {
-      return { x: el.x + el.width / 2 + 8, y: el.y + el.height / 2, baseline: "middle" };
+      return { x: el.x + el.width / 2 + 12, y: el.y + el.height / 2, baseline: "middle" };
     }
     if (archimateDepth > 0) {
       return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };

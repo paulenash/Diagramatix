@@ -704,18 +704,6 @@
           "iconType": "component"
         },
         {
-          "key": "technology-system-software-icon",
-          "name": "System Software",
-          "variant": "icon",
-          "description": "System software represents software that provides or contributes to an environment for storing, executing, and using software or data deployed within it.",
-          "category": "technology",
-          "defaultWidth": 113,
-          "defaultHeight": 76,
-          "fill": "#c5e0b4",
-          "shapeFamily": "rectangle",
-          "iconType": "component"
-        },
-        {
           "key": "technology-collaboration-box",
           "name": "Technology Collaboration",
           "variant": "box",
