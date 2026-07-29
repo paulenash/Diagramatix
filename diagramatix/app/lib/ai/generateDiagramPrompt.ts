@@ -63,6 +63,7 @@ NOTATION FORM — several element types can be drawn TWO ways. Report which one 
 REPRODUCE THE ORIGINAL LAYOUT — capture geometry so the diagram matches the drawing:
 - Give EVERY element a "bounds": { "x", "y", "w", "h" } as fractions 0..1 of the WHOLE image (x,y = the shape's top-left corner; w,h = its width/height). Use 2-3 decimals. A nested shape's bounds sit INSIDE its parent's; a container's bounds enclose all its children.
 - Set "parent" for every shape drawn inside another (visual containment), as above.
+- CONNECTION POINTS: for each connection report which element FACE each end touches in the image — "sourceSide" and "targetSide", one of "top"|"right"|"bottom"|"left" — and optionally "sourceOffset"/"targetOffset" (0..1 ALONG that side; for top/bottom measured left→right, for left/right measured top→bottom) for where on the edge it attaches. This lets the tool mimic the drawn connection points.
 Example with geometry: { "id": "s1", "type": "business-service", "label": "Claim Registration", "notation": "icon", "bounds": { "x": 0.10, "y": 0.40, "w": 0.24, "h": 0.08 } }
 
 NON-IMAGE GENERATION — for a text prompt (no image), still PREFER nesting for composition: set the part's "parent" to the whole's id instead of a "composition" connector. Aggregation stays a connector. Omit "bounds" when there is no image — positions are applied by the tool.`,

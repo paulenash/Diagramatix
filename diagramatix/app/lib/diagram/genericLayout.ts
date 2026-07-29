@@ -186,6 +186,13 @@ interface AiParsed {
     targetConstraint?: string;
     sourceDerived?: boolean;
     targetDerived?: boolean;
+    // ArchiMate image reproduction: which element FACE each end attaches to, and
+    // (optionally) the position along that side (0..1). Honoured by the preserved
+    // layout so connectors mimic the drawn connection points; ignored elsewhere.
+    sourceSide?: string;
+    targetSide?: string;
+    sourceOffset?: number;
+    targetOffset?: number;
   }>;
 }
 
@@ -1223,9 +1230,12 @@ function layoutArchimateDiagram(
 function buildArchiConnectors(
   elements: DiagramElement[],
   aiConnections: NonNullable<AiParsed["connections"]>,
+  opts?: { honorSides?: boolean },
 ): Connector[] {
   const elMap = new Map(elements.map(e => [e.id, e]));
   type Side = "top" | "bottom" | "left" | "right";
+  const SIDES = new Set<string>(["top", "bottom", "left", "right"]);
+  const honor = !!opts?.honorSides; // image reproduction: honour the AI's drawn sides
   type Pre = { c: typeof aiConnections[number]; src: DiagramElement; tgt: DiagramElement;
     connType: string; srcSide: Side; tgtSide: Side; srcOffset: number; tgtOffset: number };
   const prelim: Pre[] = [];
@@ -1238,6 +1248,7 @@ function buildArchiConnectors(
     if (connType === "archi-composition" && tgt.parentId === src.id) continue;
     const srcCx = src.x + src.width / 2, tgtCx = tgt.x + tgt.width / 2;
     const srcCy = src.y + src.height / 2, tgtCy = tgt.y + tgt.height / 2;
+    // Facing sides from geometry — the fallback when the AI didn't report a side.
     let srcSide: Side, tgtSide: Side;
     if (Math.abs(tgtCy - srcCy) > Math.abs(tgtCx - srcCx)) {
       srcSide = tgtCy > srcCy ? "bottom" : "top";
@@ -1246,9 +1257,18 @@ function buildArchiConnectors(
       srcSide = tgtCx > srcCx ? "right" : "left";
       tgtSide = tgtCx > srcCx ? "left" : "right";
     }
-    prelim.push({ c, src, tgt, connType, srcSide, tgtSide, srcOffset: 0.5, tgtOffset: 0.5 });
+    // Requirement 3 — mimic the image's connection points: honour the AI-reported
+    // face (and along-side position) per end when present.
+    if (honor && typeof c.sourceSide === "string" && SIDES.has(c.sourceSide)) srcSide = c.sourceSide as Side;
+    if (honor && typeof c.targetSide === "string" && SIDES.has(c.targetSide)) tgtSide = c.targetSide as Side;
+    const srcOffset = honor && typeof c.sourceOffset === "number" ? clamp01(c.sourceOffset) : 0.5;
+    const tgtOffset = honor && typeof c.targetOffset === "number" ? clamp01(c.targetOffset) : 0.5;
+    prelim.push({ c, src, tgt, connType, srcSide, tgtSide, srcOffset, tgtOffset });
   }
-  // Group endpoints by element|side and spread offsets.
+  // Group endpoints by element|side. A group of ONE keeps its offset (the honoured
+  // AI position, or the 0.5 centre). A group of several is spread to distinct points
+  // (requirement 2 — no two endpoints share a point), ordered by the honoured AI
+  // offset when present, else by the opposite endpoint (crossing reduction).
   const groups = new Map<string, { p: Pre; end: "src" | "tgt" }[]>();
   const push = (key: string, v: { p: Pre; end: "src" | "tgt" }) => {
     const l = groups.get(key); if (l) l.push(v); else groups.set(key, [v]);
@@ -1262,6 +1282,11 @@ function buildArchiConnectors(
     const side = key.split("|")[1];
     const horiz = side === "top" || side === "bottom";
     list.sort((a, b) => {
+      if (honor) {
+        const ka = a.end === "src" ? a.p.srcOffset : a.p.tgtOffset;
+        const kb = b.end === "src" ? b.p.srcOffset : b.p.tgtOffset;
+        if (ka !== kb) return ka - kb;
+      }
       const ao = a.end === "src" ? a.p.tgt : a.p.src;
       const bo = b.end === "src" ? b.p.tgt : b.p.src;
       return horiz ? (ao.x - bo.x) : (ao.y - bo.y);
@@ -1330,41 +1355,68 @@ function resolveArchiParents(
 // label band at the top (ArchiMate containers render their name at the top).
 const ARCHI_NEST_PAD = 16, ARCHI_NEST_HEADER = 28, ARCHI_NEST_GAP = 24;
 
-/** Push overlapping siblings apart to restore the image's inter-element gaps
- *  (Paul, 2026-07-29). When a box expands past its drawn size it can collide with
- *  a neighbour; each colliding pair is separated along the axis their IMAGE centres
- *  differ most, to an edge-gap equal to the image gap (min 14px), preserving the
- *  drawn arrangement. `move(el, dx, dy)` shifts an element — and, for a container,
- *  its whole subtree — so nested contents ride along. */
-function separateArchiSiblings(
-  group: DiagramElement[],
-  boundsById: Map<string, AiBounds>,
-  targetW: number, targetH: number,
+// Minimum inter-element gaps, as a fraction of the default Business Process box
+// (113×76): general neighbours keep 20% of the BP dimension on the facing axis; a
+// directly-connected adjacent pair keeps 35% ALONG the connector's axis so the line
+// (and any label) has room (Paul, 2026-07-29).
+const ARCHI_BP_W = 113, ARCHI_BP_H = 76;
+const ARCHI_GAP_GEN_X = Math.round(0.20 * ARCHI_BP_W);   // ~23
+const ARCHI_GAP_GEN_Y = Math.round(0.20 * ARCHI_BP_H);   // ~15
+const ARCHI_GAP_CONN_X = Math.round(0.35 * ARCHI_BP_W);  // ~40
+const ARCHI_GAP_CONN_Y = Math.round(0.35 * ARCHI_BP_H);  // ~27
+
+/** Enforce a MINIMUM gap between neighbouring elements (not just no-overlap), so the
+ *  reproduced arrangement never gets cramped. Two elements are "neighbours" when their
+ *  perpendicular projections overlap (same row or column); the gap on the facing axis
+ *  is grown to the general minimum (20% BP), or to 35% BP when the pair is directly
+ *  connected (room for the connector). Colliding pairs are separated the same way.
+ *  Ancestor↔descendant pairs are skipped (a child sits inside its container).
+ *  `move(el, dx, dy)` shifts an element — and, for a container, its whole subtree. */
+function enforceArchiGaps(
+  els: DiagramElement[],
+  connected: Set<string>,
   move: (el: DiagramElement, dx: number, dy: number) => void,
+  isAncestor: (a: string, b: string) => boolean,
 ): void {
-  if (group.length < 2) return;
-  const MIN_GAP = 14;
-  for (let iter = 0; iter < 8; iter++) {
+  if (els.length < 2) return;
+  const key = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const PERP = 0.25; // require ≥25% perpendicular overlap to count as a row/column neighbour
+  const pushX = (A: DiagramElement, B: DiagramElement, amt: number) => {
+    const half = amt / 2;
+    if (A.x + A.width / 2 <= B.x + B.width / 2) { move(A, -half, 0); move(B, half, 0); }
+    else { move(A, half, 0); move(B, -half, 0); }
+  };
+  const pushY = (A: DiagramElement, B: DiagramElement, amt: number) => {
+    const half = amt / 2;
+    if (A.y + A.height / 2 <= B.y + B.height / 2) { move(A, 0, -half); move(B, 0, half); }
+    else { move(A, 0, half); move(B, 0, -half); }
+  };
+  for (let iter = 0; iter < 12; iter++) {
     let moved = false;
-    for (let i = 0; i < group.length; i++) {
-      for (let j = i + 1; j < group.length; j++) {
-        const A = group[i], B = group[j];
+    for (let i = 0; i < els.length; i++) {
+      for (let j = i + 1; j < els.length; j++) {
+        const A = els[i], B = els[j];
+        if (isAncestor(A.id, B.id) || isAncestor(B.id, A.id)) continue;
         const ox = Math.min(A.x + A.width, B.x + B.width) - Math.max(A.x, B.x);
         const oy = Math.min(A.y + A.height, B.y + B.height) - Math.max(A.y, B.y);
-        if (ox <= 0 || oy <= 0) continue; // not colliding
-        const bA = boundsById.get(A.id), bB = boundsById.get(B.id);
-        const dcx = bA && bB ? (bA.x + bA.w / 2) - (bB.x + bB.w / 2) : (A.x + A.width / 2) - (B.x + B.width / 2);
-        const dcy = bA && bB ? (bA.y + bA.h / 2) - (bB.y + bB.h / 2) : (A.y + A.height / 2) - (B.y + B.height / 2);
-        if (Math.abs(dcx) * targetW >= Math.abs(dcy) * targetH) {
-          const imgGap = bA && bB ? Math.max(bA.x, bB.x) - Math.min(bA.x + bA.w, bB.x + bB.w) : 0;
-          const push = (ox + Math.max(MIN_GAP, imgGap * targetW)) / 2;
-          if (dcx <= 0) { move(A, -push, 0); move(B, push, 0); } else { move(A, push, 0); move(B, -push, 0); }
-        } else {
-          const imgGap = bA && bB ? Math.max(bA.y, bB.y) - Math.min(bA.y + bA.h, bB.y + bB.h) : 0;
-          const push = (oy + Math.max(MIN_GAP, imgGap * targetH)) / 2;
-          if (dcy <= 0) { move(A, 0, -push); move(B, 0, push); } else { move(A, 0, push); move(B, 0, -push); }
+        const conn = connected.has(key(A.id, B.id));
+        if (ox > 0 && oy > 0) {
+          // Collision — separate on the axis where the centres differ most.
+          if (Math.abs((A.x + A.width / 2) - (B.x + B.width / 2)) >= Math.abs((A.y + A.height / 2) - (B.y + B.height / 2))) {
+            pushX(A, B, ox + (conn ? ARCHI_GAP_CONN_X : ARCHI_GAP_GEN_X));
+          } else {
+            pushY(A, B, oy + (conn ? ARCHI_GAP_CONN_Y : ARCHI_GAP_GEN_Y));
+          }
+          moved = true;
+        } else if (oy <= 0 && ox >= PERP * Math.min(A.width, B.width)) {
+          // Vertical neighbours (columns aligned) — enforce the min gap on Y.
+          const req = conn ? ARCHI_GAP_CONN_Y : ARCHI_GAP_GEN_Y;
+          if (-oy < req - 0.5) { pushY(A, B, req - -oy); moved = true; }
+        } else if (ox <= 0 && oy >= PERP * Math.min(A.height, B.height)) {
+          // Horizontal neighbours (rows aligned) — enforce the min gap on X.
+          const req = conn ? ARCHI_GAP_CONN_X : ARCHI_GAP_GEN_X;
+          if (-ox < req - 0.5) { pushX(A, B, req - -ox); moved = true; }
         }
-        moved = true;
       }
     }
     if (!moved) break;
@@ -1405,7 +1457,6 @@ export function layoutArchimatePreserved(
   const OX = 60, OY = 60;
 
   const elements: DiagramElement[] = [];
-  const boundsById = new Map<string, AiBounds>();
   for (const e of ided) {
     const spec = archiShapeForm(e.type, e.notation)!;
     const label = formatLabel(e.label ?? e.name ?? "");
@@ -1413,7 +1464,6 @@ export function layoutArchimatePreserved(
     // before expanding). Containers: provisional; hugged around their children below.
     const sz = isContainer(e.id) ? boxSize(label) : archiFitSize(label);
     const b = validBounds(e.bounds) ? e.bounds : undefined;
-    if (b) boundsById.set(e.id, b);
     // Centre the box on the element's drawn centre (best arrangement fidelity); no
     // bounds → default origin. Containers are repositioned by the grow.
     const cx = b ? OX + clamp01(b.x + b.w / 2) * TARGET_W : OX + sz.w / 2;
@@ -1443,24 +1493,43 @@ export function layoutArchimatePreserved(
   };
 
   // Grow each container to HUG its children — DEEPEST FIRST so a mid-level container
-  // wraps its already-sized sub-containers (3-level repro needs this). Before hugging,
-  // separate that container's children so an expanded box keeps the image's gaps
-  // (Paul); the container is then sized to the children bbox + PAD + a top HEADER band.
-  const containers = elements.filter(c => isContainer(c.id)).sort((a, b) => depthOf(b.id) - depthOf(a.id));
-  for (const c of containers) {
-    const kids = (childrenOf.get(c.id) ?? []).map(id => elMap.get(id)!).filter(Boolean);
-    if (!kids.length) continue;
-    separateArchiSiblings(kids, boundsById, TARGET_W, TARGET_H, shiftSubtree);
-    const minX = Math.min(...kids.map(k => k.x)) - ARCHI_NEST_PAD;
-    const minY = Math.min(...kids.map(k => k.y)) - ARCHI_NEST_PAD - ARCHI_NEST_HEADER;
-    const maxX = Math.max(...kids.map(k => k.x + k.width)) + ARCHI_NEST_PAD;
-    const maxY = Math.max(...kids.map(k => k.y + k.height)) + ARCHI_NEST_PAD;
-    c.x = minX; c.y = minY;
-    c.width = Math.max(maxX - minX, boxSize(c.label).w); // never narrower than its own name
-    c.height = maxY - minY;
+  // wraps its already-sized sub-containers. Sized to children bbox + PAD + top HEADER.
+  const hug = () => {
+    const containers = elements.filter(c => isContainer(c.id)).sort((a, b) => depthOf(b.id) - depthOf(a.id));
+    for (const c of containers) {
+      const kids = (childrenOf.get(c.id) ?? []).map(id => elMap.get(id)!).filter(Boolean);
+      if (!kids.length) continue;
+      const minX = Math.min(...kids.map(k => k.x)) - ARCHI_NEST_PAD;
+      const minY = Math.min(...kids.map(k => k.y)) - ARCHI_NEST_PAD - ARCHI_NEST_HEADER;
+      const maxX = Math.max(...kids.map(k => k.x + k.width)) + ARCHI_NEST_PAD;
+      const maxY = Math.max(...kids.map(k => k.y + k.height)) + ARCHI_NEST_PAD;
+      c.x = minX; c.y = minY;
+      c.width = Math.max(maxX - minX, boxSize(c.label).w); // never narrower than its own name
+      c.height = maxY - minY;
+    }
+  };
+
+  // Directly-connected element pairs → the larger 35% along-connector gap.
+  const pkey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const connected = new Set<string>();
+  for (const c of aiConnections) {
+    if (c.sourceId !== c.targetId && elMap.has(c.sourceId) && elMap.has(c.targetId)) connected.add(pkey(c.sourceId, c.targetId));
   }
-  // Separate the root-level elements too (top-level containers / standalone shapes).
-  separateArchiSiblings(elements.filter(e => !e.parentId), boundsById, TARGET_W, TARGET_H, shiftSubtree);
+  const isAncestor = (a: string, b: string) => { // a is an ancestor of b?
+    let cur = parentOf.get(b); const seen = new Set<string>();
+    while (cur && !seen.has(cur)) { if (cur === a) return true; seen.add(cur); cur = parentOf.get(cur); }
+    return false;
+  };
+
+  // Hug, then enforce minimum inter-element gaps across ALL elements (moving whole
+  // subtrees), then re-hug (children may have shifted) and settle the now-final root
+  // boxes. Positions still come from the image bounds — the pass only widens gaps
+  // that fell below the minimum, so it mimics the drawn spacing as much as possible.
+  hug();
+  enforceArchiGaps(elements, connected, shiftSubtree, isAncestor);
+  hug();
+  enforceArchiGaps(elements.filter(e => !e.parentId), connected, shiftSubtree, isAncestor);
+  hug();
   for (const el of elements) { el.x = Math.round(el.x); el.y = Math.round(el.y); el.width = Math.round(el.width); el.height = Math.round(el.height); }
 
   // Roots first, deepest last → every parent precedes its children in the array
@@ -1469,7 +1538,7 @@ export function layoutArchimatePreserved(
 
   return {
     elements,
-    connectors: buildArchiConnectors(elements, aiConnections),
+    connectors: buildArchiConnectors(elements, aiConnections, { honorSides: true }),
     viewport: { x: 0, y: 0, zoom: 0.7 },
     fontSize: 14,
     connectorFontSize: 10,

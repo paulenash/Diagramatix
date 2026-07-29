@@ -592,6 +592,8 @@ AI-generated ArchiMate expresses whole-part **composition** by nesting children 
 | T1076 | `notation: "icon"\|"box"` picks the expressed (`-icon`) or box catalogue master + `archimateIconOnly` | The image's icon-form Service/Event/etc. rendering as the wrong (box) form | If `archiShapeForm` / the notation plumbing regresses |
 | T1078 | image elements render at STANDARD size (not scaled to image px); containers hug them | Ingested elements rendering ~4× too big | If `layoutArchimatePreserved` reverts to bounds×TARGET_W sizing |
 | T1081 | Location type + Node/System Software icon forms ingest (composite-location; `-icon` masters; nested) | Location names rendering as Business Actors; Node/SysSw stuck in box form on ingestion | If `location` drops out of ARCHI_SHAPE or the notation plumbing regresses |
+| T1082 | minimum inter-element gaps on ingestion — 20% BP general, 35% along a connector | Cramped, near-touching rows and connected elements with no room for the line | If `enforceArchiGaps` regresses |
+| T1083 | connectors never share a connection point + the AI-reported side is honoured | Overlapping connector endpoints; connectors ignoring the drawn side | If the endpoint spread or `honorSides` in `buildArchiConnectors` regresses |
 | T1080 | long names WIDEN to stay ≤2 lines (height standard), and expanded siblings don't overlap (image gaps preserved) | Long labels cramming/growing tall, or expanded boxes colliding | If `archiFitSize` or `separateArchiSiblings` regresses |
 
 ### `tests/archimate/connectors.test.ts` — Pins distinct visual style for all 11 ArchiMate connector types

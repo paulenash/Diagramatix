@@ -178,4 +178,53 @@ describe("ArchiMate notation form (icon vs box)", () => {
     // Nested inside the location.
     expect(g("n1").parentId).toBe("loc");
   });
+
+  it("T1082 — minimum inter-element gaps: 20% general, 35% along a connector", () => {
+    // Three services in a nearly-touching row (like the Application Usage Viewpoint)
+    // plus two directly-connected (triggering) processes drawn close together.
+    const els2 = [
+      { id: "p1", type: "business-process", label: "P1", bounds: { x: 0.15, y: 0.10, w: 0.10, h: 0.08 } },
+      { id: "p2", type: "business-process", label: "P2", bounds: { x: 0.28, y: 0.10, w: 0.10, h: 0.08 } },
+      { id: "s1", type: "business-service", label: "S1", bounds: { x: 0.15, y: 0.45, w: 0.10, h: 0.08 } },
+      { id: "s2", type: "business-service", label: "S2", bounds: { x: 0.265, y: 0.45, w: 0.10, h: 0.08 } },
+      { id: "s3", type: "business-service", label: "S3", bounds: { x: 0.38, y: 0.45, w: 0.10, h: 0.08 } },
+    ];
+    const conns = [
+      { sourceId: "p1", targetId: "p2", type: "triggering", sourceSide: "right", targetSide: "left" },
+      { sourceId: "s1", targetId: "p1", type: "serving" },
+      { sourceId: "s2", targetId: "p1", type: "serving" },
+    ];
+    const d = layoutGenericDiagram({ elements: els2, connections: conns } as never, "archimate", { imageAspect: { w: 1000, h: 1000 } });
+    const g = (id: string) => d.elements.find((e) => e.id === id)!;
+    const hgap = (a: string, b: string) => g(b).x - (g(a).x + g(a).width); // b to the right of a
+    // Unconnected services keep ≥ 20% of BP width (~23px, allow rounding).
+    expect(hgap("s1", "s2"), "s1→s2 general gap").toBeGreaterThanOrEqual(22);
+    expect(hgap("s2", "s3"), "s2→s3 general gap").toBeGreaterThanOrEqual(22);
+    // Directly-connected processes keep ≥ 35% of BP width (~40px) along the connector.
+    expect(hgap("p1", "p2"), "p1→p2 connected gap").toBeGreaterThanOrEqual(38);
+  });
+
+  it("T1083 — connectors don't share a connection point + honour the AI-reported side", () => {
+    const els2 = [
+      { id: "p1", type: "business-process", label: "P1", bounds: { x: 0.15, y: 0.10, w: 0.10, h: 0.08 } },
+      { id: "p2", type: "business-process", label: "P2", bounds: { x: 0.28, y: 0.10, w: 0.10, h: 0.08 } },
+      { id: "s1", type: "business-service", label: "S1", bounds: { x: 0.15, y: 0.45, w: 0.10, h: 0.08 } },
+      { id: "s2", type: "business-service", label: "S2", bounds: { x: 0.28, y: 0.45, w: 0.10, h: 0.08 } },
+    ];
+    const conns = [
+      { sourceId: "p1", targetId: "p2", type: "triggering", sourceSide: "right", targetSide: "left" },
+      { sourceId: "s1", targetId: "p1", type: "serving" },
+      { sourceId: "s2", targetId: "p1", type: "serving" },
+    ];
+    const d = layoutGenericDiagram({ elements: els2, connections: conns } as never, "archimate", { imageAspect: { w: 1000, h: 1000 } });
+    // Two serving connectors both reach p1 — their attachment points must differ.
+    const toP1 = d.connectors.filter((c) => c.targetId === "p1");
+    expect(toP1.length).toBe(2);
+    const [a, b] = toP1;
+    expect(a.targetSide === b.targetSide && a.targetOffsetAlong === b.targetOffsetAlong, "distinct attachment points").toBe(false);
+    // The AI-reported side on p1→p2 is honoured.
+    const t = d.connectors.find((c) => c.sourceId === "p1" && c.targetId === "p2")!;
+    expect(t.sourceSide).toBe("right");
+    expect(t.targetSide).toBe("left");
+  });
 });
