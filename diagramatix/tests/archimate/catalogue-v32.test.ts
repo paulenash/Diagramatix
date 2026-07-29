@@ -43,18 +43,16 @@ describe("ArchiMate v3.2 catalogue + layout", () => {
     }
   });
 
-  it("T1079 — Node + System Software + Component have selectable icon forms (dual-form + catalogue + drawer)", () => {
+  it("T1079 — Node + Component have selectable icon forms (dual-form + catalogue + drawer); System Software is box-only", () => {
     const keys = new Set(allShapes.map((s) => s.key));
-    // The three types the icon-form feature added/enabled are dual-form.
-    for (const t of ["technology-node", "technology-system-software", "application-component"]) {
+    for (const t of ["technology-node", "application-component"]) {
       expect(ARCHI_DUAL_FORM.has(t), `${t} is dual-form`).toBe(true);
       const iconKey = ARCHI_SHAPE[t].key.replace(/-box$/, "-icon");
       expect(keys.has(iconKey), `catalogue has ${iconKey}`).toBe(true);
     }
-    // The expressed forms reuse existing whole-shape drawers: Node → "node",
-    // System Software → "component" (Paul's choice), Component → "component".
     expect(allShapes.find((s) => s.key === "technology-node-icon").iconType).toBe("node");
-    expect(allShapes.find((s) => s.key === "technology-system-software-icon").iconType).toBe("component");
+    // System Software is box-only (bespoke corner-glyph icon assigned via the Icon Library).
+    expect(ARCHI_DUAL_FORM.has("technology-system-software"), "system software NOT dual-form").toBe(false);
   });
 
   it("T0994 — new v3.2 element types band correctly (Technology 11, Impl&Migration 12)", () => {

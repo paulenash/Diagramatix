@@ -170,13 +170,30 @@ describe("ArchiMate notation form (icon vs box)", () => {
     // Location renders as the composite-location master (place/site container).
     expect(g("loc").properties.shapeKey).toBe("composite-location");
     expect(g("loc").properties.archimateIsContainer).toBe(true);
-    // Node + System Software drawn in the image's expressed form → their -icon masters.
+    // Node drawn in the image's expressed form → its -icon master.
     expect(g("n1").properties.shapeKey).toBe("technology-node-icon");
     expect(g("n1").properties.archimateIconOnly).toBe(true);
-    expect(g("ss1").properties.shapeKey).toBe("technology-system-software-icon");
-    expect(g("ss1").properties.archimateIconOnly).toBe(true);
+    // System Software is box-only (bespoke icon via the Icon Library) — stays a box
+    // even when notation:"icon" is reported.
+    expect(g("ss1").properties.shapeKey).toBe("technology-system-software-box");
+    expect(g("ss1").properties.archimateIconOnly).toBeUndefined();
     // Nested inside the location.
     expect(g("n1").parentId).toBe("loc");
+  });
+
+  it("T1084 — a Location may only be contained by a Location or a Grouping", () => {
+    const els2 = [
+      { id: "a1", type: "business-actor", label: "ArchiSurance", bounds: { x: 0.02, y: 0.02, w: 0.96, h: 0.96 } },
+      { id: "grp", type: "grouping", label: "Cluster", bounds: { x: 0.05, y: 0.1, w: 0.5, h: 0.7 } },
+      { id: "loc1", type: "location", label: "Front Office", parent: "a1", bounds: { x: 0.6, y: 0.1, w: 0.3, h: 0.3 } },
+      { id: "loc2", type: "location", label: "Back Office", parent: "grp", bounds: { x: 0.08, y: 0.2, w: 0.4, h: 0.4 } },
+    ];
+    const d = layoutGenericDiagram({ elements: els2, connections: [] } as never, "archimate", { imageAspect: { w: 1000, h: 1000 } });
+    const g = (id: string) => d.elements.find((e) => e.id === id)!;
+    // Location under an Actor → the illegal nesting is dropped (loc1 becomes a root).
+    expect(g("loc1").parentId).toBeUndefined();
+    // Location under a Grouping → kept.
+    expect(g("loc2").parentId).toBe("grp");
   });
 
   it("T1082 — minimum inter-element gaps: 20% general, 35% along a connector", () => {

@@ -907,8 +907,10 @@ export const ARCHI_SHAPE: Record<string, { key: string; iconOnly: boolean }> = {
   "implementation-event": { key: "implementation-migration-implementation-event", iconOnly: false },
   "plateau":              { key: "implementation-migration-plateau",              iconOnly: false },
   "gap":                  { key: "implementation-migration-gap",                  iconOnly: false },
-  // Composite — Location (a place/site; often a container of other elements)
+  // Composite — Location (a place/site) + Grouping (dashed boundary); both are
+  // containers that may hold other elements.
   "location":             { key: "composite-location",                           iconOnly: false },
+  "grouping":             { key: "composite-grouping",                           iconOnly: false },
 };
 
 // Passive-structure objects that go in a SIDE COLUMN (left/right), placed next
@@ -941,7 +943,7 @@ export const ARCHI_BAND: Record<string, number> = {
   "technology-path": 11, "technology-communication-network": 11,
   "equipment": 11, "facility": 11, "distribution-network": 11, "material": 11,
   "work-package": 12, "deliverable": 12, "implementation-event": 12, "plateau": 12, "gap": 12,
-  "location": 2, // Composite — placed with the business active-structure band when flat
+  "location": 2, "grouping": 2, // Composite — placed with the business active-structure band when flat
 };
 
 // relationship name → archi-* connector type
@@ -966,7 +968,9 @@ export const ARCHI_DUAL_FORM = new Set<string>([
   "motivation-constraint", "strategy-value-stream",
   "application-component", "application-collaboration", "application-interface",
   "application-interaction", "application-event",
-  "technology-node", "technology-system-software",
+  "technology-node",
+  // NOTE: technology-system-software is intentionally NOT dual-form — it is box-only
+  // and carries a bespoke corner-glyph icon (assigned via the Icon Library).
 ]);
 
 /** Resolve {shapeKey, iconOnly} for an element type, honouring the notation FORM
@@ -1328,10 +1332,14 @@ function resolveArchiParents(
   aiElements: NonNullable<AiParsed["elements"]>,
 ): Map<string, string> {
   const mapped = new Set(aiElements.filter(e => e.id && ARCHI_SHAPE[e.type]).map(e => e.id));
+  const typeOf = new Map(aiElements.filter(e => e.id).map(e => [e.id, e.type]));
   const raw = new Map<string, string>();
   for (const e of aiElements) {
     if (e.id && typeof e.parent === "string" && e.parent !== e.id
         && mapped.has(e.id) && mapped.has(e.parent)) {
+      // A Location may only be CONTAINED BY another Location or a Grouping — never by
+      // an Actor or any other element. Drop an illegal Location nesting (Paul, 2026-07-30).
+      if (e.type === "location" && !["location", "grouping"].includes(typeOf.get(e.parent) ?? "")) continue;
       raw.set(e.id, e.parent);
     }
   }
