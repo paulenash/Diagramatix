@@ -589,6 +589,8 @@ AI-generated ArchiMate expresses whole-part **composition** by nesting children 
 | T1073 | preserved: parents render before children (array order) | Containers painted OVER their contents | If the ancestor-depth render sort regresses |
 | T1074 | text-gen (no bounds): `parent` nesting → parentId chain + enclosing containers + no composition lines | Text-prompt composition staying a flat row of lines | If `layoutArchimateNested` regresses |
 | T1075 | text-gen: a non-composition plan (serving/flow) is unchanged | The nesting path corrupting ordinary ArchiMate diagrams | If the `hasNesting` guard leaks into non-nested plans |
+| T1076 | `notation: "icon"\|"box"` picks the expressed (`-icon`) or box catalogue master + `archimateIconOnly` | The image's icon-form Service/Event/etc. rendering as the wrong (box) form | If `archiShapeForm` / the notation plumbing regresses |
+| T1078 | image elements render at STANDARD size (not scaled to image px); containers hug them | Ingested elements rendering ~4× too big | If `layoutArchimatePreserved` reverts to bounds×TARGET_W sizing |
 
 ### `tests/archimate/connectors.test.ts` — Pins distinct visual style for all 11 ArchiMate connector types
 

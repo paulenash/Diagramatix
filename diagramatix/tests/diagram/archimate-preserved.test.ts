@@ -92,4 +92,47 @@ describe("ArchiMate preserved (image nesting)", () => {
     const idx = (id: string) => d.elements.findIndex((e) => e.id === id);
     for (const [p, c] of comps) expect(idx(p), `${p} before ${c}`).toBeLessThan(idx(c));
   });
+
+  it("T1078 — elements render at STANDARD size (not scaled to image px), containers hug them", () => {
+    const d = build();
+    // Leaves are ~standard generated size (128×76, text-expanded) — NOT ~4× (which
+    // the old bounds×1400 sizing produced, ~450px for a 0.35-wide leaf).
+    for (const id of ["a3", "a4", "a6", "a7", "a8", "a9", "a10", "a11"]) {
+      const el = at(d, id);
+      expect(el.height, `${id} height standard`).toBeLessThanOrEqual(120);
+      expect(el.width, `${id} width standard`).toBeLessThanOrEqual(240);
+      expect(el.height, `${id} height ≥ default`).toBeGreaterThanOrEqual(76);
+    }
+    // A leaf that sits directly in ArchiSurance (Finance) is a single default box.
+    expect(at(d, "a9").width).toBeLessThanOrEqual(180);
+    // Because the leaves are small, their containers hug small too — the outer
+    // container is far below the old image-scaled width (~0.96×1400 ≈ 1344).
+    expect(at(d, "a1").width).toBeLessThan(900);
+    expect(at(d, "a2").width).toBeLessThan(700);
+  });
+});
+
+describe("ArchiMate notation form (icon vs box)", () => {
+  it("T1076 — `notation` picks the icon (expressed) or box catalogue form", () => {
+    const formEls = [
+      { id: "s1", type: "business-service", label: "Icon Service", notation: "icon", bounds: { x: 0.05, y: 0.05, w: 0.24, h: 0.10 } },
+      { id: "s2", type: "business-service", label: "Box Service", notation: "box", bounds: { x: 0.05, y: 0.30, w: 0.24, h: 0.10 } },
+      { id: "e1", type: "business-event", label: "Icon Event", notation: "icon", bounds: { x: 0.05, y: 0.55, w: 0.24, h: 0.10 } },
+      { id: "p1", type: "business-process", label: "Plain Process", bounds: { x: 0.05, y: 0.80, w: 0.24, h: 0.10 } },
+    ];
+    const d = layoutGenericDiagram({ elements: formEls, connections: [] } as never, "archimate", { imageAspect: { w: 1000, h: 1000 } });
+    const at2 = (id: string) => d.elements.find((e) => e.id === id)!;
+    // Service drawn as the expressed stadium → the -icon master + iconOnly flag.
+    expect(at2("s1").properties.shapeKey).toBe("business-business-service-icon");
+    expect(at2("s1").properties.archimateIconOnly).toBe(true);
+    // Service drawn as a box → the -box master, no icon flag.
+    expect(at2("s2").properties.shapeKey).toBe("business-business-service-box");
+    expect(at2("s2").properties.archimateIconOnly).toBeUndefined();
+    // Event expressed form → its -icon master.
+    expect(at2("e1").properties.shapeKey).toBe("business-business-event-icon");
+    expect(at2("e1").properties.archimateIconOnly).toBe(true);
+    // No notation → default box form.
+    expect(at2("p1").properties.shapeKey).toBe("business-business-process-box");
+    expect(at2("p1").properties.archimateIconOnly).toBeUndefined();
+  });
 });

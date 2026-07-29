@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
-import { ARCHI_SHAPE, ARCHI_BAND } from "@/app/lib/diagram/genericLayout";
+import { ARCHI_SHAPE, ARCHI_BAND, ARCHI_DUAL_FORM } from "@/app/lib/diagram/genericLayout";
 import { ARCHI_REL_NAME } from "@/app/lib/diagram/archimateConnectorStyle";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -29,6 +29,18 @@ describe("ArchiMate v3.2 catalogue + layout", () => {
     const keys = new Set(allShapes.map((s) => s.key));
     const missing = Object.values(ARCHI_SHAPE).map((v) => v.key).filter((k) => !keys.has(k));
     expect(missing).toEqual([]);
+  });
+
+  it("T1077 — every dual-form type maps to a `-box` key whose `-icon` sibling exists (image ingestion can pick either form)", () => {
+    const keys = new Set(allShapes.map((s) => s.key));
+    for (const type of ARCHI_DUAL_FORM) {
+      const spec = ARCHI_SHAPE[type];
+      expect(spec, `ARCHI_SHAPE has ${type}`).toBeTruthy();
+      expect(spec.key.endsWith("-box"), `${type} defaults to a -box key`).toBe(true);
+      const iconKey = spec.key.replace(/-box$/, "-icon");
+      expect(keys.has(spec.key), `catalogue has ${spec.key}`).toBe(true);
+      expect(keys.has(iconKey), `catalogue has ${iconKey}`).toBe(true);
+    }
   });
 
   it("T0994 — new v3.2 element types band correctly (Technology 11, Impl&Migration 12)", () => {

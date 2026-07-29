@@ -55,10 +55,14 @@ VISUAL CONTAINMENT = COMPOSITION — ArchiMate shows whole–part either by nest
 Example nested element: { "id": "a2", "type": "business-actor", "label": "Front Office", "parent": "a1" }
 
 IMAGE INPUT — when an image of an ArchiMate diagram is attached, reproduce it exactly: OCR every label verbatim, don't invent or drop elements/relationships, and if the image and prompt disagree, follow the image.
+NOTATION FORM — several element types can be drawn TWO ways. Report which one the image uses, per element, in "notation":
+- "notation": "box" (or omit) = the standard RECTANGLE with a small type symbol in the TOP-RIGHT corner.
+- "notation": "icon" = the compact EXPRESSED form where the WHOLE shape IS the type's symbol, with the label inside/below it. Cues: a Business/Application Service is a rounded stadium/pill (semicircular ends); a Business/Application Event is a rounded shape with a semicircular RIGHT end and a small inward triangular notch on its LEFT edge; a Business Actor is a stick figure; a Value Stream is a right-pointing chevron.
+- Only these types have both forms: business-actor, business-collaboration, business-service, business-process, business-function, business-interaction, business-event, motivation-constraint, strategy-value-stream, application-component, application-collaboration, application-interface, application-interaction, application-event. For any other type omit "notation".
 REPRODUCE THE ORIGINAL LAYOUT — capture geometry so the diagram matches the drawing:
 - Give EVERY element a "bounds": { "x", "y", "w", "h" } as fractions 0..1 of the WHOLE image (x,y = the shape's top-left corner; w,h = its width/height). Use 2-3 decimals. A nested shape's bounds sit INSIDE its parent's; a container's bounds enclose all its children.
 - Set "parent" for every shape drawn inside another (visual containment), as above.
-Example with geometry: { "id": "a2", "type": "business-actor", "label": "Front Office", "bounds": { "x": 0.06, "y": 0.12, "w": 0.88, "h": 0.22 }, "parent": "a1" }
+Example with geometry: { "id": "s1", "type": "business-service", "label": "Claim Registration", "notation": "icon", "bounds": { "x": 0.10, "y": 0.40, "w": 0.24, "h": 0.08 } }
 
 NON-IMAGE GENERATION — for a text prompt (no image), still PREFER nesting for composition: set the part's "parent" to the whole's id instead of a "composition" connector. Aggregation stays a connector. Omit "bounds" when there is no image — positions are applied by the tool.`,
 

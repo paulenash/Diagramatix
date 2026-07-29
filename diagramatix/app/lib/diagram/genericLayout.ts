@@ -945,6 +945,33 @@ const ARCHI_REL: Record<string, string> = {
   specialisation: "archi-specialisation", specialization: "archi-specialisation",
 };
 
+// Element types that have BOTH a box form AND an icon ("expressed") form in the
+// catalogue. For these the AI can report which form the image drew, per element,
+// via `notation: "icon" | "box"`. The icon form uses the same catalogue key with
+// `-box` → `-icon` and renders as the glyph shape (archimateIconOnly). Every entry
+// defaults to the box form in ARCHI_SHAPE; guarded by the catalogue-sync test.
+export const ARCHI_DUAL_FORM = new Set<string>([
+  "business-actor", "business-collaboration", "business-service", "business-process",
+  "business-function", "business-interaction", "business-event",
+  "motivation-constraint", "strategy-value-stream",
+  "application-component", "application-collaboration", "application-interface",
+  "application-interaction", "application-event",
+]);
+
+/** Resolve {shapeKey, iconOnly} for an element type, honouring the notation FORM
+ *  the AI reported for a dual-form type: "icon" = the expressed glyph shape,
+ *  "box" = the rectangle with a small corner symbol. Falls back to the ARCHI_SHAPE
+ *  default (box) for a non-dual type or when no notation is given. */
+function archiShapeForm(type: string, notation?: unknown): { key: string; iconOnly: boolean } | undefined {
+  const spec = ARCHI_SHAPE[type];
+  if (!spec) return undefined;
+  if (typeof notation === "string" && ARCHI_DUAL_FORM.has(type)) {
+    if (notation === "icon") return { key: spec.key.replace(/-box$/, "-icon"), iconOnly: true };
+    if (notation === "box")  return { key: spec.key.replace(/-icon$/, "-box"), iconOnly: false };
+  }
+  return spec;
+}
+
 // ── ArchiMate geometry helpers (shared by the band + preserved layouts) ──
 type AiBounds = { x: number; y: number; w: number; h: number };
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
@@ -1012,7 +1039,7 @@ function layoutArchimateDiagram(
   const sideItems: Placed[] = []; // passive-structure → side column
   const byId = new Map<string, Placed>();
   for (const ai of aiElements) {
-    const spec = ARCHI_SHAPE[ai.type];
+    const spec = archiShapeForm(ai.type, ai.notation);
     if (!spec) continue; // unknown element type — skip
     const label = formatLabel(ai.label ?? ai.name ?? "");
     const sz = boxSize(label);
@@ -1296,42 +1323,44 @@ export function layoutArchimatePreserved(
   }
   const isContainer = (id: string) => (childrenOf.get(id)?.length ?? 0) > 0;
 
-  // Normalised fractions → px, aspect-preserving (mirrors layoutBpmnPreserved).
-  const TARGET_W = 1400;
+  // Elements render at their STANDARD generated size (boxSize: text-fit, ~128×76)
+  // — NOT scaled up to the image's pixel size (that made them ~4× too big). The
+  // bounds drive POSITION / arrangement only. Containers are then grown to hug
+  // their children. Pick the position scale so a typical LEAF's bounds-slot ≈ its
+  // standard size, keeping the arrangement proportional without huge gaps.
   const aspect = imageAspect && imageAspect.w > 0 ? imageAspect.h / imageAspect.w : 0.66;
+  const median = (xs: number[]) => { if (!xs.length) return 0; const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const leafBW = ided.filter(e => !isContainer(e.id) && validBounds(e.bounds)).map(e => (e.bounds as AiBounds).w);
+  const medBW = median(leafBW);
+  const TARGET_W = medBW > 0 ? Math.min(4000, Math.max(600, A409_DEFAULT_W / medBW)) : 1400;
   const TARGET_H = TARGET_W * (Number.isFinite(aspect) && aspect > 0 ? aspect : 0.66);
   const OX = 60, OY = 60;
 
   const elements: DiagramElement[] = [];
   for (const e of ided) {
-    const spec = ARCHI_SHAPE[e.type];
+    const spec = archiShapeForm(e.type, e.notation)!;
     const label = formatLabel(e.label ?? e.name ?? "");
-    let x = OX, y = OY, w = A409_DEFAULT_W, h = A409_DEFAULT_H;
-    if (validBounds(e.bounds)) {
-      const b = e.bounds;
-      x = OX + clamp01(b.x) * TARGET_W;
-      y = OY + clamp01(b.y) * TARGET_H;
-      w = Math.max(0.01, b.w) * TARGET_W;
-      h = Math.max(0.01, b.h) * TARGET_H;
-    }
-    // Leaves get a text-fit floor; containers keep their drawn size (grown below).
-    if (!isContainer(e.id)) {
-      const fit = boxSize(label);
-      w = Math.max(w, fit.w); h = Math.max(h, fit.h);
-    }
+    const sz = boxSize(label); // standard size, expanded only for the name text
+    const b = validBounds(e.bounds) ? e.bounds : undefined;
+    // Centre the standard-sized box on the element's drawn centre (best arrangement
+    // fidelity); no bounds → default origin. Containers are repositioned by the grow.
+    const cx = b ? OX + clamp01(b.x + b.w / 2) * TARGET_W : OX + sz.w / 2;
+    const cy = b ? OY + clamp01(b.y + b.h / 2) * TARGET_H : OY + sz.h / 2;
     const props: Record<string, unknown> = { shapeKey: spec.key };
     if (spec.iconOnly) props.archimateIconOnly = true;
     if (isContainer(e.id)) props.archimateIsContainer = true;
     elements.push({
       id: e.id, type: "archimate-shape", label,
-      x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h),
+      x: Math.round(cx - sz.w / 2), y: Math.round(cy - sz.h / 2),
+      width: sz.w, height: sz.h,
       ...(parentOf.has(e.id) ? { parentId: parentOf.get(e.id) } : {}),
       properties: props,
     } as DiagramElement);
   }
 
-  // Grow each container to enclose its children — DEEPEST FIRST so a mid-level
-  // container encloses its already-grown sub-containers (3-level repro needs this).
+  // Grow each container to HUG its children — DEEPEST FIRST so a mid-level container
+  // wraps its already-sized sub-containers (3-level repro needs this). The container
+  // is sized to exactly the children bbox + PAD + a top HEADER band for its label.
   const depthOf = (id: string) => { let d = 0, cur = parentOf.get(id); const seen = new Set<string>(); while (cur && !seen.has(cur)) { seen.add(cur); d++; cur = parentOf.get(cur); } return d; };
   const elMap = new Map(elements.map(e => [e.id, e]));
   const containers = elements.filter(c => isContainer(c.id)).sort((a, b) => depthOf(b.id) - depthOf(a.id));
@@ -1342,10 +1371,9 @@ export function layoutArchimatePreserved(
     const minY = Math.min(...kids.map(k => k.y)) - ARCHI_NEST_PAD - ARCHI_NEST_HEADER;
     const maxX = Math.max(...kids.map(k => k.x + k.width)) + ARCHI_NEST_PAD;
     const maxY = Math.max(...kids.map(k => k.y + k.height)) + ARCHI_NEST_PAD;
-    const nx = Math.min(c.x, minX), ny = Math.min(c.y, minY);
-    c.width = Math.max(c.x + c.width, maxX) - nx;
-    c.height = Math.max(c.y + c.height, maxY) - ny;
-    c.x = nx; c.y = ny;
+    c.x = minX; c.y = minY;
+    c.width = Math.max(maxX - minX, boxSize(c.label).w); // never narrower than its own name
+    c.height = maxY - minY;
   }
 
   // Roots first, deepest last → every parent precedes its children in the array
@@ -1407,7 +1435,7 @@ function layoutArchimateNested(
   const elements: DiagramElement[] = [];
   const emit = (id: string, x: number, y: number) => {
     const e = mapped.find(m => m.id === id)!;
-    const spec = ARCHI_SHAPE[e.type];
+    const spec = archiShapeForm(e.type, e.notation)!;
     const s = sizeOf.get(id)!;
     const container = (childrenOf.get(id)?.length ?? 0) > 0;
     const props: Record<string, unknown> = { shapeKey: spec.key };
