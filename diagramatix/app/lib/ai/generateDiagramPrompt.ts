@@ -29,7 +29,7 @@ Relationship semantics — pick the most specific one:
 - An Actor is ASSIGNED to a Role; a Role is ASSIGNED to a Business Process ("assignment").
 - An Actor ACCESSES a Business/Application Interface; an Interface SERVES the service or process behind it ("access" / "serving").
 - A process ACCESSES a Data Object ("access").
-- Use "triggering" or "flow" for process-to-process sequence, "composition"/"aggregation" for whole–part, "association" only when nothing more specific fits.
+- Use "triggering" or "flow" for process-to-process sequence; for whole–part prefer NESTING via "parent" (see VISUAL CONTAINMENT below) for "composition", and "aggregation" (a hollow-diamond line) for shared/optional parts; "association" only when nothing more specific fits.
 
 Naming: give Business Process labels their identifier where relevant (e.g. "V01.01 Receive Order") so each process can be linked to its detailed BPMN diagram.
 
@@ -46,7 +46,21 @@ Output format:
     { "sourceId": "c1", "targetId": "p1", "type": "serving" },
     { "sourceId": "a1", "targetId": "s1", "type": "serving" }
   ]
-}`,
+}
+
+VISUAL CONTAINMENT = COMPOSITION — ArchiMate shows whole–part either by nesting one shape INSIDE another or by a line ending in a FILLED diamond. Prefer nesting:
+- When a shape sits INSIDE another shape (fully enclosed by its outline), set the inner shape's "parent" to the containing shape's id and do NOT also emit a "composition" connector between them — the nesting IS the composition. Nest every level (a contained shape may itself contain others).
+- Only when whole–part is drawn as a LINE ending in a FILLED diamond (the part is NOT inside the whole) emit a "composition" connector (source = whole/diamond end, target = part) and do NOT set "parent".
+- AGGREGATION (a HOLLOW diamond) is ALWAYS an "aggregation" connector — never nesting.
+Example nested element: { "id": "a2", "type": "business-actor", "label": "Front Office", "parent": "a1" }
+
+IMAGE INPUT — when an image of an ArchiMate diagram is attached, reproduce it exactly: OCR every label verbatim, don't invent or drop elements/relationships, and if the image and prompt disagree, follow the image.
+REPRODUCE THE ORIGINAL LAYOUT — capture geometry so the diagram matches the drawing:
+- Give EVERY element a "bounds": { "x", "y", "w", "h" } as fractions 0..1 of the WHOLE image (x,y = the shape's top-left corner; w,h = its width/height). Use 2-3 decimals. A nested shape's bounds sit INSIDE its parent's; a container's bounds enclose all its children.
+- Set "parent" for every shape drawn inside another (visual containment), as above.
+Example with geometry: { "id": "a2", "type": "business-actor", "label": "Front Office", "bounds": { "x": 0.06, "y": 0.12, "w": 0.88, "h": 0.22 }, "parent": "a1" }
+
+NON-IMAGE GENERATION — for a text prompt (no image), still PREFER nesting for composition: set the part's "parent" to the whole's id instead of a "composition" connector. Aggregation stays a connector. Omit "bounds" when there is no image — positions are applied by the tool.`,
 
   "state-machine": `You are a UML State Machine diagram expert. Output ONLY valid JSON with elements and connections.
 

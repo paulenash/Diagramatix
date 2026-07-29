@@ -575,6 +575,21 @@ Pins the deterministic connector-quality checks behind the AI-connector complain
 | T0158 | resolveDiagramTypeStyle returns the override sortOrder when present | An admin's custom tile order being ignored app-wide | If an override sortOrder isn't applied, or unrelated fields stop falling back to default |
 | T0159 | a project-style comparator orders mixed diagrams by configured order then name | Project diagram lists sorting in the wrong order | If sorting by type-order then name no longer yields Alpha, Beta, Gamma, Zeta |
 
+### `tests/diagram/archimate-preserved.test.ts` + `archimate-textgen-nesting.test.ts` — ArchiMate composition renders as VISUAL CONTAINMENT (nesting)
+
+AI-generated ArchiMate expresses whole-part **composition** by nesting children inside their container (via `parentId`), not by drawing a composition line. Image reproduction honours the AI's per-shape `bounds` + `parent`; text-gen nests from `parent` alone.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T1068 | preserved: fractional `bounds` honoured (top-left origin, rows in drawn order) | The image reproduction ignoring geometry and re-flowing to a flat row | If `layoutArchimatePreserved` stops mapping bounds → px |
+| T1069 | preserved: 3-level `parentId` chain set from `parent` | Nesting lost past 2 levels (ArchiSurance ⊃ Back Office ⊃ Car) | If parent resolution / depth handling regresses |
+| T1070 | preserved: containers enclose their children + `archimateIsContainer` flag | A container drawn smaller than its contents (children spill out) | If the deepest-first grow pass regresses |
+| T1071 | preserved: every nested composition line is dropped | Redundant composition lines drawn over the nesting | If the composition-drop filter regresses |
+| T1072 | preserved: aggregation is kept as a drawn line | Aggregation wrongly swallowed by the composition drop | If the drop rule stops being composition-only |
+| T1073 | preserved: parents render before children (array order) | Containers painted OVER their contents | If the ancestor-depth render sort regresses |
+| T1074 | text-gen (no bounds): `parent` nesting → parentId chain + enclosing containers + no composition lines | Text-prompt composition staying a flat row of lines | If `layoutArchimateNested` regresses |
+| T1075 | text-gen: a non-composition plan (serving/flow) is unchanged | The nesting path corrupting ordinary ArchiMate diagrams | If the `hasNesting` guard leaks into non-nested plans |
+
 ### `tests/archimate/connectors.test.ts` — Pins distinct visual style for all 11 ArchiMate connector types
 
 | Ref | Test | Protects you against | How it would break (go red) |

@@ -232,12 +232,23 @@ export function layoutGenericDiagram(
     if (preserved) return preserved;
   }
 
+  // ArchiMate reproduced FROM AN IMAGE: honour per-element `bounds` + `parent`
+  // nesting so the diagram matches the drawing (visual containment). Falls through
+  // to the nested / band auto-layout when bounds are missing/unusable.
+  if (diagramType === "archimate"
+      && aiElements.some((e) => e.bounds && typeof e.bounds === "object")) {
+    const preserved = layoutArchimatePreserved(
+      aiElements as never, aiConnections as never, opts?.imageAspect,
+    );
+    if (preserved) return preserved;
+  }
+
   // Context diagrams: special circular layout
   if (diagramType === "context" || diagramType === "basic") {
     return layoutContextDiagram(aiElements, aiConnections);
   }
 
-  // ArchiMate: layered-band layout
+  // ArchiMate: nested (composition) or layered-band layout
   if (diagramType === "archimate") {
     return layoutArchimateDiagram(aiElements, aiConnections);
   }
@@ -934,6 +945,54 @@ const ARCHI_REL: Record<string, string> = {
   specialisation: "archi-specialisation", specialization: "archi-specialisation",
 };
 
+// ── ArchiMate geometry helpers (shared by the band + preserved layouts) ──
+type AiBounds = { x: number; y: number; w: number; h: number };
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+function validBounds(b: unknown): b is AiBounds {
+  if (!b || typeof b !== "object") return false;
+  const { x, y, w, h } = b as AiBounds;
+  return [x, y, w, h].every((n) => typeof n === "number" && Number.isFinite(n)) && w > 0 && h > 0;
+}
+
+// A4.08: split a leading element code (e.g. "V01.01") onto its own top
+// line. Pattern: 1–3 letters, 1–2 digits, a separator (.,:;-), 1–2 digits.
+const LEADING_CODE = /^([A-Za-z]{1,3}\d{1,2}[.,:;-]\d{1,2})\s+(.+)$/;
+function formatLabel(raw: string): string {
+  const s = (raw ?? "").trim();
+  const m = LEADING_CODE.exec(s);
+  return m ? `${m[1]}\n${m[2]}` : s;
+}
+
+// Box size from the (already line-split) label so the text fits — caps the
+// width so long names wrap to extra lines, and honours explicit \n breaks
+// (e.g. the A4.08 number line). The glyph sits in the top-right corner, so
+// there is no fixed square footprint.
+// Rule A4.09 — a generated ArchiMate box is sized to CONTAIN its wrapped name
+// at the DEFAULT aspect ratio (128×76, matching the manual palette default), so
+// generated shapes stay uniform and no text ever spills outside the outline.
+// The name is wrapped with the SAME wrapText + interior padding the renderer
+// uses (ARCHI_LABEL_PAD = 16, 12px font), then the box grows the deficient
+// dimension only — it can never shrink below what the text needs.
+const A409_DEFAULT_W = 128, A409_DEFAULT_H = 76;
+const A409_ASPECT = A409_DEFAULT_W / A409_DEFAULT_H;
+const A409_PAD_X = 16;          // must match SymbolRenderer's ARCHI_LABEL_PAD
+const A409_FONT = 12, A409_LINE_H = 16, A409_PAD_Y = 16;
+function boxSize(label: string): { w: number; h: number } {
+  const text = label || "";
+  let lines = wrapText(text, A409_DEFAULT_W - A409_PAD_X, A409_FONT);
+  // A single word wider than the default interior forces a wider box; re-wrap
+  // there so the line count reflects the real interior width.
+  const longestPx = Math.max(0, ...lines.map(l => l.length * A409_FONT * AVG_CHAR_W_FACTOR));
+  let baseW = Math.max(A409_DEFAULT_W, Math.ceil(longestPx) + A409_PAD_X);
+  if (baseW > A409_DEFAULT_W) lines = wrapText(text, baseW - A409_PAD_X, A409_FONT);
+  const baseH = Math.max(A409_DEFAULT_H, lines.length * A409_LINE_H + A409_PAD_Y);
+  // Enforce the default aspect ratio by growing the deficient dimension only.
+  let w = baseW, h = baseH;
+  if (w / h < A409_ASPECT) w = h * A409_ASPECT;
+  else h = w / A409_ASPECT;
+  return { w: Math.round(w), h: Math.round(h) };
+}
+
 function layoutArchimateDiagram(
   aiElements: NonNullable<AiParsed["elements"]>,
   aiConnections: NonNullable<AiParsed["connections"]>,
@@ -942,44 +1001,11 @@ function layoutArchimateDiagram(
   const EL_GAP_X = 40;     // horizontal gap between elements in a band
   const NUM_BANDS = ARCHI_NUM_BANDS;
 
-  // A4.08: split a leading element code (e.g. "V01.01") onto its own top
-  // line. Pattern: 1–3 letters, 1–2 digits, a separator (.,:;-), 1–2 digits.
-  const LEADING_CODE = /^([A-Za-z]{1,3}\d{1,2}[.,:;-]\d{1,2})\s+(.+)$/;
-  function formatLabel(raw: string): string {
-    const s = (raw ?? "").trim();
-    const m = LEADING_CODE.exec(s);
-    return m ? `${m[1]}\n${m[2]}` : s;
-  }
-
-  // Box size from the (already line-split) label so the text fits — caps the
-  // width so long names wrap to extra lines, and honours explicit \n breaks
-  // (e.g. the A4.08 number line). The glyph sits in the top-right corner, so
-  // there is no fixed square footprint.
-  // Rule A4.09 — a generated ArchiMate box is sized to CONTAIN its wrapped name
-  // at the DEFAULT aspect ratio (128×76, matching the manual palette default), so
-  // generated shapes stay uniform and no text ever spills outside the outline.
-  // The name is wrapped with the SAME wrapText + interior padding the renderer
-  // uses (ARCHI_LABEL_PAD = 16, 12px font), then the box grows the deficient
-  // dimension only — it can never shrink below what the text needs.
-  const A409_DEFAULT_W = 128, A409_DEFAULT_H = 76;
-  const A409_ASPECT = A409_DEFAULT_W / A409_DEFAULT_H;
-  const A409_PAD_X = 16;          // must match SymbolRenderer's ARCHI_LABEL_PAD
-  const A409_FONT = 12, A409_LINE_H = 16, A409_PAD_Y = 16;
-  function boxSize(label: string): { w: number; h: number } {
-    const text = label || "";
-    let lines = wrapText(text, A409_DEFAULT_W - A409_PAD_X, A409_FONT);
-    // A single word wider than the default interior forces a wider box; re-wrap
-    // there so the line count reflects the real interior width.
-    const longestPx = Math.max(0, ...lines.map(l => l.length * A409_FONT * AVG_CHAR_W_FACTOR));
-    let baseW = Math.max(A409_DEFAULT_W, Math.ceil(longestPx) + A409_PAD_X);
-    if (baseW > A409_DEFAULT_W) lines = wrapText(text, baseW - A409_PAD_X, A409_FONT);
-    const baseH = Math.max(A409_DEFAULT_H, lines.length * A409_LINE_H + A409_PAD_Y);
-    // Enforce the default aspect ratio by growing the deficient dimension only.
-    let w = baseW, h = baseH;
-    if (w / h < A409_ASPECT) w = h * A409_ASPECT;
-    else h = w / A409_ASPECT;
-    return { w: Math.round(w), h: Math.round(h) };
-  }
+  // Composition nesting (whole-part expressed via `parent`) → dedicated nested
+  // layout that draws containers around their children. Non-nested diagrams
+  // (no `parent`) skip this and fall through to the band layout below, unchanged.
+  const nestParent = resolveArchiParents(aiElements);
+  if (nestParent.size > 0) return layoutArchimateNested(aiElements, aiConnections, nestParent);
 
   type Placed = { ai: NonNullable<AiParsed["elements"]>[number]; shapeKey: string; iconOnly: boolean; label: string; w: number; h: number; cx: number };
   const bands: Placed[][] = Array.from({ length: NUM_BANDS }, () => []);
@@ -1122,11 +1148,28 @@ function layoutArchimateDiagram(
     placeSide(right, layMaxX + SIDE_GAP, true); // left edge sits at layMaxX + gap
   }
 
-  // Connectors. Pass 1: pick the facing side for each end. Pass 2: where
-  // several connectors share one element side, spread their attachment points
-  // evenly along that side (offset 1/(n+1) … n/(n+1)) instead of all stacking
-  // at the centre — sorted by the opposite endpoint's position to also reduce
-  // crossings (rule A4.04 / attachment-point separation).
+  const computed = buildArchiConnectors(elements, aiConnections);
+
+  return {
+    elements,
+    connectors: computed,
+    viewport: { x: 0, y: 0, zoom: 0.7 },
+    fontSize: 14,
+    connectorFontSize: 10,
+  };
+}
+
+// Build routed ArchiMate connectors for a laid-out element set. Pass 1: pick the
+// facing side for each end. Pass 2: where several connectors share one element
+// side, spread their attachment points evenly (offset 1/(n+1) … n/(n+1)) sorted
+// by the opposite endpoint (rule A4.04 / attachment-point separation).
+// A `composition` whose target is NESTED inside its source (target.parentId ===
+// source.id) is DROPPED — the visual containment already expresses the whole-part,
+// so no line is drawn. For non-nested diagrams this drop is a no-op.
+function buildArchiConnectors(
+  elements: DiagramElement[],
+  aiConnections: NonNullable<AiParsed["connections"]>,
+): Connector[] {
   const elMap = new Map(elements.map(e => [e.id, e]));
   type Side = "top" | "bottom" | "left" | "right";
   type Pre = { c: typeof aiConnections[number]; src: DiagramElement; tgt: DiagramElement;
@@ -1137,6 +1180,8 @@ function layoutArchimateDiagram(
     const tgt = elMap.get(c.targetId);
     if (!src || !tgt) continue;
     const connType = ARCHI_REL[(c.type ?? "").toLowerCase()] ?? "archi-association";
+    // Nested composition → the containment IS the relationship; draw no line.
+    if (connType === "archi-composition" && tgt.parentId === src.id) continue;
     const srcCx = src.x + src.width / 2, tgtCx = tgt.x + tgt.width / 2;
     const srcCy = src.y + src.height / 2, tgtCy = tgt.y + tgt.height / 2;
     let srcSide: Side, tgtSide: Side;
@@ -1187,7 +1232,7 @@ function layoutArchimateDiagram(
     targetOffsetAlong: p.tgtOffset,
   } as Connector));
 
-  const computed = connectors.map(conn => {
+  return connectors.map(conn => {
     const src = elMap.get(conn.sourceId), tgt = elMap.get(conn.targetId);
     if (!src || !tgt) return conn;
     try {
@@ -1195,10 +1240,205 @@ function layoutArchimateDiagram(
       return { ...conn, waypoints: r.waypoints, sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
     } catch { return conn; }
   });
+}
+
+/** Resolve each element's nesting parent from its `parent` field. Honoured only
+ *  when it points at ANOTHER mapped ArchiMate element and doesn't form a cycle
+ *  (composition is single-parent, so "part of two wholes" can't arise here). */
+function resolveArchiParents(
+  aiElements: NonNullable<AiParsed["elements"]>,
+): Map<string, string> {
+  const mapped = new Set(aiElements.filter(e => e.id && ARCHI_SHAPE[e.type]).map(e => e.id));
+  const raw = new Map<string, string>();
+  for (const e of aiElements) {
+    if (e.id && typeof e.parent === "string" && e.parent !== e.id
+        && mapped.has(e.id) && mapped.has(e.parent)) {
+      raw.set(e.id, e.parent);
+    }
+  }
+  // Drop any link that would create a cycle (walk ancestors; cut if we loop back).
+  const parentId = new Map<string, string>();
+  for (const [child, parent] of raw) {
+    let cur: string | undefined = parent;
+    const seen = new Set<string>([child]);
+    let ok = true;
+    while (cur) {
+      if (seen.has(cur)) { ok = false; break; }
+      seen.add(cur);
+      cur = raw.get(cur);
+    }
+    if (ok) parentId.set(child, parent);
+  }
+  return parentId;
+}
+
+// Container-grow padding: PAD around children, HEADER for the container's own
+// label band at the top (ArchiMate containers render their name at the top).
+const ARCHI_NEST_PAD = 16, ARCHI_NEST_HEADER = 28, ARCHI_NEST_GAP = 24;
+
+/** ArchiMate image reproduction: honour the AI's per-shape `bounds` (fractions of
+ *  the image) + `parent` nesting so the diagram matches the drawing. Returns null
+ *  when too few elements carry bounds, so the caller falls back to the nested /
+ *  band auto-layout. Mirrors layoutStateMachinePreserved / layoutDomainPreserved. */
+export function layoutArchimatePreserved(
+  aiElements: NonNullable<AiParsed["elements"]>,
+  aiConnections: NonNullable<AiParsed["connections"]>,
+  imageAspect?: { w: number; h: number },
+): DiagramData | null {
+  const ided = aiElements.filter(e => e.id && ARCHI_SHAPE[e.type]);
+  const withBounds = ided.filter(e => validBounds(e.bounds));
+  if (ided.length === 0 || withBounds.length < Math.ceil(ided.length * 0.6)) return null;
+
+  const parentOf = resolveArchiParents(aiElements);
+  const childrenOf = new Map<string, string[]>();
+  for (const [child, parent] of parentOf) {
+    (childrenOf.get(parent) ?? childrenOf.set(parent, []).get(parent)!).push(child);
+  }
+  const isContainer = (id: string) => (childrenOf.get(id)?.length ?? 0) > 0;
+
+  // Normalised fractions → px, aspect-preserving (mirrors layoutBpmnPreserved).
+  const TARGET_W = 1400;
+  const aspect = imageAspect && imageAspect.w > 0 ? imageAspect.h / imageAspect.w : 0.66;
+  const TARGET_H = TARGET_W * (Number.isFinite(aspect) && aspect > 0 ? aspect : 0.66);
+  const OX = 60, OY = 60;
+
+  const elements: DiagramElement[] = [];
+  for (const e of ided) {
+    const spec = ARCHI_SHAPE[e.type];
+    const label = formatLabel(e.label ?? e.name ?? "");
+    let x = OX, y = OY, w = A409_DEFAULT_W, h = A409_DEFAULT_H;
+    if (validBounds(e.bounds)) {
+      const b = e.bounds;
+      x = OX + clamp01(b.x) * TARGET_W;
+      y = OY + clamp01(b.y) * TARGET_H;
+      w = Math.max(0.01, b.w) * TARGET_W;
+      h = Math.max(0.01, b.h) * TARGET_H;
+    }
+    // Leaves get a text-fit floor; containers keep their drawn size (grown below).
+    if (!isContainer(e.id)) {
+      const fit = boxSize(label);
+      w = Math.max(w, fit.w); h = Math.max(h, fit.h);
+    }
+    const props: Record<string, unknown> = { shapeKey: spec.key };
+    if (spec.iconOnly) props.archimateIconOnly = true;
+    if (isContainer(e.id)) props.archimateIsContainer = true;
+    elements.push({
+      id: e.id, type: "archimate-shape", label,
+      x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h),
+      ...(parentOf.has(e.id) ? { parentId: parentOf.get(e.id) } : {}),
+      properties: props,
+    } as DiagramElement);
+  }
+
+  // Grow each container to enclose its children — DEEPEST FIRST so a mid-level
+  // container encloses its already-grown sub-containers (3-level repro needs this).
+  const depthOf = (id: string) => { let d = 0, cur = parentOf.get(id); const seen = new Set<string>(); while (cur && !seen.has(cur)) { seen.add(cur); d++; cur = parentOf.get(cur); } return d; };
+  const elMap = new Map(elements.map(e => [e.id, e]));
+  const containers = elements.filter(c => isContainer(c.id)).sort((a, b) => depthOf(b.id) - depthOf(a.id));
+  for (const c of containers) {
+    const kids = (childrenOf.get(c.id) ?? []).map(id => elMap.get(id)!).filter(Boolean);
+    if (!kids.length) continue;
+    const minX = Math.min(...kids.map(k => k.x)) - ARCHI_NEST_PAD;
+    const minY = Math.min(...kids.map(k => k.y)) - ARCHI_NEST_PAD - ARCHI_NEST_HEADER;
+    const maxX = Math.max(...kids.map(k => k.x + k.width)) + ARCHI_NEST_PAD;
+    const maxY = Math.max(...kids.map(k => k.y + k.height)) + ARCHI_NEST_PAD;
+    const nx = Math.min(c.x, minX), ny = Math.min(c.y, minY);
+    c.width = Math.max(c.x + c.width, maxX) - nx;
+    c.height = Math.max(c.y + c.height, maxY) - ny;
+    c.x = nx; c.y = ny;
+  }
+
+  // Roots first, deepest last → every parent precedes its children in the array
+  // (renders containers UNDER their contents; generalises the 2-level SM sort).
+  elements.sort((a, b) => depthOf(a.id) - depthOf(b.id));
 
   return {
     elements,
-    connectors: computed,
+    connectors: buildArchiConnectors(elements, aiConnections),
+    viewport: { x: 0, y: 0, zoom: 0.7 },
+    fontSize: 14,
+    connectorFontSize: 10,
+  };
+}
+
+/** ArchiMate text-gen nesting (no image bounds): lay the containment forest out
+ *  as nested boxes — containers sized to a grid of their children, roots in a row.
+ *  Called from layoutArchimateDiagram when any element carries a resolved `parent`. */
+function layoutArchimateNested(
+  aiElements: NonNullable<AiParsed["elements"]>,
+  aiConnections: NonNullable<AiParsed["connections"]>,
+  parentOf: Map<string, string>,
+): DiagramData {
+  const mapped = aiElements.filter(e => e.id && ARCHI_SHAPE[e.type]);
+  const labelOf = new Map(mapped.map(e => [e.id, formatLabel(e.label ?? e.name ?? "")]));
+  const childrenOf = new Map<string, string[]>();
+  for (const e of mapped) {
+    const p = parentOf.get(e.id);
+    if (p) (childrenOf.get(p) ?? childrenOf.set(p, []).get(p)!).push(e.id);
+  }
+  const roots = mapped.filter(e => !parentOf.has(e.id)).map(e => e.id);
+
+  // Post-order subtree sizing: a leaf = its label box; a container = a grid of
+  // its children's subtree sizes + PAD + a HEADER band for its own label.
+  const sizeOf = new Map<string, { w: number; h: number }>();
+  type Grid = { kids: string[]; colW: number[]; rowH: number[]; cols: number };
+  const gridOf = new Map<string, Grid>();
+  const sizeSubtree = (id: string, guard: Set<string>): { w: number; h: number } => {
+    if (sizeOf.has(id)) return sizeOf.get(id)!;
+    const kids = (childrenOf.get(id) ?? []).filter(k => !guard.has(k));
+    if (!kids.length) { const s = boxSize(labelOf.get(id) ?? ""); sizeOf.set(id, s); return s; }
+    const g2 = new Set(guard); g2.add(id);
+    const childSizes = kids.map(k => sizeSubtree(k, g2));
+    const cols = Math.max(1, Math.ceil(Math.sqrt(kids.length)));
+    const rows = Math.ceil(kids.length / cols);
+    const colW = new Array(cols).fill(0), rowH = new Array(rows).fill(0);
+    childSizes.forEach((cs, i) => { const c = i % cols, r = Math.floor(i / cols); colW[c] = Math.max(colW[c], cs.w); rowH[r] = Math.max(rowH[r], cs.h); });
+    const innerW = colW.reduce((a, b) => a + b, 0) + ARCHI_NEST_GAP * (cols - 1);
+    const innerH = rowH.reduce((a, b) => a + b, 0) + ARCHI_NEST_GAP * (rows - 1);
+    const ownLabelW = boxSize(labelOf.get(id) ?? "").w;
+    const s = { w: Math.max(ARCHI_NEST_PAD * 2 + innerW, ownLabelW), h: ARCHI_NEST_HEADER + ARCHI_NEST_PAD * 2 + innerH };
+    gridOf.set(id, { kids, colW, rowH, cols });
+    sizeOf.set(id, s);
+    return s;
+  };
+  for (const id of roots) sizeSubtree(id, new Set());
+
+  // Emit: place each root in a left-to-right row (top-aligned), then recurse.
+  const elements: DiagramElement[] = [];
+  const emit = (id: string, x: number, y: number) => {
+    const e = mapped.find(m => m.id === id)!;
+    const spec = ARCHI_SHAPE[e.type];
+    const s = sizeOf.get(id)!;
+    const container = (childrenOf.get(id)?.length ?? 0) > 0;
+    const props: Record<string, unknown> = { shapeKey: spec.key };
+    if (spec.iconOnly) props.archimateIconOnly = true;
+    if (container) props.archimateIsContainer = true;
+    elements.push({
+      id, type: "archimate-shape", label: labelOf.get(id) ?? "",
+      x: Math.round(x), y: Math.round(y), width: Math.round(s.w), height: Math.round(s.h),
+      ...(parentOf.has(id) ? { parentId: parentOf.get(id) } : {}),
+      properties: props,
+    } as DiagramElement);
+    if (!container) return;
+    const g = gridOf.get(id)!;
+    let cursorY = y + ARCHI_NEST_HEADER + ARCHI_NEST_PAD;
+    g.kids.forEach((kid, i) => {
+      const c = i % g.cols, r = Math.floor(i / g.cols);
+      if (c === 0 && i > 0) cursorY += g.rowH[r - 1] + ARCHI_NEST_GAP;
+      const cellX = x + ARCHI_NEST_PAD + g.colW.slice(0, c).reduce((a, b) => a + b, 0) + ARCHI_NEST_GAP * c;
+      const ksz = sizeOf.get(kid)!;
+      emit(kid, cellX + (g.colW[c] - ksz.w) / 2, cursorY + (g.rowH[r] - ksz.h) / 2);
+    });
+  };
+  let cursorX = START_X;
+  for (const id of roots) {
+    emit(id, cursorX, START_Y);
+    cursorX += (sizeOf.get(id)?.w ?? A409_DEFAULT_W) + 60;
+  }
+
+  return {
+    elements,
+    connectors: buildArchiConnectors(elements, aiConnections),
     viewport: { x: 0, y: 0, zoom: 0.7 },
     fontSize: 14,
     connectorFontSize: 10,
