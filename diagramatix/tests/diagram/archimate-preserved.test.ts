@@ -93,6 +93,29 @@ describe("ArchiMate preserved (image nesting)", () => {
     for (const [p, c] of comps) expect(idx(p), `${p} before ${c}`).toBeLessThan(idx(c));
   });
 
+  it("T1080 — long names widen to stay 2 lines (height standard) and siblings don't overlap", () => {
+    const els2 = [
+      { id: "n1", type: "business-actor", label: "Finance", bounds: { x: 0.05, y: 0.4, w: 0.16, h: 0.08 } },
+      { id: "n2", type: "business-actor", label: "Customer Relationship Management", bounds: { x: 0.28, y: 0.4, w: 0.16, h: 0.08 } },
+      { id: "n3", type: "business-actor", label: "Document Management and Archival Subsystem", bounds: { x: 0.51, y: 0.4, w: 0.16, h: 0.08 } },
+    ];
+    const d = layoutGenericDiagram({ elements: els2, connections: [] } as never, "archimate", { imageAspect: { w: 1000, h: 600 } });
+    const g = (id: string) => d.elements.find((e) => e.id === id)!;
+    // ≤2 lines → height stays standard; long names WIDEN instead of growing tall/crammed.
+    for (const id of ["n1", "n2", "n3"]) expect(g(id).height, `${id} height standard`).toBe(76);
+    expect(g("n2").width, "long name widened").toBeGreaterThan(128);
+    expect(g("n3").width, "very long name widened").toBeGreaterThan(g("n2").width - 1);
+    expect(g("n3").width, "width capped ~3×").toBeLessThanOrEqual(128 * 3);
+    // No two elements overlap after expansion (gaps preserved by the separation pass).
+    const ids = ["n1", "n2", "n3"];
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+      const a = g(ids[i]), b = g(ids[j]);
+      const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+      const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+      expect(ox <= 0 || oy <= 0, `${ids[i]} and ${ids[j]} must not overlap`).toBe(true);
+    }
+  });
+
   it("T1078 — elements render at STANDARD size (not scaled to image px), containers hug them", () => {
     const d = build();
     // Leaves are ~standard generated size (128×76, text-expanded) — NOT ~4× (which

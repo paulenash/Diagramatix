@@ -1021,6 +1021,29 @@ function boxSize(label: string): { w: number; h: number } {
   return { w: Math.round(w), h: Math.round(h) };
 }
 
+/** ArchiMate ingestion box sizing (Paul, 2026-07-29): render at the STANDARD size
+ *  (128×76) while the name fits in at most 2 wrapped lines — WIDEN the box (keeping
+ *  height standard) to keep the name to 2 lines before any expansion, and only grow
+ *  taller once 2 lines can't hold it even at ~3× width. Unlike boxSize this does NOT
+ *  force the A4.09 aspect ratio (a 2-line name just makes a wider standard-height box). */
+function archiFitSize(label: string): { w: number; h: number } {
+  const text = label || "";
+  const lineW = (l: string) => l.length * A409_FONT * AVG_CHAR_W_FACTOR;
+  const MAX_W = A409_DEFAULT_W * 3;
+  // Widen in steps until the name wraps to ≤ 2 lines (or we hit the width cap).
+  let w = A409_DEFAULT_W;
+  let lines = wrapText(text, w - A409_PAD_X, A409_FONT);
+  while (lines.length > 2 && w < MAX_W) {
+    w += 24;
+    lines = wrapText(text, w - A409_PAD_X, A409_FONT);
+  }
+  const longest = Math.max(0, ...lines.map(lineW));
+  const width = Math.max(A409_DEFAULT_W, Math.ceil(longest) + A409_PAD_X);
+  // ≤ 2 lines → standard height; 3+ lines (only past the width cap) → grow to fit.
+  const height = lines.length <= 2 ? A409_DEFAULT_H : Math.max(A409_DEFAULT_H, lines.length * A409_LINE_H + A409_PAD_Y);
+  return { w: Math.round(width), h: Math.round(height) };
+}
+
 function layoutArchimateDiagram(
   aiElements: NonNullable<AiParsed["elements"]>,
   aiConnections: NonNullable<AiParsed["connections"]>,
@@ -1304,6 +1327,47 @@ function resolveArchiParents(
 // label band at the top (ArchiMate containers render their name at the top).
 const ARCHI_NEST_PAD = 16, ARCHI_NEST_HEADER = 28, ARCHI_NEST_GAP = 24;
 
+/** Push overlapping siblings apart to restore the image's inter-element gaps
+ *  (Paul, 2026-07-29). When a box expands past its drawn size it can collide with
+ *  a neighbour; each colliding pair is separated along the axis their IMAGE centres
+ *  differ most, to an edge-gap equal to the image gap (min 14px), preserving the
+ *  drawn arrangement. `move(el, dx, dy)` shifts an element — and, for a container,
+ *  its whole subtree — so nested contents ride along. */
+function separateArchiSiblings(
+  group: DiagramElement[],
+  boundsById: Map<string, AiBounds>,
+  targetW: number, targetH: number,
+  move: (el: DiagramElement, dx: number, dy: number) => void,
+): void {
+  if (group.length < 2) return;
+  const MIN_GAP = 14;
+  for (let iter = 0; iter < 8; iter++) {
+    let moved = false;
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const A = group[i], B = group[j];
+        const ox = Math.min(A.x + A.width, B.x + B.width) - Math.max(A.x, B.x);
+        const oy = Math.min(A.y + A.height, B.y + B.height) - Math.max(A.y, B.y);
+        if (ox <= 0 || oy <= 0) continue; // not colliding
+        const bA = boundsById.get(A.id), bB = boundsById.get(B.id);
+        const dcx = bA && bB ? (bA.x + bA.w / 2) - (bB.x + bB.w / 2) : (A.x + A.width / 2) - (B.x + B.width / 2);
+        const dcy = bA && bB ? (bA.y + bA.h / 2) - (bB.y + bB.h / 2) : (A.y + A.height / 2) - (B.y + B.height / 2);
+        if (Math.abs(dcx) * targetW >= Math.abs(dcy) * targetH) {
+          const imgGap = bA && bB ? Math.max(bA.x, bB.x) - Math.min(bA.x + bA.w, bB.x + bB.w) : 0;
+          const push = (ox + Math.max(MIN_GAP, imgGap * targetW)) / 2;
+          if (dcx <= 0) { move(A, -push, 0); move(B, push, 0); } else { move(A, push, 0); move(B, -push, 0); }
+        } else {
+          const imgGap = bA && bB ? Math.max(bA.y, bB.y) - Math.min(bA.y + bA.h, bB.y + bB.h) : 0;
+          const push = (oy + Math.max(MIN_GAP, imgGap * targetH)) / 2;
+          if (dcy <= 0) { move(A, 0, -push); move(B, 0, push); } else { move(A, 0, push); move(B, 0, -push); }
+        }
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+}
+
 /** ArchiMate image reproduction: honour the AI's per-shape `bounds` (fractions of
  *  the image) + `parent` nesting so the diagram matches the drawing. Returns null
  *  when too few elements carry bounds, so the caller falls back to the nested /
@@ -1338,13 +1402,17 @@ export function layoutArchimatePreserved(
   const OX = 60, OY = 60;
 
   const elements: DiagramElement[] = [];
+  const boundsById = new Map<string, AiBounds>();
   for (const e of ided) {
     const spec = archiShapeForm(e.type, e.notation)!;
     const label = formatLabel(e.label ?? e.name ?? "");
-    const sz = boxSize(label); // standard size, expanded only for the name text
+    // Leaves: 2-line-preferring standard size (archiFitSize — widen to keep ≤2 lines
+    // before expanding). Containers: provisional; hugged around their children below.
+    const sz = isContainer(e.id) ? boxSize(label) : archiFitSize(label);
     const b = validBounds(e.bounds) ? e.bounds : undefined;
-    // Centre the standard-sized box on the element's drawn centre (best arrangement
-    // fidelity); no bounds → default origin. Containers are repositioned by the grow.
+    if (b) boundsById.set(e.id, b);
+    // Centre the box on the element's drawn centre (best arrangement fidelity); no
+    // bounds → default origin. Containers are repositioned by the grow.
     const cx = b ? OX + clamp01(b.x + b.w / 2) * TARGET_W : OX + sz.w / 2;
     const cy = b ? OY + clamp01(b.y + b.h / 2) * TARGET_H : OY + sz.h / 2;
     const props: Record<string, unknown> = { shapeKey: spec.key };
@@ -1352,22 +1420,34 @@ export function layoutArchimatePreserved(
     if (isContainer(e.id)) props.archimateIsContainer = true;
     elements.push({
       id: e.id, type: "archimate-shape", label,
-      x: Math.round(cx - sz.w / 2), y: Math.round(cy - sz.h / 2),
-      width: sz.w, height: sz.h,
+      x: cx - sz.w / 2, y: cy - sz.h / 2, width: sz.w, height: sz.h,
       ...(parentOf.has(e.id) ? { parentId: parentOf.get(e.id) } : {}),
       properties: props,
     } as DiagramElement);
   }
 
-  // Grow each container to HUG its children — DEEPEST FIRST so a mid-level container
-  // wraps its already-sized sub-containers (3-level repro needs this). The container
-  // is sized to exactly the children bbox + PAD + a top HEADER band for its label.
   const depthOf = (id: string) => { let d = 0, cur = parentOf.get(id); const seen = new Set<string>(); while (cur && !seen.has(cur)) { seen.add(cur); d++; cur = parentOf.get(cur); } return d; };
   const elMap = new Map(elements.map(e => [e.id, e]));
+  // Shift an element and (if it is a container) its whole subtree, so nested
+  // contents ride along when a container is separated from its siblings.
+  const shiftSubtree = (el: DiagramElement, dx: number, dy: number) => {
+    const stack = [el.id];
+    while (stack.length) {
+      const cur = stack.pop()!; const cel = elMap.get(cur); if (!cel) continue;
+      cel.x += dx; cel.y += dy;
+      for (const k of childrenOf.get(cur) ?? []) stack.push(k);
+    }
+  };
+
+  // Grow each container to HUG its children — DEEPEST FIRST so a mid-level container
+  // wraps its already-sized sub-containers (3-level repro needs this). Before hugging,
+  // separate that container's children so an expanded box keeps the image's gaps
+  // (Paul); the container is then sized to the children bbox + PAD + a top HEADER band.
   const containers = elements.filter(c => isContainer(c.id)).sort((a, b) => depthOf(b.id) - depthOf(a.id));
   for (const c of containers) {
     const kids = (childrenOf.get(c.id) ?? []).map(id => elMap.get(id)!).filter(Boolean);
     if (!kids.length) continue;
+    separateArchiSiblings(kids, boundsById, TARGET_W, TARGET_H, shiftSubtree);
     const minX = Math.min(...kids.map(k => k.x)) - ARCHI_NEST_PAD;
     const minY = Math.min(...kids.map(k => k.y)) - ARCHI_NEST_PAD - ARCHI_NEST_HEADER;
     const maxX = Math.max(...kids.map(k => k.x + k.width)) + ARCHI_NEST_PAD;
@@ -1376,6 +1456,9 @@ export function layoutArchimatePreserved(
     c.width = Math.max(maxX - minX, boxSize(c.label).w); // never narrower than its own name
     c.height = maxY - minY;
   }
+  // Separate the root-level elements too (top-level containers / standalone shapes).
+  separateArchiSiblings(elements.filter(e => !e.parentId), boundsById, TARGET_W, TARGET_H, shiftSubtree);
+  for (const el of elements) { el.x = Math.round(el.x); el.y = Math.round(el.y); el.width = Math.round(el.width); el.height = Math.round(el.height); }
 
   // Roots first, deepest last → every parent precedes its children in the array
   // (renders containers UNDER their contents; generalises the 2-level SM sort).
@@ -1415,7 +1498,7 @@ function layoutArchimateNested(
   const sizeSubtree = (id: string, guard: Set<string>): { w: number; h: number } => {
     if (sizeOf.has(id)) return sizeOf.get(id)!;
     const kids = (childrenOf.get(id) ?? []).filter(k => !guard.has(k));
-    if (!kids.length) { const s = boxSize(labelOf.get(id) ?? ""); sizeOf.set(id, s); return s; }
+    if (!kids.length) { const s = archiFitSize(labelOf.get(id) ?? ""); sizeOf.set(id, s); return s; }
     const g2 = new Set(guard); g2.add(id);
     const childSizes = kids.map(k => sizeSubtree(k, g2));
     const cols = Math.max(1, Math.ceil(Math.sqrt(kids.length)));
