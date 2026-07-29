@@ -3841,6 +3841,45 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── Data-artifact overlap clearance (issue 2) ── keep every Data Object /
+  // Store (and its whole label) clear of ALL other elements, not just its own EP
+  // (e.g. a data object overlapping a Start event). If a data artifact's
+  // footprint (box + label, with the label's sideways overhang) overlaps a flow
+  // element or another artifact, nudge it vertically clear — prefer UP — bounded
+  // and clamped inside its pool; drop below only when it can't fit above. Its OWN
+  // associated element is excluded (the artifact is meant to sit beside it). Data
+  // artifacts are not routing obstacles, so this can't perturb any connector.
+  {
+    const isArt2 = (t: string) => t === "data-object" || t === "data-store";
+    const FLOW = new Set(["task", "subprocess", "subprocess-expanded", "start-event", "end-event", "intermediate-event", "gateway"]);
+    const LINE_H = 14, PAD = 8, SIDE = 34;
+    const labelH = (e: DiagramElement) => Math.max(1, (e.label ?? "").split("\n").length) * LINE_H + 6;
+    const foot = (e: DiagramElement) => isArt2(e.type)
+      ? { l: e.x - SIDE, r: e.x + e.width + SIDE, t: e.y, b: e.y + e.height + labelH(e) }
+      : { l: e.x, r: e.x + e.width, t: e.y, b: e.y + e.height };
+    const ov = (a: { l: number; r: number; t: number; b: number }, b: { l: number; r: number; t: number; b: number }) =>
+      a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+    const poolOf2 = (e: DiagramElement): DiagramElement | undefined => { let cur: DiagramElement | undefined = e; let g = 0; while (cur && g++ < 12) { if (cur.type === "pool") return cur; cur = cur.parentId ? elMap.get(cur.parentId) : undefined; } return undefined; };
+    const allConns = [...aiConnections, ...autoConns];
+    const assocOf = (artId: string) => { const c = allConns.find(x => x.sourceId === artId || x.targetId === artId); return c ? (c.sourceId === artId ? c.targetId : c.sourceId) : undefined; };
+    const obstacles = elements.filter(e => (FLOW.has(e.type) || isArt2(e.type)) && !e.boundaryHostId);
+    for (const art of elements) {
+      if (!isArt2(art.type)) continue;
+      const pool = poolOf2(art);
+      const assoc = assocOf(art.id);
+      for (let step = 0; step < 6; step++) {
+        const af = foot(art);
+        const clash = obstacles.find(o => o.id !== art.id && o.id !== assoc
+          && !(isArt2(o.type) && o.id < art.id)   // resolve each artifact-artifact pair once
+          && ov(af, foot(o)));
+        if (!clash) break;
+        const of = foot(clash);
+        const newY = art.y - (af.b - of.t + PAD);  // move the whole footprint above the obstacle
+        art.y = (pool && newY < pool.y + 4) ? of.b + PAD : newY; // can't fit above → drop below
+      }
+    }
+  }
+
   // ── Issue 3: place a boundary event's TERMINAL exit target next to the event ──
   // An element reached only from an EP edge-mounted event (e.g. an End event
   // "Lapse Application" off a "10 working days" timer) is placed by the column
