@@ -3726,6 +3726,42 @@ export function layoutBpmnDiagram(
   // may have moved during the gateway / start-end tightening passes above), then
   // re-fit the lanes so any nudged data object is still enclosed.
   positionDataObjectsR802();
+
+  // ── Vertical lane compaction (issue 1) ── the branch/column stacking can
+  // strand a lower cluster of tasks far below its predecessors, leaving a large
+  // EMPTY vertical band inside a lane (Paul's "Principal Consultants" case: a top
+  // cluster, ~400px of nothing, then a bottom cluster). Sweep each lane top→down;
+  // when the gap between the running occupied-bottom and the next child exceeds
+  // MIN_BAND, pull that child AND everything below it in the lane UP so the gap
+  // shrinks to TARGET_GAP. Whole clusters move together (same dy) so nothing
+  // inside collides, and the band was empty so nothing above is disturbed. The
+  // FINAL hug + restack below then re-tighten the (now shorter) lanes. Data
+  // objects / EP internals / boundary events ride with their element.
+  {
+    const taskH = getSymbolDefinition("task").defaultHeight;
+    const MIN_BAND = Math.round(2.0 * taskH);   // only close bands clearly larger than a normal row
+    const TARGET_GAP = Math.round(1.2 * taskH); // leave ~one normal row of space
+    const kidsByParent = new Map<string, DiagramElement[]>();
+    for (const e of elements) { if (!e.parentId) continue; const a = kidsByParent.get(e.parentId); if (a) a.push(e); else kidsByParent.set(e.parentId, [e]); }
+    const descOf = (rootId: string): string[] => { const out: string[] = []; const st = [rootId]; while (st.length) { const c = st.pop()!; for (const k of kidsByParent.get(c) ?? []) { out.push(k.id); st.push(k.id); } } return out; };
+    const shiftUp = (rootIds: string[], dy: number) => {
+      const full = new Set<string>(rootIds);
+      for (const id of rootIds) for (const d of descOf(id)) full.add(d);
+      for (const e of elements) if (e.boundaryHostId && full.has(e.boundaryHostId)) full.add(e.id);
+      for (const e of elements) if (full.has(e.id)) e.y -= dy;
+    };
+    for (const lane of elements.filter(e => e.type === "lane")) {
+      const kids = (kidsByParent.get(lane.id) ?? []).filter(e => e.type !== "lane" && e.type !== "sublane").sort((a, b) => a.y - b.y);
+      if (kids.length < 2) continue;
+      let occBottom = kids[0].y + kids[0].height;
+      for (let i = 1; i < kids.length; i++) {
+        const band = kids[i].y - occBottom;
+        if (band > MIN_BAND) shiftUp(kids.slice(i).map(k => k.id), band - TARGET_GAP);
+        occBottom = Math.max(occBottom, kids[i].y + kids[i].height);
+      }
+    }
+  }
+
   fitLanesToChildren(true);   // FINAL pass: hug each lane to its content (±½ Task-height)
   // The final lane hug shrinks a white-box pool, which would otherwise leave an
   // over-wide vertical gap to the black-box pool below it. Re-stack all pools to
