@@ -603,9 +603,9 @@ export function AiPanel({
               <button
                 onClick={() => setClarifyOpen(true)}
                 className="flex items-center gap-1 text-[10px] text-amber-700 border border-amber-300 bg-amber-50 rounded px-1.5 py-0.5 hover:bg-amber-100"
-                title="Answer the AI's open questions and regenerate"
+                title="Answer the AI Tidy questions raised from your transcript and regenerate"
               >
-                Ask for Clarification ({aiFeedback.questions.length})
+                AI Tidy Questions ({aiFeedback.questions.length})
               </button>
             )}
             {attachment && (

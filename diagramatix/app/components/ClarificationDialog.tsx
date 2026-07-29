@@ -28,11 +28,11 @@ export function ClarificationDialog({ questions, initialAnswers, onSubmit, onCan
     <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col">
         <div className="px-5 py-4 border-b border-gray-100 shrink-0">
-          <h3 className="text-sm font-semibold text-gray-900">Ask for Clarification</h3>
+          <h3 className="text-sm font-semibold text-gray-900">AI Tidy Questions</h3>
           <p className="text-xs text-gray-600 leading-relaxed mt-1">
-            The AI flagged these open questions while building the diagram. Answer
-            the ones you can — your answers are added to the prompt and the diagram
-            is regenerated. Leave any blank to skip.
+            AI Tidy flagged these open questions while turning your transcript into
+            a process. Answer the ones you can — your answers are added to the prompt
+            and the diagram is regenerated. Leave any blank to skip.
           </p>
         </div>
 

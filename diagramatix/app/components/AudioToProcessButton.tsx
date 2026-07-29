@@ -9,8 +9,8 @@ interface Props {
   onError?: (message: string) => void;
   /** Surfaces AI-noted open questions the recording left ambiguous. */
   onNote?: (message: string) => void;
-  /** Hands the AI's open questions to the host so it can offer "Ask for
-   *  Clarification". Takes precedence over onNote when provided. */
+  /** Hands the AI's open questions to the host so it can offer "AI Tidy
+   *  Questions". Takes precedence over onNote when provided. */
   onFeedback?: (questions: string[]) => void;
   /** Reports record/transcribe/tidy activity so the host can disable Generate. */
   onBusyChange?: (busy: boolean) => void;

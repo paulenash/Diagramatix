@@ -4085,7 +4085,7 @@ export function DiagramEditor({
               if (typeof window !== "undefined") localStorage.setItem(`noObstacles-${diagramId}`, on ? "true" : "false");
               rerouteAll();
             }}
-            onClose={() => { setShowAiPanel(false); setAiPrefill(null); }}
+            onClose={() => { setShowAiPanel(false); setAiPrefill(null); if (data.aiFeedback) setAiFeedback(undefined); }}
             onGeneratingChange={setAiPanelGenerating}
             isAdmin={isAdmin}
             currentElements={data.elements}
@@ -4152,7 +4152,7 @@ export function DiagramEditor({
             onPrefillConsumed={() => setAiPrefill(null)}
             aiModels={aiModels}
             currentAiModelId={currentAiModel?.id}
-            onClose={() => { setShowPlanPanel(false); setAiPrefill(null); }}
+            onClose={() => { setShowPlanPanel(false); setAiPrefill(null); if (data.aiFeedback) setAiFeedback(undefined); }}
             onBusyChange={setAiBusy}
             onAudioPhaseChange={setAudioPhase}
             aiFeedback={data.aiFeedback}
