@@ -668,6 +668,18 @@
           "iconType": "node"
         },
         {
+          "key": "technology-node-icon",
+          "name": "Node",
+          "variant": "icon",
+          "description": "A node represents a computational or physical resource that hosts, manipulates, or interacts with other computational or physical resources.",
+          "category": "technology",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#c5e0b4",
+          "shapeFamily": "rectangle",
+          "iconType": "node"
+        },
+        {
           "key": "technology-device-box",
           "name": "Device",
           "variant": "box",
@@ -683,6 +695,18 @@
           "key": "technology-system-software-box",
           "name": "System Software",
           "variant": "box",
+          "description": "System software represents software that provides or contributes to an environment for storing, executing, and using software or data deployed within it.",
+          "category": "technology",
+          "defaultWidth": 113,
+          "defaultHeight": 76,
+          "fill": "#c5e0b4",
+          "shapeFamily": "rectangle",
+          "iconType": "component"
+        },
+        {
+          "key": "technology-system-software-icon",
+          "name": "System Software",
+          "variant": "icon",
           "description": "System software represents software that provides or contributes to an environment for storing, executing, and using software or data deployed within it.",
           "category": "technology",
           "defaultWidth": 113,

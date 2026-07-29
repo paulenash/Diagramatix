@@ -19,7 +19,8 @@ export const ARCHIMATE_SEPARATE_ICON_KEY = "archimate.icon.separate";
  *  inside. Other elements stay opt-in via the Assign tab. */
 export const DEFAULT_SEPARATE_ICONS = [
   "Business Actor", "Business Service", "Business Event",
-  "Application Service", "Application Event", "Technology Service", "Technology Event",
+  "Application Service", "Application Event", "Application Component",
+  "Technology Service", "Technology Event", "Node", "System Software",
   "Value Stream",
 ];
 

@@ -956,6 +956,7 @@ export const ARCHI_DUAL_FORM = new Set<string>([
   "motivation-constraint", "strategy-value-stream",
   "application-component", "application-collaboration", "application-interface",
   "application-interaction", "application-event",
+  "technology-node", "technology-system-software",
 ]);
 
 /** Resolve {shapeKey, iconOnly} for an element type, honouring the notation FORM

@@ -181,6 +181,36 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
     const size = isActor ? el.height : Math.min(el.width, el.height);
     // Service & Event want a filled background shape in theme colour
     if (!isActor) {
+      // Component (and System Software, which shares the "component" iconType): the
+      // WHOLE shape is a rectangle with two small tabs straddling its left edge.
+      if (entry.iconType === "component") {
+        const tabW = Math.min(el.width * 0.16, 22);
+        const tabH = Math.min(el.height * 0.22, 18);
+        const bodyLeft = el.x + tabW * 0.6;
+        const bodyW = el.width - tabW * 0.6;
+        return (
+          <g stroke={stroke} strokeWidth={STROKE_WIDTH} strokeLinejoin="round">
+            <rect x={bodyLeft} y={el.y} width={bodyW} height={el.height} fill={fill} />
+            <rect x={bodyLeft - tabW / 2} y={el.y + el.height * 0.20} width={tabW} height={tabH} fill={fill} />
+            <rect x={bodyLeft - tabW / 2} y={el.y + el.height * 0.55} width={tabW} height={tabH} fill={fill} />
+          </g>
+        );
+      }
+      // Node: the WHOLE shape is a 3D box (cuboid) — front face + top + right faces.
+      if (entry.iconType === "node") {
+        const depth = Math.min(el.width, el.height) * 0.16;
+        const fx = el.x, fy = el.y + depth, fw = el.width - depth, fh = el.height - depth;
+        const front = `M ${fx} ${fy} L ${fx + fw} ${fy} L ${fx + fw} ${fy + fh} L ${fx} ${fy + fh} Z`;
+        const top = `M ${fx} ${fy} L ${fx + depth} ${fy - depth} L ${fx + fw + depth} ${fy - depth} L ${fx + fw} ${fy} Z`;
+        const right = `M ${fx + fw} ${fy} L ${fx + fw + depth} ${fy - depth} L ${fx + fw + depth} ${fy + fh - depth} L ${fx + fw} ${fy + fh} Z`;
+        return (
+          <g stroke={stroke} strokeWidth={STROKE_WIDTH} strokeLinejoin="round" fill={fill}>
+            <path d={top} />
+            <path d={right} />
+            <path d={front} />
+          </g>
+        );
+      }
       let bg: string;
       if (entry.iconType === "service") {
         // Stadium / pill shape: rectangle with semicircle ends on the

@@ -43,6 +43,20 @@ describe("ArchiMate v3.2 catalogue + layout", () => {
     }
   });
 
+  it("T1079 — Node + System Software + Component have selectable icon forms (dual-form + catalogue + drawer)", () => {
+    const keys = new Set(allShapes.map((s) => s.key));
+    // The three types the icon-form feature added/enabled are dual-form.
+    for (const t of ["technology-node", "technology-system-software", "application-component"]) {
+      expect(ARCHI_DUAL_FORM.has(t), `${t} is dual-form`).toBe(true);
+      const iconKey = ARCHI_SHAPE[t].key.replace(/-box$/, "-icon");
+      expect(keys.has(iconKey), `catalogue has ${iconKey}`).toBe(true);
+    }
+    // The expressed forms reuse existing whole-shape drawers: Node → "node",
+    // System Software → "component" (Paul's choice), Component → "component".
+    expect(allShapes.find((s) => s.key === "technology-node-icon").iconType).toBe("node");
+    expect(allShapes.find((s) => s.key === "technology-system-software-icon").iconType).toBe("component");
+  });
+
   it("T0994 — new v3.2 element types band correctly (Technology 11, Impl&Migration 12)", () => {
     for (const t of ["technology-path", "technology-communication-network", "equipment", "facility", "distribution-network", "material"])
       expect(ARCHI_BAND[t]).toBe(11);
@@ -50,9 +64,10 @@ describe("ArchiMate v3.2 catalogue + layout", () => {
       expect(ARCHI_BAND[t]).toBe(12);
   });
 
-  it("T0995 — catalogue is v3.2, Technology has 17 types, new categories present, typo/dupes gone", () => {
+  it("T0995 — catalogue is v3.2, Technology has 19 masters (Node + System Software gained icon forms), new categories present, typo/dupes gone", () => {
     expect(catalogue.version).toBe("3.2");
-    expect(catalogue.categories.find((c: { id: string }) => c.id === "technology").shapes.length).toBe(17);
+    // 17 box masters + the Node and System Software icon (expressed) forms = 19.
+    expect(catalogue.categories.find((c: { id: string }) => c.id === "technology").shapes.length).toBe(19);
     expect(catalogue.categories.map((c: { id: string }) => c.id)).toEqual(
       expect.arrayContaining(["implementation-migration", "composite"]),
     );
