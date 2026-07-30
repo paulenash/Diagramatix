@@ -1301,6 +1301,33 @@ function buildArchiConnectors(
       if (item.end === "src") item.p.srcOffset = off; else item.p.tgtOffset = off;
     });
   }
+  // Straighten each OPPOSING-PARALLEL connector: attach its target at the same absolute
+  // coordinate as its (already-spread) source, clamped into the target's side. This kills
+  // the small sideways "kink" that independent source/target spreads produce, while the
+  // source spread still guarantees distinct points. Only where a straight run is possible
+  // (top↔bottom / left↔right) — L-shaped connectors keep their spread offsets.
+  const OPP: Record<string, string> = { top: "bottom", bottom: "top", left: "right", right: "left" };
+  const clampOff = (v: number) => Math.max(0.08, Math.min(0.92, v));
+  for (const p of prelim) {
+    if (OPP[p.srcSide] !== p.tgtSide) continue;
+    const vertical = p.srcSide === "top" || p.srcSide === "bottom";
+    const srcAbs = vertical ? p.src.x + p.srcOffset * p.src.width : p.src.y + p.srcOffset * p.src.height;
+    p.tgtOffset = vertical
+      ? clampOff((srcAbs - p.tgt.x) / p.tgt.width)
+      : clampOff((srcAbs - p.tgt.y) / p.tgt.height);
+  }
+  // De-collide targets that aligned to (nearly) the same point on a shared side, so no
+  // two connectors share a connection point (requirement 2 still holds).
+  const tgtGroups = new Map<string, Pre[]>();
+  for (const p of prelim) { const k = `${p.tgt.id}|${p.tgtSide}`; (tgtGroups.get(k) ?? tgtGroups.set(k, []).get(k)!).push(p); }
+  for (const list of tgtGroups.values()) {
+    if (list.length <= 1) continue;
+    list.sort((a, b) => a.tgtOffset - b.tgtOffset);
+    const EPS = 0.07;
+    for (let i = 1; i < list.length; i++) {
+      if (list[i].tgtOffset - list[i - 1].tgtOffset < EPS) list[i].tgtOffset = Math.min(0.92, list[i - 1].tgtOffset + EPS);
+    }
+  }
   const connectors: Connector[] = prelim.map(p => ({
     id: `conn-${p.src.id}-${p.tgt.id}`,
     sourceId: p.src.id, targetId: p.tgt.id,

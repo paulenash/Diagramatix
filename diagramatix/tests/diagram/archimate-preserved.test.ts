@@ -182,6 +182,22 @@ describe("ArchiMate notation form (icon vs box)", () => {
     expect(g("n1").parentId).toBe("loc");
   });
 
+  it("T1086 — an opposing-parallel connector is straightened (its two ends share an absolute coordinate)", () => {
+    const els2 = [
+      { id: "p1", type: "business-process", label: "P1", bounds: { x: 0.4, y: 0.1, w: 0.12, h: 0.1 } },
+      { id: "s1", type: "business-service", label: "S1", bounds: { x: 0.4, y: 0.5, w: 0.12, h: 0.1 } },
+    ];
+    const d = layoutGenericDiagram({ elements: els2, connections: [{ sourceId: "s1", targetId: "p1", type: "serving" }] } as never, "archimate", { imageAspect: { w: 1000, h: 1000 } });
+    const g = (id: string) => d.elements.find((e) => e.id === id)!;
+    const c = d.connectors.find((x) => x.sourceId === "s1" && x.targetId === "p1")!;
+    const s = g("s1"), p = g("p1");
+    const srcX = s.x + (c.sourceOffsetAlong ?? 0.5) * s.width;
+    const tgtX = p.x + (c.targetOffsetAlong ?? 0.5) * p.width;
+    // Vertically-aligned pair → the serving connector attaches at the same x on both
+    // ends (a straight line), no sideways kink.
+    expect(Math.abs(srcX - tgtX)).toBeLessThan(2);
+  });
+
   it("T1085 — a Node container wraps its children in the FRONT rectangle (trapeziums external, capped)", () => {
     const els2 = [
       { id: "n1", type: "technology-node", label: "Mainframe", notation: "icon", bounds: { x: 0.1, y: 0.2, w: 0.7, h: 0.5 } },
