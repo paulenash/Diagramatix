@@ -22,6 +22,7 @@ import { tonesFor } from "@/app/lib/theme/featureColors";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { AlertDialog } from "@/app/components/AlertDialog";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { ProjectStructureSection } from "@/app/components/entityLists/ProjectStructureSection";
 import { RiskControlConsole } from "@/app/components/riskControls/RiskControlConsole";
@@ -449,6 +450,8 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   }
 
   const [showNewDiagram, setShowNewDiagram] = useState(false);
+  // SuperAdmin "Import Diagram Bundle" error message (AlertDialog).
+  const [bundleError, setBundleError] = useState<string | null>(null);
   // Opened from the diagram editor's "+ New Diagram" button (?new=1): auto-open
   // the New Diagram dialog, then strip the param so a refresh/Back doesn't re-open it.
   useEffect(() => {
@@ -704,6 +707,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     }
   }
   const importJsonInputRef = useRef<HTMLInputElement>(null);
+  const importBundleInputRef = useRef<HTMLInputElement>(null);
   const importXmlInputRef = useRef<HTMLInputElement>(null);
   const importVisioInputRef = useRef<HTMLInputElement>(null);
   const importBpmnInputRef = useRef<HTMLInputElement>(null);
@@ -1764,6 +1768,31 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     router.push(`/diagram/${diagram.id}`);
   }
 
+  // SuperAdmin: import a diagram BUNDLE (.bundle.json from the editor's "Diagram
+  // Bundle (AI)" export) — recreates the diagram + its prompt/plan + comparison
+  // matrix + per-model diagrams as a NEW diagram in THIS project, then opens it.
+  async function handleImportBundleFile(file: File) {
+    try {
+      const bundle = JSON.parse(await file.text());
+      const res = await fetch("/api/admin/import-diagram-bundle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bundle, projectId: project.id }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.error ?? `Bundle import failed (${res.status})`);
+      }
+      const { id } = await res.json();
+      if (id && selectedFolderId !== ROOT_ID) {
+        updateTree(t => ({ ...t, diagramFolderMap: { ...t.diagramFolderMap, [id]: selectedFolderId } }));
+      }
+      if (id) router.push(`/diagram/${id}`);
+    } catch (e) {
+      setBundleError(e instanceof Error ? e.message : "Bundle import failed");
+    }
+  }
+
   function handleDeleteDiagram(id: string) {
     const diag = diagrams.find(d => d.id === id);
     setConfirmDialog({
@@ -2483,6 +2512,18 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                   if (f) handleImportBpmnFile(f);
                 }}
               />
+              {/* SuperAdmin: diagram bundle import (diagram + prompt + AI JSON). */}
+              <input
+                ref={importBundleInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void handleImportBundleFile(f);
+                }}
+              />
               {/* Unified File menu — Export JSON / Import JSON / Export XML / Import XML */}
               <div className="relative" ref={fileMenuRef}>
                 <button
@@ -2628,6 +2669,15 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               >
                 + New Diagram
               </button>
+              {isAdmin && !superAdminHidden && (
+                <button
+                  onClick={() => importBundleInputRef.current?.click()}
+                  className="px-3 py-1 border border-red-300 text-red-700 rounded-md hover:bg-red-50 text-xs font-medium"
+                  title="SuperAdmin only — import a Diagram Bundle (.bundle.json): recreates the diagram with its AI prompt, plan, comparison matrix & per-model diagrams as a new diagram here."
+                >
+                  Import Bundle
+                </button>
+              )}
               {ent.apqc && aiAllowed && (
               <button
                 onClick={() => setShowPcfCreate(true)}
@@ -3958,6 +4008,15 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           message={confirmDialog.message}
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {bundleError && (
+        <AlertDialog
+          title="Import Diagram Bundle"
+          message={bundleError}
+          tone="error"
+          onClose={() => setBundleError(null)}
         />
       )}
 

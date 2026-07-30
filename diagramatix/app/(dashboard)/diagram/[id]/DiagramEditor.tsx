@@ -1342,6 +1342,8 @@ export function DiagramEditor({
   const [fileSubmenu, setFileSubmenu] = useState<"export" | "import" | null>(null);
   const [showPdfScalePopover, setShowPdfScalePopover] = useState(false);
   const [pendingPdfScale, setPendingPdfScale] = useState(100);
+  // SuperAdmin "Diagram Bundle" export result/error message (AlertDialog).
+  const [bundleMsg, setBundleMsg] = useState<string | null>(null);
   const importJsonInputRef = useRef<HTMLInputElement>(null);
   const importXmlInputRef = useRef<HTMLInputElement>(null);
   const importTemplatesInputRef = useRef<HTMLInputElement>(null);
@@ -1918,6 +1920,32 @@ export function DiagramEditor({
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // SuperAdmin: export the full diagram BUNDLE — the diagram plus its linked AI
+  // prompt (incl. the 2-phase plan), its comparison matrix, and the per-model
+  // comparison diagrams — as one file. Re-imported via a project's "Import
+  // Diagram Bundle". Assembled server-side (client lacks aiComparison/planJson).
+  async function handleExportBundle() {
+    try {
+      const res = await fetch(`/api/admin/diagram-bundle/${diagramId}`);
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.error ?? `Bundle export failed (${res.status})`);
+      }
+      const bundle = await res.json();
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${diagramName}.bundle.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      setBundleMsg(e instanceof Error ? e.message : "Bundle export failed");
+    }
   }
 
   // Import a JSON or XML file, take its FIRST diagram, and replace the
@@ -3589,6 +3617,9 @@ export function DiagramEditor({
                                 </div>
                                 <button onClick={() => { handleExport(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">SVG</button>
                                 <button onClick={() => { handleExportJson(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download diagram as a single-diagram JSON file">JSON</button>
+                                {isActingAdmin && (
+                                  <button onClick={() => { closeFm(); void handleExportBundle(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="SuperAdmin only — export the diagram together with its AI prompt, plan, comparison matrix & per-model diagrams as ONE bundle. Re-import via a project's 'Import Diagram Bundle'.">Diagram Bundle (AI)</button>
+                                )}
                                 {diagramType === "bpmn" && (
                                   <button onClick={() => { handleExportXml(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download diagram XML and the matching XSD schema">XML</button>
                                 )}
@@ -4193,6 +4224,15 @@ export function DiagramEditor({
             message={reviewActionMsg}
             tone="info"
             onClose={() => setReviewActionMsg(null)}
+          />
+        )}
+
+        {bundleMsg && (
+          <AlertDialog
+            title="Diagram Bundle"
+            message={bundleMsg}
+            tone="error"
+            onClose={() => setBundleMsg(null)}
           />
         )}
 
