@@ -8,8 +8,8 @@ import { auth } from "@/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { isSuperuser } from "@/app/lib/superuser";
 import { makeAiClient, aiApiKey } from "@/app/lib/ai/anthropicClient";
-import { enterAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
-import { AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
+import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
+import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { VECTORIZE_SYSTEM_PROMPT, VECTORIZE_INSTRUCTION, parseVectorizeResponse } from "@/app/lib/archimate/iconVectorize";
 
@@ -18,7 +18,7 @@ const ALLOWED = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 export async function POST(req: Request) {
   const session = await auth();
   if (!isSuperuser(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  await enterAiRouteContext(session, AI_INVOCATION_POINTS.IconVectorize);
+  enterAiContext(await resolveAiRouteContext(session, AI_INVOCATION_POINTS.IconVectorize));
 
   const { image, mediaType } = await req.json().catch(() => ({}));
   if (!image || typeof image !== "string") return NextResponse.json({ error: "image (base64) required" }, { status: 400 });

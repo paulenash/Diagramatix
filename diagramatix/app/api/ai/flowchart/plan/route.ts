@@ -13,8 +13,8 @@ import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { isSuperuser } from "@/app/lib/superuser";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
-import { enterAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
-import { AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
+import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
+import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   }
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
-  await enterAiRouteContext(session, AI_INVOCATION_POINTS.FlowchartPlan);
+  enterAiContext(await resolveAiRouteContext(session, AI_INVOCATION_POINTS.FlowchartPlan));
 
   const { prompt, attachment, model: requestedModel } = await req.json();
   if (!prompt?.trim()) {
