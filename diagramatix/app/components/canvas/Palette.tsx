@@ -514,11 +514,12 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
     // Body outline with its LEFT edge BROKEN at the two tab spans, so the body boundary
     // is not drawn INSIDE the tabs (which sit on that edge).
     const body = `M ${bodyLeft} ${my} L ${x2} ${my} L ${x2} ${yb} L ${bodyLeft} ${yb} L ${bodyLeft} ${t2b} M ${bodyLeft} ${t2a} L ${bodyLeft} ${t1b} M ${bodyLeft} ${t1a} L ${bodyLeft} ${my}`;
+    // Use the SAME line colour as the Service (and other) icon glyphs — iconColour.
     return (
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-        <path d={body} fill="none" stroke={stroke} strokeWidth={2.6} strokeLinejoin="round" strokeLinecap="round" />
-        <rect x={tabX} y={t1a} width={tabW} height={tabH} fill="none" stroke={stroke} strokeWidth={2} />
-        <rect x={tabX} y={t2a} width={tabW} height={tabH} fill="none" stroke={stroke} strokeWidth={2} />
+        <path d={body} fill="none" stroke={iconColour} strokeWidth={2.6} strokeLinejoin="round" strokeLinecap="round" />
+        <rect x={tabX} y={t1a} width={tabW} height={tabH} fill="none" stroke={iconColour} strokeWidth={2} />
+        <rect x={tabX} y={t2a} width={tabW} height={tabH} fill="none" stroke={iconColour} strokeWidth={2} />
       </svg>
     );
   }
