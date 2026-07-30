@@ -2035,12 +2035,13 @@ function getLabelPos(el: DiagramElement, archimateDepth: number = 0): { x: numbe
     if (isValueStreamIcon) {
       return { x: el.x + el.width / 2 + 10, y: el.y + el.height / 2, baseline: "middle" };
     }
-    // Component / System Software icon (tabs inset the body on the left) — nudge the
-    // label 8px right so it centres in the body rather than over the tabs.
+    // Component / System Software icon (tabs inset the body on the left) — centre the
+    // label in the BODY (right of the tabs), not the whole element, so it clears them.
     const isComponentIcon = iconOnly && typeof el.properties?.shapeKey === "string" &&
       /(component|system-software)/.test(el.properties.shapeKey as string);
     if (isComponentIcon) {
-      return { x: el.x + el.width / 2 + 12, y: el.y + el.height / 2, baseline: "middle" };
+      const tabW = Math.min(el.width * 0.16, 22);
+      return { x: el.x + tabW + (el.width - tabW) / 2, y: el.y + el.height / 2, baseline: "middle" };
     }
     // Node icon (3D box): the label belongs in the FRONT rectangle, not the top
     // trapezium — at the top of the front rect for a container, else centred in it.
@@ -3139,8 +3140,14 @@ export function SymbolRenderer({
         // long name flows onto multiple lines inside the box and RE-wraps when the
         // box is resized (same behaviour as a BPMN task). Icon-only Actor is the
         // exception: it renders its label via the external-label branch above.
+        // Component icon: the left tab band is not usable text width — wrap the name to
+        // the BODY width so a long name never runs into the tabs / inner boundary.
+        const compInset = (isArchi && !!element.properties?.archimateIconOnly
+          && typeof element.properties?.shapeKey === "string"
+          && /(component|system-software)/.test(element.properties.shapeKey as string))
+          ? Math.min(element.width * 0.16, 22) : 0;
         const labelLines = isArchi
-          ? wrapText(element.label ?? "", Math.max(24, element.width - ARCHI_LABEL_PAD), fSize)
+          ? wrapText(element.label ?? "", Math.max(24, element.width - compInset - ARCHI_LABEL_PAD), fSize)
           : (element.label ?? "").split('\n');
         if ((isChevron || isArchi) && labelLines.length > 1) {
           // For ArchiMate the labelInfo anchor is either the centre of

@@ -510,9 +510,9 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
     const tabX = bodyLeft - tabW / 2;
     return (
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-        <rect x={bodyLeft} y={my} width={bodyW} height={H} fill={fill} stroke={stroke} strokeWidth={1.6} strokeLinejoin="round" />
-        <rect x={tabX} y={my + H * 0.18} width={tabW} height={tabH} fill="none" stroke={stroke} strokeWidth={1.2} />
-        <rect x={tabX} y={my + H * 0.55} width={tabW} height={tabH} fill="none" stroke={stroke} strokeWidth={1.2} />
+        <rect x={bodyLeft} y={my} width={bodyW} height={H} fill="none" stroke={stroke} strokeWidth={2.6} strokeLinejoin="round" />
+        <rect x={tabX} y={my + H * 0.18} width={tabW} height={tabH} fill="none" stroke={stroke} strokeWidth={2} />
+        <rect x={tabX} y={my + H * 0.55} width={tabW} height={tabH} fill="none" stroke={stroke} strokeWidth={2} />
       </svg>
     );
   }
