@@ -15,6 +15,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { layoutGenericDiagram } from "@/app/lib/diagram/genericLayout";
+import { archiNodeDepth, archiNodeFrontRect } from "@/app/lib/diagram/nodeGeometry";
 
 type El = { id: string; type: string; label: string; parent?: string; bounds: { x: number; y: number; w: number; h: number } };
 
@@ -179,6 +180,32 @@ describe("ArchiMate notation form (icon vs box)", () => {
     expect(g("ss1").properties.archimateIconOnly).toBeUndefined();
     // Nested inside the location.
     expect(g("n1").parentId).toBe("loc");
+  });
+
+  it("T1085 — a Node container wraps its children in the FRONT rectangle (trapeziums external, capped)", () => {
+    const els2 = [
+      { id: "n1", type: "technology-node", label: "Mainframe", notation: "icon", bounds: { x: 0.1, y: 0.2, w: 0.7, h: 0.5 } },
+      { id: "ss1", type: "technology-system-software", label: "Message Queuing", parent: "n1", bounds: { x: 0.15, y: 0.32, w: 0.25, h: 0.16 } },
+      { id: "ss2", type: "technology-system-software", label: "DBMS", parent: "n1", bounds: { x: 0.5, y: 0.32, w: 0.22, h: 0.16 } },
+    ];
+    const d = layoutGenericDiagram({ elements: els2, connections: [{ sourceId: "ss1", targetId: "n1", type: "composition" }, { sourceId: "ss2", targetId: "n1", type: "composition" }] } as never, "archimate", { imageAspect: { w: 1000, h: 800 } });
+    const g = (id: string) => d.elements.find((e) => e.id === id)!;
+    const n = g("n1");
+    // It IS the Node icon container.
+    expect(n.properties.shapeKey).toBe("technology-node-icon");
+    expect(n.properties.archimateIsContainer).toBe(true);
+    // Trapezium depth grows but is capped at 80.
+    const depth = archiNodeDepth(n.width, n.height);
+    expect(depth).toBeLessThanOrEqual(80);
+    // Children sit inside the FRONT rectangle (below the top trapezium, left of the right one).
+    const fr = archiNodeFrontRect(n.x, n.y, n.width, n.height);
+    for (const id of ["ss1", "ss2"]) {
+      const c = g(id);
+      expect(c.y, `${id} below top trapezium`).toBeGreaterThanOrEqual(fr.y - 1);
+      expect(c.x + c.width, `${id} left of right trapezium`).toBeLessThanOrEqual(fr.x + fr.width + 1);
+      expect(c.x, `${id} within front left`).toBeGreaterThanOrEqual(fr.x - 1);
+      expect(c.y + c.height, `${id} within front bottom`).toBeLessThanOrEqual(fr.y + fr.height + 1);
+    }
   });
 
   it("T1084 — a Location may only be contained by a Location or a Grouping", () => {

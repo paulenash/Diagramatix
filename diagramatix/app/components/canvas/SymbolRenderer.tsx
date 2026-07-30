@@ -5,6 +5,7 @@ import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side,
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
 import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { wrapText, computePackageTab } from "@/app/lib/diagram/textMetrics";
+import { archiNodeDepth } from "@/app/lib/diagram/nodeGeometry";
 import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
 import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
 import { ArchimateShape } from "./ArchimateShape";
@@ -2040,6 +2041,17 @@ function getLabelPos(el: DiagramElement, archimateDepth: number = 0): { x: numbe
       /(component|system-software)/.test(el.properties.shapeKey as string);
     if (isComponentIcon) {
       return { x: el.x + el.width / 2 + 12, y: el.y + el.height / 2, baseline: "middle" };
+    }
+    // Node icon (3D box): the label belongs in the FRONT rectangle, not the top
+    // trapezium — at the top of the front rect for a container, else centred in it.
+    const isNodeIcon = iconOnly && typeof el.properties?.shapeKey === "string" &&
+      (el.properties.shapeKey as string).includes("node");
+    if (isNodeIcon) {
+      const d = archiNodeDepth(el.width, el.height);
+      const frontCx = el.x + (el.width - d) / 2;
+      return archimateDepth > 0
+        ? { x: frontCx, y: el.y + d + HEADER_H / 2, baseline: "middle" }
+        : { x: frontCx, y: el.y + d + (el.height - d) / 2, baseline: "middle" };
     }
     if (archimateDepth > 0) {
       return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };

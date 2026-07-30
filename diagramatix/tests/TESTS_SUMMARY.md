@@ -595,6 +595,7 @@ AI-generated ArchiMate expresses whole-part **composition** by nesting children 
 | T1082 | minimum inter-element gaps on ingestion — 20% BP general, 35% along a connector | Cramped, near-touching rows and connected elements with no room for the line | If `enforceArchiGaps` regresses |
 | T1083 | connectors never share a connection point + the AI-reported side is honoured | Overlapping connector endpoints; connectors ignoring the drawn side | If the endpoint spread or `honorSides` in `buildArchiConnectors` regresses |
 | T1084 | a Location may only be contained by a Location or a Grouping (illegal nesting dropped) | An Actor "containing" a Location; place-named actors wrongly nesting a Location | If the Location-containment guard in `resolveArchiParents` regresses |
+| T1085 | a Node container wraps its children in the FRONT rectangle; trapeziums are external + capped at 80px | Children spilling into the 3D trapeziums; node depth ballooning on a big node | If the Node hug in `layoutArchimatePreserved` or `archiNodeDepth` regresses |
 | T1080 | long names WIDEN to stay ≤2 lines (height standard), and expanded siblings don't overlap (image gaps preserved) | Long labels cramming/growing tall, or expanded boxes colliding | If `archiFitSize` or `separateArchiSiblings` regresses |
 
 ### `tests/archimate/connectors.test.ts` — Pins distinct visual style for all 11 ArchiMate connector types

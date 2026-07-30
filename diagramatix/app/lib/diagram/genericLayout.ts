@@ -10,6 +10,7 @@ import { computeWaypoints, spreadUmlEndpoints, deconflictUmlSegments, selfLoopWa
 import { sizeUmlNote } from "./umlAutoSize";
 import { parseConstraintText, parseEndRole } from "./umlConstraints";
 import { CHEVRON_THEMES } from "./chevronThemes";
+import { archiNodeDepth, isArchiNodeIcon } from "./nodeGeometry";
 import { layoutStateMachine, layoutStateMachinePreserved } from "./stateMachineLayout";
 import { layoutDomainPreserved } from "./domainLayout";
 
@@ -1507,13 +1508,24 @@ export function layoutArchimatePreserved(
     for (const c of containers) {
       const kids = (childrenOf.get(c.id) ?? []).map(id => elMap.get(id)!).filter(Boolean);
       if (!kids.length) continue;
-      const minX = Math.min(...kids.map(k => k.x)) - ARCHI_NEST_PAD;
-      const minY = Math.min(...kids.map(k => k.y)) - ARCHI_NEST_PAD - ARCHI_NEST_HEADER;
-      const maxX = Math.max(...kids.map(k => k.x + k.width)) + ARCHI_NEST_PAD;
-      const maxY = Math.max(...kids.map(k => k.y + k.height)) + ARCHI_NEST_PAD;
-      c.x = minX; c.y = minY;
-      c.width = Math.max(maxX - minX, boxSize(c.label).w); // never narrower than its own name
-      c.height = maxY - minY;
+      // The FRONT rectangle wraps the children (+ PAD, + top HEADER for the label).
+      const frontLeft = Math.min(...kids.map(k => k.x)) - ARCHI_NEST_PAD;
+      const frontTop = Math.min(...kids.map(k => k.y)) - ARCHI_NEST_PAD - ARCHI_NEST_HEADER;
+      const frontRight = Math.max(...kids.map(k => k.x + k.width)) + ARCHI_NEST_PAD;
+      const frontBottom = Math.max(...kids.map(k => k.y + k.height)) + ARCHI_NEST_PAD;
+      const frontW = Math.max(frontRight - frontLeft, boxSize(c.label).w); // fit the name too
+      const frontH = frontBottom - frontTop;
+      if (isArchiNodeIcon(c.properties?.shapeKey, c.properties?.archimateIconOnly)) {
+        // Node container: children sit in the FRONT rectangle; the 3D trapeziums add
+        // depth on the TOP and RIGHT, so the full (attachment) bounds enclose them.
+        let d = archiNodeDepth(frontW, frontH);
+        d = archiNodeDepth(frontW + d, frontH + d); // refine toward the full-size depth
+        c.x = frontLeft; c.y = frontTop - d;
+        c.width = frontW + d; c.height = frontH + d;
+      } else {
+        c.x = frontLeft; c.y = frontTop;
+        c.width = frontW; c.height = frontH;
+      }
     }
   };
 

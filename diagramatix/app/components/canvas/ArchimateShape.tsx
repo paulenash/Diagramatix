@@ -28,6 +28,7 @@ import { useArchimateCustomIcon } from "@/app/lib/archimate/useArchimateCustomIc
 import { effectiveCustomIcon } from "@/app/lib/archimate/customIcon";
 import { drawCustomIcon } from "@/app/lib/archimate/iconShapes";
 import { ArchimateDepthCtx } from "./SymbolRenderer";
+import { archiNodeDepth } from "@/app/lib/diagram/nodeGeometry";
 
 const STROKE_WIDTH = 2.4;               // 2× the previous 1.2
 
@@ -37,6 +38,16 @@ function lightenHex(hex: string, amount: number): string {
   const n = parseInt(m[1], 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   const mix = (c: number) => Math.round(c + (255 - c) * amount);
+  return `#${[mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** Darken a hex colour toward black by `amount` (0..1). */
+function darkenHex(hex: string, amount: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const mix = (c: number) => Math.round(c * (1 - amount));
   return `#${[mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
@@ -132,6 +143,9 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   const elOverrideFill = el.properties?.fill as string | undefined;
   const elOverrideStroke = el.properties?.stroke as string | undefined;
   let fill = elOverrideFill ?? (isLocation ? locFill : theme?.fill) ?? entry.fill ?? "#f5f5f5";
+  // Un-shaded base fill (before the depth-lightening below) — the Node 3D faces are
+  // coloured relative to THIS, so they aren't washed out by containment shading.
+  const baseFill = fill;
   const stroke = elOverrideStroke ?? (isLocation ? locInk : theme?.stroke) ?? entry.stroke ?? "#666666";
   const iconColour = (el.properties?.iconColour as string | undefined) ?? (isLocation ? locInk : theme?.iconColour) ?? stroke;
 
@@ -198,18 +212,24 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
           </g>
         );
       }
-      // Node: the WHOLE shape is a 3D box (cuboid) — front face + top + right faces.
+      // Node: a 3D box. The FRONT rectangle is the containment boundary (fill follows
+      // the element/containment shading); the top + right TRAPEZIUMS are external
+      // decorations, capped at 80px, coloured relative to the un-shaded base green
+      // (top = 2 shades darker, right = very dark) so they aren't washed out by nesting.
       if (entry.iconType === "node") {
-        const depth = Math.min(el.width, el.height) * 0.16;
+        const depth = archiNodeDepth(el.width, el.height);
         const fx = el.x, fy = el.y + depth, fw = el.width - depth, fh = el.height - depth;
+        const green = /^#[0-9a-f]{6}$/i.test(baseFill) ? baseFill : "#c5e0b4"; // technology green
+        const topFill = darkenHex(green, 0.30);
+        const rightFill = darkenHex(green, 0.55);
         const front = `M ${fx} ${fy} L ${fx + fw} ${fy} L ${fx + fw} ${fy + fh} L ${fx} ${fy + fh} Z`;
         const top = `M ${fx} ${fy} L ${fx + depth} ${fy - depth} L ${fx + fw + depth} ${fy - depth} L ${fx + fw} ${fy} Z`;
         const right = `M ${fx + fw} ${fy} L ${fx + fw + depth} ${fy - depth} L ${fx + fw + depth} ${fy + fh - depth} L ${fx + fw} ${fy + fh} Z`;
         return (
-          <g stroke={stroke} strokeWidth={STROKE_WIDTH} strokeLinejoin="round" fill={fill}>
-            <path d={top} />
-            <path d={right} />
-            <path d={front} />
+          <g stroke={stroke} strokeWidth={STROKE_WIDTH} strokeLinejoin="round">
+            <path d={top} fill={topFill} />
+            <path d={right} fill={rightFill} />
+            <path d={front} fill={fill} />
           </g>
         );
       }
