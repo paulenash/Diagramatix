@@ -499,6 +499,24 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
     );
   }
 
+  // Icon-only Application Component — render the WHOLE component shape (a rectangle
+  // with two tabs on the LEFT), centred and filling the cell like the other icon
+  // previews, matching the canvas. Replaces the small drawer glyph whose thin dark
+  // tabs read as "blue-filled" boxes.
+  if (iconOnly && entry.iconType === "component") {
+    const bodyW = 34, H = 26, my = (h - H) / 2;
+    const tabW = 10, tabH = H * 0.22;
+    const bodyLeft = w / 2 - (bodyW - tabW / 2) / 2; // centre the whole glyph (tabs included)
+    const tabX = bodyLeft - tabW / 2;
+    return (
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+        <rect x={bodyLeft} y={my} width={bodyW} height={H} fill={fill} stroke={stroke} strokeWidth={1.6} strokeLinejoin="round" />
+        <rect x={tabX} y={my + H * 0.18} width={tabW} height={tabH} fill="none" stroke={stroke} strokeWidth={1.2} />
+        <rect x={tabX} y={my + H * 0.55} width={tabW} height={tabH} fill="none" stroke={stroke} strokeWidth={1.2} />
+      </svg>
+    );
+  }
+
   // Icon-only variant (or a junction): render the icon glyph itself AS the shape
   // (no box outline, bigger icon) so the user sees the compact iconic form.
   if ((iconOnly || isJunction) && drawIcon) {
