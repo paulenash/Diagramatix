@@ -308,6 +308,15 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   // SuperAdmin override from ArchiMate Icon Maintenance).
   const d = drawOutline(entry.shapeFamily, el.x, el.y, el.width, el.height);
   const layout = effectiveIconLayout(entry.key, entry.category, iconOverrides, customBaseSize, categoryBuffers);
+  // Grouping has a fully TRANSPARENT interior (ArchiMate notation), so a plain
+  // fill="none" rect only catches clicks on the thin dashed stroke — making the
+  // grouping almost impossible to grab. Add invisible hit surfaces so the user
+  // can select / drag / double-click it from (a) a HEADER strip across the top
+  // (covers the label text + the top-right corner icon) and (b) a BAND hugging
+  // every boundary edge. Enclosed child elements paint LATER (on top) and keep
+  // their own clicks, so these surfaces never block selecting a nested shape.
+  const groupHitBand = Math.min(16, el.width / 3, el.height / 3);
+  const groupHeaderH = Math.min(28, el.height * 0.45);
   return (
     <g>
       <path
@@ -317,6 +326,23 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
         strokeWidth={STROKE_WIDTH}
         strokeDasharray={isGrouping ? "8 4" : undefined}
       />
+      {isGrouping && (
+        <>
+          {/* Boundary band — a fat transparent stroke on the perimeter; catches
+              clicks "near any boundary" (half inside / half outside each edge). */}
+          <rect
+            x={el.x} y={el.y} width={el.width} height={el.height}
+            fill="none" stroke="transparent" strokeWidth={groupHitBand}
+            pointerEvents="stroke"
+          />
+          {/* Header strip — the top band holding the label + corner icon; the
+              primary select / drag / double-click-to-edit surface. */}
+          <rect
+            x={el.x} y={el.y} width={el.width} height={groupHeaderH}
+            fill="transparent" pointerEvents="all"
+          />
+        </>
+      )}
       {drawIcon ? renderGlyph(drawIcon, el, layout, isGrouping ? "#555555" : glyphColour) : null}
     </g>
   );

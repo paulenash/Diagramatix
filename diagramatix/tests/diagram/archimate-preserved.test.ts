@@ -309,3 +309,47 @@ describe("ArchiMate notation form (icon vs box)", () => {
     expect(t.targetSide).toBe("left");
   });
 });
+
+describe("ArchiMate And/Or junctions", () => {
+  // A junction JOINS relationships of the same type: P1 triggers a junction, which
+  // triggers P2 and P3. Drawn in the image as a small circle on the trigger lines.
+  const els2 = [
+    { id: "p1", type: "business-process", label: "Assess Claim", bounds: { x: 0.05, y: 0.10, w: 0.20, h: 0.10 } },
+    { id: "j1", type: "and-junction", label: "", bounds: { x: 0.40, y: 0.13, w: 0.03, h: 0.03 } },
+    { id: "j2", type: "or-junction", label: "", bounds: { x: 0.40, y: 0.53, w: 0.03, h: 0.03 } },
+    { id: "p2", type: "business-process", label: "Pay Out", bounds: { x: 0.70, y: 0.05, w: 0.20, h: 0.10 } },
+    { id: "p3", type: "business-process", label: "Reject", bounds: { x: 0.70, y: 0.25, w: 0.20, h: 0.10 } },
+  ];
+  const conns = [
+    { sourceId: "p1", targetId: "j1", type: "triggering" },
+    { sourceId: "j1", targetId: "p2", type: "triggering" },
+    { sourceId: "j1", targetId: "p3", type: "triggering" },
+  ];
+  const build2 = () => layoutGenericDiagram({ elements: els2, connections: conns } as never, "archimate", { imageAspect: { w: 1000, h: 500 } });
+  const g = (d: ReturnType<typeof build2>, id: string) => d.elements.find((e) => e.id === id)!;
+
+  it("T1089 — And/Or junctions are recognised and mapped to the junction masters", () => {
+    const d = build2();
+    expect(g(d, "j1").properties.shapeKey).toBe("composite-junction-and");
+    expect(g(d, "j1").properties.archimateIconOnly).toBe(true);
+    expect(g(d, "j2").properties.shapeKey).toBe("composite-junction-or");
+    expect(g(d, "j2").properties.archimateIconOnly).toBe(true);
+  });
+
+  it("T1090 — junctions render at the fixed small size, not scaled to bounds or text-fit", () => {
+    const d = build2();
+    const j = g(d, "j1");
+    expect(j.width).toBe(25);
+    expect(j.height).toBe(25);
+    // A neighbouring labelled process is far larger — junctions never inflate to a box.
+    expect(g(d, "p1").width).toBeGreaterThan(j.width * 3);
+  });
+
+  it("T1091 — relationships wired THROUGH a junction are kept as lines", () => {
+    const d = build2();
+    // All three triggering edges survive (junction is a normal connector endpoint).
+    expect(d.connectors.filter((c) => c.type === "archi-triggering").length).toBe(3);
+    expect(d.connectors.some((c) => c.sourceId === "p1" && c.targetId === "j1")).toBe(true);
+    expect(d.connectors.some((c) => c.sourceId === "j1" && c.targetId === "p2")).toBe(true);
+  });
+});

@@ -912,7 +912,20 @@ export const ARCHI_SHAPE: Record<string, { key: string; iconOnly: boolean }> = {
   // containers that may hold other elements.
   "location":             { key: "composite-location",                           iconOnly: false },
   "grouping":             { key: "composite-grouping",                           iconOnly: false },
+  // Composite — And/Or Junctions: a small circle that JOINS several relationships
+  // of the same type. Filled = And (all apply); open ring = Or (one or more apply).
+  // No label; the whole shape IS the glyph, so iconOnly.
+  "and-junction":         { key: "composite-junction-and",                       iconOnly: true  },
+  "or-junction":          { key: "composite-junction-or",                        iconOnly: true  },
+  "junction":             { key: "composite-junction-and",                       iconOnly: true  },
 };
+
+// Composite junctions are drawn at a fixed small size (they carry no label and are
+// merely a routing node on a relationship path). Matches the catalogue master size.
+const ARCHI_JUNCTION_SIZE = 25;
+export function isArchiJunctionType(type: string): boolean {
+  return type === "and-junction" || type === "or-junction" || type === "junction";
+}
 
 // Passive-structure objects that go in a SIDE COLUMN (left/right), placed next
 // to the element(s) they connect to, rather than in the vertical bands.
@@ -945,6 +958,7 @@ export const ARCHI_BAND: Record<string, number> = {
   "equipment": 11, "facility": 11, "distribution-network": 11, "material": 11,
   "work-package": 12, "deliverable": 12, "implementation-event": 12, "plateau": 12, "gap": 12,
   "location": 2, "grouping": 2, // Composite — placed with the business active-structure band when flat
+  "and-junction": 7, "or-junction": 7, "junction": 7, // Junctions float with the behaviour band by default
 };
 
 // relationship name → archi-* connector type
@@ -1081,7 +1095,7 @@ function layoutArchimateDiagram(
     const spec = archiShapeForm(ai.type, ai.notation);
     if (!spec) continue; // unknown element type — skip
     const label = formatLabel(ai.label ?? ai.name ?? "");
-    const sz = boxSize(label);
+    const sz = isArchiJunctionType(ai.type) ? { w: ARCHI_JUNCTION_SIZE, h: ARCHI_JUNCTION_SIZE } : boxSize(label);
     const p: Placed = { ai, shapeKey: spec.key, iconOnly: spec.iconOnly, label, w: sz.w, h: sz.h, cx: 0 };
     if (ARCHI_SIDE_COLUMN.has(ai.type)) sideItems.push(p);
     else bands[ARCHI_BAND[ai.type] ?? ARCHI_DEFAULT_BAND].push(p);
@@ -1502,7 +1516,9 @@ export function layoutArchimatePreserved(
     // the 2-line text-fit size. So typical elements stay ~standard while a genuinely
     // large element (e.g. a full-width role, or a wide process) keeps its size. Containers
     // are provisional here; they are hugged around their children below.
-    const sz = isContainer(e.id)
+    const sz = isArchiJunctionType(e.type)
+      ? { w: ARCHI_JUNCTION_SIZE, h: ARCHI_JUNCTION_SIZE }   // junctions: fixed small circle, ignore bounds
+      : isContainer(e.id)
       ? boxSize(label)
       : b
         ? (() => { const fit = archiFitSize(label); return { w: Math.max(fit.w, Math.round(b.w * TARGET_W)), h: Math.max(fit.h, Math.round(b.h * TARGET_H)) }; })()
@@ -1624,6 +1640,8 @@ function layoutArchimateNested(
   const sizeSubtree = (id: string, guard: Set<string>): { w: number; h: number } => {
     if (sizeOf.has(id)) return sizeOf.get(id)!;
     const kids = (childrenOf.get(id) ?? []).filter(k => !guard.has(k));
+    const t = mapped.find(m => m.id === id)?.type;
+    if (t && isArchiJunctionType(t)) { const s = { w: ARCHI_JUNCTION_SIZE, h: ARCHI_JUNCTION_SIZE }; sizeOf.set(id, s); return s; }
     if (!kids.length) { const s = archiFitSize(labelOf.get(id) ?? ""); sizeOf.set(id, s); return s; }
     const g2 = new Set(guard); g2.add(id);
     const childSizes = kids.map(k => sizeSubtree(k, g2));
