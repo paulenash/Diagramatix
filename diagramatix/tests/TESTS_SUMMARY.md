@@ -597,6 +597,8 @@ AI-generated ArchiMate expresses whole-part **composition** by nesting children 
 | T1084 | a Location may only be contained by a Location or a Grouping (illegal nesting dropped) | An Actor "containing" a Location; place-named actors wrongly nesting a Location | If the Location-containment guard in `resolveArchiParents` regresses |
 | T1085 | a Node container wraps its children in the FRONT rectangle; trapeziums are external + capped at 80px | Children spilling into the 3D trapeziums; node depth ballooning on a big node | If the Node hug in `layoutArchimatePreserved` or `archiNodeDepth` regresses |
 | T1086 | an opposing-parallel connector is straightened (both ends share an absolute coordinate) | The persistent sideways "kink" from independent source/target endpoint spreads | If the alignment/de-collide pass in `buildArchiConnectors` regresses |
+| T1087 | a connector attaches to the reduced Service stadium (15% shorter), not the full bounds | A gap between the connector and the visible service pill | If the service-stadium branch in `projectToShapeBoundary` regresses |
+| T1088 | a large drawn element replicates its size; typical elements stay ~standard | A wide role/process (Customer, Handle Claim) forced to a standard box on ingestion | If `layoutArchimatePreserved` reverts to fixed-size leaves |
 | T1080 | long names WIDEN to stay ≤2 lines (height standard), and expanded siblings don't overlap (image gaps preserved) | Long labels cramming/growing tall, or expanded boxes colliding | If `archiFitSize` or `separateArchiSiblings` regresses |
 
 ### `tests/archimate/connectors.test.ts` — Pins distinct visual style for all 11 ArchiMate connector types

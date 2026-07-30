@@ -2837,7 +2837,8 @@ export function PropertiesPanel({
               //  • types where one master renders both via the flag (application/technology
               //    service + event, value stream) → keep the key, just toggle the flag.
               const EXPRESSED = new Set(["actor", "service", "event", "value-stream", "component", "node"]);
-              if (!entry.iconType || !EXPRESSED.has(entry.iconType)) return null;
+              // System Software shares the "component" iconType but is box-only (no icon form).
+              if (!entry.iconType || !EXPRESSED.has(entry.iconType) || shapeKey.includes("system-software")) return null;
               const isIcon = !!element.properties.archimateIconOnly;
               const iconSibling = findShapeByKey(shapeKey.replace(/-box$/, "-icon"));
               const boxSibling = findShapeByKey(shapeKey.replace(/-icon$/, "-box"));

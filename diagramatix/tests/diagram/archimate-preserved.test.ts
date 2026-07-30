@@ -182,6 +182,27 @@ describe("ArchiMate notation form (icon vs box)", () => {
     expect(g("n1").parentId).toBe("loc");
   });
 
+  it("T1088 — a large drawn element keeps its size; typical elements stay ~standard", () => {
+    // Service Realisation Viewpoint shape: Customer = full-width role, Handle Claim = wide process.
+    const els2 = [
+      { id: "r1", type: "business-role", label: "Customer", bounds: { x: 0.01, y: 0.02, w: 0.98, h: 0.22 } },
+      { id: "s1", type: "business-service", label: "Insurance Application Service", bounds: { x: 0.02, y: 0.4, w: 0.17, h: 0.2 } },
+      { id: "s2", type: "business-service", label: "Claim Registration Service", bounds: { x: 0.22, y: 0.4, w: 0.16, h: 0.2 } },
+      { id: "p1", type: "business-process", label: "Close Contract", bounds: { x: 0.02, y: 0.75, w: 0.16, h: 0.18 } },
+      { id: "p2", type: "business-process", label: "Handle Claim", bounds: { x: 0.22, y: 0.75, w: 0.42, h: 0.18 } },
+    ];
+    const d = layoutGenericDiagram({ elements: els2, connections: [] } as never, "archimate", { imageAspect: { w: 688, h: 264 } });
+    const g = (id: string) => d.elements.find((e) => e.id === id)!;
+    // The full-width role and the wide process are much wider than a standard box…
+    expect(g("r1").width, "Customer keeps its full width").toBeGreaterThan(400);
+    expect(g("p2").width, "Handle Claim keeps its width").toBeGreaterThan(250);
+    // …while typical elements stay near standard.
+    expect(g("s1").width).toBeLessThanOrEqual(190);
+    expect(g("p1").width).toBeLessThanOrEqual(160);
+    // The wide process is clearly wider than a standard neighbour.
+    expect(g("p2").width).toBeGreaterThan(g("p1").width * 1.5);
+  });
+
   it("T1086 — an opposing-parallel connector is straightened (its two ends share an absolute coordinate)", () => {
     const els2 = [
       { id: "p1", type: "business-process", label: "P1", bounds: { x: 0.4, y: 0.1, w: 0.12, h: 0.1 } },

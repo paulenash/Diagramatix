@@ -1496,10 +1496,17 @@ export function layoutArchimatePreserved(
   for (const e of ided) {
     const spec = archiShapeForm(e.type, e.notation)!;
     const label = formatLabel(e.label ?? e.name ?? "");
-    // Leaves: 2-line-preferring standard size (archiFitSize — widen to keep ≤2 lines
-    // before expanding). Containers: provisional; hugged around their children below.
-    const sz = isContainer(e.id) ? boxSize(label) : archiFitSize(label);
     const b = validBounds(e.bounds) ? e.bounds : undefined;
+    // Leaf size: replicate the element's DRAWN size (proportional to the image, via the
+    // same adaptive scale as position — the median leaf maps to ~standard), floored at
+    // the 2-line text-fit size. So typical elements stay ~standard while a genuinely
+    // large element (e.g. a full-width role, or a wide process) keeps its size. Containers
+    // are provisional here; they are hugged around their children below.
+    const sz = isContainer(e.id)
+      ? boxSize(label)
+      : b
+        ? (() => { const fit = archiFitSize(label); return { w: Math.max(fit.w, Math.round(b.w * TARGET_W)), h: Math.max(fit.h, Math.round(b.h * TARGET_H)) }; })()
+        : archiFitSize(label);
     // Centre the box on the element's drawn centre (best arrangement fidelity); no
     // bounds → default origin. Containers are repositioned by the grow.
     const cx = b ? OX + clamp01(b.x + b.w / 2) * TARGET_W : OX + sz.w / 2;
