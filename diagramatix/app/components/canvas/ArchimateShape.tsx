@@ -235,11 +235,13 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
       }
       let bg: string;
       if (entry.iconType === "service") {
-        // Stadium / pill shape: rectangle with semicircle ends on the
-        // left and right. The corner radius equals half the height so
-        // the end caps are true semicircles.
-        const r = el.height / 2;
-        bg = `M ${el.x + r} ${el.y} L ${el.x + el.width - r} ${el.y} A ${r} ${r} 0 0 1 ${el.x + el.width - r} ${el.y + el.height} L ${el.x + r} ${el.y + el.height} A ${r} ${r} 0 0 1 ${el.x + r} ${el.y} Z`;
+        // Stadium / pill shape: rectangle with semicircle ends. Drawn 15% shorter than
+        // the element height (a flatter pill), centred vertically — the standard look
+        // for a Service across all layers.
+        const sh = el.height * 0.85;
+        const sy = el.y + (el.height - sh) / 2;
+        const r = sh / 2;
+        bg = `M ${el.x + r} ${sy} L ${el.x + el.width - r} ${sy} A ${r} ${r} 0 0 1 ${el.x + el.width - r} ${sy + sh} L ${el.x + r} ${sy + sh} A ${r} ${r} 0 0 1 ${el.x + r} ${sy} Z`;
       } else if (entry.iconType === "event") {
         // Right bulge (semicircle) + an inward isosceles-triangle notch on the
         // left (apex pointing right; only the two equal sides drawn). Notch depth

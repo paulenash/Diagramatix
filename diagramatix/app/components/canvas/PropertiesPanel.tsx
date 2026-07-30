@@ -2829,14 +2829,18 @@ export function PropertiesPanel({
               </select>
             </div>
             {(() => {
-              // Representation swap — for a concept that has BOTH a box and an icon
-              // (expressed) master in the catalogue, let the user flip between them so a
-              // shape generated as the wrong form can be corrected. Keeps the element's
-              // current size/position; only the rendering + archimateIconOnly change.
-              const isIcon = shapeKey.endsWith("-icon");
-              const boxKey = isIcon ? shapeKey.replace(/-icon$/, "-box") : shapeKey;
-              const iconKey = isIcon ? shapeKey : shapeKey.replace(/-box$/, "-icon");
-              if (boxKey === iconKey || !findShapeByKey(boxKey) || !findShapeByKey(iconKey)) return null;
+              // Representation swap — for any concept whose icon type renders a distinct
+              // EXPRESSED (whole-shape) form, let the user flip box↔icon so a shape
+              // generated as the wrong form can be corrected. Two mechanisms:
+              //  • types with dedicated -box/-icon masters (actor, component, node, business
+              //    service/event) → switch the shapeKey to the sibling master;
+              //  • types where one master renders both via the flag (application/technology
+              //    service + event, value stream) → keep the key, just toggle the flag.
+              const EXPRESSED = new Set(["actor", "service", "event", "value-stream", "component", "node"]);
+              if (!entry.iconType || !EXPRESSED.has(entry.iconType)) return null;
+              const isIcon = !!element.properties.archimateIconOnly;
+              const iconSibling = findShapeByKey(shapeKey.replace(/-box$/, "-icon"));
+              const boxSibling = findShapeByKey(shapeKey.replace(/-icon$/, "-box"));
               const btn = (active: boolean) =>
                 `flex-1 text-xs rounded px-2 py-1 border ${active ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`;
               return (
@@ -2844,11 +2848,11 @@ export function PropertiesPanel({
                   <label className="block text-xs font-medium text-gray-700 mb-1">Representation</label>
                   <div className="flex gap-1" {...stop}>
                     <button type="button" className={btn(!isIcon)}
-                      onClick={() => { if (isIcon) onUpdateProperties(element.id, { shapeKey: boxKey, archimateIconOnly: false }); }}>
+                      onClick={() => { if (isIcon) onUpdateProperties(element.id, { shapeKey: boxSibling?.key ?? shapeKey, archimateIconOnly: false }); }}>
                       Box
                     </button>
                     <button type="button" className={btn(isIcon)}
-                      onClick={() => { if (!isIcon) onUpdateProperties(element.id, { shapeKey: iconKey, archimateIconOnly: true }); }}>
+                      onClick={() => { if (!isIcon) onUpdateProperties(element.id, { shapeKey: iconSibling?.key ?? shapeKey, archimateIconOnly: true }); }}>
                       Icon
                     </button>
                   </div>
