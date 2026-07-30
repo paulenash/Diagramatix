@@ -28,6 +28,7 @@ import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
 import { autoSizeForType, getDefaultSize, wrapText, type AutosizeType } from "@/app/lib/diagram/textMetrics";
 import { archiFitSize } from "@/app/lib/diagram/genericLayout";
+import { isArchiNodeIcon, archiNodeFrontRect } from "@/app/lib/diagram/nodeGeometry";
 
 /** Compute the autosize-driven dimensions for a task or subprocess based on
  *  its label and (optional) task marker. Returns the rounded element size
@@ -541,6 +542,22 @@ function containerAccepts(containerType: SymbolType, childType: SymbolType): boo
   // A vertical swimlane column holds any flowchart symbol except another column.
   if (containerType === "flowchart-vswimlane") return childType.startsWith("flowchart-") && childType !== "flowchart-vswimlane";
   return false;
+}
+
+/** The rectangle a child must be dropped into to be adopted by `b`. For a Node ICON
+ *  (3D box) this is the FRONT rectangle (the trapeziums are decoration, not containment
+ *  — matches generation); for every other container it is the full bounds. */
+function containmentRect(b: DiagramElement): { x: number; y: number; width: number; height: number } {
+  if (isArchiNodeIcon(b.properties?.shapeKey, b.properties?.archimateIconOnly)) {
+    const fr = archiNodeFrontRect(b.x, b.y, b.width, b.height);
+    return { x: fr.x, y: fr.y, width: fr.width, height: fr.height };
+  }
+  return { x: b.x, y: b.y, width: b.width, height: b.height };
+}
+/** Centre-point-in-containment-rect test used by the drag-into-container adoption. */
+function centreInContainer(cx: number, cy: number, b: DiagramElement): boolean {
+  const r = containmentRect(b);
+  return cx >= r.x && cx <= r.x + r.width && cy >= r.y && cy <= r.y + r.height;
 }
 
 function getAllDescendantIds(elements: DiagramElement[], containerId: string): Set<string> {
@@ -3820,9 +3837,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const containers = state.elements.filter(
           (b) => {
             if (!isContainerType(b.type) || !containerAccepts(b.type, newEl.type)) return false;
-            const centreInside =
-              newCx >= b.x && newCx <= b.x + b.width &&
-              newCy >= b.y && newCy <= b.y + b.height;
+            const centreInside = centreInContainer(newCx, newCy, b);
             // For subprocess-expanded: a non-event element placed ON the
             // EP boundary (straddling any edge) is treated as inside, so
             // the downstream EP-grow path picks it up. Without this, an
@@ -3851,9 +3866,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
               return straddleLR || straddleTB;
             }
             if (isNewContainer) return centreInside;
+            const r = containmentRect(b);
             return (
-              newEl.x >= b.x && newEl.x + newEl.width <= b.x + b.width &&
-              newEl.y >= b.y && newEl.y + newEl.height <= b.y + b.height
+              newEl.x >= r.x && newEl.x + newEl.width <= r.x + r.width &&
+              newEl.y >= r.y && newEl.y + newEl.height <= r.y + r.height
             );
           },
         );
@@ -4201,8 +4217,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
                 containerAccepts(b.type, e.type) &&
                 b.id !== id &&
                 !wouldCreateCycle(state.elements, id, b.id) &&
-                cx >= b.x && cx <= b.x + b.width &&
-                cy >= b.y && cy <= b.y + b.height
+                centreInContainer(cx, cy, b)
             );
             // Prefer innermost (smallest) container by type priority.
             // For lanes, also pick smallest so a sublane wins over its
@@ -7900,8 +7915,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           containerAccepts(b.type, initialEl.type) &&
           b.id !== id &&
           !wouldCreateCycle(elements, id, b.id) &&
-          cx >= b.x && cx <= b.x + b.width &&
-          cy >= b.y && cy <= b.y + b.height,
+          centreInContainer(cx, cy, b),
         );
         // Prefer innermost (smallest) EP, then archimate-shape, then the
         // smallest lane (so a sublane wins over its parent lane — issue 1),
