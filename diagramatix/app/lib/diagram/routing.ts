@@ -313,6 +313,34 @@ function chevronTip(w: number, h: number): number {
   return Math.min(h / 2, w * 0.22);
 }
 
+/** Service ICON stadium height factor — MUST match ArchimateShape's service rendering
+ *  (drawn 15% shorter than the element, centred vertically). */
+const ARCHI_SERVICE_H_FACTOR = 0.85;
+
+function isArchiServiceIcon(el: DiagramElement): boolean {
+  return el.type === "archimate-shape" &&
+    el.properties?.archimateIconOnly === true &&
+    typeof el.properties?.shapeKey === "string" &&
+    (el.properties.shapeKey as string).includes("service");
+}
+
+/** Attach point on the reduced Service stadium (15% shorter, centred) rather than the
+ *  full element bounds — so a connector meets the visible pill, not empty space above
+ *  or below it. Top/bottom snap to the stadium edge (x clamped into the straight run);
+ *  left/right snap to the stadium's semicircle tip. */
+function serviceStadiumEdge(ref: Point, el: DiagramElement): Point {
+  const vh = el.height * ARCHI_SERVICE_H_FACTOR;
+  const vy = el.y + (el.height - vh) / 2;
+  const r = vh / 2, eps = 1;
+  if (Math.abs(ref.y - el.y) < eps) // top edge
+    return { x: Math.max(el.x + r, Math.min(el.x + el.width - r, ref.x)), y: vy };
+  if (Math.abs(ref.y - (el.y + el.height)) < eps) // bottom edge
+    return { x: Math.max(el.x + r, Math.min(el.x + el.width - r, ref.x)), y: vy + vh };
+  if (Math.abs(ref.x - el.x) < eps) // left → leftmost stadium point
+    return { x: el.x, y: vy + vh / 2 };
+  return { x: el.x + el.width, y: vy + vh / 2 }; // right → rightmost stadium point
+}
+
 /** Value Stream chevron outline (6 points), clockwise from top-left. */
 function chevronPolygon(el: DiagramElement): Point[] {
   const { x, y } = el;
@@ -352,6 +380,7 @@ function projectToShapeBoundary(ref: Point, el: DiagramElement): Point | null {
   if (isValueStream(el)) {
     return polygonEdgePoint(ref, chevronPolygon(el), { x: el.x + el.width / 2, y: el.y + el.height / 2 });
   }
+  if (isArchiServiceIcon(el)) return serviceStadiumEdge(ref, el);
   return null;
 }
 
