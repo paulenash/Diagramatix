@@ -508,11 +508,17 @@ function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateSh
     const tabW = 10, tabH = H * 0.22;
     const bodyLeft = w / 2 - (bodyW - tabW / 2) / 2; // centre the whole glyph (tabs included)
     const tabX = bodyLeft - tabW / 2;
+    const x2 = bodyLeft + bodyW, yb = my + H;
+    const t1a = my + H * 0.18, t1b = t1a + tabH;
+    const t2a = my + H * 0.55, t2b = t2a + tabH;
+    // Body outline with its LEFT edge BROKEN at the two tab spans, so the body boundary
+    // is not drawn INSIDE the tabs (which sit on that edge).
+    const body = `M ${bodyLeft} ${my} L ${x2} ${my} L ${x2} ${yb} L ${bodyLeft} ${yb} L ${bodyLeft} ${t2b} M ${bodyLeft} ${t2a} L ${bodyLeft} ${t1b} M ${bodyLeft} ${t1a} L ${bodyLeft} ${my}`;
     return (
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-        <rect x={bodyLeft} y={my} width={bodyW} height={H} fill="none" stroke={stroke} strokeWidth={2.6} strokeLinejoin="round" />
-        <rect x={tabX} y={my + H * 0.18} width={tabW} height={tabH} fill="none" stroke={stroke} strokeWidth={2} />
-        <rect x={tabX} y={my + H * 0.55} width={tabW} height={tabH} fill="none" stroke={stroke} strokeWidth={2} />
+        <path d={body} fill="none" stroke={stroke} strokeWidth={2.6} strokeLinejoin="round" strokeLinecap="round" />
+        <rect x={tabX} y={t1a} width={tabW} height={tabH} fill="none" stroke={stroke} strokeWidth={2} />
+        <rect x={tabX} y={t2a} width={tabW} height={tabH} fill="none" stroke={stroke} strokeWidth={2} />
       </svg>
     );
   }
