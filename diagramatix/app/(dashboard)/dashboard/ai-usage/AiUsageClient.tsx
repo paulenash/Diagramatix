@@ -7,9 +7,11 @@ import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { tonesFor } from "@/app/lib/theme/featureColors";
 
 interface Agg {
-  invocations: number;
+  invocations: number;   // RAW attempts (every call)
   success: number;
   failure: number;
+  userAttempts: number;  // quota-metered successes (excl. AI Tidy / Vectorize / Compare)
+  diagramsGenerated: number;
   inTokens: number;
   outTokens: number;
   retries: number;
@@ -110,14 +112,21 @@ export function AiUsageClient(props: Props) {
       </div>
 
       {/* ── Summary cards ── */}
-      <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <Stat label="Invocations" value={fmtInt(summary.invocations)}
+      <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <Stat label="Raw Attempts" value={fmtInt(summary.invocations)}
           sub={`${pct(summary.success, summary.invocations)}% ok · ${fmtInt(summary.failure)} failed`} />
+        <Stat label="User Attempts" value={fmtInt(summary.userAttempts)} sub="quota-metered · excl. AI Tidy" />
+        <Stat label="Diagrams (AI)" value={fmtInt(summary.diagramsGenerated)} sub="actually generated" />
+        <Stat label="Est. cost (USD)" value={fmtCost(summary.cost)} accent={ai} />
         <Stat label="Input tokens" value={fmtTokens(summary.inTokens)} />
         <Stat label="Output tokens" value={fmtTokens(summary.outTokens)} />
         <Stat label="Retries" value={fmtInt(summary.retries)} />
-        <Stat label="Est. cost (USD)" value={fmtCost(summary.cost)} accent={ai} />
+        <Stat label="Successes / Failures" value={`${fmtInt(summary.success)} / ${fmtInt(summary.failure)}`} />
       </div>
+      <p className="mt-2 text-[11px] text-gray-400">
+        <span className="font-medium text-gray-500">Raw Attempts</span> = every AI call (incl. AI Tidy, failures, Compare per model).
+        {" "}<span className="font-medium text-gray-500">User Attempts</span> = quota-consuming successes shown to users (excludes AI Tidy, Vectorize, Compare &amp; failures).
+      </p>
 
       {empty ? (
         <div className="mt-8 text-center text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg py-12">
@@ -195,11 +204,11 @@ export function AiUsageClient(props: Props) {
           {/* ── SuperAdmin: by org + by user ── */}
           {su && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card title="By organisation">
-                <BreakdownTable rows={byOrg} max={Math.max(1, ...byOrg.map((o) => o.invocations))} barColor={ai} metric="invocations" showCost />
+              <Card title="By organisation" note="raw · user attempts · diagrams">
+                <BreakdownTable rows={byOrg} max={Math.max(1, ...byOrg.map((o) => o.invocations))} barColor={ai} metric="invocations" showAttempts />
               </Card>
-              <Card title="Top users" note="who is generating the AI load">
-                <BreakdownTable rows={byUser.slice(0, 12)} max={Math.max(1, ...byUser.map((u) => u.invocations))} barColor={ai} metric="invocations" showCost />
+              <Card title="Top users" note="raw · user attempts · diagrams">
+                <BreakdownTable rows={byUser.slice(0, 12)} max={Math.max(1, ...byUser.map((u) => u.invocations))} barColor={ai} metric="invocations" showAttempts />
               </Card>
             </div>
           )}
@@ -257,12 +266,13 @@ function Legend({ items }: { items: [string, string][] }) {
   );
 }
 
-function BreakdownTable({ rows, max, barColor, metric, showCost }: {
+function BreakdownTable({ rows, max, barColor, metric, showAttempts }: {
   rows: Array<{ name: string } & Agg>;
   max: number;
   barColor: string;
   metric: "invocations";
-  showCost?: boolean;
+  /** Append "User Attempts · Diagrams" to each row (for the per-org / per-user tables). */
+  showAttempts?: boolean;
 }) {
   if (!rows.length) return <p className="text-sm text-gray-400">No data.</p>;
   return (
@@ -272,8 +282,9 @@ function BreakdownTable({ rows, max, barColor, metric, showCost }: {
           <div className="flex items-center justify-between gap-2">
             <span className="text-gray-800 truncate">{r.name}</span>
             <span className="text-xs text-gray-400 shrink-0">
-              {fmtInt(r[metric])} · {fmtTokens(r.inTokens + r.outTokens)} tok
-              {showCost ? <> · <span style={{ color: barColor }}>{fmtCost(r.cost)}</span></> : <> · <span style={{ color: barColor }}>{fmtCost(r.cost)}</span></>}
+              {fmtInt(r[metric])} raw
+              {showAttempts && <> · {fmtInt(r.userAttempts)} attempts · {fmtInt(r.diagramsGenerated)} diagrams</>}
+              {" "}· {fmtTokens(r.inTokens + r.outTokens)} tok · <span style={{ color: barColor }}>{fmtCost(r.cost)}</span>
             </span>
           </div>
           <div className="flex items-center gap-2 mt-1">

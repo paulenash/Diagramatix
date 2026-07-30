@@ -5,7 +5,7 @@ import { prisma } from "@/app/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { makeAiClient, aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
-import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
+import { AI_INVOCATION_POINTS, enterAiContext, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import { buildGenericSystemPrompt } from "@/app/lib/ai/generateDiagramPrompt";
@@ -21,7 +21,8 @@ export async function POST(req: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
-  enterAiContext(await resolveAiRouteContext(session, AI_INVOCATION_POINTS.DiagramGenerate));
+  const aiCtx = await resolveAiRouteContext(session, AI_INVOCATION_POINTS.DiagramGenerate);
+  enterAiContext(aiCtx);
 
   const { prompt, diagramType, attachment, pcfNodeId, model: requestedModel } = await req.json();
   if (!prompt?.trim()) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
@@ -147,6 +148,7 @@ export async function POST(req: Request) {
     }
     // Record AFTER success so failed attempts don't burn the user's quota.
     await recordUsage(session.user.id, "aiAttempts");
+    await recordDiagramGenerated({ userId: aiCtx.userId, orgId: aiCtx.orgId, diagramType, source: "diagram-generate" });
     return NextResponse.json({ parsed, diagramType, model });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

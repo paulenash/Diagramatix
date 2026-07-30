@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 let created: Record<string, unknown>[] = [];
+let diagCreated: Record<string, unknown>[] = [];
 let failNext = false;
 vi.mock("@/app/lib/db", () => ({
   prisma: {
@@ -16,6 +17,13 @@ vi.mock("@/app/lib/db", () => ({
         return data;
       },
     },
+    aiDiagramGeneration: {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        if (failNext) { failNext = false; throw new Error("db down"); }
+        diagCreated.push(data);
+        return data;
+      },
+    },
   },
 }));
 
@@ -23,15 +31,17 @@ import {
   runWithAiContext,
   enterAiContext,
   recordAiInvocation,
+  recordDiagramGenerated,
   AI_INVOCATION_POINTS,
   AI_INVOCATION_POINT_VALUES,
   AI_INVOCATION_POINT_LABELS,
+  AI_USER_METERED_POINTS,
   labelForInvocationPoint,
 } from "@/app/lib/ai/aiTelemetry";
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
-beforeEach(() => { created = []; failNext = false; });
+beforeEach(() => { created = []; diagCreated = []; failNext = false; });
 
 describe("aiTelemetry", () => {
   it("T0986 — records the row merged with the route's ALS context", async () => {
@@ -100,6 +110,31 @@ describe("aiTelemetry", () => {
     // Falls back to the outer sentinel — proving why the old routes logged "unknown".
     expect(created[0].invocationPoint).toBe("unknown");
     expect(created[0].userId).toBeNull();
+  });
+
+  it("T1094 — AI_USER_METERED_POINTS = the 10 quota-metered routes; AI Tidy/Vectorize/Compare excluded", () => {
+    // These MUST match the routes that call recordUsage(userId, "aiAttempts").
+    const expected = new Set([
+      AI_INVOCATION_POINTS.BpmnPlan, AI_INVOCATION_POINTS.BpmnGenerate, AI_INVOCATION_POINTS.BpmnRefine,
+      AI_INVOCATION_POINTS.FlowchartPlan, AI_INVOCATION_POINTS.FlowchartToBpmnRefine,
+      AI_INVOCATION_POINTS.DiagramGenerate, AI_INVOCATION_POINTS.StaffNarrative,
+      AI_INVOCATION_POINTS.MiningDiscover, AI_INVOCATION_POINTS.MiningDiscoverSm, AI_INVOCATION_POINTS.MiningExplain,
+    ]);
+    expect(new Set(AI_USER_METERED_POINTS)).toEqual(expected);
+    // Raw-only points must NOT count as a User Attempt.
+    for (const p of [AI_INVOCATION_POINTS.DictationRefine, AI_INVOCATION_POINTS.IconVectorize, AI_INVOCATION_POINTS.BpmnCompare, AI_INVOCATION_POINTS.ScriptModelCompare, AI_INVOCATION_POINTS.ScriptConformanceReport]) {
+      expect(AI_USER_METERED_POINTS.has(p), `${p} must not be metered`).toBe(false);
+    }
+  });
+
+  it("T1095 — recordDiagramGenerated writes a row and never throws", async () => {
+    await recordDiagramGenerated({ userId: "u1", orgId: "o1", diagramType: "bpmn", source: "bpmn-apply" });
+    expect(diagCreated).toHaveLength(1);
+    expect(diagCreated[0]).toMatchObject({ userId: "u1", orgId: "o1", diagramType: "bpmn", source: "bpmn-apply" });
+    // Null user/org allowed (system); a DB failure is swallowed.
+    failNext = true;
+    await expect(recordDiagramGenerated({ userId: null, orgId: null, diagramType: "flowchart", source: "flowchart-apply" })).resolves.toBeUndefined();
+    expect(diagCreated).toHaveLength(1);
   });
 
   it("T0989 — every invocation point has a label; values are unique", () => {

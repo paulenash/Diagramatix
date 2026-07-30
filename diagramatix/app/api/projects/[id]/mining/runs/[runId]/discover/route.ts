@@ -19,7 +19,7 @@ import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
-import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
+import { enterAiContext, AI_INVOCATION_POINTS, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 import { discoverProcess } from "@/app/lib/mining/discoverProcess";
 import { generateProcessViaAi } from "@/app/lib/mining/aiProcess";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
@@ -90,6 +90,8 @@ export async function POST(req: Request, { params }: Params) {
       return NextResponse.json({ error: `AI generation failed: ${msg}` }, { status: 502 });
     }
     if (userId) await recordUsage(userId, "aiAttempts"); // only after success
+    // "# diagrams generated using AI" — AI mode only (deterministic discovery below isn't "AI").
+    await recordDiagramGenerated({ userId, orgId, diagramType: "bpmn", source: "mining-discover" });
     nameSuffix = "discovered (AI)";
   } else {
     const { plan } = discoverProcess(variants, { edgeThreshold });

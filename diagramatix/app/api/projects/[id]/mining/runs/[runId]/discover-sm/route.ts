@@ -22,7 +22,7 @@ import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
-import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
+import { enterAiContext, AI_INVOCATION_POINTS, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 import { discoverStateMachine } from "@/app/lib/mining/discoverStateMachine";
 import { generateStateMachineViaAi } from "@/app/lib/mining/aiStateMachine";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
@@ -92,6 +92,8 @@ export async function POST(req: Request, { params }: Params) {
       return NextResponse.json({ error: `AI generation failed: ${msg}` }, { status: 502 });
     }
     if (userId) await recordUsage(userId, "aiAttempts"); // only after success
+    // "# diagrams generated using AI" — AI mode only.
+    await recordDiagramGenerated({ userId, orgId, diagramType: "state-machine", source: "mining-discover-sm" });
     nameSuffix = asReference ? "reference (AI)" : "states (AI)";
   } else {
     data = discoverStateMachine(variants);

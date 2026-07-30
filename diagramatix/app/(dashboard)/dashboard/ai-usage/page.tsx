@@ -7,6 +7,7 @@ import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { ratesByModel, costFrom } from "@/app/lib/ai/aiRates";
 import {
   AI_INVOCATION_POINT_VALUES,
+  AI_USER_METERED_POINTS,
   labelForInvocationPoint,
 } from "@/app/lib/ai/aiTelemetry";
 import { AiUsageClient } from "./AiUsageClient";
@@ -20,15 +21,22 @@ import type { Prisma } from "@/app/generated/prisma/client";
  */
 
 interface Agg {
+  /** RAW attempts — every AI call (incl. AI Tidy, failures, Compare per model). */
   invocations: number;
   success: number;
   failure: number;
+  /** USER attempts — successful calls at a quota-metered invocation point
+   *  (excludes AI Tidy / Vectorize / Compare / failures). Derived from the
+   *  AI_USER_METERED_POINTS set. */
+  userAttempts: number;
+  /** # diagrams generated using AI (from the AiDiagramGeneration table). */
+  diagramsGenerated: number;
   inTokens: number;
   outTokens: number;
   retries: number;
   cost: number;
 }
-const blank = (): Agg => ({ invocations: 0, success: 0, failure: 0, inTokens: 0, outTokens: 0, retries: 0, cost: 0 });
+const blank = (): Agg => ({ invocations: 0, success: 0, failure: 0, userAttempts: 0, diagramsGenerated: 0, inTokens: 0, outTokens: 0, retries: 0, cost: 0 });
 
 const RANGE_DAYS: Record<string, number | null> = { "7": 7, "30": 30, "90": 90, "365": 365, all: null };
 
@@ -101,9 +109,11 @@ export default async function AiUsagePage({
     const retries = g._sum.retries ?? 0;
     const cost = costOf(g.model, inTok, outTok);
     const success = g.status === "success";
+    const metered = success && AI_USER_METERED_POINTS.has(g.invocationPoint);
     const bump = (a: Agg) => {
       a.invocations += n;
       if (success) a.success += n; else a.failure += n;
+      if (metered) a.userAttempts += n;
       a.inTokens += inTok;
       a.outTokens += outTok;
       a.retries += retries;
@@ -117,6 +127,16 @@ export default async function AiUsagePage({
     if (!byProvider.has(g.provider)) byProvider.set(g.provider, blank());
     bump(byProvider.get(g.provider)!);
   }
+
+  // # diagrams generated using AI — a separate table (AiDiagramGeneration), so
+  // scope by createdAt + org/user only (no provider/model/point/status filters).
+  const diagWhere: Prisma.AiDiagramGenerationWhereInput = {
+    ...(since ? { createdAt: { gte: since } } : {}),
+    ...(su ? {} : { orgId: activeOrgId }),
+    ...(fOrg ? { orgId: fOrg } : {}),
+    ...(fUser ? { userId: fUser } : {}),
+  };
+  total.diagramsGenerated = await prisma.aiDiagramGeneration.count({ where: diagWhere });
 
   // Time series — bucket by UTC day in JS (low volume; capped for safety).
   const rows = await prisma.aiInvocation.findMany({
@@ -143,8 +163,8 @@ export default async function AiUsagePage({
   let byUser: Array<{ id: string; name: string } & Agg> = [];
   if (su) {
     const [orgGroups, userGroups] = await Promise.all([
-      prisma.aiInvocation.groupBy({ by: ["orgId", "model", "status"], where, _count: { _all: true }, _sum: { inputTokens: true, outputTokens: true, retries: true } }),
-      prisma.aiInvocation.groupBy({ by: ["userId", "model", "status"], where, _count: { _all: true }, _sum: { inputTokens: true, outputTokens: true, retries: true } }),
+      prisma.aiInvocation.groupBy({ by: ["orgId", "model", "status", "invocationPoint"], where, _count: { _all: true }, _sum: { inputTokens: true, outputTokens: true, retries: true } }),
+      prisma.aiInvocation.groupBy({ by: ["userId", "model", "status", "invocationPoint"], where, _count: { _all: true }, _sum: { inputTokens: true, outputTokens: true, retries: true } }),
     ]);
     // model is in the grouping so we can cost each org/user (cost shows wherever
     // tokens do).
@@ -164,6 +184,7 @@ export default async function AiUsagePage({
         const outTok = (g._sum.outputTokens ?? 0) as number;
         a.invocations += n;
         if (g.status === "success") a.success += n; else a.failure += n;
+        if (g.status === "success" && AI_USER_METERED_POINTS.has(g.invocationPoint as string)) a.userAttempts += n;
         a.inTokens += inTok;
         a.outTokens += outTok;
         a.retries += (g._sum.retries ?? 0) as number;
@@ -184,6 +205,14 @@ export default async function AiUsagePage({
     ]);
     const orgName = new Map(orgs.map((o) => [o.id, o.name]));
     const userName = new Map(users.map((u) => [u.id, u.name || u.email]));
+    // Fold in per-org / per-user diagram counts (separate table).
+    const [orgDiag, userDiag] = await Promise.all([
+      prisma.aiDiagramGeneration.groupBy({ by: ["orgId"], where: diagWhere, _count: { _all: true } }),
+      prisma.aiDiagramGeneration.groupBy({ by: ["userId"], where: diagWhere, _count: { _all: true } }),
+    ]);
+    for (const d of orgDiag) { const k = d.orgId ?? "—"; const a = orgMap.get(k); if (a) a.diagramsGenerated += d._count._all; }
+    for (const d of userDiag) { const k = d.userId ?? "—"; const a = userMap.get(k); if (a) a.diagramsGenerated += d._count._all; }
+
     byOrg = [...orgMap.entries()].map(([id, a]) => ({ id, name: id === "—" ? "(no org)" : orgName.get(id) ?? id, ...a }));
     byUser = [...userMap.entries()].map(([id, a]) => ({ id, name: id === "—" ? "(system)" : userName.get(id) ?? id, ...a }));
     byOrg.sort((a, b) => b.invocations - a.invocations);

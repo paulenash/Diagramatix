@@ -9,7 +9,7 @@ import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { isSuperuser } from "@/app/lib/superuser";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
-import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
+import { AI_INVOCATION_POINTS, enterAiContext, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
@@ -21,7 +21,8 @@ export async function POST(req: Request) {
   }
   const _pol = await gateOrgPolicy(session, "allowAi");
   if (_pol) return _pol;
-  enterAiContext(await resolveAiRouteContext(session, AI_INVOCATION_POINTS.BpmnGenerate));
+  const aiCtx = await resolveAiRouteContext(session, AI_INVOCATION_POINTS.BpmnGenerate);
+  enterAiContext(aiCtx);
 
   const { prompt, attachment, pcfNodeId, model: requestedModel } = await req.json();
   if (!prompt?.trim()) {
@@ -83,6 +84,7 @@ export async function POST(req: Request) {
 
     // Record AFTER success so model errors don't burn the user's quota.
     await recordUsage(session.user.id, "aiAttempts");
+    await recordDiagramGenerated({ userId: aiCtx.userId, orgId: aiCtx.orgId, diagramType: "bpmn", source: "bpmn-generate" });
     return NextResponse.json({
       diagramData,
       model,

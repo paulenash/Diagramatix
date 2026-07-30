@@ -5,9 +5,12 @@
  * DiagramData object ready for the canvas. No Sonnet call happens here.
  */
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { layoutFlowchartDiagram, type AiFcElement, type AiFcConnection } from "@/app/lib/diagram/layoutFlowchart";
 import { normaliseFlowchartPlan } from "@/app/lib/ai/planFlowchart";
+import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
+import { recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -62,6 +65,9 @@ export async function POST(req: Request) {
 
   try {
     const diagramData = layoutFlowchartDiagram(normalised);
+    // "# diagrams generated using AI": the Plan-flow diagram is PRODUCED here.
+    const orgId = await tryGetCurrentOrgId(session as never, await cookies());
+    await recordDiagramGenerated({ userId: session.user.id, orgId, diagramType: "flowchart", source: "flowchart-apply" });
     return NextResponse.json({
       diagramData,
       elementCount: normalised.elements.length,

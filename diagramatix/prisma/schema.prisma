@@ -1682,6 +1682,30 @@ model AiInvocation {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// AiDiagramGeneration — one row each time the user actually PRODUCES a diagram
+// via AI (the "# diagrams generated using AI" statistic). Distinct from
+// AiInvocation (which counts every provider call incl. refine/AI-Tidy/failures):
+// this fires only at diagram-producing chokepoints (one-shot Generate, the
+// Plan-flow Apply step — which makes no AI call of its own — Compare per model,
+// and AI-mode Mining discover). Counted per generation event, so regenerating /
+// re-applying onto the same diagram each add a row. userId/orgId are plain
+// nullable strings (no FK) so purges leave history intact; all-scalar → plain
+// prisma.create (no pgPool).
+// ────────────────────────────────────────────────────────────────────────────
+model AiDiagramGeneration {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  userId      String? // caller (null = system)
+  orgId       String? // tenant context, when known
+  diagramType String // "bpmn" | "archimate" | "flowchart" | …
+  source      String // bpmn-generate | diagram-generate | bpmn-apply | flowchart-apply | compare | mining-discover | mining-discover-sm
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([orgId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Editable cost-per-token catalog (USD per 1M tokens), per provider+model. The
 // static defaults live in app/lib/ai/pricing.ts; a SuperAdmin can override any
 // rate here and app/lib/ai/aiRates.ts serves defaults overlaid with these rows.

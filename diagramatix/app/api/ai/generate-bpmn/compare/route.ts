@@ -14,7 +14,7 @@ import {
 import { pickBestModel } from "@/app/lib/ai/pickBestModel";
 import { allModels, resolvedEnvSecret } from "@/app/lib/ai/models";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
-import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
+import { enterAiContext, AI_INVOCATION_POINTS, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 
 /**
  * SuperAdmin "Full model comparison" for a BPMN AI prompt.
@@ -151,6 +151,8 @@ export async function POST(req: Request) {
         elements: res.plan.elements.length, connections: res.plan.connections.length,
         issues: issues.length, summary: summariseConformance(issues), diagramId: saved.id,
       });
+      // "# diagrams generated using AI": Compare produces one saved diagram per model.
+      await recordDiagramGenerated({ userId: current.userId, orgId: current.orgId, diagramType: "bpmn", source: "compare" });
       dataByModel.set(m.id, data);
     } catch (e) {
       results.push({ model: m.id, label: m.label, ok: false, ms: Date.now() - t0, error: e instanceof Error ? e.message : String(e) });

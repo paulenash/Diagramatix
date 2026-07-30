@@ -218,6 +218,31 @@ export function UsagePopover({
         <div className="flex-1 overflow-auto px-5 py-4">
           {loading && <p className="text-xs text-gray-500">Loading…</p>}
           {error && <p className="text-xs text-red-700">{error}</p>}
+          {snapshot && (() => {
+            // AI headline: attempts left this month + diagrams generated. Attempts
+            // left is derived from the aiAttempts row (limit − current); the reset
+            // date is periodEndsAt; diagrams come from the AiDiagramGeneration table.
+            const ai = snapshot.metrics.find((m) => m.metric === "aiAttempts");
+            if (!ai) return null;
+            const monthly = !!ai.periodEndsAt;
+            const left = ai.limit === null ? null : Math.max(0, ai.limit - ai.current);
+            const periodWord = monthly ? "this month" : "lifetime";
+            return (
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[11px] text-gray-500">AI attempts left ({periodWord})</p>
+                  <p className={`text-lg font-semibold ${ai.limit !== null && left === 0 ? "text-red-700" : "text-gray-900"}`}>
+                    {ai.limit === null ? "Unlimited" : `${left} of ${ai.limit}`}
+                  </p>
+                  {ai.periodEndsAt && <p className="text-[10px] text-gray-500">resets {ai.periodEndsAt}</p>}
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[11px] text-gray-500">Diagrams generated ({periodWord})</p>
+                  <p className="text-lg font-semibold text-gray-900">{snapshot.diagramsThisPeriod}</p>
+                </div>
+              </div>
+            );
+          })()}
           {snapshot && (
             <table className="w-full text-xs">
               <thead className="border-b border-gray-200">

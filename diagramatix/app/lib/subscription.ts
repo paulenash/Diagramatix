@@ -671,6 +671,10 @@ export interface UsageSnapshot {
     grantedAt: string | null;
   } | null;
   metrics: UsageMetricRow[];
+  /** "# diagrams generated using AI" by this user in the CURRENT aiAttempts
+   *  period (this month for monthly tiers, lifetime for a lifetime counter).
+   *  From the AiDiagramGeneration table — distinct from AI attempts. */
+  diagramsThisPeriod: number;
   /** Per-tier feature access for the effective tier (SuperAdmin → all true).
    *  Drives hiding of feature launch buttons / example galleries and greying
    *  of OrgAdmin tiles. */
@@ -775,6 +779,15 @@ export async function getUsageSnapshot(
     });
   }
 
+  // "# diagrams generated using AI" this period — counted from the moment the
+  // current aiAttempts period started (this month for monthly tiers; all-time
+  // for a lifetime counter or when no tier). Independent of the attempts count.
+  const aiPeriodKey = tier ? periodKeyForEventMetric(user, tier, "aiAttempts", now) : "all-time";
+  const aiPeriodStart = aiPeriodKey === "all-time" ? undefined : new Date(aiPeriodKey + "T00:00:00.000Z");
+  const diagramsThisPeriod = await prisma.aiDiagramGeneration.count({
+    where: { userId: user.id, ...(aiPeriodStart ? { createdAt: { gte: aiPeriodStart } } : {}) },
+  });
+
   // Underlying tier — only worth surfacing to the UI when it actually
   // differs from the effective tier (i.e. a comp is overriding it).
   // When effective === underlying, the UI just shows one badge.
@@ -797,6 +810,7 @@ export async function getUsageSnapshot(
         }
       : null,
     metrics: rows,
+    diagramsThisPeriod,
     entitlements: entitlementsForLevel(tier, admin),
   };
 }

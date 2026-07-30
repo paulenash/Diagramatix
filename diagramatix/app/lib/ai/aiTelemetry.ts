@@ -41,6 +41,28 @@ export type AiInvocationPoint =
 /** All labels, for tests + the report's invocation-point filter. */
 export const AI_INVOCATION_POINT_VALUES: string[] = Object.values(AI_INVOCATION_POINTS);
 
+/**
+ * Invocation points that CONSUME a "User Attempt" — i.e. the routes that gate +
+ * `recordUsage(userId, "aiAttempts")` on success. Used to DERIVE "User Attempts"
+ * from AiInvocation rows in the usage report (a success at one of these points =
+ * one User Attempt). Everything NOT in this set is a Raw Attempt only: AI Tidy
+ * (`dictation.refine`), Icon Vectorize, SuperAdmin Compare, and the offline
+ * `script.*` harnesses. MUST stay in lock-step with the routes that call
+ * `recordUsage(..., "aiAttempts")` — guarded by a test.
+ */
+export const AI_USER_METERED_POINTS: ReadonlySet<string> = new Set<string>([
+  AI_INVOCATION_POINTS.BpmnPlan,
+  AI_INVOCATION_POINTS.BpmnGenerate,
+  AI_INVOCATION_POINTS.BpmnRefine,
+  AI_INVOCATION_POINTS.FlowchartPlan,
+  AI_INVOCATION_POINTS.FlowchartToBpmnRefine,
+  AI_INVOCATION_POINTS.DiagramGenerate,
+  AI_INVOCATION_POINTS.StaffNarrative,
+  AI_INVOCATION_POINTS.MiningDiscover,
+  AI_INVOCATION_POINTS.MiningDiscoverSm,
+  AI_INVOCATION_POINTS.MiningExplain,
+]);
+
 /** Friendly display names for the report, keyed by the stored value. */
 export const AI_INVOCATION_POINT_LABELS: Record<string, string> = {
   [AI_INVOCATION_POINTS.BpmnPlan]: "BPMN Plan",
@@ -137,5 +159,35 @@ export async function recordAiInvocation(row: AiInvocationInput): Promise<void> 
     });
   } catch (e) {
     console.error("[ai-telemetry] failed to record", row.provider, row.model, e instanceof Error ? e.message : e);
+  }
+}
+
+/** One "# diagrams generated using AI" statistic per generation event. Distinct
+ *  from recordAiInvocation (which counts every provider call incl. refine / AI
+ *  Tidy / failures): this fires ONLY when the user actually produces a diagram
+ *  (one-shot Generate, the Plan-flow Apply step, Compare per model, AI-mode
+ *  Mining discover). Counted per event — regenerating / re-applying the same
+ *  diagram each add a row. Unlike recordAiInvocation, this has no AsyncLocalStorage
+ *  context to read (some chokepoints — e.g. apply-layout — make no AI call), so
+ *  the caller passes userId/orgId explicitly. NEVER throws. */
+export interface DiagramGeneratedInput {
+  userId?: string | null;
+  orgId?: string | null;
+  diagramType: string;
+  /** bpmn-generate | diagram-generate | bpmn-apply | flowchart-apply | compare | mining-discover | mining-discover-sm */
+  source: string;
+}
+export async function recordDiagramGenerated(row: DiagramGeneratedInput): Promise<void> {
+  try {
+    await prisma.aiDiagramGeneration.create({
+      data: {
+        userId: row.userId ?? null,
+        orgId: row.orgId ?? null,
+        diagramType: row.diagramType,
+        source: row.source,
+      },
+    });
+  } catch (e) {
+    console.error("[ai-telemetry] failed to record diagram generation", row.source, e instanceof Error ? e.message : e);
   }
 }

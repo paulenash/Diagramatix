@@ -5,11 +5,14 @@
  * DiagramData object ready for the canvas. No Sonnet call happens here.
  */
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { validatePlan } from "@/app/lib/ai/planSchema";
 import { normaliseAiPlan } from "@/app/lib/ai/planBpmn";
 import { isSuperuser } from "@/app/lib/superuser";
+import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
+import { recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 // Diagnostic writer — stderr only (no file I/O) to avoid Windows file-lock
 // contention under load.
 function trace(line: string) {
@@ -79,6 +82,10 @@ export async function POST(req: Request) {
     const diagramData = layoutBpmnDiagram(normalised.elements, normalised.connections,
       { promptLabel, preservePositions, imageAspect, mode });
     trace(`[apply-layout] ok in ${Date.now() - t0}ms: ${diagramData.elements.length} rendered elements, ${diagramData.connectors.length} connectors`);
+    // "# diagrams generated using AI": the Plan-flow diagram is PRODUCED here
+    // (Phase 2). No AI call happens at this step, so resolve org directly.
+    const orgId = await tryGetCurrentOrgId(session as never, await cookies());
+    await recordDiagramGenerated({ userId: session.user.id, orgId, diagramType: "bpmn", source: "bpmn-apply" });
     return NextResponse.json({
       diagramData,
       elementCount: normalised.elements.length,
