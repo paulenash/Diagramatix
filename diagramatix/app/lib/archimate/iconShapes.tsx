@@ -77,8 +77,17 @@ export interface ArcPrim extends BasePrim { type: "arc"; cx: number; cy: number;
 /** A regular polygon (Pentagon = sides 5, Hexagon = sides 6, …). Resizable via
  *  `r` (circumradius) and rotatable via `rotation` (degrees; 0 = first vertex up). */
 export interface PolygonPrim extends BasePrim { type: "polygon"; cx: number; cy: number; r: number; sides: number; rotation?: number; }
+/** A parallelogram — (x,y) = top-left vertex, `w`×`h` the edge lengths, `slant`
+ *  the rightward shift of the BOTTOM edge (lean). Resizable in both directions. */
+export interface ParallelogramPrim extends BasePrim { type: "parallelogram"; x: number; y: number; w: number; h: number; slant: number; }
 
-export type IconPrimitive = LinePrim | PathPrim | RectPrim | TrianglePrim | CirclePrim | EllipsePrim | ArcPrim | PolygonPrim;
+export type IconPrimitive = LinePrim | PathPrim | RectPrim | TrianglePrim | CirclePrim | EllipsePrim | ArcPrim | PolygonPrim | ParallelogramPrim;
+
+/** The four vertices of a parallelogram in the 0..100 box (top-left, top-right,
+ *  bottom-right, bottom-left). Shared by the renderer + the editor. */
+export function parallelogramPoints(p: { x: number; y: number; w: number; h: number; slant: number }): [number, number][] {
+  return [[p.x, p.y], [p.x + p.w, p.y], [p.x + p.w + p.slant, p.y + p.h], [p.x + p.slant, p.y + p.h]];
+}
 
 export interface CustomIcon { primitives: IconPrimitive[]; }
 
@@ -193,6 +202,11 @@ function validateOne(raw: unknown, i: number): IconPrimitive | null {
       const cx = coord(o.cx), cy = coord(o.cy);
       if (cx === null || cy === null) return null;
       return { ...base, type: "polygon", cx, cy, r: num(o.r, 0, 0, 140), sides: Math.round(num(o.sides, 5, 3, 12)), rotation: isFiniteNum(o.rotation) ? o.rotation : undefined };
+    }
+    case "parallelogram": {
+      const x = coord(o.x), y = coord(o.y);
+      if (x === null || y === null) return null;
+      return { ...base, type: "parallelogram", x, y, w: num(o.w, 0, 0, 140), h: num(o.h, 0, 0, 140), slant: num(o.slant, 12, -90, 90) };
     }
     default: return null;
   }
@@ -357,6 +371,10 @@ export function drawCustomIcon(
       }
       case "polygon": {
         const pts = polygonPoints(p.cx, p.cy, p.r, p.sides, p.rotation ?? 0).map(([x, y]) => `${mx(x)},${my(y)}`).join(" ");
+        return <polygon key={key} points={pts} {...common} />;
+      }
+      case "parallelogram": {
+        const pts = parallelogramPoints(p).map(([x, y]) => `${mx(x)},${my(y)}`).join(" ");
         return <polygon key={key} points={pts} {...common} />;
       }
     }

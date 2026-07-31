@@ -4,6 +4,7 @@ import {
   validateIconPrimitives,
   drawCustomIcon,
   polygonPoints,
+  parallelogramPoints,
   type IconPrimitive,
 } from "@/app/lib/archimate/iconShapes";
 
@@ -47,6 +48,17 @@ describe("Custom icon shapes (Icon Library)", () => {
     const [vx, vy] = polygonPoints(50, 50, 26, 5, 0)[0];
     expect(Math.round(vx)).toBe(50);
     expect(vy).toBeLessThan(50);
+  });
+
+  // T1110 — parallelogram: validated, rendered as <polygon>, 4 slanted vertices.
+  it("T1110: parallelogram primitive — validated + rendered with a leaning bottom edge", () => {
+    const [pg] = validateIconPrimitives([{ type: "parallelogram", x: 30, y: 35, w: 40, h: 30, slant: 12, z: 0, strokeWidth: 6, filled: false }]);
+    expect(pg.type).toBe("parallelogram");
+    expect((pg as Extract<IconPrimitive, { type: "parallelogram" }>).slant).toBe(12);
+    const pts = parallelogramPoints({ x: 30, y: 35, w: 40, h: 30, slant: 12 });
+    // top edge at y=35, bottom edge at y=65 shifted right by slant
+    expect(pts).toEqual([[30, 35], [70, 35], [82, 65], [42, 65]]);
+    expect(draw([{ type: "parallelogram", x: 30, y: 35, w: 40, h: 30, slant: 12, z: 0, strokeWidth: 6, filled: false }])).toContain("<polygon");
   });
 
   // T1005 — each primitive renders the expected SVG node type; z-order ascending.

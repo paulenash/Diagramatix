@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   drawCustomIcon,
   polygonPoints,
+  parallelogramPoints,
   DEFAULT_STROKE_WIDTH,
   type IconPrimitive,
   type PathSeg,
@@ -44,6 +45,7 @@ function defaultPrim(type: IconPrimitive["type"], z: number): IconPrimitive {
     case "ellipse": return { ...base, type: "ellipse", cx: 50, cy: 50, rx: 28, ry: 18 };
     case "arc": return { ...base, type: "arc", cx: 50, cy: 52, r: 24, a0: 180, a1: 360 };
     case "polygon": return { ...base, type: "polygon", cx: 50, cy: 50, r: 26, sides: 5, rotation: 0 };
+    case "parallelogram": return { ...base, type: "parallelogram", x: 30, y: 35, w: 40, h: 30, slant: 12 };
   }
 }
 
@@ -91,6 +93,13 @@ function handlesFor(p: IconPrimitive): Handle[] {
         { id: "r", x: rmx, y: rmy, control: true, apply: (q, x, y) => { const r = q as typeof p; return { ...r, r: Math.max(1, dist(x, y, r.cx, r.cy)) }; } },
       ];
     }
+    case "parallelogram": return [
+      { id: "o", x: p.x, y: p.y, apply: (q, x, y) => ({ ...(q as typeof p), x, y }) },
+      // corner handle at the bottom-right vertex — resizes w (horizontal) AND h (vertical)
+      { id: "s", x: p.x + p.w + p.slant, y: p.y + p.h, apply: (q, x, y) => { const r = q as typeof p; return { ...r, w: Math.max(1, round1(x - r.slant - r.x)), h: Math.max(1, round1(y - r.y)) }; } },
+      // slant/lean handle at the bottom-left vertex
+      { id: "k", x: p.x + p.slant, y: p.y + p.h, control: true, apply: (q, x) => { const r = q as typeof p; return { ...r, slant: round1(x - r.x) }; } },
+    ];
     case "polygon": {
       const rad = Math.PI / 180;
       const dir = ((p.rotation ?? 0) - 90) * rad;         // first-vertex direction
@@ -123,7 +132,7 @@ function handlesFor(p: IconPrimitive): Handle[] {
   }
 }
 
-const PRIM_TYPES: IconPrimitive["type"][] = ["line", "path", "rect", "triangle", "circle", "ellipse", "arc"];
+const PRIM_TYPES: IconPrimitive["type"][] = ["line", "path", "rect", "triangle", "circle", "ellipse", "arc", "parallelogram"];
 
 // ── Translate a primitive by (dx,dy) in the 0..100 box ───────────────
 function translatePrim(p: IconPrimitive, dx: number, dy: number): IconPrimitive {
@@ -136,6 +145,7 @@ function translatePrim(p: IconPrimitive, dx: number, dy: number): IconPrimitive 
     case "ellipse": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
     case "arc": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
     case "polygon": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
+    case "parallelogram": return { ...p, x: r1(p.x + dx), y: r1(p.y + dy) };
     case "path": return { ...p, segments: p.segments.map((s) => {
       if (s.t === "M" || s.t === "L") return { ...s, x: r1(s.x + dx), y: r1(s.y + dy) };
       if (s.t === "Q") return { ...s, cx: r1(s.cx + dx), cy: r1(s.cy + dy), x: r1(s.x + dx), y: r1(s.y + dy) };
@@ -155,6 +165,7 @@ function primBBox(p: IconPrimitive): { minX: number; minY: number; maxX: number;
     case "ellipse": pts.push([p.cx - p.rx, p.cy - p.ry], [p.cx + p.rx, p.cy + p.ry]); break;
     case "arc": pts.push([p.cx - p.r, p.cy - p.r], [p.cx + p.r, p.cy + p.r]); break;
     case "polygon": for (const v of polygonPoints(p.cx, p.cy, p.r, p.sides, p.rotation ?? 0)) pts.push(v); break;
+    case "parallelogram": for (const v of parallelogramPoints(p)) pts.push(v); break;
     case "path": for (const s of p.segments) {
       if ("x" in s) pts.push([s.x, s.y]);
       if (s.t === "Q") pts.push([s.cx, s.cy]);
