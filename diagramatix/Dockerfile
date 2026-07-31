@@ -12,11 +12,13 @@
 #                runtime), and the Prisma schema (so prisma migrate deploy
 #                can be invoked separately from CI before swap).
 #
-# Node 20 LTS sidesteps the Node 24 / Turbopack issue we hit locally.
+# Node 24 (current LTS line locally too — the April-2026 Turbopack dev-mode
+# hang that pinned us to Node 20 was a Next/Turbopack bug, fixed upstream;
+# re-verified `next dev` starts clean on Node 24.14 + Next 16.1.6, 2026-07-31).
 # Alpine base keeps the image ~150 MB instead of ~600 MB on Debian slim.
 
 # ─── Stage 1: deps ─────────────────────────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 
 # Prisma 7 needs OpenSSL on Alpine to run the query engine at build time
@@ -38,7 +40,7 @@ RUN npm ci --ignore-scripts
 RUN npx prisma generate
 
 # ─── Stage 2: builder ──────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 
@@ -61,7 +63,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # ─── Stage 3: runner ───────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 
 # OpenSSL for the Prisma query engine at runtime. libc6-compat for any

@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 # OIDC federation. The `id-token: write` permission lets this job request
-# a short-lived OIDC token GitHub mints; `azure/login@v2` trades that
+# a short-lived OIDC token GitHub mints; `azure/login@v3` trades that
 # token for an Azure access token via the federated credential configured
 # on the AAD app registration named in `AZURE_CLIENT_ID`.
 #
@@ -69,7 +69,7 @@ jobs:
           echo "Commit count: $COUNT"
 
       - name: Azure login (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -82,7 +82,7 @@ jobs:
         run: az acr login --name "$ACR_NAME"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build and push image
         uses: docker/build-push-action@v6
@@ -118,10 +118,10 @@ jobs:
           echo "::add-mask::$URL"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Node 22
+      - name: Set up Node 24
         uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: diagramatix/package-lock.json
 
