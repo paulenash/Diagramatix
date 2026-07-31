@@ -3053,12 +3053,12 @@ export function DiagramEditor({
               </button>
             </div>
 
-            {/* Space tools — BPMN + state-machine only. Insert Space drops
+            {/* Space tools — BPMN, state-machine + ArchiMate. Insert Space drops
                 one green marker at the viewport centre (then Shift+drag to
                 push elements apart); Remove Space drops the two red markers
                 (reposition, then Enter to collapse the highlighted band).
                 Escape exits the gesture. */}
-            {(diagramType === "bpmn" || diagramType === "state-machine") && (
+            {(diagramType === "bpmn" || diagramType === "state-machine" || diagramType === "archimate") && (
               <div className="relative" ref={spaceDropdownRef}>
                 <button
                   onClick={() => setSpaceDropdownOpen(prev => !prev)}
@@ -3997,8 +3997,8 @@ export function DiagramEditor({
           parentDiagramName={parentDiagram?.name}
           showValueDisplay={showValueDisplay}
           showBottleneck={showBottleneck}
-          onInsertSpace={(diagramType === "bpmn" || diagramType === "state-machine") ? insertSpace : undefined}
-          onRemoveSpace={(diagramType === "bpmn" || diagramType === "state-machine") ? removeSpace : undefined}
+          onInsertSpace={(diagramType === "bpmn" || diagramType === "state-machine" || diagramType === "archimate") ? insertSpace : undefined}
+          onRemoveSpace={(diagramType === "bpmn" || diagramType === "state-machine" || diagramType === "archimate") ? removeSpace : undefined}
           onAddSelfTransition={diagramType === "state-machine" ? addSelfTransition : undefined}
         />
 
