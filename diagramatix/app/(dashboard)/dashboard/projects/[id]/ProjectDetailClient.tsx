@@ -714,7 +714,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   // SharePoint: which project format is being exported (drives the folder
   // picker), whether the import file-picker is open, and a brief busy flag.
   const [spExportFormat, setSpExportFormat] = useState<null | "json" | "xml" | "visio">(null);
-  const [spImportFmt, setSpImportFmt] = useState<null | "json" | "xml" | "visio" | "bpmn">(null);
+  const [spImportFmt, setSpImportFmt] = useState<null | "json" | "xml" | "visio" | "bpmn" | "bundle">(null);
   const [spBusy, setSpBusy] = useState(false);
   // Import-progress modal state (mirrors the dashboard's import flow).
   const [importing, setImporting] = useState(false);
@@ -1056,7 +1056,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   // Open a project export file from SharePoint and import it as a new project.
   // Open a file from SharePoint and import it by the chosen format:
   // json/xml → new project; visio → bulk Visio dialog; bpmn → BPMN import.
-  async function handleImportFromSharePoint(fmt: "json" | "xml" | "visio" | "bpmn", sel: { driveId: string; itemId: string | null; name: string }) {
+  async function handleImportFromSharePoint(fmt: "json" | "xml" | "visio" | "bpmn" | "bundle", sel: { driveId: string; itemId: string | null; name: string }) {
     if (!sel.itemId) return;
     setSpBusy(true);
     try {
@@ -1068,6 +1068,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       if (fmt === "json") await handleAppendJsonFile(file);
       else if (fmt === "xml") await handleImportFile(file, "xml");
       else if (fmt === "visio") await handleImportVisioFile(file);
+      else if (fmt === "bundle") await handleImportBundleFile(file);
       else await handleImportBpmnFile(file);
     } catch (err) {
       setSpBusy(false);
@@ -2614,6 +2615,9 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                                         <button className={itemCls} onClick={() => { close(); importXmlInputRef.current?.click(); }}>XML</button>
                                         <button className={`${itemCls} disabled:opacity-50`} disabled={visioImportInProgress} onClick={() => { close(); setImportVisioError(""); importVisioInputRef.current?.click(); }} title="Import one or more pages from a Visio .vsdx file as separate diagrams">{visioImportInProgress ? "Visio (importing…)" : "Visio"}</button>
                                         <button className={`${itemCls} disabled:opacity-50`} disabled={visioImportInProgress} onClick={() => { close(); importBpmnInputRef.current?.click(); }} title="Import an OMG BPMN 2.0 .bpmn file as a new diagram">{visioImportInProgress ? "BPMN (importing…)" : "BPMN"}</button>
+                                        {isAdmin && !superAdminHidden && (
+                                          <button className={`${itemCls} text-red-700 hover:bg-red-50`} onClick={() => { close(); importBundleInputRef.current?.click(); }} title="SuperAdmin only — import a Diagram Bundle (.bundle.json): recreates the diagram with its AI prompt, plan, comparison matrix & per-model diagrams as a new diagram here.">AI Diagram Bundle</button>
+                                        )}
                                       </>
                                     )}
                                   </div>
@@ -2650,6 +2654,9 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                                         <button className={itemCls} onClick={() => { close(); setSpImportFmt("xml"); }}>XML</button>
                                         <button className={itemCls} onClick={() => { close(); setSpImportFmt("visio"); }}>Visio (.vsdx)</button>
                                         <button className={itemCls} onClick={() => { close(); setSpImportFmt("bpmn"); }}>BPMN</button>
+                                        {isAdmin && !superAdminHidden && (
+                                          <button className={`${itemCls} text-red-700 hover:bg-red-50`} onClick={() => { close(); setSpImportFmt("bundle"); }} title="SuperAdmin only — import a Diagram Bundle (.bundle.json) from SharePoint as a new diagram here.">AI Diagram Bundle</button>
+                                        )}
                                       </>
                                     )}
                                   </div>
@@ -2669,15 +2676,6 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               >
                 + New Diagram
               </button>
-              {isAdmin && !superAdminHidden && (
-                <button
-                  onClick={() => importBundleInputRef.current?.click()}
-                  className="px-3 py-1 border border-red-300 text-red-700 rounded-md hover:bg-red-50 text-xs font-medium"
-                  title="SuperAdmin only — import a Diagram Bundle (.bundle.json): recreates the diagram with its AI prompt, plan, comparison matrix & per-model diagrams as a new diagram here."
-                >
-                  Import Bundle
-                </button>
-              )}
               {ent.apqc && aiAllowed && (
               <button
                 onClick={() => setShowPcfCreate(true)}
@@ -2926,14 +2924,14 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
 
       {/* SharePoint folder picker (project export) / file picker (project import) */}
       {(spExportFormat || spImportFmt) && (() => {
-        const importExt: Record<"json" | "xml" | "visio" | "bpmn", string> = { json: ".json", xml: ".xml", visio: ".vsdx", bpmn: ".bpmn" };
+        const importExt: Record<"json" | "xml" | "visio" | "bpmn" | "bundle", string> = { json: ".json", xml: ".xml", visio: ".vsdx", bpmn: ".bpmn", bundle: ".json" };
         return (
           <SharePointPicker
             mode={spExportFormat ? "folder" : "file"}
             title={
               spExportFormat
                 ? `Save project ${spExportFormat === "visio" ? "Visio" : spExportFormat.toUpperCase()} to SharePoint`
-                : `Open a ${spImportFmt === "visio" ? "Visio (.vsdx)" : spImportFmt === "bpmn" ? "BPMN (.bpmn)" : spImportFmt?.toUpperCase()} file from SharePoint`
+                : `Open a ${spImportFmt === "visio" ? "Visio (.vsdx)" : spImportFmt === "bpmn" ? "BPMN (.bpmn)" : spImportFmt === "bundle" ? "AI Diagram Bundle (.json)" : spImportFmt?.toUpperCase()} file from SharePoint`
             }
             confirmLabel={spExportFormat ? "Save here" : "Open"}
             fileExtensions={spImportFmt ? [importExt[spImportFmt]] : undefined}

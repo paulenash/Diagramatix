@@ -59,7 +59,7 @@ export async function POST(req: Request) {
   const createDiagram = async (d: BundledDiagram): Promise<string> => {
     const row = await prisma.diagram.create({
       data: {
-        name: d.name, type: d.type,
+        name: `${d.name} (import)`, type: d.type,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: d.data as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
     const aiComparison = remapAiComparison(bundle.diagram.aiComparison, diagramIdMap);
     const main = await prisma.diagram.create({
       data: {
-        name: bundle.diagram.name, type: bundle.diagram.type,
+        name: `${bundle.diagram.name} (import)`, type: bundle.diagram.type,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: data as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
