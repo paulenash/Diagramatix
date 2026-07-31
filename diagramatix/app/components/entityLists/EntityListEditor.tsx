@@ -66,6 +66,11 @@ export function EntityListEditor({
     const name = editVal.trim(); if (!name) { setEditId(null); return; }
     if (await call(`${nodesUrl}/${id}`, "PUT", { name })) setEditId(null);
   }
+  /** Move a node between levels / among siblings (promote = out-dent, demote =
+   *  in-dent, up/down = reorder). Server re-levels the whole moved subtree. */
+  async function move(id: string, action: "promote" | "demote" | "up" | "down") {
+    await call(`${nodesUrl}/${id}`, "PUT", { action });
+  }
 
   // ── Flat list (Participants / IT Systems) ──────────────────────────
   if (flat) {
@@ -137,6 +142,18 @@ export function EntityListEditor({
   // ── Hierarchy (Org Structure) ──────────────────────────────────────
   const withKids = idsWithChildren(suggestions);
   const visible = visibleSuggestions(suggestions, collapsed);
+  // Sibling groups (suggestions are already sorted by sortOrder within a parent)
+  // — used to bound the move controls: index 0 can't move up / demote; last
+  // can't move down; a top-level node can't promote.
+  const sibsByParent = new Map<string | null, string[]>();
+  for (const s of suggestions) {
+    const arr = sibsByParent.get(s.parentId) ?? [];
+    arr.push(s.id); sibsByParent.set(s.parentId, arr);
+  }
+  const sibIndex = (n: { id: string; parentId: string | null }) => {
+    const arr = sibsByParent.get(n.parentId) ?? [];
+    return { idx: arr.indexOf(n.id), count: arr.length };
+  };
   return (
     <div className="space-y-0.5">
       {err && <p className="text-[10px] text-red-500">{err}</p>}
@@ -164,8 +181,15 @@ export function EntityListEditor({
           ) : (
             <span className="flex-1 text-gray-800">{n.name}</span>
           )}
-          {canEdit && editId !== n.id && (
-            <span className="opacity-0 group-hover:opacity-100 flex gap-1">
+          {canEdit && editId !== n.id && (() => {
+            const { idx, count } = sibIndex(n);
+            const mv = "text-gray-400 hover:text-blue-600 px-0.5 leading-none disabled:opacity-25 disabled:hover:text-gray-400";
+            return (
+            <span className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
+              <button disabled={busy || n.parentId === null} onClick={() => move(n.id, "promote")} title="Promote — out-dent a level" className={mv}>◀</button>
+              <button disabled={busy || idx <= 0} onClick={() => move(n.id, "demote")} title="Demote — in-dent under the previous entry" className={mv}>▶</button>
+              <button disabled={busy || idx <= 0} onClick={() => move(n.id, "up")} title="Move up" className={mv}>▲</button>
+              <button disabled={busy || idx < 0 || idx >= count - 1} onClick={() => move(n.id, "down")} title="Move down" className={mv}>▼</button>
               {n.level !== "Role" && (
                 <button onClick={() => { setAddParent(n.id); setAddVal(""); setCollapsed((prev) => { const nx = new Set(prev); nx.delete(n.id); return nx; }); }} title="Add child"
                   className="text-blue-400 hover:text-blue-600 px-0.5">+{ENTITY_NODE_LEVEL_LABELS[childLevelFor(n.level)]}</button>
@@ -173,7 +197,8 @@ export function EntityListEditor({
               <button onClick={() => { setEditId(n.id); setEditVal(n.name); }} className="text-gray-400 hover:text-gray-700 px-0.5">Edit</button>
               <button onClick={() => setConfirm({ id: n.id, name: n.name })} className="text-red-400 hover:text-red-600 px-0.5">Del</button>
             </span>
-          )}
+            );
+          })()}
           {addParent === n.id && (
             <input autoFocus value={addVal} onChange={(e) => setAddVal(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") addNode(n.id, childLevelFor(n.level)); if (e.key === "Escape") setAddParent("top"); }}

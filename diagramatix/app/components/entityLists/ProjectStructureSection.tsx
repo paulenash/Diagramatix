@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { EntityListEditor } from "@/app/components/entityLists/EntityListEditor";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { PromptDialog } from "@/app/components/PromptDialog";
 import {
   ENTITY_LIST_KIND_LABELS, STRUCTURE_LIST_KINDS,
   type EntityListDTO, type EntityListKind,
@@ -28,6 +29,7 @@ export function ProjectStructureSection({ projectId, canEdit }: { projectId: str
   const [note, setNote] = useState<string | null>(null);
   const [confirmReplace, setConfirmReplace] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [namingBuild, setNamingBuild] = useState(false);
 
   const refresh = useCallback(async () => {
     const [lRes, aRes] = await Promise.all([fetch(basePath), fetch(`${projectBase}/adopt-structure`)]);
@@ -52,6 +54,24 @@ export function ProjectStructureSection({ projectId, canEdit }: { projectId: str
       if (res.status === 409) { setConfirmReplace(chosen); return; }
       if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? "Adopt failed"); return; }
       setChosen(""); await refresh();
+    } finally { setBusy(false); }
+  }
+
+  async function buildFromBpmn(name: string) {
+    setBusy(true); setErr(null); setNote(null);
+    try {
+      const res = await fetch(`${projectBase}/build-org-structure`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() || undefined }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(j.error ?? "Populate failed"); return; }
+      const a = j.added ?? {};
+      const total = (a.organisations ?? 0) + (a.orgUnits ?? 0) + (a.teams ?? 0);
+      setNote(total === 0
+        ? "No new pools/lanes found in this project's BPMN diagrams (existing structure unchanged)."
+        : `Populated from BPMN — ${a.organisations ?? 0} organisation(s), ${a.orgUnits ?? 0} unit(s), ${a.teams ?? 0} team(s) added (deduped; existing kept).`);
+      await refresh();
     } finally { setBusy(false); }
   }
 
@@ -103,6 +123,11 @@ export function ProjectStructureSection({ projectId, canEdit }: { projectId: str
                   )}
                 </div>
               )}
+              <div className="pt-0.5">
+                <button onClick={() => setNamingBuild(true)} disabled={busy}
+                  title="Build the Organisation Hierarchy from this project's BPMN diagrams — white-box Pool→Organisation, Lane→Org Unit, Sublane→Team (deduped, merged with any existing structure). Refine it below by moving entries between levels."
+                  className="text-xs px-2 py-1 border border-emerald-300 text-emerald-700 rounded hover:bg-emerald-50 disabled:opacity-40">Populate from BPMN</button>
+              </div>
             </div>
           )}
 
@@ -130,6 +155,17 @@ export function ProjectStructureSection({ projectId, canEdit }: { projectId: str
                 );
               })}
             </div>
+          )}
+
+          {namingBuild && (
+            <PromptDialog
+              title="Populate Organisation Hierarchy from BPMN"
+              message="Name the Organisation Hierarchy. It's built from this project's BPMN pools/lanes/sublanes and merged into any existing structure (existing entries kept). Leave blank to keep the current name."
+              placeholder="Organisation Hierarchy"
+              confirmLabel="Populate"
+              onConfirm={(name) => { setNamingBuild(false); buildFromBpmn(name); }}
+              onCancel={() => setNamingBuild(false)}
+            />
           )}
 
           {confirmReplace && (

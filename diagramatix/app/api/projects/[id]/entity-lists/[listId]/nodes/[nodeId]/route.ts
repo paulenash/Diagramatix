@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
-import { updateNode, deleteNode, NodeOpError } from "@/app/lib/entityLists/nodeOps";
+import { updateNode, deleteNode, moveNode, MOVE_ACTIONS, NodeOpError, type MoveAction } from "@/app/lib/entityLists/nodeOps";
 
 type Params = { params: Promise<{ id: string; listId: string; nodeId: string }> };
 
@@ -18,12 +18,18 @@ async function ownerGate(projectId: string, listId: string) {
   if (!list) throw new OrgContextError("List not found", 404);
 }
 
-/** PUT — rename/move/reorder a node. Owner only. */
+/** PUT — rename a node, OR move it between levels via `{ action }`
+ *  (promote/demote/up/down). Owner only. */
 export async function PUT(req: Request, { params }: Params) {
   const { id, listId, nodeId } = await params;
   try {
     await ownerGate(id, listId);
-    const node = await updateNode(listId, nodeId, await req.json());
+    const body = await req.json();
+    if (body && MOVE_ACTIONS.includes(body.action)) {
+      await moveNode(listId, nodeId, body.action as MoveAction);
+      return NextResponse.json({ ok: true });
+    }
+    const node = await updateNode(listId, nodeId, body);
     return NextResponse.json({ node });
   } catch (err) {
     if (err instanceof OrgContextError || err instanceof NodeOpError) {
