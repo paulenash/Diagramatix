@@ -346,6 +346,7 @@ Two pure units behind "Populate from BPMN" (`extractOrgTreeFromBpmn`) and the re
 | T1101 | extract: white-box Pool→Organisation, Lane→OrgUnit, Sublane→Team | The BPMN→level mapping drifting | If the pool/lane/sublane walk or level mapping regresses |
 | T1102 | extract: black-box pools + blank labels are skipped | External-participant pools polluting the org hierarchy | If the white-box filter / blank-label trim regresses |
 | T1103 | extract: deduped by name within the same parent, across diagrams | The same Organisation/Unit/Team appearing once per diagram | If cross-diagram dedupe regresses |
+| T1108 | flat extract: pools/shapes → Participants / IT Systems / Documents / Data Stores, deduped | The named structure missing (or mis-classifying) the four flat lists | If `extractFlatEntitiesFromBpmn` classification/dedupe regresses |
 | T1104 | move: promote re-parents to the grandparent and re-levels the subtree | A promoted node keeping its old level while its children mismatch depth | If `planMove` promote / subtree re-level regresses |
 | T1105 | move: demote nests under the previous sibling and re-levels down | Demote landing at the wrong parent/level | If `planMove` demote regresses |
 | T1106 | move: up/down swaps sortOrder with the adjacent sibling, no level change | Reorder accidentally re-levelling a node | If reorder changes level or picks the wrong sibling |

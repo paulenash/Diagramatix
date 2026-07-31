@@ -57,3 +57,48 @@ export function extractOrgTreeFromBpmn(diagrams: { data: unknown }[]): OrgTreeNo
   }
   return roots;
 }
+
+const elementsOf = (d: { data: unknown }): RawEl[] =>
+  (Array.isArray((d.data as { elements?: unknown })?.elements)
+    ? (d.data as { elements: RawEl[] }).elements : []) as RawEl[];
+
+/** The FLAT lists derived from BPMN, deduped (case-insensitive) + sorted:
+ *   • External Participants — black-box pools not flagged as a system
+ *   • IT Systems — black-box "system" pools + System / Process-System shapes
+ *   • Documents — Data Object shapes
+ *   • Data Stores — Data Store shapes
+ * (Mirrors the classification in app/lib/diagram/extractEntities.ts, split into
+ * the four flat Entity-List kinds.) */
+export interface FlatEntities {
+  participants: string[];
+  systems: string[];
+  documents: string[];
+  dataStores: string[];
+}
+
+export function extractFlatEntitiesFromBpmn(diagrams: { data: unknown }[]): FlatEntities {
+  const sets = {
+    participants: new Map<string, string>(), systems: new Map<string, string>(),
+    documents: new Map<string, string>(), dataStores: new Map<string, string>(),
+  };
+  const add = (k: keyof typeof sets, e: RawEl) => { const n = label(e); if (n) sets[k].set(n.toLowerCase(), n); };
+  for (const d of diagrams) {
+    for (const e of elementsOf(d)) {
+      const props = (e.properties as Record<string, unknown> | undefined) ?? {};
+      if (e.type === "pool" && props.poolType === "black-box") {
+        add(props.isSystem === true ? "systems" : "participants", e);
+      } else if (e.type === "system" || e.type === "process-system") {
+        add("systems", e);
+      } else if (e.type === "data-object") {
+        add("documents", e);
+      } else if (e.type === "data-store") {
+        add("dataStores", e);
+      }
+    }
+  }
+  const sorted = (m: Map<string, string>) => [...m.values()].sort((a, b) => a.localeCompare(b));
+  return {
+    participants: sorted(sets.participants), systems: sorted(sets.systems),
+    documents: sorted(sets.documents), dataStores: sorted(sets.dataStores),
+  };
+}

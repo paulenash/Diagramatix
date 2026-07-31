@@ -5,7 +5,7 @@
  * subtree; up/down reorders; bounds are no-ops). No DB — both are pure functions.
  */
 import { describe, it, expect } from "vitest";
-import { extractOrgTreeFromBpmn } from "@/app/lib/entityLists/bpmnOrgTree";
+import { extractOrgTreeFromBpmn, extractFlatEntitiesFromBpmn } from "@/app/lib/entityLists/bpmnOrgTree";
 import { planMove, type MoveNodeLite } from "@/app/lib/entityLists/nodeOps";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,6 +52,29 @@ describe("extractOrgTreeFromBpmn", () => {
     const finance = tree[0].children.find((n) => n.name === "Finance")!;
     expect(tree[0].children.map((n) => n.name)).toEqual(["Finance", "HR"]);
     expect(finance.children.map((n) => n.name)).toEqual(["AP"]); // one AP, not two
+  });
+});
+
+describe("extractFlatEntitiesFromBpmn", () => {
+  it("T1108 — classifies pools/shapes into the four flat lists, deduped", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pool = (id: string, labelText: string, black: boolean, isSystem?: boolean): any =>
+      ({ id, type: "pool", label: labelText, properties: { poolType: black ? "black-box" : "white-box", ...(isSystem ? { isSystem: true } : {}) } });
+    const flat = extractFlatEntitiesFromBpmn([
+      diag([
+        pool("p1", "ArchiSurance", false),          // white-box → org hierarchy, not flat
+        pool("p2", "Customer", true),               // black-box, not system → participant
+        pool("p3", "SAP", true, true),              // black-box system → IT system
+        el("s1", "system", "CRM"),                  // system shape → IT system
+        el("d1", "data-object", "Claim Form"),      // → document
+        el("d2", "data-store", "Policy Ledger"),    // → data store
+      ]),
+      diag([ pool("p9", "Customer", true), el("d9", "data-object", "Claim Form") ]), // dupes
+    ]);
+    expect(flat.participants).toEqual(["Customer"]);
+    expect(flat.systems).toEqual(["CRM", "SAP"]);           // sorted, deduped
+    expect(flat.documents).toEqual(["Claim Form"]);          // deduped across diagrams
+    expect(flat.dataStores).toEqual(["Policy Ledger"]);
   });
 });
 

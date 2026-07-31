@@ -65,13 +65,15 @@ export function ProjectStructureSection({ projectId, canEdit }: { projectId: str
         body: JSON.stringify({ name: name.trim() || undefined }),
       });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(j.error ?? "Populate failed"); return; }
-      const a = j.added ?? {};
-      const total = (a.organisations ?? 0) + (a.orgUnits ?? 0) + (a.teams ?? 0);
-      setNote(total === 0
-        ? "No new pools/lanes found in this project's BPMN diagrams (existing structure unchanged)."
-        : `Populated from BPMN — ${a.organisations ?? 0} organisation(s), ${a.orgUnits ?? 0} unit(s), ${a.teams ?? 0} team(s) added (deduped; existing kept).`);
-      await refresh();
+      if (!res.ok) { setErr(j.error ?? "Build failed"); return; }
+      await refresh(); // the new named structure now appears in "Adopt a structure…"
+      if (j.structureId) {
+        setChosen(j.structureId); // pre-select it so the user just clicks Adopt
+        const a = j.added ?? {};
+        setNote(`Created structure “${j.name}” — ${a.organisations ?? 0} org(s), ${a.orgUnits ?? 0} unit(s), ${a.teams ?? 0} team(s), ${a.participants ?? 0} participant(s), ${a.systems ?? 0} system(s), ${a.documents ?? 0} document(s), ${a.dataStores ?? 0} data store(s). It's now in the Adopt list — click Adopt to use it here.`);
+      } else {
+        setNote("No pools, lanes or shapes found in this project's BPMN diagrams — nothing to build.");
+      }
     } finally { setBusy(false); }
   }
 
@@ -125,7 +127,7 @@ export function ProjectStructureSection({ projectId, canEdit }: { projectId: str
               )}
               <div className="pt-0.5">
                 <button onClick={() => setNamingBuild(true)} disabled={busy}
-                  title="Build the Organisation Hierarchy from this project's BPMN diagrams — white-box Pool→Organisation, Lane→Org Unit, Sublane→Team (deduped, merged with any existing structure). Refine it below by moving entries between levels."
+                  title="Create a named, reusable Entity Structure from this project's BPMN diagrams — the Organisation Hierarchy (white-box Pool→Organisation, Lane→Org Unit, Sublane→Team) plus External Participants, IT Systems, Documents & Data Stores. It's saved under its own name, appears in the Adopt list, and is editable under Admin → Entity Lists."
                   className="text-xs px-2 py-1 border border-emerald-300 text-emerald-700 rounded hover:bg-emerald-50 disabled:opacity-40">Populate from BPMN</button>
               </div>
             </div>
@@ -159,10 +161,11 @@ export function ProjectStructureSection({ projectId, canEdit }: { projectId: str
 
           {namingBuild && (
             <PromptDialog
-              title="Populate Organisation Hierarchy from BPMN"
-              message="Name the Organisation Hierarchy. It's built from this project's BPMN pools/lanes/sublanes and merged into any existing structure (existing entries kept). Leave blank to keep the current name."
-              placeholder="Organisation Hierarchy"
-              confirmLabel="Populate"
+              title="Create structure from BPMN"
+              message="Name the new Entity Structure. It's built from this project's BPMN diagrams — Organisation Hierarchy plus Participants, IT Systems, Documents & Data Stores (deduped) — saved as a reusable, editable structure under this name, and added to the Adopt list."
+              placeholder="e.g. Acme — from process models"
+              confirmLabel="Create"
+              validate={(v) => (v.trim() ? null : "Please enter a name")}
               onConfirm={(name) => { setNamingBuild(false); buildFromBpmn(name); }}
               onCancel={() => setNamingBuild(false)}
             />
