@@ -337,6 +337,20 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 | T0503 | (deleteNode) valid leaf delete → the node is gone | Node deletion not working | If a valid delete didn't remove the node |
 | T0504 | (deleteNode) deleting a parent cascades to its children | Orphaned child nodes after a parent delete | If deleting a parent left its children behind |
 
+### `tests/entity-lists/bpmn-org-build.test.ts` — Build Org Hierarchy from BPMN + move entries between levels
+
+Two pure units behind "Populate from BPMN" (`extractOrgTreeFromBpmn`) and the refine-by-moving controls (`planMove`). The org hierarchy invariant is `level == ORG_STRUCTURE_LEVELS[min(depth,3)]`, so a move re-levels the whole moved subtree by depth.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T1101 | extract: white-box Pool→Organisation, Lane→OrgUnit, Sublane→Team | The BPMN→level mapping drifting | If the pool/lane/sublane walk or level mapping regresses |
+| T1102 | extract: black-box pools + blank labels are skipped | External-participant pools polluting the org hierarchy | If the white-box filter / blank-label trim regresses |
+| T1103 | extract: deduped by name within the same parent, across diagrams | The same Organisation/Unit/Team appearing once per diagram | If cross-diagram dedupe regresses |
+| T1104 | move: promote re-parents to the grandparent and re-levels the subtree | A promoted node keeping its old level while its children mismatch depth | If `planMove` promote / subtree re-level regresses |
+| T1105 | move: demote nests under the previous sibling and re-levels down | Demote landing at the wrong parent/level | If `planMove` demote regresses |
+| T1106 | move: up/down swaps sortOrder with the adjacent sibling, no level change | Reorder accidentally re-levelling a node | If reorder changes level or picks the wrong sibling |
+| T1107 | move: impossible moves are no-ops (top-level promote, first-sibling up/demote) | A move at a bound corrupting the tree | If the bound guards drop |
+
 ### `tests/conformance/connector-conformance.test.ts` — Connector conformance on layout output
 
 Pins the deterministic connector-quality checks behind the AI-connector complaints ("too many segments", "endpoints not moveable"). The same `findConnectorConformance` net is reused by the AI conformance harness (`npm run ai:report`). The over-segmentation rule keys off the editor's ≥9-waypoint "user-customised, stop re-routing" lock.
@@ -470,6 +484,18 @@ Pins the deterministic connector-quality checks behind the AI-connector complain
 | T0446 | (XML path) data-store sharepointLink round-trips intact via XML | A Data Store's link unlinking through XML | If the XML path dropped the data-store's link |
 | T0447 | the exported XML actually contains the serialised link (not silently dropped) | The XML carrying no link data, so import couldn't restore it | If the exported XML omitted the serialised sharepointLink |
 
+### `tests/diagram/diagram-bundle.test.ts` — SuperAdmin diagram "bundle" export/import ID-remap
+
+A bundle packages a diagram + its linked AI prompt (+ plan) + the aiComparison matrix + the per-model comparison diagrams. On import everything gets NEW ids, so the embedded cross-references must be rewritten. These pin the pure remap helpers.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T1096 | `remapDiagramData` rewrites `aiGeneration.promptId`, preserving the snapshot + other fields | An imported diagram's prompt link pointing at the source env's prompt id | If the promptId rewrite (or its immutability of siblings) regresses |
+| T1097 | `remapDiagramData` is a no-op with no aiGeneration / an unmapped id | The remap corrupting a non-AI diagram or throwing on a missing map entry | If the guards drop |
+| T1098 | `remapAiComparison` rewrites each `models[].diagramId`; unmapped ids are blanked | A comparison matrix pointing at source-env diagram ids (dangling links) | If the per-model remap / blank-on-miss regresses |
+| T1099 | `comparisonDiagramIds` collects only real ids | The export missing (or over-collecting) per-model diagrams | If the id collector regresses |
+| T1100 | `isDiagramBundle` validates the `kind` discriminator | Import accepting a non-bundle JSON | If the discriminator check regresses |
+
 ---
 
 ## Layer 4 — Diagram structure & layout
@@ -600,6 +626,9 @@ AI-generated ArchiMate expresses whole-part **composition** by nesting children 
 | T1087 | a connector attaches to the reduced Service stadium (15% shorter), not the full bounds | A gap between the connector and the visible service pill | If the service-stadium branch in `projectToShapeBoundary` regresses |
 | T1088 | a large drawn element replicates its size; typical elements stay ~standard | A wide role/process (Customer, Handle Claim) forced to a standard box on ingestion | If `layoutArchimatePreserved` reverts to fixed-size leaves |
 | T1080 | long names WIDEN to stay ≤2 lines (height standard), and expanded siblings don't overlap (image gaps preserved) | Long labels cramming/growing tall, or expanded boxes colliding | If `archiFitSize` or `separateArchiSiblings` regresses |
+| T1089 | And/Or junctions ingest → the `composite-junction-and`/`-or` masters (iconOnly) | Junctions dropped on image ingestion (no ARCHI_SHAPE mapping) — the original bug | If `and-junction`/`or-junction` fall out of `ARCHI_SHAPE` |
+| T1090 | junctions render at a fixed 25px, not scaled to bounds or text-fit | A tiny junction inflating to a full labelled box | If the junction size guard in the layouts regresses |
+| T1091 | relationships wired THROUGH a junction are kept as lines (source→junction→targets) | Junction edges being swallowed / not drawn | If the junction is no longer treated as a normal connector endpoint |
 
 ### `tests/archimate/connectors.test.ts` — Pins distinct visual style for all 11 ArchiMate connector types
 
@@ -682,6 +711,17 @@ AI-generated ArchiMate expresses whole-part **composition** by nesting children 
 ---
 
 ## Layer 6 — AI generation pipeline
+
+### `tests/ai/ai-telemetry.test.ts` — AI usage telemetry context + measures
+
+Every AI call records an `AiInvocation` row merged with the route's AsyncLocalStorage context (user/org/invocation-point). These pin the context plumbing (including the `enterWith`-in-helper bug that mis-attributed real usage as "unknown") and the User-Attempts / diagrams-generated split.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T1092 | context entered in the handler body reaches the seam across a following await | Route usage recorded with no user/org/label → "unknown" | If a route reverts to entering context inside an awaited helper |
+| T1093 | the OLD form (enterWith INSIDE an awaited helper) loses the context → "unknown" | Silently reintroducing the mis-attribution bug | If the regression guard for the broken pattern is removed |
+| T1094 | `AI_USER_METERED_POINTS` = the 10 quota-metered routes; AI Tidy/Vectorize/Compare excluded | User Attempts drifting from the routes that actually consume quota | If the metered-set and the `recordUsage(...,"aiAttempts")` routes fall out of sync |
+| T1095 | `recordDiagramGenerated` writes a row and never throws | "# diagrams generated" miscounting, or a telemetry failure breaking a generation | If the recorder throws or stops writing |
 
 ### `tests/mining/parseEventLog.test.ts` — Process Mining event-log ingestion
 
@@ -1686,4 +1726,4 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 
 ---
 
-*Generated 2026-06-28, updated 2026-07-04. Regenerate this document whenever test files (Vitest OR the Playwright e2e specs) are added or their behaviour changes — it is a hand-maintained companion to the suite, not auto-generated.*
+*Generated 2026-06-28, updated 2026-07-31. Regenerate this document whenever test files (Vitest OR the Playwright e2e specs) are added or their behaviour changes — it is a hand-maintained companion to the suite, not auto-generated.*

@@ -1085,5 +1085,19 @@ export interface TemplateData {
  *             button. Plus OPTIONAL `showAiPromptAnnotation` boolean (show/hide that
  *             annotation). Both are JSON metadata only (like `aiFeedback`) — NOT in the BPMN
  *             XML interchange, so no XSD shape change.
+ *
+ *  2026-07-31 (NO version bump — feature-only, no export-shape change): a batch of
+ *             features shipped that DON'T alter the diagram XML interchange, so per this
+ *             file's convention the schemaVersion stays 1.43 and the XSD is unchanged:
+ *               • ArchiMate And/Or Junctions + first-class Groupings (new masters live in
+ *                 `element.properties.shapeKey` — the loose PropertiesType, not the XSD).
+ *               • SuperAdmin "Diagram Bundle" export/import — a SEPARATE `.bundle.json`
+ *                 envelope (diagram + prompt + planJson + aiComparison + per-model diagrams);
+ *                 it wraps DiagramData verbatim, so the diagram schema itself is untouched.
+ *               • AI-usage measures (User Attempts / # diagrams generated) and the Org
+ *                 Hierarchy "Populate from BPMN" + move-between-levels — DB/telemetry/entity
+ *                 features, nothing in the diagram export.
+ *             appVersion (major.minor.BUILD) still advances automatically via the git commit
+ *             count in /api/schema, so the release is reflected there.
  */
 export const SCHEMA_VERSION = "1.43";
