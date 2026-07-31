@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   validateIconPrimitives,
   drawCustomIcon,
+  polygonPoints,
   type IconPrimitive,
 } from "@/app/lib/archimate/iconShapes";
 
@@ -28,6 +29,24 @@ describe("Custom icon shapes (Icon Library)", () => {
     expect(p.colourRole).toBeUndefined();       // invalid role dropped
     const [q] = validateIconPrimitives([line({ colourRole: "fixed" })]); // fixed w/o hex
     expect(q.colourRole).toBe("stroke");        // downgraded to theme
+  });
+
+  // T1109 — regular polygon (Pentagon/Hexagon): validated, rendered, geometry.
+  it("T1109: polygon primitive — validated (sides clamped), rendered as <polygon>, N vertices", () => {
+    const [pent] = validateIconPrimitives([{ type: "polygon", cx: 50, cy: 50, r: 26, sides: 5, rotation: 0, z: 0, strokeWidth: 6, filled: false }]);
+    expect(pent.type).toBe("polygon");
+    expect((pent as Extract<IconPrimitive, { type: "polygon" }>).sides).toBe(5);
+    // sides clamped into 3..12
+    const [clamped] = validateIconPrimitives([{ type: "polygon", cx: 50, cy: 50, r: 10, sides: 99, z: 0, strokeWidth: 6, filled: false }]);
+    expect((clamped as Extract<IconPrimitive, { type: "polygon" }>).sides).toBe(12);
+    // renders a <polygon> with `sides` vertices (comma-separated x,y pairs)
+    const svg = draw([{ type: "polygon", cx: 50, cy: 50, r: 26, sides: 6, rotation: 0, z: 0, strokeWidth: 6, filled: false }]);
+    expect(svg).toContain("<polygon");
+    expect(polygonPoints(50, 50, 26, 6, 0)).toHaveLength(6);
+    // rotation 0 → first vertex points straight up (above centre)
+    const [vx, vy] = polygonPoints(50, 50, 26, 5, 0)[0];
+    expect(Math.round(vx)).toBe(50);
+    expect(vy).toBeLessThan(50);
   });
 
   // T1005 — each primitive renders the expected SVG node type; z-order ascending.

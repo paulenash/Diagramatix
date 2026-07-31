@@ -74,8 +74,11 @@ export interface EllipsePrim extends BasePrim { type: "ellipse"; cx: number; cy:
  *  the "virtual circle". Drawn from a0 → a1 in the positive (increasing-angle)
  *  direction; `filled` closes the chord for a circular segment. */
 export interface ArcPrim extends BasePrim { type: "arc"; cx: number; cy: number; r: number; a0: number; a1: number; }
+/** A regular polygon (Pentagon = sides 5, Hexagon = sides 6, …). Resizable via
+ *  `r` (circumradius) and rotatable via `rotation` (degrees; 0 = first vertex up). */
+export interface PolygonPrim extends BasePrim { type: "polygon"; cx: number; cy: number; r: number; sides: number; rotation?: number; }
 
-export type IconPrimitive = LinePrim | PathPrim | RectPrim | TrianglePrim | CirclePrim | EllipsePrim | ArcPrim;
+export type IconPrimitive = LinePrim | PathPrim | RectPrim | TrianglePrim | CirclePrim | EllipsePrim | ArcPrim | PolygonPrim;
 
 export interface CustomIcon { primitives: IconPrimitive[]; }
 
@@ -186,6 +189,11 @@ function validateOne(raw: unknown, i: number): IconPrimitive | null {
       if (cx === null || cy === null) return null;
       return { ...base, type: "arc", cx, cy, r: num(o.r, 0, 0, 140), a0: isFiniteNum(o.a0) ? o.a0 : 0, a1: isFiniteNum(o.a1) ? o.a1 : 180 };
     }
+    case "polygon": {
+      const cx = coord(o.cx), cy = coord(o.cy);
+      if (cx === null || cy === null) return null;
+      return { ...base, type: "polygon", cx, cy, r: num(o.r, 0, 0, 140), sides: Math.round(num(o.sides, 5, 3, 12)), rotation: isFiniteNum(o.rotation) ? o.rotation : undefined };
+    }
     default: return null;
   }
 }
@@ -206,6 +214,20 @@ export function validateIconPrimitives(raw: unknown): IconPrimitive[] {
 // ────────────────────────────────────────────────────────────────────
 
 const DEG = Math.PI / 180;
+
+/** Vertices of a regular polygon in the 0..100 box. `rotation` in degrees; at 0
+ *  the first vertex points straight up. Shared by the renderer and the editor
+ *  (handles + bbox). */
+export function polygonPoints(cx: number, cy: number, r: number, sides: number, rotation = 0): [number, number][] {
+  const n = Math.max(3, Math.round(sides));
+  const start = (rotation - 90) * DEG;
+  const pts: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    const a = start + (i * 2 * Math.PI) / n;
+    pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  return pts;
+}
 
 /** Build the SVG path `d` string from validated segments. */
 function pathD(segments: PathSeg[], closed: boolean, mx: (n: number) => number, my: (n: number) => number): string {
@@ -332,6 +354,10 @@ export function drawCustomIcon(
         const rr = mlen(p.r);
         const d = `M ${sx} ${sy} A ${rr} ${rr} 0 ${large} 1 ${ex} ${ey}${p.filled ? " Z" : ""}`;
         return <path key={key} d={d} {...common} />;
+      }
+      case "polygon": {
+        const pts = polygonPoints(p.cx, p.cy, p.r, p.sides, p.rotation ?? 0).map(([x, y]) => `${mx(x)},${my(y)}`).join(" ");
+        return <polygon key={key} points={pts} {...common} />;
       }
     }
   });

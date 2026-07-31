@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   drawCustomIcon,
+  polygonPoints,
   DEFAULT_STROKE_WIDTH,
   type IconPrimitive,
   type PathSeg,
@@ -26,6 +27,10 @@ interface LibIcon {
 
 const EDIT_COLOUR = "#334155";
 const round1 = (n: number) => Math.round(n * 10) / 10;
+/** A stable string of everything a Save persists — drives the dirty check so
+ *  the Save button is disabled until something actually changes. */
+const iconSnapshot = (name: string, category: string, defW: string, defH: string, primitives: IconPrimitive[]) =>
+  JSON.stringify({ name, category, defW, defH, primitives });
 
 // ── Add-primitive defaults (centred in the 0..100 box) ───────────────
 function defaultPrim(type: IconPrimitive["type"], z: number): IconPrimitive {
@@ -38,6 +43,7 @@ function defaultPrim(type: IconPrimitive["type"], z: number): IconPrimitive {
     case "circle": return { ...base, type: "circle", cx: 50, cy: 50, r: 22 };
     case "ellipse": return { ...base, type: "ellipse", cx: 50, cy: 50, rx: 28, ry: 18 };
     case "arc": return { ...base, type: "arc", cx: 50, cy: 52, r: 24, a0: 180, a1: 360 };
+    case "polygon": return { ...base, type: "polygon", cx: 50, cy: 50, r: 26, sides: 5, rotation: 0 };
   }
 }
 
@@ -85,6 +91,19 @@ function handlesFor(p: IconPrimitive): Handle[] {
         { id: "r", x: rmx, y: rmy, control: true, apply: (q, x, y) => { const r = q as typeof p; return { ...r, r: Math.max(1, dist(x, y, r.cx, r.cy)) }; } },
       ];
     }
+    case "polygon": {
+      const rad = Math.PI / 180;
+      const dir = ((p.rotation ?? 0) - 90) * rad;         // first-vertex direction
+      const vx = p.cx + p.r * Math.cos(dir), vy = p.cy + p.r * Math.sin(dir);
+      const gx = p.cx + (p.r + 14) * Math.cos(dir), gy = p.cy + (p.r + 14) * Math.sin(dir);
+      return [
+        { id: "c", x: p.cx, y: p.cy, apply: (q, x, y) => ({ ...(q as typeof p), cx: x, cy: y }) },
+        // resize — radius = distance from centre (rotation kept)
+        { id: "r", x: vx, y: vy, apply: (q, x, y) => { const r = q as typeof p; return { ...r, r: Math.max(1, dist(x, y, r.cx, r.cy)) }; } },
+        // rotate — angle to the pointer (0 = first vertex up)
+        { id: "rot", x: gx, y: gy, control: true, apply: (q, x, y) => { const r = q as typeof p; return { ...r, rotation: round1(((Math.atan2(y - r.cy, x - r.cx) / rad) + 90 + 360) % 360) }; } },
+      ];
+    }
     case "path": {
       const hs: Handle[] = [];
       p.segments.forEach((s, si) => {
@@ -116,6 +135,7 @@ function translatePrim(p: IconPrimitive, dx: number, dy: number): IconPrimitive 
     case "circle": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
     case "ellipse": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
     case "arc": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
+    case "polygon": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
     case "path": return { ...p, segments: p.segments.map((s) => {
       if (s.t === "M" || s.t === "L") return { ...s, x: r1(s.x + dx), y: r1(s.y + dy) };
       if (s.t === "Q") return { ...s, cx: r1(s.cx + dx), cy: r1(s.cy + dy), x: r1(s.x + dx), y: r1(s.y + dy) };
@@ -134,6 +154,7 @@ function primBBox(p: IconPrimitive): { minX: number; minY: number; maxX: number;
     case "circle": pts.push([p.cx - p.r, p.cy - p.r], [p.cx + p.r, p.cy + p.r]); break;
     case "ellipse": pts.push([p.cx - p.rx, p.cy - p.ry], [p.cx + p.rx, p.cy + p.ry]); break;
     case "arc": pts.push([p.cx - p.r, p.cy - p.r], [p.cx + p.r, p.cy + p.r]); break;
+    case "polygon": for (const v of polygonPoints(p.cx, p.cy, p.r, p.sides, p.rotation ?? 0)) pts.push(v); break;
     case "path": for (const s of p.segments) {
       if ("x" in s) pts.push([s.x, s.y]);
       if (s.t === "Q") pts.push([s.cx, s.cy]);
@@ -195,6 +216,7 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   const [defW, setDefW] = useState<string>("");
   const [defH, setDefH] = useState<string>("");
   const [primitives, setPrimitives] = useState<IconPrimitive[]>([]);
+  const [savedSnap, setSavedSnap] = useState<string>(iconSnapshot("", "", "", "", [])); // snapshot at last load/save
   const [sel, setSel] = useState<number | null>(null);          // primary (style/vertex controls)
   const [selSet, setSelSet] = useState<Set<number>>(new Set()); // group selection (lasso/move)
   const [marq, setMarq] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
@@ -237,12 +259,15 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
   function resetNew() {
     setSelectedId(null); setName(""); setCategory(""); setDefW(""); setDefH("");
     setPrimitives([]); clearSel(); setSourceFile(null); setUnderlay(null); setBgGlyph(null);
+    setSavedSnap(iconSnapshot("", "", "", "", []));
   }
   function loadIcon(ic: LibIcon) {
+    const w = ic.defaultWidth ? String(ic.defaultWidth) : "", h = ic.defaultHeight ? String(ic.defaultHeight) : "";
     setSelectedId(ic.id); setName(ic.name); setCategory(ic.category ?? "");
-    setDefW(ic.defaultWidth ? String(ic.defaultWidth) : ""); setDefH(ic.defaultHeight ? String(ic.defaultHeight) : "");
+    setDefW(w); setDefH(h);
     setPrimitives(ic.primitives); clearSel(); setSourceFile(null); setBgGlyph(null);
     setUnderlay(ic.hasSource ? `/api/admin/archimate-icon-library/${ic.id}/source` : null);
+    setSavedSnap(iconSnapshot(ic.name, ic.category ?? "", w, h, ic.primitives));
   }
 
   // ── pointer → 0..100 viewBox coords ──
@@ -284,6 +309,10 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
 
   const patchSel = (patch: Partial<IconPrimitive>) =>
     setPrimitives((prev) => prev.map((p, i) => (i === sel ? { ...p, ...patch } as IconPrimitive : p)));
+
+  // Dirty = anything a Save would persist has changed since the last load/save
+  // (or a new raster source is pending). Drives the Save button's enabled state.
+  const dirty = savedSnap !== iconSnapshot(name, category, defW, defH, primitives) || !!sourceFile;
 
   const selPrim = sel !== null ? primitives[sel] : undefined;
   // Vertex handles only when exactly one primitive is selected; a group shows a
@@ -327,6 +356,8 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
       if (!res.ok) { setErr(j.error ?? "Save failed"); return; }
       setName(finalName);
       if (!isUpdate && j.id) setSelectedId(j.id); // select the newly-created (or copied) icon
+      setSourceFile(null); // the uploaded source is now persisted
+      setSavedSnap(iconSnapshot(finalName, category, defW, defH, primitives)); // clean → Save deactivates
       invalidateArchimateCustomIconCache();
       await reload();
     } catch { setErr("Save network error"); } finally { setBusy(false); }
@@ -346,7 +377,7 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
     } finally { setBusy(false); }
   }
 
-  const addPrim = (t: IconPrimitive["type"]) => { const idx = primitives.length; setPrimitives((p) => [...p, defaultPrim(t, p.length)]); selectOne(idx); };
+  const addPrim = (t: IconPrimitive["type"], patch?: Partial<IconPrimitive>) => { const idx = primitives.length; setPrimitives((p) => [...p, { ...defaultPrim(t, p.length), ...patch } as IconPrimitive]); selectOne(idx); };
   const delPrim = (i: number) => { setPrimitives((p) => p.filter((_, k) => k !== i)); clearSel(); };
   const moveZ = (i: number, dir: -1 | 1) => setPrimitives((prev) => {
     const j = i + dir; if (j < 0 || j >= prev.length) return prev;
@@ -406,6 +437,8 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
           {PRIM_TYPES.map((t) => (
             <button key={t} onClick={() => addPrim(t)} className="px-1.5 py-1 text-[11px] border border-gray-300 rounded hover:bg-gray-50 capitalize">{t}</button>
           ))}
+          <button onClick={() => addPrim("polygon", { sides: 5 })} title="Regular pentagon — resizable + rotatable" className="px-1.5 py-1 text-[11px] border border-gray-300 rounded hover:bg-gray-50">Pentagon</button>
+          <button onClick={() => addPrim("polygon", { sides: 6 })} title="Regular hexagon — resizable + rotatable" className="px-1.5 py-1 text-[11px] border border-gray-300 rounded hover:bg-gray-50">Hexagon</button>
         </div>
 
         <svg ref={svgRef} viewBox="0 0 100 100" className="w-full max-w-[560px] mx-auto block border border-gray-100 rounded bg-[repeating-linear-gradient(45deg,#f3f4f6,#f3f4f6_6px,#fff_6px,#fff_12px)] touch-none"
@@ -469,7 +502,7 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
             <input value={defH} onChange={(e) => setDefH(e.target.value.replace(/[^0-9]/g, ""))} placeholder="auto" className="w-16 border border-gray-300 rounded px-1 py-0.5 text-xs" /></label>
         </div>
         <div className="mt-3 flex items-center gap-2">
-          <button onClick={onSaveClick} disabled={busy || !primitives.length} className="px-3 py-1.5 text-sm text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50">{selectedId ? "Save" : "Save new"}</button>
+          <button onClick={onSaveClick} disabled={busy || !primitives.length || !dirty} title={!dirty && primitives.length ? "No unsaved changes" : undefined} className="px-3 py-1.5 text-sm text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50">{selectedId ? "Save" : "Save new"}</button>
           {selectedId && <button onClick={() => setAskCopy(true)} disabled={busy || !primitives.length} className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50" title="Duplicate these shapes into a new icon under a different name">Save as copy…</button>}
           {selectedId && <button onClick={() => setConfirmDel(true)} className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50">Delete</button>}
           <div className="ml-auto flex items-start gap-3">

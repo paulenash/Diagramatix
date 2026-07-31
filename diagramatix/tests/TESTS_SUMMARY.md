@@ -1053,6 +1053,7 @@ The SuperAdmin-settable AI-Generate model. `resolveAiModel` guarantees a blank /
 | T1003 | Icon Library: validateIconPrimitives drops malformed primitives and keeps the valid remainder | Bad AI/DB primitive data crashing or rendering garbage | If the validator trust boundary regressed |
 | T1004 | Icon Library: validator coerces filled/z, drops bad colourRole, clamps strokeWidth | Unnormalised primitive fields reaching the renderer | If field normalisation regressed |
 | T1005 | Icon Library: drawCustomIcon emits the right SVG node per primitive + sorts by z | Custom icons rendering the wrong shapes / wrong paint order | If the renderer or z-sort regressed |
+| T1109 | Icon Library: regular polygon (Pentagon/Hexagon) — validated (sides clamped 3–12), renders as `<polygon>` with N vertices, rotation 0 = first vertex up | The new resizable/rotatable polygon primitive corrupting or mis-rendering | If the polygon type/validator/`polygonPoints` regresses |
 | T1006 | Icon Library: arrowheads emit a marker; orientable angle override changes it | Missing/incorrect arrowheads on custom icons | If the arrowhead renderer regressed |
 | T1007 | Icon Library: normalised coords map into {cx,cy,size} + strokeWidth scales with a floor | Custom glyphs mis-positioned or hairline/blown-out strokes | If the coordinate/stroke mapping regressed |
 | T1008 | Icon Library: effectiveCustomIcon returns the assigned icon or null (fallback to built-in) | A dangling assignment crashing a render instead of falling back | If the assignment resolver regressed |
