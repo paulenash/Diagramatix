@@ -631,6 +631,21 @@ AI-generated ArchiMate expresses whole-part **composition** by nesting children 
 | T1090 | junctions render at a fixed 25px, not scaled to bounds or text-fit | A tiny junction inflating to a full labelled box | If the junction size guard in the layouts regresses |
 | T1091 | relationships wired THROUGH a junction are kept as lines (source→junction→targets) | Junction edges being swallowed / not drawn | If the junction is no longer treated as a normal connector endpoint |
 
+### `tests/archimate/relationship-matrix.test.ts` — Connector-picker validity matches ArchiMate 3.2 exactly
+
+`public/archimate-relationships.json` is generated verbatim from the authoritative 3.2 workbook (Open Group cards + Archi's 62×62 matrix) by `scripts/gen-archimate-relationships.ts`. The picker highlights exactly what 3.2 permits (single tier — the spec's permitted set is derivation-inclusive; no direct/derived split).
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T1113 | matrix has 60 elements + version 3.2 + universal Association; Junction/Relationship excluded | The generated matrix losing elements or including pseudo-concepts | If the generator output shape regresses |
+| T1114 | Equipment→Material permits Access (+ Assignment + Association) | The category-era gap (missing Access) creeping back | If the matrix drops the Equipment→Material Access triple |
+| T1115 | matrix is DIRECTIONAL — Material→Equipment (realise+assoc) ≠ Equipment→Material | Treating relationships as symmetric | If lookup ignores source/target order |
+| T1116 | a Grouping receives ≥11 relationships; Association is universal | Grouping under-handling (the old model's worst gap) returning | If Grouping rows or the universal add regress |
+| T1117 | Assessment→Application Component does NOT permit Influence | Over-permits from the old category rules returning | If a spurious Influence triple appears |
+| T1118 | Specialization only between the same concept | Specialisation offered across different types | If the diagonal-only rule regresses |
+| T1119 | single tier — `derived` always empty; every element pair resolves to ≥1 | The picker showing a stale two-tier or an unresolved pair | If `getAllowedRelationships` regresses |
+| T1120 | degraded mode — unknown element / missing name → allow all 12 (never blocks) | The picker hard-blocking on an unknown element | If the degraded fallback regresses |
+
 ### `tests/archimate/connectors.test.ts` — Pins distinct visual style for all 11 ArchiMate connector types
 
 | Ref | Test | Protects you against | How it would break (go red) |

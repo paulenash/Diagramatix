@@ -1,39 +1,33 @@
 /**
  * ArchiMate 3.2 relationship compatibility lookup.
  *
- * Resolves which archi-* relationships are valid between a (source, target)
- * pair, distinguishing between:
- *   - allowed:  permitted directly by the spec
- *   - derived:  reachable via the derivation rules in §5.7
- *   - universal: relationships permitted between any two elements
- *               (Association is the canonical one)
+ * Resolves which archi-* relationships 3.2 PERMITS between an ordered (source,
+ * target) element pair. The matrix in /public/archimate-relationships.json is
+ * generated verbatim from the authoritative ArchiMate 3.2 workbook (Open Group
+ * reference cards + Archi's 62×62 matrix) by scripts/gen-archimate-relationships.ts.
  *
- * The matrix lives in /public/archimate-relationships.json so it can be
- * tweaked without recompiling. This module loads it on first lookup and
- * caches the result.
+ * The spec's permitted set is derivation-inclusive — it does NOT distinguish a
+ * "direct" relationship from a "derived" one — so the picker highlights exactly
+ * this set (single tier: everything permitted is directly pickable). `derived`
+ * is kept on the return type (always empty) so the picker's shape is unchanged.
  */
 
 import type { ArchimateConnectorType } from "@/app/lib/diagram/types";
 
-interface CategoryRule {
-  from: string;
-  to: string;
-  allowed?: ArchimateConnectorType[];
-  derived?: ArchimateConnectorType[];
-}
-
-interface PairOverride {
-  allowed?: ArchimateConnectorType[];
-  derived?: ArchimateConnectorType[];
-}
-
 interface MatrixData {
+  version: string;
+  elements: string[];
+  /** Permitted between ANY two elements (Association, directed + undirected). */
   universal: ArchimateConnectorType[];
-  selfTypeOnly: ArchimateConnectorType[];
-  categories: Record<string, string[]>;
-  categoryRules: CategoryRule[];
-  overrides: Record<string, Record<string, PairOverride>>;
+  /** permitted[source][target] = every relationship 3.2 permits for that pair. */
+  permitted: Record<string, Record<string, ArchimateConnectorType[]>>;
 }
+
+const ALL_TYPES: ArchimateConnectorType[] = [
+  "archi-composition", "archi-aggregation", "archi-assignment", "archi-realisation",
+  "archi-serving", "archi-access", "archi-influence", "archi-association",
+  "archi-association-directed", "archi-triggering", "archi-flow", "archi-specialisation",
+];
 
 let cached: MatrixData | null = null;
 let loadPromise: Promise<MatrixData> | null = null;
@@ -57,22 +51,17 @@ export function getCachedMatrix(): MatrixData | null {
   return cached;
 }
 
-function categoryFor(name: string, matrix: MatrixData): string | null {
-  for (const [cat, names] of Object.entries(matrix.categories)) {
-    if (names.includes(name)) return cat;
-  }
-  return null;
-}
-
 export interface AllowedRelationships {
+  /** Everything 3.2 permits between the pair — all directly pickable. */
   allowed: Set<ArchimateConnectorType>;
+  /** Retained for API stability; always empty (single-tier model). */
   derived: Set<ArchimateConnectorType>;
 }
 
 /**
- * Resolve the set of relationships permitted between sourceName and
- * targetName. If the matrix isn't loaded yet, returns ALL types as
- * allowed (degraded mode — picker stays usable).
+ * Resolve the relationships permitted between `sourceName` and `targetName`.
+ * If the matrix isn't loaded yet, or an element isn't in it, returns ALL types
+ * as allowed (degraded mode — the picker never blocks the user).
  */
 export function getAllowedRelationships(
   sourceName: string | undefined,
@@ -82,45 +71,21 @@ export function getAllowedRelationships(
   const derived = new Set<ArchimateConnectorType>();
 
   if (!cached || !sourceName || !targetName) {
-    // Degraded: matrix not loaded or unknown elements. Allow all so the
-    // user is never blocked.
-    const all: ArchimateConnectorType[] = [
-      "archi-composition", "archi-aggregation", "archi-assignment", "archi-realisation",
-      "archi-serving", "archi-access", "archi-influence", "archi-association",
-      "archi-association-directed",
-      "archi-triggering", "archi-flow", "archi-specialisation",
-    ];
-    for (const t of all) allowed.add(t);
+    for (const t of ALL_TYPES) allowed.add(t);
     return { allowed, derived };
   }
 
+  // Association is universal; add it up front (also covers a pair absent from
+  // the matrix, e.g. an unknown element name → still permits Association).
   for (const t of cached.universal) allowed.add(t);
 
-  if (sourceName === targetName) {
-    for (const t of cached.selfTypeOnly) allowed.add(t);
+  const pair = cached.permitted[sourceName]?.[targetName];
+  if (pair) {
+    for (const t of pair) allowed.add(t);
+  } else if (!(sourceName in cached.permitted)) {
+    // Unknown source element → degrade to allow-all so the picker stays usable.
+    for (const t of ALL_TYPES) allowed.add(t);
   }
-
-  const srcCat = categoryFor(sourceName, cached);
-  const tgtCat = categoryFor(targetName, cached);
-
-  if (srcCat && tgtCat) {
-    for (const rule of cached.categoryRules) {
-      if (rule.from === srcCat && rule.to === tgtCat) {
-        for (const t of rule.allowed ?? []) allowed.add(t);
-        for (const t of rule.derived ?? []) derived.add(t);
-      }
-    }
-  }
-
-  // Per-pair overrides — additive on top of category rules.
-  const pairOverride = cached.overrides[sourceName]?.[targetName];
-  if (pairOverride) {
-    for (const t of pairOverride.allowed ?? []) allowed.add(t);
-    for (const t of pairOverride.derived ?? []) derived.add(t);
-  }
-
-  // Anything in `allowed` should not also appear in `derived`.
-  for (const t of allowed) derived.delete(t);
 
   return { allowed, derived };
 }

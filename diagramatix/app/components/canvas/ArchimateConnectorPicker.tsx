@@ -63,7 +63,6 @@ const DEFAULT_TYPE: ArchimateConnectorType = "archi-triggering";
 
 export function ArchimateConnectorPicker({ x, y, sourceName, targetName, onSelect, onCancel }: Props) {
   const [hovered, setHovered] = useState<ArchimateConnectorType>(DEFAULT_TYPE);
-  const [showDerived, setShowDerived] = useState(false);
   const [matrixReady, setMatrixReady] = useState(false);
   // When the user picks Influence, the picker switches into a sub-step
   // asking for the influence sign (+/-) before committing.
@@ -146,17 +145,6 @@ export function ArchimateConnectorPicker({ x, y, sourceName, targetName, onSelec
         <div className="text-xs font-semibold text-gray-700">
           {awaitingInfluenceSign ? "Influence — pick strength" : "ArchiMate relationship"}
         </div>
-        {!awaitingInfluenceSign && (
-          <label className="flex items-center gap-1 text-[10px] text-gray-600 cursor-pointer select-none" title="Show relationships permitted via §5.7 derivation rules">
-            <input
-              type="checkbox"
-              checked={showDerived}
-              onChange={(e) => setShowDerived(e.target.checked)}
-              className="accent-blue-600"
-            />
-            show derived
-          </label>
-        )}
       </div>
       {awaitingInfluenceSign && (
         <div>
@@ -196,16 +184,12 @@ export function ArchimateConnectorPicker({ x, y, sourceName, targetName, onSelec
             <div className="grid grid-cols-2 gap-1">
               {groupEntries.map((e) => {
                 const isHover = hovered === e.type;
-                const isAllowed = compat.allowed.has(e.type);
-                const isDerived = compat.derived.has(e.type);
-                const isPickable = isAllowed || (showDerived && isDerived);
+                const isPickable = compat.allowed.has(e.type);
                 const tooltip = !sourceName || !targetName
                   ? e.label
-                  : isAllowed
-                    ? `${e.label} — permitted by spec`
-                    : isDerived
-                      ? `${e.label} — derived (toggle "show derived" to enable)`
-                      : `${e.label} — not permitted between ${sourceName} and ${targetName}`;
+                  : isPickable
+                    ? `${e.label} — permitted by ArchiMate 3.2`
+                    : `${e.label} — not permitted between ${sourceName} and ${targetName}`;
                 return (
                   <button
                     key={e.type}
@@ -216,7 +200,7 @@ export function ArchimateConnectorPicker({ x, y, sourceName, targetName, onSelec
                         ? "text-gray-400 opacity-50 cursor-not-allowed"
                         : isHover
                           ? "bg-blue-50 ring-1 ring-blue-300 text-gray-900"
-                          : `text-gray-900 hover:bg-gray-50 ${isDerived ? "italic" : ""}`
+                          : "text-gray-900 hover:bg-gray-50"
                     }`}
                     onMouseEnter={() => isPickable && setHovered(e.type)}
                     onFocus={() => isPickable && setHovered(e.type)}
