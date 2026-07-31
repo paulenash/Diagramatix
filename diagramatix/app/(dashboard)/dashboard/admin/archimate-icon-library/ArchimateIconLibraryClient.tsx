@@ -46,6 +46,8 @@ function defaultPrim(type: IconPrimitive["type"], z: number): IconPrimitive {
     case "arc": return { ...base, type: "arc", cx: 50, cy: 52, r: 24, a0: 180, a1: 360 };
     case "polygon": return { ...base, type: "polygon", cx: 50, cy: 50, r: 26, sides: 5, rotation: 0 };
     case "parallelogram": return { ...base, type: "parallelogram", x: 30, y: 35, w: 40, h: 30, slant: 12 };
+    case "gear": return { ...base, type: "gear", cx: 50, cy: 50, r: 24, teeth: 8, toothDepth: 14, rotation: 0 };
+    case "document": return { ...base, type: "document", x: 32, y: 26, w: 36, h: 48, fold: 12 };
   }
 }
 
@@ -100,6 +102,25 @@ function handlesFor(p: IconPrimitive): Handle[] {
       // slant/lean handle at the bottom-left vertex
       { id: "k", x: p.x + p.slant, y: p.y + p.h, control: true, apply: (q, x) => { const r = q as typeof p; return { ...r, slant: round1(x - r.x) }; } },
     ];
+    case "gear": {
+      const rad = Math.PI / 180;
+      const dir = ((p.rotation ?? 0) - 90) * rad;
+      const rOut = p.r + p.toothDepth / 2;
+      const vx = p.cx + rOut * Math.cos(dir), vy = p.cy + rOut * Math.sin(dir);
+      const gx = p.cx + (rOut + 14) * Math.cos(dir), gy = p.cy + (rOut + 14) * Math.sin(dir);
+      return [
+        { id: "c", x: p.cx, y: p.cy, apply: (q, x, y) => ({ ...(q as typeof p), cx: x, cy: y }) },
+        // resize — nominal radius follows the tooth tip
+        { id: "r", x: vx, y: vy, apply: (q, x, y) => { const r = q as typeof p; return { ...r, r: Math.max(1, round1(dist(x, y, r.cx, r.cy) - r.toothDepth / 2)) }; } },
+        { id: "rot", x: gx, y: gy, control: true, apply: (q, x, y) => { const r = q as typeof p; return { ...r, rotation: round1(((Math.atan2(y - r.cy, x - r.cx) / rad) + 90 + 360) % 360) }; } },
+      ];
+    }
+    case "document": return [
+      { id: "o", x: p.x, y: p.y, apply: (q, x, y) => ({ ...(q as typeof p), x, y }) },
+      { id: "s", x: p.x + p.w, y: p.y + p.h, apply: (q, x, y) => { const r = q as typeof p; return { ...r, w: Math.max(1, round1(x - r.x)), h: Math.max(1, round1(y - r.y)) }; } },
+      // fold handle on the top edge — bigger dog-ear as it drags left
+      { id: "f", x: p.x + p.w - p.fold, y: p.y, control: true, apply: (q, x) => { const r = q as typeof p; return { ...r, fold: round1(Math.max(0, Math.min((r.x + r.w) - x, Math.min(r.w, r.h)))) }; } },
+    ];
     case "polygon": {
       const rad = Math.PI / 180;
       const dir = ((p.rotation ?? 0) - 90) * rad;         // first-vertex direction
@@ -132,7 +153,7 @@ function handlesFor(p: IconPrimitive): Handle[] {
   }
 }
 
-const PRIM_TYPES: IconPrimitive["type"][] = ["line", "path", "rect", "triangle", "circle", "ellipse", "arc", "parallelogram"];
+const PRIM_TYPES: IconPrimitive["type"][] = ["line", "path", "rect", "triangle", "circle", "ellipse", "arc", "parallelogram", "gear", "document"];
 
 // ── Translate a primitive by (dx,dy) in the 0..100 box ───────────────
 function translatePrim(p: IconPrimitive, dx: number, dy: number): IconPrimitive {
@@ -146,6 +167,8 @@ function translatePrim(p: IconPrimitive, dx: number, dy: number): IconPrimitive 
     case "arc": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
     case "polygon": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
     case "parallelogram": return { ...p, x: r1(p.x + dx), y: r1(p.y + dy) };
+    case "gear": return { ...p, cx: r1(p.cx + dx), cy: r1(p.cy + dy) };
+    case "document": return { ...p, x: r1(p.x + dx), y: r1(p.y + dy) };
     case "path": return { ...p, segments: p.segments.map((s) => {
       if (s.t === "M" || s.t === "L") return { ...s, x: r1(s.x + dx), y: r1(s.y + dy) };
       if (s.t === "Q") return { ...s, cx: r1(s.cx + dx), cy: r1(s.cy + dy), x: r1(s.x + dx), y: r1(s.y + dy) };
@@ -166,6 +189,8 @@ function primBBox(p: IconPrimitive): { minX: number; minY: number; maxX: number;
     case "arc": pts.push([p.cx - p.r, p.cy - p.r], [p.cx + p.r, p.cy + p.r]); break;
     case "polygon": for (const v of polygonPoints(p.cx, p.cy, p.r, p.sides, p.rotation ?? 0)) pts.push(v); break;
     case "parallelogram": for (const v of parallelogramPoints(p)) pts.push(v); break;
+    case "gear": { const ro = p.r + p.toothDepth / 2; pts.push([p.cx - ro, p.cy - ro], [p.cx + ro, p.cy + ro]); break; }
+    case "document": pts.push([p.x, p.y], [p.x + p.w, p.y + p.h]); break;
     case "path": for (const s of p.segments) {
       if ("x" in s) pts.push([s.x, s.y]);
       if (s.t === "Q") pts.push([s.cx, s.cy]);
@@ -317,6 +342,40 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
 
   // Move the whole selection by (dx,dy) — "closer to / further from" any edge.
   const nudge = (dx: number, dy: number) => setPrimitives((prev) => prev.map((p, i) => (selSet.has(i) ? translatePrim(p, dx, dy) : p)));
+
+  // ── Select all / copy / paste ──
+  const clipboard = useRef<IconPrimitive[]>([]);
+  const [clipCount, setClipCount] = useState(0);
+  const selectAll = () => { if (!primitives.length) return; setSelSet(new Set(primitives.map((_, i) => i))); setSel(primitives.length - 1); };
+  const copySelection = () => {
+    if (!selSet.size) return;
+    clipboard.current = [...selSet].sort((a, b) => a - b).map((i) => JSON.parse(JSON.stringify(primitives[i])) as IconPrimitive);
+    setClipCount(clipboard.current.length);
+  };
+  const pasteClipboard = () => {
+    const clip = clipboard.current;
+    if (!clip.length) return;
+    const base = primitives.length;
+    const added = clip.map((p, k) => ({ ...translatePrim(JSON.parse(JSON.stringify(p)) as IconPrimitive, 6, 6), z: base + k } as IconPrimitive));
+    setPrimitives((prev) => [...prev, ...added]);
+    setSelSet(new Set(added.map((_, k) => base + k)));
+    setSel(base + added.length - 1);
+  };
+  // Keyboard: Ctrl/Cmd+A select all · +C copy · +V paste. Ignored while typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const t = e.target as HTMLElement | null;
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      const k = e.key.toLowerCase();
+      if (k === "a") { e.preventDefault(); selectAll(); }
+      else if (k === "c") { if (selSet.size) { e.preventDefault(); copySelection(); } }
+      else if (k === "v") { if (clipboard.current.length) { e.preventDefault(); pasteClipboard(); } }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [primitives, selSet]);
 
   const patchSel = (patch: Partial<IconPrimitive>) =>
     setPrimitives((prev) => prev.map((p, i) => (i === sel ? { ...p, ...patch } as IconPrimitive : p)));
@@ -532,7 +591,14 @@ function IconEditor({ icons, reload, setErr }: { icons: LibIcon[]; reload: () =>
 
       {/* Primitive list + style/arrow controls */}
       <div className="bg-white border border-gray-200 rounded-lg p-2 self-start">
-        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 px-1">Shapes ({primitives.length})</div>
+        <div className="flex items-center justify-between mb-1 px-1">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Shapes ({primitives.length})</span>
+          <span className="flex items-center gap-1">
+            <button onClick={selectAll} disabled={!primitives.length} title="Select all (Ctrl+A)" className="px-1.5 py-0.5 text-[11px] border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40">All</button>
+            <button onClick={copySelection} disabled={!selSet.size} title="Copy selection (Ctrl+C)" className="px-1.5 py-0.5 text-[11px] border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40">Copy</button>
+            <button onClick={pasteClipboard} disabled={!clipCount} title="Paste (Ctrl+V)" className="px-1.5 py-0.5 text-[11px] border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40">Paste{clipCount ? ` (${clipCount})` : ""}</button>
+          </span>
+        </div>
         <div className="space-y-1 max-h-[240px] overflow-y-auto">
           {primitives.map((p, i) => (
             <div key={i} className={`flex items-center gap-1 px-1.5 py-1 rounded border text-[11px] ${sel === i ? "border-red-400 bg-red-50" : selSet.has(i) ? "border-blue-300 bg-blue-50" : "border-gray-200"}`}>

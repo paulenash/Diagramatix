@@ -5,6 +5,7 @@ import {
   drawCustomIcon,
   polygonPoints,
   parallelogramPoints,
+  gearPoints,
   type IconPrimitive,
 } from "@/app/lib/archimate/iconShapes";
 
@@ -59,6 +60,32 @@ describe("Custom icon shapes (Icon Library)", () => {
     // top edge at y=35, bottom edge at y=65 shifted right by slant
     expect(pts).toEqual([[30, 35], [70, 35], [82, 65], [42, 65]]);
     expect(draw([{ type: "parallelogram", x: 30, y: 35, w: 40, h: 30, slant: 12, z: 0, strokeWidth: 6, filled: false }])).toContain("<polygon");
+  });
+
+  // T1111 — geared wheel: validated (teeth clamped), 4 vertices per tooth, tips at r+depth/2.
+  it("T1111: gear primitive — validated + rendered with 8 chunky teeth", () => {
+    const [g] = validateIconPrimitives([{ type: "gear", cx: 50, cy: 50, r: 24, teeth: 8, toothDepth: 14, rotation: 0, z: 0, strokeWidth: 6, filled: false }]);
+    expect(g.type).toBe("gear");
+    expect((g as Extract<IconPrimitive, { type: "gear" }>).teeth).toBe(8);
+    // teeth clamped into 3..24
+    const [c] = validateIconPrimitives([{ type: "gear", cx: 50, cy: 50, r: 10, teeth: 99, toothDepth: 5, z: 0, strokeWidth: 6, filled: false }]);
+    expect((c as Extract<IconPrimitive, { type: "gear" }>).teeth).toBe(24);
+    const pts = gearPoints(50, 50, 24, 8, 14, 0);
+    expect(pts).toHaveLength(8 * 4);            // 4 outline vertices per tooth
+    // tips reach r + depth/2 = 31 from centre
+    const maxRad = Math.max(...pts.map(([x, y]) => Math.hypot(x - 50, y - 50)));
+    expect(Math.round(maxRad)).toBe(31);
+    expect(draw([{ type: "gear", cx: 50, cy: 50, r: 24, teeth: 8, toothDepth: 14, rotation: 0, z: 0, strokeWidth: 6, filled: false }])).toContain("<polygon");
+  });
+
+  // T1112 — dog-eared page (BPMN Data Object): validated + rendered as a folded path.
+  it("T1112: document primitive — validated + rendered as a dog-eared <path>", () => {
+    const [d] = validateIconPrimitives([{ type: "document", x: 32, y: 26, w: 36, h: 48, fold: 12, z: 0, strokeWidth: 6, filled: false }]);
+    expect(d.type).toBe("document");
+    expect((d as Extract<IconPrimitive, { type: "document" }>).fold).toBe(12);
+    const svg = draw([{ type: "document", x: 32, y: 26, w: 36, h: 48, fold: 12, z: 0, strokeWidth: 6, filled: false }]);
+    expect(svg).toContain("<path");           // body + fold crease as one path (two subpaths)
+    expect(svg.match(/M /g)?.length).toBeGreaterThanOrEqual(2);
   });
 
   // T1005 — each primitive renders the expected SVG node type; z-order ascending.

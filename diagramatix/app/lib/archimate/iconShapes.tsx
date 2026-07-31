@@ -80,8 +80,15 @@ export interface PolygonPrim extends BasePrim { type: "polygon"; cx: number; cy:
 /** A parallelogram — (x,y) = top-left vertex, `w`×`h` the edge lengths, `slant`
  *  the rightward shift of the BOTTOM edge (lean). Resizable in both directions. */
 export interface ParallelogramPrim extends BasePrim { type: "parallelogram"; x: number; y: number; w: number; h: number; slant: number; }
+/** A geared wheel / cog — `teeth` chunky teeth straddling the nominal circle at
+ *  radius `r` (tips at r+toothDepth/2, valleys at r-toothDepth/2). Resizable via
+ *  `r` and rotatable via `rotation`. */
+export interface GearPrim extends BasePrim { type: "gear"; cx: number; cy: number; r: number; teeth: number; toothDepth: number; rotation?: number; }
+/** A dog-eared page (BPMN Data Object): a `w`×`h` rectangle from (x,y) with the
+ *  top-right corner folded down by `fold`. Resizable. */
+export interface DocumentPrim extends BasePrim { type: "document"; x: number; y: number; w: number; h: number; fold: number; }
 
-export type IconPrimitive = LinePrim | PathPrim | RectPrim | TrianglePrim | CirclePrim | EllipsePrim | ArcPrim | PolygonPrim | ParallelogramPrim;
+export type IconPrimitive = LinePrim | PathPrim | RectPrim | TrianglePrim | CirclePrim | EllipsePrim | ArcPrim | PolygonPrim | ParallelogramPrim | GearPrim | DocumentPrim;
 
 /** The four vertices of a parallelogram in the 0..100 box (top-left, top-right,
  *  bottom-right, bottom-left). Shared by the renderer + the editor. */
@@ -208,6 +215,16 @@ function validateOne(raw: unknown, i: number): IconPrimitive | null {
       if (x === null || y === null) return null;
       return { ...base, type: "parallelogram", x, y, w: num(o.w, 0, 0, 140), h: num(o.h, 0, 0, 140), slant: num(o.slant, 12, -90, 90) };
     }
+    case "gear": {
+      const cx = coord(o.cx), cy = coord(o.cy);
+      if (cx === null || cy === null) return null;
+      return { ...base, type: "gear", cx, cy, r: num(o.r, 0, 0, 140), teeth: Math.round(num(o.teeth, 8, 3, 24)), toothDepth: num(o.toothDepth, 12, 0, 80), rotation: isFiniteNum(o.rotation) ? o.rotation : undefined };
+    }
+    case "document": {
+      const x = coord(o.x), y = coord(o.y);
+      if (x === null || y === null) return null;
+      return { ...base, type: "document", x, y, w: num(o.w, 0, 0, 140), h: num(o.h, 0, 0, 140), fold: num(o.fold, 12, 0, 70) };
+    }
     default: return null;
   }
 }
@@ -239,6 +256,26 @@ export function polygonPoints(cx: number, cy: number, r: number, sides: number, 
   for (let i = 0; i < n; i++) {
     const a = start + (i * 2 * Math.PI) / n;
     pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  return pts;
+}
+
+/** Outline vertices of a geared wheel in the 0..100 box — `teeth` chunky teeth
+ *  straddling radius `r` (tips at r+depth/2, valleys at r-depth/2). `rotation` in
+ *  degrees. Shared by the renderer + the editor. */
+export function gearPoints(cx: number, cy: number, r: number, teeth: number, toothDepth: number, rotation = 0): [number, number][] {
+  const n = Math.max(3, Math.round(teeth));
+  const rOut = r + toothDepth / 2, rIn = Math.max(1, r - toothDepth / 2);
+  const step = (2 * Math.PI) / n;
+  const toothFrac = 0.55;                       // chunky: tooth top spans 55% of the slice
+  const start = (rotation - 90) * DEG;
+  const at = (rad: number, ang: number): [number, number] => [cx + rad * Math.cos(ang), cy + rad * Math.sin(ang)];
+  const pts: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    const a = start + i * step;
+    const topStart = a + step * (1 - toothFrac) / 2;
+    const topEnd = a + step * (1 + toothFrac) / 2;
+    pts.push(at(rIn, topStart), at(rOut, topStart), at(rOut, topEnd), at(rIn, topEnd));
   }
   return pts;
 }
@@ -376,6 +413,19 @@ export function drawCustomIcon(
       case "parallelogram": {
         const pts = parallelogramPoints(p).map(([x, y]) => `${mx(x)},${my(y)}`).join(" ");
         return <polygon key={key} points={pts} {...common} />;
+      }
+      case "gear": {
+        const pts = gearPoints(p.cx, p.cy, p.r, p.teeth, p.toothDepth, p.rotation ?? 0).map(([x, y]) => `${mx(x)},${my(y)}`).join(" ");
+        return <polygon key={key} points={pts} {...common} />;
+      }
+      case "document": {
+        const f = Math.max(0, Math.min(p.fold, Math.min(p.w, p.h)));
+        const X = (n: number) => mx(n), Y = (n: number) => my(n);
+        const d =
+          `M ${X(p.x)} ${Y(p.y)} L ${X(p.x + p.w - f)} ${Y(p.y)} L ${X(p.x + p.w)} ${Y(p.y + f)} ` +
+          `L ${X(p.x + p.w)} ${Y(p.y + p.h)} L ${X(p.x)} ${Y(p.y + p.h)} Z ` +
+          `M ${X(p.x + p.w - f)} ${Y(p.y)} L ${X(p.x + p.w - f)} ${Y(p.y + f)} L ${X(p.x + p.w)} ${Y(p.y + f)}`;
+        return <path key={key} d={d} {...common} />;
       }
     }
   });
