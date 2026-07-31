@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { UserGuideLink } from "@/app/components/UserGuideLink";
 
 interface Prompt {
   id: string;
@@ -163,7 +164,7 @@ export function PromptMaintenance() {
           <p className="text-xs text-gray-400">
             Manage saved prompts for AI diagram generation
           </p>
-          <a href="/help" className="text-xs text-blue-600 hover:underline shrink-0">User Guide</a>
+          <UserGuideLink className="text-xs text-blue-600 hover:underline shrink-0">User Guide</UserGuideLink>
         </div>
       </header>
 

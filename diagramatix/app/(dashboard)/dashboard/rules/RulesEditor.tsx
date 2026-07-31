@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { UserGuideLink } from "@/app/components/UserGuideLink";
 import {
   CODE_REQUIRED_GROUPS,
   RULE_LINE_RE,
@@ -481,7 +482,7 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
               View all categories
             </Link>
           )}
-          <Link href="/help" className="text-xs text-blue-600 hover:underline shrink-0">User Guide</Link>
+          <UserGuideLink className="text-xs text-blue-600 hover:underline shrink-0">User Guide</UserGuideLink>
         </div>
       </header>
 

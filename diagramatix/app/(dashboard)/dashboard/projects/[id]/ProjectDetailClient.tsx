@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { UserGuideLink } from "@/app/components/UserGuideLink";
 import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
@@ -2714,7 +2715,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               )}
             </>
           )}
-          <a href="/help" className="text-xs text-blue-600 hover:underline ml-1" title="User Guide">User Guide</a>
+          <UserGuideLink className="text-xs text-blue-600 hover:underline ml-1" title="User Guide">User Guide</UserGuideLink>
         </div>
         {projectDescription && (
           <p className="text-[10px] text-gray-500 mt-1 ml-20 truncate" title={projectDescription}>{projectDescription}</p>

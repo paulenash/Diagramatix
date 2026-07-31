@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { UserGuideLink } from "@/app/components/UserGuideLink";
 import { useState } from "react";
 
 export type MergedRule = {
@@ -131,7 +132,7 @@ export function ScannerRulesClient({ rules }: { rules: MergedRule[] }) {
           <p className="text-xs text-gray-400">
             Code checks in <code className="text-[10px] bg-gray-100 px-1 rounded">diagramChecks.ts</code>; lifecycle in the registry.
           </p>
-          <Link href="/help" className="text-xs text-blue-600 hover:underline shrink-0">User Guide</Link>
+          <UserGuideLink className="text-xs text-blue-600 hover:underline shrink-0">User Guide</UserGuideLink>
         </div>
       </header>
 

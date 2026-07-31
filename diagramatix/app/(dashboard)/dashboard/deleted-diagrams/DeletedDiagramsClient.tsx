@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { UserGuideLink } from "@/app/components/UserGuideLink";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 
 interface DeletedDiagram {
@@ -234,7 +235,7 @@ export function DeletedDiagramsClient() {
         </div>
         <div className="flex items-center gap-3">
           <p className="text-xs text-gray-400">Restore brings a diagram back to its original project. Permanent delete cannot be undone.</p>
-          <Link href="/help" className="text-xs text-blue-600 hover:underline">User Guide</Link>
+          <UserGuideLink className="text-xs text-blue-600 hover:underline">User Guide</UserGuideLink>
         </div>
       </header>
 

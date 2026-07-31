@@ -1,6 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { safeInternalPath } from "@/app/lib/safeRedirect";
+import { backLabelForPath } from "@/app/lib/navReturn";
 import type { Entitlements, FeatureKey } from "@/app/lib/subscription";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { tonesFor, readableTextOn, type FeatureColorKey } from "@/app/lib/theme/featureColors";
@@ -114,19 +116,24 @@ const CARDS: MenuCard[] = [
  */
 export function OrgAdminClient({ orgName, entitlements }: { orgName: string; entitlements?: Entitlements }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const scheme = useFeatureColors();
   const ent: Entitlements = entitlements ?? { simulator: true, processMining: true, riskControl: true, apqc: true };
+  // Return to the point of invocation (the page that opened OrgAdmin), falling
+  // back to the dashboard. Guarded by safeInternalPath (SEC-15 open-redirect).
+  const backHref = safeInternalPath(searchParams.get("from")) ?? "/dashboard";
+  const backLabel = backLabelForPath(backHref);
 
   return (
     <div className="h-screen dgx-dashboard-bg flex flex-col overflow-hidden">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3 shrink-0">
         <button
-          onClick={() => router.push("/dashboard")}
+          onClick={() => router.push(backHref)}
           className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-          title="Return to Dashboard"
+          title={`Return to ${backLabel}`}
         >
           <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"←"}</span>
-          <span className="underline">Dashboard</span>
+          <span className="underline">{backLabel}</span>
         </button>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-7 h-7" />

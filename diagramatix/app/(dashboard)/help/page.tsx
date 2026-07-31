@@ -6,13 +6,15 @@ import { HelpSidebar, type GuideIndexEntry } from "./HelpSidebar";
 import { isActingSuperuser } from "@/app/lib/auth/orgPolicy";
 import { prisma } from "@/app/lib/db";
 import { renderHelpMarkdown } from "@/app/lib/help/renderMarkdown";
+import { safeInternalPath } from "@/app/lib/safeRedirect";
+import { backLabelForPath } from "@/app/lib/navReturn";
 
 export const metadata = { title: "Diagramatix — User Guide" };
 
 export default async function HelpPage({
   searchParams,
 }: {
-  searchParams: Promise<{ c?: string; view?: string; q?: string; cat?: string }>;
+  searchParams: Promise<{ c?: string; view?: string; q?: string; cat?: string; from?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -21,12 +23,19 @@ export default async function HelpPage({
   // the logo down to OrgAdmin / Normal view must NOT see SuperAdmin guide content
   // OR the admin-only chrome (preview toggle, edit hint).
   const actingAdmin = await isActingSuperuser(session);
-  const { c, view, q, cat } = await searchParams;
+  const { c, view, q, cat, from } = await searchParams;
   // A SuperAdmin (in superadmin view mode) can also preview the standard view via
   // the in-page toggle. `isAdmin` is the EFFECTIVE flag used for filtering.
   const previewStandard = actingAdmin && view === "standard";
   const isAdmin = actingAdmin && !previewStandard;
   const viewQs = previewStandard ? "&view=standard" : "";
+  // Return-to-point-of-invocation: the guide is reached from many pages; the
+  // caller passes `?from=<their path>` so the back link (and every in-page
+  // chapter/toggle link, which must PRESERVE `from`) returns there instead of a
+  // hardcoded /dashboard. Guarded by safeInternalPath (SEC-15 open-redirect).
+  const backHref = safeInternalPath(from) ?? "/dashboard";
+  const backLabel = backLabelForPath(backHref);
+  const fromQs = safeInternalPath(from) ? `&from=${encodeURIComponent(safeInternalPath(from)!)}` : "";
 
   // One query feeds BOTH the searchable sidebar index and the current chapter's
   // rendered body. The guide lives in the DB (migrated out of chapters.tsx) so
@@ -83,9 +92,9 @@ export default async function HelpPage({
     <div className="min-h-screen dgx-dashboard-bg">
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+          <Link href={backHref} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
             <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"←"}</span>
-            <span className="underline">Dashboard</span>
+            <span className="underline">{backLabel}</span>
           </Link>
           <h1 className="text-lg font-semibold text-gray-900">User Guide</h1>
         </div>
@@ -93,7 +102,7 @@ export default async function HelpPage({
           <div className="flex items-center gap-2 text-xs">
             <span className="text-gray-400">Viewing as:</span>
             <Link
-              href={`/help?c=${current.slug}`}
+              href={`/help?c=${current.slug}${fromQs}`}
               className={`px-2 py-0.5 rounded ${!previewStandard
                 ? "bg-red-50 text-red-700 font-semibold border border-red-200"
                 : "text-gray-500 hover:bg-gray-100"}`}
@@ -101,7 +110,7 @@ export default async function HelpPage({
               SuperAdmin
             </Link>
             <Link
-              href={`/help?c=${current.slug}&view=standard`}
+              href={`/help?c=${current.slug}&view=standard${fromQs}`}
               className={`px-2 py-0.5 rounded ${previewStandard
                 ? "bg-blue-50 text-blue-700 font-semibold border border-blue-200"
                 : "text-gray-500 hover:bg-gray-100"}`}
@@ -117,7 +126,7 @@ export default async function HelpPage({
       {previewStandard && (
         <div className="bg-blue-50 border-b border-blue-200 px-6 py-1.5 text-center text-xs text-blue-700">
           Previewing the <strong>standard (User / OrgAdmin)</strong> guide — SuperAdmin-only pages are hidden.
-          {" "}<Link href={`/help?c=${current.slug}`} className="underline">Back to SuperAdmin view</Link>
+          {" "}<Link href={`/help?c=${current.slug}${fromQs}`} className="underline">Back to SuperAdmin view</Link>
         </div>
       )}
 
@@ -125,7 +134,7 @@ export default async function HelpPage({
         <HelpSidebar
           entries={entries}
           currentSlug={current.slug}
-          viewQs={viewQs}
+          viewQs={viewQs + fromQs}
           initialQuery={q ?? ""}
           initialCategory={cat ?? ""}
         />

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { UserGuideLink } from "@/app/components/UserGuideLink";
 import type { DiagramType } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
@@ -1606,7 +1607,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   styling matches the elevated-role convention. */}
               {((!isSu && (orgRole === "Owner" || orgRole === "Admin")) || (isSu && adminViewMode === "orgadmin")) && (
                 <a
-                  href="/dashboard/org-admin"
+                  href="/dashboard/org-admin?from=/dashboard"
                   className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
                   title="OrgAdmin menu — Registered Users, Org Settings, Project Sharing"
                 >
@@ -1818,13 +1819,12 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           >
             Features
           </a>
-          <a
-            href="/help"
+          <UserGuideLink
             className="text-xs text-gray-500 hover:text-blue-600"
             title="User Guide"
           >
             User Guide
-          </a>
+          </UserGuideLink>
           {orgName && (
             <div
               className="text-xs text-gray-600 border border-gray-200 rounded px-2 py-1 bg-gray-50"
