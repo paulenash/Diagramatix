@@ -8,8 +8,8 @@
  *
  * Each of the 11 ArchiMate relationship types maps to a DISTINCT visual per the
  * authoritative ArchiMate 3.x notation (source-end / line / target-end):
- *   composition    — filled diamond at SOURCE,  solid line, no target head
- *   aggregation    — open  diamond at SOURCE,  solid line, no target head
+ *   composition    — filled diamond at SOURCE,  solid line, open arrow at target
+ *   aggregation    — open  diamond at SOURCE,  solid line, open arrow at target
  *   assignment     — filled ball  at SOURCE,  solid line, filled arrow at target
  *   serving        —                           solid line, open  arrow  at target
  *   access         —                           dotted line, open  arrow  at target
@@ -71,12 +71,15 @@ export function styleFor(type: ArchimateConnectorType, selected: boolean): Archi
     strokeWidth: selected ? 1.8 : 1.4,
   };
   switch (type) {
-    // Structural — the diamond/ball sits at the SOURCE ("whole") end; no
-    // target arrowhead. SOLID line.
+    // Structural — the diamond/ball sits at the SOURCE ("whole") end. Composition
+    // and Aggregation are drawn DIRECTED source→target: the diamond marks the
+    // whole (source) and a small open arrowhead at the target (part) shows the
+    // direction — so drawing whole→part reads correctly and the relationship can
+    // point INTO an And/Or junction target. SOLID line.
     case "archi-composition":
-      return { ...base, startMarker: "diamond-filled", endMarker: null };
+      return { ...base, startMarker: "diamond-filled", endMarker: "arrow-open" };
     case "archi-aggregation":
-      return { ...base, startMarker: "diamond-open", endMarker: null };
+      return { ...base, startMarker: "diamond-open", endMarker: "arrow-open" };
     case "archi-assignment":
       // Filled ball at source + filled (solid) arrowhead at target, solid line.
       return { ...base, startMarker: "circle-filled", endMarker: "arrow-filled" };

@@ -29,6 +29,14 @@ const ALL_TYPES: ArchimateConnectorType[] = [
   "archi-association-directed", "archi-triggering", "archi-flow", "archi-specialisation",
 ];
 
+// And/Or junctions are notation nodes, not elements, so they're absent from the
+// 3.2 matrix. Per spec a junction splits/joins relationships: Composition,
+// Aggregation, Realisation and every directed relationship may connect to a
+// junction (in either direction). We therefore allow every relationship type
+// when either endpoint is a junction — the picker never blocks a junction wiring.
+// Names match the catalogue masters `composite-junction-and/-or`.
+const JUNCTION_NAMES = new Set<string>(["And-Junction", "Or-Junction"]);
+
 let cached: MatrixData | null = null;
 let loadPromise: Promise<MatrixData> | null = null;
 
@@ -71,6 +79,12 @@ export function getAllowedRelationships(
   const derived = new Set<ArchimateConnectorType>();
 
   if (!cached || !sourceName || !targetName) {
+    for (const t of ALL_TYPES) allowed.add(t);
+    return { allowed, derived };
+  }
+
+  // A junction at either end permits every relationship type (see JUNCTION_NAMES).
+  if (JUNCTION_NAMES.has(sourceName) || JUNCTION_NAMES.has(targetName)) {
     for (const t of ALL_TYPES) allowed.add(t);
     return { allowed, derived };
   }

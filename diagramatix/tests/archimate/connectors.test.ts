@@ -98,17 +98,17 @@ describe("ArchiMate connector registry", () => {
   const DOTTED = "2 3";
   const DASHED = "6 3";
 
-  it("composition — filled diamond at source, solid line, no target head", () => {
+  it("composition — filled diamond at source, solid line, open arrow at target (directed source→target)", () => {
     const s = styleFor("archi-composition", false);
     expect(s.startMarker).toBe("diamond-filled");
-    expect(s.endMarker).toBeNull();
+    expect(s.endMarker).toBe("arrow-open");
     expect(s.dash).toBe(SOLID);
   });
 
-  it("aggregation — open diamond at source, solid line, no target head", () => {
+  it("aggregation — open diamond at source, solid line, open arrow at target (directed source→target)", () => {
     const s = styleFor("archi-aggregation", false);
     expect(s.startMarker).toBe("diamond-open");
-    expect(s.endMarker).toBeNull();
+    expect(s.endMarker).toBe("arrow-open");
     expect(s.dash).toBe(SOLID);
   });
 

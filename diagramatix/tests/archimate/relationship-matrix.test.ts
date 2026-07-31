@@ -73,4 +73,20 @@ describe("ArchiMate 3.2 relationship matrix", () => {
     expect(getAllowedRelationships("Not An Element", "Business Actor").allowed.size).toBe(12);
     expect(getAllowedRelationships(undefined, "Business Actor").allowed.size).toBe(12);
   });
+
+  it("T2201 — a junction TARGET permits Composition, Aggregation, Realisation + all directed relationships", () => {
+    for (const jn of ["And-Junction", "Or-Junction"]) {
+      const a = getAllowedRelationships("Business Process", jn).allowed;
+      for (const rel of ["archi-composition", "archi-aggregation", "archi-realisation",
+        "archi-assignment", "archi-serving", "archi-access", "archi-influence",
+        "archi-triggering", "archi-flow", "archi-association-directed"]) {
+        expect(a.has(rel as never), `${jn} target should permit ${rel}`).toBe(true);
+      }
+    }
+  });
+
+  it("T2202 — a junction at EITHER end resolves to allow-all (junction as source or target)", () => {
+    expect(getAllowedRelationships("And-Junction", "Distribution Network").allowed.size).toBe(12);
+    expect(getAllowedRelationships("Business Process", "Or-Junction").allowed.size).toBe(12);
+  });
 });

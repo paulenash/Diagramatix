@@ -3194,9 +3194,11 @@ export function SymbolRenderer({
         );
       })()}
 
-      {/* Selection outline — ellipse for circular shapes, rect otherwise. */}
+      {/* Selection outline — ellipse for circular shapes (incl. ArchiMate
+          junctions, which are round point-nodes — a square box around the tiny
+          circle reads as a rendering glitch), rect otherwise. */}
       {selected && !isContainer && (
-        (element.type === "process-system" || element.type === "use-case") ? (
+        (element.type === "process-system" || element.type === "use-case" || isArchiJunction) ? (
           <ellipse data-interactive
             cx={element.x + element.width / 2} cy={element.y + element.height / 2}
             rx={element.width / 2 + 3} ry={element.height / 2 + 3}
@@ -3218,7 +3220,7 @@ export function SymbolRenderer({
           elements connected to the selected element (not the selected one
           itself, which keeps its blue outline). */}
       {isAssociationHighlight && !selected && (
-        (element.type === "process-system" || element.type === "use-case") ? (
+        (element.type === "process-system" || element.type === "use-case" || isArchiJunction) ? (
           <ellipse
             cx={element.x + element.width / 2} cy={element.y + element.height / 2}
             rx={element.width / 2 + 3} ry={element.height / 2 + 3}

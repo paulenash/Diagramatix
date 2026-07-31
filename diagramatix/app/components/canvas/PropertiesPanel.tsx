@@ -30,6 +30,7 @@ import { ModelSelect, type AllowedModel } from "@/app/(dashboard)/diagram/[id]/M
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { umlAttributeTypeList } from "@/app/lib/diagram/umlTypes";
 import { getCachedCatalogue, findShapeByKey, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
+import { getAllowedRelationships, loadCompatibilityMatrix } from "@/app/lib/archimate/compatibility";
 
 // ArchiMate relationship metadata — maps the archi-* connector type to its
 // human name and ArchiMate relationship group (shown in the Properties panel).
@@ -829,6 +830,10 @@ export function PropertiesPanel({
 }: Props) {
   // Grey out SharePoint actions when the deployment/org doesn't offer SharePoint.
   const sharePointAvailable = useSharePointAvailable();
+  // Load the ArchiMate 3.2 relationship matrix so the Relationship Group/Type
+  // dropdowns can be filtered to what the source→target pair actually permits.
+  const [archiMatrixReady, setArchiMatrixReady] = useState(false);
+  useEffect(() => { loadCompatibilityMatrix().then(() => setArchiMatrixReady(true)).catch(() => {}); }, []);
   const [labelDraft, setLabelDraft] = useState("");
   // Auto-grow textarea ref for task/subprocess Name editing — height
   // tracks content up to 6 lines, then scrolls.
@@ -1397,8 +1402,24 @@ export function PropertiesPanel({
         {connector.type.startsWith("archi-") && onUpdateConnectorType && (() => {
           const meta = ARCHI_REL_META[connector.type];
           const group: ArchiRelGroup = meta?.group ?? "Other";
-          const typesInGroup = Object.entries(ARCHI_REL_META).filter(([, m]) => m.group === group);
           const stop = { onMouseDown: (e: React.MouseEvent) => e.stopPropagation() };
+          // Filter both dropdowns to what ArchiMate 3.2 permits for this exact
+          // source→target pair. Resolve each endpoint's concept name from its
+          // shapeKey, then ask the matrix. `archiMatrixReady` gates a re-render
+          // once the matrix loads; until then getAllowedRelationships degrades to
+          // allow-all so the picker never blocks the user. The CURRENT type is
+          // always kept selectable so an existing (possibly legacy) connector's
+          // value never vanishes from its own dropdown.
+          void archiMatrixReady;
+          const srcEl = allElements?.find(e => e.id === connector.sourceId);
+          const tgtEl = allElements?.find(e => e.id === connector.targetId);
+          const srcName = typeof srcEl?.properties?.shapeKey === "string" ? findShapeByKey(srcEl.properties.shapeKey)?.name : undefined;
+          const tgtName = typeof tgtEl?.properties?.shapeKey === "string" ? findShapeByKey(tgtEl.properties.shapeKey)?.name : undefined;
+          const allowed = getAllowedRelationships(srcName, tgtName).allowed;
+          const isPermitted = (key: string) => (allowed as Set<string>).has(key) || key === connector.type;
+          const allowedGroups = ARCHI_GROUPS.filter(g =>
+            Object.entries(ARCHI_REL_META).some(([key, m]) => m.group === g && isPermitted(key)));
+          const typesInGroup = Object.entries(ARCHI_REL_META).filter(([key, m]) => m.group === group && isPermitted(key));
           return (
             <div className="space-y-1.5">
               <div>
@@ -1406,13 +1427,14 @@ export function PropertiesPanel({
                 <select
                   value={group}
                   onChange={(e) => {
-                    const first = Object.entries(ARCHI_REL_META).find(([, m]) => m.group === e.target.value);
+                    // Jump to the first PERMITTED type in the chosen group.
+                    const first = Object.entries(ARCHI_REL_META).find(([key, m]) => m.group === e.target.value && isPermitted(key));
                     if (first) onUpdateConnectorType(connector.id, first[0] as ConnectorType);
                   }}
                   className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700 cursor-pointer"
                   {...stop}
                 >
-                  {ARCHI_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+                  {allowedGroups.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
               <div>
@@ -1850,9 +1872,11 @@ export function PropertiesPanel({
           })();
           const showDirection = !involvesAnnotation &&
             connector.type !== "messageBPMN" &&
-            // Domain (UML) connectors carry their own end semantics (fixed
-            // arrowheads / diamonds / triangles) — no generic Direction control.
+            // Domain (UML) and ArchiMate connectors carry their own end semantics
+            // (fixed arrowheads / diamonds / triangles determined by the
+            // relationship type) — no generic Direction control.
             !isUmlConnType(connector.type) &&
+            !connector.type.startsWith("archi-") &&
             (isAssocBPMN || isAssocPC ||
             (connector.type !== "sequence" && connector.type !== "transition" && connector.type !== "flow") ||
             connector.routingType === "direct");

@@ -178,7 +178,13 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   const hasLink = !!(el.properties?.linkedDiagramId as string | undefined);
   const glyphColour = hasLink ? "#16a34a" : iconColour;
 
-  if (iconOnly && drawIcon) {
+  // Junctions have a dedicated centred-circle render below and must never take
+  // the generic icon-only path — image ingestion sets `archimateIconOnly: true`
+  // on them, and the icon-only fallback would draw a box + corner-glyph (the
+  // "funny boundary" bug) instead of the filled/open circle notation.
+  const isJunction = !!entry.iconType && entry.iconType.startsWith("junction");
+
+  if (iconOnly && drawIcon && !isJunction) {
     // Icon-only rendering: the icon IS the shape. Fill the element bounds
     // with the glyph; no rectangular outline.
     //   - Actor: the stick figure (label rendered below by SymbolRenderer)

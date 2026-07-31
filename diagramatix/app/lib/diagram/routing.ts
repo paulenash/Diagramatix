@@ -570,11 +570,14 @@ function pathHitsObstacles(path: Point[], obstacles: Bounds[], margin = 4): bool
   return false;
 }
 
-// Generous clearance used for "would this L-shape look cramped?" checks
-// in both buildOrthogonalPath and computeWaypoints. When an obstacle is
-// within this distance of an L-segment we reject the L and force a
-// proper detour. Matches the BIG_MARGIN used inside buildOrthogonalPath.
-const L_SHAPE_CLEARANCE = 33; // ½ × default Task height (65 px)
+// Clearance used for "would this simple L / Z path graze an obstacle?" checks
+// in both buildOrthogonalPath and computeWaypoints. When an obstacle is within
+// this distance of a simple-path segment we reject it and force a proper detour.
+// Kept deliberately SMALL: at 33px (½ a task height) avoidance fired well before
+// it was actually needed — a connector would kink sideways even with ample room
+// beside it. 12px gives a modest visual berth past the hard crossing test
+// (segmentHitsObstacle's margin=4) without discarding otherwise-clean paths.
+const L_SHAPE_CLEARANCE = 12;
 
 function buildOrthogonalPath(
   start: Point,
@@ -1941,7 +1944,13 @@ export function recomputeAllConnectors(
       }
       const aRes = computeWaypoints(source, target, elements,
         aSrcSide, aTgtSide, conn.routingType, aSrcOff, aTgtOff);
-      return { ...conn, waypoints: aRes.waypoints,
+      // Fuse collinear stub points: computeWaypoints emits a perpendicular exit
+      // stub + mid points that are frequently collinear (e.g. a facing-sides Z
+      // stored as 8 points that is visually 3 segments). Fusing them removes the
+      // redundant vertices — a cleaner path, fewer phantom "kinks", and stable
+      // segment handles — without changing the visible route.
+      const aWaypoints = fuseCollinearWaypoints(aRes.waypoints);
+      return { ...conn, waypoints: aWaypoints,
         sourceInvisibleLeader: aRes.sourceInvisibleLeader,
         targetInvisibleLeader: aRes.targetInvisibleLeader,
         sourceSide: aSrcSide, targetSide: aTgtSide,
