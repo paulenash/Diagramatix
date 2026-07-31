@@ -287,22 +287,42 @@ function parseFolderTree(raw: unknown): FolderTree {
   return raw as FolderTree;
 }
 
-// Debounced save — ensures rapid changes don't flood the API
+// Debounced save — ensures rapid changes don't flood the API. `flushFolderTreeSave`
+// forces any pending write to commit NOW (awaitable). We flush before navigating
+// away after creating a diagram: otherwise the 500 ms debounce can still be
+// pending when the project screen re-fetches on return, so it reads the
+// pre-save tree and the new diagram loses its folder placement (appears unfiled).
 let _folderTreeSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let _folderTreePending: { projectId: string; tree: FolderTree } | null = null;
+
+function putFolderTree(projectId: string, tree: FolderTree): Promise<void> {
+  return fetch(`/api/projects/${projectId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ folderTree: tree }),
+  }).then(r => {
+    if (!r.ok) console.error("[saveFolderTree] failed:", r.status);
+  }).catch(err => {
+    console.error("[saveFolderTree] error:", err);
+  });
+}
+
 function saveFolderTreeToDb(projectId: string, tree: FolderTree) {
   if (_folderTreeSaveTimer) clearTimeout(_folderTreeSaveTimer);
+  _folderTreePending = { projectId, tree };
   _folderTreeSaveTimer = setTimeout(() => {
     _folderTreeSaveTimer = null;
-    fetch(`/api/projects/${projectId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ folderTree: tree }),
-    }).then(r => {
-      if (!r.ok) console.error("[saveFolderTree] failed:", r.status);
-    }).catch(err => {
-      console.error("[saveFolderTree] error:", err);
-    });
+    const p = _folderTreePending; _folderTreePending = null;
+    if (p) void putFolderTree(p.projectId, p.tree);
   }, 500);
+}
+
+/** Commit any pending debounced folder-tree write immediately. Await before a
+ *  navigation that will trigger a project re-fetch so the placement isn't lost. */
+async function flushFolderTreeSave(): Promise<void> {
+  if (_folderTreeSaveTimer) { clearTimeout(_folderTreeSaveTimer); _folderTreeSaveTimer = null; }
+  const p = _folderTreePending; _folderTreePending = null;
+  if (p) await putFolderTree(p.projectId, p.tree);
 }
 
 interface DiagramSummary {
@@ -791,6 +811,16 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       }
     } catch { /* best-effort */ }
   }, [project.id]);
+
+  // Manual navigation-tree refresh (toolbar ↻). Re-fetches diagrams + folder
+  // tree from the server AND invalidates the App-Router cache, so a user who
+  // suspects the tree is stale (30 s Router-Cache window) can force-sync.
+  const [treeRefreshing, setTreeRefreshing] = useState(false);
+  const refreshTree = useCallback(async () => {
+    setTreeRefreshing(true);
+    try { await refreshProjectData(); router.refresh(); }
+    finally { setTreeRefreshing(false); }
+  }, [refreshProjectData, router]);
 
   // Refresh project data on mount (catches same-tab navigation back from diagram editor)
   // and when window/tab regains visibility
@@ -1767,6 +1797,9 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     if (selectedFolderId !== ROOT_ID) {
       updateTree(t => ({ ...t, diagramFolderMap: { ...t.diagramFolderMap, [diagram.id]: selectedFolderId } }));
     }
+    // Persist placement + invalidate the cached project snapshot before leaving.
+    await flushFolderTreeSave();
+    router.refresh();
     router.push(`/diagram/${diagram.id}`);
   }
 
@@ -2753,6 +2786,22 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               <option value="modified-asc">Modified ↑ (oldest first)</option>
               <option value="type">Diagram Type</option>
             </select>
+            {/* Manual refresh — force-sync the navigation tree with the server
+                (diagrams + folders) and invalidate the App-Router cache. */}
+            <button
+              type="button"
+              onClick={refreshTree}
+              disabled={treeRefreshing}
+              title="Refresh the navigation tree (reload diagrams & folders from the server)"
+              aria-label="Refresh navigation tree"
+              className="shrink-0 p-0.5 rounded text-gray-500 hover:text-blue-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-default"
+            >
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+                className={treeRefreshing ? "animate-spin" : undefined}>
+                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                <path d="M21 3v6h-6" />
+              </svg>
+            </button>
           </div>
           <ProjectStructureSection projectId={project.id} canEdit={!readOnly} />
           {ent.riskControl && (
@@ -3276,11 +3325,16 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           targetExistingId={targetExistingId}
           targetExistingNames={targetExistingNames}
           onClose={() => setShowPcfCreate(false)}
-          onCreated={(diagramId, createdPcf) => {
+          onCreated={async (diagramId, createdPcf) => {
             if (selectedFolderId !== ROOT_ID) {
               updateTree(t => ({ ...t, diagramFolderMap: { ...t.diagramFolderMap, [diagramId]: selectedFolderId } }));
             }
             adoptFramework(createdPcf);
+            // Persist the folder placement first, then invalidate the project
+            // route's 30 s Router-Cache snapshot so returning here shows the new
+            // diagram — not the pre-creation cached screen.
+            await flushFolderTreeSave();
+            router.refresh();
             router.push(`/diagram/${diagramId}`);
           }}
           onBulkCreated={async (assign, rootDiagramId, createdPcf) => {
@@ -3290,7 +3344,11 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             if (Object.keys(assign).length > 0) updateTree(t => ({ ...t, diagramFolderMap: { ...t.diagramFolderMap, ...assign } }));
             adoptFramework(createdPcf);
             await fetch(`/api/projects/${project.id}/scan-links`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }).catch(() => {});
+            await flushFolderTreeSave();
             setShowPcfCreate(false);
+            // Invalidate the cached project snapshot; also refresh client state
+            // when we stay on the project (no root diagram to open).
+            router.refresh();
             if (rootDiagramId) router.push(`/diagram/${rootDiagramId}`);
             else refreshProjectData();
           }}

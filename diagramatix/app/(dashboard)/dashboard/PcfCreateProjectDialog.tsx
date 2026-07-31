@@ -90,6 +90,9 @@ export function PcfCreateProjectDialog({ onClose }: { onClose: () => void }) {
         }),
       });
 
+      // Invalidate the dashboard's cached project list before opening the new
+      // project, so a return to the dashboard shows it (30 s Router-Cache window).
+      router.refresh();
       router.push(`/dashboard/projects/${project.id}`);
     } catch { setErr("Failed"); }
     finally { setBusy(false); setStatus(null); }
