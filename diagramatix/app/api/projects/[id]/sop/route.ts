@@ -69,6 +69,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const diagramId = typeof body.diagramId === "string" ? body.diagramId : "";
   const scope: SopScope = SCOPES.includes(body.scope) ? body.scope : "whole";
   const scopeElementId = typeof body.scopeElementId === "string" ? body.scopeElementId : undefined;
+  // Optional client-rasterised diagram PNG (data: URI) → embedded as a figure.
+  const figure = typeof body.figure === "string" && body.figure.startsWith("data:image/") ? body.figure : null;
   if (!diagramId) return NextResponse.json({ error: "diagramId is required" }, { status: 400 });
 
   const diagram = await prisma.diagram.findUnique({
@@ -124,7 +126,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       generatedAt: new Date(),
       createdById: session.user.id,
       sections: {
-        create: result.sections.map((s, i) => ({ heading: s.heading, bodyMarkdown: s.body, sortOrder: i })),
+        create: [
+          ...result.sections.map((s, i) => ({ heading: s.heading, bodyMarkdown: s.body, sortOrder: i })),
+          ...(figure ? [{ heading: "Process Diagram", bodyMarkdown: "", image: figure, sortOrder: result.sections.length }] : []),
+        ],
       },
     },
     select: { id: true },

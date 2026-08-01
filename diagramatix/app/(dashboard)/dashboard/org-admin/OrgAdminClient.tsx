@@ -58,6 +58,12 @@ const CARDS: MenuCard[] = [
       "Download a backup of your whole Org, or selectively restore an Org member's projects / diagrams.",
   },
   {
+    href: "/dashboard/org-admin/sop-templates?from=/dashboard/org-admin",
+    title: "SOP Templates",
+    description:
+      "Upload your organisation's Word (.docx) SOP template — its fonts & heading styles are applied when SOPs are exported. Mark one as the default.",
+  },
+  {
     href: "/dashboard/prompts?from=/dashboard/org-admin",
     title: "AI Prompt Maintenance",
     description:

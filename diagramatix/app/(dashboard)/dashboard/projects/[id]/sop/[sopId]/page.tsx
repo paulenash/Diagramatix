@@ -32,7 +32,7 @@ export default async function SopPage({ params }: { params: Promise<{ id: string
       initialTitle={doc.title}
       initialStatus={doc.status}
       initialScopeLabel={doc.scopeLabel}
-      initialSections={doc.sections.map((s) => ({ heading: s.heading ?? "", bodyMarkdown: s.bodyMarkdown }))}
+      initialSections={doc.sections.map((s) => ({ heading: s.heading ?? "", bodyMarkdown: s.bodyMarkdown, image: s.image }))}
     />
   );
 }

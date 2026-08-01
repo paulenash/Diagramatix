@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { GuideEditor } from "@/app/(dashboard)/dashboard/admin/user-guide/GuideEditor";
 
-interface Section { heading: string; bodyMarkdown: string }
+interface Section { heading: string; bodyMarkdown: string; image?: string | null }
 
 /**
  * Edit a generated SOP: per-section heading + rich-text (markdown) body, add /
@@ -91,6 +91,13 @@ export function SopEditorClient({
               <button onClick={() => remove(i)} className="text-red-500 hover:text-red-700 text-xs px-1" title="Remove section">✕</button>
             </div>
             <GuideEditor value={s.bodyMarkdown} onChange={(md) => setSection(i, { bodyMarkdown: md })} />
+            {s.image && (
+              <div className="mt-2 flex flex-col items-center gap-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={s.image} alt={s.heading || "Figure"} className="max-w-full border border-gray-200 rounded" />
+                <button onClick={() => setSection(i, { image: null })} className="text-[10px] text-red-500 hover:underline">Remove figure</button>
+              </div>
+            )}
           </div>
         ))}
         <button onClick={add} className="w-full py-2 text-xs text-blue-600 border border-dashed border-blue-300 rounded hover:bg-blue-50">+ Add section</button>

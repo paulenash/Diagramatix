@@ -42,9 +42,19 @@ export function SopGenerateDialog({
     if (needsElement && !effElementId) { setErr("Pick a " + scope + " first."); return; }
     setBusy(true); setErr(null);
     try {
+      // Capture the current diagram as a PNG figure to embed in the SOP. Best-
+      // effort — if rasterisation fails, the SOP is still generated without it.
+      let figure: string | undefined;
+      try {
+        const svg = document.querySelector("svg[data-canvas]") as SVGSVGElement | null;
+        if (svg) {
+          const { toPng } = await import("html-to-image");
+          figure = await toPng(svg as unknown as HTMLElement, { backgroundColor: "#ffffff", cacheBust: true, pixelRatio: 2 });
+        }
+      } catch { /* proceed without a figure */ }
       const res = await fetch(`/api/projects/${projectId}/sop`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ diagramId, scope, scopeElementId: effElementId }),
+        body: JSON.stringify({ diagramId, scope, scopeElementId: effElementId, figure }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || !j.id) { setErr(j.error ?? "SOP generation failed"); return; }

@@ -2748,6 +2748,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
               )}
             </>
           )}
+          <a href={`/dashboard/projects/${project.id}/sop-templates`} className="text-xs text-blue-600 hover:underline ml-1" title="Upload a Word template for SOP exports in this project">SOP Templates</a>
           <UserGuideLink className="text-xs text-blue-600 hover:underline ml-1" title="User Guide">User Guide</UserGuideLink>
         </div>
         {projectDescription && (
