@@ -77,6 +77,21 @@ export function ProjectStructureSection({ projectId, canEdit }: { projectId: str
     } finally { setBusy(false); }
   }
 
+  async function addMissingFromBpmn() {
+    setBusy(true); setErr(null); setNote(null);
+    try {
+      const res = await fetch(`${projectBase}/add-missing-from-bpmn`, { method: "POST" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(j.error ?? "Add failed"); return; }
+      await refresh();
+      const a = j.added ?? {};
+      const total = (Object.values(a) as number[]).reduce((s, n) => s + n, 0);
+      setNote(total === 0
+        ? "Nothing missing — your structure already covers everything in this project's BPMN."
+        : `Added ${total} missing entr${total === 1 ? "y" : "ies"} from BPMN (your existing entries were kept): ${a.organisations ?? 0} org, ${a.orgUnits ?? 0} unit, ${a.teams ?? 0} team, ${a.participants ?? 0} participant, ${a.systems ?? 0} system, ${a.documents ?? 0} document, ${a.dataStores ?? 0} data store.`);
+    } finally { setBusy(false); }
+  }
+
   async function syncNow() {
     setBusy(true); setErr(null); setNote(null);
     try {
@@ -125,10 +140,13 @@ export function ProjectStructureSection({ projectId, canEdit }: { projectId: str
                   )}
                 </div>
               )}
-              <div className="pt-0.5">
+              <div className="pt-0.5 flex flex-wrap gap-1.5">
                 <button onClick={() => setNamingBuild(true)} disabled={busy}
-                  title="Create a named, reusable Entity Structure from this project's BPMN diagrams — the Organisation Hierarchy (white-box Pool→Organisation, Lane→Org Unit, Sublane→Team) plus External Participants, IT Systems, Documents & Data Stores. It's saved under its own name, appears in the Adopt list, and is editable under Admin → Entity Lists."
+                  title="Create a NEW named, reusable Entity Structure from this project's BPMN diagrams — the Organisation Hierarchy (white-box Pool→Organisation, Lane→Org Unit, Sublane→Team) plus External Participants, IT Systems, Documents & Data Stores. It's saved under its own name, appears in the Adopt list, and is editable under Admin → Entity Lists. (Does not change your current structure until you Adopt it.)"
                   className="text-xs px-2 py-1 border border-emerald-300 text-emerald-700 rounded hover:bg-emerald-50 disabled:opacity-40">Populate from BPMN</button>
+                <button onClick={addMissingFromBpmn} disabled={busy}
+                  title="Add any entities found in this project's BPMN diagrams that are MISSING from your current structure, keeping everything you already have (including manual additions). Non-destructive — nothing is removed or replaced."
+                  className="text-xs px-2 py-1 border border-emerald-300 text-emerald-700 rounded hover:bg-emerald-50 disabled:opacity-40">Add missing from BPMN</button>
               </div>
             </div>
           )}
