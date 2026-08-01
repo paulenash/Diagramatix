@@ -26,6 +26,7 @@ const SCOPED_COVERED = new Set<string>([
   "Org", "User", "UsageCounter", "OrgMember", "Project", "Diagram",
   "DiagramHistory", "DiagramTemplate", "Prompt", "DiagramRules",
   "EntityList", "EntityNode",
+  "SopTemplate", "SopDocument", "SopSection",
 ]);
 
 // Simulator tables: project/org-scoped teams + project-scoped studies /

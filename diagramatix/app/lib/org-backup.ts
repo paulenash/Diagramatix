@@ -99,6 +99,25 @@ export async function buildOrgBackup(
     ? await prisma.entityNode.findMany({ where: { listId: { in: entityLists.map(l => l.id) } } })
     : [];
   onProgress?.("EntityNode", entityNodes.length);
+  // SOP: this org's + its projects' templates, plus the SOP documents generated
+  // for the org's diagrams and their sections. docxTemplate (Bytes) is base64'd
+  // for JSON transport and decoded on restore.
+  const sopTemplatesRaw = await prisma.sopTemplate.findMany({
+    where: { OR: [{ orgId }, { projectId: { in: projectIdsForEntities } }] },
+  });
+  const sopTemplates = sopTemplatesRaw.map((t) => ({
+    ...t,
+    docxTemplate: t.docxTemplate ? Buffer.from(t.docxTemplate).toString("base64") : null,
+  }));
+  onProgress?.("SopTemplate", sopTemplates.length);
+  const sopDocuments = diagramIds.length > 0
+    ? await prisma.sopDocument.findMany({ where: { diagramId: { in: diagramIds } } })
+    : [];
+  onProgress?.("SopDocument", sopDocuments.length);
+  const sopSections = sopDocuments.length > 0
+    ? await prisma.sopSection.findMany({ where: { sopDocumentId: { in: sopDocuments.map(d => d.id) } } })
+    : [];
+  onProgress?.("SopSection", sopSections.length);
 
   // System config — only when a SuperAdmin requests a self-contained scoped
   // backup. OrgAdmin backups leave these empty (they restore into a system
@@ -161,6 +180,9 @@ export async function buildOrgBackup(
       OwnershipTransfer: 0,
       EntityList: entityLists.length,
       EntityNode: entityNodes.length,
+      SopTemplate: sopTemplates.length,
+      SopDocument: sopDocuments.length,
+      SopSection: sopSections.length,
     },
     tables: {
       Org: serialise([org] as Record<string, unknown>[]),
@@ -192,6 +214,9 @@ export async function buildOrgBackup(
       OwnershipTransfer: [],
       EntityList: serialise(entityLists as Record<string, unknown>[]),
       EntityNode: serialise(entityNodes as Record<string, unknown>[]),
+      SopTemplate: serialise(sopTemplates as Record<string, unknown>[]),
+      SopDocument: serialise(sopDocuments as Record<string, unknown>[]),
+      SopSection: serialise(sopSections as Record<string, unknown>[]),
     },
   };
 
@@ -220,6 +245,18 @@ export function scopePayloadToOrg(payload: FullBackupPayload, orgId: string): Fu
   const entityListIds = new Set(entityLists.map(l => String(l.id)));
   const entityNodes = ((payload.tables.EntityNode as AnyRow[] | undefined) ?? []).filter(
     n => entityListIds.has(String(n.listId)),
+  );
+  // SOP: templates (org master OR this org's project copies), documents for this
+  // org's diagrams, and their sections.
+  const sopTemplates = ((payload.tables.SopTemplate as AnyRow[] | undefined) ?? []).filter(
+    t => String(t.orgId ?? "") === orgId || (t.projectId != null && projectIds.has(String(t.projectId))),
+  );
+  const sopDocuments = ((payload.tables.SopDocument as AnyRow[] | undefined) ?? []).filter(
+    d => diagramIds.has(String(d.diagramId)),
+  );
+  const sopDocIds = new Set(sopDocuments.map(d => String(d.id)));
+  const sopSections = ((payload.tables.SopSection as AnyRow[] | undefined) ?? []).filter(
+    s => sopDocIds.has(String(s.sopDocumentId)),
   );
   return {
     ...payload,
@@ -253,6 +290,9 @@ export function scopePayloadToOrg(payload: FullBackupPayload, orgId: string): Fu
       OwnershipTransfer: [],
       EntityList: entityLists,
       EntityNode: entityNodes,
+      SopTemplate: sopTemplates,
+      SopDocument: sopDocuments,
+      SopSection: sopSections,
     },
     // unused fields below kept from the original
     counts: {
@@ -449,6 +489,57 @@ export async function restoreOrgBackupAdditive(
           await tx.entityNode.createMany({ data: data as any[] });
           inserted.EntityNode = (inserted.EntityNode ?? 0) + nodes.length;
         }
+      }
+
+      // SOP: per-project templates for restored projects (org masters live in the
+      // target org already, like EntityList masters), then the SOP documents +
+      // sections for restored diagrams. FKs remapped; template Bytes decoded.
+      const sopTemplateIdMap = new Map<string, string>();
+      for (const t of (payload.tables.SopTemplate as AnyRow[] | undefined) ?? []) {
+        const oldProjectId = t.projectId != null ? String(t.projectId) : null;
+        if (!oldProjectId || !projectSet.has(oldProjectId)) continue; // only restored project copies
+        const newId = shortCuid();
+        sopTemplateIdMap.set(String(t.id), newId);
+        await tx.sopTemplate.create({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data: {
+            ...convertDates("SopTemplate", t),
+            id: newId,
+            orgId: null,
+            projectId: projectIdMap.get(oldProjectId)!,
+            sourceTemplateId: null,
+            docxTemplate: t.docxTemplate ? Buffer.from(String(t.docxTemplate), "base64") : null,
+          } as any,
+        });
+        inserted.SopTemplate = (inserted.SopTemplate ?? 0) + 1;
+      }
+      const sopDocIdMap = new Map<string, string>();
+      for (const d of (payload.tables.SopDocument as AnyRow[] | undefined) ?? []) {
+        if (!diagramSet.has(String(d.diagramId))) continue;
+        const newProjectId = d.projectId ? projectIdMap.get(String(d.projectId)) : undefined;
+        if (!newProjectId) continue; // projectId is required — skip if its project wasn't restored
+        const newId = shortCuid();
+        sopDocIdMap.set(String(d.id), newId);
+        await tx.sopDocument.create({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data: {
+            ...convertDates("SopDocument", d),
+            id: newId,
+            diagramId: diagramIdMap.get(String(d.diagramId))!,
+            projectId: newProjectId,
+            createdById: d.createdById ? userIdMap.get(String(d.createdById)) ?? null : null,
+            templateId: d.templateId ? sopTemplateIdMap.get(String(d.templateId)) ?? null : null,
+          } as any,
+        });
+        inserted.SopDocument = (inserted.SopDocument ?? 0) + 1;
+      }
+      const sopSectionData = ((payload.tables.SopSection as AnyRow[] | undefined) ?? [])
+        .filter(s => sopDocIdMap.has(String(s.sopDocumentId)))
+        .map(s => ({ ...convertDates("SopSection", s), id: shortCuid(), sopDocumentId: sopDocIdMap.get(String(s.sopDocumentId))! }));
+      if (sopSectionData.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await tx.sopSection.createMany({ data: sopSectionData as any[] });
+        inserted.SopSection = (inserted.SopSection ?? 0) + sopSectionData.length;
       }
     });
   } catch (err) {
