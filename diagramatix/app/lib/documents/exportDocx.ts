@@ -31,6 +31,10 @@ export interface BuildDocxOpts {
   docTitle: string;
   /** Resolve an image URL to bytes + dimensions; return null to skip it. */
   imageResolver?: (url: string) => Promise<ResolvedImage | null>;
+  /** Raw `word/styles.xml` from an org's uploaded Word template. When present it
+   *  REPLACES the built-in styles so the export adopts the template's fonts +
+   *  heading styles (style/brand adoption). */
+  externalStyles?: string;
 }
 
 const SYM = /:sym\[([^\]]+)\]:/g;           // strip symbol shortcodes to their label
@@ -171,9 +175,11 @@ export async function buildDocx(chapters: DocxChapter[], opts: BuildDocxOpts): P
     }
   }
 
-  const doc = new Document({
-    styles: { default: { document: { run: { font: "Calibri", size: 22 } } } },
-    sections: [{ children }],
-  });
+  const doc = opts.externalStyles
+    ? new Document({ externalStyles: opts.externalStyles, sections: [{ children }] })
+    : new Document({
+        styles: { default: { document: { run: { font: "Calibri", size: 22 } } } },
+        sections: [{ children }],
+      });
   return Packer.toBuffer(doc);
 }

@@ -26,6 +26,7 @@ export const AI_INVOCATION_POINTS = {
   MiningExplain: "mining.explain", // plain-language mining explanation
   SimulationAssess: "simulation.assess", // as-is/to-be assessment
   StaffNarrative: "staff.narrative",
+  GenerateSop: "sop.generate", // BPMN → SOP document prose (whole/lane/pool/subprocess)
   DictationRefine: "dictation.refine", // transcript clean-up / anonymise
   IconVectorize: "icon.vectorize", // ArchiMate icon image → editable vector primitives
   // Offline SuperAdmin harness scripts (npm run ai:report / ai:compare). They call
@@ -58,6 +59,7 @@ export const AI_USER_METERED_POINTS: ReadonlySet<string> = new Set<string>([
   AI_INVOCATION_POINTS.FlowchartToBpmnRefine,
   AI_INVOCATION_POINTS.DiagramGenerate,
   AI_INVOCATION_POINTS.StaffNarrative,
+  AI_INVOCATION_POINTS.GenerateSop,
   AI_INVOCATION_POINTS.MiningDiscover,
   AI_INVOCATION_POINTS.MiningDiscoverSm,
   AI_INVOCATION_POINTS.MiningExplain,
@@ -77,6 +79,7 @@ export const AI_INVOCATION_POINT_LABELS: Record<string, string> = {
   [AI_INVOCATION_POINTS.MiningExplain]: "Mining Explain",
   [AI_INVOCATION_POINTS.SimulationAssess]: "Simulation Assessment",
   [AI_INVOCATION_POINTS.StaffNarrative]: "Staff Narrative",
+  [AI_INVOCATION_POINTS.GenerateSop]: "SOP Generate",
   [AI_INVOCATION_POINTS.DictationRefine]: "Dictation Refine",
   [AI_INVOCATION_POINTS.IconVectorize]: "ArchiMate Icon Vectorize",
   [AI_INVOCATION_POINTS.ScriptConformanceReport]: "AI Conformance Report (script)",
