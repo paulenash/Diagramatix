@@ -1335,6 +1335,7 @@ export function DiagramEditor({
   // Space dropdown state — Insert Space / Remove Space (BPMN + state-machine).
   const [spaceDropdownOpen, setSpaceDropdownOpen] = useState(false);
   const [showSopDialog, setShowSopDialog] = useState(false);
+  const [sopInitial, setSopInitial] = useState<{ scope?: "lane" | "pool"; elementId?: string }>({});
   const spaceDropdownRef = useRef<HTMLDivElement>(null);
 
   // File menu state (Export, Import, PDF scale popover)
@@ -3059,7 +3060,7 @@ export function DiagramEditor({
                 → AI prose → editable SOP document → export .docx. */}
             {diagramType === "bpmn" && projectId && (
               <button
-                onClick={() => setShowSopDialog(true)}
+                onClick={() => { setSopInitial({}); setShowSopDialog(true); }}
                 className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
                 title="Generate a Standard Operating Procedure from this diagram (whole, or a single lane/pool/subprocess)"
               >
@@ -4011,6 +4012,7 @@ export function DiagramEditor({
           parentDiagramName={parentDiagram?.name}
           showValueDisplay={showValueDisplay}
           showBottleneck={showBottleneck}
+          onGenerateSopForElement={(diagramType === "bpmn" && projectId) ? ((scope, elementId) => { setSopInitial({ scope, elementId }); setShowSopDialog(true); }) : undefined}
           onInsertSpace={(diagramType === "bpmn" || diagramType === "state-machine" || diagramType === "archimate") ? insertSpace : undefined}
           onRemoveSpace={(diagramType === "bpmn" || diagramType === "state-machine" || diagramType === "archimate") ? removeSpace : undefined}
           onAddSelfTransition={diagramType === "state-machine" ? addSelfTransition : undefined}
@@ -5231,6 +5233,8 @@ export function DiagramEditor({
           projectId={projectId}
           diagramId={diagramId}
           data={data}
+          initialScope={sopInitial.scope}
+          initialElementId={sopInitial.elementId}
           onClose={() => setShowSopDialog(false)}
         />
       )}

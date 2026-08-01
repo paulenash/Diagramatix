@@ -736,8 +736,26 @@ Every AI call records an `AiInvocation` row merged with the route's AsyncLocalSt
 |------|------|----------------------|------------------------------|
 | T1092 | context entered in the handler body reaches the seam across a following await | Route usage recorded with no user/org/label → "unknown" | If a route reverts to entering context inside an awaited helper |
 | T1093 | the OLD form (enterWith INSIDE an awaited helper) loses the context → "unknown" | Silently reintroducing the mis-attribution bug | If the regression guard for the broken pattern is removed |
-| T1094 | `AI_USER_METERED_POINTS` = the 10 quota-metered routes; AI Tidy/Vectorize/Compare excluded | User Attempts drifting from the routes that actually consume quota | If the metered-set and the `recordUsage(...,"aiAttempts")` routes fall out of sync |
+| T1094 | `AI_USER_METERED_POINTS` = the 11 quota-metered routes (incl. `sop.generate`); AI Tidy/Vectorize/Compare excluded | User Attempts drifting from the routes that actually consume quota | If the metered-set and the `recordUsage(...,"aiAttempts")` routes fall out of sync |
 | T1095 | `recordDiagramGenerated` writes a row and never throws | "# diagrams generated" miscounting, or a telemetry failure breaking a generation | If the recorder throws or stops writing |
+
+### `tests/sop/extractSkeleton.test.ts` — BPMN → SOP skeleton (deterministic)
+
+The deterministic backbone of SOP generation: the AI only ever rewrites this structured skeleton, so these pin the extraction (never hallucinated) and — critically — the lane-scoping contract (global step numbers preserved) and both-direction hand-offs.
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T2203 | whole-diagram scope → ordered steps with global numbers + data reads/writes + both hand-offs | Steps/roles/IO/hand-offs silently dropped from a generated SOP | If the extractor mis-orders steps or loses associations |
+| T2204 | a LANE scope keeps GLOBAL step numbers (Requester = steps 1 & 3, not 1 & 2) | Role SOPs renumbering to 1,2,3 and losing cross-lane position | If lane filtering renumbers instead of filtering the global order |
+| T2205 | a LANE scope surfaces inbound AND outbound hand-offs to the other lane | A role SOP missing "received from" / "handed off to" | If cross-lane connector detection regresses |
+| T2206 | extraction is deterministic (same input → identical skeleton) | Non-deterministic SOP output run-to-run | If ordering/dedupe becomes order-dependent |
+
+### `tests/archimate/relationship-matrix.test.ts` — junction targeting (subset)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T2201 | a junction TARGET permits Composition/Aggregation/Realisation + all directed relationships | Junctions wrongly rejecting valid relationships in the picker | If junction allow-all handling is removed |
+| T2202 | a junction at EITHER end resolves to allow-all | Directed relationships blocked into/out of a junction | If `JUNCTION_NAMES` handling regresses |
 
 ### `tests/mining/parseEventLog.test.ts` — Process Mining event-log ingestion
 

@@ -18,7 +18,7 @@ import type { DiagramElement } from "@/app/lib/diagram/types";
  * Headers are non-focusable; ↑ / ↓ navigate across selectable items and
  * skip section dividers, Enter / Space picks, Esc closes.
  */
-export type ContextMenuKind = "task" | "gateway" | "subprocess" | "data-object" | "event" | "package";
+export type ContextMenuKind = "task" | "gateway" | "subprocess" | "data-object" | "event" | "package" | "lane" | "pool";
 
 type Opt = { value: string; label: string };
 
@@ -162,6 +162,9 @@ function sectionsFor(kind: ContextMenuKind, el: DiagramElement): Section[] {
     }
     case "package":
       return []; // no type-picker sections — just the Collapse Package action
+    case "lane":
+    case "pool":
+      return []; // no type-picker — just the Generate SOP action
   }
 }
 
@@ -295,6 +298,21 @@ export function ElementContextMenu({
             className="text-left w-full px-3 py-0.5 text-sm text-blue-700 hover:bg-blue-50"
           >
             Collapse Package…
+          </button>
+        </div>
+      )}
+
+      {/* Lane / Pool → generate a role-scoped SOP for just this swim-lane/pool. */}
+      {(el.type === "lane" || el.type === "pool") && onAction && (
+        <div>
+          <div className="px-3 py-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide select-none">
+            Actions
+          </div>
+          <button
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onAction("generate-sop"); }}
+            className="text-left w-full px-3 py-0.5 text-sm text-blue-700 hover:bg-blue-50"
+          >
+            Generate SOP for this {el.type === "lane" ? "lane" : "pool"}…
           </button>
         </div>
       )}

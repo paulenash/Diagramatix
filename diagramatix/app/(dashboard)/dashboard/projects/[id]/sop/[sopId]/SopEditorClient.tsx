@@ -27,6 +27,10 @@ export function SopEditorClient({
   const [sections, setSections] = useState<Section[]>(initialSections);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [confirmRegen, setConfirmRegen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const touch = () => setDirty(true);
   const setSection = (i: number, patch: Partial<Section>) => {
@@ -52,6 +56,22 @@ export function SopEditorClient({
     } finally { setSaving(false); }
   }
 
+  async function regenerate() {
+    setRegenerating(true); setErr(null); setConfirmRegen(false);
+    try {
+      const res = await fetch(`/api/sop/${sopId}/regenerate`, { method: "POST" });
+      if (res.ok) { window.location.reload(); return; } // reload to show the fresh sections
+      const j = await res.json().catch(() => ({}));
+      setErr(j.error ?? "Regeneration failed");
+    } catch { setErr("Regeneration failed"); }
+    finally { setRegenerating(false); }
+  }
+
+  async function del() {
+    await fetch(`/api/sop/${sopId}`, { method: "DELETE" });
+    router.push(`/dashboard/projects/${projectId}`);
+  }
+
   return (
     <div className="min-h-screen dgx-dashboard-bg">
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-10">
@@ -70,16 +90,39 @@ export function SopEditorClient({
             <option value="draft">Draft</option>
             <option value="published">Published</option>
           </select>
+          {confirmRegen ? (
+            <span className="flex items-center gap-1">
+              <span className="text-[10px] text-gray-500">Replace all AI sections?</span>
+              <button onClick={regenerate} className="px-2 py-1.5 text-xs text-white bg-amber-600 rounded hover:bg-amber-700">Regenerate</button>
+              <button onClick={() => setConfirmRegen(false)} className="px-2 py-1.5 text-xs text-gray-600 border border-gray-300 rounded">Cancel</button>
+            </span>
+          ) : (
+            <button onClick={() => setConfirmRegen(true)} disabled={regenerating}
+              className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40"
+              title="Re-run the AI over the source diagram, replacing the text sections (keeps the figure)">
+              {regenerating ? "Regenerating…" : "Regenerate"}
+            </button>
+          )}
           <a href={`/api/sop/${sopId}/export`}
             className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50">Export .docx</a>
           <button onClick={save} disabled={!dirty || saving}
             className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-40">
             {saving ? "Saving…" : dirty ? "Save" : "Saved"}
           </button>
+          {confirmDelete ? (
+            <span className="flex items-center gap-1">
+              <button onClick={del} className="px-2 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700">Delete</button>
+              <button onClick={() => setConfirmDelete(false)} className="px-2 py-1.5 text-xs text-gray-600 border border-gray-300 rounded">Cancel</button>
+            </span>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)}
+              className="px-3 py-1.5 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50" title="Delete this SOP">Delete</button>
+          )}
         </div>
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-6 space-y-4">
+        {err && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{err}</p>}
         {sections.map((s, i) => (
           <div key={i} className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">

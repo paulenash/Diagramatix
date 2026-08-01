@@ -18,11 +18,8 @@ import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
-import type { DiagramData } from "@/app/lib/diagram/types";
-import { extractSkeleton } from "@/app/lib/sop/extractSkeleton";
 import type { SopScope } from "@/app/lib/sop/skeleton";
-import { resolveSopTemplate } from "@/app/lib/sop/resolveTemplate";
-import { generateSop, buildSopBriefing } from "@/app/lib/ai/generateSop";
+import { runSopGenerate, runSopSuite } from "@/app/lib/sop/runGenerate";
 
 const SCOPES: SopScope[] = ["whole", "lane", "pool", "subprocess", "group"];
 
@@ -38,10 +35,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
   const docs = await prisma.sopDocument.findMany({
     where: { projectId },
-    select: { id: true, diagramId: true, scope: true, scopeLabel: true, title: true, status: true, generatedAt: true, updatedAt: true },
+    select: { id: true, diagramId: true, scope: true, scopeLabel: true, title: true, status: true, generatedAt: true, updatedAt: true, diagram: { select: { name: true } } },
     orderBy: { updatedAt: "desc" },
   });
-  return NextResponse.json({ documents: docs });
+  return NextResponse.json({ documents: docs.map((d) => ({ ...d, diagramName: d.diagram?.name ?? null, diagram: undefined })) });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -84,51 +81,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const aiBlock = await gateLimit(session.user.id, "aiAttempts");
   if (aiBlock) return aiBlock;
 
-  // Resolve the extraction target. A subprocess linked to a child diagram
-  // scopes to that child (whole); an inline-expanded subprocess scopes in place.
-  let data = diagram.data as unknown as DiagramData;
-  let effScope = scope;
-  let effScopeId = scopeElementId;
-  let effDiagramName = diagram.name;
-  if (scope === "subprocess" && scopeElementId) {
-    const el = (data.elements ?? []).find((e) => e.id === scopeElementId);
-    const linked = el?.properties?.linkedDiagramId as string | undefined;
-    if (linked) {
-      const child = await prisma.diagram.findUnique({ where: { id: linked }, select: { name: true, data: true, projectId: true } });
-      if (child && child.projectId === projectId) {
-        data = child.data as unknown as DiagramData;
-        effScope = "whole"; effScopeId = undefined; effDiagramName = child.name;
-      }
-    }
-  }
-
-  const skeleton = extractSkeleton(data, { scope: effScope, scopeElementId: effScopeId, diagramId, diagramName: effDiagramName });
-  const resolved = await resolveSopTemplate({ projectId, orgId, scope: effScope });
-  let additions: string | null = null;
-  try {
-    const dr = await prisma.diagramRules.findFirst({ where: { category: "sop", isDefault: true }, select: { rules: true } });
-    additions = dr?.rules ?? null;
-  } catch { /* proceed without additions */ }
-  const briefing = buildSopBriefing(additions, resolved.spec);
-
-  const result = await generateSop({ apiKey, skeleton, briefing });
-  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+  // Deterministic extract → AI prose (shared core). A "group" scope generates a
+  // suite across the diagram's forward-link closure; everything else is one scope.
+  const gen = scope === "group"
+    ? await runSopSuite({ projectId, orgId, rootDiagramId: diagramId, apiKey })
+    : await runSopGenerate({ projectId, orgId, diagramId, scope, scopeElementId, apiKey });
+  if (!gen.ok) return NextResponse.json({ error: gen.error }, { status: gen.status });
   await recordUsage(session.user.id, "aiAttempts");
 
   const created = await prisma.sopDocument.create({
     data: {
       projectId, diagramId,
-      scope, scopeElementId: scopeElementId ?? null, scopeLabel: skeleton.meta.scopeLabel ?? null,
-      title: skeleton.meta.title,
+      scope, scopeElementId: scopeElementId ?? null, scopeLabel: gen.scopeLabel,
+      title: gen.title,
       status: "draft",
-      templateId: resolved.templateId,
-      model: result.model,
+      templateId: gen.templateId,
+      model: gen.model,
       generatedAt: new Date(),
       createdById: session.user.id,
       sections: {
         create: [
-          ...result.sections.map((s, i) => ({ heading: s.heading, bodyMarkdown: s.body, sortOrder: i })),
-          ...(figure ? [{ heading: "Process Diagram", bodyMarkdown: "", image: figure, sortOrder: result.sections.length }] : []),
+          ...gen.sections.map((s, i) => ({ heading: s.heading, bodyMarkdown: s.body, sortOrder: i })),
+          ...(figure ? [{ heading: "Process Diagram", bodyMarkdown: "", image: figure, sortOrder: gen.sections.length }] : []),
         ],
       },
     },
@@ -143,9 +117,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     try {
       await pgPool.query(
         `UPDATE "Diagram" SET data = jsonb_set(data, '{procedureDoc}', $1::jsonb) WHERE id = $2`,
-        [JSON.stringify({ url, name: skeleton.meta.title }), diagramId],
+        [JSON.stringify({ url, name: gen.title }), diagramId],
       );
-      await prisma.diagram.update({ where: { id: diagramId }, data: { procedureDocUrl: url, procedureDocName: skeleton.meta.title } });
+      await prisma.diagram.update({ where: { id: diagramId }, data: { procedureDocUrl: url, procedureDocName: gen.title } });
     } catch { /* best-effort link */ }
   }
 

@@ -26,6 +26,7 @@ import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { ProjectStructureSection } from "@/app/components/entityLists/ProjectStructureSection";
+import { ProjectSopsSection } from "@/app/components/sop/ProjectSopsSection";
 import { RiskControlConsole } from "@/app/components/riskControls/RiskControlConsole";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
@@ -2805,6 +2806,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             </button>
           </div>
           <ProjectStructureSection projectId={project.id} canEdit={!readOnly} />
+          <ProjectSopsSection projectId={project.id} canEdit={!readOnly} />
           {ent.riskControl && (
           <button onClick={() => setShowRcm(true)}
             className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-medium text-blue-800 hover:bg-blue-50 border-b border-gray-100">

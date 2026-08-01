@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 
-type Scope = "whole" | "lane" | "pool" | "subprocess";
+type Scope = "whole" | "lane" | "pool" | "subprocess" | "group";
 
 /**
  * Generate an SOP from the current BPMN diagram. Pick a scope — the whole
@@ -35,21 +35,40 @@ export function SopGenerateDialog({
 
   const label = (e: DiagramElement) => e.label?.trim() || `(unnamed ${e.type})`;
   const listFor = scope === "lane" ? lanes : scope === "pool" ? pools : scope === "subprocess" ? subs : [];
-  const needsElement = scope !== "whole";
+  const needsElement = scope === "lane" || scope === "pool" || scope === "subprocess";
   const effElementId = needsElement ? (elementId || listFor[0]?.id || "") : undefined;
 
   async function generate() {
     if (needsElement && !effElementId) { setErr("Pick a " + scope + " first."); return; }
     setBusy(true); setErr(null);
     try {
-      // Capture the current diagram as a PNG figure to embed in the SOP. Best-
+      // Capture the diagram as a PNG figure. For a Lane/Pool SOP, crop to that
+      // element's bounds so the figure shows just the role's swim-lane. Best-
       // effort — if rasterisation fails, the SOP is still generated without it.
       let figure: string | undefined;
       try {
         const svg = document.querySelector("svg[data-canvas]") as SVGSVGElement | null;
         if (svg) {
           const { toPng } = await import("html-to-image");
-          figure = await toPng(svg as unknown as HTMLElement, { backgroundColor: "#ffffff", cacheBust: true, pixelRatio: 2 });
+          const cropEl = (scope === "lane" || scope === "pool") && effElementId ? elements.find((e) => e.id === effElementId) : undefined;
+          if (cropEl) {
+            // Clone the canvas SVG, neutralise the pan/zoom transform, and set a
+            // diagram-coordinate viewBox around the element so it crops cleanly.
+            const P = 24;
+            const vb = `${cropEl.x - P} ${cropEl.y - P} ${cropEl.width + 2 * P} ${cropEl.height + 2 * P}`;
+            const clone = svg.cloneNode(true) as SVGSVGElement;
+            const g = clone.querySelector("g");
+            if (g) g.removeAttribute("transform");
+            clone.setAttribute("viewBox", vb);
+            clone.setAttribute("width", String(Math.min(1200, Math.round((cropEl.width + 2 * P) * 1.5))));
+            clone.setAttribute("height", String(Math.round((cropEl.height + 2 * P) * 1.5)));
+            clone.style.position = "fixed"; clone.style.left = "-100000px"; clone.style.top = "0";
+            document.body.appendChild(clone);
+            try { figure = await toPng(clone as unknown as HTMLElement, { backgroundColor: "#ffffff", cacheBust: true, pixelRatio: 2 }); }
+            finally { document.body.removeChild(clone); }
+          } else {
+            figure = await toPng(svg as unknown as HTMLElement, { backgroundColor: "#ffffff", cacheBust: true, pixelRatio: 2 });
+          }
         }
       } catch { /* proceed without a figure */ }
       const res = await fetch(`/api/projects/${projectId}/sop`, {
@@ -68,6 +87,7 @@ export function SopGenerateDialog({
     { value: "lane", label: "A Lane (role SOP)", hint: "Only that role's steps, with hand-offs to/from other lanes.", disabled: lanes.length === 0 },
     { value: "pool", label: "A Pool", hint: "One participant's part of the process.", disabled: pools.length === 0 },
     { value: "subprocess", label: "A Subprocess", hint: "One subprocess (its linked diagram if linked).", disabled: subs.length === 0 },
+    { value: "group", label: "A linked group (suite)", hint: "One procedure per diagram linked from this one — a suite. Takes longer." },
   ];
 
   return (

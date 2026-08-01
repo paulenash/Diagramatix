@@ -320,6 +320,7 @@ interface Props {
    *  point + the id of the element under the cursor (or null). The
    *  editor creates the pink note + a review-comment-link to it. */
   onAddReviewComment?: (worldPos: Point, targetElementId: string | null) => void;
+  onGenerateSopForElement?: (scope: "lane" | "pool", elementId: string) => void;
   onElementMoveEnd?: (id: string) => void;
   onMoveLaneBoundary?: (aboveLaneId: string, belowLaneId: string, dy: number) => void;
   onMoveVSwimlaneBoundary?: (kind: "divider" | "left" | "right" | "bottom", delta: number, leftId?: string, rightId?: string) => void;
@@ -575,6 +576,7 @@ export function Canvas({
   onUpdateConnectorLabel,
   onSplitConnector,
   onAddReviewComment,
+  onGenerateSopForElement,
   onElementMoveEnd,
   onMoveLaneBoundary,
   onMoveVSwimlaneBoundary,
@@ -1077,7 +1079,7 @@ export function Canvas({
   //   event       → Trigger options
   const [elementContextMenu, setElementContextMenu] = useState<{
     elementId: string;
-    kind: "task" | "gateway" | "subprocess" | "data-object" | "event" | "package";
+    kind: "task" | "gateway" | "subprocess" | "data-object" | "event" | "package" | "lane" | "pool";
     screenX: number;
     screenY: number;
   } | null>(null);
@@ -5151,6 +5153,21 @@ export function Canvas({
             });
             return;
           }
+          // No inner element hit → offer "Generate SOP for this lane/pool"
+          // (BPMN only) when the cursor is over a lane/pool container.
+          if (onGenerateSopForElement && diagramType === "bpmn") {
+            let laneHit: DiagramElement | null = null, poolHit: DiagramElement | null = null;
+            for (const el of data.elements) {
+              if (worldPos.x < el.x || worldPos.x > el.x + el.width || worldPos.y < el.y || worldPos.y > el.y + el.height) continue;
+              if (el.type === "lane") { if (!laneHit || el.width * el.height < laneHit.width * laneHit.height) laneHit = el; }
+              else if (el.type === "pool") { if (!poolHit || el.width * el.height < poolHit.width * poolHit.height) poolHit = el; }
+            }
+            const target = laneHit ?? poolHit;
+            if (target) {
+              setElementContextMenu({ elementId: target.id, kind: target.type === "lane" ? "lane" : "pool", screenX: e.clientX - rect.left, screenY: e.clientY - rect.top });
+              return;
+            }
+          }
           // Empty canvas (or element type we don't have a menu for) →
           // fall back to the shape quick-add palette.
           setQuickAdd({
@@ -7609,6 +7626,9 @@ export function Canvas({
               }
               if (action === "collapse-package" && el.type === "uml-package") {
                 onCollapsePackage?.(el.id);
+              }
+              if (action === "generate-sop" && (el.type === "lane" || el.type === "pool")) {
+                onGenerateSopForElement?.(el.type === "lane" ? "lane" : "pool", el.id);
               }
             }}
             onClose={() => setElementContextMenu(null)}
