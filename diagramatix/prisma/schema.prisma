@@ -103,6 +103,7 @@ model Org {
   diagramRules        DiagramRules[]
   collaborationGroups CollaborationGroup[]
   entityLists         EntityList[]
+  sopTemplates        SopTemplate[]
   entityStructures    EntityStructure[]
   riskControlLibraries RiskControlLibrary[]
   pcfFrameworks       PcfFramework[]
@@ -302,6 +303,8 @@ model Project {
   // Entity Lists (External Participants, Org Structure, IT Systems) — a
   // project's own copy, adopted from an org master and edited independently.
   entityLists EntityList[]
+  sopTemplates SopTemplate[]
+  sopDocuments SopDocument[]
   // Risk & Control catalog — project's own copy, adopted from an org master.
   riskControlLibraries RiskControlLibrary[]
   simulationTeams SimulationTeam[]
@@ -367,6 +370,7 @@ model Diagram {
   diagramOwner   User?         @relation("DiagramOwner", fields: [diagramOwnerId], references: [id], onDelete: SetNull)
   history     DiagramHistory[]
   reviews     DiagramReview[]
+  sopDocuments SopDocument[]
   // ── BPMN lifecycle (publish + review cadence) ────────────────────────
   // `lifecycle` is the persisted state machine; see DiagramLifecycle enum.
   // `currentPublishedVersionId` points at the latest non-superseded
@@ -1722,4 +1726,84 @@ model AiModelRate {
   updatedAt   DateTime @updatedAt
 
   @@unique([provider, model])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// SOP (Standard Operating Procedure) documents generated from BPMN diagrams.
+// See plan: sparkling-doodling-moon.md. Scoped per (diagram, scope) — NOT the
+// global Help/document-collection system. Auth via ProjectShare/requireDiagramAccess.
+//
+
+/// An editable SOP generated from a diagram (or a lane/pool/subprocess of it).
+/// One document per (diagramId, scope, scopeElementId). Sections are edited in
+/// the app (TipTap) and exported to .docx (buildDocx), optionally style-adopted
+/// from the resolved SopTemplate's uploaded Word template.
+model SopDocument {
+  id             String       @id @default(cuid())
+  projectId      String
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  diagramId      String
+  diagram        Diagram      @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  // "whole" | "lane" | "pool" | "subprocess" | "group"
+  scope          String       @default("whole")
+  scopeElementId String?      // the lane/pool/subprocess element id when scoped
+  scopeLabel     String?      // its label, for display
+  title          String
+  status         String       @default("draft") // draft | published
+  templateId     String?      // the SopTemplate resolved at generation time
+  model          String?      // AI model used for the prose pass
+  generatedAt    DateTime?
+  createdById    String?
+  sections       SopSection[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([diagramId, scope])
+  @@index([projectId])
+}
+
+/// One ordered section of a SopDocument (Purpose, Roles, Procedure, …). Body is
+/// GFM markdown (same as HelpSection); `image` may be a base64 data URI (the
+/// embedded diagram figure) or a URL.
+model SopSection {
+  id            String      @id @default(cuid())
+  sopDocumentId String
+  sopDocument   SopDocument @relation(fields: [sopDocumentId], references: [id], onDelete: Cascade)
+  heading       String?
+  bodyMarkdown  String      @db.Text
+  image         String?     @db.Text
+  imageCaption  String?
+  sortOrder     Int         @default(0)
+
+  @@index([sopDocumentId, sortOrder])
+}
+
+/// A per-Org or per-Project SOP template. Follows the EntityList pattern:
+/// exactly one of orgId / projectId is set; resolution at generation time is
+/// project → org → code default. `sections` (Json) is the ordered section list
+/// + AI guidance; `docxTemplate` is an OPTIONAL uploaded Word (.docx/.dotx)
+/// whose styles + header/footer are adopted on export (style/brand adoption).
+model SopTemplate {
+  id               String   @id @default(cuid())
+  name             String
+  // Exactly one of orgId / projectId is set.
+  orgId            String?
+  org              Org?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  projectId        String?
+  project          Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sections         Json     @default("[]")
+  boilerplate      String   @default("")
+  numberingStyle   String   @default("decimal")
+  // Uploaded Word template for style/brand adoption (fonts, heading styles,
+  // header/footer). Null = generated look only.
+  docxTemplate     Bytes?
+  docxTemplateName String?
+  // The org master a project copy was cloned from (provenance only).
+  sourceTemplateId String?
+  isDefault        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([projectId])
 }
