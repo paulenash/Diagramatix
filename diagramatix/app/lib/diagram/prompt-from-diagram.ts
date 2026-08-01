@@ -1,6 +1,7 @@
 import type { ArchimateConnectorType, Connector, DiagramElement, DiagramType } from "./types";
 import { findShapeByKey } from "@/app/lib/archimate/catalogue";
 import { ARCHI_REL_NAME } from "./archimateConnectorStyle";
+import { laneOf as laneOfShared, poolOf as poolOfShared, isInside as isInsideShared } from "./containment";
 
 /**
  * Router: picks the per-diagram-type prompt generator. Falls back to the
@@ -181,30 +182,10 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
     (p.properties?.poolType as string | undefined) === "black-box" && !!p.properties?.isSystem,
   );
 
-  // Walk parentId chain to find the containing lane (null = direct in pool).
-  function laneOf(el: DiagramElement | undefined): DiagramElement | null {
-    let cur = el;
-    let guard = 0;
-    while (cur && guard++ < 16) {
-      const p = cur.parentId ? byId.get(cur.parentId) : undefined;
-      if (!p) return null;
-      if (p.type === "lane") return p;
-      if (p.type === "pool") return null;
-      cur = p;
-    }
-    return null;
-  }
-  function poolOf(el: DiagramElement | undefined): DiagramElement | null {
-    let cur = el;
-    let guard = 0;
-    while (cur && guard++ < 16) {
-      if (cur.type === "pool") return cur;
-      const p = cur.parentId ? byId.get(cur.parentId) : undefined;
-      if (!p) return null;
-      cur = p;
-    }
-    return null;
-  }
+  // Container-membership resolution (shared helpers, bound to this diagram's index).
+  const laneOf = (el: DiagramElement | undefined) => laneOfShared(el, byId);
+  const poolOf = (el: DiagramElement | undefined) => poolOfShared(el, byId);
+  const isInside = (child: DiagramElement, ancestorId: string) => isInsideShared(child, ancestorId, byId);
 
   // Sequence-flow adjacency (with effective-endpoint resolution for
   // boundary events — connectors stored on the host's id are re-attributed
@@ -435,16 +416,6 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
       const outConns: Connector[] = outgoing.get(curId) ?? [];
       curId = outConns[0]?.targetId;
     }
-  }
-
-  function isInside(child: DiagramElement, ancestorId: string): boolean {
-    let cur: DiagramElement | undefined = child;
-    let g = 0;
-    while (cur && g++ < 16) {
-      if (cur.parentId === ancestorId) return true;
-      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
-    }
-    return false;
   }
 
   for (const se of startEvents) walk(se.id, 0);
