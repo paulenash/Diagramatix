@@ -8,22 +8,24 @@ import { updateNode, deleteNode, moveNode, MOVE_ACTIONS, NodeOpError, type MoveA
 
 type Params = { params: Promise<{ id: string; listId: string; nodeId: string }> };
 
-async function ownerGate(projectId: string, listId: string) {
+// Edit access — consistent with adding a node (POST /nodes uses "edit"). A
+// shared editor who can add entries can also rename / move / delete them.
+async function editGate(projectId: string, listId: string) {
   const session = await auth();
   if (isReadOnlyImpersonation(session, await cookies())) {
     throw new OrgContextError("Read-only: viewing another user", 403);
   }
-  await requireProjectAccess(session, await cookies(), projectId, "owner");
+  await requireProjectAccess(session, await cookies(), projectId, "edit");
   const list = await prisma.entityList.findFirst({ where: { id: listId, projectId }, select: { id: true } });
   if (!list) throw new OrgContextError("List not found", 404);
 }
 
 /** PUT — rename a node, OR move it between levels via `{ action }`
- *  (promote/demote/up/down). Owner only. */
+ *  (promote/demote/up/down). Edit access. */
 export async function PUT(req: Request, { params }: Params) {
   const { id, listId, nodeId } = await params;
   try {
-    await ownerGate(id, listId);
+    await editGate(id, listId);
     const body = await req.json();
     if (body && MOVE_ACTIONS.includes(body.action)) {
       await moveNode(listId, nodeId, body.action as MoveAction);
@@ -39,11 +41,11 @@ export async function PUT(req: Request, { params }: Params) {
   }
 }
 
-/** DELETE — remove a node (cascades children). Owner only. */
+/** DELETE — remove a node (cascades children). Edit access. */
 export async function DELETE(_req: Request, { params }: Params) {
   const { id, listId, nodeId } = await params;
   try {
-    await ownerGate(id, listId);
+    await editGate(id, listId);
     await deleteNode(listId, nodeId);
     return NextResponse.json({ success: true });
   } catch (err) {
