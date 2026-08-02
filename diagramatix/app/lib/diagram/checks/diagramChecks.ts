@@ -720,6 +720,89 @@ function oppositeSide(side: "top" | "bottom" | "left" | "right"): "top" | "botto
   return side === "top" ? "bottom" : side === "bottom" ? "top" : side === "left" ? "right" : "left";
 }
 
+/** B40 — a NON-edge-mounted Intermediate Event must have BOTH an incoming and an
+ *  outgoing sequence connector (it sits mid-flow: something triggers it, and it
+ *  passes control on). Edge-mounted (boundary) intermediate events are governed by
+ *  B41 instead. */
+export function checkIntermediateEventFlow(d: DiagramLike): Violation[] {
+  const incoming = new Set<string>();
+  const outgoing = new Set<string>();
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    incoming.add(c.targetId);
+    outgoing.add(c.sourceId);
+  }
+  const out: Violation[] = [];
+  for (const e of d.elements) {
+    if (e.type !== "intermediate-event" || e.boundaryHostId) continue;
+    const hasIn = incoming.has(e.id), hasOut = outgoing.has(e.id);
+    if (hasIn && hasOut) continue;
+    const missing = !hasIn && !hasOut ? "an incoming and an outgoing" : !hasIn ? "an incoming" : "an outgoing";
+    out.push({
+      rule: "intermediate-event-flow",
+      severity: "error",
+      ids: [e.id],
+      message: `Intermediate event "${nameOf(e)}" is missing ${missing} sequence connector — a non-boundary intermediate event must have both.`,
+    });
+  }
+  return out;
+}
+
+/** B41 — outgoing-flow rule for EDGE-MOUNTED (boundary) Intermediate Events:
+ *   - mounted on the OUTER-MOST Expanded Sub-Process → it MUST have an outgoing
+ *     sequence connector (the exception path leaving the sub-process);
+ *   - mounted on an Activity INSIDE another Expanded Sub-Process → an outgoing
+ *     connector is OPTIONAL, but if present it must connect to another Activity
+ *     within the host activity's enclosing EP (the event's parent's parent EP).
+ *  Other hosts (e.g. a top-level activity) are not constrained by this rule. */
+export function checkEdgeMountIntermediateOutgoing(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const outSeq = new Map<string, Connector[]>();
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    (outSeq.get(c.sourceId) ?? outSeq.set(c.sourceId, []).get(c.sourceId)!).push(c);
+  }
+  const out: Violation[] = [];
+  for (const e of d.elements) {
+    if (e.type !== "intermediate-event" || !e.boundaryHostId) continue;
+    const host = byId.get(e.boundaryHostId);
+    if (!host) continue;
+    const outs = outSeq.get(e.id) ?? [];
+    const hostEP = findEnclosingEP(host, byId);
+    const isOuterMostEP = host.type === "subprocess-expanded" && !hostEP;
+
+    if (isOuterMostEP) {
+      if (outs.length === 0) {
+        out.push({
+          rule: "edge-mount-intermediate-outgoing",
+          severity: "error",
+          ids: [e.id, host.id],
+          message: `Edge-mounted intermediate event "${nameOf(e)}" on the outer Expanded Sub-Process "${nameOf(host)}" must have an outgoing sequence connector.`,
+        });
+      }
+      continue;
+    }
+
+    // Mounted on an Activity inside an EP: outgoing is optional, but any it has must
+    // land on another Activity within that same EP (the event's parent's parent EP).
+    if (ACTIVITY_TYPES.has(host.type) && hostEP) {
+      for (const c of outs) {
+        const tgt = byId.get(c.targetId);
+        const withinEP = !!tgt && ACTIVITY_TYPES.has(tgt.type) && tgt.id !== host.id && isDescendantOfId(byId, tgt.id, hostEP.id);
+        if (!withinEP) {
+          out.push({
+            rule: "edge-mount-intermediate-outgoing",
+            severity: "error",
+            ids: [c.id, e.id, host.id],
+            message: `Outgoing sequence from edge-mounted intermediate event "${nameOf(e)}" (on "${nameOf(host)}") must connect to another Activity inside the host's Expanded Sub-Process "${nameOf(hostEP)}".`,
+          });
+        }
+      }
+    }
+  }
+  return out;
+}
+
 /** Element types that act as obstacles for the visible path of a
  *  sequence connector — anything that has a solid body the path could
  *  cross through. Pools/lanes/EPs are not obstacles (they're routing
@@ -1989,6 +2072,24 @@ export const RULES: Rule[] = [
     severity: "warning",
     category: "bpmn-structure",
     check: checkSegregationOfDuties,
+  },
+  {
+    code: "B40",
+    id: "intermediate-event-flow",
+    title: "Intermediate event missing an incoming or outgoing sequence flow",
+    description: "A non-boundary Intermediate Event sits mid-process, so it must have BOTH an incoming and an outgoing sequence connector — something triggers it and it passes control on. (Edge-mounted/boundary intermediate events are governed by B41.)",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkIntermediateEventFlow,
+  },
+  {
+    code: "B41",
+    id: "edge-mount-intermediate-outgoing",
+    title: "Edge-mounted intermediate event outgoing sequence flow",
+    description: "An edge-mounted Intermediate Event on the outer-most Expanded Sub-Process must have an outgoing sequence connector. If it is edge-mounted on an Activity inside another Expanded Sub-Process the outgoing connector is optional, but any it has must connect to another Activity within the host activity's enclosing Expanded Sub-Process.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkEdgeMountIntermediateOutgoing,
   },
 ];
 
