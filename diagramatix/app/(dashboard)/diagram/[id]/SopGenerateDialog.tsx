@@ -64,6 +64,65 @@ function injectBoundaryStubs(clone: SVGSVGElement, data: DiagramData, scope: Sco
   }
 }
 
+/** Serialise a (viewBox'd) SVG clone to a PNG data URI via an offscreen <img> +
+ *  <canvas>. Reliable for our inline-styled canvas SVG — unlike html-to-image's
+ *  toPng on a bare <svg>, which fails silently and left SOPs with no figure. */
+async function svgToPng(clone: SVGSVGElement, outW: number, outH: number): Promise<string | undefined> {
+  try {
+    clone.setAttribute("xmlns", SVG_NS);
+    const xml = new XMLSerializer().serializeToString(clone);
+    const src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
+    const img = new Image();
+    await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error("svg load")); img.src = src; });
+    const scale = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(outW * scale));
+    canvas.height = Math.max(1, Math.round(outH * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return undefined;
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  } catch { return undefined; }
+}
+
+/** Capture the SOP figure: the whole diagram (fit to its content), or — for a
+ *  lane/pool/inline-subprocess scope — cropped to that element with the green
+ *  "To:/From:" boundary boxes on every crossing connector. */
+async function captureFigure(data: DiagramData, scope: Scope, scopeElementId: string | undefined, elements: DiagramElement[]): Promise<string | undefined> {
+  try {
+    const svg = document.querySelector("svg[data-canvas]") as SVGSVGElement | null;
+    if (!svg) return undefined;
+    const cropEl = scopeElementId ? elements.find((e) => e.id === scopeElementId) : undefined;
+    const isLinkedSub = !!cropEl && (cropEl.type === "subprocess" || cropEl.type === "subprocess-expanded") && !!cropEl.properties?.linkedDiagramId;
+
+    let bx: number, by: number, bw: number, bh: number;
+    if (cropEl && !isLinkedSub) {
+      const P = 70;
+      bx = cropEl.x - P; by = cropEl.y - P; bw = cropEl.width + 2 * P; bh = cropEl.height + 2 * P;
+    } else if (scope === "whole" || scope === "group") {
+      const els = elements.filter((e) => e.width > 0 && e.height > 0);
+      if (els.length === 0) return undefined;
+      const minX = Math.min(...els.map((e) => e.x)), minY = Math.min(...els.map((e) => e.y));
+      const maxX = Math.max(...els.map((e) => e.x + e.width)), maxY = Math.max(...els.map((e) => e.y + e.height));
+      const M = 30; bx = minX - M; by = minY - M; bw = (maxX - minX) + 2 * M; bh = (maxY - minY) + 2 * M;
+    } else {
+      return undefined; // linked subprocess → the child diagram isn't on this canvas
+    }
+
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    const g = clone.querySelector("g");
+    if (g) g.removeAttribute("transform");
+    clone.setAttribute("viewBox", `${bx} ${by} ${bw} ${bh}`);
+    const outW = Math.min(1400, Math.max(320, Math.round(bw)));
+    const outH = Math.max(1, Math.round(bh * (outW / bw)));
+    clone.setAttribute("width", String(outW));
+    clone.setAttribute("height", String(outH));
+    if (cropEl && !isLinkedSub) injectBoundaryStubs(clone, data, scope, scopeElementId!);
+    return await svgToPng(clone, outW, outH);
+  } catch { return undefined; }
+}
+
 /**
  * Generate an SOP from the current BPMN diagram. Pick a scope — the whole
  * process, a single Lane (a role-specific SOP with hand-offs), a Pool, or a
@@ -103,37 +162,7 @@ export function SopGenerateDialog({
       // Capture the diagram as a PNG figure. For a Lane/Pool SOP, crop to that
       // element's bounds so the figure shows just the role's swim-lane. Best-
       // effort — if rasterisation fails, the SOP is still generated without it.
-      let figure: string | undefined;
-      try {
-        const svg = document.querySelector("svg[data-canvas]") as SVGSVGElement | null;
-        if (svg) {
-          const { toPng } = await import("html-to-image");
-          const cropEl = needsElement && effElementId ? elements.find((e) => e.id === effElementId) : undefined;
-          // A subprocess LINKED to a child diagram is documented from the child,
-          // which isn't on this canvas — skip the (parent) figure in that case.
-          const isLinkedSub = cropEl?.type && (cropEl.type === "subprocess" || cropEl.type === "subprocess-expanded") && !!cropEl.properties?.linkedDiagramId;
-          if (cropEl && !isLinkedSub) {
-            // Clone the canvas SVG, neutralise the pan/zoom transform, and set a
-            // diagram-coordinate viewBox around the element so it crops cleanly.
-            // Extra padding leaves room for the green boundary stubs.
-            const P = 70;
-            const vb = `${cropEl.x - P} ${cropEl.y - P} ${cropEl.width + 2 * P} ${cropEl.height + 2 * P}`;
-            const clone = svg.cloneNode(true) as SVGSVGElement;
-            const g = clone.querySelector("g");
-            if (g) g.removeAttribute("transform");
-            clone.setAttribute("viewBox", vb);
-            clone.setAttribute("width", String(Math.min(1400, Math.round((cropEl.width + 2 * P) * 1.4))));
-            clone.setAttribute("height", String(Math.round((cropEl.height + 2 * P) * 1.4)));
-            injectBoundaryStubs(clone, data, scope, effElementId!);
-            clone.style.position = "fixed"; clone.style.left = "-100000px"; clone.style.top = "0";
-            document.body.appendChild(clone);
-            try { figure = await toPng(clone as unknown as HTMLElement, { backgroundColor: "#ffffff", cacheBust: true, pixelRatio: 2 }); }
-            finally { document.body.removeChild(clone); }
-          } else if (scope === "whole" || scope === "group") {
-            figure = await toPng(svg as unknown as HTMLElement, { backgroundColor: "#ffffff", cacheBust: true, pixelRatio: 2 });
-          }
-        }
-      } catch { /* proceed without a figure */ }
+      const figure = await captureFigure(data, scope, needsElement && effElementId ? effElementId : undefined, elements);
       const res = await fetch(`/api/projects/${projectId}/sop`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ diagramId, scope, scopeElementId: effElementId, figure }),

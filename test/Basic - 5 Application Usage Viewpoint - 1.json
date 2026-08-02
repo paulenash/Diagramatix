@@ -1,0 +1,883 @@
+{
+  "schemaVersion": "1.43",
+  "appVersion": "1.43.1911",
+  "exportedAt": "2026-07-29T11:05:33.793Z",
+  "project": {
+    "name": "(single diagram)",
+    "description": "",
+    "ownerName": "",
+    "colorConfig": {}
+  },
+  "diagrams": [
+    {
+      "originalId": "cms5w371v001y01o3egkuzi8s",
+      "name": "Basic - 5 Application Usage Viewpoint - 1",
+      "type": "archimate",
+      "data": {
+        "elements": [
+          {
+            "id": "hc",
+            "type": "archimate-shape",
+            "label": "Handle Claim",
+            "x": 144,
+            "y": 54,
+            "width": 561,
+            "height": 136,
+            "properties": {
+              "shapeKey": "business-business-process-box",
+              "archimateIsContainer": true
+            }
+          },
+          {
+            "id": "s1",
+            "type": "archimate-shape",
+            "label": "Scanning Service",
+            "x": 53,
+            "y": 208,
+            "width": 128,
+            "height": 76,
+            "properties": {
+              "shapeKey": "application-application-service-icon",
+              "archimateIconOnly": true
+            }
+          },
+          {
+            "id": "s2",
+            "type": "archimate-shape",
+            "label": "Customer Administration Service",
+            "x": 182,
+            "y": 208,
+            "width": 168,
+            "height": 76,
+            "properties": {
+              "shapeKey": "application-application-service-icon",
+              "archimateIconOnly": true
+            }
+          },
+          {
+            "id": "s3",
+            "type": "archimate-shape",
+            "label": "Claims Administration Service",
+            "x": 358,
+            "y": 208,
+            "width": 155,
+            "height": 76,
+            "properties": {
+              "shapeKey": "application-application-service-icon",
+              "archimateIconOnly": true
+            }
+          },
+          {
+            "id": "s4",
+            "type": "archimate-shape",
+            "label": "Printing Service",
+            "x": 528,
+            "y": 208,
+            "width": 128,
+            "height": 76,
+            "properties": {
+              "shapeKey": "application-application-service-icon",
+              "archimateIconOnly": true
+            }
+          },
+          {
+            "id": "s5",
+            "type": "archimate-shape",
+            "label": "Payment Service",
+            "x": 659,
+            "y": 208,
+            "width": 128,
+            "height": 76,
+            "properties": {
+              "shapeKey": "application-application-service-icon",
+              "archimateIconOnly": true
+            }
+          },
+          {
+            "id": "c1",
+            "type": "archimate-shape",
+            "label": "Document Management System",
+            "x": 65,
+            "y": 325,
+            "width": 142,
+            "height": 76,
+            "properties": {
+              "shapeKey": "application-application-component-icon",
+              "archimateIconOnly": true
+            }
+          },
+          {
+            "id": "c2",
+            "type": "archimate-shape",
+            "label": "CRM System",
+            "x": 223,
+            "y": 325,
+            "width": 128,
+            "height": 76,
+            "properties": {
+              "shapeKey": "application-application-component-icon",
+              "archimateIconOnly": true
+            }
+          },
+          {
+            "id": "c3",
+            "type": "archimate-shape",
+            "label": "Home & Away Financial Application",
+            "x": 361,
+            "y": 325,
+            "width": 155,
+            "height": 76,
+            "properties": {
+              "shapeKey": "application-application-component-icon",
+              "archimateIconOnly": true
+            }
+          },
+          {
+            "id": "c4",
+            "type": "archimate-shape",
+            "label": "Home & Away Policy Administration",
+            "x": 656,
+            "y": 325,
+            "width": 135,
+            "height": 76,
+            "properties": {
+              "shapeKey": "application-application-component-icon",
+              "archimateIconOnly": true
+            }
+          },
+          {
+            "id": "p1",
+            "type": "archimate-shape",
+            "label": "Register",
+            "x": 160,
+            "y": 98,
+            "width": 128,
+            "height": 76,
+            "parentId": "hc",
+            "properties": {
+              "shapeKey": "business-business-process-box"
+            }
+          },
+          {
+            "id": "p2",
+            "type": "archimate-shape",
+            "label": "Accept",
+            "x": 292,
+            "y": 98,
+            "width": 128,
+            "height": 76,
+            "parentId": "hc",
+            "properties": {
+              "shapeKey": "business-business-process-box"
+            }
+          },
+          {
+            "id": "p3",
+            "type": "archimate-shape",
+            "label": "Valuate",
+            "x": 425,
+            "y": 98,
+            "width": 128,
+            "height": 76,
+            "parentId": "hc",
+            "properties": {
+              "shapeKey": "business-business-process-box"
+            }
+          },
+          {
+            "id": "p4",
+            "type": "archimate-shape",
+            "label": "Pay",
+            "x": 562,
+            "y": 98,
+            "width": 128,
+            "height": 76,
+            "parentId": "hc",
+            "properties": {
+              "shapeKey": "business-business-process-box"
+            }
+          }
+        ],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.7
+        },
+        "connectors": [
+          {
+            "id": "conn-p1-p2",
+            "sourceId": "p1",
+            "targetId": "p2",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "archi-triggering",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 224,
+                "y": 136
+              },
+              {
+                "x": 288,
+                "y": 136
+              },
+              {
+                "x": 292,
+                "y": 136
+              },
+              {
+                "x": 288,
+                "y": 136
+              },
+              {
+                "x": 288,
+                "y": 136
+              },
+              {
+                "x": 292,
+                "y": 136
+              },
+              {
+                "x": 356,
+                "y": 136
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-p2-p3",
+            "sourceId": "p2",
+            "targetId": "p3",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "archi-triggering",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 356,
+                "y": 136
+              },
+              {
+                "x": 420,
+                "y": 136
+              },
+              {
+                "x": 424,
+                "y": 136
+              },
+              {
+                "x": 421,
+                "y": 136
+              },
+              {
+                "x": 421,
+                "y": 136
+              },
+              {
+                "x": 425,
+                "y": 136
+              },
+              {
+                "x": 489,
+                "y": 136
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-p3-p4",
+            "sourceId": "p3",
+            "targetId": "p4",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "archi-triggering",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 489,
+                "y": 136
+              },
+              {
+                "x": 553,
+                "y": 136
+              },
+              {
+                "x": 557,
+                "y": 136
+              },
+              {
+                "x": 558,
+                "y": 136
+              },
+              {
+                "x": 562,
+                "y": 136
+              },
+              {
+                "x": 626,
+                "y": 136
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-s1-p1",
+            "sourceId": "s1",
+            "targetId": "p1",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "archi-serving",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 117,
+                "y": 246
+              },
+              {
+                "x": 117,
+                "y": 208
+              },
+              {
+                "x": 117,
+                "y": 193
+              },
+              {
+                "x": 202.66666666666666,
+                "y": 193
+              },
+              {
+                "x": 202.66666666666666,
+                "y": 189
+              },
+              {
+                "x": 202.66666666666666,
+                "y": 189
+              },
+              {
+                "x": 202.66666666666666,
+                "y": 174
+              },
+              {
+                "x": 224,
+                "y": 136
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.3333333333333333
+          },
+          {
+            "id": "conn-s2-p1",
+            "sourceId": "s2",
+            "targetId": "p1",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "archi-serving",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 266,
+                "y": 246
+              },
+              {
+                "x": 266,
+                "y": 208
+              },
+              {
+                "x": 266,
+                "y": 193
+              },
+              {
+                "x": 245.33333333333331,
+                "y": 193
+              },
+              {
+                "x": 245.33333333333331,
+                "y": 189
+              },
+              {
+                "x": 245.33333333333331,
+                "y": 189
+              },
+              {
+                "x": 245.33333333333331,
+                "y": 174
+              },
+              {
+                "x": 224,
+                "y": 136
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.6666666666666666
+          },
+          {
+            "id": "conn-s3-p2",
+            "sourceId": "s3",
+            "targetId": "p2",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "archi-serving",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 435.5,
+                "y": 246
+              },
+              {
+                "x": 435.5,
+                "y": 208
+              },
+              {
+                "x": 435.5,
+                "y": 193
+              },
+              {
+                "x": 356,
+                "y": 193
+              },
+              {
+                "x": 356,
+                "y": 189
+              },
+              {
+                "x": 356,
+                "y": 189
+              },
+              {
+                "x": 356,
+                "y": 174
+              },
+              {
+                "x": 356,
+                "y": 136
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-s4-p3",
+            "sourceId": "s4",
+            "targetId": "p3",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "archi-serving",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 592,
+                "y": 246
+              },
+              {
+                "x": 570.6666666666666,
+                "y": 208
+              },
+              {
+                "x": 570.6666666666666,
+                "y": 193
+              },
+              {
+                "x": 489,
+                "y": 193
+              },
+              {
+                "x": 489,
+                "y": 189
+              },
+              {
+                "x": 489,
+                "y": 189
+              },
+              {
+                "x": 489,
+                "y": 174
+              },
+              {
+                "x": 489,
+                "y": 136
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.3333333333333333,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-s4-p4",
+            "sourceId": "s4",
+            "targetId": "p4",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "archi-serving",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 592,
+                "y": 246
+              },
+              {
+                "x": 613.3333333333334,
+                "y": 208
+              },
+              {
+                "x": 613.3333333333334,
+                "y": 193
+              },
+              {
+                "x": 613.3333333333334,
+                "y": 191
+              },
+              {
+                "x": 604.6666666666666,
+                "y": 191
+              },
+              {
+                "x": 604.6666666666666,
+                "y": 189
+              },
+              {
+                "x": 604.6666666666666,
+                "y": 174
+              },
+              {
+                "x": 626,
+                "y": 136
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.6666666666666666,
+            "targetOffsetAlong": 0.3333333333333333
+          },
+          {
+            "id": "conn-s5-p4",
+            "sourceId": "s5",
+            "targetId": "p4",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "archi-serving",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 723,
+                "y": 246
+              },
+              {
+                "x": 723,
+                "y": 208
+              },
+              {
+                "x": 723,
+                "y": 193
+              },
+              {
+                "x": 647.3333333333334,
+                "y": 193
+              },
+              {
+                "x": 647.3333333333334,
+                "y": 189
+              },
+              {
+                "x": 647.3333333333334,
+                "y": 189
+              },
+              {
+                "x": 647.3333333333334,
+                "y": 174
+              },
+              {
+                "x": 626,
+                "y": 136
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.6666666666666666
+          },
+          {
+            "id": "conn-c1-s1",
+            "sourceId": "c1",
+            "targetId": "s1",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "archi-realisation",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 136,
+                "y": 363
+              },
+              {
+                "x": 136,
+                "y": 325
+              },
+              {
+                "x": 136,
+                "y": 307
+              },
+              {
+                "x": 136,
+                "y": 304.5
+              },
+              {
+                "x": 117,
+                "y": 304.5
+              },
+              {
+                "x": 117,
+                "y": 302
+              },
+              {
+                "x": 117,
+                "y": 284
+              },
+              {
+                "x": 117,
+                "y": 246
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-c1-s4",
+            "sourceId": "c1",
+            "targetId": "s4",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "archi-realisation",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 136,
+                "y": 363
+              },
+              {
+                "x": 136,
+                "y": 325
+              },
+              {
+                "x": 136,
+                "y": 307
+              },
+              {
+                "x": 592,
+                "y": 307
+              },
+              {
+                "x": 592,
+                "y": 302
+              },
+              {
+                "x": 592,
+                "y": 302
+              },
+              {
+                "x": 592,
+                "y": 284
+              },
+              {
+                "x": 592,
+                "y": 246
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-c2-s2",
+            "sourceId": "c2",
+            "targetId": "s2",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "archi-realisation",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 287,
+                "y": 363
+              },
+              {
+                "x": 287,
+                "y": 325
+              },
+              {
+                "x": 287,
+                "y": 307
+              },
+              {
+                "x": 287,
+                "y": 304.5
+              },
+              {
+                "x": 266,
+                "y": 304.5
+              },
+              {
+                "x": 266,
+                "y": 302
+              },
+              {
+                "x": 266,
+                "y": 284
+              },
+              {
+                "x": 266,
+                "y": 246
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-c3-s3",
+            "sourceId": "c3",
+            "targetId": "s3",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "archi-realisation",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 438.5,
+                "y": 363
+              },
+              {
+                "x": 438.5,
+                "y": 325
+              },
+              {
+                "x": 438.5,
+                "y": 307
+              },
+              {
+                "x": 438.5,
+                "y": 304.5
+              },
+              {
+                "x": 435.5,
+                "y": 304.5
+              },
+              {
+                "x": 435.5,
+                "y": 302
+              },
+              {
+                "x": 435.5,
+                "y": 284
+              },
+              {
+                "x": 435.5,
+                "y": 246
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-c4-s5",
+            "sourceId": "c4",
+            "targetId": "s5",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "archi-realisation",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 723.5,
+                "y": 363
+              },
+              {
+                "x": 723.5,
+                "y": 325
+              },
+              {
+                "x": 723.5,
+                "y": 307
+              },
+              {
+                "x": 723,
+                "y": 302
+              },
+              {
+                "x": 723,
+                "y": 284
+              },
+              {
+                "x": 723,
+                "y": 246
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          }
+        ],
+        "aiGeneration": {
+          "promptId": "cms5w57cl002001o3xwqa8w9c",
+          "promptName": "Basic - 5 Application Usage Viewpoint - 1 — AI prompt",
+          "promptText": "Reproduce the diagram in the attached image (Basic - 5 Application Usage Viewpoint Example.jpg) exactly — every shape, label and transition, in its original layout.",
+          "model": "claude-opus-5",
+          "generatedAt": "2026-07-29T10:49:52.877Z",
+          "autoNamed": true
+        }
+      },
+      "colorConfig": {},
+      "displayMode": "normal"
+    }
+  ]
+}
