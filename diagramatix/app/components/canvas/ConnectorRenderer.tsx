@@ -45,6 +45,9 @@ interface Props {
   targetPoolHeight?: number;
   /** True if the source element IS a pool (not a task inside one). Debug only. */
   sourceIsPool?: boolean;
+  /** The source element's type — gates the BPMN conditional-flow diamond (only
+   *  flows FROM an activity get it; gateway outputs don't). */
+  sourceType?: string;
   /** True if the target element IS a pool (not a task inside one). Debug only. */
   targetIsPool?: boolean;
   /** Focus-edit zoom — Canvas asks the canvas to snap-zoom to the
@@ -703,7 +706,7 @@ function ConstraintBox({
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, sourceType, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
@@ -802,6 +805,28 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   })();
 
   const fullD = waypointsToSvgPath(waypoints);
+
+  // BPMN sequence-flow source-end decorations: a slash for the DEFAULT flow, and a
+  // small hollow diamond for a CONDITIONAL flow leaving an activity (never a gateway).
+  const flowMarker = (() => {
+    if (connector.type !== "sequence" || visibleWaypoints.length < 2) return null;
+    const isDefault = connector.isDefaultFlow === true;
+    const isConditional = !isDefault && !!connector.branchCondition?.trim()
+      && sourceType !== "gateway" && sourceType !== "fork-join";
+    if (!isDefault && !isConditional) return null;
+    const p0 = visibleWaypoints[0], p1 = visibleWaypoints[1];
+    const len = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1;
+    const ux = (p1.x - p0.x) / len, uy = (p1.y - p0.y) / len; // along the flow
+    const px = -uy, py = ux;                                   // perpendicular
+    const mx = p0.x + ux * 14, my = p0.y + uy * 14;            // 14px from the source
+    if (isDefault) {
+      const s = 5, ax = (ux + px) * s, ay = (uy + py) * s;
+      return <line x1={mx - ax} y1={my - ay} x2={mx + ax} y2={my + ay} stroke="#374151" strokeWidth={1.5} strokeLinecap="round" />;
+    }
+    const r = 5;
+    const pts = `${mx + ux * r},${my + uy * r} ${mx + px * r},${my + py * r} ${mx - ux * r},${my - uy * r} ${mx - px * r},${my - py * r}`;
+    return <polygon points={pts} fill="white" stroke="#374151" strokeWidth={1.2} />;
+  })();
   // For curvilinear, use the actual curve for the hit area so clicks near the arc are detected.
   // For messageBPMN, use visible path only — invisible leaders extend into pool bodies and
   // would make clicks inside the pool incorrectly select the connector.
@@ -940,6 +965,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
 
   return (
     <g opacity={faded ? 0.2 : undefined}>
+      {flowMarker}
       {isMessageBPMN ? (
         <defs>
           <UnfilledTriangleMarker id={`msg-end-${connector.id}`}   color={strokeColor} />

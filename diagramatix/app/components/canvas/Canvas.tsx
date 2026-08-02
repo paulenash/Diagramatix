@@ -6382,6 +6382,7 @@ export function Canvas({
                 sourcePoolHeight={srcPoolH}
                 targetPoolHeight={tgtPoolH}
                 sourceIsPool={srcIsPool}
+                sourceType={srcEl?.type}
                 targetIsPool={tgtIsPool}
                 hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
                 highlight={assocHighlightConnIds.has(conn.id)}

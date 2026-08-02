@@ -333,6 +333,18 @@ function GatewayMarker({ type, cx, cy }: { type: GatewayType; cx: number; cy: nu
         </g>
       );
     }
+    case "complex": {
+      // BPMN complex gateway — a six-pointed asterisk (three lines through centre).
+      const r = s * 0.75;
+      return (
+        <g stroke="#374151" strokeWidth={4} strokeLinecap="round">
+          {[0, 60, 120].map((deg, i) => {
+            const a = (deg * Math.PI) / 180;
+            return <line key={i} x1={cx - r * Math.cos(a)} y1={cy - r * Math.sin(a)} x2={cx + r * Math.cos(a)} y2={cy + r * Math.sin(a)} />;
+          })}
+        </g>
+      );
+    }
     default: return null;
   }
 }
@@ -490,6 +502,25 @@ function EventMarker({ type, cx, cy, r, filled }: {
       return (
         <polygon points={pts} fill={filled ? "#374151" : "white"}
           stroke="#374151" strokeWidth={1.2} strokeLinejoin="round" />
+      );
+    }
+    case "multiple": {
+      // Multiple event — a pentagon (point up). Hollow = catch, filled = throw.
+      const pr = s * 1.2;
+      const pts = Array.from({ length: 5 }, (_, i) => {
+        const a = (i * 72 - 90) * Math.PI / 180;
+        return `${cx + pr * Math.cos(a)},${cy + pr * Math.sin(a)}`;
+      }).join(" ");
+      return <polygon points={pts} fill={filled ? "#374151" : "white"} stroke="#374151" strokeWidth={1.2} strokeLinejoin="round" />;
+    }
+    case "parallel-multiple": {
+      // Parallel-multiple event — a plus sign (four-armed).
+      const pl = s * 1.1;
+      return (
+        <g stroke="#374151" strokeWidth={2.6} strokeLinecap="butt">
+          <line x1={cx - pl} y1={cy} x2={cx + pl} y2={cy} />
+          <line x1={cx} y1={cy - pl} x2={cx} y2={cy + pl} />
+        </g>
       );
     }
     default: return null;
@@ -1274,13 +1305,36 @@ function AdHocMarker({ cx, cy }: { cx: number; cy: number }) {
   );
 }
 
-/** Picks the appropriate marker for an element's repeatType. Renders nothing
- *  for repeatType "none" / undefined. */
+/** The BPMN compensation ACTIVITY marker — a small double left-triangle (rewind)
+ *  shown when the activity is a compensation handler (isForCompensation). */
+function CompensationActivityMarker({ cx, cy }: { cx: number; cy: number }) {
+  const w = 4, h = 5;
+  return (
+    <g fill="none" stroke="#374151" strokeWidth={1.2} strokeLinejoin="round">
+      <polygon points={`${cx},${cy - h} ${cx - w},${cy} ${cx},${cy + h}`} />
+      <polygon points={`${cx + w},${cy - h} ${cx},${cy} ${cx + w},${cy + h}`} />
+    </g>
+  );
+}
+
+/** Renders an element's activity markers (loop / multi-instance) plus the
+ *  compensation marker when set — laid side by side when both apply. Renders
+ *  nothing when neither applies. */
 function RepeatMarker({ el, cx, cy }: { el: DiagramElement; cx: number; cy: number }) {
-  if (el.repeatType === "loop") return <LoopMarker cx={cx} cy={cy} />;
-  if (el.repeatType === "mi-parallel") return <MultiInstanceMarker cx={cx} cy={cy} orientation="parallel" />;
-  if (el.repeatType === "mi-sequential") return <MultiInstanceMarker cx={cx} cy={cy} orientation="sequential" />;
-  return null;
+  const rt = el.repeatType;
+  const hasRepeat = rt === "loop" || rt === "mi-parallel" || rt === "mi-sequential";
+  const isComp = el.properties?.isForCompensation === true;
+  if (!hasRepeat && !isComp) return null;
+  const gap = hasRepeat && isComp ? 9 : 0;
+  const rcx = cx - gap, ccx = cx + gap;
+  return (
+    <>
+      {rt === "loop" && <LoopMarker cx={rcx} cy={cy} />}
+      {rt === "mi-parallel" && <MultiInstanceMarker cx={rcx} cy={cy} orientation="parallel" />}
+      {rt === "mi-sequential" && <MultiInstanceMarker cx={rcx} cy={cy} orientation="sequential" />}
+      {isComp && <CompensationActivityMarker cx={ccx} cy={cy} />}
+    </>
+  );
 }
 
 /** Multi-Instance marker — three short lines, vertical for parallel, horizontal for sequential.

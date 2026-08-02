@@ -215,7 +215,8 @@ const TASK_LOCAL_NAMES: Record<string, BpmnTaskType> = {
   receiveTask: "receive",
   scriptTask: "script",
   businessRuleTask: "business-rule",
-  callActivity: "none", // distinct visual TODO (v2); for now a plain task.
+  // callActivity is NOT a task — it imports as a collapsed sub-process with a thick
+  // ("call") border. Handled by its own loop in walkProcessBody.
 };
 
 const SUBPROCESS_LOCAL_NAMES = new Set([
@@ -229,7 +230,7 @@ const GATEWAY_LOCAL_NAMES: Record<string, GatewayType> = {
   inclusiveGateway: "inclusive",
   parallelGateway: "parallel",
   eventBasedGateway: "event-based",
-  complexGateway: "none",
+  complexGateway: "complex",
 };
 
 const EVENT_LOCAL_NAMES = new Set([
@@ -282,14 +283,13 @@ function classifyEvent(local: string, body: string): { type: SymbolType; eventTy
     type = "intermediate-event";
     flowType = "catching";
   }
-  // Sub-type from event-definition child.
+  // Sub-type from event-definition child(ren). TWO OR MORE definitions → a Multiple
+  // event (BPMN encodes "multiple" as several event definitions on one event).
   let eventType: EventType = "none";
-  for (const [defName, et] of Object.entries(EVENT_DEFINITION_MAP)) {
-    if (new RegExp(`<(?:[a-zA-Z0-9_-]+:)?${defName}\\b`).test(body)) {
-      eventType = et;
-      break;
-    }
-  }
+  const defs = Object.entries(EVENT_DEFINITION_MAP).filter(([defName]) =>
+    new RegExp(`<(?:[a-zA-Z0-9_-]+:)?${defName}\\b`).test(body));
+  if (defs.length >= 2) eventType = "multiple";
+  else if (defs.length === 1) eventType = defs[0][1];
   return { type, eventType, flowType };
 }
 
@@ -538,12 +538,33 @@ function walkProcessBody(
     if (!bpmnId) continue;
     const name = getAttr(t.openTag, "name") ?? "";
     const taskType = TASK_LOCAL_NAMES[t.local];
+    const forCompensation = getAttr(t.openTag, "isForCompensation") === "true";
     const { el, hadShape } = buildElement(ctx, bpmnId, "task", name, t.body, {
       taskType,
       parentId: parentDiagramId,
+      ...(forCompensation ? { properties: { isForCompensation: true } } : {}),
     });
     if (!hadShape) {
       ctx.warnings.push(`Task "${name || bpmnId}" has no <BPMNShape> — dropped.`);
+      ctx.stats.shapesDropped++;
+      continue;
+    }
+    ctx.elements.push(el);
+    ctx.stats.elementsCreated++;
+    produced.add(bpmnId);
+  }
+
+  // Call Activities → a collapsed sub-process with a thick ("call") border.
+  for (const c of findChildren(body, ["callActivity"])) {
+    const bpmnId = getAttr(c.openTag, "id");
+    if (!bpmnId) continue;
+    const name = getAttr(c.openTag, "name") ?? "";
+    const { el, hadShape } = buildElement(ctx, bpmnId, "subprocess", name, c.body, {
+      parentId: parentDiagramId,
+      properties: { subprocessType: "call" },
+    });
+    if (!hadShape) {
+      ctx.warnings.push(`Call Activity "${name || bpmnId}" has no <BPMNShape> — dropped.`);
       ctx.stats.shapesDropped++;
       continue;
     }

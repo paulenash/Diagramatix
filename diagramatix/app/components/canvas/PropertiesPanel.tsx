@@ -246,6 +246,7 @@ const GATEWAY_TYPE_OPTIONS: { value: GatewayType; label: string }[] = [
   { value: "inclusive",   label: "Inclusive ○" },
   { value: "parallel",    label: "Parallel +" },
   { value: "event-based", label: "Event-based ⬠" },
+  { value: "complex",     label: "Complex ✳" },
 ];
 
 const FLOW_TYPE_OPTIONS: { value: FlowType; label: string }[] = [
@@ -266,6 +267,8 @@ const TRIGGER_OPTIONS: { value: EventType; label: string }[] = [
   { value: "cancel",       label: "Cancel" },
   { value: "compensation", label: "Compensation" },
   { value: "link",         label: "Link" },
+  { value: "multiple",          label: "Multiple ⬠" },
+  { value: "parallel-multiple", label: "Parallel Multiple ✚" },
 ];
 
 /** Multiplicity selector: preset values + custom n..m */
@@ -2723,6 +2726,22 @@ export function PropertiesPanel({
             ))}
           </select>
         </div>
+      )}
+
+      {(element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") && (
+        <label className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer">
+          <input type="checkbox" checked={element.properties?.isForCompensation === true}
+            onChange={(e) => onUpdateProperties(element.id, { isForCompensation: e.target.checked })} />
+          For compensation (rewind marker)
+        </label>
+      )}
+
+      {element.type === "data-object" && (
+        <label className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer">
+          <input type="checkbox" checked={(element.properties?.multiplicity as string | undefined) === "collection"}
+            onChange={(e) => onUpdateProperties(element.id, { multiplicity: e.target.checked ? "collection" : "single" })} />
+          Collection (parallel instances)
+        </label>
       )}
 
       {(element.type === "subprocess" || element.type === "subprocess-expanded") && (

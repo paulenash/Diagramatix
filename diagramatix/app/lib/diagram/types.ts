@@ -73,13 +73,13 @@ export type BpmnTaskType =
   | "manual"
   | "business-rule";
 
-export type GatewayType = "none" | "exclusive" | "inclusive" | "parallel" | "event-based";
+export type GatewayType = "none" | "exclusive" | "inclusive" | "parallel" | "event-based" | "complex";
 
 export type GatewayRole = "decision" | "merge";
 
 export type EventType =
   | "none" | "message" | "timer" | "error" | "signal" | "terminate" | "conditional"
-  | "escalation" | "cancel" | "compensation" | "link";
+  | "escalation" | "cancel" | "compensation" | "link" | "multiple" | "parallel-multiple";
 
 export type RepeatType = "none" | "loop" | "mi-sequential" | "mi-parallel";
 
