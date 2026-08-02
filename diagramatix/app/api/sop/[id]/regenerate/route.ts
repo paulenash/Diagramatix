@@ -70,7 +70,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const fresh: MergedSopSection[] = gen.sections.map((s) => ({ heading: s.heading, bodyMarkdown: s.body, image: null, imageCaption: null, key: s.key ?? null, aiBodyHash: sopBodyHash(s.body), locked: false }));
     const lockedKept = existing.filter((e) => e.locked && !e.image);
     const images = existing.filter((e) => e.image);
-    mergedSections = [...fresh, ...lockedKept, ...images];
+    mergedSections = [...images, ...fresh, ...lockedKept];
     summary = { refreshed: fresh.length, kept: lockedKept.length + images.length, added: 0, dropped: 0 };
   } else {
     const merged = mergeSopSections(existing, gen.sections.map((s) => ({ heading: s.heading, body: s.body, key: s.key ?? null })), sopBodyHash);

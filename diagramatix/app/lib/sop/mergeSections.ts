@@ -112,5 +112,6 @@ export function mergeSopSections(
     added++;
   }
 
-  return { sections: [...out, ...images], summary: { refreshed, kept, added, dropped } };
+  // The Process Diagram figure leads the document; text sections follow.
+  return { sections: [...images, ...out], summary: { refreshed, kept, added, dropped } };
 }

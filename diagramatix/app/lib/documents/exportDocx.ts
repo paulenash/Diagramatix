@@ -169,6 +169,7 @@ async function figurePageSection(
   resolver: NonNullable<BuildDocxOpts["imageResolver"]>,
   orientation: "portrait" | "landscape",
   heading: string,
+  leading: Paragraph[] = [],
 ): Promise<ISectionOptions | null> {
   const img = await resolver(figure.dataUri).catch(() => null);
   if (!img || !img.width || !img.height) return null;
@@ -194,6 +195,7 @@ async function figurePageSection(
       },
     },
     children: [
+      ...leading,
       new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: heading })], spacing: { after: 120 } }),
       new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: img.data, type: img.type, transformation: { width: w, height: h } })] }),
       ...(figure.caption ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: stripSym(figure.caption), italics: true, size: 18, color: "666666" })] })] : []),
@@ -202,9 +204,10 @@ async function figurePageSection(
 }
 
 export async function buildDocx(chapters: DocxChapter[], opts: BuildDocxOpts): Promise<Buffer> {
-  const children: (Paragraph | Table)[] = [
-    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: opts.docTitle })] }),
-  ];
+  const titlePara = new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: opts.docTitle })] });
+  // Body content (chapters only). When a figure leads the document, the title rides
+  // on the figure page; otherwise it heads the content section.
+  const children: (Paragraph | Table)[] = [];
 
   for (let ci = 0; ci < chapters.length; ci++) {
     const c = chapters[ci];
@@ -223,14 +226,18 @@ export async function buildDocx(chapters: DocxChapter[], opts: BuildDocxOpts): P
     }
   }
 
-  // Build the section list: the main content, then (optionally) the figure pages —
-  // a portrait page (small margins → large) and a landscape page (expanded copy).
-  const sections: ISectionOptions[] = [{ children }];
+  // Section order: the Process Diagram leads (portrait, small margins → large, with
+  // the document title), then the text content, then the Expanded copy (landscape)
+  // at the very end.
+  const sections: ISectionOptions[] = [];
   if (opts.figure && opts.imageResolver) {
-    const portrait = await figurePageSection(opts.figure, opts.imageResolver, "portrait", "Process Diagram");
-    if (portrait) sections.push(portrait);
+    const portrait = await figurePageSection(opts.figure, opts.imageResolver, "portrait", "Process Diagram", [titlePara]);
+    if (portrait) sections.push(portrait); else children.unshift(titlePara);
+    sections.push({ children });
     const landscape = await figurePageSection(opts.figure, opts.imageResolver, "landscape", "Process Diagram — Expanded");
     if (landscape) sections.push(landscape);
+  } else {
+    sections.push({ children: [titlePara, ...children] });
   }
 
   const doc = opts.externalStyles

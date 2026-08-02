@@ -38,8 +38,8 @@ describe("SOP regenerate merge (by section identity)", () => {
     expect(byHeading("Systems")!.bodyMarkdown).toBe("old systems");             // locked kept (not refreshed)
     expect(byHeading("Data Objects")).toBeUndefined();                           // stale untouched dropped
     expect(byHeading("Business Rules")!.bodyMarkdown).toBe("NEW rules");         // new added
-    // Figure preserved and last.
-    expect(sections[sections.length - 1].image).toBe("data:image/png;base64,AAAA");
+    // Figure preserved and FIRST (the Process Diagram leads the document).
+    expect(sections[0].image).toBe("data:image/png;base64,AAAA");
     expect(summary).toEqual({ refreshed: 1, kept: 4, added: 1, dropped: 1 });
   });
 

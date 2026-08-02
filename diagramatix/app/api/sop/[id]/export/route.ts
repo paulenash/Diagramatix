@@ -59,12 +59,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ? { dataUri: figSec.image, caption: figSec.imageCaption ?? (doc.scopeLabel ? `Process diagram — ${doc.scopeLabel}` : undefined) }
     : undefined;
 
-  // Each SOP section → one numbered chapter (its heading owns H1). Inline images are
-  // suppressed here; the figure appears on the dedicated pages below.
-  const chapters: DocxChapter[] = doc.sections.map((s) => ({
-    title: s.heading ?? "",
-    sections: [{ heading: null, bodyMarkdown: s.bodyMarkdown, image: null, imageCaption: s.imageCaption }],
-  }));
+  // Each remaining SOP section → one numbered chapter (its heading owns H1). The
+  // figure section is dropped from the text flow — it's rendered on its own leading
+  // page (Process Diagram) + trailing landscape page (Expanded) by buildDocx.
+  const chapters: DocxChapter[] = doc.sections
+    .filter((s) => s.id !== figSec?.id)
+    .map((s) => ({
+      title: s.heading ?? "",
+      sections: [{ heading: null, bodyMarkdown: s.bodyMarkdown, image: null, imageCaption: s.imageCaption }],
+    }));
 
   // Style/brand adoption: lift word/styles.xml from the resolved template's docx.
   let externalStyles: string | undefined;

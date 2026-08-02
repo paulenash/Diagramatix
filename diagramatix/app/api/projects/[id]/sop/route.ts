@@ -111,10 +111,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       createdById: session.user.id,
       sections: {
         create: [
+          // The Process Diagram figure is the FIRST section; text sections follow.
+          ...(figure ? [{ heading: "Process Diagram", bodyMarkdown: "", image: figure, sortOrder: 0 }] : []),
           // Stamp the template key + a hash of the AI body so a later regenerate can
           // merge by section identity (keep author edits/additions).
-          ...gen.sections.map((s, i) => ({ heading: s.heading, bodyMarkdown: s.body, sortOrder: i, key: s.key ?? null, aiBodyHash: sopBodyHash(s.body) })),
-          ...(figure ? [{ heading: "Process Diagram", bodyMarkdown: "", image: figure, sortOrder: gen.sections.length }] : []),
+          ...gen.sections.map((s, i) => ({ heading: s.heading, bodyMarkdown: s.body, sortOrder: (figure ? 1 : 0) + i, key: s.key ?? null, aiBodyHash: sopBodyHash(s.body) })),
         ],
       },
     },
