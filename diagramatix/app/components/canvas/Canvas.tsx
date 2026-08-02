@@ -7215,6 +7215,10 @@ export function Canvas({
           const suggestions = isDoc ? entityStructure?.documents : entityStructure?.dataStores;
           const flatLevel: EntityNodeLevel = isDoc ? 'Document' : 'DataStore';
           const listId = entityStructure?.listIds[kind];
+          // Pre-select the element's CURRENT name when it's already an entry, so the
+          // list opens highlighted + expanded around it.
+          const curName = (el.label ?? "").replace(/\s*\n\s*/g, " ").trim();
+          const preName = curName && suggestions?.some((s) => s.name.trim().toLowerCase() === curName.toLowerCase()) ? curName : undefined;
           if (entityStructure && suggestions && listId && onAddEntityNode) {
             const commitName = (name: string) => {
               onUpdateLabel(editingLabel.elementId, name);
@@ -7233,6 +7237,7 @@ export function Canvas({
                 box={{ x: editingLabel.x, y: editingLabel.y, width: Math.max(editingLabel.width, 150), height: editingLabel.height }}
                 fontSizePx={(data.fontSize ?? 12) * 11 / 12 * zoom}
                 suggestions={suggestions}
+                defaultName={preName}
                 allowNew
                 flatLevel={flatLevel}
                 onCommit={commitName}
@@ -7249,6 +7254,8 @@ export function Canvas({
           // has no adopted structure loaded.
           const suggestions = entityStructure?.systems;
           const listId = entityStructure?.listIds['System'];
+          const curName = (editingEl?.label ?? "").replace(/\s*\n\s*/g, " ").trim();
+          const preName = curName && suggestions?.some((s) => s.name.trim().toLowerCase() === curName.toLowerCase()) ? curName : undefined;
           if (entityStructure && suggestions && listId && onAddEntityNode) {
             const commitName = (name: string) => { onUpdateLabel(editingLabel.elementId, name); setEditingLabel(null); };
             return (
@@ -7256,6 +7263,7 @@ export function Canvas({
                 box={{ x: editingLabel.x, y: editingLabel.y, width: Math.max(editingLabel.width, 150), height: editingLabel.height }}
                 fontSizePx={(data.fontSize ?? 12) * 11 / 12 * zoom}
                 suggestions={suggestions}
+                defaultName={preName}
                 allowNew
                 flatLevel={'System'}
                 onCommit={commitName}
@@ -7288,6 +7296,11 @@ export function Canvas({
             suggestions = entityStructure?.orgStructure;
             defaultName = isWhiteBoxPool ? entityStructure?.orgStructure.find(s => s.level === "Organisation")?.name : undefined;
           }
+          // If this element's CURRENT name is already an entry in the active structure,
+          // pre-select it (open the list highlighted + expanded around it) instead of
+          // the fresh-pool default. Covers pool / lane / sublane / participant / system.
+          const curName = (el.label ?? "").replace(/\s*\n\s*/g, " ").trim();
+          if (curName && suggestions?.some((s) => s.name.trim().toLowerCase() === curName.toLowerCase())) defaultName = curName;
           const listId = entityStructure?.listIds[kind];
           if (entityStructure && suggestions && listId && onAddEntityNode) {
             const commitName = (name: string) => { onUpdateLabel(editingLabel.elementId, name); setEditingLabel(null); };
