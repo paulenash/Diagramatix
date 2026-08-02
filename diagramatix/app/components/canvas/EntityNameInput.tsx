@@ -66,9 +66,12 @@ export function EntityNameInput({
   // scroll it into view (its level is expanded by default) so the user sees where
   // it sits. As soon as they start typing, the normal filter behaviour takes over.
   useEffect(() => {
-    const dn = (defaultName ?? "").trim().toLowerCase();
+    // Normalise whitespace on BOTH sides — a wrapped Pool/System name carries a \n
+    // in its label, and older entity entries were stored with that \n too.
+    const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+    const dn = norm(defaultName ?? "");
     if (!dn) return;
-    const idx = rows.findIndex(s => s.name.trim().toLowerCase() === dn);
+    const idx = rows.findIndex(s => norm(s.name) === dn);
     if (idx < 0) return;
     setHi(idx);
     requestAnimationFrame(() => {

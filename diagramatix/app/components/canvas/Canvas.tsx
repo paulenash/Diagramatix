@@ -7217,8 +7217,8 @@ export function Canvas({
           const listId = entityStructure?.listIds[kind];
           // Pre-select the element's CURRENT name when it's already an entry, so the
           // list opens highlighted + expanded around it.
-          const curName = (el.label ?? "").replace(/\s*\n\s*/g, " ").trim();
-          const preName = curName && suggestions?.some((s) => s.name.trim().toLowerCase() === curName.toLowerCase()) ? curName : undefined;
+          const curName = (el.label ?? "").replace(/\s+/g, " ").trim();
+          const preName = curName && suggestions?.some((s) => s.name.replace(/\s+/g, " ").trim().toLowerCase() === curName.toLowerCase()) ? curName : undefined;
           if (entityStructure && suggestions && listId && onAddEntityNode) {
             const commitName = (name: string) => {
               onUpdateLabel(editingLabel.elementId, name);
@@ -7254,8 +7254,8 @@ export function Canvas({
           // has no adopted structure loaded.
           const suggestions = entityStructure?.systems;
           const listId = entityStructure?.listIds['System'];
-          const curName = (editingEl?.label ?? "").replace(/\s*\n\s*/g, " ").trim();
-          const preName = curName && suggestions?.some((s) => s.name.trim().toLowerCase() === curName.toLowerCase()) ? curName : undefined;
+          const curName = (editingEl?.label ?? "").replace(/\s+/g, " ").trim();
+          const preName = curName && suggestions?.some((s) => s.name.replace(/\s+/g, " ").trim().toLowerCase() === curName.toLowerCase()) ? curName : undefined;
           if (entityStructure && suggestions && listId && onAddEntityNode) {
             const commitName = (name: string) => { onUpdateLabel(editingLabel.elementId, name); setEditingLabel(null); };
             return (
@@ -7299,8 +7299,8 @@ export function Canvas({
           // If this element's CURRENT name is already an entry in the active structure,
           // pre-select it (open the list highlighted + expanded around it) instead of
           // the fresh-pool default. Covers pool / lane / sublane / participant / system.
-          const curName = (el.label ?? "").replace(/\s*\n\s*/g, " ").trim();
-          if (curName && suggestions?.some((s) => s.name.trim().toLowerCase() === curName.toLowerCase())) defaultName = curName;
+          const curName = (el.label ?? "").replace(/\s+/g, " ").trim();
+          if (curName && suggestions?.some((s) => s.name.replace(/\s+/g, " ").trim().toLowerCase() === curName.toLowerCase())) defaultName = curName;
           const listId = entityStructure?.listIds[kind];
           if (entityStructure && suggestions && listId && onAddEntityNode) {
             const commitName = (name: string) => { onUpdateLabel(editingLabel.elementId, name); setEditingLabel(null); };

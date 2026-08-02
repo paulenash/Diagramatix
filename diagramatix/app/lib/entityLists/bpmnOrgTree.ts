@@ -22,7 +22,10 @@ export interface OrgTreeNode {
 
 type RawEl = { id?: unknown; type?: unknown; label?: unknown; parentId?: unknown; properties?: unknown };
 
-const label = (e: RawEl): string => (typeof e.label === "string" ? e.label.trim() : "");
+// Collapse whitespace (incl. the \n a wrapped Pool/System name carries in its
+// label) so entity names are stored clean — otherwise a wrapped "IT System" name
+// keeps its newline and never matches the (single-line) element name later.
+const label = (e: RawEl): string => (typeof e.label === "string" ? e.label.replace(/\s+/g, " ").trim() : "");
 const isWhiteBoxPool = (e: RawEl): boolean =>
   e.type === "pool" && (e.properties as Record<string, unknown> | undefined)?.poolType !== "black-box";
 
