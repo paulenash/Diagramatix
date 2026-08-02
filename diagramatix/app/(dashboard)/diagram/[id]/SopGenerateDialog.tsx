@@ -120,6 +120,27 @@ function stripSelectionChrome(clone: SVGSVGElement) {
   });
 }
 
+/** Dim everything OUTSIDE the selected lane/pool by laying translucent white
+ *  strips over the viewBox around the fragment rectangle. Drawn over the diagram
+ *  content but under the green boundary labels, so the chosen area stays crisp. */
+function dimOutsideScope(clone: SVGSVGElement, vb: { x: number; y: number; w: number; h: number }, cropEl: DiagramElement) {
+  const cl = cropEl.x, ct = cropEl.y, cr = cropEl.x + cropEl.width, cbm = cropEl.y + cropEl.height;
+  const strips: [number, number, number, number][] = [
+    [vb.x, vb.y, vb.w, ct - vb.y],                 // above the fragment
+    [vb.x, cbm, vb.w, vb.y + vb.h - cbm],          // below
+    [vb.x, ct, cl - vb.x, cbm - ct],               // left
+    [cr, ct, vb.x + vb.w - cr, cbm - ct],          // right
+  ];
+  for (const [x, y, w, h] of strips) {
+    if (w <= 0 || h <= 0) continue;
+    const r = document.createElementNS(SVG_NS, "rect");
+    r.setAttribute("x", String(x)); r.setAttribute("y", String(y));
+    r.setAttribute("width", String(w)); r.setAttribute("height", String(h));
+    r.setAttribute("fill", "#ffffff"); r.setAttribute("fill-opacity", "0.72");
+    clone.appendChild(r);
+  }
+}
+
 /** Serialise a (viewBox'd) SVG clone to a PNG data URI via an offscreen <img> +
  *  <canvas>. Reliable for our inline-styled canvas SVG — unlike html-to-image's
  *  toPng on a bare <svg>, which fails silently and left SOPs with no figure. */
@@ -186,6 +207,9 @@ async function captureFigure(data: DiagramData, scope: Scope, scopeElementId: st
     const outH = Math.max(1, Math.round(bh * (outW / bw)));
     clone.setAttribute("width", String(outW));
     clone.setAttribute("height", String(outH));
+    // Dim everything outside the chosen lane/pool (scoped figures only), then draw
+    // the green boundary labels on top so they stay crisp.
+    if (cropEl && !isLinkedSub) dimOutsideScope(clone, { x: bx, y: by, w: bw, h: bh }, cropEl);
     if (boxes.length) drawBoundaryStubs(clone, boxes);
     return await svgToPng(clone, outW, outH);
   } catch { return undefined; }

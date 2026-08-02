@@ -47,4 +47,23 @@ describe("document .docx export", () => {
     expect(doc).toContain("gateway");
     expect(doc).not.toContain(":sym[");
   });
+
+  it("T2213 — a figure renders on its own portrait + landscape pages, aspect preserved", async () => {
+    // A wide 200×50 (4:1) figure. A fake resolver supplies the bytes + true size, so
+    // the figure-page logic (not PNG parsing) is what's under test.
+    const resolver = async () => ({ data: Buffer.from([0x89, 0x50, 0x4e, 0x47]), width: 200, height: 50, type: "png" as const });
+    const buf = await buildDocx(
+      [{ title: "Purpose", sections: [{ heading: null, bodyMarkdown: "Do the thing." }] }],
+      { docTitle: "SOP", imageResolver: resolver, figure: { dataUri: "data:image/png;base64,iVBORw0", caption: "Fragment" } },
+    );
+    const doc = await (await JSZip.loadAsync(buf)).file("word/document.xml")!.async("string");
+    // Two figure pages → two embedded images.
+    expect((doc.match(/<w:drawing>/g) ?? []).length).toBe(2);
+    // One of the sections is landscape.
+    expect(doc).toContain('w:orient="landscape"');
+    // Both images keep the 4:1 aspect ratio (cx/cy ≈ 4) — never compressed.
+    const ratios = [...doc.matchAll(/<wp:extent cx="(\d+)" cy="(\d+)"/g)].map((m) => Number(m[1]) / Number(m[2]));
+    expect(ratios.length).toBe(2);
+    for (const r of ratios) expect(Math.abs(r - 4)).toBeLessThan(0.05);
+  });
 });

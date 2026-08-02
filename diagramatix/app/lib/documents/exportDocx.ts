@@ -14,6 +14,7 @@
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, ExternalHyperlink,
   Table, TableRow, TableCell, WidthType, ImageRun, AlignmentType, BorderStyle,
+  PageOrientation, type ISectionOptions,
 } from "docx";
 import { marked, type Token, type Tokens } from "marked";
 
@@ -35,6 +36,10 @@ export interface BuildDocxOpts {
    *  REPLACES the built-in styles so the export adopts the template's fonts +
    *  heading styles (style/brand adoption). */
   externalStyles?: string;
+  /** A key figure (e.g. an SOP diagram) to render on its OWN page(s), never
+   *  compressed: a portrait page with very small side margins so it's as large as
+   *  possible, plus a landscape page with an expanded copy — both aspect-preserved. */
+  figure?: { dataUri: string; caption?: string };
 }
 
 const SYM = /:sym\[([^\]]+)\]:/g;           // strip symbol shortcodes to their label
@@ -153,6 +158,45 @@ async function embedImage(url: string, resolver: NonNullable<BuildDocxOpts["imag
   return out;
 }
 
+// Letter page in twips (1in = 1440 twips); px assumes 96 DPI (docx image units).
+const PAGE_W = 12240, PAGE_H = 15840;
+const twToPx = (tw: number) => Math.round((tw / 1440) * 96);
+
+/** A whole-page section showing one figure as large as possible without distortion
+ *  (aspect ratio preserved), with small margins. Portrait or landscape. */
+async function figurePageSection(
+  figure: { dataUri: string; caption?: string },
+  resolver: NonNullable<BuildDocxOpts["imageResolver"]>,
+  orientation: "portrait" | "landscape",
+  heading: string,
+): Promise<ISectionOptions | null> {
+  const img = await resolver(figure.dataUri).catch(() => null);
+  if (!img || !img.width || !img.height) return null;
+  const landscape = orientation === "landscape";
+  const pageW = landscape ? PAGE_H : PAGE_W;
+  const pageH = landscape ? PAGE_W : PAGE_H;
+  const mSide = 360;                                  // ~0.25in side margins — as wide as sensible
+  const mTopBottom = landscape ? 360 : 720;
+  const usableW = twToPx(pageW - 2 * mSide);
+  const usableH = twToPx(pageH - 2 * mTopBottom) - 48; // leave room for the heading line
+  const scale = Math.min(usableW / img.width, usableH / img.height); // fit, keep aspect
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  return {
+    properties: {
+      page: {
+        size: { orientation: landscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT, width: pageW, height: pageH },
+        margin: { top: mTopBottom, bottom: mTopBottom, left: mSide, right: mSide },
+      },
+    },
+    children: [
+      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: heading })], spacing: { after: 120 } }),
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: img.data, type: img.type, transformation: { width: w, height: h } })] }),
+      ...(figure.caption ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: stripSym(figure.caption), italics: true, size: 18, color: "666666" })] })] : []),
+    ],
+  };
+}
+
 export async function buildDocx(chapters: DocxChapter[], opts: BuildDocxOpts): Promise<Buffer> {
   const children: (Paragraph | Table)[] = [
     new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: opts.docTitle })] }),
@@ -175,11 +219,21 @@ export async function buildDocx(chapters: DocxChapter[], opts: BuildDocxOpts): P
     }
   }
 
+  // Build the section list: the main content, then (optionally) the figure pages —
+  // a portrait page (small margins → large) and a landscape page (expanded copy).
+  const sections: ISectionOptions[] = [{ children }];
+  if (opts.figure && opts.imageResolver) {
+    const portrait = await figurePageSection(opts.figure, opts.imageResolver, "portrait", "Process Diagram");
+    if (portrait) sections.push(portrait);
+    const landscape = await figurePageSection(opts.figure, opts.imageResolver, "landscape", "Process Diagram — Expanded");
+    if (landscape) sections.push(landscape);
+  }
+
   const doc = opts.externalStyles
-    ? new Document({ externalStyles: opts.externalStyles, sections: [{ children }] })
+    ? new Document({ externalStyles: opts.externalStyles, sections })
     : new Document({
         styles: { default: { document: { run: { font: "Calibri", size: 22 } } } },
-        sections: [{ children }],
+        sections,
       });
   return Packer.toBuffer(doc);
 }
