@@ -36,7 +36,11 @@ export function SopEditorClient({
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [status, setStatus] = useState(initialStatus);
-  const [sections, setSections] = useState<Section[]>(initialSections);
+  // A figure section always carries a visible "Process Diagram" heading (older ones
+  // could be blank, which showed only the grey placeholder above the image).
+  const [sections, setSections] = useState<Section[]>(() =>
+    initialSections.map((s) => (s.image && !s.heading.trim() ? { ...s, heading: "Process Diagram" } : s)),
+  );
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -213,7 +217,9 @@ export function SopEditorClient({
               <button onClick={() => move(i, 1)} disabled={i === sections.length - 1} className="text-gray-400 hover:text-gray-700 disabled:opacity-30 text-xs px-1" title="Move down">↓</button>
               <button onClick={() => remove(i)} className="text-red-500 hover:text-red-700 text-xs px-1" title="Remove section">✕</button>
             </div>
-            <GuideEditor value={s.bodyMarkdown} onChange={(md) => setSection(i, { bodyMarkdown: md })} />
+            {/* Figure sections show the image directly under the "Process Diagram"
+                heading (no empty body box between). Text sections get the editor. */}
+            {!s.image && <GuideEditor value={s.bodyMarkdown} onChange={(md) => setSection(i, { bodyMarkdown: md })} />}
             {s.image && (
               <div className="mt-2 flex flex-col items-center gap-1">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
