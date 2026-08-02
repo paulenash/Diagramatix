@@ -16,7 +16,7 @@ import { buildTestConnectors } from "./bpmnTestConnectors";
  *  from the line COUNT. Matches poolMetrics (fontSize 12) so the load-time
  *  recompute agrees. Without this the height was computed from the full
  *  single-line name and the black-box pool came out far too tall. */
-function wrapPoolName(name: string): { label: string; height: number; headerWidth: number } {
+export function wrapPoolName(name: string): { label: string; height: number; headerWidth: number } {
   const MAX_CHARS = 18; // target line length — keeps the pool a sensible height
   const words = name.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
@@ -30,9 +30,13 @@ function wrapPoolName(name: string): { label: string; height: number; headerWidt
   if (lines.length === 0) lines.push(name);
   const longest = Math.max(1, ...lines.map((l) => l.length));
   const charPx = 12 * 0.6;   // poolMetrics charPxWidth
-  const lineH = 12 * 1.18;   // poolMetrics lineH
+  // The header strip stacks the label's lines ACROSS its width at the RENDERED pool
+  // font size (default 16 — same value B32/checkPoolHeaderLabelOverrun and the
+  // renderer use). Sizing it at 12 made the strip too narrow, so a 3-line pool name
+  // overflowed and tripped the B32 overflow warning. Match 16 so it fits.
+  const headerLineH = 16 * 1.18;
   const height = Math.max(BLACK_BOX_H, Math.ceil(longest * charPx + 20));
-  const headerWidth = Math.max(36, Math.ceil(lines.length * lineH + 8));
+  const headerWidth = Math.max(36, Math.ceil(lines.length * headerLineH + 8));
   return { label: lines.join("\n"), height, headerWidth };
 }
 
