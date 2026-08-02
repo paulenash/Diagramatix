@@ -4,15 +4,24 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GuideEditor } from "@/app/(dashboard)/dashboard/admin/user-guide/GuideEditor";
 
-interface Section { heading: string; bodyMarkdown: string; image?: string | null }
+interface Section {
+  heading: string;
+  bodyMarkdown: string;
+  image?: string | null;
+  key?: string | null;        // template section key (AI-derived) or null (author-added)
+  aiBodyHash?: string | null; // hash of the AI's last output — round-tripped for edit detection
+  locked?: boolean;           // "keep on regenerate"
+}
+interface RegenSummary { refreshed: number; kept: number; added: number; dropped: number }
 
 /**
  * Edit a generated SOP: per-section heading + rich-text (markdown) body, add /
- * remove / reorder sections, edit the title, Save (PUT /api/sop/:id) and Export
- * to Word (/api/sop/:id/export). Reuses the User-Guide TipTap body editor.
+ * remove / reorder / LOCK sections, edit the title, Save (PUT /api/sop/:id) and
+ * Export to Word. Regenerate MERGES fresh AI prose by section identity — author
+ * edits, added sections, and locked sections survive — with one-level Undo.
  */
 export function SopEditorClient({
-  projectId, sopId, backHref, stale, initialTitle, initialStatus, initialScopeLabel, initialSections,
+  projectId, sopId, backHref, stale, initialTitle, initialStatus, initialScopeLabel, initialUndoAvailable, initialSections,
 }: {
   projectId: string;
   sopId: string;
@@ -21,6 +30,7 @@ export function SopEditorClient({
   initialTitle: string;
   initialStatus: string;
   initialScopeLabel: string | null;
+  initialUndoAvailable: boolean;
   initialSections: Section[];
 }) {
   const router = useRouter();
@@ -34,6 +44,9 @@ export function SopEditorClient({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [zoomImg, setZoomImg] = useState<string | null>(null);
+  const [undoAvailable, setUndoAvailable] = useState(initialUndoAvailable);
+  const [undoing, setUndoing] = useState(false);
+  const [regenSummary, setRegenSummary] = useState<RegenSummary | null>(null);
 
   // Full-screen figure viewer — Esc to close.
   useEffect(() => {
@@ -54,7 +67,22 @@ export function SopEditorClient({
     }); touch();
   };
   const remove = (i: number) => { setSections((prev) => prev.filter((_, j) => j !== i)); touch(); };
-  const add = () => { setSections((prev) => [...prev, { heading: "New section", bodyMarkdown: "" }]); touch(); };
+  const add = () => { setSections((prev) => [...prev, { heading: "New section", bodyMarkdown: "", key: null, locked: false }]); touch(); };
+  const toggleLock = (i: number) => setSection(i, { locked: !sections[i].locked });
+
+  async function reloadSections() {
+    const res = await fetch(`/api/sop/${sopId}`);
+    const j = await res.json().catch(() => ({}));
+    if (res.ok && j.document) {
+      setSections((j.document.sections ?? []).map((s: Record<string, unknown>) => ({
+        heading: (s.heading as string) ?? "", bodyMarkdown: (s.bodyMarkdown as string) ?? "",
+        image: (s.image as string | null) ?? null, key: (s.key as string | null) ?? null,
+        aiBodyHash: (s.aiBodyHash as string | null) ?? null, locked: s.locked === true,
+      })));
+      setUndoAvailable(!!j.document.prevSectionsJson);
+      setDirty(false);
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -68,14 +96,25 @@ export function SopEditorClient({
   }
 
   async function regenerate() {
-    setRegenerating(true); setErr(null); setConfirmRegen(false);
+    setRegenerating(true); setErr(null); setConfirmRegen(false); setRegenSummary(null);
     try {
       const res = await fetch(`/api/sop/${sopId}/regenerate`, { method: "POST" });
-      if (res.ok) { window.location.reload(); return; } // reload to show the fresh sections
       const j = await res.json().catch(() => ({}));
+      if (res.ok) { setRegenSummary(j.summary ?? null); await reloadSections(); router.refresh(); return; }
       setErr(j.error ?? "Regeneration failed");
     } catch { setErr("Regeneration failed"); }
     finally { setRegenerating(false); }
+  }
+
+  async function undoRegen() {
+    setUndoing(true); setErr(null);
+    try {
+      const res = await fetch(`/api/sop/${sopId}/undo-regenerate`, { method: "POST" });
+      if (res.ok) { setRegenSummary(null); await reloadSections(); router.refresh(); return; }
+      const j = await res.json().catch(() => ({}));
+      setErr(j.error ?? "Undo failed");
+    } catch { setErr("Undo failed"); }
+    finally { setUndoing(false); }
   }
 
   async function del() {
@@ -101,16 +140,21 @@ export function SopEditorClient({
             <option value="draft">Draft</option>
             <option value="published">Published</option>
           </select>
+          {undoAvailable && (
+            <button onClick={undoRegen} disabled={undoing}
+              className="px-3 py-1.5 text-xs text-amber-700 border border-amber-300 rounded hover:bg-amber-50 disabled:opacity-40"
+              title="Revert the last regenerate">{undoing ? "Undoing…" : "↶ Undo regen"}</button>
+          )}
           {confirmRegen ? (
             <span className="flex items-center gap-1">
-              <span className="text-[10px] text-gray-500">Replace all AI sections?</span>
+              <span className="text-[10px] text-gray-500">Regenerate — keeps your edits, added &amp; locked sections?</span>
               <button onClick={regenerate} className="px-2 py-1.5 text-xs text-white bg-amber-600 rounded hover:bg-amber-700">Regenerate</button>
               <button onClick={() => setConfirmRegen(false)} className="px-2 py-1.5 text-xs text-gray-600 border border-gray-300 rounded">Cancel</button>
             </span>
           ) : (
             <button onClick={() => setConfirmRegen(true)} disabled={regenerating}
               className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40"
-              title="Re-run the AI over the source diagram, replacing the text sections (keeps the figure)">
+              title="Re-run the AI over the source diagram and MERGE it in — your edited, added and locked sections are kept">
               {regenerating ? "Regenerating…" : "Regenerate"}
             </button>
           )}
@@ -135,18 +179,34 @@ export function SopEditorClient({
       <div className="max-w-4xl mx-auto px-6 py-6 space-y-4">
         {stale && (
           <div className="flex items-center justify-between gap-3 text-xs bg-amber-50 border border-amber-300 text-amber-800 rounded px-3 py-2">
-            <span><strong>⚠ SOP Regeneration required.</strong> The source diagram has changed since this SOP was generated — regenerate to bring it up to date.</span>
+            <span><strong>⚠ SOP Regeneration required.</strong> The source diagram has changed since this SOP was generated — regenerate to bring it up to date. Your edits, added and 🔒 locked sections are kept.</span>
             <button onClick={() => setConfirmRegen(true)} disabled={regenerating}
               className="shrink-0 px-2 py-1 text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-40">Regenerate</button>
           </div>
         )}
+        {regenSummary && (
+          <div className="flex items-center justify-between gap-3 text-xs bg-green-50 border border-green-200 text-green-800 rounded px-3 py-2">
+            <span>
+              <strong>Regenerated.</strong> {regenSummary.refreshed} refreshed · {regenSummary.kept} kept (your edits / added / locked)
+              {regenSummary.added ? ` · ${regenSummary.added} new` : ""}{regenSummary.dropped ? ` · ${regenSummary.dropped} removed` : ""}.
+              {undoAvailable ? " Use ↶ Undo regen to revert." : ""}
+            </span>
+            <button onClick={() => setRegenSummary(null)} className="shrink-0 text-green-700 hover:text-green-900" title="Dismiss">✕</button>
+          </div>
+        )}
         {err && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{err}</p>}
         {sections.map((s, i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-lg p-4">
+          <div key={i} className={`bg-white border rounded-lg p-4 ${s.locked ? "border-amber-300" : "border-gray-200"}`}>
             <div className="flex items-center gap-2 mb-2">
+              <button onClick={() => toggleLock(i)}
+                className={`text-xs px-1 ${s.locked ? "text-amber-600" : "text-gray-300 hover:text-gray-500"}`}
+                title={s.locked ? "Locked — kept as-is on regenerate. Click to unlock." : "Lock — keep this section as-is on regenerate"}>
+                {s.locked ? "🔒" : "🔓"}
+              </button>
               <input value={s.heading} onChange={(e) => setSection(i, { heading: e.target.value })}
                 className="flex-1 text-sm font-semibold text-gray-800 bg-transparent border-b border-transparent hover:border-gray-200 focus:border-blue-400 outline-none"
                 placeholder="Section heading" />
+              {!s.key && <span className="text-[8px] uppercase text-blue-600 bg-blue-50 border border-blue-200 rounded px-1 shrink-0" title="Author-added — always kept on regenerate">Added</span>}
               <button onClick={() => move(i, -1)} disabled={i === 0} className="text-gray-400 hover:text-gray-700 disabled:opacity-30 text-xs px-1" title="Move up">↑</button>
               <button onClick={() => move(i, 1)} disabled={i === sections.length - 1} className="text-gray-400 hover:text-gray-700 disabled:opacity-30 text-xs px-1" title="Move down">↓</button>
               <button onClick={() => remove(i)} className="text-red-500 hover:text-red-700 text-xs px-1" title="Remove section">✕</button>

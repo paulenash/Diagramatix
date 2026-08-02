@@ -18,6 +18,8 @@ import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import type { SopScope } from "@/app/lib/sop/skeleton";
 import { runSopGenerate, runSopSuite } from "@/app/lib/sop/runGenerate";
+import { mergeSopSections, type MergedSopSection } from "@/app/lib/sop/mergeSections";
+import { sopBodyHash } from "@/app/lib/sop/sopHash";
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -52,18 +54,41 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!gen.ok) return NextResponse.json({ error: gen.error }, { status: gen.status });
   await recordUsage(session.user.id, "aiAttempts");
 
-  // Preserve the previously-embedded figure.
-  const figure = await prisma.sopSection.findFirst({ where: { sopDocumentId: id, image: { not: null } }, select: { image: true, imageCaption: true }, orderBy: { sortOrder: "asc" } });
+  // Non-destructive regenerate: merge the fresh AI sections into the current ones
+  // by section identity so author edits + added sections + locked sections survive.
+  const existing = await prisma.sopSection.findMany({
+    where: { sopDocumentId: id },
+    select: { heading: true, bodyMarkdown: true, image: true, imageCaption: true, key: true, aiBodyHash: true, locked: true, sortOrder: true },
+    orderBy: { sortOrder: "asc" },
+  });
+
+  let mergedSections: MergedSopSection[];
+  let summary: { refreshed: number; kept: number; added: number; dropped: number };
+  if (scope === "group") {
+    // A suite repeats template keys across diagrams → key-merge is unsafe. Replace,
+    // but carry over LOCKED sections + the figure; one-level Undo covers the rest.
+    const fresh: MergedSopSection[] = gen.sections.map((s) => ({ heading: s.heading, bodyMarkdown: s.body, image: null, imageCaption: null, key: s.key ?? null, aiBodyHash: sopBodyHash(s.body), locked: false }));
+    const lockedKept = existing.filter((e) => e.locked && !e.image);
+    const images = existing.filter((e) => e.image);
+    mergedSections = [...fresh, ...lockedKept, ...images];
+    summary = { refreshed: fresh.length, kept: lockedKept.length + images.length, added: 0, dropped: 0 };
+  } else {
+    const merged = mergeSopSections(existing, gen.sections.map((s) => ({ heading: s.heading, body: s.body, key: s.key ?? null })), sopBodyHash);
+    mergedSections = merged.sections;
+    summary = merged.summary;
+  }
+
+  const prevSectionsJson = JSON.stringify(existing);
 
   await prisma.$transaction(async (tx) => {
     await tx.sopSection.deleteMany({ where: { sopDocumentId: id } });
     await tx.sopSection.createMany({
-      data: [
-        ...gen.sections.map((s, i) => ({ sopDocumentId: id, heading: s.heading, bodyMarkdown: s.body, sortOrder: i })),
-        ...(figure?.image ? [{ sopDocumentId: id, heading: "Process Diagram", bodyMarkdown: "", image: figure.image, imageCaption: figure.imageCaption ?? null, sortOrder: gen.sections.length }] : []),
-      ],
+      data: mergedSections.map((s, i) => ({
+        sopDocumentId: id, heading: s.heading, bodyMarkdown: s.bodyMarkdown,
+        image: s.image, imageCaption: s.imageCaption, key: s.key, aiBodyHash: s.aiBodyHash, locked: s.locked, sortOrder: i,
+      })),
     });
-    await tx.sopDocument.update({ where: { id }, data: { title: gen.title, model: gen.model, templateId: gen.templateId, scopeLabel: gen.scopeLabel, generatedAt: new Date() } });
+    await tx.sopDocument.update({ where: { id }, data: { title: gen.title, model: gen.model, templateId: gen.templateId, scopeLabel: gen.scopeLabel, generatedAt: new Date(), prevSectionsJson } });
   });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, summary });
 }

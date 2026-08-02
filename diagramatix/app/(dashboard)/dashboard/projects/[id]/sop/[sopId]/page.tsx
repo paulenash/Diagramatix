@@ -44,7 +44,8 @@ export default async function SopPage({ params, searchParams }: { params: Promis
       initialTitle={doc.title}
       initialStatus={doc.status}
       initialScopeLabel={doc.scopeLabel}
-      initialSections={doc.sections.map((s) => ({ heading: s.heading ?? "", bodyMarkdown: s.bodyMarkdown, image: s.image }))}
+      initialUndoAvailable={!!doc.prevSectionsJson}
+      initialSections={doc.sections.map((s) => ({ heading: s.heading ?? "", bodyMarkdown: s.bodyMarkdown, image: s.image, key: s.key, aiBodyHash: s.aiBodyHash, locked: s.locked }))}
     />
   );
 }

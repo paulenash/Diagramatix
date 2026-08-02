@@ -64,6 +64,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           bodyMarkdown: typeof s.bodyMarkdown === "string" ? s.bodyMarkdown : "",
           image: typeof s.image === "string" ? s.image : null,
           imageCaption: typeof s.imageCaption === "string" ? s.imageCaption : null,
+          // Round-trip the section identity so regenerate can merge. aiBodyHash is
+          // preserved verbatim (reflects the AI's last output) so editing the body
+          // is detected on regenerate; `key` ties it to a template section; `locked`
+          // is the author's "keep on regenerate" pin.
+          key: typeof s.key === "string" ? s.key : null,
+          aiBodyHash: typeof s.aiBodyHash === "string" ? s.aiBodyHash : null,
+          locked: s.locked === true,
           sortOrder: i,
         })),
       });

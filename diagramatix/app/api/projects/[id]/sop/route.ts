@@ -20,6 +20,7 @@ import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import type { SopScope } from "@/app/lib/sop/skeleton";
 import { runSopGenerate, runSopSuite } from "@/app/lib/sop/runGenerate";
+import { sopBodyHash } from "@/app/lib/sop/sopHash";
 
 const SCOPES: SopScope[] = ["whole", "lane", "pool", "subprocess", "group"];
 
@@ -110,7 +111,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       createdById: session.user.id,
       sections: {
         create: [
-          ...gen.sections.map((s, i) => ({ heading: s.heading, bodyMarkdown: s.body, sortOrder: i })),
+          // Stamp the template key + a hash of the AI body so a later regenerate can
+          // merge by section identity (keep author edits/additions).
+          ...gen.sections.map((s, i) => ({ heading: s.heading, bodyMarkdown: s.body, sortOrder: i, key: s.key ?? null, aiBodyHash: sopBodyHash(s.body) })),
           ...(figure ? [{ heading: "Process Diagram", bodyMarkdown: "", image: figure, sortOrder: gen.sections.length }] : []),
         ],
       },

@@ -1754,6 +1754,9 @@ model SopDocument {
   model          String?      // AI model used for the prose pass
   generatedAt    DateTime?
   createdById    String?
+  // One-level undo: the section set (JSON string) captured just before the last
+  // regenerate, so a merge can be reverted. String (not Json) per Prisma-7 caveat.
+  prevSectionsJson String?    @db.Text
   sections       SopSection[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -1774,6 +1777,14 @@ model SopSection {
   image         String?     @db.Text
   imageCaption  String?
   sortOrder     Int         @default(0)
+  // Section identity for non-destructive regenerate. `key` = the template section
+  // key (purpose/procedure/business_rules/…) for AI-derived sections, null for
+  // author-added ones. `aiBodyHash` = hash of the AI's last output for this section;
+  // if the current body differs, the user edited it → regenerate preserves it.
+  // `locked` = the author pinned it ("keep on regenerate").
+  key           String?
+  aiBodyHash    String?
+  locked        Boolean     @default(false)
 
   @@index([sopDocumentId, sortOrder])
 }
