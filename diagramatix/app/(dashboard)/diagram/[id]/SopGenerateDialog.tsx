@@ -26,60 +26,47 @@ const STUB_HPAD = 8;   // min horizontal gap between two boxes sharing a row
  * include them (nothing clipped). Line 1 = "To:/From: <context>", line 2 = detail.
  */
 function layoutBoundaryStubs(data: DiagramData, scope: Scope, scopeElementId: string, cropEl: DiagramElement): StubBox[] {
-  const crossings = computeBoundaryCrossings(data, scope, scopeElementId);
+  // Only SEQUENCE-flow crossings get a figure note (Paul: only show a "next-lane"
+  // note where a sequence connector actually goes). Message hand-offs to pools still
+  // appear in the SOP's Hand-offs text section — they're just not drawn on the figure.
+  const crossings = computeBoundaryCrossings(data, scope, scopeElementId).filter((c) => c.kind === "sequence");
   if (crossings.length === 0) return [];
   const byId = new Map((data.elements ?? []).map((e) => [e.id, e]));
   const cl = cropEl.x, cr = cropEl.x + cropEl.width, ct = cropEl.y, cb = cropEl.y + cropEl.height;
   const ccx = cl + cropEl.width / 2, ccy = ct + cropEl.height / 2;
 
-  type Item = { lines: string[]; w: number; h: number; side: "top" | "bottom" | "left" | "right"; ax: number; ay: number };
+  type Item = { lines: string[]; w: number; h: number; side: "top" | "bottom"; ax: number };
   const items: Item[] = crossings.map((cx) => {
     const inEl = byId.get(cx.inElementId);
     const lines = [`${cx.direction === "out" ? "To" : "From"}: ${cx.context}`, cx.detail];
     const w = Math.min(200, Math.max(72, Math.max(...lines.map((l) => l.length)) * STUB_FONT * 0.6 + STUB_PAD_X * 2));
     const h = lines.length * STUB_LINE_H + STUB_PAD_Y * 2;
-    // Which boundary edge does this cross? Decide by the peer's direction from the
-    // fragment centre (lanes stack vertically → cross top/bottom; pools sit side by
-    // side → messages cross left/right).
-    const dx = cx.peerX - ccx, dy = cx.peerY - ccy;
-    const side = Math.abs(dy) >= Math.abs(dx) ? (dy < 0 ? "top" : "bottom") : (dx < 0 ? "left" : "right");
+    // Notes only ever sit ABOVE or BELOW the fragment (never left/right): lanes
+    // stack vertically, so a hand-off reads naturally above (peer higher) or below.
+    const side: "top" | "bottom" = cx.peerY < ccy ? "top" : "bottom";
     // Anchor along the edge = the in-scope element's centre, clamped to the fragment.
     const ax = inEl ? clamp(inEl.x + inEl.width / 2, cl, cr) : ccx;
-    const ay = inEl ? clamp(inEl.y + inEl.height / 2, ct, cb) : ccy;
-    return { lines, w, h, side, ax, ay };
+    return { lines, w, h, side, ax };
   });
 
   const boxes: StubBox[] = [];
-  for (const sideName of ["top", "bottom", "left", "right"] as const) {
+  for (const sideName of ["top", "bottom"] as const) {
     const group = items.filter((i) => i.side === sideName);
     if (!group.length) continue;
     const h = Math.max(...group.map((g) => g.h));
     const vgap = h / 2; // "separate bottom of one from top of another by 1/2 label height"
-
-    if (sideName === "top" || sideName === "bottom") {
-      group.sort((a, b) => a.ax - b.ax);
-      const rowRight: number[] = []; // rightmost x used, per row
-      for (const g of group) {
-        const bx = g.ax - g.w / 2;
-        let r = 0;
-        for (; r < rowRight.length; r++) if (bx >= rowRight[r] + STUB_HPAD) break;
-        if (r === rowRight.length) rowRight.push(-Infinity);
-        rowRight[r] = bx + g.w;
-        const by = sideName === "top"
-          ? ct - STUB_OUT - (r + 1) * h - r * vgap
-          : cb + STUB_OUT + r * (h + vgap);
-        boxes.push({ x: bx, y: by, w: g.w, h, lines: g.lines });
-      }
-    } else {
-      group.sort((a, b) => a.ay - b.ay);
-      let prevBottom = -Infinity;
-      for (const g of group) {
-        let by = g.ay - g.h / 2;
-        if (by < prevBottom + vgap) by = prevBottom + vgap;
-        prevBottom = by + g.h;
-        const bx = sideName === "left" ? cl - STUB_OUT - g.w : cr + STUB_OUT;
-        boxes.push({ x: bx, y: by, w: g.w, h: g.h, lines: g.lines });
-      }
+    group.sort((a, b) => a.ax - b.ax);
+    const rowRight: number[] = []; // rightmost x used, per row
+    for (const g of group) {
+      const bx = g.ax - g.w / 2;
+      let r = 0;
+      for (; r < rowRight.length; r++) if (bx >= rowRight[r] + STUB_HPAD) break;
+      if (r === rowRight.length) rowRight.push(-Infinity);
+      rowRight[r] = bx + g.w;
+      const by = sideName === "top"
+        ? ct - STUB_OUT - (r + 1) * h - r * vgap
+        : cb + STUB_OUT + r * (h + vgap);
+      boxes.push({ x: bx, y: by, w: g.w, h, lines: g.lines });
     }
   }
   return boxes;
