@@ -8012,6 +8012,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       { let anc = elements.find(e => e.id === finalEl.parentId);
         const guard = new Set<string>();
         while (anc && !guard.has(anc.id)) { guard.add(anc.id); selfIds.add(anc.id); anc = elements.find(e => e.id === anc!.parentId); } }
+      // ...and never splice the activity into its OWN boundary event's flow. A
+      // boundary event sits ON the activity's edge, so the flow-line from that
+      // event to its exception target passes straight through the activity — the
+      // net would otherwise splice the activity into be→target on any drop (even a
+      // click-drop with no movement), snapping the activity onto its own event.
+      for (const e of elements) if (e.boundaryHostId === finalEl.id) selfIds.add(e.id);
       // Detect the connector to split. Tasks are routing obstacles, so while the
       // element was being dragged onto a connector the router bent that connector
       // AROUND it — by drop time its LIVE path no longer overlaps the element and

@@ -363,4 +363,41 @@ describe("insert an existing activity onto a connector, halves parallel (T0725)"
     expect(c1After.x).toBe(c1Before.x);
     expect(c1After.y).toBe(c1Before.y);
   });
+
+  it("clicking an activity does NOT splice it into its OWN boundary event's flow (T2214)", () => {
+    // Regression (AI-generated "Fulfil Goods" diagram): an activity with a boundary
+    // event has that event sitting ON its edge, so the flow line from the event to
+    // its exception target passes straight through the activity. A click on the
+    // activity registers as a zero-move drop (MOVE_END), which mis-detected it as
+    // "dropped on" be→exception and spliced it into be→activity→exception, snapping
+    // the activity onto its own event. The moved element's boundary events must be
+    // excluded from splice candidates.
+    const d0 = {
+      elements: [
+        { id: "act", type: "task", x: 100, y: 200, width: 100, height: 60, label: "Pick items", properties: {} },
+        // Boundary event on the activity's top edge (centre 180,200).
+        { id: "be", type: "intermediate-event", x: 160, y: 180, width: 40, height: 40, label: "Shortfall", boundaryHostId: "act", properties: {} },
+        // Exception target below the activity — be→exc flow line crosses the activity.
+        { id: "exc", type: "task", x: 140, y: 400, width: 100, height: 60, label: "Notify shortfall", properties: {} },
+      ],
+      connectors: [
+        { id: "beexc", type: "sequence", sourceId: "be", targetId: "exc", sourceSide: "bottom", targetSide: "top",
+          directionType: "directed", routingType: "rectilinear",
+          waypoints: [{ x: 180, y: 200 }, { x: 180, y: 430 }, { x: 190, y: 430 }] },
+      ],
+    } as unknown as DiagramData;
+
+    const before = d0.elements.find((e) => e.id === "act")!;
+    const out = reducer(d0, { type: "MOVE_END", payload: { id: "act" } });
+
+    // The boundary event's exception flow is untouched — no self-splice.
+    expect(out.connectors.some((c) => c.id === "beexc")).toBe(true);
+    expect(out.connectors.some((c) => c.sourceId === "be" && c.targetId === "act")).toBe(false);
+    expect(out.connectors.some((c) => c.sourceId === "act" && c.targetId === "exc")).toBe(false);
+    expect(out.connectors.length).toBe(d0.connectors.length);
+    // The activity did NOT lurch onto its own event.
+    const after = out.elements.find((e) => e.id === "act")!;
+    expect(after.x).toBe(before.x);
+    expect(after.y).toBe(before.y);
+  });
 });
