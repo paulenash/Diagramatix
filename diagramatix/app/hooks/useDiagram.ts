@@ -811,6 +811,31 @@ function poolMetrics(label: string, fontSize: number): { minHeight: number; head
   return { minHeight, headerWidth };
 }
 
+/** One-time load heal: bring every pool's header strip up to a width that fits its
+ *  (multi-line) label at the pool font. Older diagrams (and any generated before the
+ *  header-sizing fix) stored a strip sized for a smaller font and tripped the B32
+ *  "Pool label overflows the header region" warning. White-box pools grow LEFT by
+ *  the shortfall so their lanes stay exactly where they are; black-box pools (no
+ *  lanes) just widen the strip. Returns the SAME reference when nothing needs it, so
+ *  a healthy diagram isn't marked dirty. */
+export function healPoolHeaderWidths(d: DiagramData): DiagramData {
+  const poolFs = d.poolFontSize ?? 16;
+  let changed = false;
+  const elements = d.elements.map((e) => {
+    if (e.type !== "pool") return e;
+    const need = poolMetrics(e.label ?? "", poolFs).headerWidth;
+    const stored = typeof e.properties?.poolHeaderWidth === "number" ? (e.properties.poolHeaderWidth as number) : 36;
+    if (stored >= need) return e;
+    changed = true;
+    const delta = need - stored;
+    const isBlackBox = (e.properties?.poolType as string | undefined) === "black-box";
+    const next: DiagramElement = { ...e, properties: { ...e.properties, poolHeaderWidth: need } };
+    if (!isBlackBox) { next.x = e.x - delta; next.width = e.width + delta; } // grow left; lanes unmoved
+    return next;
+  });
+  return changed ? { ...d, elements } : d;
+}
+
 /**
  * Compute messageBPMN label offsets per the BBP-anchored placement rules.
  *
@@ -8884,7 +8909,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 }
 
 export function useDiagram(initialData: DiagramData) {
-  const [data, dispatch] = useReducer(reducer, initialData);
+  // Heal stale/too-narrow pool header strips once on load so old diagrams stop
+  // tripping the B32 "label overflows the header" warning (no-op for healthy ones).
+  const [data, dispatch] = useReducer(reducer, initialData, healPoolHeaderWidths);
 
   // Build marker so we can confirm the latest build is live.
   if (typeof window !== "undefined" && !(window as unknown as { __DIAGRAMATIX_BUILD?: string }).__DIAGRAMATIX_BUILD) {
