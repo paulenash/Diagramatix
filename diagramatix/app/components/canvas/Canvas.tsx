@@ -860,12 +860,16 @@ export function Canvas({
     durationMs: number;
   }
   const [bubbleHelpMap, setBubbleHelpMap] = useState<Map<string, BubbleHelpRow>>(new Map());
+  // Global master switch (SuperAdmin-controlled AppSetting). Default OFF: Bubble
+  // Help shows nowhere unless a SuperAdmin turns it on, regardless of the per-user
+  // localStorage preference below.
+  const [bubbleHelpGlobalEnabled, setBubbleHelpGlobalEnabled] = useState<boolean>(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     let cancelled = false;
     fetch(`/api/bubble-helps?diagramType=${encodeURIComponent(diagramType)}`)
-      .then(r => r.ok ? r.json() : { rows: [] })
-      .then((data: { rows?: BubbleHelpRow[] }) => {
+      .then(r => r.ok ? r.json() : { rows: [], globalEnabled: false })
+      .then((data: { rows?: BubbleHelpRow[]; globalEnabled?: boolean }) => {
         if (cancelled) return;
         const rows = Array.isArray(data.rows) ? data.rows : [];
         const map = new Map<string, BubbleHelpRow>();
@@ -873,8 +877,9 @@ export function Canvas({
           if (row && row.topicKey) map.set(row.topicKey, row);
         }
         setBubbleHelpMap(map);
+        setBubbleHelpGlobalEnabled(data.globalEnabled === true);
       })
-      .catch(() => { /* offline / 404 — leave map empty */ });
+      .catch(() => { /* offline / 404 — leave map empty, feature off */ });
     return () => { cancelled = true; };
   }, [diagramType, bubbleHelpRefreshToken]);
   // Currently-shown bubble. Always point-anchored — the cloud sits to
@@ -904,14 +909,15 @@ export function Canvas({
     // Never show help clouds in the read-only published viewer — selecting
     // an element there (e.g. clicking a feedback item) must not pop a cloud.
     if (readOnly) return;
-    if (!bubbleHelpEnabled) return;
+    if (!bubbleHelpGlobalEnabled) return;   // global master switch (SuperAdmin)
+    if (!bubbleHelpEnabled) return;         // per-user preference
     const row = bubbleHelpMap.get(topicKey);
     if (!row || !row.text.trim()) return;
     if (!bumpClickCountAndShouldShow(topicKey)) return;
     if (bubbleHelpTimerRef.current) clearTimeout(bubbleHelpTimerRef.current);
     setBubbleHelpAnchor({ x: worldX, y: worldY, text: row.text });
     bubbleHelpTimerRef.current = setTimeout(() => setBubbleHelpAnchor(null), row.durationMs);
-  }, [readOnly, bubbleHelpEnabled, bubbleHelpMap]);
+  }, [readOnly, bubbleHelpGlobalEnabled, bubbleHelpEnabled, bubbleHelpMap]);
   // Canvas-background trigger uses the same function — the
   // background-click path already had world coords.
   const showBubbleHelpAtPoint = showBubbleHelp;
@@ -7973,8 +7979,9 @@ export function Canvas({
           selected (auto-dismiss after 10 s or next mousedown). OFF =
           never show. Persists across reloads. Editing-only — hidden in
           the read-only published viewer, and hidden entirely for diagram
-          types that have no bubble-help entries configured. */}
-      {!readOnly && bubbleHelpMap.size > 0 && (
+          types that have no bubble-help entries configured, and hidden when the
+          SuperAdmin global master switch is OFF (the feature is off everywhere). */}
+      {!readOnly && bubbleHelpGlobalEnabled && bubbleHelpMap.size > 0 && (
       <button
         onClick={toggleBubbleHelp}
         style={{ right: "calc(0.5rem + 156px + 6px)" }}

@@ -40,6 +40,26 @@ export function BubbleHelpClient() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  // Global master switch (SuperAdmin). Default OFF everywhere; only this page can
+  // turn Bubble Help back on for all users.
+  const [globalEnabled, setGlobalEnabled] = useState<boolean | null>(null);
+  const [savingGlobal, setSavingGlobal] = useState(false);
+  useEffect(() => {
+    fetch("/api/bubble-helps/global").then(r => r.ok ? r.json() : { enabled: false })
+      .then((d: { enabled?: boolean }) => setGlobalEnabled(d.enabled === true))
+      .catch(() => setGlobalEnabled(false));
+  }, []);
+  async function toggleGlobal() {
+    if (globalEnabled === null) return;
+    setSavingGlobal(true);
+    try {
+      const res = await fetch("/api/bubble-helps/global", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !globalEnabled }),
+      });
+      if (res.ok) { const d = await res.json(); setGlobalEnabled(d.enabled === true); }
+    } finally { setSavingGlobal(false); }
+  }
 
   // Refetch whenever diagramType changes.
   useEffect(() => {
@@ -166,7 +186,23 @@ export function BubbleHelpClient() {
           <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-7 h-7" />
           <h1 className="font-semibold text-gray-900">Bubble Help Editor</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Global master switch — off everywhere until a SuperAdmin turns it on. */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">Bubble Help (all users)</span>
+            <button
+              onClick={toggleGlobal}
+              disabled={globalEnabled === null || savingGlobal}
+              title={globalEnabled ? "Bubble Help is ON for all users — click to turn OFF everywhere" : "Bubble Help is OFF everywhere — click to turn ON"}
+              className={`px-2.5 py-1 text-xs font-medium rounded border transition-colors disabled:opacity-50 ${
+                globalEnabled
+                  ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              {globalEnabled === null ? "…" : savingGlobal ? "Saving…" : globalEnabled ? "ON" : "OFF"}
+            </button>
+          </div>
           <label className="text-xs text-gray-500">Diagram type</label>
           <select
             value={diagramType}

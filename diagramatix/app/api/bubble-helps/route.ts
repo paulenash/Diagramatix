@@ -18,6 +18,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
+import { getBubbleHelpEnabled } from "@/app/lib/bubbleHelpSetting";
 
 interface BubbleHelpInput {
   topicKey: string;
@@ -50,11 +51,16 @@ export async function GET(req: Request) {
   if (!diagramType || !KNOWN_DIAGRAM_TYPES.has(diagramType)) {
     return NextResponse.json({ error: "Invalid or missing diagramType" }, { status: 400 });
   }
-  const rows = await prisma.bubbleHelp.findMany({
-    where: { diagramType },
-    orderBy: [{ sortOrder: "asc" }, { topicKey: "asc" }],
-  });
-  return NextResponse.json({ rows });
+  const [rows, globalEnabled] = await Promise.all([
+    prisma.bubbleHelp.findMany({
+      where: { diagramType },
+      orderBy: [{ sortOrder: "asc" }, { topicKey: "asc" }],
+    }),
+    getBubbleHelpEnabled(),
+  ]);
+  // globalEnabled is the master switch (default OFF; SuperAdmin-controlled). The
+  // canvas shows no bubbles unless it is true, regardless of the per-user setting.
+  return NextResponse.json({ rows, globalEnabled });
 }
 
 export async function PUT(req: Request) {
