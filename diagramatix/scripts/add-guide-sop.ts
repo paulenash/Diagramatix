@@ -55,7 +55,7 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
       "- **Receives** — the work handed to this role from other lanes, naming who sends it and what is passed.",
       "- **Hands off** — the work this role passes on, naming the receiving lane and what is passed.",
       "",
-      "The figure for a lane / pool SOP is **cropped** to just that swim-lane, so the picture shows the role's slice of the process.",
+      "The figure for a lane / pool SOP shows just that part of the diagram. Any connector that crosses the boundary is **truncated at the edge and labelled** in a **green box**: **To:** or **From:**, then the other lane (or the pool / lane, or the external pool name) on the first line and the target activity — or the message — on the next. So the picture makes every hand-off explicit, and the same crossings are listed in the **Hand-offs** section of the text.",
     ].join("\n"),
   },
   {

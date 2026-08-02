@@ -11,6 +11,7 @@ import type { Connector, DiagramData, DiagramElement } from "../diagram/types";
 import { indexById, laneOf, poolOf, isInside, type ElementIndex } from "../diagram/containment";
 import { buildAnimationOrder } from "../diagram/animateOrder";
 import { getRiskControl } from "../diagram/riskControl";
+import { computeBoundaryCrossings } from "./boundaryCrossings";
 import type { SopHandoff, SopScope, SopSkeleton, SopStep } from "./skeleton";
 
 const STEP_TYPES = new Set(["task", "subprocess", "subprocess-expanded"]);
@@ -40,10 +41,6 @@ export function extractSkeleton(data: DiagramData, opts: ExtractOptions): SopSke
     const pool = poolOf(el, byId);
     return pool ? labelOf(pool) : "Unassigned";
   };
-  // The container id used for lane/pool scope comparison.
-  const laneOrPoolId = (el: DiagramElement | undefined): string | null =>
-    laneOf(el, byId)?.id ?? poolOf(el, byId)?.id ?? null;
-
   // ---- 1. Global step order (whole process), 1-based numbers -------------------
   const order = buildAnimationOrder(data, "bfs");
   const orderedSteps: DiagramElement[] = [];
@@ -127,18 +124,13 @@ export function extractSkeleton(data: DiagramData, opts: ExtractOptions): SopSke
       default: return true; // whole / group
     }
   };
-  for (const c of connectors) {
-    const isSeq = c.type === "sequence" || c.type === "flow" || c.type === "flowline";
-    const isMsg = c.type === "message" || c.type === "messageBPMN";
-    if (!isSeq && !isMsg) continue;
-    const src = byId.get(c.sourceId), tgt = byId.get(c.targetId);
-    if (!src || !tgt || src.type === "pool" || tgt.type === "pool") continue;
-    const srcRole = roleOf(src), tgtRole = roleOf(tgt);
-    if (srcRole === tgtRole || laneOrPoolId(src) === laneOrPoolId(tgt)) continue; // same lane → no hand-off
-    const what = c.label?.trim() || undefined;
-    // Only record hand-offs that touch the scope (for whole scope, both sides are in scope).
-    if (elInScope(src)) { const h = { to: tgtRole, what }; handoffsOut.push(h); if (STEP_TYPES.has(src.type)) stepHandoffOut.set(src.id, h); }
-    if (elInScope(tgt)) { const h = { from: srcRole, what }; handoffsIn.push(h); if (STEP_TYPES.has(tgt.type)) stepHandoffIn.set(tgt.id, h); }
+  // Every connector with exactly one endpoint in scope → a hand-off (shared with
+  // the figure's boundary stubs so text + picture agree). context = the target's
+  // lane/pool (or pool for a message to a black-box pool); detail = target name /
+  // message label.
+  for (const cx of computeBoundaryCrossings(data, opts.scope, opts.scopeElementId)) {
+    if (cx.direction === "out") { const h: SopHandoff = { to: cx.context, what: cx.detail }; handoffsOut.push(h); stepHandoffOut.set(cx.inElementId, h); }
+    else { const h: SopHandoff = { from: cx.context, what: cx.detail }; handoffsIn.push(h); stepHandoffIn.set(cx.inElementId, h); }
   }
 
   // ---- 5. Assemble scope-filtered steps (global numbers preserved) ------------

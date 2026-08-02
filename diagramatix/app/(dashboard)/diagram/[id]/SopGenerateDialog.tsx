@@ -3,8 +3,66 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import { computeBoundaryCrossings } from "@/app/lib/sop/boundaryCrossings";
 
 type Scope = "whole" | "lane" | "pool" | "subprocess" | "group";
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/**
+ * Draw a green "To:/From:" boundary box for every connector that crosses out of
+ * the shown region, into a cloned+cropped canvas SVG (diagram coordinates). Two
+ * lines: line 1 = "To:/From: <lane/pool context>", line 2 = target name / message.
+ */
+function injectBoundaryStubs(clone: SVGSVGElement, data: DiagramData, scope: Scope, scopeElementId: string) {
+  const crossings = computeBoundaryCrossings(data, scope, scopeElementId);
+  if (crossings.length === 0) return;
+  const byId = new Map((data.elements ?? []).map((e) => [e.id, e]));
+  const stack = new Map<string, number>(); // (element:side) → count, to fan out overlaps
+  const FONT = 9, LINE_H = 12, PAD_X = 4, PAD_Y = 3, GAP = 8;
+
+  for (const cx of crossings) {
+    const inEl = byId.get(cx.inElementId);
+    if (!inEl) continue;
+    const ecx = inEl.x + inEl.width / 2, ecy = inEl.y + inEl.height / 2;
+    const dx = cx.peerX - ecx, dy = cx.peerY - ecy;
+    const lines = [`${cx.direction === "out" ? "To" : "From"}: ${cx.context}`, cx.detail];
+    const boxW = Math.min(190, Math.max(64, Math.max(...lines.map((l) => l.length)) * FONT * 0.6 + PAD_X * 2));
+    const boxH = lines.length * LINE_H + PAD_Y * 2;
+
+    let side: "top" | "bottom" | "left" | "right", ax: number, ay: number;
+    if (Math.abs(dy) >= Math.abs(dx)) { side = dy < 0 ? "top" : "bottom"; ax = ecx; ay = dy < 0 ? inEl.y - GAP : inEl.y + inEl.height + GAP; }
+    else { side = dx < 0 ? "left" : "right"; ax = dx < 0 ? inEl.x - GAP : inEl.x + inEl.width + GAP; ay = ecy; }
+    const key = `${cx.inElementId}:${side}`;
+    const n = stack.get(key) ?? 0; stack.set(key, n + 1);
+
+    let bx: number, by: number;
+    if (side === "top") { bx = ax - boxW / 2; by = ay - boxH - n * (boxH + 3); }
+    else if (side === "bottom") { bx = ax - boxW / 2; by = ay + n * (boxH + 3); }
+    else if (side === "left") { bx = ax - boxW - n * (boxW + 3); by = ay - boxH / 2; }
+    else { bx = ax + n * (boxW + 3); by = ay - boxH / 2; }
+
+    const g = document.createElementNS(SVG_NS, "g");
+    const rect = document.createElementNS(SVG_NS, "rect");
+    rect.setAttribute("x", String(bx)); rect.setAttribute("y", String(by));
+    rect.setAttribute("width", String(boxW)); rect.setAttribute("height", String(boxH));
+    rect.setAttribute("rx", "3");
+    rect.setAttribute("fill", "#f0fdf4"); rect.setAttribute("stroke", "#16a34a"); rect.setAttribute("stroke-width", "1.5");
+    g.appendChild(rect);
+    lines.forEach((ln, i) => {
+      const t = document.createElementNS(SVG_NS, "text");
+      t.setAttribute("x", String(bx + PAD_X));
+      t.setAttribute("y", String(by + PAD_Y + (i + 1) * LINE_H - 3));
+      t.setAttribute("font-size", String(FONT));
+      t.setAttribute("font-family", "sans-serif");
+      t.setAttribute("fill", "#166534");
+      if (i === 0) t.setAttribute("font-weight", "600");
+      t.textContent = ln;
+      g.appendChild(t);
+    });
+    clone.appendChild(g);
+  }
+}
 
 /**
  * Generate an SOP from the current BPMN diagram. Pick a scope — the whole
@@ -50,23 +108,28 @@ export function SopGenerateDialog({
         const svg = document.querySelector("svg[data-canvas]") as SVGSVGElement | null;
         if (svg) {
           const { toPng } = await import("html-to-image");
-          const cropEl = (scope === "lane" || scope === "pool") && effElementId ? elements.find((e) => e.id === effElementId) : undefined;
-          if (cropEl) {
+          const cropEl = needsElement && effElementId ? elements.find((e) => e.id === effElementId) : undefined;
+          // A subprocess LINKED to a child diagram is documented from the child,
+          // which isn't on this canvas — skip the (parent) figure in that case.
+          const isLinkedSub = cropEl?.type && (cropEl.type === "subprocess" || cropEl.type === "subprocess-expanded") && !!cropEl.properties?.linkedDiagramId;
+          if (cropEl && !isLinkedSub) {
             // Clone the canvas SVG, neutralise the pan/zoom transform, and set a
             // diagram-coordinate viewBox around the element so it crops cleanly.
-            const P = 24;
+            // Extra padding leaves room for the green boundary stubs.
+            const P = 70;
             const vb = `${cropEl.x - P} ${cropEl.y - P} ${cropEl.width + 2 * P} ${cropEl.height + 2 * P}`;
             const clone = svg.cloneNode(true) as SVGSVGElement;
             const g = clone.querySelector("g");
             if (g) g.removeAttribute("transform");
             clone.setAttribute("viewBox", vb);
-            clone.setAttribute("width", String(Math.min(1200, Math.round((cropEl.width + 2 * P) * 1.5))));
-            clone.setAttribute("height", String(Math.round((cropEl.height + 2 * P) * 1.5)));
+            clone.setAttribute("width", String(Math.min(1400, Math.round((cropEl.width + 2 * P) * 1.4))));
+            clone.setAttribute("height", String(Math.round((cropEl.height + 2 * P) * 1.4)));
+            injectBoundaryStubs(clone, data, scope, effElementId!);
             clone.style.position = "fixed"; clone.style.left = "-100000px"; clone.style.top = "0";
             document.body.appendChild(clone);
             try { figure = await toPng(clone as unknown as HTMLElement, { backgroundColor: "#ffffff", cacheBust: true, pixelRatio: 2 }); }
             finally { document.body.removeChild(clone); }
-          } else {
+          } else if (scope === "whole" || scope === "group") {
             figure = await toPng(svg as unknown as HTMLElement, { backgroundColor: "#ffffff", cacheBust: true, pixelRatio: 2 });
           }
         }

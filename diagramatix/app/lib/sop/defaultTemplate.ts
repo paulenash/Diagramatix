@@ -45,7 +45,8 @@ const HANDOFFS_SECTION: SopTemplateSection = {
  *  section). */
 export function defaultSopTemplate(scope: SopScope): SopTemplateSpec {
   const sections = [...COMMON_SECTIONS];
-  if (scope === "lane" || scope === "pool") {
+  // Any partial scope (lane / pool / subprocess) has boundary hand-offs to document.
+  if (scope === "lane" || scope === "pool" || scope === "subprocess") {
     const at = sections.findIndex((s) => s.key === "procedure");
     sections.splice(at + 1, 0, HANDOFFS_SECTION);
   }

@@ -47,8 +47,9 @@ describe("SOP skeleton extractor", () => {
     // Request form: written by T1 (output), read by T3 (input).
     expect(sk.steps.find((s) => s.label === "Raise request")!.outputs).toContain("Request form");
     expect(sk.steps.find((s) => s.label === "File request")!.inputs).toContain("Request form");
-    // Two cross-lane hand-offs exist.
-    expect(sk.handoffsOut.length).toBeGreaterThanOrEqual(2);
+    // A WHOLE-diagram SOP has no BOUNDARY hand-offs (nothing leaves the scope).
+    expect(sk.handoffsOut).toEqual([]);
+    expect(sk.handoffsIn).toEqual([]);
   });
 
   it("T2204 — LANE scope keeps GLOBAL step numbers (Requester = steps 1 and 3, not 1 and 2)", () => {
