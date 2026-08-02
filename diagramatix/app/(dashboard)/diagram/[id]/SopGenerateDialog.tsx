@@ -26,10 +26,9 @@ const STUB_HPAD = 8;   // min horizontal gap between two boxes sharing a row
  * include them (nothing clipped). Line 1 = "To:/From: <context>", line 2 = detail.
  */
 function layoutBoundaryStubs(data: DiagramData, scope: Scope, scopeElementId: string, cropEl: DiagramElement): StubBox[] {
-  // Only SEQUENCE-flow crossings get a figure note (Paul: only show a "next-lane"
-  // note where a sequence connector actually goes). Message hand-offs to pools still
-  // appear in the SOP's Hand-offs text section — they're just not drawn on the figure.
-  const crossings = computeBoundaryCrossings(data, scope, scopeElementId).filter((c) => c.kind === "sequence");
+  // Both SEQUENCE-flow crossings (to another lane) AND MESSAGE crossings (to/from a
+  // pool) get a figure note — placed above/below the fragment, never left/right.
+  const crossings = computeBoundaryCrossings(data, scope, scopeElementId);
   if (crossings.length === 0) return [];
   const byId = new Map((data.elements ?? []).map((e) => [e.id, e]));
   const cl = cropEl.x, cr = cropEl.x + cropEl.width, ct = cropEl.y, cb = cropEl.y + cropEl.height;
