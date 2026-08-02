@@ -73,4 +73,15 @@ describe("SOP skeleton extractor", () => {
     expect(JSON.stringify(extractSkeleton(fixture(), { scope: "whole" })))
       .toEqual(JSON.stringify(extractSkeleton(fixture(), { scope: "whole" })));
   });
+
+  it("T2211 — data objects, data stores + business rules (from annotations, AI-Prompt excluded)", () => {
+    const f = fixture();
+    f.elements.push(el("DS", "data-store", "Requisition register", "L1"));
+    f.elements.push(el("N1", "text-annotation", "Approvals over $10k need CFO sign-off", "L1"));
+    f.elements.push(el("N2", "text-annotation", "AI Prompt: draft a purchase requisition process", "L1"));
+    const sk = extractSkeleton(f, { scope: "whole" });
+    expect(sk.dataObjects).toContain("Request form");
+    expect(sk.dataStores).toEqual(["Requisition register"]);
+    expect(sk.businessRules).toEqual(["Approvals over $10k need CFO sign-off"]); // AI-Prompt annotation excluded
+  });
 });

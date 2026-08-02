@@ -55,4 +55,18 @@ describe("SOP boundary crossings", () => {
     expect(computeBoundaryCrossings(fixture(), "whole")).toEqual([]);
     expect(computeBoundaryCrossings(fixture(), "group", "P1")).toEqual([]);
   });
+
+  it("T2212 — an edge-mounted boundary event's internal flow is NOT a crossing", () => {
+    const data = fixture();
+    // A boundary timer on T1 (lane L1) whose flow goes to T3, also in L1. The event
+    // has no lane parent of its own — membership must resolve through its host T1,
+    // so this internal flow must not be reported as a boundary crossing.
+    data.elements.push(el("T3", "task", "Escalate", "L1"));
+    data.elements.push({ ...el("BE", "intermediate-event", "3d"), boundaryHostId: "T1" } as DiagramElement);
+    data.connectors.push(seq("s2", "BE", "T3"));
+    const cx = computeBoundaryCrossings(data, "lane", "L1");
+    expect(cx.some((c) => c.detail === "Escalate")).toBe(false);
+    // The genuine cross-lane sequence (T1→T2) is still detected.
+    expect(cx.some((c) => c.kind === "sequence" && c.detail === "Approve request")).toBe(true);
+  });
 });

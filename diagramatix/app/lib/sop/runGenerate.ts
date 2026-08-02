@@ -6,7 +6,7 @@
 import { prisma } from "@/app/lib/db";
 import type { DiagramData } from "../diagram/types";
 import { extractSkeleton } from "./extractSkeleton";
-import type { SopScope } from "./skeleton";
+import type { SopScope, SopSkeleton } from "./skeleton";
 import { resolveSopTemplate } from "./resolveTemplate";
 import { generateSop, buildSopBriefing } from "../ai/generateSop";
 import { walkForwardClosure } from "../diagram/linkClosure";
@@ -19,14 +19,23 @@ export type RunResult =
 /** Max diagrams a single suite will generate prose for (bounds cost/time). */
 export const SOP_SUITE_CAP = 12;
 
-async function loadSopBriefing(projectId: string, orgId: string, scope: SopScope) {
+async function loadSopBriefing(projectId: string, orgId: string, scope: SopScope, skeleton: SopSkeleton) {
   const resolved = await resolveSopTemplate({ projectId, orgId, scope });
+  // Drop the omit-if-empty data sections when the diagram has none, so the AI
+  // doesn't emit a hollow "Data Objects" / "Data Stores" heading. (Business Rules
+  // is always kept — the author extends it even when nothing was captured.)
+  const spec = {
+    ...resolved.spec,
+    sections: resolved.spec.sections.filter((s) =>
+      (s.key !== "data_objects" || skeleton.dataObjects.length > 0) &&
+      (s.key !== "data_stores" || skeleton.dataStores.length > 0)),
+  };
   let additions: string | null = null;
   try {
     const dr = await prisma.diagramRules.findFirst({ where: { category: "sop", isDefault: true }, select: { rules: true } });
     additions = dr?.rules ?? null;
   } catch { /* proceed without additions */ }
-  return { resolved, briefing: buildSopBriefing(additions, resolved.spec) };
+  return { resolved, briefing: buildSopBriefing(additions, spec) };
 }
 
 /** Generate one SOP for a single scope (whole/lane/pool/subprocess). */
@@ -48,7 +57,7 @@ export async function runSopGenerate(opts: {
   }
 
   const skeleton = extractSkeleton(data, { scope: effScope, scopeElementId: effScopeId, diagramId: opts.diagramId, diagramName: effName });
-  const { resolved, briefing } = await loadSopBriefing(opts.projectId, opts.orgId, effScope);
+  const { resolved, briefing } = await loadSopBriefing(opts.projectId, opts.orgId, effScope, skeleton);
   const result = await generateSop({ apiKey: opts.apiKey, skeleton, briefing });
   if (!result.ok) return { ok: false, status: result.status, error: result.error };
   return { ok: true, sections: result.sections, model: result.model, templateId: resolved.templateId, title: skeleton.meta.title, scopeLabel: skeleton.meta.scopeLabel ?? null };

@@ -53,6 +53,9 @@ export interface SopSkeleton {
   inputs: string[];             // distinct inputs across scope
   outputs: string[];            // distinct outputs across scope
   systems: string[];            // distinct systems across scope
+  dataObjects: string[];        // distinct BPMN data-object names in scope
+  dataStores: string[];         // distinct BPMN data-store names in scope
+  businessRules: string[];      // rules extracted from text annotations in scope (author-extendable)
   risksControls: { code: string; label: string; kind: "risk" | "control" }[];
   handoffsIn: SopHandoff[];     // (lane/pool scope) everything the role receives
   handoffsOut: SopHandoff[];    // (lane/pool scope) everything the role hands off

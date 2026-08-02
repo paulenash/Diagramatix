@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GuideEditor } from "@/app/(dashboard)/dashboard/admin/user-guide/GuideEditor";
 
@@ -12,10 +12,11 @@ interface Section { heading: string; bodyMarkdown: string; image?: string | null
  * to Word (/api/sop/:id/export). Reuses the User-Guide TipTap body editor.
  */
 export function SopEditorClient({
-  projectId, sopId, initialTitle, initialStatus, initialScopeLabel, initialSections,
+  projectId, sopId, backHref, initialTitle, initialStatus, initialScopeLabel, initialSections,
 }: {
   projectId: string;
   sopId: string;
+  backHref: string;
   initialTitle: string;
   initialStatus: string;
   initialScopeLabel: string | null;
@@ -31,6 +32,15 @@ export function SopEditorClient({
   const [confirmRegen, setConfirmRegen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [zoomImg, setZoomImg] = useState<string | null>(null);
+
+  // Full-screen figure viewer — Esc to close.
+  useEffect(() => {
+    if (!zoomImg) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setZoomImg(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoomImg]);
 
   const touch = () => setDirty(true);
   const setSection = (i: number, patch: Partial<Section>) => {
@@ -76,9 +86,9 @@ export function SopEditorClient({
     <div className="min-h-screen dgx-dashboard-bg">
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3 min-w-0">
-          <button onClick={() => router.push(`/dashboard/projects/${projectId}`)}
-            className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 shrink-0" title="Back to project">
-            <span style={{ fontSize: "1.5em", lineHeight: 1 }}>{"←"}</span><span className="underline">Project</span>
+          <button onClick={() => router.push(backHref)}
+            className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 shrink-0" title="Return to where you came from">
+            <span style={{ fontSize: "1.5em", lineHeight: 1 }}>{"←"}</span><span className="underline">Back</span>
           </button>
           <input value={title} onChange={(e) => { setTitle(e.target.value); touch(); }}
             className="text-lg font-semibold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-200 focus:border-blue-400 outline-none min-w-0 flex-1" />
@@ -137,14 +147,28 @@ export function SopEditorClient({
             {s.image && (
               <div className="mt-2 flex flex-col items-center gap-1">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={s.image} alt={s.heading || "Figure"} className="max-w-full border border-gray-200 rounded" />
-                <button onClick={() => setSection(i, { image: null })} className="text-[10px] text-red-500 hover:underline">Remove figure</button>
+                <img src={s.image} alt={s.heading || "Figure"} onClick={() => setZoomImg(s.image!)}
+                  className="max-w-full border border-gray-200 rounded cursor-zoom-in" title="Click to view full screen" />
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setZoomImg(s.image!)} className="text-[10px] text-blue-600 hover:underline">⤢ Full screen</button>
+                  <button onClick={() => setSection(i, { image: null })} className="text-[10px] text-red-500 hover:underline">Remove figure</button>
+                </div>
               </div>
             )}
           </div>
         ))}
         <button onClick={add} className="w-full py-2 text-xs text-blue-600 border border-dashed border-blue-300 rounded hover:bg-blue-50">+ Add section</button>
       </div>
+
+      {zoomImg && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6 cursor-zoom-out"
+          onClick={() => setZoomImg(null)} title="Click or press Esc to close">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={zoomImg} alt="Diagram figure" className="max-w-full max-h-full object-contain" onClick={(e) => e.stopPropagation()} />
+          <button onClick={() => setZoomImg(null)}
+            className="absolute top-4 right-5 text-white/90 hover:text-white text-2xl leading-none" title="Close (Esc)">✕</button>
+        </div>
+      )}
     </div>
   );
 }

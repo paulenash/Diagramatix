@@ -35,11 +35,18 @@ export function computeBoundaryCrossings(data: DiagramData, scope: SopScope, sco
   const byId = indexById(elements);
   const labelOf = (e?: DiagramElement | null) => (e ? (e.label?.trim() || `(unnamed ${e.type})`) : "");
 
+  // A boundary-mounted event (edge timer/error/etc.) belongs to the same lane/pool
+  // as the activity it is attached to — resolve membership through its host so its
+  // (internal) outgoing flow isn't mistaken for a boundary crossing.
+  const forScope = (el?: DiagramElement): DiagramElement | undefined =>
+    el?.boundaryHostId ? (byId.get(el.boundaryHostId) ?? el) : el;
+
   const inScope = (el?: DiagramElement): boolean => {
-    if (!el) return false;
-    if (scope === "lane") return laneOf(el, byId)?.id === scopeElementId;
-    if (scope === "pool") return poolOf(el, byId)?.id === scopeElementId;
-    if (scope === "subprocess") return isInside(el, scopeElementId, byId);
+    const e = forScope(el);
+    if (!e) return false;
+    if (scope === "lane") return laneOf(e, byId)?.id === scopeElementId;
+    if (scope === "pool") return poolOf(e, byId)?.id === scopeElementId;
+    if (scope === "subprocess") return isInside(e, scopeElementId, byId);
     return false;
   };
 

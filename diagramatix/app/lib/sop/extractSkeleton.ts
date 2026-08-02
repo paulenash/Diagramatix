@@ -171,6 +171,23 @@ export function extractSkeleton(data: DiagramData, opts: ExtractOptions): SopSke
   }
   for (const pid of data.parentDiagramIds ?? []) references.push({ kind: "parent", diagramId: pid });
 
+  // Data objects / data stores present in scope (explicit sections; distinct from
+  // the inputs/outputs derived from associations).
+  const dataObjects: string[] = [];
+  const dataStores: string[] = [];
+  // Business rules pulled from text annotations in scope. Skip the auto AI-Prompt
+  // annotation ("AI Prompt: …") — it's provenance, not a business rule.
+  const businessRules: string[] = [];
+  for (const el of elements) {
+    if (!elInScope(el)) continue;
+    if (el.type === "data-object") dataObjects.push(labelOf(el));
+    else if (el.type === "data-store") dataStores.push(labelOf(el));
+    else if (el.type === "text-annotation") {
+      const text = el.label?.trim();
+      if (text && !/^ai prompt\b/i.test(text)) businessRules.push(text);
+    }
+  }
+
   const dedupeHandoffs = (hs: SopHandoff[]): SopHandoff[] => {
     const seen = new Set<string>(); const out: SopHandoff[] = [];
     for (const h of hs) { const k = `${h.from ?? ""}>${h.to ?? ""}>${h.what ?? ""}`; if (!seen.has(k)) { seen.add(k); out.push(h); } }
@@ -194,6 +211,9 @@ export function extractSkeleton(data: DiagramData, opts: ExtractOptions): SopSke
     inputs: uniq(steps.flatMap((s) => s.inputs)),
     outputs: uniq(steps.flatMap((s) => s.outputs)),
     systems: uniq(steps.flatMap((s) => s.systems)),
+    dataObjects: uniq(dataObjects),
+    dataStores: uniq(dataStores),
+    businessRules: uniq(businessRules),
     risksControls: [...rcItems.values()],
     handoffsIn: dedupeHandoffs(handoffsIn),
     handoffsOut: dedupeHandoffs(handoffsOut),

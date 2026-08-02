@@ -47,7 +47,7 @@ export function ProjectSopsSection({ projectId, canEdit }: { projectId: string; 
             <p className="text-[11px] text-gray-400 px-1 italic">No SOPs yet. Open a BPMN diagram and click <span className="font-medium">Generate SOP</span>.</p>
           ) : rows.map((r) => (
             <div key={r.id} className="flex items-center gap-1 text-[11px] group">
-              <Link href={`/dashboard/projects/${projectId}/sop/${r.id}`} className="flex-1 min-w-0 truncate text-blue-700 hover:underline" title={`${r.title}${r.diagramName ? " — " + r.diagramName : ""}`}>
+              <Link href={`/dashboard/projects/${projectId}/sop/${r.id}?from=${encodeURIComponent(`/dashboard/projects/${projectId}`)}`} className="flex-1 min-w-0 truncate text-blue-700 hover:underline" title={`${r.title}${r.diagramName ? " — " + r.diagramName : ""}`}>
                 {r.title}
                 {r.scopeLabel && r.scope !== "whole" && <span className="ml-1 text-[9px] text-gray-400">· {r.scopeLabel}</span>}
               </Link>

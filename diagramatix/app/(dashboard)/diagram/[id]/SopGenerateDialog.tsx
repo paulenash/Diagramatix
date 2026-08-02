@@ -9,51 +9,97 @@ type Scope = "whole" | "lane" | "pool" | "subprocess" | "group";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+interface StubBox { x: number; y: number; w: number; h: number; lines: string[] }
+
+const STUB_FONT = 9, STUB_LINE_H = 12, STUB_PAD_X = 5, STUB_PAD_Y = 4;
+const STUB_OUT = 16;   // clearance from the fragment boundary to the first row/column
+const STUB_HPAD = 8;   // min horizontal gap between two boxes sharing a row
+
 /**
- * Draw a green "To:/From:" boundary box for every connector that crosses out of
- * the shown region, into a cloned+cropped canvas SVG (diagram coordinates). Two
- * lines: line 1 = "To:/From: <lane/pool context>", line 2 = target name / message.
+ * Lay out a green "To:/From:" boundary box for every connector that crosses the
+ * fragment boundary — placed OUTSIDE the fragment (the lane/pool) on the side
+ * toward the peer, and de-overlapped: same-side boxes never overlap horizontally;
+ * when they would, they stack into vertical rows separated by half a box height.
+ * Returns the boxes in diagram coordinates so the caller can grow the viewBox to
+ * include them (nothing clipped). Line 1 = "To:/From: <context>", line 2 = detail.
  */
-function injectBoundaryStubs(clone: SVGSVGElement, data: DiagramData, scope: Scope, scopeElementId: string) {
+function layoutBoundaryStubs(data: DiagramData, scope: Scope, scopeElementId: string, cropEl: DiagramElement): StubBox[] {
   const crossings = computeBoundaryCrossings(data, scope, scopeElementId);
-  if (crossings.length === 0) return;
+  if (crossings.length === 0) return [];
   const byId = new Map((data.elements ?? []).map((e) => [e.id, e]));
-  const stack = new Map<string, number>(); // (element:side) → count, to fan out overlaps
-  const FONT = 9, LINE_H = 12, PAD_X = 4, PAD_Y = 3, GAP = 8;
+  const cl = cropEl.x, cr = cropEl.x + cropEl.width, ct = cropEl.y, cb = cropEl.y + cropEl.height;
+  const ccx = cl + cropEl.width / 2, ccy = ct + cropEl.height / 2;
 
-  for (const cx of crossings) {
+  type Item = { lines: string[]; w: number; h: number; side: "top" | "bottom" | "left" | "right"; ax: number; ay: number };
+  const items: Item[] = crossings.map((cx) => {
     const inEl = byId.get(cx.inElementId);
-    if (!inEl) continue;
-    const ecx = inEl.x + inEl.width / 2, ecy = inEl.y + inEl.height / 2;
-    const dx = cx.peerX - ecx, dy = cx.peerY - ecy;
     const lines = [`${cx.direction === "out" ? "To" : "From"}: ${cx.context}`, cx.detail];
-    const boxW = Math.min(190, Math.max(64, Math.max(...lines.map((l) => l.length)) * FONT * 0.6 + PAD_X * 2));
-    const boxH = lines.length * LINE_H + PAD_Y * 2;
+    const w = Math.min(200, Math.max(72, Math.max(...lines.map((l) => l.length)) * STUB_FONT * 0.6 + STUB_PAD_X * 2));
+    const h = lines.length * STUB_LINE_H + STUB_PAD_Y * 2;
+    // Which boundary edge does this cross? Decide by the peer's direction from the
+    // fragment centre (lanes stack vertically → cross top/bottom; pools sit side by
+    // side → messages cross left/right).
+    const dx = cx.peerX - ccx, dy = cx.peerY - ccy;
+    const side = Math.abs(dy) >= Math.abs(dx) ? (dy < 0 ? "top" : "bottom") : (dx < 0 ? "left" : "right");
+    // Anchor along the edge = the in-scope element's centre, clamped to the fragment.
+    const ax = inEl ? clamp(inEl.x + inEl.width / 2, cl, cr) : ccx;
+    const ay = inEl ? clamp(inEl.y + inEl.height / 2, ct, cb) : ccy;
+    return { lines, w, h, side, ax, ay };
+  });
 
-    let side: "top" | "bottom" | "left" | "right", ax: number, ay: number;
-    if (Math.abs(dy) >= Math.abs(dx)) { side = dy < 0 ? "top" : "bottom"; ax = ecx; ay = dy < 0 ? inEl.y - GAP : inEl.y + inEl.height + GAP; }
-    else { side = dx < 0 ? "left" : "right"; ax = dx < 0 ? inEl.x - GAP : inEl.x + inEl.width + GAP; ay = ecy; }
-    const key = `${cx.inElementId}:${side}`;
-    const n = stack.get(key) ?? 0; stack.set(key, n + 1);
+  const boxes: StubBox[] = [];
+  for (const sideName of ["top", "bottom", "left", "right"] as const) {
+    const group = items.filter((i) => i.side === sideName);
+    if (!group.length) continue;
+    const h = Math.max(...group.map((g) => g.h));
+    const vgap = h / 2; // "separate bottom of one from top of another by 1/2 label height"
 
-    let bx: number, by: number;
-    if (side === "top") { bx = ax - boxW / 2; by = ay - boxH - n * (boxH + 3); }
-    else if (side === "bottom") { bx = ax - boxW / 2; by = ay + n * (boxH + 3); }
-    else if (side === "left") { bx = ax - boxW - n * (boxW + 3); by = ay - boxH / 2; }
-    else { bx = ax + n * (boxW + 3); by = ay - boxH / 2; }
+    if (sideName === "top" || sideName === "bottom") {
+      group.sort((a, b) => a.ax - b.ax);
+      const rowRight: number[] = []; // rightmost x used, per row
+      for (const g of group) {
+        const bx = g.ax - g.w / 2;
+        let r = 0;
+        for (; r < rowRight.length; r++) if (bx >= rowRight[r] + STUB_HPAD) break;
+        if (r === rowRight.length) rowRight.push(-Infinity);
+        rowRight[r] = bx + g.w;
+        const by = sideName === "top"
+          ? ct - STUB_OUT - (r + 1) * h - r * vgap
+          : cb + STUB_OUT + r * (h + vgap);
+        boxes.push({ x: bx, y: by, w: g.w, h, lines: g.lines });
+      }
+    } else {
+      group.sort((a, b) => a.ay - b.ay);
+      let prevBottom = -Infinity;
+      for (const g of group) {
+        let by = g.ay - g.h / 2;
+        if (by < prevBottom + vgap) by = prevBottom + vgap;
+        prevBottom = by + g.h;
+        const bx = sideName === "left" ? cl - STUB_OUT - g.w : cr + STUB_OUT;
+        boxes.push({ x: bx, y: by, w: g.w, h: g.h, lines: g.lines });
+      }
+    }
+  }
+  return boxes;
+}
 
+/** Draw the laid-out green boundary boxes into the cloned SVG. */
+function drawBoundaryStubs(clone: SVGSVGElement, boxes: StubBox[]) {
+  for (const b of boxes) {
     const g = document.createElementNS(SVG_NS, "g");
     const rect = document.createElementNS(SVG_NS, "rect");
-    rect.setAttribute("x", String(bx)); rect.setAttribute("y", String(by));
-    rect.setAttribute("width", String(boxW)); rect.setAttribute("height", String(boxH));
+    rect.setAttribute("x", String(b.x)); rect.setAttribute("y", String(b.y));
+    rect.setAttribute("width", String(b.w)); rect.setAttribute("height", String(b.h));
     rect.setAttribute("rx", "3");
     rect.setAttribute("fill", "#f0fdf4"); rect.setAttribute("stroke", "#16a34a"); rect.setAttribute("stroke-width", "1.5");
     g.appendChild(rect);
-    lines.forEach((ln, i) => {
+    b.lines.forEach((ln, i) => {
       const t = document.createElementNS(SVG_NS, "text");
-      t.setAttribute("x", String(bx + PAD_X));
-      t.setAttribute("y", String(by + PAD_Y + (i + 1) * LINE_H - 3));
-      t.setAttribute("font-size", String(FONT));
+      t.setAttribute("x", String(b.x + STUB_PAD_X));
+      t.setAttribute("y", String(b.y + STUB_PAD_Y + (i + 1) * STUB_LINE_H - 3));
+      t.setAttribute("font-size", String(STUB_FONT));
       t.setAttribute("font-family", "sans-serif");
       t.setAttribute("fill", "#166534");
       if (i === 0) t.setAttribute("font-weight", "600");
@@ -62,6 +108,16 @@ function injectBoundaryStubs(clone: SVGSVGElement, data: DiagramData, scope: Sco
     });
     clone.appendChild(g);
   }
+}
+
+/** Remove selection chrome (resize handles + the dashed blue selected-outline) from
+ *  a cloned canvas SVG so the SOP figure isn't marred by the editor's selection. */
+function stripSelectionChrome(clone: SVGSVGElement) {
+  clone.querySelectorAll("[data-resize-handle]").forEach((n) => n.remove());
+  clone.querySelectorAll("rect").forEach((r) => {
+    const s = r.getAttribute("stroke");
+    if ((s === "#2563eb" || s === "#3b82f6") && r.getAttribute("stroke-dasharray")) r.setAttribute("stroke", "none");
+  });
 }
 
 /** Serialise a (viewBox'd) SVG clone to a PNG data URI via an offscreen <img> +
@@ -97,9 +153,20 @@ async function captureFigure(data: DiagramData, scope: Scope, scopeElementId: st
     const isLinkedSub = !!cropEl && (cropEl.type === "subprocess" || cropEl.type === "subprocess-expanded") && !!cropEl.properties?.linkedDiagramId;
 
     let bx: number, by: number, bw: number, bh: number;
+    let boxes: StubBox[] = [];
     if (cropEl && !isLinkedSub) {
-      const P = 70;
-      bx = cropEl.x - P; by = cropEl.y - P; bw = cropEl.width + 2 * P; bh = cropEl.height + 2 * P;
+      // Boundary labels first, then grow the crop to include them so they sit
+      // OUTSIDE the fragment and never clip. Start from a snug pad around the element.
+      boxes = layoutBoundaryStubs(data, scope, scopeElementId!, cropEl);
+      const PAD = 24;
+      let minX = cropEl.x - PAD, minY = cropEl.y - PAD;
+      let maxX = cropEl.x + cropEl.width + PAD, maxY = cropEl.y + cropEl.height + PAD;
+      for (const b of boxes) {
+        minX = Math.min(minX, b.x); minY = Math.min(minY, b.y);
+        maxX = Math.max(maxX, b.x + b.w); maxY = Math.max(maxY, b.y + b.h);
+      }
+      const M = 12; // outer breathing room around everything
+      bx = minX - M; by = minY - M; bw = (maxX - minX) + 2 * M; bh = (maxY - minY) + 2 * M;
     } else if (scope === "whole" || scope === "group") {
       const els = elements.filter((e) => e.width > 0 && e.height > 0);
       if (els.length === 0) return undefined;
@@ -113,12 +180,13 @@ async function captureFigure(data: DiagramData, scope: Scope, scopeElementId: st
     const clone = svg.cloneNode(true) as SVGSVGElement;
     const g = clone.querySelector("g");
     if (g) g.removeAttribute("transform");
+    stripSelectionChrome(clone);
     clone.setAttribute("viewBox", `${bx} ${by} ${bw} ${bh}`);
     const outW = Math.min(1400, Math.max(320, Math.round(bw)));
     const outH = Math.max(1, Math.round(bh * (outW / bw)));
     clone.setAttribute("width", String(outW));
     clone.setAttribute("height", String(outH));
-    if (cropEl && !isLinkedSub) injectBoundaryStubs(clone, data, scope, scopeElementId!);
+    if (boxes.length) drawBoundaryStubs(clone, boxes);
     return await svgToPng(clone, outW, outH);
   } catch { return undefined; }
 }
@@ -169,7 +237,7 @@ export function SopGenerateDialog({
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || !j.id) { setErr(j.error ?? "SOP generation failed"); return; }
-      router.push(`/dashboard/projects/${projectId}/sop/${j.id}`);
+      router.push(`/dashboard/projects/${projectId}/sop/${j.id}?from=${encodeURIComponent(`/diagram/${diagramId}`)}`);
     } catch { setErr("SOP generation failed"); }
     finally { setBusy(false); }
   }
