@@ -297,7 +297,13 @@ export function SopGenerateDialog({
         {err && <p className="text-[11px] text-red-600 mb-2">{err}</p>}
         {busy && <p className="text-[11px] text-blue-700 mb-2 flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse" />Generating the SOP with AI (15–30s)…</p>}
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end items-center gap-2">
+          {busy && (
+            <svg className="w-4 h-4 animate-spin text-blue-600 shrink-0" viewBox="0 0 24 24" fill="none" aria-label="Generating">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          )}
           <button onClick={onClose} disabled={busy} className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">Cancel</button>
           <button onClick={generate} disabled={busy} className="px-3 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
             {busy ? "Working…" : "Generate SOP"}

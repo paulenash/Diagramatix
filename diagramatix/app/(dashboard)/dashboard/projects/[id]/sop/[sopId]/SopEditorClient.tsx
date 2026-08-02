@@ -240,7 +240,7 @@ export function SopEditorClient({
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6 cursor-zoom-out"
           onClick={() => setZoomImg(null)} title="Click or press Esc to close">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={zoomImg} alt="Diagram figure" className="max-w-full max-h-full object-contain" onClick={(e) => e.stopPropagation()} />
+          <img src={zoomImg} alt="Diagram figure" className="max-w-full max-h-full object-contain cursor-zoom-out" onClick={() => setZoomImg(null)} />
           <button onClick={() => setZoomImg(null)}
             className="absolute top-4 right-5 text-white/90 hover:text-white text-2xl leading-none" title="Close (Esc)">✕</button>
         </div>
