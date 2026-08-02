@@ -196,7 +196,11 @@ async function figurePageSection(
     },
     children: [
       ...leading,
-      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: heading })], spacing: { after: 120 } }),
+      // Figure label with EXPLICIT run formatting (bold, sized, dark) rather than
+      // the Heading1 STYLE — an org Word template (externalStyles) can define
+      // Heading1 so its text renders invisibly, which hid this label. Direct run
+      // properties override the style, so "Process Diagram" always shows.
+      new Paragraph({ children: [new TextRun({ text: heading, bold: true, size: 28, color: "1F2937" })], spacing: { before: 60, after: 120 } }),
       new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: img.data, type: img.type, transformation: { width: w, height: h } })] }),
       ...(figure.caption ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: stripSym(figure.caption), italics: true, size: 18, color: "666666" })] })] : []),
     ],
