@@ -552,6 +552,22 @@ export function DiagramEditor({
     } catch { /* ignore */ }
   }, [projectId]);
   useEffect(() => { void refreshRiskCatalog(); }, [refreshRiskCatalog]);
+  // SOPs generated for THIS diagram — lets the Properties panel offer "Open SOP" for
+  // the selected Lane/Pool and the whole Diagram, each flagged stale ("regeneration
+  // required") when the diagram changed after the SOP was generated.
+  const [diagramSops, setDiagramSops] = useState<{ id: string; scope: string; scopeElementId: string | null; stale: boolean; title: string }[]>([]);
+  const refreshDiagramSops = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const r = await fetch(`/api/projects/${projectId}/sop`);
+      const j = r.ok ? await r.json() : { documents: [] };
+      setDiagramSops((j.documents ?? [])
+        .filter((d: { diagramId: string }) => d.diagramId === diagramId)
+        .map((d: { id: string; scope: string; scopeElementId: string | null; stale?: boolean; title: string }) =>
+          ({ id: d.id, scope: d.scope, scopeElementId: d.scopeElementId ?? null, stale: !!d.stale, title: d.title })));
+    } catch { /* ignore */ }
+  }, [projectId, diagramId]);
+  useEffect(() => { void refreshDiagramSops(); }, [refreshDiagramSops]);
   // Create a brand-new catalog Risk/Control straight from the diagram (owner-gated
   // by the API), then refresh the catalog so it can be attached to the step.
   const onCreateRiskItem = useCallback(async (kind: "Risk" | "Control", name: string): Promise<RiskCatalogItem | null> => {
@@ -4085,6 +4101,8 @@ export function DiagramEditor({
             onSetProcessOwner={diagramType === "bpmn" ? setProcessOwner : undefined}
             procedureDoc={data.procedureDoc}
             onSetProcedureDoc={diagramType === "bpmn" ? setProcedureDoc : undefined}
+            sops={diagramSops}
+            onOpenSop={projectId ? ((sopId) => router.push(`/dashboard/projects/${projectId}/sop/${sopId}?from=${encodeURIComponent(`/diagram/${diagramId}`)}`)) : undefined}
             projectId={projectId ?? undefined}
             pcf={data.pcf}
             onSetPcf={diagramType === "bpmn" ? setPcf : undefined}
@@ -5235,7 +5253,7 @@ export function DiagramEditor({
           data={data}
           initialScope={sopInitial.scope}
           initialElementId={sopInitial.elementId}
-          onClose={() => setShowSopDialog(false)}
+          onClose={() => { setShowSopDialog(false); void refreshDiagramSops(); }}
         />
       )}
     </div>

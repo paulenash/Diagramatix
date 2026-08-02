@@ -173,19 +173,23 @@ async function figurePageSection(
   const img = await resolver(figure.dataUri).catch(() => null);
   if (!img || !img.width || !img.height) return null;
   const landscape = orientation === "landscape";
-  const pageW = landscape ? PAGE_H : PAGE_W;
-  const pageH = landscape ? PAGE_W : PAGE_H;
+  // Effective (on-page) dimensions AFTER orientation, used only for the fit math.
+  const effW = landscape ? PAGE_H : PAGE_W;
+  const effH = landscape ? PAGE_W : PAGE_H;
   const mSide = 360;                                  // ~0.25in side margins — as wide as sensible
   const mTopBottom = landscape ? 360 : 720;
-  const usableW = twToPx(pageW - 2 * mSide);
-  const usableH = twToPx(pageH - 2 * mTopBottom) - 48; // leave room for the heading line
+  const usableW = twToPx(effW - 2 * mSide);
+  const usableH = twToPx(effH - 2 * mTopBottom) - 48; // leave room for the heading line
   const scale = Math.min(usableW / img.width, usableH / img.height); // fit, keep aspect
   const w = Math.max(1, Math.round(img.width * scale));
   const h = Math.max(1, Math.round(img.height * scale));
   return {
     properties: {
       page: {
-        size: { orientation: landscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT, width: pageW, height: pageH },
+        // IMPORTANT: docx swaps width/height ITSELF when orientation is landscape.
+        // So always pass PORTRAIT dimensions here — passing pre-swapped dims makes it
+        // double-swap back to portrait (the bug that showed the expanded page upright).
+        size: { orientation: landscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT, width: PAGE_W, height: PAGE_H },
         margin: { top: mTopBottom, bottom: mTopBottom, left: mSide, right: mSide },
       },
     },

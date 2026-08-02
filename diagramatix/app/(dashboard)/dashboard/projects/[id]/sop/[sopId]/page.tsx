@@ -15,9 +15,13 @@ export default async function SopPage({ params, searchParams }: { params: Promis
 
   const doc = await prisma.sopDocument.findUnique({
     where: { id: sopId },
-    include: { sections: { orderBy: { sortOrder: "asc" } } },
+    include: { sections: { orderBy: { sortOrder: "asc" } }, diagram: { select: { updatedAt: true } } },
   });
   if (!doc || doc.projectId !== projectId) redirect(`/dashboard/projects/${projectId}`);
+
+  // "SOP Regeneration required" — the source diagram changed after this SOP was
+  // last generated (generatedAt is (re)stamped on generate/regenerate).
+  const stale = !!(doc.generatedAt && doc.diagram && doc.diagram.updatedAt > doc.generatedAt);
 
   // Return to the point of origin — the source diagram by default (or wherever the
   // SOP was opened from, when a ?from= is supplied). Only allow same-site paths.
@@ -36,6 +40,7 @@ export default async function SopPage({ params, searchParams }: { params: Promis
       projectId={projectId}
       sopId={doc.id}
       backHref={backHref}
+      stale={stale}
       initialTitle={doc.title}
       initialStatus={doc.status}
       initialScopeLabel={doc.scopeLabel}

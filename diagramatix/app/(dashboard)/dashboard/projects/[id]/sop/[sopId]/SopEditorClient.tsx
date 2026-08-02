@@ -12,11 +12,12 @@ interface Section { heading: string; bodyMarkdown: string; image?: string | null
  * to Word (/api/sop/:id/export). Reuses the User-Guide TipTap body editor.
  */
 export function SopEditorClient({
-  projectId, sopId, backHref, initialTitle, initialStatus, initialScopeLabel, initialSections,
+  projectId, sopId, backHref, stale, initialTitle, initialStatus, initialScopeLabel, initialSections,
 }: {
   projectId: string;
   sopId: string;
   backHref: string;
+  stale: boolean;
   initialTitle: string;
   initialStatus: string;
   initialScopeLabel: string | null;
@@ -132,6 +133,13 @@ export function SopEditorClient({
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-6 space-y-4">
+        {stale && (
+          <div className="flex items-center justify-between gap-3 text-xs bg-amber-50 border border-amber-300 text-amber-800 rounded px-3 py-2">
+            <span><strong>⚠ SOP Regeneration required.</strong> The source diagram has changed since this SOP was generated — regenerate to bring it up to date.</span>
+            <button onClick={() => setConfirmRegen(true)} disabled={regenerating}
+              className="shrink-0 px-2 py-1 text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-40">Regenerate</button>
+          </div>
+        )}
         {err && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{err}</p>}
         {sections.map((s, i) => (
           <div key={i} className="bg-white border border-gray-200 rounded-lg p-4">

@@ -59,8 +59,12 @@ describe("document .docx export", () => {
     const doc = await (await JSZip.loadAsync(buf)).file("word/document.xml")!.async("string");
     // Two figure pages → two embedded images.
     expect((doc.match(/<w:drawing>/g) ?? []).length).toBe(2);
-    // One of the sections is landscape.
-    expect(doc).toContain('w:orient="landscape"');
+    // One section is genuinely landscape — orient flag AND width > height (docx
+    // swaps w/h for landscape, so the emitted pgSz must have w:w > w:h, else Word
+    // renders it upright).
+    const land = doc.match(/<w:pgSz w:w="(\d+)" w:h="(\d+)" w:orient="landscape"\s*\/>/);
+    expect(land).toBeTruthy();
+    expect(Number(land![1])).toBeGreaterThan(Number(land![2]));
     // Both images keep the 4:1 aspect ratio (cx/cy ≈ 4) — never compressed.
     const ratios = [...doc.matchAll(/<wp:extent cx="(\d+)" cy="(\d+)"/g)].map((m) => Number(m[1]) / Number(m[2]));
     expect(ratios.length).toBe(2);

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-interface SopRow { id: string; title: string; scope: string; scopeLabel: string | null; status: string; diagramName: string | null; updatedAt: string }
+interface SopRow { id: string; title: string; scope: string; scopeLabel: string | null; status: string; diagramName: string | null; updatedAt: string; stale?: boolean }
 
 /**
  * Sidebar section listing the Standard Operating Procedures generated in this
@@ -51,6 +51,7 @@ export function ProjectSopsSection({ projectId, canEdit }: { projectId: string; 
                 {r.title}
                 {r.scopeLabel && r.scope !== "whole" && <span className="ml-1 text-[9px] text-gray-400">· {r.scopeLabel}</span>}
               </Link>
+              {r.stale && <span className="text-[8px] uppercase text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 shrink-0" title="The source diagram changed — SOP regeneration required">Regen</span>}
               {r.status === "published" && <span className="text-[8px] uppercase text-green-700 bg-green-50 border border-green-200 rounded px-1 shrink-0">Pub</span>}
               {canEdit && (confirmDelete === r.id ? (
                 <>

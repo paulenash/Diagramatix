@@ -184,6 +184,12 @@ interface Props {
    *  Portal + the read-only viewer. URL + optional display name. */
   procedureDoc?: { url?: string; name?: string };
   onSetProcedureDoc?: (doc: { url?: string; name?: string } | undefined) => void;
+  /** SOPs generated for THIS diagram (whole + per lane/pool). Lets the panel offer
+   *  "Open SOP" for the selected Lane/Pool and for the whole Diagram, each with a
+   *  stale flag ("SOP Regeneration required") when the diagram changed after it was
+   *  generated. Matched to a lane/pool by scope + scopeElementId. */
+  sops?: { id: string; scope: string; scopeElementId: string | null; stale: boolean; title: string }[];
+  onOpenSop?: (sopId: string) => void;
   /** APQC PCF classification for this diagram (diagram-level). `projectId` powers
    *  the picker's framework/search fetch. */
   projectId?: string;
@@ -812,6 +818,8 @@ export function PropertiesPanel({
   onSetProcessOwner,
   procedureDoc,
   onSetProcedureDoc,
+  sops,
+  onOpenSop,
   projectId,
   pcf,
   onSetPcf,
@@ -1336,6 +1344,16 @@ export function PropertiesPanel({
                 onBlur={(e) => { const name = e.target.value.trim(); if (procedureDoc?.url) onSetProcedureDoc({ url: procedureDoc.url, name: name || undefined }); }}
                 onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
             </InlineField>
+            {/* The generated whole-diagram SOP — open it to edit / re-publish. */}
+            {(() => {
+              const whole = sops?.find((s) => s.scope === "whole");
+              return whole && onOpenSop ? (
+                <div className="flex items-center gap-2 px-1 py-1">
+                  <button onClick={() => onOpenSop(whole.id)} className="text-blue-600 hover:underline text-[10px]" title="Open the generated SOP to edit / re-publish">Open SOP ↗</button>
+                  {whole.stale && <span className="text-[8px] uppercase text-amber-700 bg-amber-50 border border-amber-300 rounded px-1" title="The diagram changed — SOP regeneration required">Regen</span>}
+                </div>
+              ) : null;
+            })()}
           </>)}
         </>)}
 
@@ -2224,6 +2242,18 @@ export function PropertiesPanel({
       {titleOpen && TitleSection()}
       <SectionHeader label="Properties" open={propsOpen} onToggle={() => setPropsOpen(!propsOpen)} />
       {propsOpen && <div className="space-y-1.5">
+      {/* SOP generated for this Lane/Pool — open it to re-edit, save + re-publish. */}
+      {(() => {
+        if (!(element.type === "lane" || element.type === "pool")) return null;
+        const sop = sops?.find((s) => s.scope === element.type && s.scopeElementId === element.id);
+        return sop && onOpenSop ? (
+          <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded px-2 py-1">
+            <span className="text-[10px] text-gray-600">SOP:</span>
+            <button onClick={() => onOpenSop(sop.id)} className="text-blue-600 hover:underline text-[10px]" title="Open the SOP generated for this lane/pool to edit / re-publish">Open ↗</button>
+            {sop.stale && <span className="text-[8px] uppercase text-amber-700 bg-amber-50 border border-amber-300 rounded px-1" title="The diagram changed — SOP regeneration required">Regen</span>}
+          </div>
+        ) : null;
+      })()}
       <div>
         <p className="text-[10px] text-gray-400 mb-0.5">Type: {element.type}</p>
         {debugMode && (

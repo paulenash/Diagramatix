@@ -35,10 +35,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
   const docs = await prisma.sopDocument.findMany({
     where: { projectId },
-    select: { id: true, diagramId: true, scope: true, scopeLabel: true, title: true, status: true, generatedAt: true, updatedAt: true, diagram: { select: { name: true } } },
+    select: { id: true, diagramId: true, scope: true, scopeElementId: true, scopeLabel: true, title: true, status: true, generatedAt: true, updatedAt: true, diagram: { select: { name: true, updatedAt: true } } },
     orderBy: { updatedAt: "desc" },
   });
-  return NextResponse.json({ documents: docs.map((d) => ({ ...d, diagramName: d.diagram?.name ?? null, diagram: undefined })) });
+  return NextResponse.json({
+    documents: docs.map((d) => ({
+      ...d,
+      diagramName: d.diagram?.name ?? null,
+      // Stale = the source diagram was changed after this SOP was last generated →
+      // "SOP Regeneration required". generatedAt is (re)stamped on generate/regenerate.
+      stale: !!(d.generatedAt && d.diagram && d.diagram.updatedAt > d.generatedAt),
+      diagram: undefined,
+    })),
+  });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
