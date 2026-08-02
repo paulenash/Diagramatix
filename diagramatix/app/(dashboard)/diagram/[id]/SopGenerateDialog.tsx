@@ -187,6 +187,11 @@ async function captureFigure(data: DiagramData, scope: Scope, scopeElementId: st
     const clone = svg.cloneNode(true) as SVGSVGElement;
     const g = clone.querySelector("g");
     if (g) g.removeAttribute("transform");
+    // Rich-text is rendered in <foreignObject> (HTML). An SVG loaded as an <img>
+    // can't rasterise HTML and the embedded markup often makes the SVG invalid XML,
+    // so the whole capture fails silently → no Process Diagram figure. Strip them so
+    // the figure is always produced (shapes + SVG text labels are unaffected).
+    clone.querySelectorAll("foreignObject").forEach((n) => n.remove());
     stripSelectionChrome(clone);
     clone.setAttribute("viewBox", `${bx} ${by} ${bw} ${bh}`);
     const outW = Math.min(1400, Math.max(320, Math.round(bw)));

@@ -206,7 +206,9 @@ export function SopEditorClient({
               <input value={s.heading} onChange={(e) => setSection(i, { heading: e.target.value })}
                 className="flex-1 text-sm font-semibold text-gray-800 bg-transparent border-b border-transparent hover:border-gray-200 focus:border-blue-400 outline-none"
                 placeholder="Section heading" />
-              {!s.key && <span className="text-[8px] uppercase text-blue-600 bg-blue-50 border border-blue-200 rounded px-1 shrink-0" title="Author-added — always kept on regenerate">Added</span>}
+              {s.image
+                ? <span className="text-[8px] uppercase text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1 shrink-0" title="The process diagram figure — leads the document and is kept on regenerate">Figure</span>
+                : !s.key && <span className="text-[8px] uppercase text-blue-600 bg-blue-50 border border-blue-200 rounded px-1 shrink-0" title="Author-added — always kept on regenerate">Added</span>}
               <button onClick={() => move(i, -1)} disabled={i === 0} className="text-gray-400 hover:text-gray-700 disabled:opacity-30 text-xs px-1" title="Move up">↑</button>
               <button onClick={() => move(i, 1)} disabled={i === sections.length - 1} className="text-gray-400 hover:text-gray-700 disabled:opacity-30 text-xs px-1" title="Move down">↓</button>
               <button onClick={() => remove(i)} className="text-red-500 hover:text-red-700 text-xs px-1" title="Remove section">✕</button>
