@@ -22,6 +22,8 @@ import { BubbleHelp } from "./BubbleHelp";
 import { EntityNameInput } from "./EntityNameInput";
 import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
 import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
+import { CollabCursors } from "./CollabCursors";
+import { LIVEBLOCKS_ENABLED } from "@/app/lib/collab/liveblocks";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { parseUmlAttribute, parseUmlOperation } from "@/app/lib/diagram/umlParse";
@@ -271,6 +273,8 @@ interface Props {
   /** Co-authoring soft locks: elementId → the OTHER editor currently holding it.
    *  Renders a lock badge and blocks editing that element (advisory). */
   coEditLocks?: Record<string, { userId: string; userName: string; color: string }>;
+  /** Phase 2: render live cursors (inside a Liveblocks room). */
+  collabCursors?: boolean;
   /** After the user closes "Scan Diagram for Issues", flagged elements are
    *  tinted on the canvas (red = error, orange = warning) for a short window.
    *  The map is element id → severity; undefined / empty means no tint. */
@@ -553,6 +557,7 @@ export function Canvas({
   selectedElementIds,
   selectedConnectorId,
   coEditLocks,
+  collabCursors,
   pcHighlightEnabled = true,
   scanHighlightById,
   entityDriftById,
@@ -6321,6 +6326,12 @@ export function Canvas({
               </g>
             );
           })}
+
+          {/* Phase 2 live cursors (Liveblocks). In the world group so they
+              pan/zoom with the diagram; counter-scaled to stay screen-constant. */}
+          {collabCursors && LIVEBLOCKS_ENABLED && (
+            <CollabCursors clientToWorld={clientToWorld} zoom={zoom} />
+          )}
 
           {/* Active-group overlay — when a multi-selection is active
               (most often a template was just stamped) every selected

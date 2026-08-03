@@ -31,6 +31,7 @@ import { Canvas } from "@/app/components/canvas/Canvas";
 import { Palette } from "@/app/components/canvas/Palette";
 import { PresenceBar } from "@/app/components/canvas/PresenceBar";
 import { usePresence } from "@/app/hooks/usePresence";
+import { CollabRoom } from "@/app/components/canvas/CollabRoom";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
@@ -2861,6 +2862,7 @@ export function DiagramEditor({
   const headerTint = isImpersonating ? undefined : lightenHex(typeStyle.bgColor, 0.55);
 
   return (
+    <CollabRoom diagramId={diagramId} enabled={collabEnabled}>
     <div
       className={`flex flex-col h-screen ${isImpersonating ? "bg-orange-50" : "bg-white"}`}
       onContextMenu={(e) => {
@@ -4085,6 +4087,7 @@ export function DiagramEditor({
           selectedElementIds={selectedElementIds}
           selectedConnectorId={selectedConnectorId}
           coEditLocks={presenceLocks}
+          collabCursors={collabEnabled}
           pcHighlightEnabled={highlightEnabled}
           scanHighlightById={scanHighlight ?? undefined}
           riskHighlightById={riskHighlight ?? undefined}
@@ -5364,5 +5367,6 @@ export function DiagramEditor({
         />
       )}
     </div>
+    </CollabRoom>
   );
 }
