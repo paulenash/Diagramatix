@@ -1780,6 +1780,26 @@ export function recomputeAllConnectors(
     // coordinate (wrong for anything but horizontally or vertically
     // aligned centres). For non-data associations the stored
     // sides/offsets are preserved.
+    // A compensation Association (from an edge-mounted compensation event to its
+    // handler activity) routes RECTILINEARLY like a sequence flow — never as the
+    // straight diagonal the generic association path below would rebuild. Force
+    // it on every re-route so it can't revert to "direct".
+    const isCompensationAssoc = conn.type === "associationBPMN" &&
+      source.type === "intermediate-event" &&
+      (source.eventType as string | undefined) === "compensation" &&
+      !!source.boundaryHostId;
+    if (isCompensationAssoc) {
+      const res = computeWaypoints(
+        source, target, elements,
+        conn.sourceSide, conn.targetSide, "rectilinear",
+        conn.sourceOffsetAlong ?? 0.5, conn.targetOffsetAlong ?? 0.5,
+      );
+      return { ...conn, routingType: "rectilinear",
+        waypoints: res.waypoints,
+        sourceInvisibleLeader: res.sourceInvisibleLeader ?? false,
+        targetInvisibleLeader: res.targetInvisibleLeader ?? false };
+    }
+
     if (conn.type === "associationBPMN") {
       const DATA_TYPES = new Set<string>(["data-object", "data-store", "text-annotation"]);
       const involvesData = DATA_TYPES.has(source.type) || DATA_TYPES.has(target.type);

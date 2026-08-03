@@ -3827,6 +3827,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           };
         }
       }
+      // A compensation intermediate event placed inline (not snapped to a host
+      // boundary) is a Throwing event by default; the edge-mounted CATCH variant
+      // is the one that snaps to a host above.
+      if (newEl.type === "intermediate-event" && newEl.eventType === "compensation"
+          && !newEl.boundaryHostId && !newEl.flowType) {
+        newEl = { ...newEl, flowType: "throwing" as FlowType };
+      }
       // Elements dropped inside an Expanded Subprocess use their default size
       // (no shrinking).
       if (!newEl.boundaryHostId) {
@@ -5860,6 +5867,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             updatedLabel = "Decision?";
           }
         }
+        // A compensation INTERMEDIATE event is a Throwing event by default (the
+        // edge-mounted CATCH variant is created boundary-mounted). Default its
+        // flow type when the trigger is set to compensation and none was given.
+        const compDefaultFlow =
+          eventType === "compensation" && flowType === undefined
+          && el.type === "intermediate-event" && !el.boundaryHostId
+            ? { flowType: "throwing" as FlowType } : {};
         return {
           ...el,
           label: updatedLabel,
@@ -5868,6 +5882,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           ...(eventType !== undefined ? { eventType: eventType as EventType } : {}),
           ...(repeatType !== undefined ? { repeatType: repeatType as RepeatType } : {}),
           ...(flowType !== undefined ? { flowType: flowType as FlowType } : {}),
+          ...compDefaultFlow,
           properties: { ...el.properties, ...rest },
         };
       });
@@ -6613,6 +6628,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // ── BPMN sequence connector rules ──
       const isSeqConn = connectorType === "sequence";
       if (isSeqConn) {
+        // A Compensation Activity is triggered by its compensation association,
+        // never a sequence flow — reject any sequence connector in or out of it.
+        if (source.properties?.isForCompensation === true || target.properties?.isForCompensation === true) return state;
         // Helper: find the expanded subprocess ancestor of an element
         const findExpandedSubParent = (el: DiagramElement): DiagramElement | undefined => {
           let cur = el;
@@ -6924,9 +6942,28 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         return { ...state, elements: updatedElements, connectors: updatedConnectors };
       }
 
-      // Recalculate data-object role when associationBPMN connector is deleted
+      // Recalculate data-object role when associationBPMN connector is deleted;
+      // and un-mark a Compensation Activity when its (directed) compensation
+      // Association is deleted — the marker exists BECAUSE of that connector.
       if (conn?.type === "associationBPMN") {
+        const src = state.elements.find(e => e.id === conn.sourceId);
+        const wasCompensationLink =
+          src?.type === "intermediate-event" &&
+          (src.eventType as string | undefined) === "compensation" &&
+          !!src.boundaryHostId;
+        // Another compensation association still pointing at the target keeps it marked.
+        const targetStillCompensated = wasCompensationLink && updatedConnectors.some(c => {
+          if (c.type !== "associationBPMN" || c.targetId !== conn.targetId) return false;
+          const s = state.elements.find(e => e.id === c.sourceId);
+          return s?.type === "intermediate-event"
+            && (s.eventType as string | undefined) === "compensation" && !!s.boundaryHostId;
+        });
         const updatedElements = state.elements.map(el => {
+          if (wasCompensationLink && !targetStillCompensated && el.id === conn.targetId) {
+            const nextProps = { ...el.properties };
+            delete nextProps.isForCompensation;
+            return { ...el, properties: nextProps };
+          }
           if (el.type !== "data-object") return el;
           if (el.id !== conn.sourceId && el.id !== conn.targetId) return el;
           const inbound = updatedConnectors.filter(c => c.type === "associationBPMN" && c.targetId === el.id);

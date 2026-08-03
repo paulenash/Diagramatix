@@ -1903,6 +1903,29 @@ export function PropertiesPanel({
             connector.routingType === "direct");
           if (!showDirection) return null;
 
+          // --- Compensation association: a fixed "Compensation" direction ---
+          // (an edge-mounted compensation event → its handler activity). Shown
+          // instead of the data-object direction buttons, which don't apply.
+          if (isAssocBPMN && allElements) {
+            const s = allElements.find(e => e.id === connector.sourceId);
+            const t = allElements.find(e => e.id === connector.targetId);
+            const isCompAssoc = s?.type === "intermediate-event"
+              && (s.eventType as string | undefined) === "compensation" && !!s.boundaryHostId
+              && (t?.type === "task" || t?.type === "subprocess" || t?.type === "subprocess-expanded");
+            if (isCompAssoc) {
+              return (
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-medium text-gray-500 shrink-0">Direction:</span>
+                  <button
+                    disabled
+                    title="Compensation association — a directed, rectilinear link from the compensation event to its handler activity"
+                    className="px-2 py-0.5 text-[10px] rounded border font-medium bg-blue-600 text-white border-blue-600 cursor-default"
+                  >Compensation</button>
+                </div>
+              );
+            }
+          }
+
           // --- associationBPMN: "To Data Object" / "From Data Object" buttons ---
           if (isAssocBPMN && allElements && allConnectors && onReverseConnector) {
             const srcEl = allElements.find(e => e.id === connector.sourceId);
@@ -2237,6 +2260,26 @@ export function PropertiesPanel({
     element.type === "start-event" ||
     element.type === "intermediate-event" ||
     element.type === "end-event";
+
+  // A Compensation START trigger is legal ONLY as the start event of an embedded
+  // Compensation Event Sub-Process (an event `subprocess-expanded`) nested inside
+  // an EP. Rare, but legal — gate the trigger option to that exact placement.
+  const compensationStartAllowed = (() => {
+    if (element.type !== "start-event") return false;
+    const parentEl = element.parentId ? allElements?.find((e) => e.id === element.parentId) : undefined;
+    const inEventSub = parentEl?.type === "subprocess-expanded"
+      && (parentEl.properties?.subprocessType as string | undefined) === "event";
+    if (!inEventSub || !parentEl) return false;
+    // …and that event sub-process must itself sit inside an (expanded) EP.
+    let cur = parentEl.parentId ? allElements?.find((e) => e.id === parentEl.parentId) : undefined;
+    const seen = new Set<string>();
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      if (cur.type === "subprocess-expanded") return true;
+      cur = cur.parentId ? allElements?.find((e) => e.id === cur!.parentId) : undefined;
+    }
+    return false;
+  })();
 
   return (
     <div style={{ width: panelWidth }} className="border-l border-gray-200 bg-white p-3 overflow-y-auto relative shrink-0">{resizeHandle}
@@ -3290,6 +3333,8 @@ export function PropertiesPanel({
                 if (element.type !== "end-event" && o.value === "terminate") return false;
                 if (element.type === "end-event" && (o.value === "timer" || o.value === "conditional")) return false;
                 if (element.type !== "intermediate-event" && o.value === "link") return false;
+                // Compensation START only inside an embedded event sub-process in an EP.
+                if (o.value === "compensation" && element.type === "start-event" && !compensationStartAllowed) return false;
                 return true;
               })
               .map(({ value, label }) => (

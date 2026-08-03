@@ -76,6 +76,7 @@ interface Props {
   isDisallowedTarget?: boolean;
   isMessageBpmnTarget?: boolean;
   isAssocBpmnTarget?: boolean;
+  isCompensationTarget?: boolean;
   isErrorTarget?: boolean;
   isElementDragTarget?: boolean;
   /** Process-Context association highlight: this element is connected to the
@@ -1031,15 +1032,44 @@ function ForkJoinShape({ el }: { el: DiagramElement }) {
   );
 }
 
+/** Bottom marker-row layout for a COLLAPSED subprocess. The compensation,
+ *  loop/MI, "+" and ad-hoc markers are laid out left→right (compensation to the
+ *  LEFT of the "+") and the complete group is centred along the bottom edge.
+ *  Shared by the shape and the "+" drill-through hit area so they stay aligned. */
+function subprocessMarkerLayout(el: DiagramElement) {
+  const SLOT = 14, GAP = 5;
+  const hasComp = el.properties?.isForCompensation === true;
+  const hasRepeat = !!el.repeatType && el.repeatType !== "none";
+  const hasAdHoc = !!el.properties.adHoc;
+  const order: string[] = [];
+  if (hasComp) order.push("comp");
+  if (hasRepeat) order.push("repeat");
+  order.push("plus");
+  if (hasAdHoc) order.push("adhoc");
+  const groupW = order.length * SLOT + (order.length - 1) * GAP;
+  const left = el.x + el.width / 2 - groupW / 2;
+  const cxOf = (k: string) => {
+    const i = order.indexOf(k);
+    return i < 0 ? el.x + el.width / 2 : left + i * (SLOT + GAP) + SLOT / 2;
+  };
+  const my = el.y + el.height - SLOT - 3;
+  return {
+    SLOT, my, plusCX: cxOf("plus"), compCX: cxOf("comp"),
+    repeatCX: cxOf("repeat"), adHocCX: cxOf("adhoc"), hasComp, hasRepeat, hasAdHoc,
+  };
+}
+
 function SubprocessShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const hasRepeat = el.repeatType && el.repeatType !== "none";
   const markerW = 14, markerH = 14;
-  // "+" always stays centred; repeat marker sits to the left with 4px gap
-  const plusCX = el.x + el.width / 2;
-  const repeatCX = plusCX - markerW / 2 - 4 - 5; // left edge of "+" - 4px gap - marker radius
+  // Compensation / loop / "+" / ad-hoc laid out as one group, centred on the
+  // bottom edge, with the compensation marker to the LEFT of the "+".
+  const L = subprocessMarkerLayout(el);
+  const hasRepeat = L.hasRepeat;
+  const plusCX = L.plusCX;
+  const repeatCX = L.repeatCX;
   const mx = plusCX - markerW / 2;
-  const my = el.y + el.height - markerH - 3;
+  const my = L.my;
   const spType = (el.properties.subprocessType as string | undefined) ?? "normal";
   const fill = resolveColor("subprocess", colors);
   return (
@@ -1066,9 +1096,10 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
           </>
         );
       })()}
-      {hasRepeat && <RepeatMarker el={el} cx={repeatCX} cy={my + markerH * 0.55} />}
-      {!!el.properties.adHoc && (
-        <AdHocMarker cx={plusCX + markerW / 2 + 4 + 5} cy={my + markerH * 0.55} />
+      {L.hasComp && <CompensationActivityMarker cx={L.compCX} cy={my + markerH * 0.55} />}
+      {hasRepeat && <RepeatMarker el={el} cx={repeatCX} cy={my + markerH * 0.55} includeCompensation={false} />}
+      {L.hasAdHoc && (
+        <AdHocMarker cx={L.adHocCX} cy={my + markerH * 0.55} />
       )}
       {/* Link icon and ValueBadge rendered in main SymbolRenderer */}
     </g>
@@ -1142,13 +1173,23 @@ function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
   const cy = el.y + el.height - 10;
   const hasRepeat = el.repeatType && el.repeatType !== "none";
   const hasAdHoc = !!el.properties.adHoc;
-  const offset = 7;
-  let repeatCX = cx;
-  let adHocCX = cx;
-  if (hasRepeat && hasAdHoc) {
-    repeatCX = cx - offset;
-    adHocCX = cx + offset;
-  }
+  const hasComp = el.properties?.isForCompensation === true;
+  // Compensation / loop / ad-hoc markers laid left→right and centred as a group
+  // along the bottom edge (compensation leftmost — an expanded SP has no "+").
+  const SLOT = 14, GAP = 5;
+  const order: string[] = [];
+  if (hasComp) order.push("comp");
+  if (hasRepeat) order.push("repeat");
+  if (hasAdHoc) order.push("adhoc");
+  const groupW = order.length ? order.length * SLOT + (order.length - 1) * GAP : 0;
+  const groupLeft = cx - groupW / 2;
+  const cxOf = (k: string) => {
+    const i = order.indexOf(k);
+    return i < 0 ? cx : groupLeft + i * (SLOT + GAP) + SLOT / 2;
+  };
+  const compCX = cxOf("comp");
+  const repeatCX = cxOf("repeat");
+  const adHocCX = cxOf("adhoc");
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
@@ -1159,7 +1200,8 @@ function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
         <rect x={el.x + 4} y={el.y + 4} width={el.width - 8} height={el.height - 8}
           rx={3} ry={3} fill="none" stroke="#374151" strokeWidth={1.5} />
       )}
-      {hasRepeat && <RepeatMarker el={el} cx={repeatCX} cy={cy} />}
+      {hasComp && <CompensationActivityMarker cx={compCX} cy={cy} />}
+      {hasRepeat && <RepeatMarker el={el} cx={repeatCX} cy={cy} includeCompensation={false} />}
       {hasAdHoc && <AdHocMarker cx={adHocCX} cy={cy} />}
       {/* ValueBadge rendered in main SymbolRenderer */}
     </g>
@@ -1308,7 +1350,7 @@ function AdHocMarker({ cx, cy }: { cx: number; cy: number }) {
 /** The BPMN compensation ACTIVITY marker — a small double left-triangle (rewind)
  *  shown when the activity is a compensation handler (isForCompensation). */
 function CompensationActivityMarker({ cx, cy }: { cx: number; cy: number }) {
-  const w = 4, h = 5;
+  const w = 8, h = 5; // 2× wider than tall (each triangle is w wide, so the pair spans 2w)
   return (
     <g fill="none" stroke="#374151" strokeWidth={1.2} strokeLinejoin="round">
       <polygon points={`${cx},${cy - h} ${cx - w},${cy} ${cx},${cy + h}`} />
@@ -1320,10 +1362,10 @@ function CompensationActivityMarker({ cx, cy }: { cx: number; cy: number }) {
 /** Renders an element's activity markers (loop / multi-instance) plus the
  *  compensation marker when set — laid side by side when both apply. Renders
  *  nothing when neither applies. */
-function RepeatMarker({ el, cx, cy }: { el: DiagramElement; cx: number; cy: number }) {
+function RepeatMarker({ el, cx, cy, includeCompensation = true }: { el: DiagramElement; cx: number; cy: number; includeCompensation?: boolean }) {
   const rt = el.repeatType;
   const hasRepeat = rt === "loop" || rt === "mi-parallel" || rt === "mi-sequential";
-  const isComp = el.properties?.isForCompensation === true;
+  const isComp = includeCompensation && el.properties?.isForCompensation === true;
   if (!hasRepeat && !isComp) return null;
   const gap = hasRepeat && isComp ? 9 : 0;
   const rcx = cx - gap, ccx = cx + gap;
@@ -2162,6 +2204,7 @@ export function SymbolRenderer({
   isDisallowedTarget,
   isMessageBpmnTarget,
   isAssocBpmnTarget,
+  isCompensationTarget,
   isErrorTarget,
   isElementDragTarget,
   isAssociationHighlight,
@@ -2845,8 +2888,11 @@ export function SymbolRenderer({
           );
         }
         const mw = 14, mh = 14;
-        const pmx = element.x + element.width / 2 - mw / 2;
-        const pmy = element.y + element.height - mh - 3;
+        // Follow the "+" position from the shared marker-row layout (it shifts
+        // off-centre when compensation / loop / ad-hoc markers share the row).
+        const L = subprocessMarkerLayout(element);
+        const pmx = L.plusCX - mw / 2;
+        const pmy = L.my;
         return (
           <rect
             x={pmx - 2} y={pmy - 2} width={mw + 4} height={mh + 4}
@@ -3338,6 +3384,18 @@ export function SymbolRenderer({
           x={element.x - 4} y={element.y - 4}
           width={element.width + 8} height={element.height + 8}
           fill="none" stroke="#c084fc" strokeWidth={2} rx={6}
+          style={{ pointerEvents: "none" }}
+        />
+      )}
+
+      {/* Compensation-association target highlight — dark yellow. Used ONLY when
+          dragging a connector from an edge-mounted compensation event onto an
+          Activity (the only valid compensation-handler targets). */}
+      {isCompensationTarget && (
+        <rect data-interactive
+          x={element.x - 4} y={element.y - 4}
+          width={element.width + 8} height={element.height + 8}
+          fill="none" stroke="#a16207" strokeWidth={2} rx={6}
           style={{ pointerEvents: "none" }}
         />
       )}

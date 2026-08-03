@@ -60,3 +60,45 @@ describe("edge-mounted compensation event → activity", () => {
     expect(d.connectors[0]?.type).toBe("sequence");
   });
 });
+
+describe("deleting the compensation association un-marks the target (T2221)", () => {
+  it("clears isForCompensation when its association is deleted", () => {
+    const drawn = reducer(world(), add("comp", "handler", "sequence"));
+    expect(drawn.elements.find((e) => e.id === "handler")!.properties?.isForCompensation).toBe(true);
+    const connId = drawn.connectors[0].id;
+    const deleted = reducer(drawn, { type: "DELETE_CONNECTOR", payload: { id: connId } } as Action);
+    const handler = deleted.elements.find((e) => e.id === "handler")!;
+    expect(handler.properties?.isForCompensation).toBeUndefined();
+    expect(deleted.connectors).toHaveLength(0);
+  });
+});
+
+describe("a Compensation Activity has no sequence flow (T2221)", () => {
+  const world2 = () => base([
+    el("host", "subprocess-expanded"),
+    el("comp", "intermediate-event", { eventType: "compensation", boundaryHostId: "host", x: 220, y: 160 }),
+    el("handler", "task", { x: 400, properties: { isForCompensation: true } }),
+    el("next", "task", { x: 600 }),
+  ]);
+  it("rejects a sequence FROM the compensation activity", () => {
+    const d = reducer(world2(), add("handler", "next", "sequence"));
+    expect(d.connectors).toHaveLength(0);
+  });
+  it("rejects a sequence TO the compensation activity", () => {
+    const d = reducer(world2(), add("next", "handler", "sequence"));
+    expect(d.connectors).toHaveLength(0);
+  });
+});
+
+describe("compensation intermediate event defaults to Throwing (T2221)", () => {
+  it("sets flowType throwing when eventType is set to compensation on an inline intermediate", () => {
+    const start = base([el("ie", "intermediate-event", { x: 100 })]);
+    const d = reducer(start, { type: "UPDATE_PROPERTIES", payload: { id: "ie", properties: { eventType: "compensation" } } } as Action);
+    expect(d.elements[0].flowType).toBe("throwing");
+  });
+  it("does NOT force throwing on a boundary-mounted (catch) compensation event", () => {
+    const start = base([el("ie", "intermediate-event", { x: 100, boundaryHostId: "host" })]);
+    const d = reducer(start, { type: "UPDATE_PROPERTIES", payload: { id: "ie", properties: { eventType: "compensation" } } } as Action);
+    expect(d.elements[0].flowType).toBeUndefined();
+  });
+});

@@ -4536,6 +4536,13 @@ export function Canvas({
     draggingSourceEl.flowType === "catching";
   const draggingFromEdgeMountedIntermediateEvent =
     draggingFromEdgeMountedIntermediateSendEvent || draggingFromEdgeMountedIntermediateReceiveEvent;
+  // Edge-mounted (boundary) compensation event: a connector from it is a
+  // compensation Association whose ONLY valid targets are Activities — those
+  // are highlighted in a dedicated dark-yellow colour used only here.
+  const draggingFromEdgeMountedCompensationEvent =
+    draggingSourceEl?.type === "intermediate-event" &&
+    !!draggingSourceEl.boundaryHostId &&
+    draggingSourceEl.eventType === "compensation";
   const draggingSourceBoundaryHostId = draggingSourceEl?.boundaryHostId ?? null;
   // State-machine: no connections FROM final-state or TO initial-state
   const draggingFromFinalState = draggingSourceEl?.type === "final-state";
@@ -5710,6 +5717,7 @@ export function Canvas({
             let elIsDropTarget = false;
             let elIsMsgTarget = false;
             let elIsAssocTarget = false;
+            let elIsCompTarget = false; // dark-yellow: valid Activity target of a compensation Association
             // When dragging from an expanded subprocess, never highlight its
             // own children (parentId === source.id) or its boundary events
             // (boundaryHostId === source.id) — connectors from the container
@@ -5728,7 +5736,13 @@ export function Canvas({
               const elIsSendLocked = el.type === "end-event"
                 || ((el.taskType === "send" || el.flowType === "throwing")
                     && data.connectors.some(c => c.type === "messageBPMN" && c.sourceId === el.id));
-              if (draggingFromPool) {
+              if (draggingFromEdgeMountedCompensationEvent) {
+                // Compensation association: ONLY Activities are valid targets,
+                // highlighted in the dedicated dark-yellow colour used only here.
+                if (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded") {
+                  elIsCompTarget = true;
+                }
+              } else if (draggingFromPool) {
                 // Pools can only create messageBPMN — target elements in other white-box pools
                 if (!elIsData && !elIsSendLocked) {
                   const elPoolId = getElementPoolId(el, data.elements);
@@ -5886,6 +5900,12 @@ export function Canvas({
                 if (draggingConnector && draggingSourceEl?.parentId !== _elP.id) elIsDropTarget = false;
               }
             }
+            // A Compensation Activity participates only via its compensation
+            // association — never a sequence flow. It is not a valid sequence
+            // TARGET, and no sequence may start FROM it (so no green highlight
+            // when dragging from it). Messages / data associations still apply.
+            if (elIsDropTarget && el.properties?.isForCompensation === true) elIsDropTarget = false;
+            if (elIsDropTarget && draggingSourceEl?.properties?.isForCompensation === true) elIsDropTarget = false;
             return (
             <SymbolRenderer
               key={el.id}
@@ -5896,6 +5916,7 @@ export function Canvas({
               isDropTarget={elIsDropTarget}
               isMessageBpmnTarget={elIsMsgTarget}
               isAssocBpmnTarget={elIsAssocTarget}
+              isCompensationTarget={elIsCompTarget}
               isErrorTarget={errorTargetIds.has(el.id) || obstacleViolationElementIds.has(el.id)}
               onSelect={(ev) => {
                 // Force-connect override (Shift+Ctrl+Click)
