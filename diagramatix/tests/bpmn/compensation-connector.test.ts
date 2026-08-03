@@ -90,6 +90,43 @@ describe("a Compensation Activity has no sequence flow (T2221)", () => {
   });
 });
 
+describe("A4: only one compensation association per edge-mounted event (T2222)", () => {
+  const w = () => base([
+    el("host", "subprocess-expanded"),
+    el("comp", "intermediate-event", { eventType: "compensation", boundaryHostId: "host", x: 220, y: 160 }),
+    el("h1", "task", { x: 400 }),
+    el("h2", "task", { x: 600 }),
+  ]);
+  it("rejects a second association from the same compensation event", () => {
+    const d1 = reducer(w(), add("comp", "h1", "sequence"));
+    expect(d1.connectors).toHaveLength(1);
+    const d2 = reducer(d1, add("comp", "h2", "sequence"));
+    expect(d2.connectors).toHaveLength(1); // second is rejected
+    expect(d2.elements.find((e) => e.id === "h2")!.properties?.isForCompensation).toBeUndefined();
+  });
+});
+
+describe("A3: inline intermediate-event sequence endpoints are cardinal (T2222)", () => {
+  const addOff = (s: string, t: string, so: number, to: number): Action => ({
+    type: "ADD_CONNECTOR",
+    payload: {
+      sourceId: s, targetId: t, connectorType: "sequence",
+      directionType: "non-directed", routingType: "rectilinear",
+      sourceSide: "right", targetSide: "left", sourceOffsetAlong: so, targetOffsetAlong: to,
+    },
+  });
+  it("forces the intermediate end to 0.5 but leaves the task end untouched (source)", () => {
+    const d = reducer(base([el("ie", "intermediate-event", { x: 100 }), el("t", "task", { x: 400 })]), addOff("ie", "t", 0.2, 0.8));
+    expect(d.connectors[0].sourceOffsetAlong).toBe(0.5); // intermediate end -> cardinal
+    expect(d.connectors[0].targetOffsetAlong).toBe(0.8); // task end -> unchanged
+  });
+  it("forces the offset to 0.5 when the target is an inline intermediate event", () => {
+    const d = reducer(base([el("t", "task", { x: 100 }), el("ie", "intermediate-event", { x: 400 })]), addOff("t", "ie", 0.2, 0.8));
+    expect(d.connectors[0].targetOffsetAlong).toBe(0.5);
+    expect(d.connectors[0].sourceOffsetAlong).toBe(0.2); // task end -> unchanged
+  });
+});
+
 describe("compensation intermediate event defaults to Throwing (T2221)", () => {
   it("sets flowType throwing when eventType is set to compensation on an inline intermediate", () => {
     const start = base([el("ie", "intermediate-event", { x: 100 })]);

@@ -4543,6 +4543,12 @@ export function Canvas({
     draggingSourceEl?.type === "intermediate-event" &&
     !!draggingSourceEl.boundaryHostId &&
     draggingSourceEl.eventType === "compensation";
+  // A4: an edge-mounted compensation event may have only ONE outgoing
+  // compensation association. If it already has one, offer no targets.
+  const compEventAlreadyLinked =
+    draggingFromEdgeMountedCompensationEvent && !!draggingConnector &&
+    data.connectors.some((c) => c.type === "associationBPMN" && c.sourceId === draggingConnector!.fromId);
+  const compTargetsAvailable = draggingFromEdgeMountedCompensationEvent && !compEventAlreadyLinked;
   const draggingSourceBoundaryHostId = draggingSourceEl?.boundaryHostId ?? null;
   // State-machine: no connections FROM final-state or TO initial-state
   const draggingFromFinalState = draggingSourceEl?.type === "final-state";
@@ -5296,6 +5302,7 @@ export function Canvas({
               !isEventSubprocess && // never highlight Event Expanded Subprocesses as sequence targets
               !draggingFromEventSubprocess && // Event Expanded Subprocesses cannot create sequence connectors
               !draggingFromInsideEventSubprocess && // elements inside Event subprocesses cannot connect out
+              !draggingFromEdgeMountedCompensationEvent && // compensation uses its own dark-yellow target, never green
               el.id !== draggingConnector!.fromId &&
               el.id !== (draggingSourceEl?.parentId ?? "") && // rule 4: child cannot target its own parent subprocess
               !draggingFromEdgeMountedStartEvent &&
@@ -5303,6 +5310,13 @@ export function Canvas({
             const isSubExpAssocTarget = isDraggingConnector && draggingSourceIsData &&
               el.type === "subprocess-expanded" &&
               el.id !== draggingConnector!.fromId;
+            // Compensation association: an Expanded Sub-Process (not an event sub,
+            // not the event's own host) is a valid dark-yellow handler target.
+            const isSubExpCompTarget = isDraggingConnector && compTargetsAvailable &&
+              el.type === "subprocess-expanded" &&
+              !isEventSubprocess &&
+              el.id !== draggingConnector!.fromId &&
+              el.id !== draggingSourceBoundaryHostId;
             const isCompositeDropTarget =
               isDraggingConnector &&
               !draggingSourceIsData &&
@@ -5328,6 +5342,7 @@ export function Canvas({
                 isDisallowedTarget={false}
                 isMessageBpmnTarget={isMsgTarget}
                 isAssocBpmnTarget={isSubExpAssocTarget}
+                isCompensationTarget={isSubExpCompTarget}
                 isElementDragTarget={isElementDragTarget}
                 onSelect={(e) => {
                   // Force-connect override (Shift+Ctrl+Click)
@@ -5739,7 +5754,10 @@ export function Canvas({
               if (draggingFromEdgeMountedCompensationEvent) {
                 // Compensation association: ONLY Activities are valid targets,
                 // highlighted in the dedicated dark-yellow colour used only here.
-                if (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded") {
+                // A2: never the event's own host. A4: none once already linked.
+                if (compTargetsAvailable
+                    && (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded")
+                    && el.id !== draggingSourceBoundaryHostId) {
                   elIsCompTarget = true;
                 }
               } else if (draggingFromPool) {

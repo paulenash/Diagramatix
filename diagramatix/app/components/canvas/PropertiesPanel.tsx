@@ -2266,16 +2266,16 @@ export function PropertiesPanel({
   // an EP. Rare, but legal — gate the trigger option to that exact placement.
   const compensationStartAllowed = (() => {
     if (element.type !== "start-event") return false;
-    const parentEl = element.parentId ? allElements?.find((e) => e.id === element.parentId) : undefined;
-    const inEventSub = parentEl?.type === "subprocess-expanded"
-      && (parentEl.properties?.subprocessType as string | undefined) === "event";
-    if (!inEventSub || !parentEl) return false;
-    // …and that event sub-process must itself sit inside an (expanded) EP.
-    let cur = parentEl.parentId ? allElements?.find((e) => e.id === parentEl.parentId) : undefined;
+    // The start event's nearest containing subprocess must be an event
+    // sub-process. (Walk up in case the start event sits inside a lane/pool
+    // nested within the event sub-process.)
+    let cur = element.parentId ? allElements?.find((e) => e.id === element.parentId) : undefined;
     const seen = new Set<string>();
     while (cur && !seen.has(cur.id)) {
       seen.add(cur.id);
-      if (cur.type === "subprocess-expanded") return true;
+      if (cur.type === "subprocess-expanded") {
+        return (cur.properties?.subprocessType as string | undefined) === "event";
+      }
       cur = cur.parentId ? allElements?.find((e) => e.id === cur!.parentId) : undefined;
     }
     return false;

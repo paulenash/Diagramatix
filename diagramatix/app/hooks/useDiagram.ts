@@ -6486,9 +6486,23 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         !!source.boundaryHostId &&
         COMPENSATION_TARGET_TYPES.has(target.type);
       if (isCompensationLink) {
+        // A4: an edge-mounted compensation event may have only ONE outgoing
+        // compensation association — reject a second.
+        const alreadyLinked = state.connectors.some(
+          (c) => c.type === "associationBPMN" && c.sourceId === sourceId,
+        );
+        if (alreadyLinked) return state;
         connectorType = "associationBPMN";
         directionType = "open-directed";
         routingType = "rectilinear"; // right-angle routing, never a diagonal
+      }
+
+      // A3: a sequence/transition connector touching an INLINE (non-boundary)
+      // intermediate event must attach at a CARDINAL endpoint — force the
+      // offset to the side centre (0.5) so it lands on N/E/S/W, never off-centre.
+      if (connectorType === "sequence" || connectorType === "transition") {
+        if (source.type === "intermediate-event" && !source.boundaryHostId) sourceOffsetAlong = 0.5;
+        if (target.type === "intermediate-event" && !target.boundaryHostId) targetOffsetAlong = 0.5;
       }
 
       // ── UML self-connector (source === target) ────────────────────────────
@@ -7043,6 +7057,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const [s, o] = clampParallelFace(movedEl, otherEl, side, off);
           side = s; off = o ?? 0.5;
         }
+        // A3: a sequence/transition endpoint on an inline (non-boundary)
+        // intermediate event stays on the cardinal midpoint of whatever side.
+        if ((conn.type === "sequence" || conn.type === "transition")
+            && movedEl?.type === "intermediate-event" && !movedEl.boundaryHostId) {
+          off = 0.5;
+        }
         const updated = endpoint === "source"
           ? { ...conn, sourceId: newElementId, sourceSide: side, sourceOffsetAlong: off,
               sourceRoleOffset: undefined, sourceMultOffset: undefined,
@@ -7200,6 +7220,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
                      : "top"; // side === "left"
             }
             return vertex ? { side: vertex, offset: 0.5 } : { side, offset: newOffset };
+          }
+          // A3: an inline (non-boundary) intermediate event keeps its endpoints on
+          // the cardinal midpoint — nudging never slides them off-centre.
+          if (el?.type === "intermediate-event" && !el.boundaryHostId) {
+            return { side, offset: 0.5 };
           }
           if (!el) {
             if (side === "top" || side === "bottom") return { side, offset: clamp(offset + dx * 0.02) };
