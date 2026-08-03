@@ -3317,8 +3317,10 @@ export function layoutBpmnDiagram(
     // vs write semantic the user drew in the source diagram.
     const directionTypeFinal: "directed" | "open-directed" =
       connType === "associationBPMN" ? "open-directed" : "directed";
+    // Associations route "direct" (short diagonal) EXCEPT the compensation
+    // association, which — like a sequence flow — routes rectilinearly.
     const routingTypeFinal: "rectilinear" | "direct" =
-      connType === "associationBPMN" ? "direct" : "rectilinear";
+      connType === "associationBPMN" && !isCompensationAssoc ? "direct" : "rectilinear";
 
     connectors.push({
       id: `conn-${c.sourceId}-${c.targetId}`,

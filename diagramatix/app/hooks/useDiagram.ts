@@ -6447,7 +6447,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       let { connectorType, directionType } = action.payload;
       // Domain: generalisation / realisation / dependency default to DIRECT
       // (straight) lines when drawn manually (matches AI text generation).
-      const routingType: RoutingType =
+      // let: a compensation link overrides this to "rectilinear" below.
+      let routingType: RoutingType =
         (connectorType === "uml-generalisation" || connectorType === "uml-realisation" || connectorType === "uml-dependency")
           ? "direct" : payloadRoutingType;
       // eslint-disable-next-line prefer-const
@@ -6472,6 +6473,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (isCompensationLink) {
         connectorType = "associationBPMN";
         directionType = "open-directed";
+        routingType = "rectilinear"; // right-angle routing, never a diagonal
       }
 
       // ── UML self-connector (source === target) ────────────────────────────

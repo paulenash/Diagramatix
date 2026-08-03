@@ -38,6 +38,7 @@ describe("edge-mounted compensation event → activity", () => {
     expect(d.connectors).toHaveLength(1);
     expect(d.connectors[0].type).toBe("associationBPMN");
     expect(d.connectors[0].directionType).toBe("open-directed");
+    expect(d.connectors[0].routingType).toBe("rectilinear");
   });
 
   it("stamps the Compensation marker onto the target activity", () => {
