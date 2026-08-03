@@ -1100,4 +1100,4 @@ export interface TemplateData {
  *             appVersion (major.minor.BUILD) still advances automatically via the git commit
  *             count in /api/schema, so the release is reflected there.
  */
-export const SCHEMA_VERSION = "1.43";
+export const SCHEMA_VERSION = "1.44";

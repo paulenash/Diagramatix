@@ -804,6 +804,7 @@
       <xs:enumeration value="inclusive"/>
       <xs:enumeration value="parallel"/>
       <xs:enumeration value="event-based"/>
+      <xs:enumeration value="complex"/>          <!-- schema 1.44 -->
     </xs:restriction>
   </xs:simpleType>
 
@@ -823,6 +824,8 @@
       <xs:enumeration value="cancel"/>
       <xs:enumeration value="compensation"/>
       <xs:enumeration value="link"/>
+      <xs:enumeration value="multiple"/>            <!-- schema 1.44 -->
+      <xs:enumeration value="parallel-multiple"/>   <!-- schema 1.44 -->
     </xs:restriction>
   </xs:simpleType>
 
