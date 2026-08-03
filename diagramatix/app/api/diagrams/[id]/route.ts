@@ -148,32 +148,73 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   try {
+    const hasData = data !== undefined;
     if (
       name !== undefined ||
-      data !== undefined ||
+      hasData ||
       projectId !== undefined ||
       diagramOwnerId !== undefined ||
       colorConfig !== undefined ||
       displayMode !== undefined
     ) {
-      await prisma.diagram.update({
-        where: { id },
-        data: {
-          ...(name !== undefined && { name }),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(data !== undefined && { data: data as any }),
-          // Keep the Portal's browse/governance columns in step with the
-          // diagram's classification + procedure-doc link + entity refs on
-          // every data save (entityRefs is a JSON column — hence the cast).
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(data !== undefined && (deriveDiagramDenorm(data) as any)),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(colorConfig !== undefined && { colorConfig: colorConfig as any }),
-          ...(projectId !== undefined && { projectId }),
-          ...(diagramOwnerId !== undefined && { diagramOwnerId }),
-          ...(displayMode !== undefined && { displayMode }),
-        },
-      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const writeFields: any = {
+        ...(name !== undefined && { name }),
+        ...(hasData && { data: data as unknown }),
+        // Keep the Portal's browse/governance columns in step with the
+        // diagram's classification + procedure-doc link + entity refs on
+        // every data save (entityRefs is a JSON column — hence the cast).
+        ...(hasData && (deriveDiagramDenorm(data) as unknown as object)),
+        ...(colorConfig !== undefined && { colorConfig: colorConfig as unknown }),
+        ...(projectId !== undefined && { projectId }),
+        ...(diagramOwnerId !== undefined && { diagramOwnerId }),
+        ...(displayMode !== undefined && { displayMode }),
+      };
+
+      // ── Co-authoring optimistic-concurrency guard ──
+      // A DATA-changing save from a version-aware client is a compare-and-swap
+      // on `version`; if the diagram moved on under us we 409 with the current
+      // state so the client can reload+replay its local edits, instead of
+      // silently clobbering a concurrent editor.
+      const clientVersion = typeof body.version === "number" ? body.version : null;
+      if (hasData && clientVersion !== null) {
+        const cas = await prisma.diagram.updateMany({
+          where: { id, version: clientVersion },
+          data: { ...writeFields, version: { increment: 1 } },
+        });
+        if (cas.count === 0) {
+          const current = await prisma.diagram.findUnique({
+            where: { id },
+            select: { version: true, data: true, name: true, colorConfig: true, displayMode: true, updatedAt: true },
+          });
+          const lastHist = await prisma.diagramHistory.findFirst({
+            where: { diagramId: id },
+            orderBy: { createdAt: "desc" },
+            select: { userId: true },
+          });
+          let lastEditor: string | null = null;
+          if (lastHist?.userId) {
+            const u = await prisma.user.findUnique({ where: { id: lastHist.userId }, select: { name: true, email: true } });
+            lastEditor = u?.name ?? u?.email ?? null;
+          }
+          return NextResponse.json({
+            error: "conflict",
+            currentVersion: current?.version ?? null,
+            data: current?.data ?? null,
+            name: current?.name,
+            colorConfig: current?.colorConfig,
+            displayMode: current?.displayMode,
+            lastEditor,
+          }, { status: 409 });
+        }
+      } else {
+        // Legacy client (no version) or metadata-only save: unconditional write.
+        // A data save still bumps `version` so version-aware clients converge.
+        await prisma.diagram.update({
+          where: { id },
+          data: { ...writeFields, ...(hasData && { version: { increment: 1 } }) },
+        });
+      }
 
       // Auto-snapshot: create history entry on every data-changing save
       if (data !== undefined) {

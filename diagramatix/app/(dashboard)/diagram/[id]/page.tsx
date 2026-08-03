@@ -257,6 +257,8 @@ export default async function DiagramPage({ params, searchParams }: Props) {
         viewingAsEmail={viewingAsEmail}
         impersonationMode={impersonationMode}
         version={commitCount}
+        dataVersion={diagram.version}
+        currentUserName={session.user.name ?? ""}
         elementCountLimit={elementCountLimit}
         initialDiagramOwner={diagramOwner}
         diagramOwnerCandidates={diagramOwnerCandidates}

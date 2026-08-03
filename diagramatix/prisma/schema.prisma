@@ -84,6 +84,7 @@ model Org {
   // enforced by the platform. All default TRUE (backward-compatible; nothing
   // changes until a tenant tightens them). "Enterprise Mode" flips them off.
   allowAi             Boolean @default(true)  // AI (LLM) features               ENT-05
+  allowCollaboration  Boolean @default(true)  // live diagram co-authoring        ENT-11
   allowVoiceAi        Boolean @default(true)  // voice → text (Deepgram)         ENT-07
   allowExternalExport Boolean @default(true)  // push data OUT (SharePoint upload) ENT-10
   allowSharePoint     Boolean @default(true)  // SharePoint/OneDrive integration E3
@@ -250,6 +251,7 @@ model User {
   // Project-sharing back-relations.
   projectShares                 ProjectShare[]             @relation("ProjectShareRecipient")
   diagramsOwned                 Diagram[]                  @relation("DiagramOwner")
+  diagramPresences              DiagramPresence[]
   // BPMN lifecycle (Phase 1) back-relations.
   publishedVersionsAuthored     PublishedVersion[]         @relation("PublishedVersionAuthor")
   diagramFeedbackAuthored       DiagramFeedback[]          @relation("DiagramFeedbackAuthor")
@@ -412,6 +414,11 @@ model Diagram {
   // labels). The Portal canonicalises these against the Org Entity Lists at
   // read time to power "which processes use System X / involve Team Y".
   entityRefs                    Json               @default("[]")
+  // Optimistic-concurrency token for co-authoring. Every data-changing save is
+  // a compare-and-swap on this value (PUT /api/diagrams/[id]); a stale client
+  // version 409s instead of silently clobbering a concurrent editor's work.
+  version     Int              @default(0)
+  presences   DiagramPresence[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
@@ -419,6 +426,26 @@ model Diagram {
   @@index([diagramOwnerId])
   @@index([lifecycle])
   @@index([orgId, lifecycle])
+}
+
+// Live co-authoring presence: one row per (diagram, user) currently in the
+// editor, refreshed by a heartbeat (POST /api/diagrams/[id]/presence). Rows
+// older than the TTL are treated as gone. `editingElementIds` powers soft
+// element locking; `selection` is informational.
+model DiagramPresence {
+  id               String   @id @default(cuid())
+  diagramId        String
+  diagram          Diagram  @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userName         String
+  color            String
+  editingElementIds String[] @default([])
+  selection        String[] @default([])
+  lastHeartbeatAt  DateTime @default(now())
+
+  @@unique([diagramId, userId])
+  @@index([diagramId, lastHeartbeatAt])
 }
 
 model DiagramHistory {
@@ -745,6 +772,7 @@ model SubscriptionLevel {
   hasProcessMining Boolean @default(true)
   hasRiskControl   Boolean @default(true)
   hasApqc          Boolean @default(true)
+  hasCollaboration Boolean @default(false) // live diagram co-authoring (premium)
 
   users     User[]
   createdAt DateTime @default(now())

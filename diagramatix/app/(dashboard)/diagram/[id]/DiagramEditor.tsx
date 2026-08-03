@@ -105,6 +105,12 @@ interface Props {
   viewingAsEmail?: string;
   impersonationMode?: "view" | "edit";
   version?: number;
+  /** Co-authoring optimistic-concurrency token (Diagram.version). Sent on every
+   *  data save; the server 409s a stale write. Distinct from `version` (the app
+   *  build/commit count used only for the header version badge). */
+  dataVersion?: number;
+  /** Current user's display name, for presence attribution. */
+  currentUserName?: string;
   /** Subscription per-diagram element cap for THIS diagram's type.
    *  null when the tier is unlimited or the user is a superuser. The
    *  client-side ADD gate compares (current node count + 1) against
@@ -148,15 +154,27 @@ interface Props {
   initialNextReviewDate?: string | null;
 }
 
+/** Co-authoring conflict surfaced by the version guard: another editor saved
+ *  since this client loaded, so our data save was rejected (409). */
+export interface SaveConflict {
+  serverData: DiagramData;
+  currentVersion: number;
+  lastEditor: string | null;
+}
+
 function useAutoSave(
   diagramId: string,
   data: DiagramData,
   delay = 1500,
-  disabled = false
+  disabled = false,
+  initialVersion = 0,
 ) {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<SaveConflict | null>(null);
   const lastSaved = useRef<string>(JSON.stringify(data));
+  // Optimistic-concurrency token: the diagram version this client last saw.
+  const versionRef = useRef<number>(initialVersion);
 
   // Track unsaved changes (no auto-save timer)
   useEffect(() => {
@@ -170,20 +188,47 @@ function useAutoSave(
   const saveNow = useCallback(async () => {
     const current = JSON.stringify(data);
     if (current === lastSaved.current) return;
+    if (conflict) return; // paused until the user resolves the conflict
     setSaveStatus("saving");
     try {
-      await fetch(`/api/diagrams/${diagramId}`, {
+      const res = await fetch(`/api/diagrams/${diagramId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data }),
+        body: JSON.stringify({ data, version: versionRef.current }),
       });
+      if (res.status === 409) {
+        // Someone saved under us — surface a conflict instead of clobbering.
+        const payload = await res.json().catch(() => ({}));
+        setConflict({
+          serverData: payload.data as DiagramData,
+          currentVersion: typeof payload.currentVersion === "number" ? payload.currentVersion : versionRef.current,
+          lastEditor: payload.lastEditor ?? null,
+        });
+        setSaveStatus("unsaved");
+        return;
+      }
+      if (!res.ok) { setSaveStatus("unsaved"); return; }
+      const updated = await res.json().catch(() => null);
+      if (updated && typeof updated.version === "number") versionRef.current = updated.version;
       lastSaved.current = current;
       setLastSavedAt(new Date().toISOString());
       setSaveStatus("saved");
     } catch {
       setSaveStatus("unsaved");
     }
-  }, [data, diagramId]);
+  }, [data, diagramId, conflict]);
+
+  /** Resolve a conflict by adopting the server's version as the new base. The
+   *  caller applies `nextData` to the reducer (their version, ours, or a merge)
+   *  BEFORE calling this so the ref/base stay consistent. */
+  const resolveConflict = useCallback((nextData: DiagramData, sameAsServerBase: boolean) => {
+    versionRef.current = conflict?.currentVersion ?? versionRef.current;
+    // If we adopted the server's data verbatim, mark it saved; otherwise leave
+    // it unsaved so the next debounce persists the merged/kept data at the new version.
+    lastSaved.current = sameAsServerBase ? JSON.stringify(nextData) : lastSaved.current + "~";
+    setConflict(null);
+    setSaveStatus(sameAsServerBase ? "saved" : "unsaved");
+  }, [conflict]);
 
   // Debounced auto-save. Without this the diagram only persists when a
   // navigation hook explicitly calls saveNow(); a change followed by leaving
@@ -191,13 +236,13 @@ function useAutoSave(
   // browsing away) was silently lost. Force-saves on navigation still win;
   // this timer no-ops when there's nothing new to write.
   useEffect(() => {
-    if (disabled) return;
+    if (disabled || conflict) return; // paused while a conflict is unresolved
     if (JSON.stringify(data) === lastSaved.current) return;
     const t = setTimeout(() => { void saveNow(); }, delay);
     return () => clearTimeout(t);
-  }, [data, disabled, delay, saveNow]);
+  }, [data, disabled, delay, saveNow, conflict]);
 
-  return { saveStatus, lastSavedAt, saveNow };
+  return { saveStatus, lastSavedAt, saveNow, conflict, resolveConflict };
 }
 
 function exportSvg(svgEl: SVGSVGElement, name: string) {
@@ -394,6 +439,8 @@ export function DiagramEditor({
   viewingAsEmail,
   impersonationMode,
   version,
+  dataVersion = 0,
+  currentUserName,
   elementCountLimit,
   initialDiagramOwner,
   diagramOwnerCandidates = [],
@@ -921,7 +968,7 @@ export function DiagramEditor({
   // prePreviewDataRef holds the real diagram so a discard reverts the canvas.
   const [historyPreviewActive, setHistoryPreviewActive] = useState(false);
   const prePreviewDataRef = useRef<DiagramData | null>(null);
-  const { saveStatus, lastSavedAt, saveNow } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly || historyPreviewActive);
+  const { saveStatus, lastSavedAt, saveNow, conflict, resolveConflict } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly || historyPreviewActive, dataVersion);
   saveNowRef.current = saveNow;
   saveStatusRef.current = saveStatus;
   const effectiveUpdatedAt = lastSavedAt ?? updatedAt;
@@ -2809,6 +2856,27 @@ export function DiagramEditor({
           >
             ✕
           </button>
+        </div>
+      )}
+      {/* Co-authoring save conflict: another editor saved since we loaded. */}
+      {conflict && (
+        <div className="bg-amber-50 border-b border-amber-300 px-4 py-2 text-xs text-amber-900 flex items-center justify-between gap-3">
+          <span>
+            <span className="font-semibold">{conflict.lastEditor ?? "Another editor"}</span>{" "}
+            saved changes to this diagram while you were editing. Your auto‑save is paused.
+          </span>
+          <span className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => { setData(conflict.serverData); resolveConflict(conflict.serverData, true); }}
+              className="px-2 py-0.5 rounded border border-amber-400 bg-white text-amber-800 hover:bg-amber-100 font-medium"
+              title="Discard your unsaved changes and load their latest version"
+            >Load their version</button>
+            <button
+              onClick={() => { resolveConflict(data, false); }}
+              className="px-2 py-0.5 rounded border border-amber-400 bg-white text-amber-800 hover:bg-amber-100 font-medium"
+              title="Keep your changes and overwrite theirs on the next save"
+            >Keep mine (overwrite)</button>
+          </span>
         </div>
       )}
       {/* Top bar */}
