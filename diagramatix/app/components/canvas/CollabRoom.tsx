@@ -7,7 +7,7 @@
  */
 import type { ReactNode } from "react";
 import { LiveblocksProvider, RoomProvider } from "@liveblocks/react";
-import { LIVEBLOCKS_ENABLED } from "@/app/lib/collab/liveblocks";
+import "@/app/lib/collab/liveblocks"; // global Presence/UserMeta types
 
 export function CollabRoom({
   diagramId,
@@ -18,7 +18,7 @@ export function CollabRoom({
   enabled: boolean;
   children: ReactNode;
 }) {
-  if (!enabled || !LIVEBLOCKS_ENABLED) return <>{children}</>;
+  if (!enabled) return <>{children}</>;
   return (
     <LiveblocksProvider authEndpoint="/api/collab/token">
       <RoomProvider id={`diagram:${diagramId}`} initialPresence={{ cursor: null }}>

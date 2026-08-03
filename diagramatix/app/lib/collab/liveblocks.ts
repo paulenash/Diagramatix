@@ -1,11 +1,15 @@
 /**
- * Liveblocks typing + enable flag for Phase 2 real-time co-authoring (cursors).
- * Collaboration is OFF unless NEXT_PUBLIC_LIVEBLOCKS_ENABLED === "true" AND the
- * server has LIVEBLOCKS_SECRET_KEY (the auth route 503s otherwise). When off the
- * app runs Phase 1 (polled presence) unchanged.
+ * Liveblocks typing for Phase 2 real-time co-authoring (cursors).
+ *
+ * Activation is server-driven: the diagram page passes `collabRealtime` = true
+ * only when LIVEBLOCKS_SECRET_KEY is set (see page.tsx / the /api/collab/token
+ * route). No build-time flag — enabling in prod is a single runtime env var, no
+ * rebuild. When off the editor runs Phase 1 (polled presence) unchanged.
+ *
+ * Side-effect import this file (or import a symbol from it) anywhere it's needed
+ * so the global augmentation below is in the compilation graph.
  */
 
-// Global augmentation so Liveblocks hooks are typed across the app.
 declare global {
   interface Liveblocks {
     Presence: { cursor: { x: number; y: number } | null };
@@ -13,4 +17,4 @@ declare global {
   }
 }
 
-export const LIVEBLOCKS_ENABLED = process.env.NEXT_PUBLIC_LIVEBLOCKS_ENABLED === "true";
+export {};

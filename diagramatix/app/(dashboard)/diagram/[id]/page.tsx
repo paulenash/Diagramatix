@@ -259,6 +259,7 @@ export default async function DiagramPage({ params, searchParams }: Props) {
         version={commitCount}
         dataVersion={diagram.version}
         currentUserName={session.user.name ?? ""}
+        collabRealtime={!!process.env.LIVEBLOCKS_SECRET_KEY}
         elementCountLimit={elementCountLimit}
         initialDiagramOwner={diagramOwner}
         diagramOwnerCandidates={diagramOwnerCandidates}

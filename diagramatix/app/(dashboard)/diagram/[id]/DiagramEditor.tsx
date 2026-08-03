@@ -115,6 +115,8 @@ interface Props {
   dataVersion?: number;
   /** Current user's display name, for presence attribution. */
   currentUserName?: string;
+  /** Phase 2: real-time cursors available (server has LIVEBLOCKS_SECRET_KEY). */
+  collabRealtime?: boolean;
   /** Subscription per-diagram element cap for THIS diagram's type.
    *  null when the tier is unlimited or the user is a superuser. The
    *  client-side ADD gate compares (current node count + 1) against
@@ -457,6 +459,7 @@ export function DiagramEditor({
   version,
   dataVersion = 0,
   currentUserName,
+  collabRealtime,
   elementCountLimit,
   initialDiagramOwner,
   diagramOwnerCandidates = [],
@@ -1047,6 +1050,8 @@ export function DiagramEditor({
   // Selected element(s) double as an advisory soft-lock signal for other editors.
   const presenceSelection = useMemo(() => [...selectedElementIds], [selectedElementIds]);
   const collabEnabled = !!currentUserId && templateEditState === null && !historyPreviewActive;
+  // Phase 2: live cursors only when the server has Liveblocks configured.
+  const liveCursors = !!collabRealtime && collabEnabled;
   const { roster: presenceRoster, locks: presenceLocks } = usePresence(diagramId, {
     enabled: collabEnabled,
     userName: currentUserName,
@@ -2862,7 +2867,7 @@ export function DiagramEditor({
   const headerTint = isImpersonating ? undefined : lightenHex(typeStyle.bgColor, 0.55);
 
   return (
-    <CollabRoom diagramId={diagramId} enabled={collabEnabled}>
+    <CollabRoom diagramId={diagramId} enabled={liveCursors}>
     <div
       className={`flex flex-col h-screen ${isImpersonating ? "bg-orange-50" : "bg-white"}`}
       onContextMenu={(e) => {
@@ -4087,7 +4092,7 @@ export function DiagramEditor({
           selectedElementIds={selectedElementIds}
           selectedConnectorId={selectedConnectorId}
           coEditLocks={presenceLocks}
-          collabCursors={collabEnabled}
+          collabCursors={liveCursors}
           pcHighlightEnabled={highlightEnabled}
           scanHighlightById={scanHighlight ?? undefined}
           riskHighlightById={riskHighlight ?? undefined}

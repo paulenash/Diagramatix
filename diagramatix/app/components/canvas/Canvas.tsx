@@ -23,7 +23,6 @@ import { EntityNameInput } from "./EntityNameInput";
 import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
 import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
 import { CollabCursors } from "./CollabCursors";
-import { LIVEBLOCKS_ENABLED } from "@/app/lib/collab/liveblocks";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { parseUmlAttribute, parseUmlOperation } from "@/app/lib/diagram/umlParse";
@@ -6329,7 +6328,7 @@ export function Canvas({
 
           {/* Phase 2 live cursors (Liveblocks). In the world group so they
               pan/zoom with the diagram; counter-scaled to stay screen-constant. */}
-          {collabCursors && LIVEBLOCKS_ENABLED && (
+          {collabCursors && (
             <CollabCursors clientToWorld={clientToWorld} zoom={zoom} />
           )}
 
