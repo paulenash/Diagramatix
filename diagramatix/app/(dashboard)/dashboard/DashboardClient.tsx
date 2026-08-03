@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { UserGuideLink } from "@/app/components/UserGuideLink";
 import type { DiagramType } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
@@ -1615,14 +1614,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 </a>
               )}
 
-              {/* Collaboration Groups — opens the Groups dashboard page */}
-              <button
-                onClick={() => router.push("/dashboard/groups")}
-                className="text-xs font-medium rounded px-2 py-1 border text-gray-600 border-gray-300 hover:bg-gray-50"
-                title="Manage Collaboration Groups"
-              >
-                Collaboration Groups
-              </button>
+              {/* Collaboration Groups moved into the System menu. */}
 
               {/* In-app notifications — opens the panel as a modal over
                   the dashboard (dashboard shows behind, shaded). */}
@@ -1803,6 +1795,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       {"Matrix Screensaver\u2026"}
                     </button>
+                    <div className="border-t border-gray-100" />
+                    {/* Collaboration Groups \u2014 moved into the System menu. */}
+                    <button
+                      onClick={() => { setFileMenuOpen(false); router.push("/dashboard/groups"); }}
+                      title="Manage Collaboration Groups"
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      Collaboration Groups
+                    </button>
                     {/* Admin moved out of the System menu and into the
                         top-level header bar as the leftmost menu item. */}
                   </div>
@@ -1819,12 +1820,6 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           >
             Features
           </a>
-          <UserGuideLink
-            className="text-xs text-gray-500 hover:text-blue-600"
-            title="User Guide"
-          >
-            User Guide
-          </UserGuideLink>
           {orgName && (
             <div
               className="text-xs text-gray-600 border border-gray-200 rounded px-2 py-1 bg-gray-50"

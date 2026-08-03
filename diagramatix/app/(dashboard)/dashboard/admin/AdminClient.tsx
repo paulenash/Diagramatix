@@ -280,7 +280,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
           on columns have room to breathe. Per-column min-widths declared
           on the <th> stops the smaller numeric / date columns from
           starving the text-heavy ones. */}
-      <div className="flex-1 min-h-0 overflow-y-auto max-w-screen-2xl mx-auto px-6 py-8">
+      <div className="flex-1 min-h-0 overflow-y-auto max-w-none w-full mx-auto px-6 py-8">
         {isSuperAdmin && !showUsers && <SuperAdminToolsGrid onShowUsers={() => setShowUsers(true)} />}
         {showUsers && (
         <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
@@ -291,7 +291,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
                   Name <span className="text-[9px] text-gray-400">{sortIcon("name")}</span>
                 </button>
               </th>
-              <th className="px-3 py-3" style={{ width: "16%" }}>
+              <th className="px-3 py-3" style={{ width: "13%" }}>
                 <button onClick={() => toggleSort("email")} className="inline-flex items-center gap-1 hover:text-gray-700">
                   Email Address <span className="text-[9px] text-gray-400">{sortIcon("email")}</span>
                 </button>
@@ -302,11 +302,12 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
                 </button>
               </th>
               <th className="px-3 py-3" style={{ width: "8%" }}>Working on</th>
-              <th className="px-3 py-3" style={{ width: "14%" }}>
+              <th className="px-3 py-3" style={{ width: "11%" }}>
                 <button onClick={() => toggleSort("subscription")} className="inline-flex items-center gap-1 hover:text-gray-700">
                   Subscription <span className="text-[9px] text-gray-400">{sortIcon("subscription")}</span>
                 </button>
               </th>
+              <th className="px-3 py-3" style={{ width: "12%" }} title="The user's primary Org">Org</th>
               <th className="px-3 py-3" style={{ width: "8%" }} title="OrgRole inside the user's primary Org">Org Role</th>
               <th className="px-3 py-3 text-center" style={{ width: "7%" }}>Projects</th>
               <th className="px-3 py-3 text-center" style={{ width: "7%" }}>Diagrams</th>
@@ -315,7 +316,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
                   Registered <span className="text-[9px] text-gray-400">{sortIcon("registered")}</span>
                 </button>
               </th>
-              <th className="px-3 py-3" style={{ width: "12%" }}></th>
+              <th className="px-3 py-3" style={{ width: "9%" }}></th>
             </tr>
             {/* Filter row — substring match per filterable column. */}
             <tr className="bg-gray-50 border-t border-gray-200">
@@ -352,7 +353,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
                   className="w-full text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
                 />
               </th>
-              <th /><th /><th />
+              <th /><th /><th /><th />
               <th className="px-2 pb-2 pt-0">
                 <input
                   type="text" value={filters.registered}
@@ -444,6 +445,14 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
                         </span>
                       )}
                     </button>
+                  </td>
+                  {/* Org name (primary Org) — display only. */}
+                  <td className="px-3 py-3 text-xs text-gray-700">
+                    {u.primaryOrg ? (
+                      <span className="truncate block" title={u.primaryOrg.orgName}>{u.primaryOrg.orgName}</span>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
                   </td>
                   {/* OrgRole cell — display only (Paul's 2026-06-08
                       rule). Role changes happen on the Org Settings
