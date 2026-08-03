@@ -16,6 +16,7 @@ import {
   type SymbolType,
   type TemplateData,
 } from "@/app/lib/diagram/types";
+import { mergeDiagram, type MergeConflict } from "@/app/lib/diagram/mergeDiagram";
 import { buildPromptAnnotation, contentBBox, stripPromptAnnotations, stripPromptAnnotationConnectors } from "@/app/lib/ai/promptAnnotation";
 import { useAllowedModels } from "./ModelSelect";
 import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
@@ -157,9 +158,13 @@ interface Props {
 }
 
 /** Co-authoring conflict surfaced by the version guard: another editor saved
- *  since this client loaded, so our data save was rejected (409). */
+ *  since this client loaded, so our data save was rejected (409). We three-way
+ *  merge our edits onto theirs; `merged` is the result and `conflicts` lists any
+ *  true overlaps (same element/connector changed by both — resolved to theirs). */
 export interface SaveConflict {
   serverData: DiagramData;
+  merged: DiagramData;
+  conflicts: MergeConflict[];
   currentVersion: number;
   lastEditor: string | null;
 }
@@ -199,10 +204,18 @@ function useAutoSave(
         body: JSON.stringify({ data, version: versionRef.current }),
       });
       if (res.status === 409) {
-        // Someone saved under us — surface a conflict instead of clobbering.
+        // Someone saved under us — three-way merge our edits onto theirs.
         const payload = await res.json().catch(() => ({}));
+        const theirs = payload.data as DiagramData;
+        let base: DiagramData | null = null;
+        try { base = JSON.parse(lastSaved.current) as DiagramData; } catch { base = null; }
+        const { merged, conflicts } = base
+          ? mergeDiagram(base, data, theirs)
+          : { merged: theirs, conflicts: [] as MergeConflict[] };
         setConflict({
-          serverData: payload.data as DiagramData,
+          serverData: theirs,
+          merged,
+          conflicts,
           currentVersion: typeof payload.currentVersion === "number" ? payload.currentVersion : versionRef.current,
           lastEditor: payload.lastEditor ?? null,
         });
@@ -220,16 +233,16 @@ function useAutoSave(
     }
   }, [data, diagramId, conflict]);
 
-  /** Resolve a conflict by adopting the server's version as the new base. The
-   *  caller applies `nextData` to the reducer (their version, ours, or a merge)
-   *  BEFORE calling this so the ref/base stay consistent. */
-  const resolveConflict = useCallback((nextData: DiagramData, sameAsServerBase: boolean) => {
-    versionRef.current = conflict?.currentVersion ?? versionRef.current;
-    // If we adopted the server's data verbatim, mark it saved; otherwise leave
-    // it unsaved so the next debounce persists the merged/kept data at the new version.
-    lastSaved.current = sameAsServerBase ? JSON.stringify(nextData) : lastSaved.current + "~";
+  /** Adopt the server's version as the new base after the caller has applied the
+   *  merged document to the reducer. Set lastSaved to the SERVER's data so the
+   *  merged (which includes our edits) still differs and the next debounce
+   *  persists it at the new version. */
+  const acceptMerge = useCallback(() => {
+    if (!conflict) return;
+    versionRef.current = conflict.currentVersion;
+    lastSaved.current = JSON.stringify(conflict.serverData);
     setConflict(null);
-    setSaveStatus(sameAsServerBase ? "saved" : "unsaved");
+    setSaveStatus("unsaved");
   }, [conflict]);
 
   // Debounced auto-save. Without this the diagram only persists when a
@@ -244,7 +257,7 @@ function useAutoSave(
     return () => clearTimeout(t);
   }, [data, disabled, delay, saveNow, conflict]);
 
-  return { saveStatus, lastSavedAt, saveNow, conflict, resolveConflict };
+  return { saveStatus, lastSavedAt, saveNow, conflict, acceptMerge };
 }
 
 function exportSvg(svgEl: SVGSVGElement, name: string) {
@@ -970,7 +983,20 @@ export function DiagramEditor({
   // prePreviewDataRef holds the real diagram so a discard reverts the canvas.
   const [historyPreviewActive, setHistoryPreviewActive] = useState(false);
   const prePreviewDataRef = useRef<DiagramData | null>(null);
-  const { saveStatus, lastSavedAt, saveNow, conflict, resolveConflict } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly || historyPreviewActive, dataVersion);
+  const { saveStatus, lastSavedAt, saveNow, conflict, acceptMerge } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly || historyPreviewActive, dataVersion);
+  // Auto-merge on conflict (Phase 1d): apply the three-way merge to the canvas
+  // and resume — silently when there were no true overlaps, or with a dismissible
+  // note listing how many elements you both changed (theirs kept).
+  const [mergeNote, setMergeNote] = useState<{ count: number; editor: string | null } | null>(null);
+  useEffect(() => {
+    if (!conflict) return;
+    setData(conflict.merged);
+    acceptMerge();
+    setMergeNote(conflict.conflicts.length > 0
+      ? { count: conflict.conflicts.length, editor: conflict.lastEditor }
+      : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conflict]);
   saveNowRef.current = saveNow;
   saveStatusRef.current = saveStatus;
   const effectiveUpdatedAt = lastSavedAt ?? updatedAt;
@@ -1020,12 +1046,14 @@ export function DiagramEditor({
   // Selected element(s) double as an advisory soft-lock signal for other editors.
   const presenceSelection = useMemo(() => [...selectedElementIds], [selectedElementIds]);
   const collabEnabled = !!currentUserId && templateEditState === null && !historyPreviewActive;
-  const { roster: presenceRoster } = usePresence(diagramId, {
+  const { roster: presenceRoster, locks: presenceLocks } = usePresence(diagramId, {
     enabled: collabEnabled,
     userName: currentUserName,
     selection: presenceSelection,
     editingElementIds: presenceSelection,
   });
+  // Soft lock: an element another editor is holding is not editable by us.
+  const isCoLocked = useCallback((id: string) => !!presenceLocks[id], [presenceLocks]);
   const [pendingDragSymbol, setPendingDragSymbol] = useState<SymbolType | null>(null);
   const [pendingArchimateShapeKey, setPendingArchimateShapeKey] = useState<string | null>(null);
   const [pendingArchimateIconOnly, setPendingArchimateIconOnly] = useState<boolean>(false);
@@ -2871,25 +2899,18 @@ export function DiagramEditor({
           </button>
         </div>
       )}
-      {/* Co-authoring save conflict: another editor saved since we loaded. */}
-      {conflict && (
+      {/* Co-authoring auto-merge note: shown only when a concurrent save
+          overlapped the SAME element(s) — non-overlapping edits merge silently. */}
+      {mergeNote && (
         <div className="bg-amber-50 border-b border-amber-300 px-4 py-2 text-xs text-amber-900 flex items-center justify-between gap-3">
           <span>
-            <span className="font-semibold">{conflict.lastEditor ?? "Another editor"}</span>{" "}
-            saved changes to this diagram while you were editing. Your auto‑save is paused.
+            Merged with <span className="font-semibold">{mergeNote.editor ?? "another editor"}</span>’s changes.{" "}
+            {mergeNote.count} element{mergeNote.count === 1 ? "" : "s"} you both edited kept their version — review if needed.
           </span>
-          <span className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => { setData(conflict.serverData); resolveConflict(conflict.serverData, true); }}
-              className="px-2 py-0.5 rounded border border-amber-400 bg-white text-amber-800 hover:bg-amber-100 font-medium"
-              title="Discard your unsaved changes and load their latest version"
-            >Load their version</button>
-            <button
-              onClick={() => { resolveConflict(data, false); }}
-              className="px-2 py-0.5 rounded border border-amber-400 bg-white text-amber-800 hover:bg-amber-100 font-medium"
-              title="Keep your changes and overwrite theirs on the next save"
-            >Keep mine (overwrite)</button>
-          </span>
+          <button
+            onClick={() => setMergeNote(null)}
+            className="text-amber-700 hover:text-amber-900 font-medium shrink-0"
+          >✕</button>
         </div>
       )}
       {/* Top bar */}
@@ -4041,15 +4062,16 @@ export function DiagramEditor({
           data={displayData}
           diagramType={diagramType}
           onAddElement={addElementGated}
-          onMoveElement={moveElement}
-          onResizeElement={resizeElement}
-          onUpdateLabel={handleUpdateLabel}
+          onMoveElement={(id, x, y, uc) => { if (!isCoLocked(id)) moveElement(id, x, y, uc); }}
+          onResizeElement={(id, x, y, w, h) => { if (!isCoLocked(id)) resizeElement(id, x, y, w, h); }}
+          onUpdateLabel={(id, label) => { if (!isCoLocked(id)) handleUpdateLabel(id, label); }}
           entityStructure={entityStructure}
           onAddEntityNode={addEntityNode}
           onBeginLabelEdit={beginLabelEdit}
           onUpdateLabelLive={updateLabelLive}
           onCancelLabelEdit={cancelLabelEdit}
           onDeleteElement={(id) => {
+            if (isCoLocked(id)) return; // another editor is holding this element
             deleteElement(id);
             setSelectedElementIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
           }}
@@ -4062,6 +4084,7 @@ export function DiagramEditor({
           onUpdateConnectorEndpoint={updateConnectorEndpoint}
           selectedElementIds={selectedElementIds}
           selectedConnectorId={selectedConnectorId}
+          coEditLocks={presenceLocks}
           pcHighlightEnabled={highlightEnabled}
           scanHighlightById={scanHighlight ?? undefined}
           riskHighlightById={riskHighlight ?? undefined}

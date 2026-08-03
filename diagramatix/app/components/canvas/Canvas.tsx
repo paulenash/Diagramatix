@@ -268,6 +268,9 @@ interface Props {
   ) => void;
   selectedElementIds: Set<string>;
   selectedConnectorId: string | null;
+  /** Co-authoring soft locks: elementId → the OTHER editor currently holding it.
+   *  Renders a lock badge and blocks editing that element (advisory). */
+  coEditLocks?: Record<string, { userId: string; userName: string; color: string }>;
   /** After the user closes "Scan Diagram for Issues", flagged elements are
    *  tinted on the canvas (red = error, orange = warning) for a short window.
    *  The map is element id → severity; undefined / empty means no tint. */
@@ -549,6 +552,7 @@ export function Canvas({
   onUpdateConnectorEndpoint,
   selectedElementIds,
   selectedConnectorId,
+  coEditLocks,
   pcHighlightEnabled = true,
   scanHighlightById,
   entityDriftById,
@@ -6298,6 +6302,25 @@ export function Canvas({
               debugMode={debugMode}
             />
           ))}
+
+          {/* Co-authoring soft-lock badges — an element another editor is
+              currently holding shows a dashed ring in their colour plus a
+              small initials chip. Advisory (editing is also blocked upstream). */}
+          {coEditLocks && Object.entries(coEditLocks).map(([elId, lock]) => {
+            const el = data.elements.find(e => e.id === elId);
+            if (!el) return null;
+            const ini = (lock.userName.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join("") || "?").toUpperCase();
+            return (
+              <g key={`lock-${elId}`} style={{ pointerEvents: "none" }}>
+                <rect x={el.x - 3} y={el.y - 3} width={el.width + 6} height={el.height + 6}
+                  rx={6} fill="none" stroke={lock.color} strokeWidth={1.5} strokeDasharray="4 3" opacity={0.85} />
+                <g transform={`translate(${el.x + el.width - 7}, ${el.y - 7})`}>
+                  <circle r={9} fill={lock.color} stroke="#fff" strokeWidth={1.5} />
+                  <text x={0} y={0.5} textAnchor="middle" dominantBaseline="central" fontSize={9} fontWeight={700} fill="#fff">{ini}</text>
+                </g>
+              </g>
+            );
+          })}
 
           {/* Active-group overlay — when a multi-selection is active
               (most often a template was just stamped) every selected
