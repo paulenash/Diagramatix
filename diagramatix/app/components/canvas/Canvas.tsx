@@ -5605,12 +5605,19 @@ export function Canvas({
               !isEventSubprocess &&
               !draggingFromEventSubprocess &&
               !draggingFromInsideEventSubprocess &&
+              !draggingFromEdgeMountedCompensationEvent && // compensation uses its own dark-yellow target, never green
               el.id !== draggingConnector!.fromId &&
               el.id !== (draggingSourceEl?.parentId ?? "") &&
               !draggingFromEdgeMountedStartEvent &&
               !draggingFromEdgeMountedIntermediateReceiveEvent;
             const isSubExpAssocTarget = isDraggingConnector && draggingSourceIsData &&
               el.id !== draggingConnector!.fromId;
+            // Compensation association: an Expanded Sub-Process (not an event sub,
+            // not the event's own host) is a valid dark-yellow handler target.
+            const isSubExpCompTarget = isDraggingConnector && compTargetsAvailable &&
+              !isEventSubprocess &&
+              el.id !== draggingConnector!.fromId &&
+              el.id !== draggingSourceBoundaryHostId;
             const draggingEl = draggingElementId ? data.elements.find(e => e.id === draggingElementId) : null;
             const isElementDragTarget = draggingEl != null &&
               (draggingEl.x + draggingEl.width / 2) >= el.x &&
@@ -5627,6 +5634,7 @@ export function Canvas({
                 isDropTarget={isSubExpDropTarget}
                 isDisallowedTarget={false}
                 isAssocBpmnTarget={isSubExpAssocTarget}
+                isCompensationTarget={isSubExpCompTarget}
                 isElementDragTarget={isElementDragTarget}
                 onSelect={(e) => {
                   if (handleForceConnectSelect(el.id, e)) return;
