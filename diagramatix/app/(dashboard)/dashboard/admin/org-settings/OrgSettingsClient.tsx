@@ -24,6 +24,8 @@ export interface OrgDetail {
   allowSupportDiagram: boolean;
   requireSso: boolean;
   aiRedaction: boolean;
+  emailDomains: string[];
+  domainJoinRole: string | null;
   createdAt: string;
   memberCount: number;
   projectCount: number;
@@ -98,6 +100,9 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
   });
   const [requireSso, setRequireSso] = useState(org.requireSso);
   const [aiRedaction, setAiRedaction] = useState(org.aiRedaction);
+  // Domain-managed membership (SuperAdmin-only).
+  const [domainsDraft, setDomainsDraft] = useState((org.emailDomains ?? []).join(", "));
+  const [joinRoleDraft, setJoinRoleDraft] = useState<string>(org.domainJoinRole ?? "");
   useEffect(() => {
     setName(org.name);
     setAllowCrossOrg(org.allowCrossOrgSharing);
@@ -107,7 +112,9 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
     });
     setRequireSso(org.requireSso);
     setAiRedaction(org.aiRedaction);
-  }, [org.id, org.name, org.allowCrossOrgSharing, org.allowAi, org.allowVoiceAi, org.allowExternalExport, org.allowSharePoint, org.allowSupportDiagram, org.requireSso, org.aiRedaction]);
+    setDomainsDraft((org.emailDomains ?? []).join(", "));
+    setJoinRoleDraft(org.domainJoinRole ?? "");
+  }, [org.id, org.name, org.allowCrossOrgSharing, org.allowAi, org.allowVoiceAi, org.allowExternalExport, org.allowSharePoint, org.allowSupportDiagram, org.requireSso, org.aiRedaction, org.emailDomains, org.domainJoinRole]);
 
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
@@ -140,7 +147,7 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
   // SuperAdmin and OrgAdmin; name/entityType are SuperAdmin-only (the
   // server re-checks).
   const saveField = useCallback(
-    async (patch: Partial<{ name: string; entityType: OrgEntityType; allowCrossOrgSharing: boolean; requireSso: boolean; aiRedaction: boolean } & Record<PolicyKey, boolean>>) => {
+    async (patch: Partial<{ name: string; entityType: OrgEntityType; allowCrossOrgSharing: boolean; requireSso: boolean; aiRedaction: boolean; emailDomains: string[]; domainJoinRole: string | null } & Record<PolicyKey, boolean>>) => {
       setSaving(true);
       setSavedMessage(null);
       try {
@@ -580,6 +587,54 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
           </div>
 
           {/* ── Danger Zone (SuperAdmin only) ──────────────────────── */}
+          {isSuperAdmin && (
+            <div className="bg-white rounded-md border border-gray-200">
+              <div className="px-5 py-3 border-b border-gray-100">
+                <h2 className="text-sm font-semibold text-gray-800">Domain-managed membership</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  Email domains this Org claims. Anyone registering with a matching domain
+                  auto-joins <strong>{org.name}</strong> (they get no personal org and can’t
+                  create one). A domain should be claimed by only one Org.
+                </p>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                <label className="block">
+                  <span className="text-xs font-medium text-gray-700">Claimed domains (comma-separated)</span>
+                  <input
+                    type="text"
+                    value={domainsDraft}
+                    onChange={(e) => setDomainsDraft(e.target.value)}
+                    placeholder="example.com, example.com.au"
+                    className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
+                  />
+                </label>
+                <label className="block max-w-xs">
+                  <span className="text-xs font-medium text-gray-700">Role for auto-joiners</span>
+                  <select
+                    value={joinRoleDraft}
+                    onChange={(e) => setJoinRoleDraft(e.target.value)}
+                    className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
+                  >
+                    <option value="">Default (Process Owner)</option>
+                    {Object.entries(ORG_ROLE_LABELS).map(([role, label]) => (
+                      <option key={role} value={role}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  disabled={saving}
+                  onClick={() => saveField({
+                    emailDomains: domainsDraft.split(",").map((d) => d.trim().toLowerCase().replace(/^@/, "")).filter((d) => d.includes(".")),
+                    domainJoinRole: joinRoleDraft || null,
+                  })}
+                  className="text-xs font-medium px-3 py-1.5 bg-gray-800 text-white rounded hover:bg-gray-900 disabled:opacity-50"
+                >
+                  Save domains
+                </button>
+              </div>
+            </div>
+          )}
+
           {isSuperAdmin && (
             <div className="bg-white rounded-md border border-red-200">
               <div className="px-5 py-3 border-b border-red-100">

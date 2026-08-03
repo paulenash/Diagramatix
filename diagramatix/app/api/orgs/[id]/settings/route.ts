@@ -8,7 +8,7 @@ import {
   getCurrentOrgId,
   OrgContextError,
 } from "@/app/lib/auth/orgContext";
-import { OrgEntityType } from "@/app/generated/prisma/enums";
+import { OrgEntityType, OrgRole } from "@/app/generated/prisma/enums";
 import { ORG_POLICY_KEYS } from "@/app/lib/auth/orgPolicy";
 import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
 
@@ -95,6 +95,8 @@ export async function GET(_req: Request, { params }: Params) {
       allowSupportDiagram: true,
       requireSso: true,
       aiRedaction: true,
+      emailDomains: true,
+      domainJoinRole: true,
       createdAt: true,
       _count: { select: { members: true, projects: true, diagrams: true } },
     },
@@ -188,6 +190,32 @@ export async function PUT(req: Request, { params }: Params) {
     updates.entityType = et;
   }
 
+  // Domain-managed membership (SuperAdmin-only — claiming a domain routes every
+  // future signup on it into this org, a platform-level decision like renaming).
+  if (bodyRec.emailDomains !== undefined) {
+    if (!su) {
+      return NextResponse.json({ error: "Only a SuperAdmin can set claimed email domains" }, { status: 403 });
+    }
+    const raw = Array.isArray(bodyRec.emailDomains) ? bodyRec.emailDomains : [];
+    const domains = [...new Set(
+      raw.map((d) => String(d).toLowerCase().trim().replace(/^@/, "")).filter((d) => d.includes(".")),
+    )];
+    updates.emailDomains = domains;
+  }
+  if (bodyRec.domainJoinRole !== undefined) {
+    if (!su) {
+      return NextResponse.json({ error: "Only a SuperAdmin can set the domain join role" }, { status: 403 });
+    }
+    const r = bodyRec.domainJoinRole;
+    if (r === null || r === "") {
+      updates.domainJoinRole = null;
+    } else if (typeof r === "string" && (Object.values(OrgRole) as string[]).includes(r)) {
+      updates.domainJoinRole = r as OrgRole;
+    } else {
+      return NextResponse.json({ error: "domainJoinRole must be a valid OrgRole or null" }, { status: 400 });
+    }
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "No supported fields supplied" }, { status: 400 });
   }
@@ -213,6 +241,8 @@ export async function PUT(req: Request, { params }: Params) {
       allowSupportDiagram: true,
       requireSso: true,
       aiRedaction: true,
+      emailDomains: true,
+      domainJoinRole: true,
       createdAt: true,
       _count: { select: { members: true, projects: true, diagrams: true } },
     },

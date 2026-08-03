@@ -72,6 +72,16 @@ model Org {
   entityType OrgEntityType @default(Other)
   createdAt  DateTime      @default(now())
 
+  // ── Domain-managed membership ──────────────────────────────────────────
+  // Email domains this Org "claims" (lowercased, no @). A user whose email
+  // domain matches one of these auto-joins THIS org on registration / SSO
+  // instead of getting a personal org, and cannot create their own. A domain
+  // should be claimed by at most one Org (the resolver takes the first match).
+  emailDomains   String[]  @default([])
+  // Role granted to a domain auto-joiner. Null → the code default
+  // (DEFAULT_DOMAIN_JOIN_ROLE). Set per-org by a SuperAdmin.
+  domainJoinRole OrgRole?
+
   // Per-org admin setting (managed by Org Owner/Admin via /dashboard/admin).
   // When false, project sharing is restricted to users in the same Org as
   // the project owner. When true, the owner can share with any registered

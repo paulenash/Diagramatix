@@ -17,6 +17,7 @@
  */
 import bcrypt from "bcryptjs";
 import { prisma } from "@/app/lib/db";
+import { joinDomainOrgOrCreatePersonal } from "@/app/lib/auth/domainOrg";
 
 export type RegisterResult =
   | { ok: true; user: { id: string; email: string; name: string | null } }
@@ -58,9 +59,10 @@ export async function registerUser(input: {
 
   const hashedPassword = await bcrypt.hash(password, 12);
 
-  // CPS 230: every new user gets a default Org with Owner role.
-  // Wrap user + org + membership in a single transaction so a failure leaves
-  // no partial state behind.
+  // CPS 230: every new user gets an org. A user whose email domain is CLAIMED by
+  // an Org (Org.emailDomains) auto-joins that org (as its domainJoinRole); everyone
+  // else gets a personal "<name>'s Org" with Owner. Wrap user + org/membership in a
+  // single transaction so a failure leaves no partial state behind.
   const user = await prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
       data: {
@@ -77,12 +79,7 @@ export async function registerUser(input: {
       select: { id: true, email: true, name: true },
     });
     const displayName = created.name ?? created.email;
-    const org = await tx.org.create({
-      data: { name: `${displayName}'s Org`, entityType: "Other" },
-    });
-    await tx.orgMember.create({
-      data: { orgId: org.id, userId: created.id, role: "Owner" },
-    });
+    await joinDomainOrgOrCreatePersonal(created.id, created.email, displayName, tx);
     return created;
   });
 
