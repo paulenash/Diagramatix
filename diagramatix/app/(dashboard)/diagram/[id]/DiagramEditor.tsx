@@ -28,6 +28,8 @@ import { SopGenerateDialog } from "./SopGenerateDialog";
 import { useDiagram, nanoid } from "@/app/hooks/useDiagram";
 import { Canvas } from "@/app/components/canvas/Canvas";
 import { Palette } from "@/app/components/canvas/Palette";
+import { PresenceBar } from "@/app/components/canvas/PresenceBar";
+import { usePresence } from "@/app/hooks/usePresence";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
@@ -1013,6 +1015,17 @@ export function DiagramEditor({
   const [pdfScale, setPdfScale] = useState(100);
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
+
+  // ── Co-authoring presence (Phase 1b/1c) ──
+  // Selected element(s) double as an advisory soft-lock signal for other editors.
+  const presenceSelection = useMemo(() => [...selectedElementIds], [selectedElementIds]);
+  const collabEnabled = !!currentUserId && templateEditState === null && !historyPreviewActive;
+  const { roster: presenceRoster } = usePresence(diagramId, {
+    enabled: collabEnabled,
+    userName: currentUserName,
+    selection: presenceSelection,
+    editingElementIds: presenceSelection,
+  });
   const [pendingDragSymbol, setPendingDragSymbol] = useState<SymbolType | null>(null);
   const [pendingArchimateShapeKey, setPendingArchimateShapeKey] = useState<string | null>(null);
   const [pendingArchimateIconOnly, setPendingArchimateIconOnly] = useState<boolean>(false);
@@ -3062,6 +3075,9 @@ export function DiagramEditor({
             Feedback
           </button>
         )}
+
+        {/* Co-authoring presence — who else is in this diagram right now. */}
+        {collabEnabled && <PresenceBar members={presenceRoster} />}
 
         {!readOnly && (
           <>
