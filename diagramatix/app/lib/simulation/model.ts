@@ -65,6 +65,12 @@ export interface SimNode {
   delay?: SimDist;
   // gateway
   gateway?: "decision" | "parallel";
+  // compensation (BPMN): a host activity carries the node ids of its
+  // compensation handler activities — armed when the host executes, fired when
+  // a throwing compensation event is later reached.
+  compensationHandlers?: string[];
+  // an inline THROWING compensation event: on entry, fire all armed handlers.
+  compensationThrow?: boolean;
   // token property assignments applied on entry
   assign?: Assignment[];
 }

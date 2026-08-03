@@ -104,8 +104,33 @@ export function assembleFromDiagram(
     return undefined;
   };
 
+  // ── Compensation wiring (BPMN) ──
+  // A boundary CATCHING compensation event is not a flow node — it's skipped —
+  // and its outgoing association names the host activity's compensation handler.
+  // The host → handler-ids map arms the engine; an inline THROWING compensation
+  // event (tagged below) fires the armed handlers. Association / message links
+  // are excluded from the control-flow graph entirely (see the edge filter).
+  const compHandlersByHost = new Map<string, string[]>();
+  const isCompEvent = (el: DiagramElement) =>
+    el.type === "intermediate-event" && el.eventType === "compensation";
+  const isBoundaryCompCatch = (el: DiagramElement) =>
+    isCompEvent(el) && !!el.boundaryHostId && el.flowType !== "throwing";
+  const isInlineCompThrow = (el: DiagramElement) =>
+    isCompEvent(el) && !el.boundaryHostId && el.flowType === "throwing";
+
   // ── Event subprocesses: build EventSub records, skip their start events ──
   const skip = new Set<string>();          // elements that aren't flow nodes
+  for (const el of data.elements) {
+    if (!isBoundaryCompCatch(el)) continue;
+    skip.add(el.id); // boundary compensation catch event is not a flow node
+    const handlers = data.connectors
+      .filter((c) => c.sourceId === el.id) // its (association) links to the handler activity
+      .map((c) => c.targetId);
+    if (handlers.length) {
+      const arr = compHandlersByHost.get(el.boundaryHostId!) ?? compHandlersByHost.set(el.boundaryHostId!, []).get(el.boundaryHostId!)!;
+      arr.push(...handlers);
+    }
+  }
   const eventSubsByParent = new Map<string, EventSub[]>();
   for (const el of data.elements) {
     if (!isEventEP(el)) continue;
@@ -153,6 +178,7 @@ export function assembleFromDiagram(
       if (teamId) teamIds.add(teamId);
     } else if (kind === "delay") {
       node.delay = sim.delay ?? { kind: "fixed", value: 0 };
+      if (isInlineCompThrow(el)) node.compensationThrow = true; // fires armed handlers on entry
     } else if (kind === "gateway") {
       node.gateway = el.gatewayType === "parallel" ? "parallel" : "decision";
     } else if (kind === "subprocess") {
@@ -173,12 +199,26 @@ export function assembleFromDiagram(
         value: a.expr ? { expr: a.expr } : (a.dist ?? { kind: "fixed", value: 0 }),
       }));
     }
+    // Host activity → its armed compensation handler(s).
+    const ch = compHandlersByHost.get(el.id);
+    if (ch && ch.length) node.compensationHandlers = ch;
     nodes.push(node);
   }
 
   const nodeIds = new Set(nodes.map((n) => n.id));
+  // Prune compensation handler ids to those that are real sim nodes.
+  for (const n of nodes) {
+    if (!n.compensationHandlers) continue;
+    n.compensationHandlers = n.compensationHandlers.filter((id) => nodeIds.has(id));
+    if (n.compensationHandlers.length === 0) delete n.compensationHandlers;
+  }
+  // Only CONTROL-FLOW connectors form the executable graph. Associations (incl.
+  // the compensation association) and message flows are NOT control flow — the
+  // engine walks sequence flow only; compensation handlers are dispatched
+  // separately. Exclude by type (undefined type = legacy sequence → kept).
+  const NON_FLOW = new Set(["associationBPMN", "association", "messageBPMN", "message"]);
   const edges: SimEdge[] = data.connectors
-    .filter((c) => nodeIds.has(c.sourceId) && nodeIds.has(c.targetId))
+    .filter((c) => !NON_FLOW.has(c.type) && nodeIds.has(c.sourceId) && nodeIds.has(c.targetId))
     .map((c) => ({
       id: c.id,
       source: c.sourceId,

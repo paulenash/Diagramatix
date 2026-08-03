@@ -35,7 +35,14 @@ interface Pending { tokenId: string; nodeId: string; units: number; requestedAt:
  *  per-pass repeat probability (0..100); `parallel` marks a parallel-MI body
  *  instance whose completion is counted by the join. */
 interface Frame { sub: string; scopeInst: string; remaining: number; loopBack?: number; parallel?: boolean; handler?: boolean; continueFrom?: string }
-interface Token { id: string; enteredAt: number; props: Record<string, Value>; callStack: Frame[]; internal?: boolean }
+interface Token {
+  id: string; enteredAt: number; props: Record<string, Value>; callStack: Frame[]; internal?: boolean;
+  /** BPMN compensation: handler node ids armed by executed host activities, in
+   *  completion order (fired reverse-completion / LIFO on a throwing event). */
+  armed?: string[];
+  /** Set while this token is running compensation handlers in sequence. */
+  comp?: { queue: string[]; resume: string };
+}
 
 function cloneStack(s: Frame[]): Frame[] { return s.map((f) => ({ ...f })); }
 
@@ -276,6 +283,7 @@ export class Engine {
     switch (node.kind) {
       case "sink": return this.onReachEnd(token, node);
       case "delay":
+        if (node.compensationThrow) return this.fireCompensation(token, node);
         this.calendar.schedule(this.clock + (node.delay ? sample(node.delay, this.rng) : 0), { type: "RESUME", nodeId, tokenId: token.id });
         return;
       case "task": return this.startOrQueue(token, node);
@@ -300,6 +308,7 @@ export class Engine {
           id: `t${this.nextTokenId++}`, enteredAt: token.enteredAt, props: { ...token.props },
           callStack: [...cloneStack(token.callStack), { sub: node.id, scopeInst, remaining: 0, parallel: true }],
           internal: true,
+          armed: token.armed ? [...token.armed] : undefined,
         };
         this.tokens.set(clone.id, clone);
         this.emit("spawn", clone.id, node.id);
@@ -489,10 +498,45 @@ export class Engine {
         }
       }
     }
+    // A compensation handler just finished → run the next armed handler; the
+    // main flow resumes only once all handlers are done.
+    if (token.comp) return this.runNextCompensation(token);
     this.moveNext(token, node);
   }
 
+  // ── BPMN compensation ────────────────────────────────────────────────────
+  /** An inline THROWING compensation event fires every armed handler (activities
+   *  whose host actually executed) in reverse-completion order (LIFO), globally.
+   *  Each runs as real work (duration + cost), then flow continues past the throw. */
+  private fireCompensation(token: Token, throwNode: SimNode): void {
+    const armed = token.armed ?? [];
+    if (armed.length === 0) return this.moveNext(token, throwNode); // nothing compensable → pass through
+    token.comp = { queue: [...armed].reverse(), resume: throwNode.id };
+    token.armed = []; // compensation consumes the armed set
+    this.runNextCompensation(token);
+  }
+
+  private runNextCompensation(token: Token): void {
+    const comp = token.comp;
+    if (!comp) return;
+    const next = comp.queue.shift();
+    if (next === undefined) {
+      const resume = this.nodeById.get(comp.resume);
+      token.comp = undefined;
+      return resume ? this.moveNext(token, resume) : this.completeToken(token);
+    }
+    const handler = this.nodeById.get(next);
+    if (!handler) return this.runNextCompensation(token); // handler missing → skip
+    this.emit("enter", token.id, handler.id); // flash / mark as compensated
+    this.startOrQueue(token, handler);        // real work: seizes team, samples duration/cost
+  }
+
   private moveNext(token: Token, node: SimNode): void {
+    // Leaving a host activity forward ARMS its compensation handler(s) — the
+    // host has now executed. (Not while compensation is already in progress.)
+    if (node.compensationHandlers && node.compensationHandlers.length && !token.comp) {
+      (token.armed ??= []).push(...node.compensationHandlers);
+    }
     const out = this.outEdges.get(node.id);
     if (!out || out.length === 0) return this.completeToken(token);
     this.enterNode(token, out[0].target, out[0].id);
@@ -504,7 +548,7 @@ export class Engine {
     if (node.gateway === "parallel" && out.length > 1) {
       // Parallel split: a clone per branch (join sync is a later phase).
       for (const e of out) {
-        const clone: Token = { id: `t${this.nextTokenId++}`, enteredAt: token.enteredAt, props: { ...token.props }, callStack: cloneStack(token.callStack), internal: token.internal };
+        const clone: Token = { id: `t${this.nextTokenId++}`, enteredAt: token.enteredAt, props: { ...token.props }, callStack: cloneStack(token.callStack), internal: token.internal, armed: token.armed ? [...token.armed] : undefined };
         this.tokens.set(clone.id, clone);
         this.enterNode(clone, e.target, e.id);
       }
@@ -591,7 +635,7 @@ export class Engine {
     const pools: Record<string, PoolState<Pending>> = {};
     for (const [id, p] of this.pools) pools[id] = p.toJSON();
     const tokens: Record<string, Token> = {};
-    for (const [id, t] of this.tokens) tokens[id] = { id: t.id, enteredAt: t.enteredAt, props: { ...t.props }, callStack: cloneStack(t.callStack), internal: t.internal };
+    for (const [id, t] of this.tokens) tokens[id] = { id: t.id, enteredAt: t.enteredAt, props: { ...t.props }, callStack: cloneStack(t.callStack), internal: t.internal, armed: t.armed ? [...t.armed] : undefined, comp: t.comp ? { queue: [...t.comp.queue], resume: t.comp.resume } : undefined };
     const perNode: Record<string, NodeAcc> = {};
     for (const [id, a] of this.perNode) perNode[id] = { ...a };
     return {
