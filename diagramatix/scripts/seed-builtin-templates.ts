@@ -22,7 +22,7 @@ import { PrismaClient } from "../app/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { recomputeAllConnectors } from "../app/lib/diagram/routing";
 import { renderTemplateThumbnailSvg } from "../app/lib/diagram/templateThumbnail";
-import type { DiagramElement, Connector, TemplateData, SymbolType, ConnectorType, Side } from "../app/lib/diagram/types";
+import type { DiagramElement, Connector, TemplateData, SymbolType, ConnectorType, Side, Point } from "../app/lib/diagram/types";
 
 // ── Fragment spec → laid-out TemplateData ──────────────────────────────────
 type Step = {
@@ -74,8 +74,9 @@ function buildFragment(f: Fragment): TemplateData {
     directionType: "directed", routingType: "rectilinear",
     sourceSide: "right" as Side, targetSide: "left" as Side,
     sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
-    waypoints: [], ...(c.label ? { label: c.label } : {}),
-  } as Connector));
+    sourceInvisibleLeader: false, targetInvisibleLeader: false,
+    waypoints: [] as Point[], ...(c.label ? { label: c.label } : {}),
+  }));
   const connectors = recomputeAllConnectors(rawConnectors, elements);
   return { elements, connectors };
 }

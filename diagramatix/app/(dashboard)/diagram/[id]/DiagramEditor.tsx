@@ -1404,7 +1404,7 @@ export function DiagramEditor({
     if (usesPlanPanel) { setShowPlanPanel(true); setShowAiPanel(false); }
     else { setShowAiPanel(true); setShowPlanPanel(false); }
   }, [data.aiGeneration, usesPlanPanel]);
-  type TemplateRow = { id: string; name: string; group: string | null };
+  type TemplateRow = { id: string; name: string; group: string | null; description?: string | null; thumbnailSvg?: string | null };
   const [userTemplates, setUserTemplates] = useState<TemplateRow[]>([]);
   const [builtInTemplates, setBuiltInTemplates] = useState<TemplateRow[]>([]);
   // Per-user collapse state, keyed `<scope>:<group-name>` (scope = "user"
@@ -1773,22 +1773,22 @@ export function DiagramEditor({
       try {
         const r1 = await fetch("/api/templates?type=user");
         if (r1.ok) {
-          const list = await r1.json() as { id: string; name: string; diagramType: string; group: string | null }[];
+          const list = await r1.json() as { id: string; name: string; diagramType: string; group: string | null; description?: string | null; thumbnailSvg?: string | null }[];
           setUserTemplates(
             list
               .filter((t) => t.diagramType === "bpmn")
-              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null })),
+              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null, description: t.description ?? null, thumbnailSvg: t.thumbnailSvg ?? null })),
           );
         }
       } catch {}
       try {
         const r2 = await fetch("/api/templates?type=builtin");
         if (r2.ok) {
-          const list = await r2.json() as { id: string; name: string; diagramType: string; group: string | null }[];
+          const list = await r2.json() as { id: string; name: string; diagramType: string; group: string | null; description?: string | null; thumbnailSvg?: string | null }[];
           setBuiltInTemplates(
             list
               .filter((t) => t.diagramType === "bpmn")
-              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null })),
+              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null, description: t.description ?? null, thumbnailSvg: t.thumbnailSvg ?? null })),
           );
         }
       } catch {}
@@ -3400,10 +3400,13 @@ export function DiagramEditor({
                             onClick={() => !isDeleting && handleApplyTemplate(t.id)}
                             disabled={isDeleting}
                             className={`flex items-center gap-2 flex-1 min-w-0 text-left ${indent ? "pl-6 pr-2" : "px-2"} py-1.5 text-xs text-gray-700 ${isDeleting ? "line-through text-gray-400" : ""}`}
-                            title={`Apply template: ${t.name}`}
+                            title={t.description ? `${t.name} \u2014 ${t.description}` : `Apply template: ${t.name}`}
                           >
-                            <TemplateThumbnail templateId={t.id} />
-                            <span className="flex-1 min-w-0 truncate">{t.name}{isDeleting ? " (deleting\u2026)" : ""}</span>
+                            <TemplateThumbnail templateId={t.id} svg={t.thumbnailSvg} />
+                            <span className="flex-1 min-w-0 flex flex-col">
+                              <span className="truncate">{t.name}{isDeleting ? " (deleting\u2026)" : ""}</span>
+                              {t.description && <span className="truncate text-[10px] text-gray-400">{t.description}</span>}
+                            </span>
                           </button>
                           {canEdit && !isDeleting && (
                             <>

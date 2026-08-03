@@ -82,18 +82,27 @@ function ElementShape({ el }: { el: DiagramElement }) {
  */
 export function TemplateThumbnail({
   templateId,
+  svg,
   width = 64,
   height = 48,
 }: {
   templateId: string;
+  /** Stored vector preview (DiagramTemplate.thumbnailSvg). When present it's
+   *  rendered directly — no fetch — and stays crisp at any size (e.g. the NL
+   *  suggestion popup). Falls back to the lazy fetch+render when absent. */
+  svg?: string | null;
   width?: number;
   height?: number;
 }) {
+  // Fast path: a stored SVG renders instantly + scales without pixelation.
+  const stored = svg;
+
   const [data, setData] = useState<TemplateData | null | undefined>(() =>
     cache.has(templateId) ? cache.get(templateId) : undefined,
   );
 
   useEffect(() => {
+    if (stored) return; // no fetch needed when we already have the SVG
     let alive = true;
     if (cache.has(templateId)) {
       setData(cache.get(templateId));
@@ -105,7 +114,17 @@ export function TemplateThumbnail({
     return () => {
       alive = false;
     };
-  }, [templateId]);
+  }, [templateId, stored]);
+
+  if (stored) {
+    return (
+      <div
+        className="shrink-0 rounded border border-gray-200 bg-white overflow-hidden [&_svg]:block [&_svg]:w-full [&_svg]:h-full"
+        style={{ width, height }}
+        dangerouslySetInnerHTML={{ __html: stored }}
+      />
+    );
+  }
 
   // Frame everything — elements AND connector waypoints — so loops or
   // labels that spill past the element bounds aren't clipped.
