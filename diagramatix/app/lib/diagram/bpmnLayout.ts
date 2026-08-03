@@ -2943,7 +2943,12 @@ export function layoutBpmnDiagram(
     const tgt = elMap.get(c.targetId);
     if (!src || !tgt) continue;
 
-    const isAssociation = DATA_ASSOC_TYPES.has(src.type) || DATA_ASSOC_TYPES.has(tgt.type);
+    // A link between a Compensation event and a Compensation activity is a directed
+    // Association (dashed, open arrow) — never a sequence flow.
+    const isCompensationAssoc =
+      (src.eventType === "compensation" && tgt.properties?.isForCompensation === true) ||
+      (tgt.eventType === "compensation" && src.properties?.isForCompensation === true);
+    const isAssociation = DATA_ASSOC_TYPES.has(src.type) || DATA_ASSOC_TYPES.has(tgt.type) || isCompensationAssoc;
     const isMessage = !isAssociation && (
       c.type === "message" ||
       src.type === "pool" || tgt.type === "pool"

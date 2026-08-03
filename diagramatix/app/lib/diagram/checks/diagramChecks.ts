@@ -305,6 +305,7 @@ export function checkActivityHasIncoming(d: DiagramLike): Violation[] {
   for (const e of d.elements) {
     if (!ACTIVITY_TYPES.has(e.type)) continue;
     if (isScopeSubprocess(e, d.elements)) continue;
+    if (e.properties?.isForCompensation === true) continue; // compensation handler — triggered by association, not sequence flow
     if ((incoming.get(e.id) ?? 0) > 0) continue;
     const ep = findEnclosingEP(e, byId);
     if (!ep) { topLevelOrphans.push(e); continue; }
@@ -350,6 +351,7 @@ export function checkActivityHasOutgoing(d: DiagramLike): Violation[] {
   for (const e of d.elements) {
     if (!ACTIVITY_TYPES.has(e.type)) continue;
     if (isScopeSubprocess(e, d.elements)) continue;
+    if (e.properties?.isForCompensation === true) continue; // compensation handler — triggered by association, not sequence flow
     if ((outgoing.get(e.id) ?? 0) > 0) continue;
     const ep = findEnclosingEP(e, byId);
     if (!ep) { topLevelOrphans.push(e); continue; }

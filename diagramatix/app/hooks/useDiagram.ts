@@ -6441,7 +6441,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     }
 
     case "ADD_CONNECTOR": {
-      const { sourceId, targetId, connectorType, directionType, routingType: payloadRoutingType, force, initialLabel } = action.payload;
+      const { sourceId, targetId, routingType: payloadRoutingType, force, initialLabel } = action.payload;
+      // connectorType/directionType may be re-typed below (a compensation link
+      // coerces to a directed Association), so they are mutable.
+      let { connectorType, directionType } = action.payload;
       // Domain: generalisation / realisation / dependency default to DIRECT
       // (straight) lines when drawn manually (matches AI text generation).
       const routingType: RoutingType =
@@ -6452,6 +6455,24 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const source = state.elements.find((el) => el.id === sourceId);
       const target = state.elements.find((el) => el.id === targetId);
       if (!source || !target) return state;
+
+      // ── BPMN compensation association ──
+      // Per the BPMN 2.0 spec an edge-mounted Intermediate Compensation event
+      // may have an OUTGOING Association (never a Sequence Flow), and that
+      // association's target IS the Compensation Activity. So a connector drawn
+      // FROM such an event TO an Activity (task / sub-process) is coerced to a
+      // directed Association and the Compensation marker is stamped onto that
+      // target activity (see updatedElements below).
+      const COMPENSATION_TARGET_TYPES = new Set<SymbolType>(["task", "subprocess", "subprocess-expanded"]);
+      const isCompensationLink =
+        source.type === "intermediate-event" &&
+        (source.eventType as string | undefined) === "compensation" &&
+        !!source.boundaryHostId &&
+        COMPENSATION_TARGET_TYPES.has(target.type);
+      if (isCompensationLink) {
+        connectorType = "associationBPMN";
+        directionType = "open-directed";
+      }
 
       // ── UML self-connector (source === target) ────────────────────────────
       // A relationship from an entity to itself renders as a squared-off
@@ -6573,7 +6594,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // Allow associationBPMN between event elements (child/boundary event connections)
       const EVENT_CONN_TYPES = new Set<SymbolType>(["start-event", "intermediate-event", "end-event"]);
       const isEventToEvent = EVENT_CONN_TYPES.has(source.type) && EVENT_CONN_TYPES.has(target.type);
-      if (!isDataConn && !isEventToEvent && connectorType === "associationBPMN") return state;
+      if (!isDataConn && !isEventToEvent && !isCompensationLink && connectorType === "associationBPMN") return state;
 
       // Message flows attach only to black-box pools (or to flow elements
       // inside any pool). A white-box pool ITSELF is not a valid endpoint —
@@ -6811,6 +6832,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       };
 
       const updatedElements = state.elements.map((el) => {
+        // A compensation Association terminating on an Activity makes it the
+        // Compensation Activity → stamp the marker so it renders the rewind icon.
+        if (isCompensationLink && el.id === targetId) {
+          return { ...el, properties: { ...el.properties, isForCompensation: true } };
+        }
         if (isMsgBpmn) {
           // For tasks: system pool → "user", non-system pool → "send"/"receive"
           if (el.id === sourceId) {
