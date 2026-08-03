@@ -86,6 +86,9 @@ const SCOPED_OMITTED = new Set<string>([
   // Diagram-JSON schema-validation findings are app-side observability, not
   // per-user/org data — carried by the SuperAdmin full backup only.
   "SchemaValidationIssue",
+  // Live co-authoring presence is EPHEMERAL session state (30s TTL heartbeats),
+  // never restored — backing it up would resurrect stale "who's online" rows.
+  "DiagramPresence",
   // The audit log is system-global security telemetry (who did what), not
   // per-user/org data — deliberately NOT carried by a tenant backup. It's in the
   // SuperAdmin full backup (catalog-driven).
