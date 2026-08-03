@@ -14,6 +14,8 @@ import { auth } from "@/auth";
 import { pgPool } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { isSuperuser } from "@/app/lib/superuser";
+import { renderTemplateThumbnailSvg } from "@/app/lib/diagram/templateThumbnail";
+import type { TemplateData } from "@/app/lib/diagram/types";
 
 function cuid() {
   const ts = Date.now().toString(36);
@@ -25,6 +27,8 @@ interface IncomingTemplate {
   name: string;
   diagramType: string;
   group?: string | null;
+  description?: string | null;
+  thumbnailSvg?: string | null;
   data: unknown;
 }
 
@@ -99,11 +103,15 @@ export async function POST(req: Request) {
       // groups), trimmed empty → null, non-empty string → preserved.
       const incomingGroup = typeof t.group === "string" ? t.group.trim() : "";
       const groupValue: string | null = incomingGroup.length > 0 ? incomingGroup : null;
+      const descValue: string | null = typeof t.description === "string" && t.description.trim() ? t.description.trim() : null;
+      // Carry an exported preview if present; otherwise generate one from the data.
+      let thumb: string | null = typeof t.thumbnailSvg === "string" && t.thumbnailSvg ? t.thumbnailSvg : null;
+      if (!thumb) { try { thumb = renderTemplateThumbnailSvg((t.data ?? { elements: [], connectors: [] }) as TemplateData) || null; } catch { thumb = null; } }
       await pgPool.query(
         `INSERT INTO "DiagramTemplate"
-          (id, name, "diagramType", "templateType", "group", data, "userId", "createdAt", "updatedAt")
-         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)`,
-        [id, t.name, t.diagramType, targetType, groupValue, JSON.stringify(t.data ?? {}), session.user.id, now, now]
+          (id, name, "diagramType", "templateType", "group", description, "thumbnailSvg", data, "userId", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11)`,
+        [id, t.name, t.diagramType, targetType, groupValue, descValue, thumb, JSON.stringify(t.data ?? {}), session.user.id, now, now]
       );
       existingKeys.add(key);
       created++;

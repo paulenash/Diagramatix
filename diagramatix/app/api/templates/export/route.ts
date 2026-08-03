@@ -36,13 +36,13 @@ export async function GET(req: Request) {
   async function buildPayloadBytes(onProgress?: (label: string, count: number) => void): Promise<Uint8Array> {
     const result = type === "builtin"
       ? await pgPool.query(
-          `SELECT name, "diagramType", "group", data
+          `SELECT name, "diagramType", "group", description, "thumbnailSvg", data
              FROM "DiagramTemplate"
             WHERE "templateType" = 'builtin'
             ORDER BY COALESCE("group", '~'), "createdAt" ASC`
         )
       : await pgPool.query(
-          `SELECT name, "diagramType", "group", data
+          `SELECT name, "diagramType", "group", description, "thumbnailSvg", data
              FROM "DiagramTemplate"
             WHERE "templateType" = 'user' AND "userId" = $1
             ORDER BY COALESCE("group", '~'), "createdAt" ASC`,
@@ -59,10 +59,12 @@ export async function GET(req: Request) {
       // entries land at the bottom of the file). The `group` field
       // (string or null) round-trips into the import.
       templates: result.rows.map(
-        (r: { name: string; diagramType: string; group: string | null; data: unknown }) => ({
+        (r: { name: string; diagramType: string; group: string | null; description: string | null; thumbnailSvg: string | null; data: unknown }) => ({
           name: r.name,
           diagramType: r.diagramType,
           group: r.group,
+          description: r.description,
+          thumbnailSvg: r.thumbnailSvg,
           data: r.data,
         }),
       ),

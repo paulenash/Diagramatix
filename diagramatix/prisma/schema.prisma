@@ -656,6 +656,12 @@ model DiagramTemplate {
   name         String
   diagramType  String   @default("bpmn")
   templateType String   @default("user")
+  // One-line human description — powers the template menu, the hover/NL popup,
+  // and AI "suggest a template" matching. Null on legacy rows.
+  description  String?
+  // Vector preview of the fragment (an inline <svg> string) generated on
+  // create/update. SVG so the NL suggestion popup renders it crisp at any size.
+  thumbnailSvg String?
   // Free-form group name. Null = ungrouped. Same name across multiple
   // templates clusters them under one collapsible header in the editor
   // menu. User and builtin clusters are independent (user-template

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { pgPool, prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isReadOnlyImpersonation, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { isAdminPasswordValid } from "@/app/lib/adminPassword";
+import { renderTemplateThumbnailSvg } from "@/app/lib/diagram/templateThumbnail";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,7 +24,7 @@ export async function GET(_req: Request, { params }: Params) {
     try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback */ }
     const { id } = await params;
     const result = await pgPool.query(
-      `SELECT id, name, "diagramType", "templateType", "group", data, "createdAt"
+      `SELECT id, name, "diagramType", "templateType", "group", description, "thumbnailSvg", data, "createdAt"
        FROM "DiagramTemplate"
        WHERE id = $1 AND ("templateType" = 'builtin' OR "userId" = $2)`,
       [id, userId]
@@ -81,7 +82,17 @@ export async function PUT(req: Request, { params }: Params) {
     let idx = 1;
 
     if (name?.trim()) { sets.push(`name = $${idx++}`); values.push(name.trim()); }
-    if (data) { sets.push(`data = $${idx++}::jsonb`); values.push(JSON.stringify(data)); }
+    if (data) {
+      sets.push(`data = $${idx++}::jsonb`); values.push(JSON.stringify(data));
+      // Regenerate the vector preview from the updated fragment.
+      let thumb: string | null = null;
+      try { thumb = renderTemplateThumbnailSvg(data) || null; } catch { thumb = null; }
+      sets.push(`"thumbnailSvg" = $${idx++}`); values.push(thumb);
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "description")) {
+      const d = typeof body.description === "string" && body.description.trim() ? body.description.trim() : null;
+      sets.push(`description = $${idx++}`); values.push(d);
+    }
     // Group is an explicit setter: null / "" → NULL (ungrouped); a non-empty
     // string → group name. Only touch the column if the caller actually
     // sent the field (`groupProvided`) so an edit that only renames the
