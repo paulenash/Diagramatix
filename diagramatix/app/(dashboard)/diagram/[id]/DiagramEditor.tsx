@@ -32,6 +32,7 @@ import { Palette } from "@/app/components/canvas/Palette";
 import { PresenceBar } from "@/app/components/canvas/PresenceBar";
 import { usePresence } from "@/app/hooks/usePresence";
 import { CollabRoom } from "@/app/components/canvas/CollabRoom";
+import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
@@ -1021,6 +1022,12 @@ export function DiagramEditor({
     function handleKeyDown(e: globalThis.KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+      // Tier-1 assist: Tab accepts the primary next-step ghost.
+      if (e.key === "Tab" && !e.shiftKey && nextStepRef.current.candidates.length > 0) {
+        e.preventDefault();
+        nextStepRef.current.accept(nextStepRef.current.candidates[0]);
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
         e.preventDefault();
         e.shiftKey ? redo() : undo();
@@ -1892,6 +1899,23 @@ export function DiagramEditor({
     ? data.elements.find((el) => selectedElementIds.has(el.id)) ?? null
     : null;
   const selectedConnector = data.connectors.find((c) => c.id === selectedConnectorId) ?? null;
+
+  // ── Tier-1 assist: next-step ghost suggestions ──
+  const nextStepCandidates = useMemo(
+    () => (selectedElement && !readOnly ? suggestNextSteps(selectedElement, data, diagramType) : []),
+    [selectedElement, data, diagramType, readOnly],
+  );
+  const acceptNextStep = useCallback((c: NextStepCandidate) => {
+    if (!selectedElement) return;
+    const newId = nanoid();
+    addElementGated(c.symbolType, { x: selectedElement.x + selectedElement.width + 70, y: selectedElement.y }, undefined, c.eventType, newId);
+    if (c.gatewayType) updateProperties(newId, { gatewayType: c.gatewayType });
+    addConnector(selectedElement.id, newId, c.connectorType);
+    setSelectedElementIds(new Set([newId])); // chain: select the new step
+  }, [selectedElement, addElementGated, updateProperties, addConnector]);
+  // Stable ref so the global Tab handler always sees the latest candidates.
+  const nextStepRef = useRef<{ candidates: NextStepCandidate[]; accept: (c: NextStepCandidate) => void }>({ candidates: [], accept: () => {} });
+  nextStepRef.current = { candidates: nextStepCandidates, accept: acceptNextStep };
 
   const isContext = diagramType === "context" || diagramType === "basic";
   const defaultDirectionType: DirectionType =
@@ -4093,6 +4117,8 @@ export function DiagramEditor({
           selectedConnectorId={selectedConnectorId}
           coEditLocks={presenceLocks}
           collabCursors={liveCursors}
+          nextStep={selectedElement && nextStepCandidates.length > 0 ? { source: selectedElement, candidates: nextStepCandidates } : undefined}
+          onAcceptNextStep={acceptNextStep}
           pcHighlightEnabled={highlightEnabled}
           scanHighlightById={scanHighlight ?? undefined}
           riskHighlightById={riskHighlight ?? undefined}

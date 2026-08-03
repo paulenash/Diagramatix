@@ -23,6 +23,8 @@ import { EntityNameInput } from "./EntityNameInput";
 import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
 import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
 import { CollabCursors } from "./CollabCursors";
+import { GhostSuggestion } from "./GhostSuggestion";
+import type { NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { parseUmlAttribute, parseUmlOperation } from "@/app/lib/diagram/umlParse";
@@ -274,6 +276,9 @@ interface Props {
   coEditLocks?: Record<string, { userId: string; userName: string; color: string }>;
   /** Phase 2: render live cursors (inside a Liveblocks room). */
   collabCursors?: boolean;
+  /** Tier-1 assist: next-step ghost suggestions for the selected element. */
+  nextStep?: { source: DiagramElement; candidates: NextStepCandidate[] };
+  onAcceptNextStep?: (c: NextStepCandidate) => void;
   /** After the user closes "Scan Diagram for Issues", flagged elements are
    *  tinted on the canvas (red = error, orange = warning) for a short window.
    *  The map is element id → severity; undefined / empty means no tint. */
@@ -557,6 +562,8 @@ export function Canvas({
   selectedConnectorId,
   coEditLocks,
   collabCursors,
+  nextStep,
+  onAcceptNextStep,
   pcHighlightEnabled = true,
   scanHighlightById,
   entityDriftById,
@@ -6330,6 +6337,11 @@ export function Canvas({
               pan/zoom with the diagram; counter-scaled to stay screen-constant. */}
           {collabCursors && (
             <CollabCursors clientToWorld={clientToWorld} zoom={zoom} />
+          )}
+
+          {/* Tier-1 assist: next-step ghost suggestions for the selection. */}
+          {nextStep && onAcceptNextStep && (
+            <GhostSuggestion source={nextStep.source} candidates={nextStep.candidates} onAccept={onAcceptNextStep} />
           )}
 
           {/* Active-group overlay — when a multi-selection is active
