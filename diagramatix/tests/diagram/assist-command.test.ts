@@ -1,0 +1,102 @@
+/**
+ * Abracadabra Mode interpreter: deterministic grammar + name/pronoun resolution.
+ */
+import { describe, it, expect } from "vitest";
+import { parseCommand } from "@/app/lib/assist/commandGrammar";
+import { resolveRef } from "@/app/lib/assist/resolveRef";
+import { validateOps } from "@/app/lib/assist/ops";
+import type { DiagramElement } from "@/app/lib/diagram/types";
+
+const el = (id: string, type: string, label = "", extra: Record<string, unknown> = {}): DiagramElement =>
+  ({ id, type: type as DiagramElement["type"], label, x: 0, y: 0, width: 100, height: 60, properties: {}, ...extra });
+
+describe("parseCommand — add", () => {
+  it("add a task called X after Y", () => {
+    expect(parseCommand("add a task called Approve after Review")).toEqual([
+      { op: "add", symbolType: "task", label: "Approve", afterRef: "Review" },
+    ]);
+  });
+  it("add a start event", () => {
+    expect(parseCommand("add a start event")).toEqual([{ op: "add", symbolType: "start-event" }]);
+  });
+  it("add a decision → exclusive gateway", () => {
+    expect(parseCommand("add a decision")).toEqual([{ op: "add", symbolType: "gateway", gatewayType: "exclusive" }]);
+  });
+  it("insert a parallel gateway", () => {
+    expect(parseCommand("insert a parallel gateway")).toEqual([{ op: "add", symbolType: "gateway", gatewayType: "parallel" }]);
+  });
+  it("add Approve after Review (no type word → task)", () => {
+    expect(parseCommand("add Approve after Review")).toEqual([{ op: "add", symbolType: "task", label: "Approve", afterRef: "Review" }]);
+  });
+  it("implicit label after the type", () => {
+    expect(parseCommand("add a task Review invoice")).toEqual([{ op: "add", symbolType: "task", label: "Review invoice" }]);
+  });
+});
+
+describe("parseCommand — connect / disconnect", () => {
+  it("connect X to Y", () => {
+    expect(parseCommand("connect Send Invoice to Receive Payment")).toEqual([
+      { op: "connect", fromRef: "Send Invoice", toRef: "Receive Payment" },
+    ]);
+  });
+  it("connect them → previous to last", () => {
+    expect(parseCommand("connect them")).toEqual([{ op: "connect", fromRef: "the previous", toRef: "the last" }]);
+  });
+  it("disconnect X from Y", () => {
+    expect(parseCommand("disconnect Review from Approve")).toEqual([{ op: "disconnect", fromRef: "Review", toRef: "Approve" }]);
+  });
+});
+
+describe("parseCommand — rename / delete / undo", () => {
+  it("rename X to Y", () => {
+    expect(parseCommand("rename Review to Quality Check")).toEqual([{ op: "rename", ref: "Review", label: "Quality Check" }]);
+  });
+  it("delete the gateway", () => {
+    expect(parseCommand("delete the gateway")).toEqual([{ op: "delete", ref: "gateway" }]);
+  });
+  it("undo that", () => {
+    expect(parseCommand("undo that")).toEqual([{ op: "undo" }]);
+  });
+  it("returns null for unrecognised phrasings", () => {
+    expect(parseCommand("make the approval bit loop back when it fails")).toBeNull();
+  });
+});
+
+describe("resolveRef", () => {
+  const els = [el("s", "start-event"), el("t1", "task", "Review"), el("g", "gateway", "Approved?"), el("t2", "task", "Send Invoice")];
+  it("exact + substring by name", () => {
+    expect(resolveRef("Review", els)).toEqual({ id: "t1" });
+    expect(resolveRef("invoice", els)).toEqual({ id: "t2" });
+  });
+  it("bare type noun → unique of that type", () => {
+    expect(resolveRef("the gateway", els)).toEqual({ id: "g" });
+    expect(resolveRef("the start event", els)).toEqual({ id: "s" });
+  });
+  it("pronoun 'it' → last added (array order)", () => {
+    expect(resolveRef("it", els)).toEqual({ id: "t2" });
+    expect(resolveRef("the previous", els)).toEqual({ id: "g" });
+  });
+  it("ambiguous exact labels list candidates", () => {
+    const dup = [el("a", "task", "Review"), el("b", "task", "Review")];
+    expect(resolveRef("Review", dup)).toEqual({ ambiguous: ["a", "b"] });
+  });
+  it("no match → null", () => {
+    expect(resolveRef("Nonexistent", els)).toBeNull();
+  });
+});
+
+describe("validateOps (AI output)", () => {
+  it("keeps valid ops, drops junk", () => {
+    const out = validateOps([
+      { op: "add", symbolType: "task", label: "X" },
+      { op: "add", symbolType: "banana" },        // invalid type
+      { op: "connect", fromRef: "A", toRef: "B" },
+      { op: "delete" },                            // missing ref
+      { op: "frobnicate" },                        // unknown op
+    ]);
+    expect(out).toEqual([
+      { op: "add", symbolType: "task", label: "X" },
+      { op: "connect", fromRef: "A", toRef: "B" },
+    ]);
+  });
+});
