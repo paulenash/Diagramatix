@@ -922,7 +922,11 @@ export function PropertiesPanel({
       setTitleOpen(false);
       setPanelCollapsed(true);
     } else {
+      // AI panel dismissed → show the Diagram panel EXPANDED (not the narrow
+      // collapsed tab, and with the Diagram section open). The selection effect
+      // below still takes over once an element/connector is picked.
       setPanelCollapsed(false);
+      setTitleOpen(true);
     }
   }, [forceCollapseTitle]);
 

@@ -4243,16 +4243,22 @@ export function DiagramEditor({
         {!readOnly && diagramType !== "basic" && aiAllowedHere && (
           <button
             onClick={() => {
-              if (usesPlanPanel) {
-                setShowPlanPanel(prev => !prev);
-                if (!showPlanPanel) { setShowAiPanel(false); setShowHistoryPanel(false); }
+              const active = usesPlanPanel ? showPlanPanel : showAiPanel;
+              if (active) {
+                // Deactivate → remove the AI panel; the Diagram (Properties) panel
+                // re-expands via forceCollapseTitle going false.
+                setShowPlanPanel(false);
+                setShowAiPanel(false);
               } else {
-                setShowAiPanel(prev => !prev);
-                if (!showAiPanel) { setShowHistoryPanel(false); setShowPlanPanel(false); }
+                setShowHistoryPanel(false);
+                if (usesPlanPanel) { setShowPlanPanel(true); setShowAiPanel(false); }
+                else { setShowAiPanel(true); setShowPlanPanel(false); }
               }
             }}
-            style={featureVars(featureScheme, "ai")}
-            className={`px-2 py-0.5 text-[11px] rounded border ${(usesPlanPanel ? showPlanPanel : showAiPanel) ? "feature-tile-active" : "feature-tile"}`}
+            style={(usesPlanPanel ? showPlanPanel : showAiPanel) ? featureVars(featureScheme, "ai") : undefined}
+            className={`px-2 py-0.5 text-[11px] rounded border ${(usesPlanPanel ? showPlanPanel : showAiPanel)
+              ? "feature-tile-active"
+              : "text-gray-700 border-gray-300 hover:bg-gray-50"}`}
             title={usesPlanPanel ? "Two-phase AI generation: plan first, then apply layout" : "Generate a diagram from a natural-language description"}
           >
             ✨ AI Generate
