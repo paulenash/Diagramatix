@@ -34,7 +34,7 @@ import { PresenceBar } from "@/app/components/canvas/PresenceBar";
 import { usePresence } from "@/app/hooks/usePresence";
 import { CollabRoom } from "@/app/components/canvas/CollabRoom";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
-import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, placeAfterBoundaryEvent, boundaryOuterSide, findFreeSlot, HALF_TASK_W } from "@/app/lib/diagram/assistPlacement";
+import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, placeAfterBoundaryEvent, boundaryOuterSide, findFreeSlot, HALF_TASK_W, HALF_TASK_H } from "@/app/lib/diagram/assistPlacement";
 import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
@@ -318,6 +318,21 @@ function getDiagramBounds(data: DiagramData, padding = 20) {
     width: maxX - minX + padding * 2,
     height: maxY - minY + padding * 2,
   };
+}
+
+/** A spoken command that clearly isn't finished yet — Deepgram split it at a
+ *  pause. We hold the buffer and wait for the rest instead of running a half
+ *  command like "rename Task 8 to" (which would just fail). */
+function isIncompleteCommand(text: string): boolean {
+  const t = text.trim().toLowerCase().replace(/[.?!,]+$/g, "").trim();
+  if (!t) return false;
+  // Ends on a dangling connective / preposition → more is coming.
+  if (/\b(to|as|from|and|with|into|onto|labell?ed|called|named|saying|by|above|below|over|under(?:neath)?|of|for|around|the|a|an)$/.test(t)) return true;
+  // rename / relabel / change / call / set — missing its "to <target>".
+  if (/^(rename|relabel|change|set|call)\b/.test(t) && !/\b(to|as)\b\s+\S+/.test(t)) return true;
+  // connect / disconnect — missing the second operand.
+  if (/^(connect|link|join|disconnect|unlink)\b/.test(t) && !/\b(to|and|with|from)\b\s+\S+/.test(t)) return true;
+  return false;
 }
 
 /** Normalise a spoken connector/message reference to match against a connector
@@ -2085,25 +2100,47 @@ export function DiagramEditor({
 
     let wanted: { x: number; y: number };
     let srcSide: Side | undefined;
+    const isGw = src.type === "gateway";
     if (src.boundaryHostId) {
       const host = data.elements.find((e) => e.id === src.boundaryHostId);
       const side = host ? boundaryOuterSide(src, host) : "bottom";
       wanted = placeAfterBoundaryEvent(src, side, w, h);
       srcSide = side;
-    } else if (src.type === "gateway") {
+    } else if (isGw) {
       wanted = placeGatewayBranch(src, data.connectors.filter((cn) => cn.sourceId === src.id).length, w, h);
     } else {
       wanted = placeInline(src, w, h);
     }
-    const center = findFreeSlot(wanted, w, h, others);
+    // Gateway branches sit ½ Task height apart — match the clearance so the
+    // fan-out isn't blown apart by the default 51px (#5).
+    const center = findFreeSlot(wanted, w, h, others, isGw ? HALF_TASK_H : HALF_TASK_W);
+    // #5: gateway branch exits by position — above→top, same row→right, below→bottom.
+    if (isGw && !srcSide) {
+      srcSide = center.y + h / 2 <= src.y ? "top"
+        : center.y - h / 2 >= src.y + src.height ? "bottom"
+        : "right";
+    }
 
     const newId = nanoid();
-    addElementGated(c.symbolType, center, undefined, c.eventType, newId);
+    // A ghost-added task also joins the white-box pool (anchor's lane/pool, else
+    // the white-box pool's first lane/pool) so it never lands outside.
+    let parentId: string | undefined = src.parentId ?? undefined;
+    if (!parentId) {
+      const wb = data.elements.find((e) => e.type === "pool" && (((e.properties?.poolType as string | undefined) ?? "white-box") === "white-box"));
+      if (wb) {
+        const firstLane = data.elements.filter((e) => e.type === "lane" && e.parentId === wb.id).sort((a, b) => a.y - b.y)[0];
+        parentId = firstLane?.id ?? wb.id;
+      }
+    }
+    addElementGated(c.symbolType, center, undefined, c.eventType, newId, parentId ? { parentId } : undefined);
     if (c.gatewayType) updateProperties(newId, { gatewayType: c.gatewayType });
     if (srcSide) addConnector(src.id, newId, c.connectorType, "directed", "rectilinear", srcSide, "left");
     else addConnector(src.id, newId, c.connectorType);
+    // Auto-extend all pools to the same width if the new element overflows.
+    const addRight = center.x + w / 2;
+    if (parentId && data.elements.some((e) => e.type === "pool" && e.x + e.width < addRight + 40)) extendPools();
     setSelectedElementIds(new Set([newId])); // chain: select the new step
-  }, [selectedElement, data.elements, data.connectors, addElementGated, updateProperties, addConnector, setEventBoundary, inlineTemplates, attachTemplate]);
+  }, [selectedElement, data.elements, data.connectors, addElementGated, updateProperties, addConnector, setEventBoundary, inlineTemplates, attachTemplate, extendPools]);
   // Stable ref so the global Tab handler always sees the latest candidates.
   const nextStepRef = useRef<{ candidates: NextStepCandidate[]; accept: (c: NextStepCandidate) => void }>({ candidates: [], accept: () => {} });
   nextStepRef.current = { candidates: nextStepCandidates, accept: acceptNextStep };
@@ -2175,7 +2212,10 @@ export function DiagramEditor({
         } else if (anchor) {
           const isGw = anchor.type === "gateway";
           const bi = isGw ? data.connectors.filter((cn) => cn.sourceId === anchor!.id).length : 0;
-          center = findFreeSlot(isGw ? placeGatewayBranch(anchor, bi, w, h) : placeInline(anchor, w, h), w, h, others);
+          // Gateway branches are intentionally stacked ½ Task height (32px) apart,
+          // so use a matching clearance — the default 51px would treat siblings
+          // as collisions and blow the fan-out apart.
+          center = findFreeSlot(isGw ? placeGatewayBranch(anchor, bi, w, h) : placeInline(anchor, w, h), w, h, others, isGw ? HALF_TASK_H : HALF_TASK_W);
           if (isGw) {
             // #5: a branch ABOVE the gateway leaves its TOP point, one BELOW its
             // BOTTOM point, one on the same row (overlapping) its RIGHT point.
@@ -2207,6 +2247,10 @@ export function DiagramEditor({
           if (srcSide) addConnector(anchor.id, newId, "sequence", "directed", "rectilinear", srcSide, "left");
           else addConnector(anchor.id, newId, "sequence");
         }
+        // Auto-extend: if the new element overflows its pool's right edge, widen
+        // ALL pools to the same width so they stay aligned (Paul).
+        const addRight = center.x + w / 2;
+        if (parentId && els.some((e) => e.type === "pool" && e.x + e.width < addRight + 40)) extendPools();
         abraLastId.current = newId;
         setSelectedElementIds(new Set([newId]));
         results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}`);
@@ -2531,10 +2575,21 @@ export function DiagramEditor({
   // to … My Company" is treated as a single command.
   const abraBuffer = useRef("");
   const abraFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abraWaits = useRef(0);           // how many times we've held an incomplete command
   const ABRA_SILENCE_MS = 2200;
-  const flushAbraBuffer = useCallback(() => {
+  const ABRA_CONTINUE_MS = 3200;         // longer grace while waiting for the rest of a split command
+  const ABRA_MAX_WAITS = 3;
+  const flushAbraBuffer = useCallback((force = false) => {
     if (abraFlushTimer.current) { clearTimeout(abraFlushTimer.current); abraFlushTimer.current = null; }
     const cmd = abraBuffer.current.trim();
+    // A split command ("rename Task 8 to" … pause … "Approve") — keep the buffer
+    // and wait a bit longer for the continuation rather than running the half.
+    if (!force && cmd && isIncompleteCommand(cmd) && abraWaits.current < ABRA_MAX_WAITS) {
+      abraWaits.current += 1;
+      abraFlushTimer.current = setTimeout(() => flushAbraBuffer(), ABRA_CONTINUE_MS);
+      return;
+    }
+    abraWaits.current = 0;
     abraBuffer.current = "";
     setAbraInterim("");
     if (cmd) void runAbraCommandRef.current(cmd);
@@ -2545,7 +2600,7 @@ export function DiagramEditor({
     abraDictRef.current?.stop();
     abraDictRef.current = null;
     setAbraListening(false);
-    flushAbraBuffer(); // apply anything still buffered
+    flushAbraBuffer(true); // apply anything still buffered (force — no more is coming)
   }, [flushAbraBuffer]);
 
   const toggleAbraListening = useCallback(async () => {
@@ -2566,14 +2621,16 @@ export function DiagramEditor({
           stopAbraListening();
           return;
         }
-        // Accumulate this fragment and restart the silence timer.
+        // Accumulate this fragment and restart the silence timer. A fresh
+        // fragment may complete a held command, so re-evaluate from scratch.
         abraBuffer.current = (abraBuffer.current ? abraBuffer.current + " " : "") + txt;
+        abraWaits.current = 0;
         setAbraInterim(abraBuffer.current);
         if (abraFlushTimer.current) clearTimeout(abraFlushTimer.current);
         abraFlushTimer.current = setTimeout(() => flushAbraBuffer(), ABRA_SILENCE_MS);
       },
       onError: (msg) => setAbraLog((prev) => [...prev, { id: nanoid(), heard: "", summary: msg, ok: false }]),
-      onEnd: () => { abraDictRef.current = null; setAbraListening(false); flushAbraBuffer(); },
+      onEnd: () => { abraDictRef.current = null; setAbraListening(false); flushAbraBuffer(true); },
     });
     if (!handle || abraStopRequested.current) { handle?.stop(); abraDictRef.current = null; setAbraListening(false); return; }
     abraDictRef.current = handle;

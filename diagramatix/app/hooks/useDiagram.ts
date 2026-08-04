@@ -2163,8 +2163,10 @@ function resizeEmptyPoolsToHeader(elements: DiagramElement[], poolFs: number, on
   return elements.map((e) => {
     if (e.type !== "pool" || parented.has(e.id)) return e;
     if (onlyIds && !onlyIds.has(e.id)) return e;
-    const { width, height } = poolNameFitSize(e.label ?? "Pool", poolFs);
-    return { ...e, width, height };
+    // Only the HEIGHT collapses to fit the (vertical) name — the WIDTH is kept
+    // so an emptied participant pool still lines up with the process pool.
+    const { height } = poolNameFitSize(e.label ?? "Pool", poolFs);
+    return { ...e, height };
   });
 }
 
@@ -8761,8 +8763,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // Unique, never-bare pool name (rules: no "Pool", no duplicate of any
       // existing Pool/Lane). Black-box with no name defaults to "Participant".
       const finalLabel = uniqueContainerLabel(state.elements, label ?? (poolType === "black-box" ? "Participant" : undefined), "Pool");
-      const { width, height } = poolNameFitSize(finalLabel, poolFs);
       const pools = state.elements.filter((e) => e.type === "pool");
+      // HEIGHT fits the (vertical) name; WIDTH matches the widest existing pool
+      // so a new participant lines up with the process pool — NOT the thin
+      // name-fit width. First pool falls back to 80% of the catalogue default.
+      const { height } = poolNameFitSize(finalLabel, poolFs);
+      const width = pools.length > 0
+        ? Math.max(...pools.map((p) => p.width))
+        : Math.round(getSymbolDefinition("pool").defaultWidth * 0.8);
       const GAP = 40;
       let x: number, y: number;
       if (pools.length > 0) {
