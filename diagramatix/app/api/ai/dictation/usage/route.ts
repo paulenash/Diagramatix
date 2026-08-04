@@ -26,6 +26,18 @@ export async function POST(req: Request) {
 
   try {
     await prisma.dictationSession.create({ data: { userId: session.user.id, orgId, engine, seconds } });
+    // Also record a unified usage row so Deepgram shows up as a provider/model
+    // in the AI Usage "By model / By provider" breakdowns + dropdowns. No tokens;
+    // the session duration rides in latencyMs. Not a metered "User Attempt".
+    await prisma.aiInvocation.create({
+      data: {
+        provider: engine === "browser" ? "browser" : "deepgram",
+        model: engine === "browser" ? "browser" : "deepgram",
+        userId: session.user.id, orgId,
+        invocationPoint: "voice.dictation", status: "success",
+        inputTokens: 0, outputTokens: 0, latencyMs: seconds * 1000,
+      },
+    });
   } catch (err) {
     console.error("[POST /api/ai/dictation/usage]", err instanceof Error ? err.message : String(err));
     return NextResponse.json({ ok: false }, { status: 200 });

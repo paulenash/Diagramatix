@@ -247,6 +247,13 @@ export default async function AiUsagePage({
     ? new Map((await prisma.org.findMany({ where: { id: { in: orgOptions } }, select: { id: true, name: true } })).map((o) => [o.id, o.name]))
     : new Map<string, string>();
 
+  // Providers list = every provider that has appeared (LLM + Deepgram/Liveblocks/
+  // browser), scope-wide, so each is selectable in the filter + shows "By provider".
+  const providerOptionRows = await prisma.aiInvocation.findMany({
+    where: since ? { createdAt: { gte: since } } : {}, select: { provider: true }, distinct: ["provider"],
+  });
+  const providerOptions = [...new Set(["anthropic", "moonshot", ...providerOptionRows.map((r) => r.provider).filter(Boolean)])].sort();
+
   const toArr = (m: Map<string, Agg>) => [...m.entries()].map(([k, a]) => ({ key: k, ...a }));
   const modelArr = [...byModel.entries()].map(([k, a]) => ({ key: k, ...a })).sort((x, y) => y.cost - x.cost || y.invocations - x.invocations);
   const pointArr = toArr(byPoint)
@@ -260,7 +267,7 @@ export default async function AiUsagePage({
       activeOrgName={activeOrgName}
       filters={{ range: rangeKey, provider: fProvider, model: fModel, point: fPoint, org: fOrg, user: fUser }}
       filterOptions={{
-        providers: ["anthropic", "moonshot"],
+        providers: providerOptions,
         models: [...new Set([...rates.keys(), ...modelArr.map((m) => m.key)])].sort(),
         points: AI_INVOCATION_POINT_VALUES.map((p) => ({ value: p, label: labelForInvocationPoint(p) })),
         orgs: su ? orgOptions.map((id) => ({ id, name: orgOptionNames.get(id) ?? id })) : [],

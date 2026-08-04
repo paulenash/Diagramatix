@@ -10,7 +10,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
-import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { requireDiagramAccess, OrgContextError, getCurrentOrgId } from "@/app/lib/auth/orgContext";
+import { prisma } from "@/app/lib/db";
 
 const PALETTE = [
   "#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed",
@@ -55,5 +56,16 @@ export async function POST(req: Request) {
   });
   lbSession.allow(room, canWrite ? lbSession.FULL_ACCESS : lbSession.READ_ACCESS);
   const { status, body: tokenBody } = await lbSession.authorize();
+  // Record a unified usage row so Liveblocks shows up as a provider/model in the
+  // AI Usage breakdowns + dropdowns (one row per collab room join). Non-fatal.
+  if (status < 400) {
+    try {
+      let orgId: string | null = null;
+      try { orgId = await getCurrentOrgId(session, await cookies()); } catch { /* no active org */ }
+      await prisma.aiInvocation.create({
+        data: { provider: "liveblocks", model: "liveblocks", userId, orgId, invocationPoint: "collab.session", status: "success", inputTokens: 0, outputTokens: 0 },
+      });
+    } catch { /* metering must never block a collab token */ }
+  }
   return new Response(tokenBody, { status, headers: { "Content-Type": "application/json" } });
 }

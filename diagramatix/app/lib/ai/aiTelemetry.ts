@@ -29,6 +29,8 @@ export const AI_INVOCATION_POINTS = {
   GenerateSop: "sop.generate", // BPMN → SOP document prose (whole/lane/pool/subprocess)
   DictationRefine: "dictation.refine", // transcript clean-up / anonymise
   LiveCommand: "bpmn.live-command", // Abracadabra Mode: NL edit command → op list (Raw Attempt only)
+  VoiceDictation: "voice.dictation", // one row per Deepgram dictation session (provider/model "deepgram")
+  CollabSession: "collab.session", // one row per Liveblocks collab room join (provider/model "liveblocks")
   IconVectorize: "icon.vectorize", // ArchiMate icon image → editable vector primitives
   // Offline SuperAdmin harness scripts (npm run ai:report / ai:compare). They call
   // planBpmn directly — outside any route — so without their own label the seam
@@ -83,6 +85,8 @@ export const AI_INVOCATION_POINT_LABELS: Record<string, string> = {
   [AI_INVOCATION_POINTS.GenerateSop]: "SOP Generate",
   [AI_INVOCATION_POINTS.DictationRefine]: "Dictation Refine",
   [AI_INVOCATION_POINTS.LiveCommand]: "Live Command (Abracadabra)",
+  [AI_INVOCATION_POINTS.VoiceDictation]: "Voice Dictation (Deepgram)",
+  [AI_INVOCATION_POINTS.CollabSession]: "Collaboration (Liveblocks)",
   [AI_INVOCATION_POINTS.IconVectorize]: "ArchiMate Icon Vectorize",
   [AI_INVOCATION_POINTS.ScriptConformanceReport]: "AI Conformance Report (script)",
   [AI_INVOCATION_POINTS.ScriptModelCompare]: "AI Model Compare (script)",
