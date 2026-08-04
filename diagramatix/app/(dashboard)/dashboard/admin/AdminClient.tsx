@@ -783,6 +783,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "feature-colours", title: "Feature Colours", description: "Set the Background + Text colour for each feature area (Simulator, Mining, AI, Entity Lists, …) — the highlight is a darkened shade. Applied to the dashboard menus, admin tiles, AI controls and the Entity-Drift ring.", href: "/dashboard/admin/feature-colours" },
   { id: "sharing", title: "Project Sharing", description: "Every shared project plus its editors / viewers.", href: "/dashboard/admin/sharing", feature: "projectSharing" },
   { id: "scanner-rules", title: "BPMN Scanner Rules", description: "Rules used by the diagram issue scanner.", href: "/dashboard/admin/scanner-rules" },
+  { id: "intent-keywords", title: "Intent Keywords", description: "Assist semantic suggestion: map element-name keywords (approve, escalate, notify…) to a template or category the ghost suggests.", href: "/dashboard/admin/intent-keywords" },
   { id: "bubble-help", title: "Bubble Help", description: "The contextual help-cloud topics shown in the editor.", href: "/dashboard/admin/bubble-help" },
   { id: "user-guide", title: "Document Editor", description: "Edit the in-app User Guide, the SuperAdmin Technical Design Notes, and Other Documents (SharePoint) — WYSIWYG with tables & symbols; export to .docx or a .diag-guide backup, and import between environments.", href: "/dashboard/admin/user-guide" },
   { id: "tech-design-notes-read", title: "Technical Design Notes", description: "Read-only view of the Technical Design Notes (no editor chrome).", href: "/tech-notes" },

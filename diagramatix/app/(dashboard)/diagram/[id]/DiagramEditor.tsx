@@ -34,6 +34,7 @@ import { usePresence } from "@/app/hooks/usePresence";
 import { CollabRoom } from "@/app/components/canvas/CollabRoom";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, findFreeSlot, HALF_TASK_W } from "@/app/lib/diagram/assistPlacement";
+import { matchIntent, type IntentRow } from "@/app/lib/diagram/intentMatch";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate, templateAttachData, instantiateTemplateAnchored } from "@/app/lib/diagram/templates";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
@@ -1916,15 +1917,37 @@ export function DiagramEditor({
   // Which element (if any) the template-attach picker is anchored on.
   const [templatePicker, setTemplatePicker] = useState<{ sourceId: string; category: string | null } | null>(null);
 
+  // Editable intent→template keyword catalog (assist semantic suggestion).
+  const [intentCatalog, setIntentCatalog] = useState<IntentRow[]>([]);
+  useEffect(() => {
+    if (diagramType !== "bpmn") return;
+    let alive = true;
+    fetch("/api/admin/intent-keywords")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (alive && j?.rows) setIntentCatalog(j.rows as IntentRow[]); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [diagramType]);
+
   const nextStepCandidates = useMemo(() => {
     if (!(assistEnabled && selectedElement && !readOnly)) return [];
     const base = suggestNextSteps(selectedElement, data, diagramType);
-    // Offer a "Template" ghost whenever there's an inline template to attach.
+    // Semantic suggestion: if the element's name implies an intent, surface it
+    // first (attaches the mapped template / opens the picker at its category).
     if (inlineTemplates.length > 0) {
+      const hit = matchIntent(selectedElement.label, intentCatalog);
+      if (hit) {
+        base.unshift({
+          kind: "intent", symbolType: "task", connectorType: "sequence",
+          label: hit.label, reason: `suggested from the name — ${hit.templateName ?? hit.category}`,
+          intentLabel: hit.label, intentCategory: hit.category ?? undefined, intentTemplateName: hit.templateName ?? undefined,
+        });
+      }
+      // Always offer the generic "Template" ghost too.
       base.push({ kind: "template", symbolType: "task", connectorType: "sequence", label: "Template", reason: "insert a template fragment" });
     }
     return base;
-  }, [assistEnabled, selectedElement, data, diagramType, readOnly, inlineTemplates]);
+  }, [assistEnabled, selectedElement, data, diagramType, readOnly, inlineTemplates, intentCatalog]);
 
   // Attach a template's fragment inline to a source element: strip a leading
   // Start Event, anchor the entry element 51px to the source's right (centres
@@ -1969,6 +1992,12 @@ export function DiagramEditor({
     if (!selectedElement) return;
     const src = selectedElement;
 
+    // Intent (rule 6): if the catalog names a template we have, attach it
+    // directly; otherwise fall through to the picker at its category.
+    if (c.kind === "intent" && c.intentTemplateName) {
+      const t = inlineTemplates.find((x) => x.name.toLowerCase() === c.intentTemplateName!.toLowerCase());
+      if (t) { void attachTemplate(t.id, src.id); return; }
+    }
     // Template (rule 5): open the inline-template picker anchored on the source.
     if (c.kind === "template" || c.kind === "intent") {
       setTemplatePicker({ sourceId: src.id, category: c.intentCategory ?? null });
@@ -2008,7 +2037,7 @@ export function DiagramEditor({
     if (c.gatewayType) updateProperties(newId, { gatewayType: c.gatewayType });
     addConnector(src.id, newId, c.connectorType);
     setSelectedElementIds(new Set([newId])); // chain: select the new step
-  }, [selectedElement, data.elements, data.connectors, addElementGated, updateProperties, addConnector, setEventBoundary]);
+  }, [selectedElement, data.elements, data.connectors, addElementGated, updateProperties, addConnector, setEventBoundary, inlineTemplates, attachTemplate]);
   // Stable ref so the global Tab handler always sees the latest candidates.
   const nextStepRef = useRef<{ candidates: NextStepCandidate[]; accept: (c: NextStepCandidate) => void }>({ candidates: [], accept: () => {} });
   nextStepRef.current = { candidates: nextStepCandidates, accept: acceptNextStep };

@@ -65,7 +65,7 @@ const SCOPED_OMITTED = new Set<string>([
   "PublicationBundleAudience", "PendingBundleAudience", "DiagramFeedback", "Notification",
   "CollaborationGroup", "CollaborationGroupMember", "DiagramReview", "DiagramReviewer",
   "OwnershipTransfer", "ScannerRule", "SubscriptionLevel", "Feature", "BubbleHelp",
-  "DiagramTypeStyle",
+  "DiagramTypeStyle", "IntentKeywordMap",
   // Entity Structures are org MASTERS (like the org-master EntityLists) — the
   // scoped org/user backup recreates only project COPIES of EntityList (which
   // carry no structureId), never the masters, so EntityStructure is not carried
