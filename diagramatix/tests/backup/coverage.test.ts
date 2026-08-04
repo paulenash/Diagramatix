@@ -97,7 +97,7 @@ const SCOPED_OMITTED = new Set<string>([
   // is system-global observability like AuditLog, and the model cost-rate catalog
   // (AiModelRate) is global admin config like AppSetting / DiagramTypeStyle — none
   // is per-user/org data. Carried by the SuperAdmin full backup (catalog-driven) only.
-  "AiInvocation", "AiDiagramGeneration", "AiModelRate",
+  "AiInvocation", "AiDiagramGeneration", "AiModelRate", "DictationSession",
   ...SIMULATOR_TABLES,
   ...RISK_CONTROL_TABLES,
   ...PCF_TABLES,

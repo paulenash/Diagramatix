@@ -30,6 +30,7 @@ interface Props {
     orgs: { id: string; name: string }[];
   };
   summary: Agg;
+  dictation: { sessions: number; seconds: number; byEngine: Array<{ engine: string; sessions: number; seconds: number }> };
   byModel: Array<{ key: string; provider: string } & Agg>;
   byPoint: Array<{ key: string; label: string } & Agg>;
   byProvider: Array<{ key: string } & Agg>;
@@ -56,7 +57,7 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
 }
 
 export function AiUsageClient(props: Props) {
-  const { isSuperAdmin: su, activeOrgName, filters, filterOptions, summary, byModel, byPoint, byProvider, series, seriesCapped, byOrg, byUser } = props;
+  const { isSuperAdmin: su, activeOrgName, filters, filterOptions, summary, dictation, byModel, byPoint, byProvider, series, seriesCapped, byOrg, byUser } = props;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -127,6 +128,27 @@ export function AiUsageClient(props: Props) {
         <span className="font-medium text-gray-500">Raw Attempts</span> = every AI call (incl. AI Tidy, failures, Compare per model).
         {" "}<span className="font-medium text-gray-500">User Attempts</span> = quota-consuming successes shown to users (excludes AI Tidy, Vectorize, Compare &amp; failures).
       </p>
+
+      {/* ── Voice dictation (separate from AI tokens; Deepgram billed separately) ── */}
+      <div className="mt-4 flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-gray-400">Voice dictation</div>
+          <div className="text-lg font-semibold text-gray-900">
+            {Math.round(dictation.seconds / 60).toLocaleString()} min
+            <span className="ml-2 text-xs font-normal text-gray-400">· {fmtInt(dictation.sessions)} session{dictation.sessions === 1 ? "" : "s"}</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3 text-[11px] text-gray-500">
+          {dictation.byEngine.length === 0 && <span className="text-gray-400">No voice sessions in range.</span>}
+          {dictation.byEngine.map((e) => (
+            <span key={e.engine} className="rounded bg-gray-50 border border-gray-100 px-2 py-1">
+              <span className={e.engine === "deepgram" ? "text-purple-600" : "text-gray-500"}>{e.engine}</span>
+              {" "}· {Math.round(e.seconds / 60).toLocaleString()} min · {fmtInt(e.sessions)}
+            </span>
+          ))}
+        </div>
+        <span className="ml-auto text-[10px] text-gray-400">Deepgram audio is billed on the Deepgram dashboard.</span>
+      </div>
 
       {empty ? (
         <div className="mt-8 text-center text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg py-12">

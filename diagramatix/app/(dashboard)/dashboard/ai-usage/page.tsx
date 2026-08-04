@@ -138,6 +138,23 @@ export default async function AiUsagePage({
   };
   total.diagramsGenerated = await prisma.aiDiagramGeneration.count({ where: diagWhere });
 
+  // Voice dictation minutes (separate DictationSession table; Deepgram/browser
+  // engine). Scoped like diagrams — createdAt + org/user only.
+  const dictWhere: Prisma.DictationSessionWhereInput = {
+    ...(since ? { createdAt: { gte: since } } : {}),
+    ...(su ? {} : { orgId: activeOrgId }),
+    ...(fOrg ? { orgId: fOrg } : {}),
+    ...(fUser ? { userId: fUser } : {}),
+  };
+  const dictGroups = await prisma.dictationSession.groupBy({
+    by: ["engine"], where: dictWhere, _count: { _all: true }, _sum: { seconds: true },
+  });
+  const dictation = {
+    sessions: dictGroups.reduce((s, g) => s + (g._count?._all ?? 0), 0),
+    seconds: dictGroups.reduce((s, g) => s + (g._sum?.seconds ?? 0), 0),
+    byEngine: dictGroups.map((g) => ({ engine: g.engine, sessions: g._count?._all ?? 0, seconds: g._sum?.seconds ?? 0 })),
+  };
+
   // Time series — bucket by UTC day in JS (low volume; capped for safety).
   const rows = await prisma.aiInvocation.findMany({
     where,
@@ -249,6 +266,7 @@ export default async function AiUsagePage({
         orgs: su ? orgOptions.map((id) => ({ id, name: orgOptionNames.get(id) ?? id })) : [],
       }}
       summary={total}
+      dictation={dictation}
       byModel={modelArr}
       byPoint={pointArr}
       byProvider={providerArr}

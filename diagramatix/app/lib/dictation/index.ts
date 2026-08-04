@@ -25,6 +25,20 @@ export interface DictationHandle {
 
 const LANG = "en-AU";
 
+/** Best-effort report of a finished dictation session (voice minutes visibility;
+ *  Deepgram is billed separately). sendBeacon survives page unload. */
+function reportDictationUsage(engine: "deepgram" | "browser", seconds: number) {
+  if (seconds < 1) return;
+  const body = JSON.stringify({ engine, seconds });
+  try {
+    if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+      navigator.sendBeacon("/api/ai/dictation/usage", new Blob([body], { type: "application/json" }));
+      return;
+    }
+  } catch { /* fall through to fetch */ }
+  try { void fetch("/api/ai/dictation/usage", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }); } catch { /* ignore */ }
+}
+
 /** Start a dictation session. Resolves to a handle, or null if nothing could
  *  start (e.g. mic blocked, or no engine available). */
 export async function startDictation(cb: DictationCallbacks): Promise<DictationHandle | null> {
@@ -39,12 +53,21 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
     }
   } catch { /* offline / not configured → fall back below */ }
 
-  if (token) {
-    cb.onEngine?.("deepgram");
-    return startDeepgram(token, scheme, cb);
-  }
-  cb.onEngine?.("browser");
-  return startBrowserSpeech(cb);
+  const engine: "deepgram" | "browser" = token ? "deepgram" : "browser";
+  const startedAt = Date.now();
+  let reported = false;
+  const report = () => {
+    if (reported) return;
+    reported = true;
+    reportDictationUsage(engine, Math.round((Date.now() - startedAt) / 1000));
+  };
+  // Meter once when the session ends — however it ends (own end or user stop).
+  const metered: DictationCallbacks = { ...cb, onEnd: () => { report(); cb.onEnd?.(); } };
+
+  cb.onEngine?.(engine);
+  const handle = token ? await startDeepgram(token, scheme, metered) : startBrowserSpeech(metered);
+  if (!handle) { report(); return null; }
+  return { stop: () => { report(); handle.stop(); } };
 }
 
 // ── Deepgram streaming ──────────────────────────────────────────────────────

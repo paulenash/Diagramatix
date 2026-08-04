@@ -1750,6 +1750,22 @@ model AiInvocation {
   @@index([status])
 }
 
+// One row per voice-dictation session (Abracadabra / AI panel mic). Deepgram
+// audio is billed by Deepgram, not visible in-app — this gives lightweight
+// app-side visibility of voice minutes per user/org in the AI Usage report.
+model DictationSession {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId    String?
+  orgId     String?
+  engine    String   // "deepgram" | "browser"
+  seconds   Int      @default(0)
+
+  @@index([createdAt])
+  @@index([orgId])
+  @@index([userId])
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // AiDiagramGeneration — one row each time the user actually PRODUCES a diagram
 // via AI (the "# diagrams generated using AI" statistic). Distinct from
