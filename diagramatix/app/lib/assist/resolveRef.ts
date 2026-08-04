@@ -42,9 +42,43 @@ function stripKind(s: string): string {
   return s;
 }
 
+// "the middle pool", "the left lane", "the top pool"… → an element by position.
+function positional(spoken: string, elements: DiagramElement[]): RefResolution {
+  const s = stripArticle(norm(spoken));
+  const m = s.match(/^(first|last|left|right|middle|centre|center|top|bottom)\s+(pool|lane|sublane|sub ?lane)$/);
+  if (!m) return null;
+  const pos = m[1];
+  const kind = m[2].replace(/\s/g, "");
+  const isLane = (e: DiagramElement) => e.type === "lane";
+  const parentType = (e: DiagramElement) => elements.find((p) => p.id === e.parentId)?.type;
+  const items = elements.filter((e) =>
+    kind === "pool" ? e.type === "pool"
+    : kind === "sublane" ? (isLane(e) && parentType(e) === "lane")
+    : isLane(e),
+  );
+  if (items.length === 0) return null;
+  const spreadX = Math.max(...items.map((e) => e.x)) - Math.min(...items.map((e) => e.x));
+  const spreadY = Math.max(...items.map((e) => e.y)) - Math.min(...items.map((e) => e.y));
+  const byPrimary = [...items].sort(spreadX >= spreadY ? (a, b) => a.x - b.x || a.y - b.y : (a, b) => a.y - b.y || a.x - b.x);
+  const byX = [...items].sort((a, b) => a.x - b.x);
+  const byY = [...items].sort((a, b) => a.y - b.y);
+  const pick =
+    pos === "first" ? byPrimary[0] :
+    pos === "last" ? byPrimary[byPrimary.length - 1] :
+    pos === "left" ? byX[0] :
+    pos === "right" ? byX[byX.length - 1] :
+    pos === "top" ? byY[0] :
+    pos === "bottom" ? byY[byY.length - 1] :
+    byPrimary[Math.floor((byPrimary.length - 1) / 2)]; // middle / centre
+  return pick ? { id: pick.id } : null;
+}
+
 export function resolveRef(spoken: string, elements: DiagramElement[], lastAddedId?: string | null): RefResolution {
   const s = norm(spoken);
   if (!s) return null;
+
+  const pos = positional(s, elements);
+  if (pos) return pos;
 
   // Pronouns / recency. Array order reflects add order (adds append), so the
   // last two entries are "it"/"the last" and "the previous".

@@ -62,6 +62,35 @@ describe("parseCommand — rename / delete / undo", () => {
   });
 });
 
+describe("parseCommand — lanes / sublanes", () => {
+  it("add 2 lanes to the middle pool called A and B", () => {
+    expect(parseCommand("add 2 lanes to the middle pool called Sales Team and Marketing Team")).toEqual([
+      { op: "addLanes", poolRef: "the middle pool", labels: ["Sales Team", "Marketing Team"] },
+    ]);
+  });
+  it("add 3 sublanes with an Oxford comma", () => {
+    expect(parseCommand("add 3 sublanes to the Marketing Team lane called Marketing Manager, Marketing Assistant, and Marketing Staff")).toEqual([
+      { op: "addSublanes", laneRef: "the Marketing Team lane", labels: ["Marketing Manager", "Marketing Assistant", "Marketing Staff"] },
+    ]);
+  });
+  it("add a single lane", () => {
+    expect(parseCommand("add a lane to Pool 1 called Finance")).toEqual([{ op: "addLanes", poolRef: "Pool 1", labels: ["Finance"] }]);
+  });
+});
+
+describe("resolveRef — positional", () => {
+  const pools = [
+    el("p1", "pool", "Ops", { x: 0, y: 0, width: 200, height: 100 }),
+    el("p2", "pool", "Sales", { x: 300, y: 0, width: 200, height: 100 }),
+    el("p3", "pool", "HR", { x: 600, y: 0, width: 200, height: 100 }),
+  ];
+  it("left / middle / right pool by position", () => {
+    expect(resolveRef("the left pool", pools)).toEqual({ id: "p1" });
+    expect(resolveRef("the middle pool", pools)).toEqual({ id: "p2" });
+    expect(resolveRef("the right pool", pools)).toEqual({ id: "p3" });
+  });
+});
+
 describe("parseCommand — boundary event", () => {
   it("add a boundary event called X to Y", () => {
     expect(parseCommand("add a boundary event called Cancel process to the Repeat Until subprocess")).toEqual([

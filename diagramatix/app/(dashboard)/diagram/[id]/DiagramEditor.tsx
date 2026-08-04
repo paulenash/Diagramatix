@@ -948,6 +948,8 @@ export function DiagramEditor({
     removeSpace,
     addLane,
     addSublane,
+    splitPoolEven,
+    splitLaneEven,
     reorderLane,
     moveLaneBoundary,
     moveVSwimlaneBoundary,
@@ -2193,9 +2195,27 @@ export function DiagramEditor({
         results.push(`added boundary event${op.label ? ` ${op.label}` : ""} on ${nameOf(host)}`);
         continue;
       }
+
+      if (op.op === "addLanes") {
+        const pool = resolve1(op.poolRef);
+        if ("err" in pool) { results.push(pool.err); anyFail = true; continue; }
+        if (pool.type !== "pool") { results.push(`${nameOf(pool)} isn't a pool`); anyFail = true; continue; }
+        splitPoolEven(pool.id, op.labels);
+        results.push(`added ${op.labels.length} lane${op.labels.length === 1 ? "" : "s"} to ${nameOf(pool)}: ${op.labels.join(", ")}`);
+        continue;
+      }
+
+      if (op.op === "addSublanes") {
+        const lane = resolve1(op.laneRef);
+        if ("err" in lane) { results.push(lane.err); anyFail = true; continue; }
+        if (lane.type !== "lane") { results.push(`${nameOf(lane)} isn't a lane`); anyFail = true; continue; }
+        splitLaneEven(lane.id, op.labels);
+        results.push(`added ${op.labels.length} sublane${op.labels.length === 1 ? "" : "s"} to ${nameOf(lane)}: ${op.labels.join(", ")}`);
+        continue;
+      }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, deleteElement, undo, clearDiagram, setEventBoundary]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven]);
 
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
   const runAbraCommand = useCallback(async (text: string) => {

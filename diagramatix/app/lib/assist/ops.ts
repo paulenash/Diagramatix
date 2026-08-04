@@ -14,6 +14,8 @@ export type AssistOp =
   | { op: "delete"; ref: Ref }
   | { op: "rename"; ref: Ref; label: string }
   | { op: "addBoundary"; hostRef: Ref; label?: string; eventType?: EventType }
+  | { op: "addLanes"; poolRef: Ref; labels: string[] }
+  | { op: "addSublanes"; laneRef: Ref; labels: string[] }
   | { op: "clear" }
   | { op: "export"; format?: "json" }
   | { op: "undo" };
@@ -99,6 +101,14 @@ export function validateOp(raw: unknown): AssistOp | null {
       if (isRef(o.label)) op.label = (o.label as string).trim();
       if (isRef(o.eventType)) op.eventType = o.eventType as EventType;
       return op;
+    }
+    case "addLanes": {
+      const labels = Array.isArray(o.labels) ? (o.labels as unknown[]).map((l) => String(l).trim()).filter(Boolean) : [];
+      return isRef(o.poolRef) && labels.length ? { op: "addLanes", poolRef: (o.poolRef as string).trim(), labels } : null;
+    }
+    case "addSublanes": {
+      const labels = Array.isArray(o.labels) ? (o.labels as unknown[]).map((l) => String(l).trim()).filter(Boolean) : [];
+      return isRef(o.laneRef) && labels.length ? { op: "addSublanes", laneRef: (o.laneRef as string).trim(), labels } : null;
     }
     case "clear":
       return { op: "clear" };

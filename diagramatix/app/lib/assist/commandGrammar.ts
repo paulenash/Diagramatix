@@ -9,6 +9,8 @@ import type { SymbolType, EventType, GatewayType } from "../diagram/types";
 
 const clean = (s: string) => s.trim().replace(/[.,!?;:]+$/g, "").trim();
 const stripArticle = (s: string) => s.replace(/^(a|an|the)\s+/i, "").trim();
+/** "Sales Team and Marketing Team" / "A, B and C" → ["…"] (handles Oxford comma). */
+const splitLabels = (s: string) => s.split(/\s*,\s*(?:and\s+)?|\s+and\s+/i).map(clean).filter(Boolean);
 
 /** Find a symbol type mentioned in `text` (longest phrase wins). */
 function matchSymbol(text: string): { symbolType: SymbolType; eventType?: EventType; gatewayType?: GatewayType; phrase: string } | null {
@@ -81,6 +83,20 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     else if (toCalled) { hostRef = clean(toCalled[1]); label = clean(toCalled[2]); }
     else if (onlyTo) { hostRef = clean(onlyTo[1]); }
     if (hostRef) return [{ op: "addBoundary", hostRef, ...(label ? { label } : {}) }];
+  }
+
+  // ── Sublanes (before lanes: "sublanes" must not match the lane rule) ──
+  m = raw.match(/^(?:add|insert|create|split)\s+(?:\d+\s+|a\s+|some\s+)?(?:sub-?lanes?|sub lanes?)\s+(?:to|in|into|onto|on)\s+(.+?)\s+(?:called|named|labell?ed)\s+(.+)$/i);
+  if (m) {
+    const labels = splitLabels(m[2]);
+    if (labels.length) return [{ op: "addSublanes", laneRef: clean(m[1]), labels }];
+  }
+
+  // ── Lanes ──
+  m = raw.match(/^(?:add|insert|create|split)\s+(?:\d+\s+|a\s+|some\s+)?lanes?\s+(?:to|in|into|onto|on)\s+(.+?)\s+(?:called|named|labell?ed)\s+(.+)$/i);
+  if (m) {
+    const labels = splitLabels(m[2]);
+    if (labels.length) return [{ op: "addLanes", poolRef: clean(m[1]), labels }];
   }
 
   // ── Add ──

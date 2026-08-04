@@ -431,6 +431,8 @@ export type Action =
     }}
   | { type: "ADD_LANE"; payload: { poolId: string } }
   | { type: "ADD_SUBLANE"; payload: { laneId: string } }
+  | { type: "SPLIT_POOL_EVEN"; payload: { poolId: string; labels: string[] } }
+  | { type: "SPLIT_LANE_EVEN"; payload: { laneId: string; labels: string[] } }
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
   | { type: "MOVE_VSWIMLANE_BOUNDARY"; payload: { kind: "divider" | "left" | "right" | "bottom"; delta: number; leftId?: string; rightId?: string } }
   | { type: "REORDER_LANE"; payload: { laneId: string; direction: "up" | "down" } }
@@ -8534,6 +8536,65 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       }
     }
 
+    // Divide a pool's body into N equal, named lanes in one shot (assist "add
+    // N lanes named A, B…"). Existing lanes are re-equalised alongside the new
+    // ones so every lane ends the same height.
+    case "SPLIT_POOL_EVEN": {
+      const { poolId, labels } = action.payload;
+      const pool = state.elements.find((e) => e.id === poolId && e.type === "pool");
+      if (!pool || labels.length === 0) return state;
+      const POOL_LW = getPoolHeaderWidth(pool);
+      const existing = state.elements.filter((e) => e.type === "lane" && e.parentId === poolId).sort((a, b) => a.y - b.y);
+      const newLanes: DiagramElement[] = labels.map((label) => ({
+        id: nanoid(), type: "lane", x: pool.x + POOL_LW, y: 0,
+        width: pool.width - POOL_LW, height: 0, label, properties: {}, parentId: poolId,
+      }));
+      const all = [...existing, ...newLanes];
+      const N = all.length;
+      const bodyH = pool.height;
+      const each = Math.max(40, Math.floor(bodyH / N));
+      let y = pool.y;
+      const geo = new Map<string, { y: number; h: number }>();
+      all.forEach((l, i) => { const h = i === N - 1 ? (pool.y + bodyH) - y : each; geo.set(l.id, { y, h }); y += h; });
+      const placedNew = newLanes.map((l) => ({ ...l, y: geo.get(l.id)!.y, height: geo.get(l.id)!.h }));
+      const elements = state.elements.map((e) => {
+        const g = geo.get(e.id);
+        return g ? { ...e, y: g.y, height: g.h } : e;
+      });
+      return { ...state, elements: updatePoolTypes([...elements, ...placedNew]), connectors: state.connectors };
+    }
+
+    // Divide a lane into N equal, named sublanes in one shot (assist "add N
+    // sublanes named A, B…"), re-parenting the lane's loose children into the
+    // first sublane.
+    case "SPLIT_LANE_EVEN": {
+      const { laneId, labels } = action.payload;
+      const parent = state.elements.find((e) => e.id === laneId && e.type === "lane");
+      if (!parent || labels.length === 0) return state;
+      const LANE_LW = getLaneHeaderWidth(parent);
+      const existing = state.elements.filter((e) => e.type === "lane" && e.parentId === laneId).sort((a, b) => a.y - b.y);
+      const newSubs: DiagramElement[] = labels.map((label) => ({
+        id: nanoid(), type: "lane", x: parent.x + LANE_LW, y: 0,
+        width: parent.width - LANE_LW, height: 0, label, properties: {}, parentId: laneId,
+      }));
+      const all = [...existing, ...newSubs];
+      const N = all.length;
+      const bodyH = parent.height;
+      const each = Math.max(28, Math.floor(bodyH / N));
+      let y = parent.y;
+      const geo = new Map<string, { y: number; h: number }>();
+      all.forEach((l, i) => { const h = i === N - 1 ? (parent.y + bodyH) - y : each; geo.set(l.id, { y, h }); y += h; });
+      const placedNew = newSubs.map((l) => ({ ...l, y: geo.get(l.id)!.y, height: geo.get(l.id)!.h }));
+      const firstId = all[0].id;
+      const elements = state.elements.map((e) => {
+        const g = geo.get(e.id);
+        if (g) return { ...e, y: g.y, height: g.h };
+        if (e.parentId === laneId && e.type !== "lane") return { ...e, parentId: firstId };
+        return e;
+      });
+      return { ...state, elements: updatePoolTypes([...elements, ...placedNew]), connectors: state.connectors };
+    }
+
     case "REORDER_LANE": {
       const { laneId, direction } = action.payload;
       const lane = state.elements.find(e => e.id === laneId && e.type === "lane");
@@ -9510,6 +9571,16 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "ADD_SUBLANE", payload: { laneId } });
   }, []);
 
+  const splitPoolEven = useCallback((poolId: string, labels: string[]) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "SPLIT_POOL_EVEN", payload: { poolId, labels } });
+  }, []);
+
+  const splitLaneEven = useCallback((laneId: string, labels: string[]) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "SPLIT_LANE_EVEN", payload: { laneId, labels } });
+  }, []);
+
   const moveLaneBoundary = useCallback(
     (aboveLaneId: string, belowLaneId: string, dy: number) => {
       if (!preLaneRef.current) preLaneRef.current = snapshotData();
@@ -9757,6 +9828,8 @@ export function useDiagram(initialData: DiagramData) {
     removeSpace,
     addLane,
     addSublane,
+    splitPoolEven,
+    splitLaneEven,
     moveLaneBoundary,
     moveVSwimlaneBoundary,
     reorderLane,

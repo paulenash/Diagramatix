@@ -30,6 +30,8 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"delete", "ref": <name> }
   { "op":"rename", "ref": <name>, "label": string }
   { "op":"addBoundary", "hostRef": <name>, "label"?: string, "eventType"?: "error"|"timer"|"message"|... }  // boundary event on a task/subprocess
+  { "op":"addLanes", "poolRef": <name>, "labels": [string,…] }      // N equal named lanes in a pool
+  { "op":"addSublanes", "laneRef": <name>, "labels": [string,…] }   // N equal named sublanes in a lane
   { "op":"clear" }                    // empty the whole diagram
   { "op":"export", "format":"json" }  // download the diagram as JSON
   { "op":"undo" }
