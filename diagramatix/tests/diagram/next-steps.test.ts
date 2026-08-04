@@ -19,10 +19,16 @@ describe("suggestNextSteps", () => {
     expect(out.map((c) => c.symbolType)).toEqual(["task"]);
   });
 
-  it("task → Task, Decision, End (in that order)", () => {
+  it("task → Task, Decision, End element candidates (in that order)", () => {
     const s = el("t", "task");
     const out = suggestNextSteps(s, data([s]), "bpmn");
-    expect(out.map((c) => c.label)).toEqual(["Task", "Decision", "End"]);
+    expect(out.filter((c) => c.kind === "element").map((c) => c.label)).toEqual(["Task", "Decision", "End"]);
+  });
+
+  it("task (a boundary host) also offers a Boundary event when there's room", () => {
+    const s = el("t", "task");
+    const out = suggestNextSteps(s, data([s]), "bpmn");
+    expect(out.some((c) => c.kind === "boundary")).toBe(true);
   });
 
   it("end-event → nothing follows", () => {
