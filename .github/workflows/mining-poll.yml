@@ -12,12 +12,13 @@ name: Mining live-source poll
 # The endpoint is a no-op (503) until CRON_SECRET is configured on the app.
 
 on:
-  # DISABLED until the live-connectors feature is resumed. The scheduled poll is
-  # a no-op until CRON_SECRET (App Service env) + APP_BASE_URL/CRON_SECRET (repo
-  # secrets) are configured, so the 15-min cron only cluttered the Actions log.
-  # To re-enable: uncomment the `schedule:` block below and set the secrets.
-  # schedule:
-  #   - cron: "*/15 * * * *"   # every 15 minutes
+  # Every 15 minutes. The endpoint is a SAFE NO-OP until the secrets are set:
+  # `/api/mining/poll` returns 503 until CRON_SECRET is configured on the App
+  # Service, and the step below skips (exit 0) unless BOTH repo secrets
+  # (APP_BASE_URL + CRON_SECRET) are present. So enabling the schedule does
+  # nothing until you set those — then live-source polling starts automatically.
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes
   workflow_dispatch: {}       # manual runs still allowed
 
 jobs:
