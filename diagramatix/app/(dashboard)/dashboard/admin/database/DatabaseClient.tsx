@@ -177,6 +177,30 @@ export function DatabaseClient() {
     }
   }
 
+  // ── Regenerate template thumbnails ──
+  // Re-render DiagramTemplate.thumbnailSvg for every template from its own
+  // current data (server-side; uses the app's DB connection). Rolls out a
+  // renderer/palette change + backfills missing thumbnails without the CLI.
+  const [thumbBusy, setThumbBusy] = useState(false);
+  async function handleRegenThumbnails() {
+    setThumbBusy(true);
+    setRulesImportStatus(null);
+    try {
+      const res = await fetch("/api/admin/templates/regenerate-thumbnails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: "all" }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setRulesImportStatus(`Error: ${json?.error ?? res.statusText}`); return; }
+      setRulesImportStatus(`Thumbnails regenerated: ${json.updated} updated, ${json.skipped} skipped (of ${json.total}).`);
+    } catch (err) {
+      setRulesImportStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setThumbBusy(false);
+    }
+  }
+
   // ── User Guide backup / restore (.diag-guide) ──
   // Backs up the whole User Guide at table level (HelpChapter/HelpSection +
   // the entire HelpImage library, bytes and all) with ids preserved, so
@@ -675,6 +699,17 @@ export function DatabaseClient() {
               e.currentTarget.value = "";
             }}
           />
+          {/* Regenerate every template's stored thumbnail from its own current
+              data \u2014 refreshes previews after a renderer/palette change and
+              backfills any that are missing. Never touches `data`. */}
+          <button
+            onClick={handleRegenThumbnails}
+            disabled={thumbBusy}
+            className="text-xs text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded px-2.5 py-1 disabled:opacity-50"
+            title="Regenerate all stored template thumbnails from their current data"
+          >
+            {thumbBusy ? "Regenerating\u2026" : "Regen Thumbnails \u21bb"}
+          </button>
           {/* User Guide transfer (.diag-guide) — content + whole Image Library,
               ids preserved. Restore REPLACES the three guide tables. Yellow. */}
           <button
