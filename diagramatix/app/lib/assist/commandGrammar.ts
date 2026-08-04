@@ -74,9 +74,9 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   m = raw.match(/^call\s+(.+?)\s+(.+)$/i);
   if (m && !matchSymbol(m[1])) return [{ op: "rename", ref: clean(m[1]), label: clean(m[2]) }];
 
-  // ── Wrap everything in a pool ──
-  if (/^(?:put|wrap|draw|add)\s+(?:a\s+)?pool\s+(?:around|round)\s+(?:everything|all|the (?:lot|whole thing)|it all)\b/i.test(raw)
-      || /^wrap\s+(?:everything|all|it all)\s+in\s+(?:a\s+)?pool\b/i.test(raw)) {
+  // ── Wrap everything in a pool ("poll" is a common mishearing of "pool") ──
+  if (/^(?:put|wrap|draw|add)\s+(?:a\s+)?(?:pool|poll)\s+(?:around|round)\s+(?:everything|all(?:\s+elements)?|the (?:lot|whole thing)|it all)\b/i.test(raw)
+      || /^wrap\s+(?:everything|all(?:\s+elements)?|it all)\s+in\s+(?:a\s+)?(?:pool|poll)\b/i.test(raw)) {
     return [{ op: "wrapInPool" }];
   }
 
@@ -110,18 +110,23 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     if (hostRef) return [{ op: "addBoundary", hostRef, ...(label ? { label } : {}) }];
   }
 
+  const COUNT = "(\\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|some)";
   // ── Sublanes (before lanes: "sublanes" must not match the lane rule) ──
-  m = raw.match(/^(?:add|insert|create|split)\s+(?:\d+\s+|a\s+|some\s+)?(?:sub-?lanes?|sub lanes?)\s+(?:to|in|into|onto|on)\s+(.+?)\s+(?:called|named|labell?ed)\s+(.+)$/i);
+  // "line" is a common mishearing of "lane". Names optional — default to
+  // Sublane 1..N when the user doesn't say "called …".
+  m = raw.match(new RegExp(`^(?:add|insert|create|split)\\s+${COUNT}?\\s*(?:sub-?lanes?|sub lanes?|sub-?lines?|sub lines?)\\s+(?:to|in|into|onto|on)\\s+(.+?)(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
   if (m) {
-    const labels = splitLabels(m[2]);
-    if (labels.length) return [{ op: "addSublanes", laneRef: clean(m[1]), labels }];
+    let labels = m[3] ? splitLabels(m[3]) : [];
+    if (!labels.length) labels = Array.from({ length: Math.max(1, toCount(m[1])) }, (_, i) => `Sublane ${i + 1}`);
+    return [{ op: "addSublanes", laneRef: clean(m[2]), labels }];
   }
 
   // ── Lanes ──
-  m = raw.match(/^(?:add|insert|create|split)\s+(?:\d+\s+|a\s+|some\s+)?lanes?\s+(?:to|in|into|onto|on)\s+(.+?)\s+(?:called|named|labell?ed)\s+(.+)$/i);
+  m = raw.match(new RegExp(`^(?:add|insert|create|split)\\s+${COUNT}?\\s*(?:lanes?|lines?)\\s+(?:to|in|into|onto|on)\\s+(.+?)(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
   if (m) {
-    const labels = splitLabels(m[2]);
-    if (labels.length) return [{ op: "addLanes", poolRef: clean(m[1]), labels }];
+    let labels = m[3] ? splitLabels(m[3]) : [];
+    if (!labels.length) labels = Array.from({ length: Math.max(1, toCount(m[1])) }, (_, i) => `Lane ${i + 1}`);
+    return [{ op: "addLanes", poolRef: clean(m[2]), labels }];
   }
 
   // ── Add ──

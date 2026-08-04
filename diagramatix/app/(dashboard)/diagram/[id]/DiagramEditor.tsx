@@ -2302,36 +2302,59 @@ export function DiagramEditor({
   runAbraCommandRef.current = runAbraCommand;
   exportJsonRef.current = () => { void handleExportJson(); };
 
+  // Voice comes in as fragments (Deepgram finalises on every pause), so ONE
+  // spoken command arrives as several onText calls. Buffer the fragments and
+  // interpret the whole sentence after a short silence, so "rename the pool …
+  // to … My Company" is treated as a single command.
+  const abraBuffer = useRef("");
+  const abraFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ABRA_SILENCE_MS = 1500;
+  const flushAbraBuffer = useCallback(() => {
+    if (abraFlushTimer.current) { clearTimeout(abraFlushTimer.current); abraFlushTimer.current = null; }
+    const cmd = abraBuffer.current.trim();
+    abraBuffer.current = "";
+    setAbraInterim("");
+    if (cmd) void runAbraCommandRef.current(cmd);
+  }, []);
+
   const stopAbraListening = useCallback(() => {
     abraStopRequested.current = true;
     abraDictRef.current?.stop();
     abraDictRef.current = null;
     setAbraListening(false);
-    setAbraInterim("");
-  }, []);
+    flushAbraBuffer(); // apply anything still buffered
+  }, [flushAbraBuffer]);
 
   const toggleAbraListening = useCallback(async () => {
     if (abraListening || abraDictRef.current) { stopAbraListening(); return; }
     abraStopRequested.current = false;
+    abraBuffer.current = "";
     setAbraListening(true);
     const handle = await startDictation({
       onEngine: (e) => setAbraEngine(e),
-      onInterim: (t) => setAbraInterim(t),
+      // Show the command building: buffered fragments + the in-progress words.
+      onInterim: (t) => setAbraInterim((abraBuffer.current ? abraBuffer.current + " " : "") + t),
       onText: (t) => {
-        setAbraInterim("");
-        // Spoken "stop" ends the session rather than being interpreted as an edit.
-        if (/^(stop|stop listening|stop it|that'?s enough|pause|abracadabra off|thank you gort)\b/i.test(t.trim())) {
+        const txt = t.trim();
+        if (!txt) return;
+        // Spoken "stop" ends the session immediately.
+        if (/^(stop|stop listening|stop it|that'?s enough|pause|abracadabra off|thank you gort)\b/i.test(txt)) {
+          abraBuffer.current = "";
           stopAbraListening();
           return;
         }
-        void runAbraCommandRef.current(t);
+        // Accumulate this fragment and restart the silence timer.
+        abraBuffer.current = (abraBuffer.current ? abraBuffer.current + " " : "") + txt;
+        setAbraInterim(abraBuffer.current);
+        if (abraFlushTimer.current) clearTimeout(abraFlushTimer.current);
+        abraFlushTimer.current = setTimeout(() => flushAbraBuffer(), ABRA_SILENCE_MS);
       },
       onError: (msg) => setAbraLog((prev) => [...prev, { id: nanoid(), heard: "", summary: msg, ok: false }]),
-      onEnd: () => { abraDictRef.current = null; setAbraListening(false); setAbraInterim(""); },
+      onEnd: () => { abraDictRef.current = null; setAbraListening(false); flushAbraBuffer(); },
     });
     if (!handle || abraStopRequested.current) { handle?.stop(); abraDictRef.current = null; setAbraListening(false); return; }
     abraDictRef.current = handle;
-  }, [abraListening, stopAbraListening]);
+  }, [abraListening, stopAbraListening, flushAbraBuffer]);
 
   // Stop the mic when the mode is turned off or the editor unmounts.
   useEffect(() => {

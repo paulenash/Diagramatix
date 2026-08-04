@@ -76,6 +76,17 @@ describe("parseCommand — lanes / sublanes", () => {
   it("add a single lane", () => {
     expect(parseCommand("add a lane to Pool 1 called Finance")).toEqual([{ op: "addLanes", poolRef: "Pool 1", labels: ["Finance"] }]);
   });
+  it("lanes without names → default Lane N labels", () => {
+    expect(parseCommand("add 3 lanes to the pool")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane 1", "Lane 2", "Lane 3"] }]);
+  });
+  it("mishearings: 'line' → lane, 'poll' → pool", () => {
+    expect(parseCommand("add 2 lines to the pool called A and B")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["A", "B"] }]);
+    expect(parseCommand("put a poll around all elements")).toEqual([{ op: "wrapInPool" }]);
+    expect(parseCommand("wrap all elements in a poll")).toEqual([{ op: "wrapInPool" }]);
+  });
+  it("sublanes without names → default Sublane N labels", () => {
+    expect(parseCommand("add 2 sublanes to Sales Team")).toEqual([{ op: "addSublanes", laneRef: "Sales Team", labels: ["Sublane 1", "Sublane 2"] }]);
+  });
 });
 
 describe("resolveRef — positional", () => {
