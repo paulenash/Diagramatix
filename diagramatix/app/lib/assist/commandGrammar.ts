@@ -12,6 +12,13 @@ const stripArticle = (s: string) => s.replace(/^(a|an|the)\s+/i, "").trim();
 /** "Sales Team and Marketing Team" / "A, B and C" → ["…"] (handles Oxford comma). */
 const splitLabels = (s: string) => s.split(/\s*,\s*(?:and\s+)?|\s+and\s+/i).map(clean).filter(Boolean);
 
+const WORD_NUM: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+const toCount = (s: string | undefined): number => {
+  if (!s) return 1;
+  const t = s.trim().toLowerCase();
+  return WORD_NUM[t] ?? (Number.isFinite(Number(t)) ? Math.max(1, Math.round(Number(t))) : 1);
+};
+
 /** Find a symbol type mentioned in `text` (longest phrase wins). */
 function matchSymbol(text: string): { symbolType: SymbolType; eventType?: EventType; gatewayType?: GatewayType; phrase: string } | null {
   const t = ` ${text.toLowerCase()} `;
@@ -67,9 +74,27 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   m = raw.match(/^call\s+(.+?)\s+(.+)$/i);
   if (m && !matchSymbol(m[1])) return [{ op: "rename", ref: clean(m[1]), label: clean(m[2]) }];
 
-  // ── Delete ──
+  // ── Wrap everything in a pool ──
+  if (/^(?:put|wrap|draw|add)\s+(?:a\s+)?pool\s+(?:around|round)\s+(?:everything|all|the (?:lot|whole thing)|it all)\b/i.test(raw)
+      || /^wrap\s+(?:everything|all|it all)\s+in\s+(?:a\s+)?pool\b/i.test(raw)) {
+    return [{ op: "wrapInPool" }];
+  }
+
+  // ── Move ──
+  m = raw.match(/^move\s+(.+?)\s+(?:(\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:elements?|steps?|places?|spaces?|cells?)\s+)?(?:to\s+the\s+)?(left|right|up|down)\b/i);
+  if (m) {
+    return [{ op: "move", ref: clean(m[1]), direction: m[3].toLowerCase() as "left" | "right" | "up" | "down", count: toCount(m[2]) }];
+  }
+
+  // ── Delete (+ optional compact) ──
   m = raw.match(/^(?:delete|remove|get rid of|drop|erase)\s+(.+)$/i);
-  if (m) return [{ op: "delete", ref: stripArticle(clean(m[1])) }];
+  if (m) {
+    let ref = stripArticle(clean(m[1]));
+    let compact = false;
+    const andCompact = ref.match(/\s+and\s+(?:compact|close the gap|tidy(?:\s+up)?|collapse|clean up)(?:\s+.*)?$/i);
+    if (andCompact) { compact = true; ref = clean(ref.slice(0, andCompact.index)); }
+    return [{ op: "delete", ref, ...(compact ? { compact: true } : {}) }];
+  }
 
   // ── Boundary event (before the generic add) ──
   m = raw.match(/^(?:add|put|attach|create|place)\s+(?:a\s+)?boundary\s+event\s+(.+)$/i);

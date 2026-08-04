@@ -27,8 +27,10 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"add", "symbolType": <type>, "label"?: string, "gatewayType"?: "exclusive"|"parallel"|"inclusive"|"event-based", "eventType"?: "message"|"timer"|"error"|..., "afterRef"?: <name> }
   { "op":"connect", "fromRef": <name>, "toRef": <name> }
   { "op":"disconnect", "fromRef": <name>, "toRef": <name> }
-  { "op":"delete", "ref": <name> }
+  { "op":"delete", "ref": <name>, "compact"?: boolean }   // compact closes the gap left behind
   { "op":"rename", "ref": <name>, "label": string }
+  { "op":"move", "ref": <name>, "direction": "left"|"right"|"up"|"down", "count"?: number }
+  { "op":"wrapInPool", "label"?: string }                 // put a pool around all un-pooled elements
   { "op":"addBoundary", "hostRef": <name>, "label"?: string, "eventType"?: "error"|"timer"|"message"|... }  // boundary event on a task/subprocess
   { "op":"addLanes", "poolRef": <name>, "labels": [string,…] }      // N equal named lanes in a pool
   { "op":"addSublanes", "laneRef": <name>, "labels": [string,…] }   // N equal named sublanes in a lane

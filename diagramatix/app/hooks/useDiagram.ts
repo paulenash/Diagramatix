@@ -433,6 +433,7 @@ export type Action =
   | { type: "ADD_SUBLANE"; payload: { laneId: string } }
   | { type: "SPLIT_POOL_EVEN"; payload: { poolId: string; labels: string[] } }
   | { type: "SPLIT_LANE_EVEN"; payload: { laneId: string; labels: string[] } }
+  | { type: "WRAP_IN_POOL"; payload: { label?: string } }
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
   | { type: "MOVE_VSWIMLANE_BOUNDARY"; payload: { kind: "divider" | "left" | "right" | "bottom"; delta: number; leftId?: string; rightId?: string } }
   | { type: "REORDER_LANE"; payload: { laneId: string; direction: "up" | "down" } }
@@ -8595,6 +8596,48 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements: updatePoolTypes([...elements, ...placedNew]), connectors: state.connectors };
     }
 
+    // Wrap all loose (un-pooled) flow elements in a new pool + single lane sized
+    // to contain them (assist "put a pool around everything"). Existing pools/
+    // lanes and anything already inside one are left untouched.
+    case "WRAP_IN_POOL": {
+      const CONTAINER = new Set<string>(["pool", "lane", "sublane"]);
+      const byId = new Map(state.elements.map((e) => [e.id, e] as const));
+      const inContainer = (e: DiagramElement) => {
+        let cur: DiagramElement | undefined = e;
+        for (let i = 0; cur?.parentId && i < 12; i++) {
+          const p = byId.get(cur.parentId);
+          if (p && CONTAINER.has(p.type)) return true;
+          cur = p;
+        }
+        return false;
+      };
+      const targets = state.elements.filter((e) => !CONTAINER.has(e.type) && e.type !== "text-annotation" && !inContainer(e));
+      if (targets.length === 0) return state;
+
+      const minX = Math.min(...targets.map((e) => e.x));
+      const minY = Math.min(...targets.map((e) => e.y));
+      const maxX = Math.max(...targets.map((e) => e.x + e.width));
+      const maxY = Math.max(...targets.map((e) => e.y + e.height));
+      const PAD = 40, HEADER_W = 36;
+      const poolId = nanoid();
+      const laneId = nanoid();
+      const pool: DiagramElement = {
+        id: poolId, type: "pool",
+        x: minX - PAD - HEADER_W, y: minY - PAD,
+        width: (maxX - minX) + 2 * PAD + HEADER_W, height: (maxY - minY) + 2 * PAD,
+        label: action.payload.label || "Pool", properties: { poolType: "white-box" },
+      };
+      const lane: DiagramElement = {
+        id: laneId, type: "lane",
+        x: pool.x + HEADER_W, y: pool.y,
+        width: pool.width - HEADER_W, height: pool.height,
+        label: "Lane 1", properties: {}, parentId: poolId,
+      };
+      const targetIds = new Set(targets.map((e) => e.id));
+      const elements = state.elements.map((e) => (targetIds.has(e.id) && !e.parentId ? { ...e, parentId: laneId } : e));
+      return { ...state, elements: updatePoolTypes([pool, lane, ...elements]), connectors: state.connectors };
+    }
+
     case "REORDER_LANE": {
       const { laneId, direction } = action.payload;
       const lane = state.elements.find(e => e.id === laneId && e.type === "lane");
@@ -9581,6 +9624,11 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "SPLIT_LANE_EVEN", payload: { laneId, labels } });
   }, []);
 
+  const wrapInPool = useCallback((label?: string) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "WRAP_IN_POOL", payload: { label } });
+  }, []);
+
   const moveLaneBoundary = useCallback(
     (aboveLaneId: string, belowLaneId: string, dy: number) => {
       if (!preLaneRef.current) preLaneRef.current = snapshotData();
@@ -9830,6 +9878,7 @@ export function useDiagram(initialData: DiagramData) {
     addSublane,
     splitPoolEven,
     splitLaneEven,
+    wrapInPool,
     moveLaneBoundary,
     moveVSwimlaneBoundary,
     reorderLane,

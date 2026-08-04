@@ -950,6 +950,7 @@ export function DiagramEditor({
     addSublane,
     splitPoolEven,
     splitLaneEven,
+    wrapInPool,
     reorderLane,
     moveLaneBoundary,
     moveVSwimlaneBoundary,
@@ -2182,9 +2183,40 @@ export function DiagramEditor({
       if (op.op === "delete") {
         const e = resolve1(op.ref);
         if ("err" in e) { results.push(e.err); anyFail = true; continue; }
+        const foot = { x: e.x, y: e.y, width: e.width, height: e.height };
         deleteElement(e.id);
         if (abraLastId.current === e.id) abraLastId.current = null;
-        results.push(`deleted ${nameOf(e)}`);
+        // Compact: close the horizontal gap the element left (vertical strip only).
+        if (op.compact) removeSpace({ x: foot.x, y: foot.y, width: foot.width, height: 0 });
+        results.push(`deleted ${nameOf(e)}${op.compact ? " and compacted" : ""}`);
+        continue;
+      }
+
+      if (op.op === "move") {
+        const e = resolve1(op.ref);
+        if ("err" in e) { results.push(e.err); anyFail = true; continue; }
+        const horiz = op.direction === "left" || op.direction === "right";
+        // "N elements over" → move past the N nearest elements in that direction
+        // (same band), else fall back to N element-spans.
+        const band = els.filter((x) => x.id !== e.id && x.type !== "pool" && x.type !== "lane" && x.type !== "sublane" && (
+          horiz ? (Math.abs((x.y + x.height / 2) - (e.y + e.height / 2)) < e.height && (op.direction === "right" ? x.x > e.x : x.x < e.x))
+                : (Math.abs((x.x + x.width / 2) - (e.x + e.width / 2)) < e.width && (op.direction === "down" ? x.y > e.y : x.y < e.y))
+        )).sort((a, b) => horiz ? (op.direction === "right" ? a.x - b.x : b.x - a.x) : (op.direction === "down" ? a.y - b.y : b.y - a.y));
+        const tgt = band[Math.min(op.count ?? 1, band.length) - 1];
+        const SPAN = (horiz ? e.width : e.height) + HALF_TASK_W;
+        let dx = 0, dy = 0;
+        if (op.direction === "right") dx = tgt ? (tgt.x + tgt.width + HALF_TASK_W) - e.x : (op.count ?? 1) * SPAN;
+        else if (op.direction === "left") dx = tgt ? (tgt.x - HALF_TASK_W - e.width) - e.x : -(op.count ?? 1) * SPAN;
+        else if (op.direction === "down") dy = tgt ? (tgt.y + tgt.height + HALF_TASK_W) - e.y : (op.count ?? 1) * SPAN;
+        else dy = tgt ? (tgt.y - HALF_TASK_W - e.height) - e.y : -(op.count ?? 1) * SPAN;
+        moveElements([e.id], dx, dy);
+        results.push(`moved ${nameOf(e)} ${op.direction}`);
+        continue;
+      }
+
+      if (op.op === "wrapInPool") {
+        wrapInPool(op.label);
+        results.push("wrapped everything in a pool");
         continue;
       }
 
@@ -2232,7 +2264,7 @@ export function DiagramEditor({
       }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, moveElements, removeSpace]);
 
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
   const runAbraCommand = useCallback(async (text: string) => {

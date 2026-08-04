@@ -107,6 +107,26 @@ describe("parseCommand — boundary event", () => {
   });
 });
 
+describe("parseCommand — move / wrap / delete+compact (Batch 3)", () => {
+  it("move X two elements to the right", () => {
+    expect(parseCommand("move the gateway two elements to the right")).toEqual([
+      { op: "move", ref: "the gateway", direction: "right", count: 2 },
+    ]);
+  });
+  it("move X left (default count 1)", () => {
+    expect(parseCommand("move Review left")).toEqual([{ op: "move", ref: "Review", direction: "left", count: 1 }]);
+  });
+  it("put a pool around everything", () => {
+    expect(parseCommand("put a pool around everything")).toEqual([{ op: "wrapInPool" }]);
+    expect(parseCommand("wrap everything in a pool")).toEqual([{ op: "wrapInPool" }]);
+  });
+  it("delete + compact", () => {
+    expect(parseCommand("remove Prepare and compact")).toEqual([{ op: "delete", ref: "Prepare", compact: true }]);
+    expect(parseCommand("delete the task Prepare and tidy up")).toEqual([{ op: "delete", ref: "task Prepare", compact: true }]);
+    expect(parseCommand("delete Prepare")).toEqual([{ op: "delete", ref: "Prepare" }]);
+  });
+});
+
 describe("parseCommand — clear / export", () => {
   it("clear the diagram", () => {
     expect(parseCommand("clear the diagram")).toEqual([{ op: "clear" }]);

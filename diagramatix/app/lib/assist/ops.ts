@@ -11,8 +11,10 @@ export type AssistOp =
   | { op: "add"; symbolType: SymbolType; label?: string; eventType?: EventType; gatewayType?: GatewayType; afterRef?: Ref }
   | { op: "connect"; fromRef: Ref; toRef: Ref; connectorType?: ConnectorType }
   | { op: "disconnect"; fromRef: Ref; toRef: Ref }
-  | { op: "delete"; ref: Ref }
+  | { op: "delete"; ref: Ref; compact?: boolean }
   | { op: "rename"; ref: Ref; label: string }
+  | { op: "move"; ref: Ref; direction: "left" | "right" | "up" | "down"; count?: number }
+  | { op: "wrapInPool"; label?: string }
   | { op: "addBoundary"; hostRef: Ref; label?: string; eventType?: EventType }
   | { op: "addLanes"; poolRef: Ref; labels: string[] }
   | { op: "addSublanes"; laneRef: Ref; labels: string[] }
@@ -92,9 +94,17 @@ export function validateOp(raw: unknown): AssistOp | null {
       return op;
     }
     case "delete":
-      return isRef(o.ref) ? { op: "delete", ref: (o.ref as string).trim() } : null;
+      return isRef(o.ref) ? { op: "delete", ref: (o.ref as string).trim(), ...(o.compact ? { compact: true } : {}) } : null;
     case "rename":
       return isRef(o.ref) && isRef(o.label) ? { op: "rename", ref: (o.ref as string).trim(), label: (o.label as string).trim() } : null;
+    case "move": {
+      const dir = ["left", "right", "up", "down"].includes(o.direction as string) ? o.direction as "left" | "right" | "up" | "down" : null;
+      if (!isRef(o.ref) || !dir) return null;
+      const count = Number.isFinite(o.count) ? Math.max(1, Math.round(Number(o.count))) : 1;
+      return { op: "move", ref: (o.ref as string).trim(), direction: dir, count };
+    }
+    case "wrapInPool":
+      return { op: "wrapInPool", ...(isRef(o.label) ? { label: (o.label as string).trim() } : {}) };
     case "addBoundary": {
       if (!isRef(o.hostRef)) return null;
       const op: AssistOp = { op: "addBoundary", hostRef: (o.hostRef as string).trim() };
