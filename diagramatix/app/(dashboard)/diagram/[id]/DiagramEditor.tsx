@@ -33,9 +33,9 @@ import { PresenceBar } from "@/app/components/canvas/PresenceBar";
 import { usePresence } from "@/app/hooks/usePresence";
 import { CollabRoom } from "@/app/components/canvas/CollabRoom";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
-import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, findFreeSlot } from "@/app/lib/diagram/assistPlacement";
+import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, findFreeSlot, HALF_TASK_W } from "@/app/lib/diagram/assistPlacement";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
-import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
+import { captureTemplate, instantiateTemplate, templateAttachData, instantiateTemplateAnchored } from "@/app/lib/diagram/templates";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
@@ -1410,7 +1410,7 @@ export function DiagramEditor({
     if (usesPlanPanel) { setShowPlanPanel(true); setShowAiPanel(false); }
     else { setShowAiPanel(true); setShowPlanPanel(false); }
   }, [data.aiGeneration, usesPlanPanel]);
-  type TemplateRow = { id: string; name: string; group: string | null; description?: string | null; thumbnailSvg?: string | null };
+  type TemplateRow = { id: string; name: string; group: string | null; description?: string | null; thumbnailSvg?: string | null; hasContainer?: boolean };
   const [userTemplates, setUserTemplates] = useState<TemplateRow[]>([]);
   const [builtInTemplates, setBuiltInTemplates] = useState<TemplateRow[]>([]);
   // Per-user collapse state, keyed `<scope>:<group-name>` (scope = "user"
@@ -1779,22 +1779,22 @@ export function DiagramEditor({
       try {
         const r1 = await fetch("/api/templates?type=user");
         if (r1.ok) {
-          const list = await r1.json() as { id: string; name: string; diagramType: string; group: string | null; description?: string | null; thumbnailSvg?: string | null }[];
+          const list = await r1.json() as { id: string; name: string; diagramType: string; group: string | null; description?: string | null; thumbnailSvg?: string | null; hasContainer?: boolean }[];
           setUserTemplates(
             list
               .filter((t) => t.diagramType === "bpmn")
-              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null, description: t.description ?? null, thumbnailSvg: t.thumbnailSvg ?? null })),
+              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null, description: t.description ?? null, thumbnailSvg: t.thumbnailSvg ?? null, hasContainer: !!t.hasContainer })),
           );
         }
       } catch {}
       try {
         const r2 = await fetch("/api/templates?type=builtin");
         if (r2.ok) {
-          const list = await r2.json() as { id: string; name: string; diagramType: string; group: string | null; description?: string | null; thumbnailSvg?: string | null }[];
+          const list = await r2.json() as { id: string; name: string; diagramType: string; group: string | null; description?: string | null; thumbnailSvg?: string | null; hasContainer?: boolean }[];
           setBuiltInTemplates(
             list
               .filter((t) => t.diagramType === "bpmn")
-              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null, description: t.description ?? null, thumbnailSvg: t.thumbnailSvg ?? null })),
+              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null, description: t.description ?? null, thumbnailSvg: t.thumbnailSvg ?? null, hasContainer: !!t.hasContainer })),
           );
         }
       } catch {}
@@ -1907,13 +1907,73 @@ export function DiagramEditor({
   const selectedConnector = data.connectors.find((c) => c.id === selectedConnectorId) ?? null;
 
   // ── Tier-1 assist: next-step ghost suggestions ──
-  const nextStepCandidates = useMemo(
-    () => (assistEnabled && selectedElement && !readOnly ? suggestNextSteps(selectedElement, data, diagramType) : []),
-    [assistEnabled, selectedElement, data, diagramType, readOnly],
+  // Inline-only templates (no pools/lanes) — the pool candidates for the
+  // "Template" ghost + the attach picker.
+  const inlineTemplates = useMemo(
+    () => [...builtInTemplates, ...userTemplates].filter((t) => !t.hasContainer),
+    [builtInTemplates, userTemplates],
   );
+  // Which element (if any) the template-attach picker is anchored on.
+  const [templatePicker, setTemplatePicker] = useState<{ sourceId: string; category: string | null } | null>(null);
+
+  const nextStepCandidates = useMemo(() => {
+    if (!(assistEnabled && selectedElement && !readOnly)) return [];
+    const base = suggestNextSteps(selectedElement, data, diagramType);
+    // Offer a "Template" ghost whenever there's an inline template to attach.
+    if (inlineTemplates.length > 0) {
+      base.push({ kind: "template", symbolType: "task", connectorType: "sequence", label: "Template", reason: "insert a template fragment" });
+    }
+    return base;
+  }, [assistEnabled, selectedElement, data, diagramType, readOnly, inlineTemplates]);
+
+  // Attach a template's fragment inline to a source element: strip a leading
+  // Start Event, anchor the entry element 51px to the source's right (centres
+  // aligned), nudge the whole fragment off any overlap, then join source→entry.
+  const attachTemplate = useCallback(async (templateId: string, sourceId: string) => {
+    const src = data.elements.find((e) => e.id === sourceId);
+    if (!src) return;
+    let tmplData: TemplateData;
+    try {
+      const res = await fetch(`/api/templates/${templateId}`);
+      if (!res.ok) return;
+      tmplData = (await res.json()).data as TemplateData;
+    } catch { return; }
+    const attach = templateAttachData(tmplData);
+    if (!attach) return;
+    const entry = attach.data.elements.find((e) => e.id === attach.entryId);
+    if (!entry) return;
+    const anchorX = src.x + src.width + HALF_TASK_W;
+    const anchorY = (src.y + src.height / 2) - entry.height / 2;
+    const inst = instantiateTemplateAnchored(attach.data, attach.entryId, anchorX, anchorY);
+    // Nudge the whole fragment off any overlap (rule 4) as one box.
+    const minX = Math.min(...inst.elements.map((e) => e.x));
+    const minY = Math.min(...inst.elements.map((e) => e.y));
+    const bw = Math.max(...inst.elements.map((e) => e.x + e.width)) - minX;
+    const bh = Math.max(...inst.elements.map((e) => e.y + e.height)) - minY;
+    const others = data.elements
+      .filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane")
+      .map((e) => ({ x: e.x, y: e.y, width: e.width, height: e.height }));
+    const free = findFreeSlot({ x: minX + bw / 2, y: minY + bh / 2 }, bw, bh, others);
+    const dx = free.x - (minX + bw / 2), dy = free.y - (minY + bh / 2);
+    const elements = dx || dy ? inst.elements.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy })) : inst.elements;
+    const connectors = dx || dy
+      ? inst.connectors.map((c) => ({ ...c, waypoints: c.waypoints.map((wp) => ({ x: wp.x + dx, y: wp.y + dy })) }))
+      : inst.connectors;
+    applyTemplate(elements, connectors);
+    if (inst.entryNewId) addConnector(src.id, inst.entryNewId, "sequence");
+    setSelectedElementIds(new Set(inst.newIds));
+    setTemplatePicker(null);
+  }, [data.elements, applyTemplate, addConnector]);
+
   const acceptNextStep = useCallback((c: NextStepCandidate) => {
     if (!selectedElement) return;
     const src = selectedElement;
+
+    // Template (rule 5): open the inline-template picker anchored on the source.
+    if (c.kind === "template" || c.kind === "intent") {
+      setTemplatePicker({ sourceId: src.id, category: c.intentCategory ?? null });
+      return;
+    }
 
     // Boundary Event (rule 3): mount a trigger-less intermediate event on the
     // source's edge; no connector is drawn.
@@ -4237,6 +4297,57 @@ export function DiagramEditor({
           onRemoveSpace={(diagramType === "bpmn" || diagramType === "state-machine" || diagramType === "archimate") ? removeSpace : undefined}
           onAddSelfTransition={diagramType === "state-machine" ? addSelfTransition : undefined}
         />
+
+        {/* Template-attach picker (assist "Template" ghost). Category → template
+            cascade over inline-only templates; on pick, attach to the source. */}
+        {templatePicker && (() => {
+          const cats = Array.from(new Set(inlineTemplates.map((t) => t.group ?? "Ungrouped"))).sort((a, b) => a.localeCompare(b));
+          const cat = templatePicker.category;
+          const shown = cat ? inlineTemplates.filter((t) => (t.group ?? "Ungrouped") === cat) : [];
+          return (
+            <div className="fixed inset-0 z-50 flex items-start justify-center pt-24" onMouseDown={() => setTemplatePicker(null)}>
+              <div className="bg-white rounded-lg shadow-xl border border-gray-200 w-[420px] max-h-[70vh] flex flex-col" onMouseDown={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {cat && (
+                      <button onClick={() => setTemplatePicker({ ...templatePicker, category: null })} className="text-gray-400 hover:text-gray-700 text-sm" title="Back to categories">←</button>
+                    )}
+                    <h3 className="text-sm font-semibold text-purple-800 truncate">{cat ? `Templates · ${cat}` : "Insert a template"}</h3>
+                  </div>
+                  <button onClick={() => setTemplatePicker(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+                </div>
+                <div className="overflow-y-auto p-2">
+                  {!cat ? (
+                    cats.length === 0 ? (
+                      <p className="text-xs text-gray-400 px-2 py-3">No inline templates available.</p>
+                    ) : cats.map((cName) => {
+                      const n = inlineTemplates.filter((t) => (t.group ?? "Ungrouped") === cName).length;
+                      return (
+                        <button key={cName} onClick={() => setTemplatePicker({ ...templatePicker, category: cName })}
+                          className="w-full flex items-center justify-between px-3 py-2 text-left text-sm text-gray-700 rounded hover:bg-purple-50">
+                          <span className="truncate">{cName}</span>
+                          <span className="text-[10px] text-gray-400 ml-2 shrink-0">{n}</span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    shown.map((t) => (
+                      <button key={t.id} onClick={() => attachTemplate(t.id, templatePicker.sourceId)}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-left rounded hover:bg-purple-50"
+                        title={t.description ? `${t.name} — ${t.description}` : t.name}>
+                        <TemplateThumbnail templateId={t.id} svg={t.thumbnailSvg} width={56} height={42} />
+                        <span className="flex-1 min-w-0 flex flex-col">
+                          <span className="text-xs text-gray-800 truncate">{t.name}</span>
+                          {t.description && <span className="text-[10px] text-gray-400 truncate">{t.description}</span>}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {!readOnly && (
           <PropertiesPanel

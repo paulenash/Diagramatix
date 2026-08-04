@@ -29,7 +29,9 @@ export async function GET(req: Request) {
     let result;
     if (type === "builtin") {
       result = await pgPool.query(
-        `SELECT id, name, "diagramType", "group", description, "thumbnailSvg", "createdAt"
+        `SELECT id, name, "diagramType", "group", description, "thumbnailSvg", "createdAt",
+                EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(data->'elements', '[]'::jsonb)) e
+                         WHERE e->>'type' IN ('pool','lane','sublane')) AS "hasContainer"
          FROM "DiagramTemplate"
          WHERE "templateType" = 'builtin'
          ORDER BY "updatedAt" DESC`
@@ -38,7 +40,9 @@ export async function GET(req: Request) {
       let userId = session.user.id;
       try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback to session user */ }
       result = await pgPool.query(
-        `SELECT id, name, "diagramType", "group", description, "thumbnailSvg", "createdAt"
+        `SELECT id, name, "diagramType", "group", description, "thumbnailSvg", "createdAt",
+                EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(data->'elements', '[]'::jsonb)) e
+                         WHERE e->>'type' IN ('pool','lane','sublane')) AS "hasContainer"
          FROM "DiagramTemplate"
          WHERE "templateType" = 'user' AND "userId" = $1
          ORDER BY "updatedAt" DESC`,
