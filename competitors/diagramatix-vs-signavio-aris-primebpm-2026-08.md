@@ -67,6 +67,16 @@ Diagramatix is still the only one exposing an **editable intermediate plan** and
 
 The rivals' assist is essentially **repository/mining NL chat** (Joule, AI Companion, PrimeGPT) — ask questions of a process estate. None publicly offers **canvas-native, rules-grounded, voice-driven live structural editing**. Diagramatix also **meters voice minutes** (Deepgram sessions) in its AI-usage dashboard.
 
+#### The real axis: *interaction model* vs *data grounding*
+
+It's easy to score this as "everyone has NL now." They don't have the *same* NL. Two different axes separate the four products:
+
+- **Interaction model — how the AI touches the diagram.** The incumbents' assist is **batch generation** ("describe it → get a whole diagram") plus **conversational query** over a backend. Diagramatix's assist is **incremental, canvas-native editing**: inline **ghost** next-steps (Tab to accept), an **NL command bar** that applies a *delta* to the *current* diagram (not a regenerate), and **Abracadabra Mode** live voice editing — each utterance a surgical, undoable, **rules-validated** edit. A **hybrid** design runs the common 80% on instant free deterministic rules and only falls back to a metered LLM for unusual phrasing, so it's cheap enough to leave on all day. And **template insertion is seamless and governed** — naming an element drives a suggestion from the org's *own* template library + APQC (leading start-event stripped, anchored, auto-laid-out), tuned via an admin-editable green/red rule catalog. No competitor packages canvas-side, name-driven retrieval from a governed template library, and none offers voice-driven live structural editing.
+
+- **Data grounding — what the AI knows.** Here the enterprise suites lead: their assist sits on a company-wide **repository + mined execution estate**, so "ask Joule about our order-to-cash" reasons over *real* data in a way Diagramatix's canvas + rules + templates + APQC grounding does not. **Mining-grounded "what actually happens next"** is the one assist capability they have that Diagramatix doesn't yet — and the natural next moat (ground the ghost in a linked event log). Diagramatix also trails on **maturity/scale**, has **no response streaming** yet (a spinner on the AI fallback), and voice depends on a speech service with the usual ASR rough edges.
+
+**In one line:** *their AI helps you by talking **about** processes; Diagramatix's helps you **build** them — by hand, by keyboard, or by voice — with the correctness guarantees of a governed rules engine behind every change.* Diagramatix wins the interaction model outright; the suites still win data-grounded reasoning at enterprise scale.
+
 ---
 
 ## 3. Process mining — NEW (previously a gap)
