@@ -41,6 +41,7 @@ import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { resolveRef } from "@/app/lib/assist/resolveRef";
 import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
 import { AbracadabraBar, type CommandLogEntry } from "@/app/components/canvas/AbracadabraBar";
+import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate, templateAttachData, instantiateTemplateAnchored } from "@/app/lib/diagram/templates";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
@@ -2056,6 +2057,8 @@ export function DiagramEditor({
   const [abraInterim, setAbraInterim] = useState("");
   const [abraBusy, setAbraBusy] = useState(false);
   const abraLastId = useRef<string | null>(null);
+  const abraDictRef = useRef<DictationHandle | null>(null);
+  const abraStopRequested = useRef(false);
   useEffect(() => {
     if (diagramType !== "bpmn") return;
     setAbracadabraOn(localStorage.getItem(`abracadabra-${diagramId}`) === "true");
@@ -2176,6 +2179,38 @@ export function DiagramEditor({
       setAbraBusy(false);
     }
   }, [applyAssistOps, data.elements, data.connectors]);
+  // Keep a stable ref so the mic's onText callback always calls the latest.
+  const runAbraCommandRef = useRef(runAbraCommand);
+  runAbraCommandRef.current = runAbraCommand;
+
+  const stopAbraListening = useCallback(() => {
+    abraStopRequested.current = true;
+    abraDictRef.current?.stop();
+    abraDictRef.current = null;
+    setAbraListening(false);
+    setAbraInterim("");
+  }, []);
+
+  const toggleAbraListening = useCallback(async () => {
+    if (abraListening || abraDictRef.current) { stopAbraListening(); return; }
+    abraStopRequested.current = false;
+    setAbraListening(true);
+    const handle = await startDictation({
+      onEngine: (e) => setAbraEngine(e),
+      onInterim: (t) => setAbraInterim(t),
+      onText: (t) => { setAbraInterim(""); void runAbraCommandRef.current(t); },
+      onError: (msg) => setAbraLog((prev) => [...prev, { id: nanoid(), heard: "", summary: msg, ok: false }]),
+      onEnd: () => { abraDictRef.current = null; setAbraListening(false); setAbraInterim(""); },
+    });
+    if (!handle || abraStopRequested.current) { handle?.stop(); abraDictRef.current = null; setAbraListening(false); return; }
+    abraDictRef.current = handle;
+  }, [abraListening, stopAbraListening]);
+
+  // Stop the mic when the mode is turned off or the editor unmounts.
+  useEffect(() => {
+    if (!abracadabraOn && abraDictRef.current) stopAbraListening();
+  }, [abracadabraOn, stopAbraListening]);
+  useEffect(() => () => { abraDictRef.current?.stop(); }, []);
 
   const isContext = diagramType === "context" || diagramType === "basic";
   const defaultDirectionType: DirectionType =
@@ -4491,8 +4526,8 @@ export function DiagramEditor({
             busy={abraBusy}
             log={abraLog}
             onSubmitText={(t) => { void runAbraCommand(t); }}
-            onToggleListen={() => setAbraListening((v) => !v)}
-            onClose={() => { setAbracadabraOn(false); try { localStorage.setItem(`abracadabra-${diagramId}`, "false"); } catch {} }}
+            onToggleListen={() => { void toggleAbraListening(); }}
+            onClose={() => { stopAbraListening(); setAbracadabraOn(false); try { localStorage.setItem(`abracadabra-${diagramId}`, "false"); } catch {} }}
           />
         )}
 

@@ -9,6 +9,8 @@
 export interface DictationCallbacks {
   /** Append a chunk of finalised transcript text. */
   onText: (text: string) => void;
+  /** Live, not-yet-final transcript (updates as the user speaks). Optional. */
+  onInterim?: (text: string) => void;
   /** A user-facing message (transient or fatal). */
   onError?: (message: string) => void;
   /** Fired once the session has fully stopped on its own (fatal / closed). */
@@ -111,7 +113,10 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
     try {
       const msg = JSON.parse(ev.data as string);
       const transcript = msg?.channel?.alternatives?.[0]?.transcript;
-      if (transcript && msg.is_final) cb.onText(transcript);
+      if (transcript) {
+        if (msg.is_final) cb.onText(transcript);
+        else cb.onInterim?.(transcript);
+      }
     } catch { /* non-JSON keep-alive etc. */ }
   };
   ws.onerror = () => { cb.onError?.("Dictation connection error."); };
@@ -144,6 +149,7 @@ function startBrowserSpeech(cb: DictationCallbacks): DictationHandle | null {
       failures = 0;
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) cb.onText(event.results[i][0].transcript);
+        else cb.onInterim?.(event.results[i][0].transcript);
       }
     };
     recognition.onend = () => {
