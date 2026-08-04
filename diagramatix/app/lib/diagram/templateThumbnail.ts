@@ -12,12 +12,29 @@ const short = (s: string, n = 16) => (s.length > n ? s.slice(0, n - 1) + "…" :
 const cx = (e: DiagramElement) => e.x + e.width / 2;
 const cy = (e: DiagramElement) => e.y + e.height / 2;
 
-const FILL: Record<string, string> = {
-  task: "#eff6ff", "subprocess": "#eef2ff", "subprocess-expanded": "#eef2ff",
-  pool: "#f9fafb", lane: "#ffffff", "process-group": "#ecfeff",
-  "data-object": "#fefce8", "data-store": "#fefce8", "text-annotation": "#ffffff",
+// Vivid BPMN-semantic palette — kept in lockstep with the live fallback
+// renderer (TemplateThumbnail.tsx `ElementShape`) so a stored SVG and a
+// freshly-fetched preview look identical: green start, red end, yellow
+// gateway, blue task, amber intermediate, grey data/containers.
+const PAL: Record<string, { fill: string; stroke: string }> = {
+  task: { fill: "#dbeafe", stroke: "#3b82f6" },
+  subprocess: { fill: "#dbeafe", stroke: "#3b82f6" },
+  "subprocess-expanded": { fill: "#dbeafe", stroke: "#3b82f6" },
+  "process-group": { fill: "#dbeafe", stroke: "#3b82f6" },
+  gateway: { fill: "#fef9c3", stroke: "#ca8a04" },
+  "fork-join": { fill: "#fef9c3", stroke: "#ca8a04" },
+  "flowchart-parallel": { fill: "#fef9c3", stroke: "#ca8a04" },
+  "start-event": { fill: "#dcfce7", stroke: "#16a34a" },
+  "intermediate-event": { fill: "#fff7ed", stroke: "#ca8a04" },
+  "end-event": { fill: "#fee2e2", stroke: "#dc2626" },
+  "data-object": { fill: "#f3f4f6", stroke: "#6b7280" },
+  "data-store": { fill: "#f3f4f6", stroke: "#6b7280" },
+  pool: { fill: "#f9fafb", stroke: "#9ca3af" },
+  lane: { fill: "#ffffff", stroke: "#9ca3af" },
+  sublane: { fill: "#ffffff", stroke: "#9ca3af" },
 };
-const STROKE = "#334155";
+const DEFAULT_PAL = { fill: "#eef2ff", stroke: "#818cf8" };
+const palFor = (t: string) => PAL[t] ?? DEFAULT_PAL;
 
 function label(e: DiagramElement, tx: number, ty: number, dy = 4): string {
   const t = (e.label ?? "").trim();
@@ -28,40 +45,40 @@ function label(e: DiagramElement, tx: number, ty: number, dy = 4): string {
 function shapeFor(e: DiagramElement, tx: number, ty: number): string {
   const x = e.x + tx, y = e.y + ty, w = e.width, h = e.height;
   const t = e.type as string;
-  const fill = FILL[t] ?? "#ffffff";
+  const { fill, stroke } = palFor(t);
   const emid = `${(cx(e) + tx).toFixed(1)} ${(cy(e) + ty).toFixed(1)}`;
 
   if (t === "pool" || t === "lane" || t === "sublane") {
     // rect with a header strip on the left
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${STROKE}" stroke-width="1"/>`
-      + `<rect x="${x}" y="${y}" width="18" height="${h}" fill="#e2e8f0" stroke="${STROKE}" stroke-width="1"/>`;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`
+      + `<rect x="${x}" y="${y}" width="18" height="${h}" fill="#e2e8f0" stroke="${stroke}" stroke-width="1"/>`;
   }
   if (t === "task" || t === "subprocess" || t === "subprocess-expanded" || t === "process-group") {
     const call = (e.properties?.subprocessType as string) === "call";
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" stroke="${STROKE}" stroke-width="${call ? 3 : 1.2}"/>` + label(e, tx, ty);
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="${call ? 3 : 1.4}"/>` + label(e, tx, ty);
   }
   if (t === "gateway" || t === "fork-join" || t === "flowchart-parallel") {
     const s = Math.min(w, h) / 2;
     const mx = cx(e) + tx, my = cy(e) + ty;
-    return `<polygon points="${mx},${my - s} ${mx + s},${my} ${mx},${my + s} ${mx - s},${my}" fill="#ffffff" stroke="${STROKE}" stroke-width="1.2"/>`;
+    return `<polygon points="${mx},${my - s} ${mx + s},${my} ${mx},${my + s} ${mx - s},${my}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>`;
   }
   if (t === "start-event" || t === "intermediate-event" || t === "end-event") {
     const r = Math.min(w, h) / 2;
     const dbl = t !== "start-event";
-    const sw = t === "end-event" ? 2.6 : 1.2;
-    let out = `<circle cx="${emid.split(" ")[0]}" cy="${emid.split(" ")[1]}" r="${r}" fill="#ffffff" stroke="${STROKE}" stroke-width="${sw}"/>`;
-    if (dbl) out += `<circle cx="${emid.split(" ")[0]}" cy="${emid.split(" ")[1]}" r="${(r - 3).toFixed(1)}" fill="none" stroke="${STROKE}" stroke-width="1"/>`;
+    const sw = t === "end-event" ? 2.6 : 1.4;
+    let out = `<circle cx="${emid.split(" ")[0]}" cy="${emid.split(" ")[1]}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+    if (dbl) out += `<circle cx="${emid.split(" ")[0]}" cy="${emid.split(" ")[1]}" r="${(r - 3).toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="1"/>`;
     return out;
   }
   if (t === "data-object") {
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${STROKE}" stroke-width="1"/>`;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
   }
   if (t === "data-store") {
-    return `<ellipse cx="${cx(e) + tx}" cy="${y + 6}" rx="${w / 2}" ry="5" fill="${fill}" stroke="${STROKE}" stroke-width="1"/>`
-      + `<rect x="${x}" y="${y + 6}" width="${w}" height="${h - 6}" fill="${fill}" stroke="${STROKE}" stroke-width="1"/>`;
+    return `<ellipse cx="${cx(e) + tx}" cy="${y + 6}" rx="${w / 2}" ry="5" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`
+      + `<rect x="${x}" y="${y + 6}" width="${w}" height="${h - 6}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
   }
   // fallback
-  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${fill}" stroke="${STROKE}" stroke-width="1"/>` + label(e, tx, ty);
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1"/>` + label(e, tx, ty);
 }
 
 function connFor(c: Connector, els: DiagramElement[], tx: number, ty: number): string {
