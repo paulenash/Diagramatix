@@ -1099,5 +1099,18 @@ export interface TemplateData {
  *                 features, nothing in the diagram export.
  *             appVersion (major.minor.BUILD) still advances automatically via the git commit
  *             count in /api/schema, so the release is reflected there.
+ *
+ *  2026-08-03 (v1.44 — SHAPE CHANGE): Full BPMN Tier-1 palette added the `complex`
+ *             GatewayType and the `multiple` / `parallel-multiple` EventTypes to the export
+ *             (new enumerations in diagramatix-export.xsd, marked "schema 1.44").
+ *
+ *  2026-08-04 (NO version bump — feature-only, no export-shape change): the AI Assist +
+ *             Abracadabra Mode suite shipped — assist-while-you-draw ghosts (next-step,
+ *             boundary, template, intent, data-object), live voice/typed command editing,
+ *             the editable Assist/NL-Rules catalog, and voice-dictation metering. All of it
+ *             uses EXISTING element/connector types + open `properties` keys and DB/telemetry
+ *             tables (IntentKeywordMap, DictationSession, DiagramTemplate.description/
+ *             thumbnailSvg) — nothing in the diagram XML interchange — so schemaVersion stays
+ *             1.44 and the XSD is unchanged. appVersion (build) advances via /api/schema.
  */
 export const SCHEMA_VERSION = "1.44";

@@ -1711,6 +1711,33 @@ The simulation *effect* of a calendar: teams only work in-hours, in-service task
 
 ---
 
+## Layer 10b — AI Assist + Abracadabra Mode (assist-while-you-draw + voice/typed command editing)
+
+### `tests/diagram/assist-placement.test.ts` — ghost placement geometry (rules 1–4, R7)
+| # | What it asserts | Bug it prevents | Fails if |
+|---|---|---|---|
+| T2207 | inline placement — target's near edge 51px right of the source, vertical centres aligned | Accepted ghosts landing at the wrong offset / mis-aligned | If `placeInline` gap or centring regresses |
+| T2208 | gateway fan-out — 1st branch inline, then ±rows (h+51) apart, symmetric | Branches stacking on top of each other | If `placeGatewayBranch` sign/row maths regresses |
+| T2209 | boundary event near-edge 18px from a corner; bottom-right → top-right → alternate; give up (null) when full | Boundary events overlapping / off the host | If `placeBoundaryEvent` stepping or the give-up guard regresses |
+| T2210 | `findFreeSlot` returns the nearest slot ≥51px clear, never overlapping | New elements dropped on top of existing ones | If the overlap search regresses |
+| T2211 | R7 — a task after a boundary event lands bottom/top-right, near edge 50px beyond the event's outer point | Boundary-follow task placed at the wrong height / inline | If `placeAfterBoundaryEvent` or `boundaryOuterSide` regresses |
+
+### `tests/diagram/assist-command.test.ts` — the command interpreter (grammar + ref resolution)
+| # | What it asserts | Bug it prevents | Fails if |
+|---|---|---|---|
+| T2212 | `parseCommand` maps add/connect/disconnect/delete/rename/undo phrasings to the right ops | Spoken/typed commands mis-parsed | If a grammar pattern regresses |
+| T2213 | add/lanes/sublanes/boundary/move/wrap/clear/export/delete+compact parse to their ops (counts, Oxford comma, "and compact" tail) | Batch 1–3 commands not recognised | If the extended grammar regresses |
+| T2214 | `resolveRef` — exact/substring/token-fuzzy name, bare type nouns, pronouns (it/last/previous), kind-prefix strip, positional (left/middle/right pool) | Commands resolving to the wrong element or failing | If reference resolution regresses |
+| T2215 | `validateOps` keeps valid AI-returned ops and drops junk | Malformed AI output applied to the diagram | If op validation regresses |
+
+### `tests/diagram/intent-match.test.ts` — semantic Assist/NL rules
+| # | What it asserts | Bug it prevents | Fails if |
+|---|---|---|---|
+| T2216 | `keywordHits` matches whole words case-insensitively, not substrings inside other words | "Disapproved" wrongly triggering an approval suggestion | If the word-boundary regex regresses |
+| T2217 | `matchIntent` / `matchAssistRules` return the mapped template/category (or data-object action), or null | Wrong or missing intent suggestions | If catalog matching regresses |
+
+---
+
 ## Layer 11 — End-to-end (Playwright) browser tests
 
 Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG canvas, full navigation, cross-page flows. **Separate from the Vitest suite above** (different runner, different CI job) and **separate from deployment**.
@@ -1764,4 +1791,4 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 
 ---
 
-*Generated 2026-06-28, updated 2026-07-31. Regenerate this document whenever test files (Vitest OR the Playwright e2e specs) are added or their behaviour changes — it is a hand-maintained companion to the suite, not auto-generated.*
+*Generated 2026-06-28, updated 2026-08-04. Regenerate this document whenever test files (Vitest OR the Playwright e2e specs) are added or their behaviour changes — it is a hand-maintained companion to the suite, not auto-generated.*
