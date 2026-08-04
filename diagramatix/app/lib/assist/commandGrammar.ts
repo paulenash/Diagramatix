@@ -81,7 +81,9 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     const ALL = "(?:everything|all(?:\\s+(?:the\\s+)?elements?)?(?:\\s+on\\s+(?:the\\s+)?diagram)?|the\\s+(?:lot|whole\\s+thing|diagram)|it\\s+all)";
 
     // Compress / collapse a pool: "compress the Customer pool", "shrink Sales".
-    let mc = raw.match(new RegExp(`^(?:compress|collapse|shrink|tighten|condense|minimise|minimize)\\s+(?:the\\s+)?(?:${P}\\s+)?(.+?)(?:\\s+${P})?$`, "i"));
+    // Aliases: compress · collapse · shrink · reduce · shorten · compact
+    //          (+ tighten · condense · minimise/minimize).
+    let mc = raw.match(new RegExp(`^(?:compress|collapse|shrink|reduce|shorten|compact|tighten|condense|minimise|minimize)\\s+(?:the\\s+)?(?:${P}\\s+)?(.+?)(?:\\s+${P})?$`, "i"));
     if (mc) return [{ op: "compressPool", poolRef: clean(mc[1]) }];
 
     // Swap two named lanes: "swap lane A with lane B" / "swap A and B".
@@ -96,14 +98,23 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       return [{ op: "addLaneAt", poolRef: mm[1] ? clean(mm[1]) : "the pool", position: pos, refLane: clean(mm[3]), ...(mm[4] ? { label: clean(mm[4]) } : {}) }];
     }
 
-    // Wrap / grow a pool around everything (a qualifier is REQUIRED here, so a
-    // bare "add a pool" falls through to the create-pool rule below).
+    // Wrap all loose (un-pooled) elements INTO a pool (a qualifier is REQUIRED
+    // here, so a bare "add a pool" falls through to the create-pool rule below).
     if (
       new RegExp(`^(?:put|wrap|draw|add|create|make)\\s+(?:a\\s+)?(?:new\\s+)?${P}\\s+(?:around|round|over|to(?:\\s+include|\\s+cover|\\s+contain)?|including|containing)\\s+${ALL}`, "i").test(raw)
       || new RegExp(`^wrap\\s+${ALL}\\s+(?:in|with|inside|into)\\s+(?:a\\s+)?${P}\\b`, "i").test(raw)
-      || new RegExp(`^(?:extend|expand|grow|stretch|enlarge)\\s+(?:the\\s+)?${P}\\s+(?:to\\s+)?(?:include|around|cover|contain|fit|accommodate|accomodate|encompass|hold)\\s+${ALL}`, "i").test(raw)
     ) {
       return [{ op: "wrapInPool" }];
+    }
+
+    // Extend / widen the pools rightward to include all elements, keeping EVERY
+    // pool the same width. Aliases: extend · lengthen · widen (+ expand · grow ·
+    // stretch · enlarge). A bare "include all elements" also means extend.
+    if (
+      new RegExp(`^(?:extend|lengthen|widen|expand|grow|stretch|enlarge)\\s+(?:all\\s+)?(?:the\\s+)?${P}s?(?:\\s+(?:to\\s+)?(?:the\\s+right|include|around|cover|contain|fit|accommodate|accomodate|encompass|hold)\\b.*)?$`, "i").test(raw)
+      || new RegExp(`^(?:include|cover|contain|fit|encompass)\\s+${ALL}(?:\\s+(?:to\\s+)?the\\s+right)?$`, "i").test(raw)
+    ) {
+      return [{ op: "extendPools" }];
     }
 
     // Create a NEW pool: "add a [black-box|white-box] pool [above|below existing pools] [called X]".

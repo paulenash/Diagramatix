@@ -23,8 +23,8 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 | **Add a pool** | "add a pool", "create a pool", "add a new pool", "add a pool called Finance" | New **empty** pool, **no starter lane**; auto‑sized to just fit the pool name in the header |
 | **Add a black‑box pool** | "add a black‑box pool", "add a black box pool above/below existing pools" | Bare participant box, no lanes; positions relative to existing pools |
 | **Wrap everything in a pool** | "put a pool around everything", "add a pool to all elements on the diagram", "wrap everything in a pool" | Wraps all loose (un‑pooled) elements |
-| **Extend the pool** | "extend the pool to include all elements", "grow the pool to include everything" | **Grows the existing pool** (never adds a second) |
-| **Compress a pool** | "compress the Customer pool", "shrink Sales", "collapse the pool", "tighten Finance" | White‑box → shrinks pool + lanes to content ± ½ Task; black‑box / empty → shrinks to just fit the name |
+| **Extend the pools** | "extend the pools to include all elements", "widen the pools", "lengthen the pool", "include all elements" | **Widens every pool rightward** to cover all elements and sets **all pools to the same width** (kept aligned). Aliases: extend · lengthen · widen (· expand · grow · stretch) |
+| **Compress a pool** | "compress the Customer pool", "shrink Sales", "reduce Finance", "collapse the pool" | White‑box → shrinks pool + lanes to content ± ½ Task; black‑box / empty → shrinks to just fit the name. Aliases: compress · shrink · reduce · shorten · compact · collapse |
 
 ## Lanes
 
@@ -72,6 +72,14 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 - **Fillers:** "new / another / extra" before a lane/pool; "the/a/an"; a trailing "on the diagram".
 - **Names:** `called / named / labelled X`, or a comma/"and" list ("A, B and C", Oxford comma ok).
 - **Numbers in names:** "Lane 2" ≡ "lane two".
+
+## Container naming rules (always enforced)
+
+These run in the reducer, so they hold for **every** create/rename path (voice, palette, AI) — not just spoken commands:
+
+- **Never the bare kind word.** A pool called just "Pool", or a lane called just "Lane", is auto‑numbered → "Pool 1", "Lane 2", etc.
+- **Always unique.** A new or renamed Pool / Lane / Sub‑lane may not duplicate the name of any existing Pool or Lane on the diagram; a numeric suffix is appended until it is unique ("Sales" → "Sales 2").
+- Applies across a batch too: "add 3 lanes" never yields two "Lane 1"s.
 
 ## What Deepgram can and can't do
 

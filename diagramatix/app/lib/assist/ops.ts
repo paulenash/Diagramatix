@@ -22,6 +22,7 @@ export type AssistOp =
   | { op: "addSublanes"; laneRef: Ref; labels: string[] }
   | { op: "swapLanes"; laneA: Ref; laneB: Ref }
   | { op: "compressPool"; poolRef: Ref }
+  | { op: "extendPools" }
   | { op: "addMessage"; fromRef: Ref; toRef: Ref; label?: string }
   | { op: "clear" }
   | { op: "export"; format?: "json" }
@@ -138,6 +139,8 @@ export function validateOp(raw: unknown): AssistOp | null {
       return isRef(o.laneA) && isRef(o.laneB) ? { op: "swapLanes", laneA: (o.laneA as string).trim(), laneB: (o.laneB as string).trim() } : null;
     case "compressPool":
       return isRef(o.poolRef) ? { op: "compressPool", poolRef: (o.poolRef as string).trim() } : null;
+    case "extendPools":
+      return { op: "extendPools" };
     case "addMessage": {
       if (!isRef(o.fromRef) || !isRef(o.toRef)) return null;
       const op: AssistOp = { op: "addMessage", fromRef: (o.fromRef as string).trim(), toRef: (o.toRef as string).trim() };

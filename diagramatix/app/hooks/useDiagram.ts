@@ -437,6 +437,7 @@ export type Action =
   | { type: "ADD_POOL"; payload: { label?: string; poolType?: string; position?: "above" | "below" } }
   | { type: "ADD_LANE_AT"; payload: { poolId: string; label?: string; position: "above" | "below"; refLaneId: string } }
   | { type: "COMPRESS_POOL"; payload: { poolId: string } }
+  | { type: "EXTEND_POOLS"; payload: Record<string, never> }
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
   | { type: "MOVE_VSWIMLANE_BOUNDARY"; payload: { kind: "divider" | "left" | "right" | "bottom"; delta: number; leftId?: string; rightId?: string } }
   | { type: "REORDER_LANE"; payload: { laneId: string; direction: "up" | "down" } }
@@ -2121,6 +2122,35 @@ function getPoolHeaderWidth(pool: DiagramElement): number {
 function poolNameFitSize(label: string, poolFs: number): { width: number; height: number } {
   const chars = Math.max(4, (label || "Pool").trim().length);
   return { width: 36 + 48, height: Math.max(64, Math.round(chars * poolFs * 0.62) + 24) };
+}
+
+// A pool/lane/sublane name must be UNIQUE across every container in the diagram,
+// and must never be the bare kind word ("Pool"/"Lane"/"Sublane"). A blank or bare
+// name becomes "<Kind> N"; a name that collides with an existing container gets a
+// numeric suffix. `excludeId` lets a rename keep its own current label.
+function uniqueContainerLabel(
+  elements: DiagramElement[],
+  desired: string | undefined,
+  kind: "Pool" | "Lane" | "Sublane",
+  excludeId?: string,
+): string {
+  const taken = new Set(
+    elements
+      .filter((e) => (e.type === "pool" || e.type === "lane" || e.type === "sublane") && e.id !== excludeId)
+      .map((e) => (e.label ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const base = (desired ?? "").trim();
+  const bare = base === "" || base.toLowerCase() === kind.toLowerCase();
+  if (bare) {
+    let n = 1;
+    while (taken.has(`${kind.toLowerCase()} ${n}`)) n++;
+    return `${kind} ${n}`;
+  }
+  if (!taken.has(base.toLowerCase())) return base;
+  let n = 2;
+  while (taken.has(`${base.toLowerCase()} ${n}`)) n++;
+  return `${base} ${n}`;
 }
 
 // Shrink any pool that has NO children (no lanes, no flow) to just fit its name
@@ -5768,9 +5798,21 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     }
 
     case "UPDATE_LABEL": {
+      // A Pool/Lane/Sublane rename must stay unique and never be the bare kind
+      // word (rules #3/#4/#5). Other element types keep the label verbatim.
+      const target = state.elements.find((e) => e.id === action.payload.id);
+      const nextLabel =
+        target && (target.type === "pool" || target.type === "lane" || target.type === "sublane")
+          ? uniqueContainerLabel(
+              state.elements,
+              action.payload.label,
+              target.type === "pool" ? "Pool" : target.parentId && state.elements.find((e) => e.id === target.parentId)?.type === "lane" ? "Sublane" : "Lane",
+              target.id,
+            )
+          : action.payload.label;
       const elements = state.elements.map((el) =>
         el.id === action.payload.id
-          ? { ...el, label: action.payload.label }
+          ? { ...el, label: nextLabel }
           : el
       );
       // Auto-resize UML elements and recompute attached connectors
@@ -8570,10 +8612,18 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (!pool || labels.length === 0) return state;
       const POOL_LW = getPoolHeaderWidth(pool);
       const existing = state.elements.filter((e) => e.type === "lane" && e.parentId === poolId).sort((a, b) => a.y - b.y);
-      const newLanes: DiagramElement[] = labels.map((label) => ({
-        id: nanoid(), type: "lane", x: pool.x + POOL_LW, y: 0,
-        width: pool.width - POOL_LW, height: 0, label, properties: {}, parentId: poolId,
-      }));
+      // Unique, never-bare lane names (unique across the whole diagram AND
+      // against the other new lanes being added in this same batch).
+      const nameAcc: DiagramElement[] = [...state.elements];
+      const newLanes: DiagramElement[] = labels.map((label) => {
+        const uniq = uniqueContainerLabel(nameAcc, label, "Lane");
+        const lane: DiagramElement = {
+          id: nanoid(), type: "lane", x: pool.x + POOL_LW, y: 0,
+          width: pool.width - POOL_LW, height: 0, label: uniq, properties: {}, parentId: poolId,
+        };
+        nameAcc.push(lane);
+        return lane;
+      });
       const all = [...existing, ...newLanes];
       const N = all.length;
       const bodyH = pool.height;
@@ -8598,10 +8648,18 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (!parent || labels.length === 0) return state;
       const LANE_LW = getLaneHeaderWidth(parent);
       const existing = state.elements.filter((e) => e.type === "lane" && e.parentId === laneId).sort((a, b) => a.y - b.y);
-      const newSubs: DiagramElement[] = labels.map((label) => ({
-        id: nanoid(), type: "lane", x: parent.x + LANE_LW, y: 0,
-        width: parent.width - LANE_LW, height: 0, label, properties: {}, parentId: laneId,
-      }));
+      // Unique, never-bare sublane names (unique across the whole diagram AND
+      // against the other new sublanes added in this same batch).
+      const nameAcc: DiagramElement[] = [...state.elements];
+      const newSubs: DiagramElement[] = labels.map((label) => {
+        const uniq = uniqueContainerLabel(nameAcc, label, "Sublane");
+        const sub: DiagramElement = {
+          id: nanoid(), type: "lane", x: parent.x + LANE_LW, y: 0,
+          width: parent.width - LANE_LW, height: 0, label: uniq, properties: {}, parentId: laneId,
+        };
+        nameAcc.push(sub);
+        return sub;
+      });
       const all = [...existing, ...newSubs];
       const N = all.length;
       const bodyH = parent.height;
@@ -8659,17 +8717,18 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const PAD = 40, HEADER_W = 36;
       const poolId = nanoid();
       const laneId = nanoid();
+      const poolLabel = uniqueContainerLabel(state.elements, action.payload.label, "Pool");
       const pool: DiagramElement = {
         id: poolId, type: "pool",
         x: minX - PAD - HEADER_W, y: minY - PAD,
         width: (maxX - minX) + 2 * PAD + HEADER_W, height: (maxY - minY) + 2 * PAD,
-        label: action.payload.label || "Pool", properties: { poolType: "white-box" },
+        label: poolLabel, properties: { poolType: "white-box" },
       };
       const lane: DiagramElement = {
         id: laneId, type: "lane",
         x: pool.x + HEADER_W, y: pool.y,
         width: pool.width - HEADER_W, height: pool.height,
-        label: "Lane 1", properties: {}, parentId: poolId,
+        label: uniqueContainerLabel([...state.elements, pool], undefined, "Lane"), properties: {}, parentId: poolId,
       };
       const elements = state.elements.map((e) => (targetIds.has(e.id) && !e.parentId ? { ...e, parentId: laneId } : e));
       return { ...state, elements: ensureContainersEncloseChildren(updatePoolTypes([pool, lane, ...elements])), connectors: state.connectors };
@@ -8681,7 +8740,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "ADD_POOL": {
       const { label, poolType, position } = action.payload;
       const poolFs = state.poolFontSize ?? 16;
-      const { width, height } = poolNameFitSize(label || "Pool", poolFs);
+      // Unique, never-bare pool name (rules: no "Pool", no duplicate of any
+      // existing Pool/Lane). Black-box with no name defaults to "Participant".
+      const finalLabel = uniqueContainerLabel(state.elements, label ?? (poolType === "black-box" ? "Participant" : undefined), "Pool");
+      const { width, height } = poolNameFitSize(finalLabel, poolFs);
       const pools = state.elements.filter((e) => e.type === "pool");
       const GAP = 40;
       let x: number, y: number;
@@ -8699,7 +8761,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       }
       const pool: DiagramElement = {
         id: nanoid(), type: "pool", x, y, width, height,
-        label: label || (poolType === "black-box" ? "Participant" : "Pool"),
+        label: finalLabel,
         properties: { poolType: poolType ?? "black-box" },
       };
       return { ...state, elements: updatePoolTypes([...state.elements, pool]), connectors: state.connectors };
@@ -8745,6 +8807,38 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements: els, connectors: recomputeAllConnectors(state.connectors, els) };
     }
 
+    // Extend the pools rightward to include every element, then make ALL pools
+    // the SAME width so a stack of pools stays aligned. Lanes/sublanes widen to
+    // their pool's new right edge.
+    case "EXTEND_POOLS": {
+      const pools = state.elements.filter((e) => e.type === "pool");
+      if (pools.length === 0) return state;
+      const MARGIN = 40;
+      const content = state.elements.filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane");
+      const contentRight = content.length ? Math.max(...content.map((e) => e.x + e.width)) : -Infinity;
+      // Common width: the largest of (each pool's current width) and (what each
+      // pool needs so its right edge clears the rightmost element + margin).
+      const targetWidth = Math.max(
+        ...pools.map((p) => Math.max(p.width, contentRight > -Infinity ? (contentRight + MARGIN) - p.x : 0)),
+      );
+      const byId = new Map(state.elements.map((e) => [e.id, e] as const));
+      const poolAncestor = (e: DiagramElement): DiagramElement | undefined => {
+        let cur: DiagramElement | undefined = byId.get(e.parentId ?? "");
+        for (let i = 0; cur && cur.type !== "pool" && i < 12; i++) cur = byId.get(cur.parentId ?? "");
+        return cur?.type === "pool" ? cur : undefined;
+      };
+      const elements = state.elements.map((e) => {
+        if (e.type === "pool") return { ...e, width: targetWidth };
+        if (e.type === "lane" || e.type === "sublane") {
+          const anc = poolAncestor(e);
+          if (anc) return { ...e, width: Math.max(e.width, (anc.x + targetWidth) - e.x) };
+        }
+        return e;
+      });
+      const enclosed = ensureContainersEncloseChildren(updatePoolTypes(elements));
+      return { ...state, elements: enclosed, connectors: recomputeAllConnectors(state.connectors, enclosed) };
+    }
+
     // Insert a lane band above/below a reference lane: shift that lane's pool's
     // descendants at/below the insertion line down, grow the pool, reroute.
     case "ADD_LANE_AT": {
@@ -8763,7 +8857,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       };
       const newLane: DiagramElement = {
         id: nanoid(), type: "lane", x: pool.x + HEADER_W, y: insertY,
-        width: pool.width - HEADER_W, height: newH, label: label || "Lane", properties: {}, parentId: poolId,
+        width: pool.width - HEADER_W, height: newH, label: uniqueContainerLabel(state.elements, label, "Lane"), properties: {}, parentId: poolId,
       };
       const shifted = state.elements.map((e) => {
         if (e.id === pool.id) return { ...e, height: e.height + newH };
@@ -9784,6 +9878,11 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "COMPRESS_POOL", payload: { poolId } });
   }, []);
 
+  const extendPools = useCallback(() => {
+    pushHistory(snapshotData());
+    dispatch({ type: "EXTEND_POOLS", payload: {} });
+  }, []);
+
   const moveLaneBoundary = useCallback(
     (aboveLaneId: string, belowLaneId: string, dy: number) => {
       if (!preLaneRef.current) preLaneRef.current = snapshotData();
@@ -10037,6 +10136,7 @@ export function useDiagram(initialData: DiagramData) {
     addPool,
     addLaneAt,
     compressPool,
+    extendPools,
     moveLaneBoundary,
     moveVSwimlaneBoundary,
     reorderLane,

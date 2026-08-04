@@ -965,6 +965,7 @@ export function DiagramEditor({
     addPool,
     addLaneAt,
     compressPool,
+    extendPools,
     reorderLane,
     moveLaneBoundary,
     moveVSwimlaneBoundary,
@@ -2299,6 +2300,13 @@ export function DiagramEditor({
         continue;
       }
 
+      if (op.op === "extendPools") {
+        if (!els.some((e) => e.type === "pool")) { results.push("there are no pools to extend"); anyFail = true; continue; }
+        extendPools();
+        results.push("extended all pools to the same width");
+        continue;
+      }
+
       if (op.op === "addMessage") {
         const f = resolve1(op.fromRef), t = resolve1(op.toRef);
         if ("err" in f) { results.push(f.err); anyFail = true; continue; }
@@ -2358,7 +2366,7 @@ export function DiagramEditor({
       }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, swapLane, moveElements, removeSpace]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, extendPools, swapLane, moveElements, removeSpace]);
 
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
   const runAbraCommand = useCallback(async (text: string) => {
