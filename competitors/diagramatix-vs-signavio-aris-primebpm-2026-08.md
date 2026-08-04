@@ -2,7 +2,7 @@
 
 *Compiled: **August 2026**. Diagramatix data from the current codebase (export schema v1.2x; BPMN + 6 other diagram types incl. **ArchiMate**, plus a built-in **process-mining module (DiagramatixMINER)**, a discrete-event **Process Simulator** (now with working-time calendars + mining calibration), an **AI SOP generator**, a **Risk & Control (GRC) matrix**, **APQC PCF** process classification, **multi-model AI** with usage metering, a **publishing & review lifecycle**, **real-time co-authoring** (live presence + cursors, soft locks, conflict-merged saves), **Microsoft 365 (SharePoint/OneDrive)** integration, **governed pool/lane naming**, **domain-managed org membership** and **role-based sharing / org admin**). Competitor data from public product pages/documentation accessed May–June 2026 (carried forward from the July edition — **re-verify against live competitor pages before quoting externally**; their AI/mining/simulation features move fast).*
 
-> **Rev. 2026-08-03.** Headline changes since the first August cut: **real-time co-authoring has shipped** — live presence + cursors, soft element locks, and a version guard with **automatic conflict-merge** — so **real-time co-editing is no longer a suite-only advantage**; the **BPMN 2.0 orchestration palette is now complete** (complex gateway, multiple / parallel-multiple events, call activity, and **compensation semantics executed in the simulator**); and org onboarding gained **domain-managed membership**. (The prior August edition had already closed the July gaps — **process mining and GRC** shipped and integrated, plus an **AI SOP generator** and **APQC PCF** anchoring; process mining is **no longer** a "where not to compete" item.)
+> **Rev. 2026-08-04.** Headline change: the **last AI gap is closed and overshot** — **assist-while-you-draw** shipped as rules-grounded **ghost next-step suggestions**, a **natural-language command bar**, and **Abracadabra Mode: live, hands-free voice editing** (speak/type an edit and the diagram changes live, undoable, rules-validated), plus an admin-editable **Assist / NL Rules** catalog and **voice-minute metering**. No competitor publicly offers canvas-native, voice-driven live structural editing. *(Rev 2026-08-03 shipped **real-time co-authoring** — live presence + cursors, soft element locks, version-guard conflict-merge; completed the **BPMN 2.0 orchestration palette** — complex gateway, multiple / parallel-multiple events, call activity, simulator-executed compensation; and added **domain-managed org membership**. The prior August edition had already closed the July gaps — **process mining and GRC**, an **AI SOP generator** and **APQC PCF** anchoring.)*
 
 ---
 
@@ -36,7 +36,8 @@ All four products do "describe a process → get a BPMN diagram", but differ sha
 | **AI → SOP document** (procedure writer) | ✅ **BPMN → SOP** (whole/lane/pool/subprocess/group) → AI prose → editable → **Word (.docx)** with org **template style-adoption** | — | — | ✅ **AI Procedure Writer** (from recordings/conversations) |
 | Grounding / knowledge base | The model + your rules + (optional) mined data; no external content library | ✅ **5,000 SAP best-practice models** | ARIS repository + GenAI on mining | Its own BPM methodology + guardrails |
 | Deterministic publish-ready auto-layout of AI output | ✅ 50+ codified rules run *after* plan approval; **40+ live scan rules** (B01–B41) flag structure issues | Basic auto-layout | Standard layout | Auto-map |
-| "Assist-while-you-draw" (suggest next step, NL search) | ❌ (generation is batch) | ✅ Joule NL search | ✅ NL search / NL→calc-field | ✅ PrimeGPT NL search |
+| "Assist-while-you-draw" (suggest next step, NL search) | ✅ **Now shipped + overshot** — inline rules-grounded **ghost next-steps** (Tab to accept), a **NL command bar**, and **Abracadabra Mode: live hands-free voice editing** | ✅ Joule NL search | ✅ NL search / NL→calc-field | ✅ PrimeGPT NL search |
+| **Voice-driven live diagram editing** | ✅ **Unique** — speak/​type edits ("add a task after Review", "put a pool around everything", "delete Prepare and compact") applied live, undoable, rules-validated | ❌ | ❌ | ❌ |
 | Claimed time saving | "Seconds" to a laid-out diagram | Up to **80%** | — | Up to **90%** |
 
 ### What each one is really good at
@@ -57,6 +58,14 @@ All four products do "describe a process → get a BPMN diagram", but differ sha
 - **PRIME BPM** — best if your input is **messy real-world capture** and you want AI-driven **improvement** analysis.
 
 Diagramatix is still the only one exposing an **editable intermediate plan** and a **user-editable layout rule set**, the only one generating **all its notations** (not just BPMN) and **image→BPMN** — and now the only one offering **LLM provider choice with per-org cost metering**.
+
+**Assist-while-you-draw — the last AI gap, now closed and overshot.** The July/early-August editions flagged this as Diagramatix's one clear AI weakness (generation was batch-only while all three rivals had NL search). It has now shipped as a full suite and gone past the competitors:
+
+- **Rules-grounded ghost suggestions** — select an element and translucent next-step chips appear (Tab/click to accept); every suggestion is validated by the same rules engine + `canConnect` legality that governs AI generation, so it's never illegal or badly laid out. Suggestions include next-step elements, boundary events, template fragments, and **content-aware data objects / template intents** driven by an **admin-editable keyword catalog** ("Assist / NL Rules", green rules editable, red geometry read-only).
+- **A natural-language command bar** — type an editing instruction and it's applied to the current diagram (an incremental delta, not a regenerate).
+- **Abracadabra Mode — live, hands-free voice editing.** This is the genuine differentiator: speak commands and the diagram edits itself live — *"add a task called Approve after Review"*, *"put a pool around everything"*, *"add 3 sublanes to the Marketing Team lane called…"*, *"move the gateway two elements right"*, *"delete Prepare and compact"*. A deterministic parser handles common phrasings instantly and free; only unusual phrasing falls back to a metered LLM. Every change is undoable and the command log colour-codes rule vs AI.
+
+The rivals' assist is essentially **repository/mining NL chat** (Joule, AI Companion, PrimeGPT) — ask questions of a process estate. None publicly offers **canvas-native, rules-grounded, voice-driven live structural editing**. Diagramatix also **meters voice minutes** (Deepgram sessions) in its AI-usage dashboard.
 
 ---
 
@@ -215,6 +224,7 @@ Now with **working-time calendars** (a July roadmap item, shipped) and **mining 
 9. **Self-hosted, no ecosystem lock-in**, per-seat, **bring-your-own AI**, with **full-account portable backup**.
 10. **Interop** — Visio round-trip, BPSim, DDL↔Domain, and **Microsoft 365** save/open + document links.
 11. **Real-time co-authoring** — live presence + cursors, soft element locks, and a **version guard + automatic 3-way merge** so concurrent edits never silently clobber. Matches the enterprise suites on collaboration in a **self-hosted, per-seat** tool.
+12. **Voice-driven, rules-grounded assist** — the only tool here with **canvas-native assist-while-you-draw** (ghost next-steps) *and* **Abracadabra Mode live voice editing**: speak or type an edit and it's applied live, undoable, and validated by the same rules engine that governs generation. Competitors' assist is repository/mining NL chat, not structural canvas editing.
 
 ## 12. Where each competitor still wins
 
@@ -226,6 +236,7 @@ Now with **working-time calendars** (a July roadmap item, shipped) and **mining 
 ## 13. Positioning Diagramatix
 
 - "Describe your process — then **edit the plan before it's drawn**, on **the LLM you choose**. AI you actually control and can cost-govern."
+- "**Just talk.** Say *'add a task after Review'*, *'put a pool around everything'*, *'delete Prepare and compact'* — and watch it happen, live and undoable. Voice-driven modelling no other BPM tool offers."
 - "**Publish-ready** BPMN/ArchiMate in seconds, laid out by 50+ rules — no clean-up."
 - "**Mine it, model it, simulate it** — discover the real process from logs (incl. object-centric), then simulate the redesign with a **cost verdict**, in one self-hosted tool."
 - "**Document it (SOP → Word)** and **govern it (risk-control matrix, APQC)** — the operate layer, not just an editor."
