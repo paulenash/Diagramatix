@@ -36,6 +36,12 @@ const PAL: Record<string, { fill: string; stroke: string }> = {
 const DEFAULT_PAL = { fill: "#eef2ff", stroke: "#818cf8" };
 const palFor = (t: string) => PAL[t] ?? DEFAULT_PAL;
 
+// Keep every stroke a crisp 1px regardless of how far the viewBox is scaled
+// (the menu shrinks a wide diagram into ~64px; without this the outlines
+// become sub-pixel hairlines and the whole preview looks washed-out/dim).
+// Mirrors the live fallback renderer (TemplateThumbnail.tsx `ElementShape`).
+const VE = ' vector-effect="non-scaling-stroke"';
+
 function label(e: DiagramElement, tx: number, ty: number, dy = 4): string {
   const t = (e.label ?? "").trim();
   if (!t) return "";
@@ -50,35 +56,35 @@ function shapeFor(e: DiagramElement, tx: number, ty: number): string {
 
   if (t === "pool" || t === "lane" || t === "sublane") {
     // rect with a header strip on the left
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`
-      + `<rect x="${x}" y="${y}" width="18" height="${h}" fill="#e2e8f0" stroke="${stroke}" stroke-width="1"/>`;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`
+      + `<rect x="${x}" y="${y}" width="18" height="${h}" fill="#e2e8f0" stroke="${stroke}" stroke-width="1"${VE}/>`;
   }
   if (t === "task" || t === "subprocess" || t === "subprocess-expanded" || t === "process-group") {
     const call = (e.properties?.subprocessType as string) === "call";
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="${call ? 3 : 1.4}"/>` + label(e, tx, ty);
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="${call ? 3 : 1.4}"${VE}/>` + label(e, tx, ty);
   }
   if (t === "gateway" || t === "fork-join" || t === "flowchart-parallel") {
     const s = Math.min(w, h) / 2;
     const mx = cx(e) + tx, my = cy(e) + ty;
-    return `<polygon points="${mx},${my - s} ${mx + s},${my} ${mx},${my + s} ${mx - s},${my}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>`;
+    return `<polygon points="${mx},${my - s} ${mx + s},${my} ${mx},${my + s} ${mx - s},${my}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"${VE}/>`;
   }
   if (t === "start-event" || t === "intermediate-event" || t === "end-event") {
     const r = Math.min(w, h) / 2;
     const dbl = t !== "start-event";
     const sw = t === "end-event" ? 2.6 : 1.4;
-    let out = `<circle cx="${emid.split(" ")[0]}" cy="${emid.split(" ")[1]}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
-    if (dbl) out += `<circle cx="${emid.split(" ")[0]}" cy="${emid.split(" ")[1]}" r="${(r - 3).toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="1"/>`;
+    let out = `<circle cx="${emid.split(" ")[0]}" cy="${emid.split(" ")[1]}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${VE}/>`;
+    if (dbl) out += `<circle cx="${emid.split(" ")[0]}" cy="${emid.split(" ")[1]}" r="${(r - 3).toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="1"${VE}/>`;
     return out;
   }
   if (t === "data-object") {
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`;
   }
   if (t === "data-store") {
-    return `<ellipse cx="${cx(e) + tx}" cy="${y + 6}" rx="${w / 2}" ry="5" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`
-      + `<rect x="${x}" y="${y + 6}" width="${w}" height="${h - 6}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
+    return `<ellipse cx="${cx(e) + tx}" cy="${y + 6}" rx="${w / 2}" ry="5" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`
+      + `<rect x="${x}" y="${y + 6}" width="${w}" height="${h - 6}" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`;
   }
   // fallback
-  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1"/>` + label(e, tx, ty);
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>` + label(e, tx, ty);
 }
 
 function connFor(c: Connector, els: DiagramElement[], tx: number, ty: number): string {
@@ -93,7 +99,7 @@ function connFor(c: Connector, els: DiagramElement[], tx: number, ty: number): s
     pts = [{ x: cx(s) + tx, y: cy(s) + ty }, { x: cx(t) + tx, y: cy(t) + ty }];
   }
   const d = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
-  return `<path d="${d}" fill="none" stroke="#475569" stroke-width="1.2" ${dashed ? 'stroke-dasharray="4 3"' : ""} marker-end="url(#tmarr)"/>`;
+  return `<path d="${d}" fill="none" stroke="#475569" stroke-width="1.2"${VE} ${dashed ? 'stroke-dasharray="4 3"' : ""} marker-end="url(#tmarr)"/>`;
 }
 
 export function renderTemplateThumbnailSvg(data: TemplateData): string {
