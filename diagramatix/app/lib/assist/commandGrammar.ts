@@ -69,6 +69,20 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   m = raw.match(/^(?:delete|remove|get rid of|drop|erase)\s+(.+)$/i);
   if (m) return [{ op: "delete", ref: stripArticle(clean(m[1])) }];
 
+  // ── Boundary event (before the generic add) ──
+  m = raw.match(/^(?:add|put|attach|create|place)\s+(?:a\s+)?boundary\s+event\s+(.+)$/i);
+  if (m) {
+    const rest = clean(m[1]);
+    const calledTo = rest.match(/^called\s+(.+?)\s+(?:to|on|onto)\s+(.+)$/i);
+    const toCalled = rest.match(/^(?:to|on|onto)\s+(.+?)\s+called\s+(.+)$/i);
+    const onlyTo = rest.match(/^(?:to|on|onto)\s+(.+)$/i);
+    let hostRef: string | undefined, label: string | undefined;
+    if (calledTo) { label = clean(calledTo[1]); hostRef = clean(calledTo[2]); }
+    else if (toCalled) { hostRef = clean(toCalled[1]); label = clean(toCalled[2]); }
+    else if (onlyTo) { hostRef = clean(onlyTo[1]); }
+    if (hostRef) return [{ op: "addBoundary", hostRef, ...(label ? { label } : {}) }];
+  }
+
   // ── Add ──
   m = raw.match(/^(?:add|insert|create|put|place|drop in|give me|new)\s+(?:(?:a|an|the)\s+)?(.+)$/i);
   if (m) {

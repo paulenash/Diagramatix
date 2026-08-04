@@ -62,6 +62,22 @@ describe("parseCommand — rename / delete / undo", () => {
   });
 });
 
+describe("parseCommand — boundary event", () => {
+  it("add a boundary event called X to Y", () => {
+    expect(parseCommand("add a boundary event called Cancel process to the Repeat Until subprocess")).toEqual([
+      { op: "addBoundary", hostRef: "the Repeat Until subprocess", label: "Cancel process" },
+    ]);
+  });
+  it("add a boundary event to Y called X", () => {
+    expect(parseCommand("add a boundary event to Review called Timeout")).toEqual([
+      { op: "addBoundary", hostRef: "Review", label: "Timeout" },
+    ]);
+  });
+  it("add a boundary event on Y (no label)", () => {
+    expect(parseCommand("put a boundary event on the Prepare task")).toEqual([{ op: "addBoundary", hostRef: "the Prepare task" }]);
+  });
+});
+
 describe("parseCommand — clear / export", () => {
   it("clear the diagram", () => {
     expect(parseCommand("clear the diagram")).toEqual([{ op: "clear" }]);

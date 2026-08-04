@@ -13,6 +13,7 @@ export type AssistOp =
   | { op: "disconnect"; fromRef: Ref; toRef: Ref }
   | { op: "delete"; ref: Ref }
   | { op: "rename"; ref: Ref; label: string }
+  | { op: "addBoundary"; hostRef: Ref; label?: string; eventType?: EventType }
   | { op: "clear" }
   | { op: "export"; format?: "json" }
   | { op: "undo" };
@@ -92,6 +93,13 @@ export function validateOp(raw: unknown): AssistOp | null {
       return isRef(o.ref) ? { op: "delete", ref: (o.ref as string).trim() } : null;
     case "rename":
       return isRef(o.ref) && isRef(o.label) ? { op: "rename", ref: (o.ref as string).trim(), label: (o.label as string).trim() } : null;
+    case "addBoundary": {
+      if (!isRef(o.hostRef)) return null;
+      const op: AssistOp = { op: "addBoundary", hostRef: (o.hostRef as string).trim() };
+      if (isRef(o.label)) op.label = (o.label as string).trim();
+      if (isRef(o.eventType)) op.eventType = o.eventType as EventType;
+      return op;
+    }
     case "clear":
       return { op: "clear" };
     case "export":

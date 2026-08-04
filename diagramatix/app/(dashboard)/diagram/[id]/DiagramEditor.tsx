@@ -2176,9 +2176,26 @@ export function DiagramEditor({
         results.push(`renamed ${nameOf(e)} → ${op.label}`);
         continue;
       }
+
+      if (op.op === "addBoundary") {
+        const host = resolve1(op.hostRef);
+        if ("err" in host) { results.push(host.err); anyFail = true; continue; }
+        if (!["task", "subprocess", "subprocess-expanded"].includes(host.type)) { results.push(`${nameOf(host)} can't host a boundary event`); anyFail = true; continue; }
+        const existing = els.filter((e) => e.boundaryHostId === host.id);
+        const spot = placeBoundaryEvent(host, existing);
+        if (!spot) { results.push(`no room for another boundary event on ${nameOf(host)}`); anyFail = true; continue; }
+        const newId = nanoid();
+        addElementGated("intermediate-event", spot, undefined, op.eventType, newId);
+        setEventBoundary(newId, host.id);
+        if (op.label) updateLabel(newId, op.label);
+        abraLastId.current = newId;
+        setSelectedElementIds(new Set([newId]));
+        results.push(`added boundary event${op.label ? ` ${op.label}` : ""} on ${nameOf(host)}`);
+        continue;
+      }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, deleteElement, undo, clearDiagram]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, deleteElement, undo, clearDiagram, setEventBoundary]);
 
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
   const runAbraCommand = useCallback(async (text: string) => {

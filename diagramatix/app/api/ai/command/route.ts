@@ -29,6 +29,7 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"disconnect", "fromRef": <name>, "toRef": <name> }
   { "op":"delete", "ref": <name> }
   { "op":"rename", "ref": <name>, "label": string }
+  { "op":"addBoundary", "hostRef": <name>, "label"?: string, "eventType"?: "error"|"timer"|"message"|... }  // boundary event on a task/subprocess
   { "op":"clear" }                    // empty the whole diagram
   { "op":"export", "format":"json" }  // download the diagram as JSON
   { "op":"undo" }
