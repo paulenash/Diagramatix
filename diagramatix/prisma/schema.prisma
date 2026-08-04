@@ -889,12 +889,18 @@ model DiagramTypeStyle {
 // selected element's NAME contains any of a row's keywords, the ghost surfaces
 // this intent, attaching the named template (or opening the picker at its
 // category). SuperAdmin-editable; seeded with common intents.
+// The editable GREEN half of the Assist / NL Rules. Each row = keywords → an
+// ACTION taken when the just-named element matches: suggest a template, or ghost
+// an input/output Data Object. Injected into the Abracadabra AI prompt too.
 model IntentKeywordMap {
   id                 String   @id @default(cuid())
-  label              String   // shown on the ghost chip, e.g. "Approval"
+  label              String   // shown on the ghost chip, e.g. "Approval" / "Instructions"
   keywords           String[] @default([]) // matched (word-boundary, case-insensitive) against the element name
-  targetCategory     String?  // template group to open the picker at
-  targetTemplateName String?  // exact template name to attach directly (wins over category)
+  action             String   @default("suggest-template") // suggest-template | add-input-data-object | add-output-data-object
+  diagramType        String   @default("all") // "all" or a specific notation (bpmn, archimate, …)
+  defaultLabel       String?  // data-object actions: the default object name ("Instructions", "Output Doc")
+  targetCategory     String?  // suggest-template: template group to open the picker at
+  targetTemplateName String?  // suggest-template: exact template name to attach directly (wins over category)
   sortOrder          Int      @default(0)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

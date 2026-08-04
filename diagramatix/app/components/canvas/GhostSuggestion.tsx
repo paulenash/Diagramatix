@@ -18,6 +18,7 @@ const STYLE: Record<CandidateKind, { fill: string; stroke: string; text: string;
   boundary: { fill: "#eff6ff", stroke: "#2563eb", text: "#1e40af", icon: "◔ " },
   template: { fill: "#f0fdf4", stroke: "#16a34a", text: "#166534", icon: "🧩 " },
   intent:   { fill: "#fef3c7", stroke: "#d97706", text: "#92400e", icon: "✨ ", filled: true },
+  dataobject: { fill: "#f8fafc", stroke: "#64748b", text: "#334155", icon: "📄 " },
 };
 
 export function GhostSuggestion({

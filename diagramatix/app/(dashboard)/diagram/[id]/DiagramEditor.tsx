@@ -35,7 +35,7 @@ import { usePresence } from "@/app/hooks/usePresence";
 import { CollabRoom } from "@/app/components/canvas/CollabRoom";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, findFreeSlot, HALF_TASK_W } from "@/app/lib/diagram/assistPlacement";
-import { matchIntent, type IntentRow } from "@/app/lib/diagram/intentMatch";
+import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { resolveRef } from "@/app/lib/assist/resolveRef";
@@ -1953,6 +1953,12 @@ export function DiagramEditor({
       // Always offer the generic "Template" ghost too.
       base.push({ kind: "template", symbolType: "task", connectorType: "sequence", label: "Template", reason: "insert a template fragment" });
     }
+    // Data-object suggestions (green rules G2/G3): if the element's name implies
+    // using instructions or producing a document, offer a ghost Data Object.
+    const inRule = matchAssistRules(selectedElement.label, diagramType, intentCatalog, "add-input-data-object")[0];
+    if (inRule) base.push({ kind: "dataobject", dataDirection: "in", symbolType: "data-object", connectorType: "associationBPMN", label: inRule.defaultLabel || "Instructions", reason: "input the process uses" });
+    const outRule = matchAssistRules(selectedElement.label, diagramType, intentCatalog, "add-output-data-object")[0];
+    if (outRule) base.push({ kind: "dataobject", dataDirection: "out", symbolType: "data-object", connectorType: "associationBPMN", label: outRule.defaultLabel || "Output Doc", reason: "document it produces" });
     return base;
   }, [assistEnabled, selectedElement, data, diagramType, readOnly, inlineTemplates, intentCatalog]);
 
@@ -2008,6 +2014,27 @@ export function DiagramEditor({
     // Template (rule 5): open the inline-template picker anchored on the source.
     if (c.kind === "template" || c.kind === "intent") {
       setTemplatePicker({ sourceId: src.id, category: c.intentCategory ?? null });
+      return;
+    }
+
+    // Data Object (green rules G2/G3): place a data object above (input) or below
+    // (output) the source and connect it with a directed association — data → task
+    // for an input, task → data for an output.
+    if (c.kind === "dataobject") {
+      const { w, h } = sizeOf("data-object");
+      const others = data.elements
+        .filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane")
+        .map((e) => ({ x: e.x, y: e.y, width: e.width, height: e.height }));
+      const wanted = c.dataDirection === "in"
+        ? { x: src.x + src.width / 2, y: src.y - (h / 2 + HALF_TASK_W) }
+        : { x: src.x + src.width / 2, y: src.y + src.height + h / 2 + HALF_TASK_W };
+      const center = findFreeSlot(wanted, w, h, others);
+      const newId = nanoid();
+      addElementGated("data-object", center, undefined, undefined, newId);
+      if (c.label) updateLabel(newId, c.label);
+      if (c.dataDirection === "in") addConnector(newId, src.id, "associationBPMN");
+      else addConnector(src.id, newId, "associationBPMN");
+      setSelectedElementIds(new Set([newId]));
       return;
     }
 

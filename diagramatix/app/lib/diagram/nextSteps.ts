@@ -17,7 +17,7 @@ import { placeBoundaryEvent } from "./assistPlacement";
  *  - "template" → open the inline-template picker anchored on the source.
  *  - "intent"   → attach the template a keyword catalog maps the source name to.
  */
-export type CandidateKind = "element" | "boundary" | "template" | "intent";
+export type CandidateKind = "element" | "boundary" | "template" | "intent" | "dataobject";
 
 export interface NextStepCandidate {
   kind: CandidateKind;
@@ -33,6 +33,8 @@ export interface NextStepCandidate {
   intentLabel?: string;
   intentCategory?: string;
   intentTemplateName?: string;
+  /** dataobject kind only — "in" (data → element) or "out" (element → data). */
+  dataDirection?: "in" | "out";
 }
 
 const BOUNDARY_HOST_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded"]);

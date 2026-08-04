@@ -11,9 +11,14 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 
+const ACTIONS = new Set(["suggest-template", "add-input-data-object", "add-output-data-object"]);
+
 interface RowInput {
   label?: string;
   keywords?: unknown;
+  action?: string;
+  diagramType?: string;
+  defaultLabel?: string | null;
   targetCategory?: string | null;
   targetTemplateName?: string | null;
   sortOrder?: number;
@@ -46,7 +51,7 @@ export async function PUT(req: Request) {
   }
 
   // Validate + normalise every row before touching the DB.
-  let clean: { label: string; keywords: string[]; targetCategory: string | null; targetTemplateName: string | null; sortOrder: number }[];
+  let clean: { label: string; keywords: string[]; action: string; diagramType: string; defaultLabel: string | null; targetCategory: string | null; targetTemplateName: string | null; sortOrder: number }[];
   try {
     clean = incoming.map((r, i) => {
       const label = typeof r.label === "string" ? r.label.trim() : "";
@@ -55,10 +60,18 @@ export async function PUT(req: Request) {
         ? (r.keywords as unknown[]).map((k) => String(k).trim()).filter(Boolean)
         : [];
       if (keywords.length === 0) throw new Error(`"${label}": at least one keyword is required`);
+      const action = ACTIONS.has(r.action ?? "") ? r.action! : "suggest-template";
+      const diagramType = r.diagramType?.toString().trim() || "all";
+      const defaultLabel = r.defaultLabel?.toString().trim() || null;
       const targetCategory = r.targetCategory?.toString().trim() || null;
       const targetTemplateName = r.targetTemplateName?.toString().trim() || null;
-      if (!targetCategory && !targetTemplateName) throw new Error(`"${label}": set a category or a template name`);
-      return { label, keywords, targetCategory, targetTemplateName, sortOrder: Number.isFinite(r.sortOrder) ? Number(r.sortOrder) : i };
+      if (action === "suggest-template" && !targetCategory && !targetTemplateName) {
+        throw new Error(`"${label}": a template rule needs a category or a template name`);
+      }
+      if (action !== "suggest-template" && !defaultLabel) {
+        throw new Error(`"${label}": a data-object rule needs a default object name`);
+      }
+      return { label, keywords, action, diagramType, defaultLabel, targetCategory, targetTemplateName, sortOrder: Number.isFinite(r.sortOrder) ? Number(r.sortOrder) : i };
     });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Invalid row" }, { status: 400 });

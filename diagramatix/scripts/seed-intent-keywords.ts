@@ -14,9 +14,10 @@
 import { PrismaClient } from "../app/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-type Row = { label: string; keywords: string[]; targetCategory?: string; targetTemplateName?: string; sortOrder: number };
+type Row = { label: string; keywords: string[]; action?: string; diagramType?: string; defaultLabel?: string; targetCategory?: string; targetTemplateName?: string; sortOrder: number };
 
 const ROWS: Row[] = [
+  // suggest-template (green)
   { label: "Approval", keywords: ["approve", "approval", "sign-off", "sign off", "authorise", "authorize", "review", "endorse", "ratify"], targetCategory: "Approvals", sortOrder: 10 },
   { label: "Rejection", keywords: ["reject", "rejection", "decline", "deny", "refuse"], targetCategory: "Approvals", sortOrder: 20 },
   { label: "Escalation", keywords: ["escalate", "escalation", "expedite"], targetCategory: "Exceptions", sortOrder: 30 },
@@ -24,6 +25,11 @@ const ROWS: Row[] = [
   { label: "Notification", keywords: ["notify", "notification", "alert", "email", "inform", "remind", "reminder"], targetCategory: "Events", sortOrder: 50 },
   { label: "Payment", keywords: ["pay", "payment", "invoice", "billing", "refund", "settle"], targetCategory: "Approvals", sortOrder: 60 },
   { label: "Review loop", keywords: ["rework", "revise", "revision", "amend", "correct"], targetCategory: "Loops", sortOrder: 70 },
+  // data-object suggestions (green, all diagram types) — G2/G3
+  { label: "Instructions", keywords: ["per the", "according to", "policy", "procedure", "guideline", "instructions", "template", "checklist", "standard", "rules", "as per"],
+    action: "add-input-data-object", diagramType: "all", defaultLabel: "Instructions", sortOrder: 80 },
+  { label: "Output Doc", keywords: ["produce", "prepare", "create", "draft", "write", "generate", "update", "issue", "compile", "report", "letter", "document", "certificate", "record"],
+    action: "add-output-data-object", diagramType: "all", defaultLabel: "Output Doc", sortOrder: 90 },
 ];
 
 async function main() {
@@ -35,10 +41,14 @@ async function main() {
       const existing = await prisma.intentKeywordMap.findFirst({ where: { label: r.label } });
       if (existing) { skipped++; console.log(`  skip   "${r.label}" (exists)`); continue; }
       await prisma.intentKeywordMap.create({
-        data: { label: r.label, keywords: r.keywords, targetCategory: r.targetCategory ?? null, targetTemplateName: r.targetTemplateName ?? null, sortOrder: r.sortOrder },
+        data: {
+          label: r.label, keywords: r.keywords,
+          action: r.action ?? "suggest-template", diagramType: r.diagramType ?? "all", defaultLabel: r.defaultLabel ?? null,
+          targetCategory: r.targetCategory ?? null, targetTemplateName: r.targetTemplateName ?? null, sortOrder: r.sortOrder,
+        },
       });
       created++;
-      console.log(`  add    "${r.label}" → ${r.targetTemplateName ?? r.targetCategory}`);
+      console.log(`  add    "${r.label}" [${r.action ?? "suggest-template"}] → ${r.defaultLabel ?? r.targetTemplateName ?? r.targetCategory}`);
     }
     console.log(`\nDone. Created ${created}, skipped ${skipped}.`);
   } finally {
