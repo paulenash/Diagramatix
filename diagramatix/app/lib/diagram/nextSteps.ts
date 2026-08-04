@@ -8,8 +8,19 @@
  */
 import type { DiagramData, DiagramElement, SymbolType, ConnectorType, EventType, GatewayType } from "./types";
 import { canConnect } from "./canConnect";
+import { placeBoundaryEvent } from "./assistPlacement";
+
+/**
+ * What accepting a candidate does:
+ *  - "element"  → place a new element inline / on a gateway branch + connect.
+ *  - "boundary" → mount a trigger-less intermediate event on the source's edge.
+ *  - "template" → open the inline-template picker anchored on the source.
+ *  - "intent"   → attach the template a keyword catalog maps the source name to.
+ */
+export type CandidateKind = "element" | "boundary" | "template" | "intent";
 
 export interface NextStepCandidate {
+  kind: CandidateKind;
   symbolType: SymbolType;
   connectorType: ConnectorType;
   eventType?: EventType;
@@ -18,13 +29,19 @@ export interface NextStepCandidate {
   label: string;
   /** Why it's suggested (tooltip). */
   reason: string;
+  /** intent kind only — the catalog match. */
+  intentLabel?: string;
+  intentCategory?: string;
+  intentTemplateName?: string;
 }
+
+const BOUNDARY_HOST_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded"]);
 
 /** Ordered candidate menu per source type (BPMN), most-likely first. */
 function menuFor(sourceType: string): NextStepCandidate[] {
-  const task: NextStepCandidate = { symbolType: "task", connectorType: "sequence", label: "Task", reason: "next activity" };
-  const decision: NextStepCandidate = { symbolType: "gateway", connectorType: "sequence", gatewayType: "exclusive", label: "Decision", reason: "branch the flow" };
-  const end: NextStepCandidate = { symbolType: "end-event", connectorType: "sequence", label: "End", reason: "end the process" };
+  const task: NextStepCandidate = { kind: "element", symbolType: "task", connectorType: "sequence", label: "Task", reason: "next activity" };
+  const decision: NextStepCandidate = { kind: "element", symbolType: "gateway", connectorType: "sequence", gatewayType: "exclusive", label: "Decision", reason: "branch the flow" };
+  const end: NextStepCandidate = { kind: "element", symbolType: "end-event", connectorType: "sequence", label: "End", reason: "end the process" };
   switch (sourceType) {
     case "start-event": return [task];
     case "task":
@@ -34,6 +51,14 @@ function menuFor(sourceType: string): NextStepCandidate[] {
     case "intermediate-event": return [task];
     default: return [];
   }
+}
+
+/** Boundary-event candidate when the source can host one AND there's room. */
+function boundaryCandidateFor(source: DiagramElement, data: DiagramData): NextStepCandidate | null {
+  if (!BOUNDARY_HOST_TYPES.has(source.type)) return null;
+  const existing = data.elements.filter((e) => e.boundaryHostId === source.id);
+  if (placeBoundaryEvent(source, existing) === null) return null; // full → give up
+  return { kind: "boundary", symbolType: "intermediate-event", connectorType: "sequence", label: "Boundary", reason: "attach a boundary event" };
 }
 
 /** A fresh, top-level-ish target of the candidate type — placed in the source's
@@ -58,7 +83,9 @@ export function suggestNextSteps(
   diagramType: string,
 ): NextStepCandidate[] {
   if (diagramType !== "bpmn") return [];
-  return menuFor(source.type).filter((c) =>
+  const elements = menuFor(source.type).filter((c) =>
     canConnect(source, synthTarget(c, source.parentId), c.connectorType, data.elements),
   );
+  const boundary = boundaryCandidateFor(source, data);
+  return boundary ? [...elements, boundary] : elements;
 }

@@ -33,6 +33,7 @@ import { PresenceBar } from "@/app/components/canvas/PresenceBar";
 import { usePresence } from "@/app/hooks/usePresence";
 import { CollabRoom } from "@/app/components/canvas/CollabRoom";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
+import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, findFreeSlot } from "@/app/lib/diagram/assistPlacement";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
@@ -1912,12 +1913,42 @@ export function DiagramEditor({
   );
   const acceptNextStep = useCallback((c: NextStepCandidate) => {
     if (!selectedElement) return;
+    const src = selectedElement;
+
+    // Boundary Event (rule 3): mount a trigger-less intermediate event on the
+    // source's edge; no connector is drawn.
+    if (c.kind === "boundary") {
+      const existing = data.elements.filter((e) => e.boundaryHostId === src.id);
+      const spot = placeBoundaryEvent(src, existing);
+      if (!spot) return; // no room — give up
+      const newId = nanoid();
+      addElementGated("intermediate-event", spot, undefined, undefined, newId);
+      setEventBoundary(newId, src.id); // stamp boundaryHostId deterministically
+      setSelectedElementIds(new Set([newId]));
+      return;
+    }
+
+    // Element (rules 1, 2, 4): inline, or a gateway branch that fans out, then
+    // nudged to the nearest free slot so it never lands on an existing element.
+    const { w, h } = sizeOf(c.symbolType);
+    const isGateway = src.type === "gateway";
+    const branchIndex = isGateway
+      ? data.connectors.filter((cn) => cn.sourceId === src.id).length
+      : 0;
+    const wanted = isGateway
+      ? placeGatewayBranch(src, branchIndex, w, h)
+      : placeInline(src, w, h);
+    const others = data.elements
+      .filter((e) => e.id !== src.id && e.type !== "pool" && e.type !== "lane" && e.type !== "sublane")
+      .map((e) => ({ x: e.x, y: e.y, width: e.width, height: e.height }));
+    const center = findFreeSlot(wanted, w, h, others);
+
     const newId = nanoid();
-    addElementGated(c.symbolType, { x: selectedElement.x + selectedElement.width + 70, y: selectedElement.y }, undefined, c.eventType, newId);
+    addElementGated(c.symbolType, center, undefined, c.eventType, newId);
     if (c.gatewayType) updateProperties(newId, { gatewayType: c.gatewayType });
-    addConnector(selectedElement.id, newId, c.connectorType);
+    addConnector(src.id, newId, c.connectorType);
     setSelectedElementIds(new Set([newId])); // chain: select the new step
-  }, [selectedElement, addElementGated, updateProperties, addConnector]);
+  }, [selectedElement, data.elements, data.connectors, addElementGated, updateProperties, addConnector, setEventBoundary]);
   // Stable ref so the global Tab handler always sees the latest candidates.
   const nextStepRef = useRef<{ candidates: NextStepCandidate[]; accept: (c: NextStepCandidate) => void }>({ candidates: [], accept: () => {} });
   nextStepRef.current = { candidates: nextStepCandidates, accept: acceptNextStep };
