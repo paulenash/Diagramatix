@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  HALF_TASK_W, HALF_EVENT_W, BOUNDARY_FOLLOW_GAP, placeInline, placeGatewayBranch, placeBoundaryEvent,
+  HALF_TASK_W, HALF_TASK_H, HALF_EVENT_W, BOUNDARY_FOLLOW_GAP, placeInline, placeGatewayBranch, placeBoundaryEvent,
   placeAfterBoundaryEvent, boundaryOuterSide, findFreeSlot,
 } from "@/app/lib/diagram/assistPlacement";
 import type { DiagramElement } from "@/app/lib/diagram/types";
@@ -31,12 +31,12 @@ describe("rule 2 — gateway fan-out", () => {
     expect(c.y).toBe(gw.y + gw.height / 2);
     expect(c.x - w / 2).toBe(gw.x + gw.width + HALF_TASK_W);
   });
-  it("branches fan above then below by (h + 51), symmetric", () => {
+  it("branches fan above then below by (h + ½ Task height), symmetric", () => {
     const mid = gw.y + gw.height / 2;
-    expect(placeGatewayBranch(gw, 1, w, h).y).toBe(mid - (h + HALF_TASK_W)); // above
-    expect(placeGatewayBranch(gw, 2, w, h).y).toBe(mid + (h + HALF_TASK_W)); // below
-    expect(placeGatewayBranch(gw, 3, w, h).y).toBe(mid - 2 * (h + HALF_TASK_W)); // above²
-    expect(placeGatewayBranch(gw, 4, w, h).y).toBe(mid + 2 * (h + HALF_TASK_W)); // below²
+    expect(placeGatewayBranch(gw, 1, w, h).y).toBe(mid - (h + HALF_TASK_H)); // above
+    expect(placeGatewayBranch(gw, 2, w, h).y).toBe(mid + (h + HALF_TASK_H)); // below
+    expect(placeGatewayBranch(gw, 3, w, h).y).toBe(mid - 2 * (h + HALF_TASK_H)); // above²
+    expect(placeGatewayBranch(gw, 4, w, h).y).toBe(mid + 2 * (h + HALF_TASK_H)); // below²
     // all share the same x
     expect(placeGatewayBranch(gw, 2, w, h).x).toBe(placeGatewayBranch(gw, 1, w, h).x);
   });
