@@ -951,6 +951,8 @@ export function DiagramEditor({
     splitPoolEven,
     splitLaneEven,
     wrapInPool,
+    addPool,
+    addLaneAt,
     reorderLane,
     moveLaneBoundary,
     moveVSwimlaneBoundary,
@@ -2228,6 +2230,36 @@ export function DiagramEditor({
         continue;
       }
 
+      if (op.op === "addPool") {
+        addPool({ label: op.label, poolType: op.poolType, position: op.position });
+        results.push(`added a ${op.poolType === "black-box" ? "black-box " : ""}pool${op.position ? ` ${op.position} existing pools` : ""}`);
+        continue;
+      }
+
+      if (op.op === "addLaneAt") {
+        const ref = resolve1(op.refLane);
+        if ("err" in ref) { results.push(ref.err); anyFail = true; continue; }
+        if (ref.type !== "lane") { results.push(`${nameOf(ref)} isn't a lane`); anyFail = true; continue; }
+        const poolId = ref.parentId ?? (() => { const p = resolve1(op.poolRef); return "err" in p ? null : p.id; })();
+        if (!poolId) { results.push(`couldn't find the pool for ${nameOf(ref)}`); anyFail = true; continue; }
+        addLaneAt(poolId, op.position, ref.id, op.label);
+        results.push(`added a lane ${op.position} ${nameOf(ref)}`);
+        continue;
+      }
+
+      if (op.op === "swapLanes") {
+        const a = resolve1(op.laneA), b = resolve1(op.laneB);
+        if ("err" in a) { results.push(a.err); anyFail = true; continue; }
+        if ("err" in b) { results.push(b.err); anyFail = true; continue; }
+        if (a.type !== "lane" || b.type !== "lane" || a.parentId !== b.parentId) { results.push("both must be lanes in the same pool"); anyFail = true; continue; }
+        const sibs = els.filter((e) => e.type === "lane" && e.parentId === a.parentId).sort((x, y) => x.y - y.y);
+        const ia = sibs.findIndex((e) => e.id === a.id), ib = sibs.findIndex((e) => e.id === b.id);
+        if (Math.abs(ia - ib) !== 1) { results.push("lanes must be next to each other to swap"); anyFail = true; continue; }
+        swapLane(sibs[Math.min(ia, ib)].id, "down");
+        results.push(`swapped ${nameOf(a)} ↔ ${nameOf(b)}`);
+        continue;
+      }
+
       if (op.op === "rename") {
         const e = resolve1(op.ref);
         if ("err" in e) { results.push(e.err); anyFail = true; continue; }
@@ -2272,7 +2304,7 @@ export function DiagramEditor({
       }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, moveElements, removeSpace]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, swapLane, moveElements, removeSpace]);
 
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
   const runAbraCommand = useCallback(async (text: string) => {

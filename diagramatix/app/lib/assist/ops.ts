@@ -16,8 +16,11 @@ export type AssistOp =
   | { op: "move"; ref: Ref; direction: "left" | "right" | "up" | "down"; count?: number }
   | { op: "wrapInPool"; label?: string }
   | { op: "addBoundary"; hostRef: Ref; label?: string; eventType?: EventType }
+  | { op: "addPool"; label?: string; poolType?: "black-box" | "white-box"; position?: "above" | "below" }
   | { op: "addLanes"; poolRef: Ref; labels: string[] }
+  | { op: "addLaneAt"; poolRef: Ref; label?: string; position: "above" | "below"; refLane: Ref }
   | { op: "addSublanes"; laneRef: Ref; labels: string[] }
+  | { op: "swapLanes"; laneA: Ref; laneB: Ref }
   | { op: "clear" }
   | { op: "export"; format?: "json" }
   | { op: "undo" };
@@ -112,10 +115,25 @@ export function validateOp(raw: unknown): AssistOp | null {
       if (isRef(o.eventType)) op.eventType = o.eventType as EventType;
       return op;
     }
+    case "addPool": {
+      const op: AssistOp = { op: "addPool" };
+      if (isRef(o.label)) op.label = (o.label as string).trim();
+      if (o.poolType === "black-box" || o.poolType === "white-box") op.poolType = o.poolType;
+      if (o.position === "above" || o.position === "below") op.position = o.position;
+      return op;
+    }
     case "addLanes": {
       const labels = Array.isArray(o.labels) ? (o.labels as unknown[]).map((l) => String(l).trim()).filter(Boolean) : [];
       return isRef(o.poolRef) && labels.length ? { op: "addLanes", poolRef: (o.poolRef as string).trim(), labels } : null;
     }
+    case "addLaneAt": {
+      if (!isRef(o.poolRef) || !isRef(o.refLane) || (o.position !== "above" && o.position !== "below")) return null;
+      const op: AssistOp = { op: "addLaneAt", poolRef: (o.poolRef as string).trim(), position: o.position, refLane: (o.refLane as string).trim() };
+      if (isRef(o.label)) op.label = (o.label as string).trim();
+      return op;
+    }
+    case "swapLanes":
+      return isRef(o.laneA) && isRef(o.laneB) ? { op: "swapLanes", laneA: (o.laneA as string).trim(), laneB: (o.laneB as string).trim() } : null;
     case "addSublanes": {
       const labels = Array.isArray(o.labels) ? (o.labels as unknown[]).map((l) => String(l).trim()).filter(Boolean) : [];
       return isRef(o.laneRef) && labels.length ? { op: "addSublanes", laneRef: (o.laneRef as string).trim(), labels } : null;

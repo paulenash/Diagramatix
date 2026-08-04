@@ -92,15 +92,53 @@ describe("parseCommand — lanes / sublanes", () => {
     expect(parseCommand("add a new lane")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane 1"] }]);
     expect(parseCommand("add a new sublane")).toEqual([{ op: "addSublanes", laneRef: "the lane", labels: ["Sublane 1"] }]);
   });
-  it("wrap: 'add a pool to all elements', bare 'add a pool', extend", () => {
+  it("wrap: 'add a pool to all elements' / extend (bare 'add a pool' is a NEW pool)", () => {
     expect(parseCommand("add a pool to all elements on the diagram")).toEqual([{ op: "wrapInPool" }]);
-    expect(parseCommand("add a pool")).toEqual([{ op: "wrapInPool" }]);
-    expect(parseCommand("add a new pool")).toEqual([{ op: "wrapInPool" }]);
+    expect(parseCommand("wrap everything in a pool")).toEqual([{ op: "wrapInPool" }]);
     expect(parseCommand("extend the pool to include all elements")).toEqual([{ op: "wrapInPool" }]);
+    // bare add → create a new (empty) pool, not wrap
+    expect(parseCommand("add a pool")).toEqual([{ op: "addPool" }]);
+    expect(parseCommand("add a new pool")).toEqual([{ op: "addPool" }]);
   });
   it("container words never become a task", () => {
     // malformed pool phrasing → null (AI), not a task named after the phrase
     expect(parseCommand("add a pool thingy blah")).toBeNull();
+  });
+});
+
+// The definitive container-maintenance command set (docs/abracadabra-commands.md).
+describe("container maintenance — definitive set", () => {
+  it("1. Add Pool", () => {
+    expect(parseCommand("add a pool")).toEqual([{ op: "addPool" }]);
+    expect(parseCommand("create a pool called Finance")).toEqual([{ op: "addPool", label: "Finance" }]);
+  });
+  it("2. Add Lane to Pool", () => {
+    expect(parseCommand("add a lane to the pool")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane 1"] }]);
+    expect(parseCommand("add a lane to My Company called Sales")).toEqual([{ op: "addLanes", poolRef: "My Company", labels: ["Sales"] }]);
+  });
+  it("3. Add Lane above/below a lane", () => {
+    expect(parseCommand("add a lane above Lane 2")).toEqual([{ op: "addLaneAt", poolRef: "the pool", position: "above", refLane: "Lane 2" }]);
+    expect(parseCommand("add a lane below the Sales lane")).toEqual([{ op: "addLaneAt", poolRef: "the pool", position: "below", refLane: "Sales lane" }]);
+    expect(parseCommand("insert a lane to My Company below Sales called Support")).toEqual([{ op: "addLaneAt", poolRef: "My Company", position: "below", refLane: "Sales", label: "Support" }]);
+  });
+  it("4. Delete Lane / Sublane", () => {
+    expect(parseCommand("delete lane 2")).toEqual([{ op: "delete", ref: "lane 2" }]);
+    expect(parseCommand("remove the sublane Marketing Assistant")).toEqual([{ op: "delete", ref: "sublane Marketing Assistant" }]);
+  });
+  it("5. Add Sublanes to a lane", () => {
+    expect(parseCommand("add 3 sublanes to Marketing called A, B and C")).toEqual([{ op: "addSublanes", laneRef: "Marketing", labels: ["A", "B", "C"] }]);
+    expect(parseCommand("add sublanes to the Sales lane")).toEqual([{ op: "addSublanes", laneRef: "the Sales lane", labels: ["Sublane 1"] }]);
+  });
+  it("6. Extend Pool to include all elements", () => {
+    expect(parseCommand("extend the pool to include all elements on the diagram")).toEqual([{ op: "wrapInPool" }]);
+  });
+  it("7/8. Add Black-box Pool above/below existing pools", () => {
+    expect(parseCommand("add a black-box pool above existing pools")).toEqual([{ op: "addPool", poolType: "black-box", position: "above" }]);
+    expect(parseCommand("add a black box pool below existing pools")).toEqual([{ op: "addPool", poolType: "black-box", position: "below" }]);
+  });
+  it("9. Swap two lanes", () => {
+    expect(parseCommand("swap lane Sales with lane Marketing")).toEqual([{ op: "swapLanes", laneA: "lane Sales", laneB: "lane Marketing" }]);
+    expect(parseCommand("swap Sales and Marketing")).toEqual([{ op: "swapLanes", laneA: "Sales", laneB: "Marketing" }]);
   });
 });
 

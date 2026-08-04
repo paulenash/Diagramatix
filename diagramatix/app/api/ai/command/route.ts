@@ -32,8 +32,11 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"move", "ref": <name>, "direction": "left"|"right"|"up"|"down", "count"?: number }
   { "op":"wrapInPool", "label"?: string }                 // put a pool around all un-pooled elements
   { "op":"addBoundary", "hostRef": <name>, "label"?: string, "eventType"?: "error"|"timer"|"message"|... }  // boundary event on a task/subprocess
+  { "op":"addPool", "label"?: string, "poolType"?: "black-box"|"white-box", "position"?: "above"|"below" }  // new pool
   { "op":"addLanes", "poolRef": <name>, "labels": [string,…] }      // N equal named lanes in a pool
+  { "op":"addLaneAt", "poolRef": <name>, "position": "above"|"below", "refLane": <name>, "label"?: string }  // insert a lane by a ref lane
   { "op":"addSublanes", "laneRef": <name>, "labels": [string,…] }   // N equal named sublanes in a lane
+  { "op":"swapLanes", "laneA": <name>, "laneB": <name> }            // swap two adjacent lanes
   { "op":"clear" }                    // empty the whole diagram
   { "op":"export", "format":"json" }  // download the diagram as JSON
   { "op":"undo" }

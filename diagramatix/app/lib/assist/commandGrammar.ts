@@ -74,19 +74,40 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   m = raw.match(/^call\s+(.+?)\s+(.+)$/i);
   if (m && !matchSymbol(m[1])) return [{ op: "rename", ref: clean(m[1]), label: clean(m[2]) }];
 
-  // ── Wrap / grow a pool around everything ("poll"/"pull" mishear "pool") ──
-  // Broad: "add/put/draw a pool [around|to|over] [all elements|everything|the
-  // diagram]", a bare "add a pool", "wrap everything in a pool", and
-  // "extend/grow the pool to include/accommodate all elements".
+  // ── Pool / lane container commands ("poll"/"pull"→pool, "line"→lane) ──
   {
     const P = "(?:pool|poll|pull)";
-    const ALL = "(?:everything|all(?:\\s+(?:the\\s+)?elements?)?|the\\s+(?:lot|whole\\s+thing|diagram)|it\\s+all)";
+    const L = "(?:lanes?|lines?)";
+    const ALL = "(?:everything|all(?:\\s+(?:the\\s+)?elements?)?(?:\\s+on\\s+(?:the\\s+)?diagram)?|the\\s+(?:lot|whole\\s+thing|diagram)|it\\s+all)";
+
+    // Swap two named lanes: "swap lane A with lane B" / "swap A and B".
+    // (resolveRef strips a leading "lane"/"pool" kind word, so keep the raw ref.)
+    let mm = raw.match(new RegExp(`^swap\\s+(.+?)\\s+(?:with|and|for|<->|<>)\\s+(.+)$`, "i"));
+    if (mm) return [{ op: "swapLanes", laneA: clean(mm[1]), laneB: clean(mm[2]) }];
+
+    // Insert a lane above/below a reference lane: "add a lane above/below Lane X".
+    mm = raw.match(new RegExp(`^(?:add|insert|create)\\s+(?:a\\s+)?(?:new\\s+)?${L}\\s+(?:to\\s+(?:the\\s+)?(.+?)\\s+)?(above|below|under(?:neath)?|over|before|after)\\s+(?:the\\s+)?(.+?)(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
+    if (mm) {
+      const pos = /^(?:above|over|before)/i.test(mm[2]) ? "above" : "below";
+      return [{ op: "addLaneAt", poolRef: mm[1] ? clean(mm[1]) : "the pool", position: pos, refLane: clean(mm[3]), ...(mm[4] ? { label: clean(mm[4]) } : {}) }];
+    }
+
+    // Wrap / grow a pool around everything (a qualifier is REQUIRED here, so a
+    // bare "add a pool" falls through to the create-pool rule below).
     if (
-      new RegExp(`^(?:put|wrap|draw|add|create|make)\\s+(?:a\\s+)?(?:new\\s+)?${P}(?:\\s+(?:around|round|over|to(?:\\s+include|\\s+cover|\\s+contain)?|including|containing)\\s+${ALL})?(?:\\s+on\\s+the\\s+diagram)?$`, "i").test(raw)
+      new RegExp(`^(?:put|wrap|draw|add|create|make)\\s+(?:a\\s+)?(?:new\\s+)?${P}\\s+(?:around|round|over|to(?:\\s+include|\\s+cover|\\s+contain)?|including|containing)\\s+${ALL}`, "i").test(raw)
       || new RegExp(`^wrap\\s+${ALL}\\s+(?:in|with|inside|into)\\s+(?:a\\s+)?${P}\\b`, "i").test(raw)
       || new RegExp(`^(?:extend|expand|grow|stretch|enlarge)\\s+(?:the\\s+)?${P}\\s+(?:to\\s+)?(?:include|around|cover|contain|fit|accommodate|accomodate|encompass|hold)\\s+${ALL}`, "i").test(raw)
     ) {
       return [{ op: "wrapInPool" }];
+    }
+
+    // Create a NEW pool: "add a [black-box|white-box] pool [above|below existing pools] [called X]".
+    mm = raw.match(new RegExp(`^(?:add|insert|create|put|make|new|draw)\\s+(?:a\\s+|an\\s+|the\\s+)?(?:new\\s+|another\\s+|empty\\s+)?(black[- ]?box|white[- ]?box)?\\s*${P}(?:\\s+(above|below|under(?:neath)?|over)\\b.*?)?(?:\\s+called\\s+(.+))?$`, "i"));
+    if (mm) {
+      const poolType = mm[1] ? (/black/i.test(mm[1]) ? "black-box" : "white-box") : undefined;
+      const position = mm[2] ? (/^(?:above|over)/i.test(mm[2]) ? "above" : "below") : undefined;
+      return [{ op: "addPool", ...(poolType ? { poolType } : {}), ...(position ? { position } : {}), ...(mm[3] ? { label: clean(mm[3]) } : {}) }];
     }
   }
 

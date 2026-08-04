@@ -434,6 +434,8 @@ export type Action =
   | { type: "SPLIT_POOL_EVEN"; payload: { poolId: string; labels: string[] } }
   | { type: "SPLIT_LANE_EVEN"; payload: { laneId: string; labels: string[] } }
   | { type: "WRAP_IN_POOL"; payload: { label?: string } }
+  | { type: "ADD_POOL"; payload: { label?: string; poolType?: string; position?: "above" | "below" } }
+  | { type: "ADD_LANE_AT"; payload: { poolId: string; label?: string; position: "above" | "below"; refLaneId: string } }
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
   | { type: "MOVE_VSWIMLANE_BOUNDARY"; payload: { kind: "divider" | "left" | "right" | "bottom"; delta: number; leftId?: string; rightId?: string } }
   | { type: "REORDER_LANE"; payload: { laneId: string; direction: "up" | "down" } }
@@ -8651,6 +8653,73 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements: ensureContainersEncloseChildren(updatePoolTypes([pool, lane, ...elements])), connectors: state.connectors };
     }
 
+    // Create a NEW pool (empty). Black-box = a bare participant box (no lanes);
+    // white-box = a pool with one starter lane. Position above/below any existing
+    // pools, else below the current content.
+    case "ADD_POOL": {
+      const { label, poolType = "white-box", position } = action.payload;
+      const pools = state.elements.filter((e) => e.type === "pool");
+      const HEADER_W = 36, GAP = 40, DEFAULT_W = 760, DEFAULT_H = 200;
+      let x: number, y: number, width = DEFAULT_W;
+      const height = DEFAULT_H;
+      if (pools.length > 0) {
+        x = Math.min(...pools.map((p) => p.x));
+        width = Math.max(DEFAULT_W, Math.max(...pools.map((p) => p.x + p.width)) - x);
+        y = position === "above"
+          ? Math.min(...pools.map((p) => p.y)) - height - GAP
+          : Math.max(...pools.map((p) => p.y + p.height)) + GAP;
+      } else {
+        const loose = state.elements.filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane");
+        if (loose.length) {
+          x = Math.min(...loose.map((e) => e.x)) - GAP;
+          y = position === "above" ? Math.min(...loose.map((e) => e.y)) - height - GAP : Math.max(...loose.map((e) => e.y + e.height)) + GAP;
+          width = Math.max(DEFAULT_W, Math.max(...loose.map((e) => e.x + e.width)) - x + GAP);
+        } else { x = 80; y = 80; }
+      }
+      const poolId = nanoid();
+      const pool: DiagramElement = {
+        id: poolId, type: "pool", x, y, width, height,
+        label: label || (poolType === "black-box" ? "Participant" : "Pool"),
+        properties: { poolType },
+      };
+      const added: DiagramElement[] = [pool];
+      if (poolType !== "black-box") {
+        added.push({ id: nanoid(), type: "lane", x: x + HEADER_W, y, width: width - HEADER_W, height, label: "Lane 1", properties: {}, parentId: poolId });
+      }
+      return { ...state, elements: updatePoolTypes([...state.elements, ...added]), connectors: state.connectors };
+    }
+
+    // Insert a lane band above/below a reference lane: shift that lane's pool's
+    // descendants at/below the insertion line down, grow the pool, reroute.
+    case "ADD_LANE_AT": {
+      const { poolId, label, position, refLaneId } = action.payload;
+      const pool = state.elements.find((e) => e.id === poolId && e.type === "pool");
+      const refLane = state.elements.find((e) => e.id === refLaneId && e.type === "lane");
+      if (!pool || !refLane) return state;
+      const HEADER_W = getPoolHeaderWidth(pool);
+      const newH = refLane.height;
+      const insertY = position === "above" ? refLane.y : refLane.y + refLane.height;
+      const byId = new Map(state.elements.map((e) => [e.id, e] as const));
+      const isDesc = (e: DiagramElement) => {
+        let cur: DiagramElement | undefined = e;
+        for (let i = 0; cur?.parentId && i < 12; i++) { if (cur.parentId === poolId) return true; cur = byId.get(cur.parentId); }
+        return false;
+      };
+      const newLane: DiagramElement = {
+        id: nanoid(), type: "lane", x: pool.x + HEADER_W, y: insertY,
+        width: pool.width - HEADER_W, height: newH, label: label || "Lane", properties: {}, parentId: poolId,
+      };
+      const shifted = state.elements.map((e) => {
+        if (e.id === pool.id) return { ...e, height: e.height + newH };
+        if (isDesc(e) && e.y >= insertY) return { ...e, y: e.y + newH };
+        return e;
+      });
+      let next = { elements: ensureContainersEncloseChildren([...shifted, newLane]), connectors: state.connectors };
+      next = applyPoolBelowShift(next.elements, next.connectors, poolId, pool.y + pool.height, newH);
+      next.connectors = recomputeAllConnectors(next.connectors, next.elements);
+      return { ...state, ...next };
+    }
+
     case "REORDER_LANE": {
       const { laneId, direction } = action.payload;
       const lane = state.elements.find(e => e.id === laneId && e.type === "lane");
@@ -9644,6 +9713,16 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "WRAP_IN_POOL", payload: { label } });
   }, []);
 
+  const addPool = useCallback((opts?: { label?: string; poolType?: string; position?: "above" | "below" }) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "ADD_POOL", payload: { label: opts?.label, poolType: opts?.poolType, position: opts?.position } });
+  }, []);
+
+  const addLaneAt = useCallback((poolId: string, position: "above" | "below", refLaneId: string, label?: string) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "ADD_LANE_AT", payload: { poolId, position, refLaneId, label } });
+  }, []);
+
   const moveLaneBoundary = useCallback(
     (aboveLaneId: string, belowLaneId: string, dy: number) => {
       if (!preLaneRef.current) preLaneRef.current = snapshotData();
@@ -9894,6 +9973,8 @@ export function useDiagram(initialData: DiagramData) {
     splitPoolEven,
     splitLaneEven,
     wrapInPool,
+    addPool,
+    addLaneAt,
     moveLaneBoundary,
     moveVSwimlaneBoundary,
     reorderLane,
