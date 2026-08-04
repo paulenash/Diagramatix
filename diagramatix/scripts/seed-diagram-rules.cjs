@@ -21,22 +21,50 @@ const rules = {
   "assist": "## Command Aliases & Phrasing\nV1.01: \"Compress a pool\" also accepts the verbs: compress, shrink, reduce, shorten, compact, collapse (e.g. \"shrink the Sales pool\").\nV1.02: \"Extend the pools\" also accepts the verbs: extend, lengthen, widen; the bare phrase \"include all elements\" also means extend. Extend widens EVERY pool to the SAME width so they cover all elements and stay aligned.\nV1.03: \"Add a pool\" creates a new EMPTY pool (no starter lane); \"put a pool around everything\" instead wraps the loose (un-pooled) elements into a pool.\nV1.04: Message flows: \"add message from <activity> to <pool> labelled <text>\" (either from/to word order). Rename or delete a message by its label: \"rename '<label>' to '<new label>'\", \"delete '<label>'\".\nV1.05: When normalising a mis-heard instruction, fix common speech errors: poll/pull -> pool, line -> lane, \"lane two\" -> Lane 2.\n\n## Container Naming & Sizing (enforced in code)\nV2.01: A Pool, Lane or Sub-lane is never left named the bare kind word: \"Pool\" becomes \"Pool 1\", \"Lane\" becomes \"Lane 2\", and so on.\nV2.02: A new or renamed Pool/Lane/Sub-lane never duplicates the name of any existing Pool or Lane; a numeric suffix is appended until the name is unique (e.g. \"Sales\" -> \"Sales 2\").\nV2.03: A newly created empty pool - and a pool whose last lane has just been deleted - is auto-sized to just fit its name in the vertical header.\nV2.04: Compress: a white-box pool shrinks itself and its lanes to leave half a Task height above the highest element and below the lowest; a black-box or empty pool shrinks to just fit its name.\nV2.05: Extend: all pools are set to the same width and widened rightward to clear the right-most element by a margin; lanes and sub-lanes widen to their pool's new right edge.",
 };
 
+// SAFETY: by default this script is INSERT-ONLY — it seeds a category's default
+// row only if that category has no default row yet, and NEVER overwrites live
+// rules. Admin edits made through the Rules editor are saved into these same
+// default rows, so an overwrite silently destroys them (this bit us once —
+// running the stale seed reset BPMN from 90+ rules down to 55).
+//
+// To deliberately overwrite existing default rows with the seed text, pass
+// --force. Even then, edit-tracked categories should be recovered from a
+// `.diag-rules` export or Azure PITR, not from this file.
+const FORCE = process.argv.includes("--force");
+
 async function seed() {
+  const countRules = (text) => text.split("\n").filter((l) => l.match(/^[A-Z]\d+(?:\.\d+)*:/)).length;
   for (const [category, text] of Object.entries(rules)) {
-    // UPSERT on id so re-running the seed propagates updated rule text
-    // to the existing default rows. The fixed id is `default-{category}`.
+    if (FORCE) {
+      await pool.query(
+        `INSERT INTO "DiagramRules" (id, category, rules, "isDefault", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, true, NOW(), NOW())
+         ON CONFLICT (id) DO UPDATE
+           SET rules = EXCLUDED.rules, "updatedAt" = NOW()`,
+        [`default-${category}`, category, text],
+      );
+      console.log(`FORCED overwrite: ${category} (${countRules(text)} rules)`);
+      continue;
+    }
+    // Insert-only: skip any category that already has a default row (by id OR
+    // by the natural key), so live/edited rules are never clobbered.
+    const { rows } = await pool.query(
+      `SELECT id FROM "DiagramRules" WHERE id=$1 OR (category=$2 AND "isDefault"=true AND "userId" IS NULL AND "orgId" IS NULL) LIMIT 1`,
+      [`default-${category}`, category],
+    );
+    if (rows.length > 0) {
+      console.log(`Skipped (exists, not overwritten): ${category}`);
+      continue;
+    }
     await pool.query(
       `INSERT INTO "DiagramRules" (id, category, rules, "isDefault", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, true, NOW(), NOW())
-       ON CONFLICT (id) DO UPDATE
-         SET rules = EXCLUDED.rules,
-             "updatedAt" = NOW()`,
-      [`default-${category}`, category, text]
+       VALUES ($1, $2, $3, true, NOW(), NOW())`,
+      [`default-${category}`, category, text],
     );
-    console.log(`Seeded: ${category} (${text.split("\n").filter(l => l.match(/^[A-Z]\d+(?:\.\d+)*:/)).length} rules)`);
+    console.log(`Seeded (new): ${category} (${countRules(text)} rules)`);
   }
   await pool.end();
-  console.log("Done!");
+  console.log(FORCE ? "Done (FORCE mode)." : "Done (insert-only; pass --force to overwrite).");
 }
 
 seed().catch(e => { console.error(e); process.exit(1); });
