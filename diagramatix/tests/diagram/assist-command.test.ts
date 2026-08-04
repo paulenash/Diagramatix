@@ -62,6 +62,20 @@ describe("parseCommand — rename / delete / undo", () => {
   });
 });
 
+describe("parseCommand — clear / export", () => {
+  it("clear the diagram", () => {
+    expect(parseCommand("clear the diagram")).toEqual([{ op: "clear" }]);
+    expect(parseCommand("clear current diagram")).toEqual([{ op: "clear" }]);
+    expect(parseCommand("start over")).toEqual([{ op: "clear" }]);
+    expect(parseCommand("wipe everything")).toEqual([{ op: "clear" }]);
+  });
+  it("export to JSON", () => {
+    expect(parseCommand("export diagram to json")).toEqual([{ op: "export", format: "json" }]);
+    expect(parseCommand("download as JSON")).toEqual([{ op: "export", format: "json" }]);
+    expect(parseCommand("export the diagram")).toEqual([{ op: "export", format: "json" }]);
+  });
+});
+
 describe("resolveRef", () => {
   const els = [el("s", "start-event"), el("t1", "task", "Review"), el("g", "gateway", "Approved?"), el("t2", "task", "Send Invoice")];
   it("exact + substring by name", () => {
@@ -82,6 +96,12 @@ describe("resolveRef", () => {
   });
   it("no match → null", () => {
     expect(resolveRef("Nonexistent", els)).toBeNull();
+  });
+  it("strips a leading kind word (#4 remove-sublane phrasing)", () => {
+    const lanes = [el("l1", "sublane", "Marketing Assistant"), el("l2", "sublane", "Marketing Staff")];
+    expect(resolveRef("sublane Marketing Assistant", lanes)).toEqual({ id: "l1" });
+    expect(resolveRef("the sub lane Marketing Staff", lanes)).toEqual({ id: "l2" });
+    expect(resolveRef("task Review", els)).toEqual({ id: "t1" });
   });
 });
 

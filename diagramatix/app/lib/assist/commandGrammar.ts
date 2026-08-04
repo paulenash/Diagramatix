@@ -30,6 +30,18 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     return [{ op: "undo" }];
   }
 
+  // ── Clear the whole diagram ──
+  if (/^(clear|empty|wipe|reset|blank)\s+(the\s+)?(current\s+|whole\s+|entire\s+)?(diagram|canvas|everything|it all|all|page)\b/.test(lower)
+      || /^(start over|start again|new diagram|clear all|delete everything|remove everything)\b/.test(lower)) {
+    return [{ op: "clear" }];
+  }
+
+  // ── Export to JSON ──
+  if (/^(export|download|save)\b.*\b(json)\b/.test(lower)
+      || /^(export|download)\s+(the\s+)?diagram\b/.test(lower)) {
+    return [{ op: "export", format: "json" }];
+  }
+
   // ── Disconnect (before delete, so "remove the link from X to Y" isn't a delete) ──
   let m = raw.match(/^(?:disconnect|unlink|remove (?:the )?(?:connection|link|arrow|flow|line))\s+(?:from\s+)?(.+?)\s+(?:to|and|from)\s+(.+)$/i);
   if (m) return [{ op: "disconnect", fromRef: clean(m[1]), toRef: clean(m[2]) }];

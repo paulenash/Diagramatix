@@ -29,6 +29,8 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"disconnect", "fromRef": <name>, "toRef": <name> }
   { "op":"delete", "ref": <name> }
   { "op":"rename", "ref": <name>, "label": string }
+  { "op":"clear" }                    // empty the whole diagram
+  { "op":"export", "format":"json" }  // download the diagram as JSON
   { "op":"undo" }
 
 <type> is one of: task, gateway, start-event, end-event, intermediate-event, subprocess, data-object, data-store, text-annotation.

@@ -13,6 +13,8 @@ export type AssistOp =
   | { op: "disconnect"; fromRef: Ref; toRef: Ref }
   | { op: "delete"; ref: Ref }
   | { op: "rename"; ref: Ref; label: string }
+  | { op: "clear" }
+  | { op: "export"; format?: "json" }
   | { op: "undo" };
 
 // ── Spoken vocabulary → canonical BPMN types ────────────────────────────────
@@ -90,6 +92,10 @@ export function validateOp(raw: unknown): AssistOp | null {
       return isRef(o.ref) ? { op: "delete", ref: (o.ref as string).trim() } : null;
     case "rename":
       return isRef(o.ref) && isRef(o.label) ? { op: "rename", ref: (o.ref as string).trim(), label: (o.label as string).trim() } : null;
+    case "clear":
+      return { op: "clear" };
+    case "export":
+      return { op: "export", format: "json" };
     case "undo":
       return { op: "undo" };
     default:

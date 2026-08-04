@@ -30,6 +30,18 @@ function typeNoun(spoken: string): string | null {
   return null;
 }
 
+// A leading kind word before a name ("sublane Marketing Assistant", "task Prepare")
+// is stripped so the remainder matches the element's label. Longest first.
+const KIND_PREFIXES = ["sub lane", "sublane", "lane", "pool", "sub process", "subprocess", "boundary event",
+  "start event", "end event", "event", "gateway", "decision", "task", "activity", "step"]
+  .sort((a, b) => b.length - a.length);
+function stripKind(s: string): string {
+  for (const k of KIND_PREFIXES) {
+    if (s.startsWith(k + " ")) return s.slice(k.length).trim();
+  }
+  return s;
+}
+
 export function resolveRef(spoken: string, elements: DiagramElement[], lastAddedId?: string | null): RefResolution {
   const s = norm(spoken);
   if (!s) return null;
@@ -54,7 +66,7 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
     return ofType.length > 1 ? { id: ofType[ofType.length - 1].id } : pick(ofType.map((e) => e.id));
   }
 
-  const target = stripArticle(s);
+  const target = stripKind(stripArticle(s));
   const labelled = elements.filter((e) => (e.label ?? "").trim().length > 0);
 
   // 1. Exact label (case-insensitive).

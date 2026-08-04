@@ -2059,6 +2059,9 @@ export function DiagramEditor({
   const abraLastId = useRef<string | null>(null);
   const abraDictRef = useRef<DictationHandle | null>(null);
   const abraStopRequested = useRef(false);
+  // Stable ref to the JSON export (a plain function redefined each render) so
+  // the memoised apply layer can call it without churning its deps.
+  const exportJsonRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (diagramType !== "bpmn") return;
     setAbracadabraOn(localStorage.getItem(`abracadabra-${diagramId}`) === "true");
@@ -2080,6 +2083,8 @@ export function DiagramEditor({
     };
     for (const op of ops) {
       if (op.op === "undo") { undo(); results.push("undid the last change"); continue; }
+      if (op.op === "clear") { clearDiagram(); abraLastId.current = null; results.push("cleared the diagram"); continue; }
+      if (op.op === "export") { exportJsonRef.current?.(); results.push("exported to JSON"); continue; }
 
       if (op.op === "add") {
         const { w, h } = sizeOf(op.symbolType);
@@ -2146,7 +2151,7 @@ export function DiagramEditor({
       }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, deleteElement, undo]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, deleteElement, undo, clearDiagram]);
 
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
   const runAbraCommand = useCallback(async (text: string) => {
@@ -2182,6 +2187,7 @@ export function DiagramEditor({
   // Keep a stable ref so the mic's onText callback always calls the latest.
   const runAbraCommandRef = useRef(runAbraCommand);
   runAbraCommandRef.current = runAbraCommand;
+  exportJsonRef.current = () => { void handleExportJson(); };
 
   const stopAbraListening = useCallback(() => {
     abraStopRequested.current = true;
