@@ -72,6 +72,7 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"compressPool", "poolRef": <name> }                        // shrink a pool to fit its contents (verbs: compress/shrink/reduce/shorten/compact/collapse)
   { "op":"extendPools" }                                            // widen ALL pools to the same width, covering every element (verbs: extend/lengthen/widen)
   { "op":"nudgePool", "ref"?: <name>, "direction": "up"|"down", "distance"?: number }  // move a pool a small step (default 20px); ref omitted → the black-box pool
+  { "op":"moveLane", "ref": <lane name>, "direction": "up"|"down", "distance"?: number }  // shift a lane ½ Task height (32px), keeping its height
   { "op":"again" }                                                  // repeat the last command (e.g. another nudge)
   { "op":"addMessage", "fromRef": <name>, "toRef": <name>, "label"?: string }  // message flow between an activity and a pool/participant
   { "op":"clear" }                    // empty the whole diagram

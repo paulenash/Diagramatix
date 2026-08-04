@@ -162,6 +162,13 @@ describe("container maintenance — definitive set", () => {
     expect(parseCommand("do it again")).toEqual([{ op: "again" }]);
     expect(parseCommand("once more")).toEqual([{ op: "again" }]);
   });
+  it("13. Move a lane up/down by ½ Task height", () => {
+    expect(parseCommand("move lane Sales down")).toEqual([{ op: "moveLane", ref: "lane Sales", direction: "down" }]);
+    expect(parseCommand("move the Sales lane up")).toEqual([{ op: "moveLane", ref: "Sales", direction: "up" }]);
+    expect(parseCommand("nudge lane 2 down by 16")).toEqual([{ op: "moveLane", ref: "lane 2", direction: "down", distance: 16 }]);
+    // no "lane" word → stays the generic element move, not a lane move
+    expect(parseCommand("move Task 1 up")).toEqual([{ op: "move", ref: "Task 1", direction: "up", count: 1 }]);
+  });
   it("10. Compress a pool (all aliases)", () => {
     expect(parseCommand("compress the Customer pool")).toEqual([{ op: "compressPool", poolRef: "Customer" }]);
     expect(parseCommand("shrink Sales")).toEqual([{ op: "compressPool", poolRef: "Sales" }]);

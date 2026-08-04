@@ -130,6 +130,20 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       return [{ op: "addPool", ...(poolType ? { poolType } : {}), ...(position ? { position } : {}), ...(mm[3] ? { label: clean(mm[3]) } : {}) }];
     }
 
+    // Move / nudge a LANE up or down by ½ Task height (default 32px). Must name
+    // a lane ("move lane Sales up", "move the Sales lane down", "nudge lane 2
+    // up") — the lane word disambiguates it from the pool-nudge and the generic
+    // element move. Checked BEFORE the pool-nudge so "nudge lane X" wins.
+    if (new RegExp(`\\b${L}\\b`, "i").test(raw)) {
+      // Keep a leading "lane" in the ref (so "lane 2" stays "lane 2" and
+      // resolveRef matches it whole); only a TRAILING "lane" ("Sales lane") is
+      // stripped here.
+      const mlane = raw.match(new RegExp(`^(?:move|nudge|bump|shift|slide|inch)\\s+(?:the\\s+)?(.+?)(?:\\s+${L})?\\s+(up|down)(?:\\s+by\\s+(\\d+)\\s*(?:px|pixels?)?)?$`, "i"));
+      if (mlane) {
+        return [{ op: "moveLane", ref: clean(mlane[1]), direction: mlane[2].toLowerCase() as "up" | "down", ...(mlane[3] ? { distance: Number(mlane[3]) } : {}) }];
+      }
+    }
+
     // Nudge a pool up / down by a small step (default 20px). "nudge"/"bump"
     // always mean this; "move/slide <…> up|down" only counts as a pool-nudge
     // when a pool is named (so "move Task 1 up" stays the generic element move).

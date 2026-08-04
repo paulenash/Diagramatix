@@ -974,6 +974,7 @@ export function DiagramEditor({
     moveElements,
     elementsMoveEnd,
     swapLane,
+    moveLane,
     undo,
     redo,
     canUndo,
@@ -2362,6 +2363,20 @@ export function DiagramEditor({
         continue;
       }
 
+      if (op.op === "moveLane") {
+        const r = resolve1(op.ref);
+        if ("err" in r) { results.push(r.err); anyFail = true; continue; }
+        if (r.type !== "lane") { results.push(`${nameOf(r)} isn't a lane`); anyFail = true; continue; }
+        const sibs = els.filter((e) => e.type === "lane" && e.parentId === r.parentId).sort((a, b) => a.y - b.y);
+        const i = sibs.findIndex((s) => s.id === r.id);
+        const toward = op.direction === "down" ? sibs[i + 1] : sibs[i - 1];
+        if (!toward) { results.push(`${nameOf(r)} is against the pool edge — can't move it ${op.direction}`); anyFail = true; continue; }
+        moveLane(r.id, op.direction, op.distance ?? 32);
+        abraLastId.current = r.id;
+        results.push(`moved ${nameOf(r)} ${op.direction}`);
+        continue;
+      }
+
       if (op.op === "addMessage") {
         const f = resolve1(op.fromRef), t = resolve1(op.toRef);
         if ("err" in f) { results.push(f.err); anyFail = true; continue; }
@@ -2434,7 +2449,7 @@ export function DiagramEditor({
       }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, extendPools, swapLane, moveElements, removeSpace]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, removeSpace]);
 
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
   const runAbraCommand = useCallback(async (text: string) => {

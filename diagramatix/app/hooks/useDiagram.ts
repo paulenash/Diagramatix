@@ -441,6 +441,7 @@ export type Action =
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
   | { type: "MOVE_VSWIMLANE_BOUNDARY"; payload: { kind: "divider" | "left" | "right" | "bottom"; delta: number; leftId?: string; rightId?: string } }
   | { type: "REORDER_LANE"; payload: { laneId: string; direction: "up" | "down" } }
+  | { type: "MOVE_LANE"; payload: { laneId: string; direction: "up" | "down"; distance: number } }
   | { type: "MOVE_ELEMENTS"; payload: { ids: string[]; dx: number; dy: number } }
   | { type: "APPLY_TEMPLATE"; payload: { elements: DiagramElement[]; connectors: Connector[] } }
   | { type: "ALIGN_ELEMENTS"; payload: { ids: string[]; mode: "center" | "top" | "bottom" | "vcenter" | "left" | "right" | "smart" } };
@@ -8995,6 +8996,53 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements, connectors };
     }
 
+    // Shift a lane up/down by ½ Task height (default 32px) KEEPING its height:
+    // the neighbour it moves toward shrinks, the one it leaves grows, so the
+    // stack still tiles the pool (pool size unchanged). Clamped so the shrinking
+    // neighbour never drops below 1 Task height (64px) and its moving edge never
+    // passes one of its own children. Only works on a middle lane (a neighbour
+    // on each side); an edge lane sits against the pool boundary and can't shift.
+    case "MOVE_LANE": {
+      const { laneId, direction, distance } = action.payload;
+      const lane = state.elements.find((e) => e.id === laneId && e.type === "lane");
+      if (!lane) return state;
+      const siblings = state.elements.filter((e) => e.type === "lane" && e.parentId === lane.parentId).sort((a, b) => a.y - b.y);
+      const idx = siblings.findIndex((s) => s.id === laneId);
+      const prev = siblings[idx - 1]; // lane above
+      const next = siblings[idx + 1]; // lane below
+      const grow = direction === "down" ? prev : next;
+      const shrink = direction === "down" ? next : prev;
+      if (!grow || !shrink) return state; // edge lane — nothing to absorb the shift
+      const MIN_LANE = 64; // 1 Task height
+      let maxDy = shrink.height - MIN_LANE;
+      const shrinkKids = state.elements.filter((e) => e.parentId === shrink.id);
+      if (direction === "down") {
+        // `next` shrinks from the TOP — don't move its top past its topmost child.
+        const topChild = shrinkKids.length ? Math.min(...shrinkKids.map((c) => c.y)) : Infinity;
+        maxDy = Math.min(maxDy, topChild - shrink.y - 4);
+      } else {
+        // `prev` shrinks from the BOTTOM — don't move its bottom past its lowest child.
+        const botChild = shrinkKids.length ? Math.max(...shrinkKids.map((c) => c.y + c.height)) : -Infinity;
+        maxDy = Math.min(maxDy, (shrink.y + shrink.height) - botChild - 4);
+      }
+      const d = Math.min(distance, maxDy);
+      if (d <= 0) return state; // clamped — no room to move further
+      const moveIds = new Set<string>([laneId, ...getAllDescendantIds(state.elements, laneId)]);
+      const elements = state.elements.map((e) => {
+        if (moveIds.has(e.id)) return { ...e, y: e.y + (direction === "down" ? d : -d) };
+        if (direction === "down") {
+          if (e.id === prev.id) return { ...e, height: e.height + d };          // grow at bottom
+          if (e.id === next.id) return { ...e, y: e.y + d, height: e.height - d }; // shrink from top
+        } else {
+          if (e.id === next.id) return { ...e, y: e.y - d, height: e.height + d }; // grow from top
+          if (e.id === prev.id) return { ...e, height: e.height - d };           // shrink at bottom
+        }
+        return e;
+      });
+      const connectors = recomputeAllConnectors(state.connectors, elements, state.relaxedLayout);
+      return { ...state, elements, connectors };
+    }
+
     case "MOVE_LANE_BOUNDARY": {
       const { aboveLaneId, belowLaneId, dy } = action.payload;
       const MIN_H = 40;
@@ -9941,6 +9989,11 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "REORDER_LANE", payload: { laneId, direction } });
   }, []);
 
+  const moveLane = useCallback((laneId: string, direction: "up" | "down", distance = 32) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "MOVE_LANE", payload: { laneId, direction, distance } });
+  }, []);
+
   const moveVSwimlaneBoundary = useCallback(
     (kind: "divider" | "left" | "right" | "bottom", delta: number, leftId?: string, rightId?: string) => {
       if (!preLaneRef.current) preLaneRef.current = snapshotData();
@@ -10185,6 +10238,7 @@ export function useDiagram(initialData: DiagramData) {
     moveLaneBoundary,
     moveVSwimlaneBoundary,
     reorderLane,
+    moveLane,
     laneBoundaryMoveEnd,
     undo,
     redo,

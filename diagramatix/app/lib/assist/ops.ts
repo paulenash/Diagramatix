@@ -24,6 +24,7 @@ export type AssistOp =
   | { op: "compressPool"; poolRef: Ref }
   | { op: "extendPools" }
   | { op: "nudgePool"; ref?: Ref; direction: "up" | "down"; distance?: number }
+  | { op: "moveLane"; ref: Ref; direction: "up" | "down"; distance?: number }
   | { op: "again" }
   | { op: "addMessage"; fromRef: Ref; toRef: Ref; label?: string }
   | { op: "clear" }
@@ -147,6 +148,12 @@ export function validateOp(raw: unknown): AssistOp | null {
       if (o.direction !== "up" && o.direction !== "down") return null;
       const op: AssistOp = { op: "nudgePool", direction: o.direction };
       if (isRef(o.ref)) op.ref = (o.ref as string).trim();
+      if (Number.isFinite(o.distance)) op.distance = Math.max(1, Math.round(Number(o.distance)));
+      return op;
+    }
+    case "moveLane": {
+      if (!isRef(o.ref) || (o.direction !== "up" && o.direction !== "down")) return null;
+      const op: AssistOp = { op: "moveLane", ref: (o.ref as string).trim(), direction: o.direction };
       if (Number.isFinite(o.distance)) op.distance = Math.max(1, Math.round(Number(o.distance)));
       return op;
     }
