@@ -8613,7 +8613,21 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       };
       const targets = state.elements.filter((e) => !CONTAINER.has(e.type) && e.type !== "text-annotation" && !inContainer(e));
       if (targets.length === 0) return state;
+      const targetIds = new Set(targets.map((e) => e.id));
 
+      // If a pool already exists, GROW it to include the loose elements rather
+      // than creating a second pool (assist "extend the pool to include all…").
+      const existingPools = state.elements.filter((e) => e.type === "pool");
+      if (existingPools.length > 0) {
+        const pool = existingPools.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
+        const lanes = state.elements.filter((e) => e.type === "lane" && e.parentId === pool.id).sort((a, b) => a.y - b.y);
+        const holderId = lanes[0]?.id ?? pool.id; // adopt into the first lane, else the pool
+        const adopted = state.elements.map((e) => (targetIds.has(e.id) && !e.parentId ? { ...e, parentId: holderId } : e));
+        // Let the shared enclosure pass grow the lane + pool around their new children.
+        return { ...state, elements: ensureContainersEncloseChildren(adopted), connectors: state.connectors };
+      }
+
+      // No pool yet → create one + a single lane sized to contain the loose set.
       const minX = Math.min(...targets.map((e) => e.x));
       const minY = Math.min(...targets.map((e) => e.y));
       const maxX = Math.max(...targets.map((e) => e.x + e.width));
@@ -8633,9 +8647,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         width: pool.width - HEADER_W, height: pool.height,
         label: "Lane 1", properties: {}, parentId: poolId,
       };
-      const targetIds = new Set(targets.map((e) => e.id));
       const elements = state.elements.map((e) => (targetIds.has(e.id) && !e.parentId ? { ...e, parentId: laneId } : e));
-      return { ...state, elements: updatePoolTypes([pool, lane, ...elements]), connectors: state.connectors };
+      return { ...state, elements: ensureContainersEncloseChildren(updatePoolTypes([pool, lane, ...elements])), connectors: state.connectors };
     }
 
     case "REORDER_LANE": {
@@ -8850,7 +8863,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "APPLY_TEMPLATE":
       return {
         ...state,
-        elements: [...state.elements, ...action.payload.elements],
+        // Grow any pool/lane around inserted elements that were parented into it
+        // (e.g. a template attached to a task inside a lane).
+        elements: ensureContainersEncloseChildren([...state.elements, ...action.payload.elements]),
         connectors: [...state.connectors, ...action.payload.connectors],
       };
 

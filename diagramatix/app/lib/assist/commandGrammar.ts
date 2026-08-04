@@ -74,10 +74,20 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   m = raw.match(/^call\s+(.+?)\s+(.+)$/i);
   if (m && !matchSymbol(m[1])) return [{ op: "rename", ref: clean(m[1]), label: clean(m[2]) }];
 
-  // ── Wrap everything in a pool ("poll" is a common mishearing of "pool") ──
-  if (/^(?:put|wrap|draw|add)\s+(?:a\s+)?(?:pool|poll)\s+(?:around|round)\s+(?:everything|all(?:\s+elements)?|the (?:lot|whole thing)|it all)\b/i.test(raw)
-      || /^wrap\s+(?:everything|all(?:\s+elements)?|it all)\s+in\s+(?:a\s+)?(?:pool|poll)\b/i.test(raw)) {
-    return [{ op: "wrapInPool" }];
+  // ── Wrap / grow a pool around everything ("poll"/"pull" mishear "pool") ──
+  // Broad: "add/put/draw a pool [around|to|over] [all elements|everything|the
+  // diagram]", a bare "add a pool", "wrap everything in a pool", and
+  // "extend/grow the pool to include/accommodate all elements".
+  {
+    const P = "(?:pool|poll|pull)";
+    const ALL = "(?:everything|all(?:\\s+(?:the\\s+)?elements?)?|the\\s+(?:lot|whole\\s+thing|diagram)|it\\s+all)";
+    if (
+      new RegExp(`^(?:put|wrap|draw|add|create|make)\\s+(?:a\\s+)?(?:new\\s+)?${P}(?:\\s+(?:around|round|over|to(?:\\s+include|\\s+cover|\\s+contain)?|including|containing)\\s+${ALL})?(?:\\s+on\\s+the\\s+diagram)?$`, "i").test(raw)
+      || new RegExp(`^wrap\\s+${ALL}\\s+(?:in|with|inside|into)\\s+(?:a\\s+)?${P}\\b`, "i").test(raw)
+      || new RegExp(`^(?:extend|expand|grow|stretch|enlarge)\\s+(?:the\\s+)?${P}\\s+(?:to\\s+)?(?:include|around|cover|contain|fit|accommodate|accomodate|encompass|hold)\\s+${ALL}`, "i").test(raw)
+    ) {
+      return [{ op: "wrapInPool" }];
+    }
   }
 
   // ── Move ──
@@ -112,27 +122,31 @@ export function parseCommand(utterance: string): AssistOp[] | null {
 
   const COUNT = "(\\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|some)";
   // ── Sublanes (before lanes: "sublanes" must not match the lane rule) ──
-  // "line" is a common mishearing of "lane". Names optional — default to
-  // Sublane 1..N when the user doesn't say "called …".
-  m = raw.match(new RegExp(`^(?:add|insert|create|split)\\s+${COUNT}?\\s*(?:sub-?lanes?|sub lanes?|sub-?lines?|sub lines?)\\s+(?:to|in|into|onto|on)\\s+(.+?)(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
+  // "line" mishears "lane". Optional count, optional "new", optional target
+  // (defaults to "the lane"), optional names (default Sublane 1..N).
+  m = raw.match(new RegExp(`^(?:add|insert|create|split)\\s+${COUNT}?\\s*(?:new\\s+|another\\s+|extra\\s+)?(?:sub-?lanes?|sub lanes?|sub-?lines?|sub lines?)(?:\\s+(?:to|in|into|onto|on|under|below|inside)\\s+(.+?))?(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
   if (m) {
     let labels = m[3] ? splitLabels(m[3]) : [];
     if (!labels.length) labels = Array.from({ length: Math.max(1, toCount(m[1])) }, (_, i) => `Sublane ${i + 1}`);
-    return [{ op: "addSublanes", laneRef: clean(m[2]), labels }];
+    return [{ op: "addSublanes", laneRef: m[2] ? clean(m[2]) : "the lane", labels }];
   }
 
   // ── Lanes ──
-  m = raw.match(new RegExp(`^(?:add|insert|create|split)\\s+${COUNT}?\\s*(?:lanes?|lines?)\\s+(?:to|in|into|onto|on)\\s+(.+?)(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
+  m = raw.match(new RegExp(`^(?:add|insert|create|split)\\s+${COUNT}?\\s*(?:new\\s+|another\\s+|extra\\s+)?(?:lanes?|lines?)(?:\\s+(?:to|in|into|onto|on|inside)\\s+(.+?))?(?:\\s+(?:called|named|labell?ed)\\s+(.+))?$`, "i"));
   if (m) {
     let labels = m[3] ? splitLabels(m[3]) : [];
     if (!labels.length) labels = Array.from({ length: Math.max(1, toCount(m[1])) }, (_, i) => `Lane ${i + 1}`);
-    return [{ op: "addLanes", poolRef: clean(m[2]), labels }];
+    return [{ op: "addLanes", poolRef: m[2] ? clean(m[2]) : "the pool", labels }];
   }
 
   // ── Add ──
   m = raw.match(/^(?:add|insert|create|put|place|drop in|give me|new)\s+(?:(?:a|an|the)\s+)?(.+)$/i);
   if (m) {
     let rest = clean(m[1]);
+    // Container words are handled by the pool/lane rules above; if one slips
+    // through here it's a malformed phrasing — send it to the AI rather than
+    // creating a task literally named "pool to all elements on the diagram".
+    if (/^(?:new\s+|another\s+)?(?:pool|poll|pull|lanes?|lines?|sub-?lanes?|sub-?lines?)\b/i.test(rest)) return null;
     let afterRef: string | undefined;
     const after = rest.match(/\s+(?:after|following|behind|next to|onto)\s+(.+)$/i);
     if (after) { afterRef = clean(after[1]); rest = rest.slice(0, after.index).trim(); }

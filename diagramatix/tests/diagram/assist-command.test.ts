@@ -87,6 +87,21 @@ describe("parseCommand — lanes / sublanes", () => {
   it("sublanes without names → default Sublane N labels", () => {
     expect(parseCommand("add 2 sublanes to Sales Team")).toEqual([{ op: "addSublanes", laneRef: "Sales Team", labels: ["Sublane 1", "Sublane 2"] }]);
   });
+  it("'new'/adjectives + optional target (defaults 'the pool'/'the lane')", () => {
+    expect(parseCommand("add a new lane to the pool")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane 1"] }]);
+    expect(parseCommand("add a new lane")).toEqual([{ op: "addLanes", poolRef: "the pool", labels: ["Lane 1"] }]);
+    expect(parseCommand("add a new sublane")).toEqual([{ op: "addSublanes", laneRef: "the lane", labels: ["Sublane 1"] }]);
+  });
+  it("wrap: 'add a pool to all elements', bare 'add a pool', extend", () => {
+    expect(parseCommand("add a pool to all elements on the diagram")).toEqual([{ op: "wrapInPool" }]);
+    expect(parseCommand("add a pool")).toEqual([{ op: "wrapInPool" }]);
+    expect(parseCommand("add a new pool")).toEqual([{ op: "wrapInPool" }]);
+    expect(parseCommand("extend the pool to include all elements")).toEqual([{ op: "wrapInPool" }]);
+  });
+  it("container words never become a task", () => {
+    // malformed pool phrasing → null (AI), not a task named after the phrase
+    expect(parseCommand("add a pool thingy blah")).toBeNull();
+  });
 });
 
 describe("resolveRef — positional", () => {

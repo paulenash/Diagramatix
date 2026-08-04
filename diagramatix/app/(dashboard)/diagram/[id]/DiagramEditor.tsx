@@ -1994,7 +1994,11 @@ export function DiagramEditor({
       .map((e) => ({ x: e.x, y: e.y, width: e.width, height: e.height }));
     const free = findFreeSlot({ x: minX + bw / 2, y: minY + bh / 2 }, bw, bh, others);
     const dx = free.x - (minX + bw / 2), dy = free.y - (minY + bh / 2);
-    const elements = dx || dy ? inst.elements.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy })) : inst.elements;
+    let elements = dx || dy ? inst.elements.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy })) : inst.elements;
+    // If the source sits in a lane/pool, adopt the (parentless) fragment into the
+    // same container so it grows to enclose them (APPLY_TEMPLATE runs the
+    // container-enclose pass).
+    if (src.parentId) elements = elements.map((e) => (e.parentId ? e : { ...e, parentId: src.parentId }));
     const connectors = dx || dy
       ? inst.connectors.map((c) => ({ ...c, waypoints: c.waypoints.map((wp) => ({ x: wp.x + dx, y: wp.y + dy })) }))
       : inst.connectors;
