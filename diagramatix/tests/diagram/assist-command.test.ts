@@ -149,6 +149,19 @@ describe("container maintenance — definitive set", () => {
     expect(parseCommand("swap lanes Sales with Marketing")).toEqual([{ op: "swapLanes", laneA: "lanes Sales", laneB: "Marketing" }]);
     expect(parseCommand("swap sub-lanes Manager with Assistant")).toEqual([{ op: "swapLanes", laneA: "sub-lanes Manager", laneB: "Assistant" }]);
   });
+  it("11. Nudge a pool up/down (alias move, when a pool is named)", () => {
+    expect(parseCommand("nudge pool down")).toEqual([{ op: "nudgePool", direction: "down" }]);
+    expect(parseCommand("nudge the IT System up")).toEqual([{ op: "nudgePool", ref: "IT System", direction: "up" }]);
+    expect(parseCommand("bump Customer down by 40")).toEqual([{ op: "nudgePool", ref: "Customer", direction: "down", distance: 40 }]);
+    expect(parseCommand("move the pool up")).toEqual([{ op: "nudgePool", direction: "up" }]);
+    // "move <task> up" WITHOUT a pool word stays the generic element move
+    expect(parseCommand("move Task 1 up")).toEqual([{ op: "move", ref: "Task 1", direction: "up", count: 1 }]);
+  });
+  it("12. Again repeats the last command", () => {
+    expect(parseCommand("again")).toEqual([{ op: "again" }]);
+    expect(parseCommand("do it again")).toEqual([{ op: "again" }]);
+    expect(parseCommand("once more")).toEqual([{ op: "again" }]);
+  });
   it("10. Compress a pool (all aliases)", () => {
     expect(parseCommand("compress the Customer pool")).toEqual([{ op: "compressPool", poolRef: "Customer" }]);
     expect(parseCommand("shrink Sales")).toEqual([{ op: "compressPool", poolRef: "Sales" }]);

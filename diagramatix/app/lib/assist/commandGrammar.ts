@@ -39,6 +39,11 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     return [{ op: "undo" }];
   }
 
+  // ── Again — repeat the last command (e.g. another nudge) ──
+  if (/^(again|and again|do (?:it|that) again|repeat(?:\s+(?:it|that))?|once more|same again|one more(?:\s+time)?|keep going)\s*$/.test(lower)) {
+    return [{ op: "again" }];
+  }
+
   // ── Clear the whole diagram ──
   if (/^(clear|empty|wipe|reset|blank)\s+(the\s+)?(current\s+|whole\s+|entire\s+)?(diagram|canvas|everything|it all|all|page)\b/.test(lower)
       || /^(start over|start again|new diagram|clear all|delete everything|remove everything)\b/.test(lower)) {
@@ -123,6 +128,20 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       const poolType = mm[1] ? (/black/i.test(mm[1]) ? "black-box" : "white-box") : undefined;
       const position = mm[2] ? (/^(?:above|over)/i.test(mm[2]) ? "above" : "below") : undefined;
       return [{ op: "addPool", ...(poolType ? { poolType } : {}), ...(position ? { position } : {}), ...(mm[3] ? { label: clean(mm[3]) } : {}) }];
+    }
+
+    // Nudge a pool up / down by a small step (default 20px). "nudge"/"bump"
+    // always mean this; "move/slide <…> up|down" only counts as a pool-nudge
+    // when a pool is named (so "move Task 1 up" stays the generic element move).
+    let mnudge = raw.match(new RegExp(`^(?:nudge|bump|inch|shift)\\s+(?:the\\s+)?(.*?)\\s*(up|down)(?:\\s+by\\s+(\\d+)\\s*(?:px|pixels?)?)?$`, "i"));
+    if (!mnudge) {
+      const mv = raw.match(new RegExp(`^(?:move|slide)\\s+(?:the\\s+)?(.*?)\\s*(up|down)(?:\\s+by\\s+(\\d+)\\s*(?:px|pixels?)?)?$`, "i"));
+      if (mv && new RegExp(`\\b${P}\\b`, "i").test(mv[1] || "")) mnudge = mv;
+    }
+    if (mnudge) {
+      const rawRef = clean(mnudge[1] || "");
+      const ref = rawRef && !new RegExp(`^${P}$`, "i").test(rawRef) ? rawRef : undefined; // bare "pool" → default target
+      return [{ op: "nudgePool", ...(ref ? { ref } : {}), direction: mnudge[2].toLowerCase() as "up" | "down", ...(mnudge[3] ? { distance: Number(mnudge[3]) } : {}) }];
     }
   }
 

@@ -320,12 +320,13 @@ function getDiagramBounds(data: DiagramData, padding = 20) {
   };
 }
 
-/** Normalise a spoken message reference to match against a connector label:
- *  drop a leading "message/msg/flow" noun and any surrounding quotes. */
+/** Normalise a spoken connector/message reference to match against a connector
+ *  label: drop a leading "connector/message/msg/flow/arrow" noun and any
+ *  surrounding quotes. */
 function messageLabelKey(ref: string): string {
   return ref
     .trim()
-    .replace(/^(?:the\s+)?(?:message|msg|flow)\s+/i, "")
+    .replace(/^(?:the\s+)?(?:connector|connexion|connection|message|msg|flow|arrow|link)\s+/i, "")
     .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
     .trim()
     .toLowerCase();
@@ -2114,6 +2115,8 @@ export function DiagramEditor({
   const [abraInterim, setAbraInterim] = useState("");
   const [abraBusy, setAbraBusy] = useState(false);
   const abraLastId = useRef<string | null>(null);
+  // Remembers the last real command so "again" can repeat it (e.g. nudge again).
+  const lastAbraOpsRef = useRef<AssistOp[]>([]);
   const abraDictRef = useRef<DictationHandle | null>(null);
   const abraStopRequested = useRef(false);
   // Stable ref to the JSON export (a plain function redefined each render) so
@@ -2132,7 +2135,15 @@ export function DiagramEditor({
   const nameOf = (e: DiagramElement) => (e.label?.trim() || e.type);
 
   // Apply one interpreted op via the granular (undoable) reducer helpers.
-  const applyAssistOps = useCallback((ops: AssistOp[]): { ok: boolean; summary: string } => {
+  const applyAssistOps = useCallback((incoming: AssistOp[]): { ok: boolean; summary: string } => {
+    // "again" repeats the last real command (a nudge, a move, an add…).
+    let ops = incoming;
+    if (ops.length === 1 && ops[0].op === "again") {
+      if (!lastAbraOpsRef.current.length) return { ok: false, summary: "nothing to repeat yet" };
+      ops = lastAbraOpsRef.current;
+    } else if (ops.length && !ops.every((o) => o.op === "undo" || o.op === "again" || o.op === "export")) {
+      lastAbraOpsRef.current = ops; // remember for "again" (but not undo/again/export)
+    }
     const results: string[] = [];
     let anyFail = false;
     const els = data.elements;
@@ -2307,6 +2318,31 @@ export function DiagramEditor({
         continue;
       }
 
+      if (op.op === "again") { continue; } // handled by substitution above; ignore if stray
+
+      if (op.op === "nudgePool") {
+        const dist = op.distance ?? 20;
+        const dy = op.direction === "up" ? -dist : dist;
+        let target: DiagramElement | undefined;
+        if (op.ref) {
+          const r = resolve1(op.ref);
+          if ("err" in r) { results.push(r.err); anyFail = true; continue; }
+          target = r;
+        } else {
+          // Default target: the most-recent black-box pool, else any pool.
+          const pools = els.filter((e) => e.type === "pool");
+          const blacks = pools.filter((p) => (p.properties?.poolType as string | undefined) === "black-box");
+          target = blacks[blacks.length - 1] ?? pools[pools.length - 1];
+          if (!target) { results.push("there's no pool to nudge"); anyFail = true; continue; }
+        }
+        // MOVE_ELEMENTS auto-includes container descendants, so a white-box pool
+        // rides with its lanes/contents; a black-box pool just moves itself.
+        moveElements([target.id], 0, dy);
+        abraLastId.current = target.id;
+        results.push(`nudged ${nameOf(target)} ${op.direction} ${dist}px`);
+        continue;
+      }
+
       if (op.op === "addMessage") {
         const f = resolve1(op.fromRef), t = resolve1(op.toRef);
         if ("err" in f) { results.push(f.err); anyFail = true; continue; }
@@ -2317,16 +2353,29 @@ export function DiagramEditor({
       }
 
       if (op.op === "rename") {
-        const e = resolve1(op.ref);
-        if ("err" in e) {
-          // Not an element — maybe a message/connector label.
-          const key = messageLabelKey(op.ref);
+        // #7 Reliable split. The grammar split "<name> to <new>" at the FIRST
+        // " to ", which is wrong when the name (or the new name) itself contains
+        // "to". Reconstruct the full phrase and try every " to " boundary,
+        // preferring the LONGEST left side that actually resolves — to an
+        // element OR a connector label (#6 "rename connector <label> to <new>").
+        const phrase = `${op.ref} to ${op.label}`;
+        const parts = phrase.split(/\s+to\s+/i);
+        let done = false;
+        for (let k = parts.length - 1; k >= 1 && !done; k--) {
+          const leftRef = parts.slice(0, k).join(" to ").trim();
+          const newLabel = parts.slice(k).join(" to ").trim();
+          if (!leftRef || !newLabel) continue;
+          const e = resolve1(leftRef);
+          if (!("err" in e)) { updateLabel(e.id, newLabel); results.push(`renamed ${nameOf(e)} → ${newLabel}`); done = true; break; }
+          const key = messageLabelKey(leftRef);
           const conn = data.connectors.find((c) => (c.label ?? "").trim().toLowerCase() === key);
-          if (conn) { updateConnectorLabel(conn.id, op.label); results.push(`renamed message “${conn.label}” → ${op.label}`); continue; }
-          results.push(e.err); anyFail = true; continue;
+          if (conn) { updateConnectorLabel(conn.id, newLabel); results.push(`renamed connector “${conn.label}” → ${newLabel}`); done = true; break; }
         }
-        updateLabel(e.id, op.label);
-        results.push(`renamed ${nameOf(e)} → ${op.label}`);
+        if (!done) {
+          const e = resolve1(op.ref);
+          results.push("err" in e ? e.err : `couldn't rename “${op.ref}”`);
+          anyFail = true;
+        }
         continue;
       }
 

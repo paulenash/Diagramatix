@@ -8767,9 +8767,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements: updatePoolTypes([...state.elements, pool]), connectors: state.connectors };
     }
 
-    // Compress a pool vertically. Black-box / empty → shrink to just its name.
-    // White-box → shrink the pool + its lanes to leave ½-Task height (32px)
-    // above the highest element and below the lowest.
+    // Compress a pool vertically.
+    //   • Black-box / empty  → height fits the name only; width matches the
+    //     white-box pool if one is present (#1 update), else keeps its width.
+    //   • White-box          → shrink the pool + retile its lanes AND sub-lanes
+    //     recursively so nothing sticks out (which would make the enclose pass
+    //     re-grow it), leaving ½-Task (32px) above the highest element and below
+    //     the lowest. Width is preserved.
+    // Invariant enforced afterwards: every black-box pool has the white-box
+    // pool's width, so participant boxes always align with the process pool.
     case "COMPRESS_POOL": {
       const { poolId } = action.payload;
       const pool = state.elements.find((e) => e.id === poolId && e.type === "pool");
@@ -8777,34 +8783,56 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const poolFs = state.poolFontSize ?? 16;
       const byId = new Map(state.elements.map((e) => [e.id, e] as const));
       const isDesc = (e: DiagramElement) => { let c: DiagramElement | undefined = e; for (let i = 0; c?.parentId && i < 12; i++) { if (c.parentId === poolId) return true; c = byId.get(c.parentId); } return false; };
-      const flow = state.elements.filter((e) => e.type !== "lane" && isDesc(e));
+      const poolTypeOf = (p: DiagramElement) => (p.properties?.poolType as string | undefined) ?? "white-box";
       const MARGIN = 32; // ½ Task height
 
-      if (flow.length === 0) {
-        // Empty → collapse to a name-sized black-box; drop any empty lanes.
-        const { width, height } = poolNameFitSize(pool.label ?? "Pool", poolFs);
+      // Reference width: the widest white-box pool on the diagram (if any).
+      const whiteBoxes = state.elements.filter((e) => e.type === "pool" && poolTypeOf(e) === "white-box");
+      const wbWidth = whiteBoxes.length ? Math.max(...whiteBoxes.map((p) => p.width)) : null;
+
+      const flow = state.elements.filter((e) => e.type !== "lane" && isDesc(e));
+      const isBlack = poolTypeOf(pool) === "black-box";
+
+      let els: DiagramElement[];
+      if (isBlack || flow.length === 0) {
+        // Height fits the name; width = white-box width (if present) else keep.
+        const { height } = poolNameFitSize(pool.label ?? "Pool", poolFs);
+        const newWidth = wbWidth ?? pool.width;
         const kept = state.elements.filter((e) => !(e.type === "lane" && isDesc(e)));
-        const els = kept.map((e) => (e.id === poolId ? { ...e, width, height, properties: { ...e.properties, poolType: "black-box" } } : e));
-        return { ...state, elements: updatePoolTypes(els), connectors: recomputeAllConnectors(state.connectors, els) };
+        els = kept.map((e) => (e.id === poolId ? { ...e, width: newWidth, height, properties: { ...e.properties, poolType: "black-box" } } : e));
+      } else {
+        const minY = Math.min(...flow.map((e) => e.y));
+        const maxY = Math.max(...flow.map((e) => e.y + e.height));
+        const newTop = minY - MARGIN, newH = (maxY + MARGIN) - newTop;
+        // Retile lanes → their sub-lanes → sub-sub-lanes proportionally so every
+        // structural child tiles its parent exactly (no overflow → no re-grow).
+        const geo = new Map<string, { y: number; h: number }>();
+        const retile = (parentId: string, top: number, h: number) => {
+          const kids = state.elements.filter((e) => e.type === "lane" && e.parentId === parentId).sort((a, b) => a.y - b.y);
+          if (!kids.length) return;
+          const oldTotal = kids.reduce((s, l) => s + l.height, 0) || 1;
+          let yy = top;
+          kids.forEach((l, i) => {
+            const hh = i === kids.length - 1 ? (top + h) - yy : Math.round((l.height / oldTotal) * h);
+            geo.set(l.id, { y: yy, h: hh });
+            retile(l.id, yy, hh);
+            yy += hh;
+          });
+        };
+        retile(poolId, newTop, newH);
+        els = state.elements.map((e) => {
+          if (e.id === poolId) return { ...e, y: newTop, height: newH };
+          const g = geo.get(e.id);
+          return g ? { ...e, y: g.y, height: g.h } : e;
+        });
       }
 
-      const minY = Math.min(...flow.map((e) => e.y));
-      const maxY = Math.max(...flow.map((e) => e.y + e.height));
-      const newTop = minY - MARGIN, newH = (maxY + MARGIN) - newTop;
-      const HEADER = getPoolHeaderWidth(pool);
-      const lanes = state.elements.filter((e) => e.type === "lane" && e.parentId === poolId).sort((a, b) => a.y - b.y);
-      const geo = new Map<string, { y: number; h: number }>();
-      const oldTotal = lanes.reduce((s, l) => s + l.height, 0) || 1;
-      let yy = newTop;
-      lanes.forEach((l, i) => { const hh = i === lanes.length - 1 ? (newTop + newH) - yy : Math.round((l.height / oldTotal) * newH); geo.set(l.id, { y: yy, h: hh }); yy += hh; });
-      let els = state.elements.map((e) => {
-        if (e.id === poolId) return { ...e, y: newTop, height: newH };
-        const g = geo.get(e.id);
-        if (g) return { ...e, y: g.y, height: g.h, x: pool.x + HEADER, width: pool.width - HEADER };
-        return e;
-      });
+      // Black-box pools always take the white-box pool's width.
+      if (wbWidth != null) {
+        els = els.map((e) => (e.type === "pool" && poolTypeOf(e) === "black-box" ? { ...e, width: wbWidth } : e));
+      }
       els = ensureContainersEncloseChildren(els);
-      return { ...state, elements: els, connectors: recomputeAllConnectors(state.connectors, els) };
+      return { ...state, elements: updatePoolTypes(els), connectors: recomputeAllConnectors(state.connectors, els) };
     }
 
     // Extend the pools rightward to include every element, then make ALL pools

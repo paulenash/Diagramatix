@@ -49,7 +49,8 @@ Canonical forms:
   delete <name>   ·   delete <name> and compact   ·   add a boundary event called <name> to <name>
   add a pool   ·   add a black-box pool above|below existing pools   ·   put a pool around everything (wraps loose elements)
   add <n> lanes to <pool> called <A, B and C>   ·   add a lane above|below <lane>   ·   add <n> sublanes to <lane> called <A, B and C>   ·   swap <lane> with <lane>
-  compress <pool>   ·   extend the pools to include all elements   ·   add a message from <name> to <name> labelled <text>   ·   rename message <text> to <text>   ·   delete message <text>
+  compress <pool>   ·   extend the pools to include all elements   ·   nudge <pool> up|down   ·   again
+  add a message from <name> to <name> labelled <text>   ·   rename connector <text> to <text>   ·   delete connector <text>
   clear the diagram   ·   export the diagram to JSON   ·   undo that
 
 **ops** (fallback, used only if canonical is ""): the same edit as structured ops.
@@ -70,6 +71,8 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"swapLanes", "laneA": <name>, "laneB": <name> }            // swap two adjacent lanes
   { "op":"compressPool", "poolRef": <name> }                        // shrink a pool to fit its contents (verbs: compress/shrink/reduce/shorten/compact/collapse)
   { "op":"extendPools" }                                            // widen ALL pools to the same width, covering every element (verbs: extend/lengthen/widen)
+  { "op":"nudgePool", "ref"?: <name>, "direction": "up"|"down", "distance"?: number }  // move a pool a small step (default 20px); ref omitted → the black-box pool
+  { "op":"again" }                                                  // repeat the last command (e.g. another nudge)
   { "op":"addMessage", "fromRef": <name>, "toRef": <name>, "label"?: string }  // message flow between an activity and a pool/participant
   { "op":"clear" }                    // empty the whole diagram
   { "op":"export", "format":"json" }  // download the diagram as JSON

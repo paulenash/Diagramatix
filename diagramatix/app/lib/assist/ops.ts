@@ -23,6 +23,8 @@ export type AssistOp =
   | { op: "swapLanes"; laneA: Ref; laneB: Ref }
   | { op: "compressPool"; poolRef: Ref }
   | { op: "extendPools" }
+  | { op: "nudgePool"; ref?: Ref; direction: "up" | "down"; distance?: number }
+  | { op: "again" }
   | { op: "addMessage"; fromRef: Ref; toRef: Ref; label?: string }
   | { op: "clear" }
   | { op: "export"; format?: "json" }
@@ -141,6 +143,15 @@ export function validateOp(raw: unknown): AssistOp | null {
       return isRef(o.poolRef) ? { op: "compressPool", poolRef: (o.poolRef as string).trim() } : null;
     case "extendPools":
       return { op: "extendPools" };
+    case "nudgePool": {
+      if (o.direction !== "up" && o.direction !== "down") return null;
+      const op: AssistOp = { op: "nudgePool", direction: o.direction };
+      if (isRef(o.ref)) op.ref = (o.ref as string).trim();
+      if (Number.isFinite(o.distance)) op.distance = Math.max(1, Math.round(Number(o.distance)));
+      return op;
+    }
+    case "again":
+      return { op: "again" };
     case "addMessage": {
       if (!isRef(o.fromRef) || !isRef(o.toRef)) return null;
       const op: AssistOp = { op: "addMessage", fromRef: (o.fromRef as string).trim(), toRef: (o.toRef as string).trim() };
