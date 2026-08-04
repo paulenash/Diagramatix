@@ -24,7 +24,8 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 | **Add a black‑box pool** | "add a black‑box pool", "add a black box pool above/below existing pools" | Bare participant box, no lanes; positions relative to existing pools |
 | **Wrap everything in a pool** | "put a pool around everything", "add a pool to all elements on the diagram", "wrap everything in a pool" | Wraps all loose (un‑pooled) elements |
 | **Extend the pools** | "extend the pools to include all elements", "widen the pools", "lengthen the pool", "include all elements" | **Widens every pool rightward** to cover all elements and sets **all pools to the same width** (kept aligned). Aliases: extend · lengthen · widen (· expand · grow · stretch) |
-| **Compress a pool** | "compress the Customer pool", "shrink Sales", "reduce Finance", "collapse the pool" | White‑box → shrinks pool + lanes to content ± ½ Task; black‑box / empty → shrinks to just fit the name. Aliases: compress · shrink · reduce · shorten · compact · collapse |
+| **Compress a pool** | "compress the Customer pool", "shrink Sales", "reduce Finance", "collapse the pool" | White‑box → shrinks pool + lanes (and sub‑lanes) to content ± ½ Task; black‑box / empty → fits the name in height and takes the **white‑box pool's width** (participant boxes stay aligned). Aliases: compress · shrink · reduce · shorten · compact · collapse |
+| **Nudge a pool** | "nudge pool down", "nudge the IT System up", "bump Customer down by 40", "move the pool up" | Moves a pool a small step (default 20px); its lanes/contents ride along. Bare "nudge pool" → the most‑recent black‑box pool. Aliases: nudge · bump · inch · shift · move (move only when a pool is named). Follow with **"again"** to repeat |
 
 ## Lanes
 
@@ -47,8 +48,8 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 | Intent | Say | Notes |
 |---|---|---|
 | **Add a message flow** | "add message from Task 1 to IT System labelled Email Details", "send a message from Approve to Customer", "add a message to IT System from Task 1 saying Get Approval" | Direction follows the *from → to* order (either word order accepted); label optional |
-| **Rename a message** | "rename 'Email Details' to 'Send the invoice'", "rename message Email Details to Get Approval" | Matches the message by its current label |
-| **Delete a message** | "delete 'Email Details'", "remove message Email Details" | Matches the message by its label |
+| **Rename a message/connector** | "rename connector Email Details to Send Invoice", "rename 'Email Details' to 'Send the invoice'" | Matches the connector by its current label; a leading connector/message/arrow/link noun is stripped |
+| **Delete a message/connector** | "delete connector Email Details", "delete 'Email Details'", "remove message Email Details" | Matches the connector by its label |
 
 ## Elements & flow (non‑container, for completeness)
 
@@ -61,6 +62,7 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 | Move | "move the gateway two elements to the right" |
 | Delete (+ compact) | "delete Prepare", "remove Prepare and compact" |
 | Diagram | "clear the diagram", "export the diagram to JSON", "undo that", "stop" |
+| Again | "again", "do it again", "once more", "repeat" — repeats the last command (e.g. another nudge) |
 
 ---
 

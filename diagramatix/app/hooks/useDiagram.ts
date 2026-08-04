@@ -339,7 +339,7 @@ function adjustMsgLabelOffset(
 
 export type Action =
   | { type: "SET_DATA"; payload: DiagramData }
-  | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string; initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string } } }
+  | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string; initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string; parentId?: string } } }
   | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number; unconstrained?: boolean } }
   | { type: "SWAP_LANES_VERTICAL"; payload: { laneId: string; direction: "up" | "down" } }
   | { type: "RESIZE_ELEMENT"; payload: { id: string; x: number; y: number; width: number; height: number; wasWhiteBoxAtResizeStart?: boolean } }
@@ -2153,12 +2153,15 @@ function uniqueContainerLabel(
   return `${base} ${n}`;
 }
 
-// Shrink any pool that has NO children (no lanes, no flow) to just fit its name
-// — a new empty pool, or one whose last lane was just deleted.
-function resizeEmptyPoolsToHeader(elements: DiagramElement[], poolFs: number): DiagramElement[] {
+// Shrink a pool that has NO children (no lanes, no flow) to just fit its name.
+// `onlyIds`, when given, restricts the resize to those pool ids — so a delete
+// only collapses the pool that JUST lost its last lane, and never re-collapses
+// a deliberately-sized black-box participant pool on an unrelated delete.
+function resizeEmptyPoolsToHeader(elements: DiagramElement[], poolFs: number, onlyIds?: Set<string>): DiagramElement[] {
   const parented = new Set(elements.map((e) => e.parentId).filter(Boolean) as string[]);
   return elements.map((e) => {
     if (e.type !== "pool" || parented.has(e.id)) return e;
+    if (onlyIds && !onlyIds.has(e.id)) return e;
     const { width, height } = poolNameFitSize(e.label ?? "Pool", poolFs);
     return { ...e, width, height };
   });
@@ -3856,6 +3859,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         properties: { ...baseProperties, ...(initial?.properties ?? {}) },
         taskType:  action.payload.taskType,
         eventType: action.payload.eventType,
+        // An explicit parent (assist "add … in the pool") overrides the
+        // position-based containment below, so a task always joins its pool
+        // even if it was placed past the pool's current right edge.
+        ...(initial?.parentId ? { parentId: initial.parentId } : {}),
       };
       // Descriptions are OFF by default for both Pain Points and Issues — the
       // user turns "Show descriptions on diagram" on explicitly. (Display Pain
@@ -3916,7 +3923,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // EXCEPT for subprocess-expanded: drop a Task whose centre is inside the
       // subprocess and we adopt it even if it pokes past the current bounds.
       // ensureContainersEncloseChildren below grows the subprocess to enclose it.
-      if (!newEl.boundaryHostId) {
+      if (!newEl.boundaryHostId && !newEl.parentId) {
         const newCx = newEl.x + newEl.width / 2;
         const newCy = newEl.y + newEl.height / 2;
         const isNewContainer = isContainerType(newEl.type);
@@ -6519,9 +6526,19 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       // A deleted pain point / issue closes its numbering gap.
       const afterDelete = el && MARKER_TYPES.has(el.type) ? renumberMarkers(elements, el.type) : elements;
-      // A pool left with no lanes/flow (last lane just deleted) becomes an empty
-      // black-box → shrink it to just fit its name.
-      return { ...state, elements: resizeEmptyPoolsToHeader(updatePoolTypes(afterDelete), state.poolFontSize ?? 16), connectors };
+      // Only a pool that JUST lost its last lane (had lanes before, none now)
+      // collapses to a name-sized black-box. A pool that was already childless
+      // (a deliberately-sized black-box participant) is left alone — otherwise
+      // every unrelated delete would squash it to name-fit.
+      const laneKids = (arr: DiagramElement[], poolId: string) => arr.some((x) => x.type === "lane" && x.parentId === poolId);
+      const justEmptied = new Set(
+        state.elements
+          .filter((e) => e.type === "pool" && laneKids(state.elements, e.id) && !laneKids(afterDelete, e.id))
+          .map((e) => e.id),
+      );
+      const typed = updatePoolTypes(afterDelete);
+      const finalElements = justEmptied.size ? resizeEmptyPoolsToHeader(typed, state.poolFontSize ?? 16, justEmptied) : typed;
+      return { ...state, elements: finalElements, connectors };
     }
 
     case "ADD_CONNECTOR": {
@@ -9457,7 +9474,7 @@ export function useDiagram(initialData: DiagramData) {
       taskType?: BpmnTaskType,
       eventType?: EventType,
       id?: string,
-      initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string },
+      initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string; parentId?: string },
     ) => {
       pushHistory(snapshotData());
       dispatch({ type: "ADD_ELEMENT", payload: { symbolType, position, taskType, eventType, id, initial } });

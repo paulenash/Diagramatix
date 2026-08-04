@@ -2175,12 +2175,31 @@ export function DiagramEditor({
           const isGw = anchor.type === "gateway";
           const bi = isGw ? data.connectors.filter((cn) => cn.sourceId === anchor!.id).length : 0;
           center = findFreeSlot(isGw ? placeGatewayBranch(anchor, bi, w, h) : placeInline(anchor, w, h), w, h, others);
+          if (isGw) {
+            // #5: a branch ABOVE the gateway leaves its TOP point, one BELOW its
+            // BOTTOM point, one on the same row (overlapping) its RIGHT point.
+            srcSide = center.y + h / 2 <= anchor.y ? "top"
+              : center.y - h / 2 >= anchor.y + anchor.height ? "bottom"
+              : "right";
+          }
         } else {
           const rightmost = els.reduce<DiagramElement | null>((m, e) => (!m || e.x + e.width > m.x + m.width ? e : m), null);
           center = findFreeSlot(rightmost ? placeInline(rightmost, w, h) : { x: 240, y: 200 }, w, h, others);
         }
         const newId = nanoid();
-        addElementGated(op.symbolType, center, undefined, op.eventType, newId);
+        // A newly added task must ALWAYS live inside the white-box pool, even if
+        // it isn't connected (Paul). Prefer the anchor's own lane/pool; else the
+        // white-box pool's first lane, else the pool itself. The pool then grows
+        // to enclose it (ensureContainersEncloseChildren in the reducer).
+        let parentId: string | undefined = anchor?.parentId ?? undefined;
+        if (!parentId) {
+          const wb = els.find((e) => e.type === "pool" && (((e.properties?.poolType as string | undefined) ?? "white-box") === "white-box"));
+          if (wb) {
+            const firstLane = els.filter((e) => e.type === "lane" && e.parentId === wb.id).sort((a, b) => a.y - b.y)[0];
+            parentId = firstLane?.id ?? wb.id;
+          }
+        }
+        addElementGated(op.symbolType, center, undefined, op.eventType, newId, parentId ? { parentId } : undefined);
         if (op.gatewayType) updateProperties(newId, { gatewayType: op.gatewayType });
         if (op.label) updateLabel(newId, op.label);
         if (anchor && op.afterRef) {

@@ -17,6 +17,7 @@ import type { DiagramElement, SymbolType } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 
 export const HALF_TASK_W = 51;   // ½ Task width (Task = 102)
+export const HALF_TASK_H = 32;   // ½ Task height (Task = 64) — vertical branch gap
 export const HALF_EVENT_W = 18;  // ½ event width (event = 36)
 export const BOUNDARY_FOLLOW_GAP = 50;  // R7: gap from a boundary event's outer edge to the following task
 
@@ -41,15 +42,16 @@ export function placeInline(source: Box, w: number, h: number): Center {
 
 /**
  * Rule 2 — gateway branch by index. Branch 0 is inline (same line as the
- * gateway centre); 1 above, 2 below, 3 above², 4 below²… Rows are `h + 51`
- * apart centre-to-centre so nearest edges are 51px clear. Returns a CENTER.
+ * gateway centre); 1 above, 2 below, 3 above², 4 below²… Rows are `h + ½ Task
+ * height` apart centre-to-centre so a stacked branch sits just ½ a Task height
+ * (32px) clear of its nearest neighbour (#5). Returns a CENTER.
  */
 export function placeGatewayBranch(gateway: Box, branchIndex: number, w: number, h: number): Center {
   const x = gateway.x + gateway.width + HALF_TASK_W + w / 2;
   // index 0 → row 0; 1 → -1; 2 → +1; 3 → -2; 4 → +2 …
   const row = Math.ceil(branchIndex / 2);
   const sign = branchIndex % 2 === 1 ? -1 : 1;
-  const y = cyOf(gateway) + sign * row * (h + HALF_TASK_W);
+  const y = cyOf(gateway) + sign * row * (h + HALF_TASK_H);
   return { x, y };
 }
 
