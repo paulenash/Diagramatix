@@ -132,7 +132,7 @@ export function AiUsageClient(props: Props) {
       {/* ── Voice dictation (separate from AI tokens; Deepgram billed separately) ── */}
       <div className="mt-4 flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3">
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-gray-400">Voice dictation</div>
+          <div className="text-[10px] uppercase tracking-wide text-gray-400">🎙 Voice dictation (Deepgram)</div>
           <div className="text-lg font-semibold text-gray-900">
             {Math.round(dictation.seconds / 60).toLocaleString()} min
             <span className="ml-2 text-xs font-normal text-gray-400">· {fmtInt(dictation.sessions)} session{dictation.sessions === 1 ? "" : "s"}</span>
