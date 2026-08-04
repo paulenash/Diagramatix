@@ -342,9 +342,13 @@ interface InteractionLabelProps {
   // branch label is suppressed entirely (still stored, just not drawn), so
   // flipping the marker back reveals it. Evaluated per render by Canvas.
   hideLabel?: boolean;
+  // Which endpoint is a pool — a messageBPMN label defaults to 60px from the
+  // (black-box) pool end rather than the spine midpoint.
+  sourceIsPool?: boolean;
+  targetIsPool?: boolean;
 }
 
-function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, onUpdateLabel, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel }: InteractionLabelProps) {
+function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, onUpdateLabel, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, sourceIsPool, targetIsPool }: InteractionLabelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [isLabelFocused, setIsLabelFocused] = useState(false);
@@ -375,10 +379,26 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
     const pN = visibleWaypoints[visibleWaypoints.length - 1];
     anchor = { x: (p0.x + pN.x) / 2, y: (p0.y + pN.y) / 2 };
   }
+  // #2b — a message flow to/from a pool defaults its label 60px from the POOL
+  // endpoint (measured along the spine), not the midpoint — UNLESS the user has
+  // dragged it (a stored offset), which is respected as-is.
+  const labelManuallyMoved = connector.labelOffsetX != null || connector.labelOffsetY != null;
+  const msgToPool = connector.type === "messageBPMN" && (sourceIsPool || targetIsPool);
+  if (!labelManuallyMoved && msgToPool && visibleWaypoints.length >= 2 && !isSourceAnchored) {
+    const p0 = visibleWaypoints[0];
+    const pN = visibleWaypoints[visibleWaypoints.length - 1];
+    const poolEnd = targetIsPool ? pN : p0;
+    const otherEnd = targetIsPool ? p0 : pN;
+    const dx = otherEnd.x - poolEnd.x, dy = otherEnd.y - poolEnd.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const step = Math.min(60, len - 6); // don't overshoot a very short spine
+    anchor = { x: poolEnd.x + (dx / len) * step, y: poolEnd.y + (dy / len) * step };
+  }
   // Default the flowline label to sit just beside the source endpoint
   // (down-right of the exit), clear of the connector line; still draggable.
-  const offsetX = connector.labelOffsetX ?? (connector.type === "flowline" ? 18 : 0);
-  const offsetY = connector.labelOffsetY ?? (connector.type === "flowline" ? 16 : -30);
+  // A message-to-pool label sits just beside its 60px anchor (not 30px above).
+  const offsetX = connector.labelOffsetX ?? (connector.type === "flowline" ? 18 : msgToPool ? 20 : 0);
+  const offsetY = connector.labelOffsetY ?? (connector.type === "flowline" ? 16 : msgToPool ? -7 : -30);
   const lWidth  = connector.labelWidth ?? 80;
   const label   = connector.label ?? "";
   // Auto-size: measure text width from actual content
@@ -1162,6 +1182,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           onLabelFocusEditStart={onLabelFocusEditStart}
           onLabelFocusEditEnd={onLabelFocusEditEnd}
           hideLabel={hideLabel}
+          sourceIsPool={sourceIsPool}
+          targetIsPool={targetIsPool}
         />
       )}
 

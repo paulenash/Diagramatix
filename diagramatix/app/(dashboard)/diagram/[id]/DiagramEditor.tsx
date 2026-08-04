@@ -2381,7 +2381,36 @@ export function DiagramEditor({
         const f = resolve1(op.fromRef), t = resolve1(op.toRef);
         if ("err" in f) { results.push(f.err); anyFail = true; continue; }
         if ("err" in t) { results.push(t.err); anyFail = true; continue; }
-        addConnector(f.id, t.id, "messageBPMN", "directed", "rectilinear", "right", "left", undefined, undefined, false, op.label);
+        // #2a — connect the NEAREST facing boundaries (a message runs vertically
+        // between an activity and the pool above/below it).
+        const fcy = f.y + f.height / 2, tcy = t.y + t.height / 2;
+        const fSide: Side = fcy <= tcy ? "bottom" : "top";
+        const tSide: Side = fcy <= tcy ? "top" : "bottom";
+        // #2c — the connection point sits in the MIDDLE of the activity but at
+        // least 20px clear of any other message point on the same boundary. The
+        // vertical message shares one x, so we spread on the activity (the non-
+        // pool end) and drive it through the source offset.
+        const activity = f.type === "pool" ? (t.type === "pool" ? f : t) : f;
+        const MIN_GAP = 20;
+        const takenX: number[] = [];
+        for (const c of data.connectors) {
+          if (c.type !== "messageBPMN") continue;
+          if (c.sourceId !== activity.id && c.targetId !== activity.id) continue;
+          const wx = c.waypoints?.[1]?.x;
+          if (typeof wx === "number") takenX.push(wx);
+        }
+        const midX = activity.x + activity.width / 2;
+        const clear = (x: number) => takenX.every((v) => Math.abs(v - x) >= MIN_GAP);
+        let sharedX = midX;
+        if (!clear(sharedX)) {
+          for (let k = 1; k <= 12; k++) {
+            const lo = midX - k * MIN_GAP, hi = midX + k * MIN_GAP;
+            if (lo >= activity.x + 8 && clear(lo)) { sharedX = lo; break; }
+            if (hi <= activity.x + activity.width - 8 && clear(hi)) { sharedX = hi; break; }
+          }
+        }
+        const srcOff = f.width > 0 ? Math.max(0, Math.min(1, (sharedX - f.x) / f.width)) : 0.5;
+        addConnector(f.id, t.id, "messageBPMN", "directed", "rectilinear", fSide, tSide, srcOff, 0.5, false, op.label);
         results.push(`added message${op.label ? ` “${op.label}”` : ""} ${nameOf(f)} → ${nameOf(t)}`);
         continue;
       }
