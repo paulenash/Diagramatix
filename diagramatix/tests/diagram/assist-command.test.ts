@@ -145,6 +145,9 @@ describe("container maintenance — definitive set", () => {
   it("9. Swap two lanes", () => {
     expect(parseCommand("swap lane Sales with lane Marketing")).toEqual([{ op: "swapLanes", laneA: "lane Sales", laneB: "lane Marketing" }]);
     expect(parseCommand("swap Sales and Marketing")).toEqual([{ op: "swapLanes", laneA: "Sales", laneB: "Marketing" }]);
+    // plural / sub-lane collective nouns are captured verbatim (resolveRef strips them)
+    expect(parseCommand("swap lanes Sales with Marketing")).toEqual([{ op: "swapLanes", laneA: "lanes Sales", laneB: "Marketing" }]);
+    expect(parseCommand("swap sub-lanes Manager with Assistant")).toEqual([{ op: "swapLanes", laneA: "sub-lanes Manager", laneB: "Assistant" }]);
   });
   it("10. Compress a pool (all aliases)", () => {
     expect(parseCommand("compress the Customer pool")).toEqual([{ op: "compressPool", poolRef: "Customer" }]);
@@ -281,6 +284,17 @@ describe("resolveRef", () => {
     expect(resolveRef("sublane Marketing Assistant", lanes)).toEqual({ id: "l1" });
     expect(resolveRef("the sub lane Marketing Staff", lanes)).toEqual({ id: "l2" });
     expect(resolveRef("task Review", els)).toEqual({ id: "t1" });
+  });
+  it("strips PLURAL / hyphenated collective nouns (swap lanes / sub-lanes X with Y)", () => {
+    const lanes = [el("l1", "lane", "Sales"), el("l2", "lane", "Marketing")];
+    expect(resolveRef("lanes Sales", lanes)).toEqual({ id: "l1" });
+    expect(resolveRef("lane Marketing", lanes)).toEqual({ id: "l2" });
+    const subs = [el("s1", "lane", "Manager", { parentId: "L" }), el("s2", "lane", "Assistant", { parentId: "L" }), el("L", "lane", "Team")];
+    expect(resolveRef("sub-lanes Manager", subs)).toEqual({ id: "s1" });
+    expect(resolveRef("sublane Assistant", subs)).toEqual({ id: "s2" });
+    // a lane literally named "Lane 2" still wins via its full label
+    const named = [el("n1", "lane", "Lane 1"), el("n2", "lane", "Lane 2")];
+    expect(resolveRef("Lane 2", named)).toEqual({ id: "n2" });
   });
 });
 

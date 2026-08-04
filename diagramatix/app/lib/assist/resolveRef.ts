@@ -59,6 +59,12 @@ const KIND_PREFIXES = ["sub lane", "sublane", "lane", "pool", "sub process", "su
   "start event", "end event", "event", "gateway", "decision", "task", "activity", "step"]
   .sort((a, b) => b.length - a.length);
 function stripKind(s: string): string {
+  // Container collective nouns first, allowing PLURAL + hyphen/space variants so
+  // "lanes Sales", "sub-lanes Marketing", "pools Finance" resolve to the bare
+  // name. (Only used as a fallback after the full-phrase exact match, so a lane
+  // literally named "Lane 2" still resolves via its full label first.)
+  const c = s.match(/^(?:sub[-\s]?lanes?|lanes?|pools?)\s+(.+)$/);
+  if (c) return c[1].trim();
   for (const k of KIND_PREFIXES) {
     if (s.startsWith(k + " ")) return s.slice(k.length).trim();
   }
