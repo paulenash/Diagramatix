@@ -34,7 +34,7 @@ import { PresenceBar } from "@/app/components/canvas/PresenceBar";
 import { usePresence } from "@/app/hooks/usePresence";
 import { CollabRoom } from "@/app/components/canvas/CollabRoom";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
-import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, findFreeSlot, HALF_TASK_W } from "@/app/lib/diagram/assistPlacement";
+import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, placeAfterBoundaryEvent, boundaryOuterSide, findFreeSlot, HALF_TASK_W } from "@/app/lib/diagram/assistPlacement";
 import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
 import { canConnect } from "@/app/lib/diagram/canConnect";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
@@ -2053,25 +2053,33 @@ export function DiagramEditor({
       return;
     }
 
-    // Element (rules 1, 2, 4): inline, or a gateway branch that fans out, then
-    // nudged to the nearest free slot so it never lands on an existing element.
+    // Element (rules 1, 2, 4, R7): inline; a gateway branch that fans out; or —
+    // when the source is a boundary event — bottom/top-right of the event with
+    // the connector exiting the event's outer face (R7).
     const { w, h } = sizeOf(c.symbolType);
-    const isGateway = src.type === "gateway";
-    const branchIndex = isGateway
-      ? data.connectors.filter((cn) => cn.sourceId === src.id).length
-      : 0;
-    const wanted = isGateway
-      ? placeGatewayBranch(src, branchIndex, w, h)
-      : placeInline(src, w, h);
     const others = data.elements
       .filter((e) => e.id !== src.id && e.type !== "pool" && e.type !== "lane" && e.type !== "sublane")
       .map((e) => ({ x: e.x, y: e.y, width: e.width, height: e.height }));
+
+    let wanted: { x: number; y: number };
+    let srcSide: Side | undefined;
+    if (src.boundaryHostId) {
+      const host = data.elements.find((e) => e.id === src.boundaryHostId);
+      const side = host ? boundaryOuterSide(src, host) : "bottom";
+      wanted = placeAfterBoundaryEvent(src, side, w, h);
+      srcSide = side;
+    } else if (src.type === "gateway") {
+      wanted = placeGatewayBranch(src, data.connectors.filter((cn) => cn.sourceId === src.id).length, w, h);
+    } else {
+      wanted = placeInline(src, w, h);
+    }
     const center = findFreeSlot(wanted, w, h, others);
 
     const newId = nanoid();
     addElementGated(c.symbolType, center, undefined, c.eventType, newId);
     if (c.gatewayType) updateProperties(newId, { gatewayType: c.gatewayType });
-    addConnector(src.id, newId, c.connectorType);
+    if (srcSide) addConnector(src.id, newId, c.connectorType, "directed", "rectilinear", srcSide, "left");
+    else addConnector(src.id, newId, c.connectorType);
     setSelectedElementIds(new Set([newId])); // chain: select the new step
   }, [selectedElement, data.elements, data.connectors, addElementGated, updateProperties, addConnector, setEventBoundary, inlineTemplates, attachTemplate]);
   // Stable ref so the global Tab handler always sees the latest candidates.
@@ -2121,8 +2129,14 @@ export function DiagramEditor({
         if (op.afterRef) { const a = resolve1(op.afterRef); if ("err" in a) { results.push(a.err); anyFail = true; } else anchor = a; }
         if (!anchor && abraLastId.current) anchor = els.find((e) => e.id === abraLastId.current) ?? null;
         const others = els.filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane").map(elBox);
-        let center;
-        if (anchor) {
+        let center; let srcSide: Side | undefined;
+        if (anchor && anchor.boundaryHostId) {
+          // R7: task after a boundary event → bottom/top-right, connector exits the outer face.
+          const host = els.find((e) => e.id === anchor!.boundaryHostId);
+          const side = host ? boundaryOuterSide(anchor, host) : "bottom";
+          center = findFreeSlot(placeAfterBoundaryEvent(anchor, side, w, h), w, h, others);
+          srcSide = side;
+        } else if (anchor) {
           const isGw = anchor.type === "gateway";
           const bi = isGw ? data.connectors.filter((cn) => cn.sourceId === anchor!.id).length : 0;
           center = findFreeSlot(isGw ? placeGatewayBranch(anchor, bi, w, h) : placeInline(anchor, w, h), w, h, others);
@@ -2134,7 +2148,10 @@ export function DiagramEditor({
         addElementGated(op.symbolType, center, undefined, op.eventType, newId);
         if (op.gatewayType) updateProperties(newId, { gatewayType: op.gatewayType });
         if (op.label) updateLabel(newId, op.label);
-        if (anchor && op.afterRef) addConnector(anchor.id, newId, "sequence");
+        if (anchor && op.afterRef) {
+          if (srcSide) addConnector(anchor.id, newId, "sequence", "directed", "rectilinear", srcSide, "left");
+          else addConnector(anchor.id, newId, "sequence");
+        }
         abraLastId.current = newId;
         setSelectedElementIds(new Set([newId]));
         results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}`);

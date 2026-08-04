@@ -3,7 +3,8 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  HALF_TASK_W, HALF_EVENT_W, placeInline, placeGatewayBranch, placeBoundaryEvent, findFreeSlot,
+  HALF_TASK_W, HALF_EVENT_W, BOUNDARY_FOLLOW_GAP, placeInline, placeGatewayBranch, placeBoundaryEvent,
+  placeAfterBoundaryEvent, boundaryOuterSide, findFreeSlot,
 } from "@/app/lib/diagram/assistPlacement";
 import type { DiagramElement } from "@/app/lib/diagram/types";
 
@@ -67,6 +68,25 @@ describe("rule 3 — boundary events", () => {
     }
     // leftmost event near the left corner → next would run off → null
     expect(placeBoundaryEvent(host, many)).toBeNull();
+  });
+});
+
+describe("rule R7 — task after a boundary event", () => {
+  const host = box(200, 200, 102, 65);
+  const w = 102, h = 65;
+  it("bottom-mounted event → outer side bottom, task 50px below the event's bottom", () => {
+    // event straddling the host's bottom edge (y = 265), 36×36 → y 247..283
+    const ev = box(240, 247, 36, 36);
+    expect(boundaryOuterSide(ev, host)).toBe("bottom");
+    const c = placeAfterBoundaryEvent(ev, "bottom", w, h);
+    expect(c.y - h / 2).toBe(ev.y + ev.height + BOUNDARY_FOLLOW_GAP); // near edge 50px below event bottom
+    expect(c.x).toBeGreaterThan(ev.x + ev.width);                     // to the right
+  });
+  it("top-mounted event → outer side top, task 50px above the event's top", () => {
+    const ev = box(240, 182, 36, 36); // straddling host top edge (y=200) → 182..218
+    expect(boundaryOuterSide(ev, host)).toBe("top");
+    const c = placeAfterBoundaryEvent(ev, "top", w, h);
+    expect(c.y + h / 2).toBe(ev.y - BOUNDARY_FOLLOW_GAP);
   });
 });
 

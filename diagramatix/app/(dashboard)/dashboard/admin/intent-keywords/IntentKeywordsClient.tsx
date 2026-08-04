@@ -31,7 +31,7 @@ const RED_RULES: { id: string; text: string }[] = [
   { id: "R4", text: "No overlap — placements move to the nearest free slot keeping edges ≥51px clear." },
   { id: "R5", text: "Connector legality — every suggested connection must pass canConnect." },
   { id: "R6", text: "Template attach — strip a leading Start Event, anchor the entry element inline, free-slot the fragment." },
-  { id: "R7", text: "Boundary-follow — a task after a boundary event lands bottom-right/top-right; the connector exits the event's outer face." },
+  { id: "R7", text: "Boundary-follow — a task after a boundary event lands bottom-right (bottom-mounted) or top-right (top-mounted), its near edge 50px beyond the event's outer point; the connector exits the event's outer face into the task's left side." },
 ];
 
 export function IntentKeywordsClient() {

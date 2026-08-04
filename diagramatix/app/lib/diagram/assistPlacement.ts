@@ -18,6 +18,7 @@ import { getSymbolDefinition } from "./symbols/definitions";
 
 export const HALF_TASK_W = 51;   // ½ Task width (Task = 102)
 export const HALF_EVENT_W = 18;  // ½ event width (event = 36)
+export const BOUNDARY_FOLLOW_GAP = 50;  // R7: gap from a boundary event's outer edge to the following task
 
 export interface Box { x: number; y: number; width: number; height: number }
 export interface Center { x: number; y: number }
@@ -143,4 +144,36 @@ export function findFreeSlot(
 /** Convert a CENTER + size to a top-left Box (for callers that need bounds). */
 export function boxFromCenter(c: Center, w: number, h: number): Box {
   return { x: c.x - w / 2, y: c.y - h / 2, width: w, height: h };
+}
+
+export type OuterSide = "top" | "bottom" | "left" | "right";
+
+/** Which host edge a boundary event sits on (= the side it faces outward). */
+export function boundaryOuterSide(event: Box, host: Box): OuterSide {
+  const ecx = cxOf(event), ecy = cyOf(event);
+  const dTop = Math.abs(ecy - host.y);
+  const dBottom = Math.abs(ecy - (host.y + host.height));
+  const dLeft = Math.abs(ecx - host.x);
+  const dRight = Math.abs(ecx - (host.x + host.width));
+  const min = Math.min(dTop, dBottom, dLeft, dRight);
+  if (min === dTop) return "top";
+  if (min === dBottom) return "bottom";
+  if (min === dLeft) return "left";
+  return "right";
+}
+
+/**
+ * Rule R7 — a task placed AFTER a boundary event goes to the event's bottom-right
+ * (event on the bottom edge) or top-right (top edge), with its near edge
+ * BOUNDARY_FOLLOW_GAP (50px) beyond the event's outer (lowest/highest) point, and
+ * shifted right so the connector can leave the event's outer face and turn into
+ * the task's left side. Side-mounted events go straight out. Returns a CENTER.
+ */
+export function placeAfterBoundaryEvent(event: Box, side: OuterSide, w: number, h: number): Center {
+  const ecx = cxOf(event), ecy = cyOf(event);
+  const dxRight = event.width / 2 + HALF_TASK_W + w / 2;
+  if (side === "bottom") return { x: ecx + dxRight, y: event.y + event.height + BOUNDARY_FOLLOW_GAP + h / 2 };
+  if (side === "top") return { x: ecx + dxRight, y: event.y - BOUNDARY_FOLLOW_GAP - h / 2 };
+  if (side === "left") return { x: event.x - BOUNDARY_FOLLOW_GAP - w / 2, y: ecy };
+  return { x: event.x + event.width + BOUNDARY_FOLLOW_GAP + w / 2, y: ecy };
 }
