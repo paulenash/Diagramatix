@@ -21,7 +21,19 @@ import { validateOps } from "@/app/lib/assist/ops";
 import { serializeDiagramForCommand } from "@/app/lib/assist/serializeDiagram";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
-const SYSTEM = `You translate ONE spoken instruction from a process modeller into a small list of edit operations on the CURRENT BPMN diagram. Output ONLY a JSON array of ops — no prose, no markdown.
+const SYSTEM = `You interpret ONE spoken (often mis-transcribed) instruction from a process modeller editing a BPMN diagram. Output ONLY a JSON OBJECT — no prose, no markdown:
+  { "canonical": string, "ops": [ …op objects… ] }
+
+**canonical** (preferred): rewrite the instruction as ONE plain command using the exact phrasings below, keeping the user's names/numbers, and FIXING obvious speech mis-hears ("poll"/"pull"→pool, "line"→lane, "lane two"→Lane 2). The app re-parses this deterministically, so it's the safest path. Use "" if it doesn't fit any form.
+Canonical forms:
+  add a <type> called <name> after <name>   ·   connect <name> to <name>   ·   disconnect <name> from <name>
+  rename <name> to <name>   ·   move <name> <n> elements <left|right|up|down>
+  delete <name>   ·   delete <name> and compact   ·   add a boundary event called <name> to <name>
+  add a pool   ·   add a black-box pool above|below existing pools   ·   put a pool around everything   ·   extend the pool to include all elements
+  add <n> lanes to <pool> called <A, B and C>   ·   add a lane above|below <lane>   ·   add <n> sublanes to <lane> called <A, B and C>   ·   swap <lane> with <lane>
+  clear the diagram   ·   export the diagram to JSON   ·   undo that
+
+**ops** (fallback, used only if canonical is ""): the same edit as structured ops.
 
 Op shapes (use element NAMES for refs — they are resolved against the diagram; you may also use "it"/"the last"/"the previous"/"the <type>"):
   { "op":"add", "symbolType": <type>, "label"?: string, "gatewayType"?: "exclusive"|"parallel"|"inclusive"|"event-based", "eventType"?: "message"|"timer"|"error"|..., "afterRef"?: <name> }
@@ -42,10 +54,10 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"undo" }
 
 <type> is one of: task, gateway, start-event, end-event, intermediate-event, subprocess, data-object, data-store, text-annotation.
-Rules: prefer the smallest op list that satisfies the instruction. Use "afterRef" when the user says a new element follows an existing one (this also connects them). Only reference elements that exist in the diagram (below) — except for a brand-new element you are adding. If the instruction is not an editing command, return [].`;
+Rules: prefer canonical whenever the instruction maps to a form above. Use "afterRef" when a new element follows an existing one. Only reference elements that exist in the diagram (below) — except a brand-new element you are adding. If it is not an editing command, return { "canonical": "", "ops": [] }.`;
 
-function extractJsonArray(text: string): unknown {
-  const s = text.indexOf("["), e = text.lastIndexOf("]");
+function extractJsonObject(text: string): { canonical?: unknown; ops?: unknown } | null {
+  const s = text.indexOf("{"), e = text.lastIndexOf("}");
   if (s === -1 || e === -1 || e < s) return null;
   try { return JSON.parse(text.slice(s, e + 1)); } catch { return null; }
 }
@@ -66,7 +78,7 @@ export async function POST(req: Request) {
 
   const model = await getAiGenerateModel();
   const apiKey = aiApiKey(model);
-  if (!apiKey) return NextResponse.json({ ops: [] }); // no AI configured → no-op
+  if (!apiKey) return NextResponse.json({ canonical: "", ops: [] }); // no AI configured → no-op
 
   try {
     const client = makeAiClient(model, apiKey);
@@ -76,18 +88,20 @@ export async function POST(req: Request) {
       system: SYSTEM,
       messages: [{
         role: "user",
-        content: `CURRENT DIAGRAM:\n${serializeDiagramForCommand(state)}\n\nINSTRUCTION:\n${instruction}\n\nReturn the JSON op array.`,
+        content: `CURRENT DIAGRAM:\n${serializeDiagramForCommand(state)}\n\nINSTRUCTION:\n${instruction}\n\nReturn the JSON object { "canonical", "ops" }.`,
       }],
     });
     const text = resp.content
       .filter((c): c is Anthropic.TextBlock => c.type === "text")
       .map((c) => c.text)
       .join("");
-    const ops = validateOps(extractJsonArray(text));
-    return NextResponse.json({ ops });
+    const obj = extractJsonObject(text);
+    const canonical = typeof obj?.canonical === "string" ? obj.canonical.trim() : "";
+    const ops = validateOps(obj?.ops);
+    return NextResponse.json({ canonical, ops });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[POST /api/ai/command] error:", message);
-    return NextResponse.json({ ops: [], error: message }, { status: 200 });
+    return NextResponse.json({ canonical: "", ops: [], error: message }, { status: 200 });
   }
 }

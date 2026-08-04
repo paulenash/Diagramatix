@@ -2327,6 +2327,15 @@ export function DiagramEditor({
       });
       if (!res.ok) { setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "didn’t understand that", ok: false, viaAi: true }]); return; }
       const j = await res.json();
+      // Prefer the AI's CANONICAL rewrite re-parsed deterministically (fixes
+      // mis-hears + guarantees a valid, documented command); fall back to ops.
+      const canonical = typeof j.canonical === "string" ? j.canonical.trim() : "";
+      const canonicalOps = canonical ? parseCommand(canonical) : null;
+      if (canonicalOps) {
+        const r = applyAssistOps(canonicalOps);
+        setAbraLog((prev) => [...prev, { id: entryId, heard, summary: `“${canonical}” → ${r.summary}`, ok: r.ok, viaAi: true }]);
+        return;
+      }
       const aiOps = validateOps(j.ops);
       if (aiOps.length === 0) { setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "didn’t understand that", ok: false, viaAi: true }]); return; }
       const r = applyAssistOps(aiOps);
