@@ -140,6 +140,37 @@ describe("container maintenance — definitive set", () => {
     expect(parseCommand("swap lane Sales with lane Marketing")).toEqual([{ op: "swapLanes", laneA: "lane Sales", laneB: "lane Marketing" }]);
     expect(parseCommand("swap Sales and Marketing")).toEqual([{ op: "swapLanes", laneA: "Sales", laneB: "Marketing" }]);
   });
+  it("10. Compress a pool", () => {
+    expect(parseCommand("compress the Customer pool")).toEqual([{ op: "compressPool", poolRef: "Customer" }]);
+    expect(parseCommand("shrink Sales")).toEqual([{ op: "compressPool", poolRef: "Sales" }]);
+    expect(parseCommand("collapse the pool")).toEqual([{ op: "compressPool", poolRef: "pool" }]);
+  });
+});
+
+describe("parseCommand — message flows", () => {
+  it("add message from an activity to a pool, labelled", () => {
+    expect(parseCommand("add message from Task 1 to IT System labelled Email Details")).toEqual([
+      { op: "addMessage", fromRef: "Task 1", toRef: "IT System", label: "Email Details" },
+    ]);
+  });
+  it("add message to a pool from an activity (reversed order)", () => {
+    expect(parseCommand("add a message to IT System from Task 1 saying Email Details")).toEqual([
+      { op: "addMessage", fromRef: "Task 1", toRef: "IT System", label: "Email Details" },
+    ]);
+  });
+  it("add message without a label", () => {
+    expect(parseCommand("send a message flow from Approve to Customer")).toEqual([
+      { op: "addMessage", fromRef: "Approve", toRef: "Customer" },
+    ]);
+  });
+  it("rename a message by label (falls through to rename op)", () => {
+    expect(parseCommand("rename 'Email Details' to 'Send the invoice'")).toEqual([
+      { op: "rename", ref: "Email Details", label: "Send the invoice" },
+    ]);
+  });
+  it("delete a message by label (falls through to delete op)", () => {
+    expect(parseCommand("delete 'Email Details'")).toEqual([{ op: "delete", ref: "Email Details" }]);
+  });
 });
 
 describe("resolveRef — positional", () => {

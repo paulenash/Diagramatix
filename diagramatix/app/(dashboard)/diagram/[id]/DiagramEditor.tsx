@@ -320,6 +320,17 @@ function getDiagramBounds(data: DiagramData, padding = 20) {
   };
 }
 
+/** Normalise a spoken message reference to match against a connector label:
+ *  drop a leading "message/msg/flow" noun and any surrounding quotes. */
+function messageLabelKey(ref: string): string {
+  return ref
+    .trim()
+    .replace(/^(?:the\s+)?(?:message|msg|flow)\s+/i, "")
+    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
+    .trim()
+    .toLowerCase();
+}
+
 async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData, scale = 1, output: "save" | "blob" = "save"): Promise<Blob | void> {
   const { jsPDF } = await import("jspdf");
   await import("svg2pdf.js");
@@ -953,6 +964,7 @@ export function DiagramEditor({
     wrapInPool,
     addPool,
     addLaneAt,
+    compressPool,
     reorderLane,
     moveLaneBoundary,
     moveVSwimlaneBoundary,
@@ -2192,7 +2204,25 @@ export function DiagramEditor({
 
       if (op.op === "delete") {
         const e = resolve1(op.ref);
-        if ("err" in e) { results.push(e.err); anyFail = true; continue; }
+        if ("err" in e) {
+          // Not an element — maybe a message/connector label.
+          const key = messageLabelKey(op.ref);
+          const conn = data.connectors.find((c) => (c.label ?? "").trim().toLowerCase() === key);
+          if (conn) { deleteConnector(conn.id); results.push(`deleted message “${conn.label}”`); continue; }
+          results.push(e.err); anyFail = true; continue;
+        }
+        // #7 — never delete a container we can't confidently identify. If the
+        // spoken name doesn't actually appear in the resolved container's label
+        // and there's more than one of its kind, ask rather than guess.
+        if (e.type === "pool" || e.type === "lane" || e.type === "sublane") {
+          const kindWord = e.type === "sublane" ? "sub-?lanes?" : `${e.type}s?`;
+          const named = op.ref.replace(new RegExp(`\\b(?:the|a|an|named|called|${kindWord})\\b`, "gi"), "").trim();
+          const siblings = els.filter((x) => x.type === e.type);
+          if (siblings.length > 1 && (!named || !(e.label ?? "").toLowerCase().includes(named.toLowerCase()))) {
+            results.push(`which ${e.type}? there are ${siblings.length}${named ? ` — I couldn't match “${named}”` : ""}; say its exact name`);
+            anyFail = true; continue;
+          }
+        }
         const foot = { x: e.x, y: e.y, width: e.width, height: e.height };
         deleteElement(e.id);
         if (abraLastId.current === e.id) abraLastId.current = null;
@@ -2260,9 +2290,33 @@ export function DiagramEditor({
         continue;
       }
 
+      if (op.op === "compressPool") {
+        const p = resolve1(op.poolRef);
+        if ("err" in p) { results.push(p.err); anyFail = true; continue; }
+        if (p.type !== "pool") { results.push(`${nameOf(p)} isn't a pool`); anyFail = true; continue; }
+        compressPool(p.id);
+        results.push(`compressed ${nameOf(p)}`);
+        continue;
+      }
+
+      if (op.op === "addMessage") {
+        const f = resolve1(op.fromRef), t = resolve1(op.toRef);
+        if ("err" in f) { results.push(f.err); anyFail = true; continue; }
+        if ("err" in t) { results.push(t.err); anyFail = true; continue; }
+        addConnector(f.id, t.id, "messageBPMN", "directed", "rectilinear", "right", "left", undefined, undefined, false, op.label);
+        results.push(`added message${op.label ? ` “${op.label}”` : ""} ${nameOf(f)} → ${nameOf(t)}`);
+        continue;
+      }
+
       if (op.op === "rename") {
         const e = resolve1(op.ref);
-        if ("err" in e) { results.push(e.err); anyFail = true; continue; }
+        if ("err" in e) {
+          // Not an element — maybe a message/connector label.
+          const key = messageLabelKey(op.ref);
+          const conn = data.connectors.find((c) => (c.label ?? "").trim().toLowerCase() === key);
+          if (conn) { updateConnectorLabel(conn.id, op.label); results.push(`renamed message “${conn.label}” → ${op.label}`); continue; }
+          results.push(e.err); anyFail = true; continue;
+        }
         updateLabel(e.id, op.label);
         results.push(`renamed ${nameOf(e)} → ${op.label}`);
         continue;
@@ -2304,7 +2358,7 @@ export function DiagramEditor({
       }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, swapLane, moveElements, removeSpace]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, swapLane, moveElements, removeSpace]);
 
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
   const runAbraCommand = useCallback(async (text: string) => {

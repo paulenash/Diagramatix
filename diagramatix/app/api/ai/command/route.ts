@@ -31,6 +31,7 @@ Canonical forms:
   delete <name>   ·   delete <name> and compact   ·   add a boundary event called <name> to <name>
   add a pool   ·   add a black-box pool above|below existing pools   ·   put a pool around everything   ·   extend the pool to include all elements
   add <n> lanes to <pool> called <A, B and C>   ·   add a lane above|below <lane>   ·   add <n> sublanes to <lane> called <A, B and C>   ·   swap <lane> with <lane>
+  compress <pool>   ·   add a message from <name> to <name> labelled <text>   ·   rename message <text> to <text>   ·   delete message <text>
   clear the diagram   ·   export the diagram to JSON   ·   undo that
 
 **ops** (fallback, used only if canonical is ""): the same edit as structured ops.
@@ -49,6 +50,8 @@ Op shapes (use element NAMES for refs — they are resolved against the diagram;
   { "op":"addLaneAt", "poolRef": <name>, "position": "above"|"below", "refLane": <name>, "label"?: string }  // insert a lane by a ref lane
   { "op":"addSublanes", "laneRef": <name>, "labels": [string,…] }   // N equal named sublanes in a lane
   { "op":"swapLanes", "laneA": <name>, "laneB": <name> }            // swap two adjacent lanes
+  { "op":"compressPool", "poolRef": <name> }                        // shrink a pool to just fit its contents (or its name if empty)
+  { "op":"addMessage", "fromRef": <name>, "toRef": <name>, "label"?: string }  // message flow between an activity and a pool/participant
   { "op":"clear" }                    // empty the whole diagram
   { "op":"export", "format":"json" }  // download the diagram as JSON
   { "op":"undo" }

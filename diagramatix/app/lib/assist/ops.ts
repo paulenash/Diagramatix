@@ -21,6 +21,8 @@ export type AssistOp =
   | { op: "addLaneAt"; poolRef: Ref; label?: string; position: "above" | "below"; refLane: Ref }
   | { op: "addSublanes"; laneRef: Ref; labels: string[] }
   | { op: "swapLanes"; laneA: Ref; laneB: Ref }
+  | { op: "compressPool"; poolRef: Ref }
+  | { op: "addMessage"; fromRef: Ref; toRef: Ref; label?: string }
   | { op: "clear" }
   | { op: "export"; format?: "json" }
   | { op: "undo" };
@@ -134,6 +136,14 @@ export function validateOp(raw: unknown): AssistOp | null {
     }
     case "swapLanes":
       return isRef(o.laneA) && isRef(o.laneB) ? { op: "swapLanes", laneA: (o.laneA as string).trim(), laneB: (o.laneB as string).trim() } : null;
+    case "compressPool":
+      return isRef(o.poolRef) ? { op: "compressPool", poolRef: (o.poolRef as string).trim() } : null;
+    case "addMessage": {
+      if (!isRef(o.fromRef) || !isRef(o.toRef)) return null;
+      const op: AssistOp = { op: "addMessage", fromRef: (o.fromRef as string).trim(), toRef: (o.toRef as string).trim() };
+      if (isRef(o.label)) op.label = (o.label as string).trim();
+      return op;
+    }
     case "addSublanes": {
       const labels = Array.isArray(o.labels) ? (o.labels as unknown[]).map((l) => String(l).trim()).filter(Boolean) : [];
       return isRef(o.laneRef) && labels.length ? { op: "addSublanes", laneRef: (o.laneRef as string).trim(), labels } : null;

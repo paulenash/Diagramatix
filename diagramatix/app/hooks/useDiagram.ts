@@ -436,6 +436,7 @@ export type Action =
   | { type: "WRAP_IN_POOL"; payload: { label?: string } }
   | { type: "ADD_POOL"; payload: { label?: string; poolType?: string; position?: "above" | "below" } }
   | { type: "ADD_LANE_AT"; payload: { poolId: string; label?: string; position: "above" | "below"; refLaneId: string } }
+  | { type: "COMPRESS_POOL"; payload: { poolId: string } }
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
   | { type: "MOVE_VSWIMLANE_BOUNDARY"; payload: { kind: "divider" | "left" | "right" | "bottom"; delta: number; leftId?: string; rightId?: string } }
   | { type: "REORDER_LANE"; payload: { laneId: string; direction: "up" | "down" } }
@@ -2112,6 +2113,25 @@ function expandEPForBoundaryEntry(
 function getPoolHeaderWidth(pool: DiagramElement): number {
   const stored = pool.properties?.poolHeaderWidth;
   return typeof stored === "number" && stored > 0 ? stored : 36;
+}
+
+// The pool name renders as rotated (vertical) text in the left header, so a
+// pool "sized to fit its name" needs HEIGHT ∝ the name length + a small buffer,
+// and only a narrow body. Used for empty/black-box pools + Compress.
+function poolNameFitSize(label: string, poolFs: number): { width: number; height: number } {
+  const chars = Math.max(4, (label || "Pool").trim().length);
+  return { width: 36 + 48, height: Math.max(64, Math.round(chars * poolFs * 0.62) + 24) };
+}
+
+// Shrink any pool that has NO children (no lanes, no flow) to just fit its name
+// — a new empty pool, or one whose last lane was just deleted.
+function resizeEmptyPoolsToHeader(elements: DiagramElement[], poolFs: number): DiagramElement[] {
+  const parented = new Set(elements.map((e) => e.parentId).filter(Boolean) as string[]);
+  return elements.map((e) => {
+    if (e.type !== "pool" || parented.has(e.id)) return e;
+    const { width, height } = poolNameFitSize(e.label ?? "Pool", poolFs);
+    return { ...e, width, height };
+  });
 }
 
 /**
@@ -6457,7 +6477,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       // A deleted pain point / issue closes its numbering gap.
       const afterDelete = el && MARKER_TYPES.has(el.type) ? renumberMarkers(elements, el.type) : elements;
-      return { ...state, elements: updatePoolTypes(afterDelete), connectors };
+      // A pool left with no lanes/flow (last lane just deleted) becomes an empty
+      // black-box → shrink it to just fit its name.
+      return { ...state, elements: resizeEmptyPoolsToHeader(updatePoolTypes(afterDelete), state.poolFontSize ?? 16), connectors };
     }
 
     case "ADD_CONNECTOR": {
@@ -8653,40 +8675,74 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements: ensureContainersEncloseChildren(updatePoolTypes([pool, lane, ...elements])), connectors: state.connectors };
     }
 
-    // Create a NEW pool (empty). Black-box = a bare participant box (no lanes);
-    // white-box = a pool with one starter lane. Position above/below any existing
-    // pools, else below the current content.
+    // Create a NEW empty pool sized to just fit its name (NO auto lane). It
+    // starts black-box; adding a lane later flips it white-box. Position
+    // above/below existing pools, else near the current content.
     case "ADD_POOL": {
-      const { label, poolType = "white-box", position } = action.payload;
+      const { label, poolType, position } = action.payload;
+      const poolFs = state.poolFontSize ?? 16;
+      const { width, height } = poolNameFitSize(label || "Pool", poolFs);
       const pools = state.elements.filter((e) => e.type === "pool");
-      const HEADER_W = 36, GAP = 40, DEFAULT_W = 760, DEFAULT_H = 200;
-      let x: number, y: number, width = DEFAULT_W;
-      const height = DEFAULT_H;
+      const GAP = 40;
+      let x: number, y: number;
       if (pools.length > 0) {
         x = Math.min(...pools.map((p) => p.x));
-        width = Math.max(DEFAULT_W, Math.max(...pools.map((p) => p.x + p.width)) - x);
         y = position === "above"
           ? Math.min(...pools.map((p) => p.y)) - height - GAP
           : Math.max(...pools.map((p) => p.y + p.height)) + GAP;
       } else {
         const loose = state.elements.filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane");
         if (loose.length) {
-          x = Math.min(...loose.map((e) => e.x)) - GAP;
-          y = position === "above" ? Math.min(...loose.map((e) => e.y)) - height - GAP : Math.max(...loose.map((e) => e.y + e.height)) + GAP;
-          width = Math.max(DEFAULT_W, Math.max(...loose.map((e) => e.x + e.width)) - x + GAP);
+          x = Math.min(...loose.map((e) => e.x)) - GAP - width;
+          y = position === "above" ? Math.min(...loose.map((e) => e.y)) : Math.max(...loose.map((e) => e.y + e.height)) - height;
         } else { x = 80; y = 80; }
       }
-      const poolId = nanoid();
       const pool: DiagramElement = {
-        id: poolId, type: "pool", x, y, width, height,
+        id: nanoid(), type: "pool", x, y, width, height,
         label: label || (poolType === "black-box" ? "Participant" : "Pool"),
-        properties: { poolType },
+        properties: { poolType: poolType ?? "black-box" },
       };
-      const added: DiagramElement[] = [pool];
-      if (poolType !== "black-box") {
-        added.push({ id: nanoid(), type: "lane", x: x + HEADER_W, y, width: width - HEADER_W, height, label: "Lane 1", properties: {}, parentId: poolId });
+      return { ...state, elements: updatePoolTypes([...state.elements, pool]), connectors: state.connectors };
+    }
+
+    // Compress a pool vertically. Black-box / empty → shrink to just its name.
+    // White-box → shrink the pool + its lanes to leave ½-Task height (32px)
+    // above the highest element and below the lowest.
+    case "COMPRESS_POOL": {
+      const { poolId } = action.payload;
+      const pool = state.elements.find((e) => e.id === poolId && e.type === "pool");
+      if (!pool) return state;
+      const poolFs = state.poolFontSize ?? 16;
+      const byId = new Map(state.elements.map((e) => [e.id, e] as const));
+      const isDesc = (e: DiagramElement) => { let c: DiagramElement | undefined = e; for (let i = 0; c?.parentId && i < 12; i++) { if (c.parentId === poolId) return true; c = byId.get(c.parentId); } return false; };
+      const flow = state.elements.filter((e) => e.type !== "lane" && isDesc(e));
+      const MARGIN = 32; // ½ Task height
+
+      if (flow.length === 0) {
+        // Empty → collapse to a name-sized black-box; drop any empty lanes.
+        const { width, height } = poolNameFitSize(pool.label ?? "Pool", poolFs);
+        const kept = state.elements.filter((e) => !(e.type === "lane" && isDesc(e)));
+        const els = kept.map((e) => (e.id === poolId ? { ...e, width, height, properties: { ...e.properties, poolType: "black-box" } } : e));
+        return { ...state, elements: updatePoolTypes(els), connectors: recomputeAllConnectors(state.connectors, els) };
       }
-      return { ...state, elements: updatePoolTypes([...state.elements, ...added]), connectors: state.connectors };
+
+      const minY = Math.min(...flow.map((e) => e.y));
+      const maxY = Math.max(...flow.map((e) => e.y + e.height));
+      const newTop = minY - MARGIN, newH = (maxY + MARGIN) - newTop;
+      const HEADER = getPoolHeaderWidth(pool);
+      const lanes = state.elements.filter((e) => e.type === "lane" && e.parentId === poolId).sort((a, b) => a.y - b.y);
+      const geo = new Map<string, { y: number; h: number }>();
+      const oldTotal = lanes.reduce((s, l) => s + l.height, 0) || 1;
+      let yy = newTop;
+      lanes.forEach((l, i) => { const hh = i === lanes.length - 1 ? (newTop + newH) - yy : Math.round((l.height / oldTotal) * newH); geo.set(l.id, { y: yy, h: hh }); yy += hh; });
+      let els = state.elements.map((e) => {
+        if (e.id === poolId) return { ...e, y: newTop, height: newH };
+        const g = geo.get(e.id);
+        if (g) return { ...e, y: g.y, height: g.h, x: pool.x + HEADER, width: pool.width - HEADER };
+        return e;
+      });
+      els = ensureContainersEncloseChildren(els);
+      return { ...state, elements: els, connectors: recomputeAllConnectors(state.connectors, els) };
     }
 
     // Insert a lane band above/below a reference lane: shift that lane's pool's
@@ -9723,6 +9779,11 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "ADD_LANE_AT", payload: { poolId, position, refLaneId, label } });
   }, []);
 
+  const compressPool = useCallback((poolId: string) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "COMPRESS_POOL", payload: { poolId } });
+  }, []);
+
   const moveLaneBoundary = useCallback(
     (aboveLaneId: string, belowLaneId: string, dy: number) => {
       if (!preLaneRef.current) preLaneRef.current = snapshotData();
@@ -9975,6 +10036,7 @@ export function useDiagram(initialData: DiagramData) {
     wrapInPool,
     addPool,
     addLaneAt,
+    compressPool,
     moveLaneBoundary,
     moveVSwimlaneBoundary,
     reorderLane,

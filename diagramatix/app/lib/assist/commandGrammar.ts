@@ -7,7 +7,7 @@ import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
 import type { SymbolType, EventType, GatewayType } from "../diagram/types";
 
-const clean = (s: string) => s.trim().replace(/[.,!?;:]+$/g, "").trim();
+const clean = (s: string) => s.trim().replace(/[.,!?;:]+$/g, "").replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
 const stripArticle = (s: string) => s.replace(/^(a|an|the)\s+/i, "").trim();
 /** "Sales Team and Marketing Team" / "A, B and C" → ["…"] (handles Oxford comma). */
 const splitLabels = (s: string) => s.split(/\s*,\s*(?:and\s+)?|\s+and\s+/i).map(clean).filter(Boolean);
@@ -80,6 +80,10 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     const L = "(?:lanes?|lines?)";
     const ALL = "(?:everything|all(?:\\s+(?:the\\s+)?elements?)?(?:\\s+on\\s+(?:the\\s+)?diagram)?|the\\s+(?:lot|whole\\s+thing|diagram)|it\\s+all)";
 
+    // Compress / collapse a pool: "compress the Customer pool", "shrink Sales".
+    let mc = raw.match(new RegExp(`^(?:compress|collapse|shrink|tighten|condense|minimise|minimize)\\s+(?:the\\s+)?(?:${P}\\s+)?(.+?)(?:\\s+${P})?$`, "i"));
+    if (mc) return [{ op: "compressPool", poolRef: clean(mc[1]) }];
+
     // Swap two named lanes: "swap lane A with lane B" / "swap A and B".
     // (resolveRef strips a leading "lane"/"pool" kind word, so keep the raw ref.)
     let mm = raw.match(new RegExp(`^swap\\s+(.+?)\\s+(?:with|and|for|<->|<>)\\s+(.+)$`, "i"));
@@ -126,6 +130,13 @@ export function parseCommand(utterance: string): AssistOp[] | null {
     if (andCompact) { compact = true; ref = clean(ref.slice(0, andCompact.index)); }
     return [{ op: "delete", ref, ...(compact ? { compact: true } : {}) }];
   }
+
+  // ── Message flow (before the generic add): "add message from X to Y labelled Z" ──
+  const MSGLABEL = "(?:,?\\s+(?:labelled|labeled|called|named|saying|with label|that says)\\s+(.+))?";
+  m = raw.match(new RegExp(`^(?:add|create|draw|put|send)\\s+(?:a\\s+)?message(?:\\s+flow)?\\s+from\\s+(.+?)\\s+to\\s+(.+?)${MSGLABEL}$`, "i"));
+  if (m) return [{ op: "addMessage", fromRef: clean(m[1]), toRef: clean(m[2]), ...(m[3] ? { label: clean(m[3]) } : {}) }];
+  m = raw.match(new RegExp(`^(?:add|create|draw|put|send)\\s+(?:a\\s+)?message(?:\\s+flow)?\\s+to\\s+(.+?)\\s+from\\s+(.+?)${MSGLABEL}$`, "i"));
+  if (m) return [{ op: "addMessage", fromRef: clean(m[2]), toRef: clean(m[1]), ...(m[3] ? { label: clean(m[3]) } : {}) }];
 
   // ── Boundary event (before the generic add) ──
   m = raw.match(/^(?:add|put|attach|create|place)\s+(?:a\s+)?boundary\s+event\s+(.+)$/i);

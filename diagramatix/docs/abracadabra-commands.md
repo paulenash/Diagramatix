@@ -20,10 +20,11 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 
 | Intent | Say (any variant) | Notes |
 |---|---|---|
-| **Add a pool** | "add a pool", "create a pool", "add a new pool", "add a pool called Finance" | New empty white‑box pool + a starter lane |
+| **Add a pool** | "add a pool", "create a pool", "add a new pool", "add a pool called Finance" | New **empty** pool, **no starter lane**; auto‑sized to just fit the pool name in the header |
 | **Add a black‑box pool** | "add a black‑box pool", "add a black box pool above/below existing pools" | Bare participant box, no lanes; positions relative to existing pools |
 | **Wrap everything in a pool** | "put a pool around everything", "add a pool to all elements on the diagram", "wrap everything in a pool" | Wraps all loose (un‑pooled) elements |
 | **Extend the pool** | "extend the pool to include all elements", "grow the pool to include everything" | **Grows the existing pool** (never adds a second) |
+| **Compress a pool** | "compress the Customer pool", "shrink Sales", "collapse the pool", "tighten Finance" | White‑box → shrinks pool + lanes to content ± ½ Task; black‑box / empty → shrinks to just fit the name |
 
 ## Lanes
 
@@ -40,6 +41,14 @@ command (with variants) → if none, the **AI** interprets it → ops apply live
 |---|---|---|
 | **Add sub‑lane(s)** | "add 3 sublanes to the Marketing lane called Manager, Assistant and Staff", "add sublanes to Sales" | Equal size; names optional (default Sublane 1..N) |
 | **Delete a sub‑lane** | "remove the sublane Marketing Assistant", "delete sublane Staff" | Neighbour grows; pool keeps its size |
+
+## Messages (between an activity and a pool / participant)
+
+| Intent | Say | Notes |
+|---|---|---|
+| **Add a message flow** | "add message from Task 1 to IT System labelled Email Details", "send a message from Approve to Customer", "add a message to IT System from Task 1 saying Get Approval" | Direction follows the *from → to* order (either word order accepted); label optional |
+| **Rename a message** | "rename 'Email Details' to 'Send the invoice'", "rename message Email Details to Get Approval" | Matches the message by its current label |
+| **Delete a message** | "delete 'Email Details'", "remove message Email Details" | Matches the message by its label |
 
 ## Elements & flow (non‑container, for completeness)
 
