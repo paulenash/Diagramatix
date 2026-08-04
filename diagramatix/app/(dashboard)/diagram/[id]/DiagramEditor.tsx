@@ -2308,7 +2308,7 @@ export function DiagramEditor({
   // to … My Company" is treated as a single command.
   const abraBuffer = useRef("");
   const abraFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const ABRA_SILENCE_MS = 1500;
+  const ABRA_SILENCE_MS = 2200;
   const flushAbraBuffer = useCallback(() => {
     if (abraFlushTimer.current) { clearTimeout(abraFlushTimer.current); abraFlushTimer.current = null; }
     const cmd = abraBuffer.current.trim();

@@ -91,8 +91,18 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
     interim_results: "true",
     smart_format: "true",
     punctuate: "true",
-    language: "en",
+    // Australian English — the default "en" leans US and mis-hears AU vowels.
+    language: "en-AU",
+    // Wait ~0.8s of silence before finalising a segment, so one paused sentence
+    // arrives as fewer, larger finals instead of many fragments to re-stitch.
+    endpointing: "800",
   });
+  // Bias recognition toward the command vocabulary so "lane"≠"line", "pool"≠
+  // "poll"/"pull", etc. (Deepgram `keywords`, with a boost on the confusable ones.)
+  for (const kw of ["lane:3", "sublane:3", "pool:3", "gateway:2", "task:2", "subprocess:2",
+    "boundary", "connect", "rename", "delete", "compact", "Abracadabra"]) {
+    params.append("keywords", kw);
+  }
   const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, [scheme, token]);
   ws.binaryType = "arraybuffer";
 

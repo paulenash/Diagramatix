@@ -173,6 +173,16 @@ describe("resolveRef", () => {
   it("no match → null", () => {
     expect(resolveRef("Nonexistent", els)).toBeNull();
   });
+  it("number words match digit names ('lane two' → 'Lane 2')", () => {
+    const lanes = [el("l1", "lane", "Lane 1"), el("l2", "lane", "Lane 2")];
+    expect(resolveRef("lane two", lanes)).toEqual({ id: "l2" });
+    expect(resolveRef("remove lane two".replace(/^remove\s+/, ""), lanes)).toEqual({ id: "l2" });
+  });
+  it("bare container nouns resolve ('the pool' / 'pool' → the pool)", () => {
+    const withPool = [el("p", "pool", "My Company"), el("t1", "task", "Review")];
+    expect(resolveRef("the pool", withPool)).toEqual({ id: "p" });
+    expect(resolveRef("pool", withPool)).toEqual({ id: "p" });
+  });
   it("strips a leading kind word (#4 remove-sublane phrasing)", () => {
     const lanes = [el("l1", "sublane", "Marketing Assistant"), el("l2", "sublane", "Marketing Staff")];
     expect(resolveRef("sublane Marketing Assistant", lanes)).toEqual({ id: "l1" });

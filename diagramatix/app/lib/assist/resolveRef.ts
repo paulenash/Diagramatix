@@ -11,9 +11,32 @@ export type RefResolution = { id: string } | { ambiguous: string[] } | null;
 const LAST_PRONOUNS = new Set(["it", "that", "this", "the last", "the last one", "last one", "the new one"]);
 const PREV_PRONOUNS = new Set(["the previous", "previous one", "the previous one", "second last", "the second last", "the one before"]);
 
-const norm = (s: string) => s.toLowerCase().replace(/[.,!?;:]+$/g, "").trim();
+// Speech spells numbers as words ("Lane two") but generated names use digits
+// ("Lane 2"). Normalise both sides so they match.
+const NUM_WORDS: Record<string, string> = {
+  zero: "0", one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7",
+  eight: "8", nine: "9", ten: "10", eleven: "11", twelve: "12", thirteen: "13", fourteen: "14",
+  fifteen: "15", sixteen: "16", seventeen: "17", eighteen: "18", nineteen: "19", twenty: "20",
+};
+const numNorm = (s: string) => s.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/g, (m) => NUM_WORDS[m]);
+const norm = (s: string) => numNorm(s.toLowerCase().replace(/[.,!?;:]+$/g, "").trim());
 const stripArticle = (s: string) => s.replace(/^(the|a|an)\s+/i, "").trim();
 const tokens = (s: string) => norm(s).split(/\s+/).filter(Boolean);
+
+// Bare container type-nouns ("the pool", "pool", "the lane", "sublane") →
+// resolveRef never knew these (SYMBOL_SYNONYMS has no pool/lane), so "the pool"
+// used to fall through to name-matching and fail. Resolve to the unique / most
+// recent element of that container type.
+function containerNoun(spoken: string, elements: DiagramElement[]): RefResolution {
+  const s = stripArticle(norm(spoken));
+  const parentType = (e: DiagramElement) => elements.find((p) => p.id === e.parentId)?.type;
+  let items: DiagramElement[] | null = null;
+  if (/^pools?$/.test(s)) items = elements.filter((e) => e.type === "pool");
+  else if (/^sub-?lanes?$/.test(s)) items = elements.filter((e) => e.type === "lane" && parentType(e) === "lane");
+  else if (/^lanes?$/.test(s)) items = elements.filter((e) => e.type === "lane");
+  if (!items) return null;
+  return items.length ? { id: items[items.length - 1].id } : null; // most-recent
+}
 
 function pick(ids: string[]): RefResolution {
   if (ids.length === 0) return null;
@@ -92,6 +115,10 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
     return prev ? { id: prev.id } : null;
   }
 
+  // Bare container noun ("the pool", "pool", "sublane") → the unique/most-recent.
+  const cont = containerNoun(s, elements);
+  if (cont) return cont;
+
   // Bare type noun ("the gateway", "the end event") → elements of that type.
   const t = typeNoun(s);
   if (t) {
@@ -100,10 +127,14 @@ export function resolveRef(spoken: string, elements: DiagramElement[], lastAdded
     return ofType.length > 1 ? { id: ofType[ofType.length - 1].id } : pick(ofType.map((e) => e.id));
   }
 
-  const target = stripKind(stripArticle(s));
+  const fullTarget = stripArticle(s);          // "lane 2"
+  const target = stripKind(fullTarget);        // "2"
   const labelled = elements.filter((e) => (e.label ?? "").trim().length > 0);
 
-  // 1. Exact label (case-insensitive).
+  // 1. Exact label — try the FULL phrase first ("lane 2" == "Lane 2"), then the
+  //    kind-stripped remainder ("Prepare" from "task Prepare").
+  const exactFull = labelled.filter((e) => norm(e.label!) === fullTarget);
+  if (exactFull.length) return pick(exactFull.map((e) => e.id));
   const exact = labelled.filter((e) => norm(e.label!) === target);
   if (exact.length) return pick(exact.map((e) => e.id));
 
