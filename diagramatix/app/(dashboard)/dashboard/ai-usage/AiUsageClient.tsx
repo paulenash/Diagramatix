@@ -163,13 +163,8 @@ export function AiUsageClient(props: Props) {
           </Card>
 
           {/* ── By invocation point ── */}
-          <Card title="By invocation point">
-            <BreakdownTable
-              rows={byPoint.map((p) => ({ name: p.label, ...p }))}
-              max={Math.max(1, ...byPoint.map((p) => p.invocations))}
-              barColor={ai}
-              metric="invocations"
-            />
+          <Card title="By invocation point" note="calls · tokens · estimated cost (each bar to its own scale)">
+            <BreakdownTable rows={byPoint.map((p) => ({ name: p.label, ...p }))} barColor={ai} />
           </Card>
 
           {/* ── By model ── */}
@@ -201,12 +196,7 @@ export function AiUsageClient(props: Props) {
           {/* ── By provider + reliability ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card title="By provider">
-              <BreakdownTable
-                rows={byProvider.map((p) => ({ name: p.key, ...p }))}
-                max={Math.max(1, ...byProvider.map((p) => p.invocations))}
-                barColor={ai}
-                metric="invocations"
-              />
+              <BreakdownTable rows={byProvider.map((p) => ({ name: p.key, ...p }))} barColor={ai} />
             </Card>
             <Card title="Reliability & retries" note="failure rate + retries by point">
               <div className="space-y-2">
@@ -227,10 +217,10 @@ export function AiUsageClient(props: Props) {
           {su && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card title="By organisation" note="raw · user attempts · diagrams">
-                <BreakdownTable rows={byOrg} max={Math.max(1, ...byOrg.map((o) => o.invocations))} barColor={ai} metric="invocations" showAttempts />
+                <BreakdownTable rows={byOrg} barColor={ai} showAttempts />
               </Card>
               <Card title="Top users" note="raw · user attempts · diagrams">
-                <BreakdownTable rows={byUser.slice(0, 12)} max={Math.max(1, ...byUser.map((u) => u.invocations))} barColor={ai} metric="invocations" showAttempts />
+                <BreakdownTable rows={byUser.slice(0, 12)} barColor={ai} showAttempts />
               </Card>
             </div>
           )}
@@ -288,29 +278,48 @@ function Legend({ items }: { items: [string, string][] }) {
   );
 }
 
-function BreakdownTable({ rows, max, barColor, metric, showAttempts }: {
+/** One labelled metric column: caption, value, and a bar scaled to its OWN max. */
+function MetricCol({ label, text, value, max, color }: { label: string; text: string; value: number; max: number; color: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-baseline justify-between gap-1">
+        <span className="text-[9px] uppercase tracking-wide text-gray-400">{label}</span>
+        <span className="text-[11px] text-gray-700 tabular-nums" style={label === "cost" ? { color } : undefined}>{text}</span>
+      </div>
+      <div className="mt-0.5"><Bar value={value} max={max} color={color} /></div>
+    </div>
+  );
+}
+
+/**
+ * Per-row breakdown with SEPARATE bars for calls / tokens / cost — each scaled to
+ * its own column max, so the cost bar reflects cost (not invocation count) and
+ * tokens are shown apart from the estimated cost.
+ */
+function BreakdownTable({ rows, barColor, showAttempts }: {
   rows: Array<{ name: string } & Agg>;
-  max: number;
   barColor: string;
-  metric: "invocations";
   /** Append "User Attempts · Diagrams" to each row (for the per-org / per-user tables). */
   showAttempts?: boolean;
 }) {
   if (!rows.length) return <p className="text-sm text-gray-400">No data.</p>;
+  const maxInv = Math.max(1, ...rows.map((r) => r.invocations));
+  const maxTok = Math.max(1, ...rows.map((r) => r.inTokens + r.outTokens));
+  const maxCost = Math.max(1e-9, ...rows.map((r) => r.cost));
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {rows.map((r, i) => (
         <div key={`${r.name}-${i}`} className="text-sm">
           <div className="flex items-center justify-between gap-2">
             <span className="text-gray-800 truncate">{r.name}</span>
-            <span className="text-xs text-gray-400 shrink-0">
-              {fmtInt(r[metric])} raw
-              {showAttempts && <> · {fmtInt(r.userAttempts)} attempts · {fmtInt(r.diagramsGenerated)} diagrams</>}
-              {" "}· {fmtTokens(r.inTokens + r.outTokens)} tok · <span style={{ color: barColor }}>{fmtCost(r.cost)}</span>
-            </span>
+            {showAttempts && (
+              <span className="text-[10px] text-gray-400 shrink-0">{fmtInt(r.userAttempts)} attempts · {fmtInt(r.diagramsGenerated)} diagrams</span>
+            )}
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <Bar value={r[metric]} max={max} color={barColor} />
+          <div className="grid grid-cols-3 gap-3 mt-1">
+            <MetricCol label="calls" text={fmtInt(r.invocations)} value={r.invocations} max={maxInv} color="#94a3b8" />
+            <MetricCol label="tokens" text={fmtTokens(r.inTokens + r.outTokens)} value={r.inTokens + r.outTokens} max={maxTok} color="#38bdf8" />
+            <MetricCol label="cost" text={fmtCost(r.cost)} value={r.cost} max={maxCost} color={barColor} />
           </div>
         </div>
       ))}

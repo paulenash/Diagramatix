@@ -2104,10 +2104,14 @@ export function DiagramEditor({
   // Stable ref to the JSON export (a plain function redefined each render) so
   // the memoised apply layer can call it without churning its deps.
   const exportJsonRef = useRef<(() => void) | null>(null);
+  // Abracadabra is always OFF when you open (or switch) a diagram — a live mic
+  // should never be silently on when you arrive. Reset + stop on diagram change.
   useEffect(() => {
-    if (diagramType !== "bpmn") return;
-    setAbracadabraOn(localStorage.getItem(`abracadabra-${diagramId}`) === "true");
-  }, [diagramId, diagramType]);
+    setAbracadabraOn(false);
+    abraDictRef.current?.stop();
+    abraDictRef.current = null;
+    setAbraListening(false);
+  }, [diagramId]);
 
   const elBox = (e: DiagramElement) => ({ x: e.x, y: e.y, width: e.width, height: e.height });
   const nameOf = (e: DiagramElement) => (e.label?.trim() || e.type);
