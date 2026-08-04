@@ -2198,7 +2198,15 @@ export function DiagramEditor({
     const handle = await startDictation({
       onEngine: (e) => setAbraEngine(e),
       onInterim: (t) => setAbraInterim(t),
-      onText: (t) => { setAbraInterim(""); void runAbraCommandRef.current(t); },
+      onText: (t) => {
+        setAbraInterim("");
+        // Spoken "stop" ends the session rather than being interpreted as an edit.
+        if (/^(stop|stop listening|stop it|that'?s enough|pause|abracadabra off|thank you gort)\b/i.test(t.trim())) {
+          stopAbraListening();
+          return;
+        }
+        void runAbraCommandRef.current(t);
+      },
       onError: (msg) => setAbraLog((prev) => [...prev, { id: nanoid(), heard: "", summary: msg, ok: false }]),
       onEnd: () => { abraDictRef.current = null; setAbraListening(false); setAbraInterim(""); },
     });
@@ -4527,6 +4535,7 @@ export function DiagramEditor({
             log={abraLog}
             onSubmitText={(t) => { void runAbraCommand(t); }}
             onToggleListen={() => { void toggleAbraListening(); }}
+            onClear={() => setAbraLog([])}
             onClose={() => { stopAbraListening(); setAbracadabraOn(false); try { localStorage.setItem(`abracadabra-${diagramId}`, "false"); } catch {} }}
           />
         )}

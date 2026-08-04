@@ -5,7 +5,7 @@
  * did, per-entry undo). Presentational: all state + apply logic live in the
  * editor.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface CommandLogEntry {
   id: string;
@@ -22,6 +22,7 @@ export function AbracadabraBar({
   log,
   onSubmitText,
   onToggleListen,
+  onClear,
   onClose,
 }: {
   listening: boolean;
@@ -31,9 +32,12 @@ export function AbracadabraBar({
   log: CommandLogEntry[];
   onSubmitText: (text: string) => void;
   onToggleListen: () => void;
+  onClear: () => void;
   onClose: () => void;
 }) {
   const [text, setText] = useState("");
+  const logEnd = useRef<HTMLDivElement | null>(null);
+  useEffect(() => { logEnd.current?.scrollIntoView({ block: "end" }); }, [log.length]);
   const submit = () => {
     const t = text.trim();
     if (!t) return;
@@ -50,7 +54,10 @@ export function AbracadabraBar({
           {listening && <span className="text-[10px] font-normal text-red-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />listening{engine === "browser" ? " (browser)" : ""}…</span>}
           {busy && <span className="text-[10px] font-normal text-gray-400">thinking…</span>}
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none" title="Close">×</button>
+        <div className="flex items-center gap-2">
+          {log.length > 0 && <button onClick={onClear} className="text-[10px] text-gray-400 hover:text-gray-600" title="Clear the command log">clear</button>}
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none" title="Close">×</button>
+        </div>
       </div>
 
       {/* Command log */}
@@ -60,11 +67,12 @@ export function AbracadabraBar({
             <div key={e.id} className="text-[11px] flex items-start gap-2">
               <span className={e.ok ? "text-green-600" : "text-amber-600"}>{e.ok ? "✓" : "…"}</span>
               <span className="flex-1 min-w-0">
-                <span className="text-gray-400">“{e.heard}”</span>
-                <span className="text-gray-700"> → {e.summary}</span>
+                {e.heard && <span className="text-gray-400">“{e.heard}” </span>}
+                <span className="text-gray-700">→ {e.summary}</span>
               </span>
             </div>
           ))}
+          <div ref={logEnd} />
         </div>
       )}
 
