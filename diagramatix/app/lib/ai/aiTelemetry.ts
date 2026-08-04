@@ -28,6 +28,7 @@ export const AI_INVOCATION_POINTS = {
   StaffNarrative: "staff.narrative",
   GenerateSop: "sop.generate", // BPMN → SOP document prose (whole/lane/pool/subprocess)
   DictationRefine: "dictation.refine", // transcript clean-up / anonymise
+  LiveCommand: "bpmn.live-command", // Abracadabra Mode: NL edit command → op list (Raw Attempt only)
   IconVectorize: "icon.vectorize", // ArchiMate icon image → editable vector primitives
   // Offline SuperAdmin harness scripts (npm run ai:report / ai:compare). They call
   // planBpmn directly — outside any route — so without their own label the seam
@@ -81,6 +82,7 @@ export const AI_INVOCATION_POINT_LABELS: Record<string, string> = {
   [AI_INVOCATION_POINTS.StaffNarrative]: "Staff Narrative",
   [AI_INVOCATION_POINTS.GenerateSop]: "SOP Generate",
   [AI_INVOCATION_POINTS.DictationRefine]: "Dictation Refine",
+  [AI_INVOCATION_POINTS.LiveCommand]: "Live Command (Abracadabra)",
   [AI_INVOCATION_POINTS.IconVectorize]: "ArchiMate Icon Vectorize",
   [AI_INVOCATION_POINTS.ScriptConformanceReport]: "AI Conformance Report (script)",
   [AI_INVOCATION_POINTS.ScriptModelCompare]: "AI Model Compare (script)",
