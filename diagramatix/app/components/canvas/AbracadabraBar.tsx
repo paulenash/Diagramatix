@@ -12,6 +12,8 @@ export interface CommandLogEntry {
   heard: string;
   summary: string;
   ok: boolean;
+  /** true = interpreted by the AI fallback (metered); false/undefined = instant local rules. */
+  viaAi?: boolean;
 }
 
 export function AbracadabraBar({
@@ -67,6 +69,15 @@ export function AbracadabraBar({
             <div key={e.id} className="text-[11px] flex items-start gap-2">
               <span className={e.ok ? "text-green-600" : "text-amber-600"}>{e.ok ? "✓" : "…"}</span>
               <span className="flex-1 min-w-0">
+                {/* Colour-code the interpreter: instant local rule vs metered AI. */}
+                <span
+                  className={`inline-block mr-1 px-1 rounded text-[8px] uppercase tracking-wide align-middle ${
+                    e.viaAi ? "bg-fuchsia-100 text-fuchsia-700" : "bg-emerald-100 text-emerald-700"
+                  }`}
+                  title={e.viaAi ? "Interpreted by the AI (metered)" : "Instant local rule (free)"}
+                >
+                  {e.viaAi ? "✨ AI" : "rule"}
+                </span>
                 {e.heard && <span className="text-gray-400">“{e.heard}” </span>}
                 <span className="text-gray-700">→ {e.summary}</span>
               </span>

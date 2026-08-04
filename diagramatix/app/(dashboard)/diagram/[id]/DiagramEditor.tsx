@@ -2242,10 +2242,10 @@ export function DiagramEditor({
     const ops = parseCommand(heard);
     if (ops) {
       const res = applyAssistOps(ops);
-      setAbraLog((prev) => [...prev, { id: entryId, heard, summary: res.summary, ok: res.ok }]);
+      setAbraLog((prev) => [...prev, { id: entryId, heard, summary: res.summary, ok: res.ok, viaAi: false }]);
       return;
     }
-    // Deterministic parser didn't recognise it → AI fallback (Stage 4).
+    // Deterministic parser didn't recognise it → AI fallback (metered).
     setAbraBusy(true);
     try {
       const res = await fetch("/api/ai/command", {
@@ -2253,14 +2253,14 @@ export function DiagramEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ instruction: heard, state: { elements: data.elements, connectors: data.connectors } }),
       });
-      if (!res.ok) { setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "didn’t understand that", ok: false }]); return; }
+      if (!res.ok) { setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "didn’t understand that", ok: false, viaAi: true }]); return; }
       const j = await res.json();
       const aiOps = validateOps(j.ops);
-      if (aiOps.length === 0) { setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "didn’t understand that", ok: false }]); return; }
+      if (aiOps.length === 0) { setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "didn’t understand that", ok: false, viaAi: true }]); return; }
       const r = applyAssistOps(aiOps);
-      setAbraLog((prev) => [...prev, { id: entryId, heard, summary: r.summary, ok: r.ok }]);
+      setAbraLog((prev) => [...prev, { id: entryId, heard, summary: r.summary, ok: r.ok, viaAi: true }]);
     } catch {
-      setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "command service unavailable", ok: false }]);
+      setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "command service unavailable", ok: false, viaAi: true }]);
     } finally {
       setAbraBusy(false);
     }
