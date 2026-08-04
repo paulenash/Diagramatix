@@ -1103,6 +1103,9 @@ export function DiagramEditor({
   const [aiPanelGenerating, setAiPanelGenerating] = useState(false);
   const [aiPanelNarrativeGenerating, setAiPanelNarrativeGenerating] = useState(false);
   const [showPlanPanel, setShowPlanPanel] = useState(false);
+  // Tier-1 assist (ghost next-step suggestions) is OPT-IN — off until the user
+  // turns it on. Remembered per-diagram in localStorage.
+  const [assistEnabled, setAssistEnabled] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
   const [showAnimate, setShowAnimate] = useState(false);
   // BPMN and Standard Flowchart both use the 2-phase Plan panel (plan → edit →
@@ -1367,6 +1370,8 @@ export function DiagramEditor({
     setNoObstacleAvoidance(noObs);
     if (localStorage.getItem(`valueDisplay-${diagramId}`) === "false") setShowValueDisplay(false);
     if (localStorage.getItem(`bottleneck-${diagramId}`) === "false") setShowBottleneck(false);
+    // Assist is opt-in: on only if the user previously turned it on here.
+    setAssistEnabled(localStorage.getItem(`assist-${diagramId}`) === "true");
   }, [projectId, diagramId]);
 
   // Template state (BPMN only)
@@ -1902,8 +1907,8 @@ export function DiagramEditor({
 
   // ── Tier-1 assist: next-step ghost suggestions ──
   const nextStepCandidates = useMemo(
-    () => (selectedElement && !readOnly ? suggestNextSteps(selectedElement, data, diagramType) : []),
-    [selectedElement, data, diagramType, readOnly],
+    () => (assistEnabled && selectedElement && !readOnly ? suggestNextSteps(selectedElement, data, diagramType) : []),
+    [assistEnabled, selectedElement, data, diagramType, readOnly],
   );
   const acceptNextStep = useCallback((c: NextStepCandidate) => {
     if (!selectedElement) return;
@@ -3903,6 +3908,30 @@ export function DiagramEditor({
             title={usesPlanPanel ? "Two-phase AI generation: plan first, then apply layout" : "Generate a diagram from a natural-language description"}
           >
             ✨ AI Generate
+          </button>
+        )}
+        {/* Tier-1 Assist toggle (BPMN only) — OPT-IN. When on, selecting a single
+            element shows translucent ghost next-step suggestions (Tab / click to
+            accept). Remembered per-diagram. */}
+        {!readOnly && diagramType === "bpmn" && (
+          <button
+            onClick={() => {
+              setAssistEnabled((prev) => {
+                const nv = !prev;
+                try { localStorage.setItem(`assist-${diagramId}`, String(nv)); } catch { /* ignore */ }
+                return nv;
+              });
+            }}
+            className={`px-2 py-0.5 text-[11px] rounded border ${
+              assistEnabled
+                ? "text-purple-700 border-purple-400 bg-purple-50"
+                : "text-gray-700 border-gray-300 hover:bg-gray-50"
+            }`}
+            title={assistEnabled
+              ? "Assist ON — select an element to see ghost next-step suggestions (Tab or click to accept). Click to turn off."
+              : "Assist OFF — turn on ghost next-step suggestions while you draw"}
+          >
+            👻 Assist{assistEnabled ? " ●" : ""}
           </button>
         )}
         {!readOnly && (

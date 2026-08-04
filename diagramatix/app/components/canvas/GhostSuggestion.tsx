@@ -30,7 +30,16 @@ export function GhostSuggestion({
         const midY = y + H / 2;
         const primary = i === 0;
         return (
-          <g key={`${c.symbolType}-${i}`} onClick={(e) => { e.stopPropagation(); onAccept(c); }} style={{ cursor: "pointer" }}>
+          <g
+            key={`${c.symbolType}-${i}`}
+            // Act on mousedown, not click: a bubbling mousedown would reach the
+            // canvas background handler, start a pan gesture and clear the
+            // selection — which unmounts this ghost before a click could land.
+            // preventDefault + stopPropagation keeps the selection intact so the
+            // accept handler still sees the source element.
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onAccept(c); }}
+            style={{ cursor: "pointer" }}
+          >
             {primary && (
               <line x1={source.x + source.width} y1={srcMidY} x2={x} y2={midY}
                 stroke="#9333ea" strokeWidth={1.5} strokeDasharray="5 4" opacity={0.55} />
