@@ -8,6 +8,7 @@ import {
   type AiApplyMeta,
   type ConnectorType,
   type DiagramData,
+  type DiagramElement,
   type DiagramType,
   type DirectionType,
   type Point,
@@ -35,6 +36,11 @@ import { CollabRoom } from "@/app/components/canvas/CollabRoom";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, findFreeSlot, HALF_TASK_W } from "@/app/lib/diagram/assistPlacement";
 import { matchIntent, type IntentRow } from "@/app/lib/diagram/intentMatch";
+import { canConnect } from "@/app/lib/diagram/canConnect";
+import { parseCommand } from "@/app/lib/assist/commandGrammar";
+import { resolveRef } from "@/app/lib/assist/resolveRef";
+import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
+import { AbracadabraBar, type CommandLogEntry } from "@/app/components/canvas/AbracadabraBar";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate, templateAttachData, instantiateTemplateAnchored } from "@/app/lib/diagram/templates";
 import { resolvePackageNameLink } from "@/app/lib/diagram/packageLink";
@@ -2041,6 +2047,135 @@ export function DiagramEditor({
   // Stable ref so the global Tab handler always sees the latest candidates.
   const nextStepRef = useRef<{ candidates: NextStepCandidate[]; accept: (c: NextStepCandidate) => void }>({ candidates: [], accept: () => {} });
   nextStepRef.current = { candidates: nextStepCandidates, accept: acceptNextStep };
+
+  // ── Abracadabra Mode: live voice/typed command editing ──
+  const [abracadabraOn, setAbracadabraOn] = useState(false);
+  const [abraLog, setAbraLog] = useState<CommandLogEntry[]>([]);
+  const [abraListening, setAbraListening] = useState(false);
+  const [abraEngine, setAbraEngine] = useState<"deepgram" | "browser" | null>(null);
+  const [abraInterim, setAbraInterim] = useState("");
+  const [abraBusy, setAbraBusy] = useState(false);
+  const abraLastId = useRef<string | null>(null);
+  useEffect(() => {
+    if (diagramType !== "bpmn") return;
+    setAbracadabraOn(localStorage.getItem(`abracadabra-${diagramId}`) === "true");
+  }, [diagramId, diagramType]);
+
+  const elBox = (e: DiagramElement) => ({ x: e.x, y: e.y, width: e.width, height: e.height });
+  const nameOf = (e: DiagramElement) => (e.label?.trim() || e.type);
+
+  // Apply one interpreted op via the granular (undoable) reducer helpers.
+  const applyAssistOps = useCallback((ops: AssistOp[]): { ok: boolean; summary: string } => {
+    const results: string[] = [];
+    let anyFail = false;
+    const els = data.elements;
+    const resolve1 = (ref: string): DiagramElement | { err: string } => {
+      const r = resolveRef(ref, els, abraLastId.current);
+      if (!r) return { err: `couldn't find “${ref}”` };
+      if ("ambiguous" in r) return { err: `“${ref}” is ambiguous` };
+      return els.find((e) => e.id === r.id)!;
+    };
+    for (const op of ops) {
+      if (op.op === "undo") { undo(); results.push("undid the last change"); continue; }
+
+      if (op.op === "add") {
+        const { w, h } = sizeOf(op.symbolType);
+        let anchor: DiagramElement | null = null;
+        if (op.afterRef) { const a = resolve1(op.afterRef); if ("err" in a) { results.push(a.err); anyFail = true; } else anchor = a; }
+        if (!anchor && abraLastId.current) anchor = els.find((e) => e.id === abraLastId.current) ?? null;
+        const others = els.filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane").map(elBox);
+        let center;
+        if (anchor) {
+          const isGw = anchor.type === "gateway";
+          const bi = isGw ? data.connectors.filter((cn) => cn.sourceId === anchor!.id).length : 0;
+          center = findFreeSlot(isGw ? placeGatewayBranch(anchor, bi, w, h) : placeInline(anchor, w, h), w, h, others);
+        } else {
+          const rightmost = els.reduce<DiagramElement | null>((m, e) => (!m || e.x + e.width > m.x + m.width ? e : m), null);
+          center = findFreeSlot(rightmost ? placeInline(rightmost, w, h) : { x: 240, y: 200 }, w, h, others);
+        }
+        const newId = nanoid();
+        addElementGated(op.symbolType, center, undefined, op.eventType, newId);
+        if (op.gatewayType) updateProperties(newId, { gatewayType: op.gatewayType });
+        if (op.label) updateLabel(newId, op.label);
+        if (anchor && op.afterRef) addConnector(anchor.id, newId, "sequence");
+        abraLastId.current = newId;
+        setSelectedElementIds(new Set([newId]));
+        results.push(`added ${op.label ?? op.symbolType}${anchor && op.afterRef ? ` after ${nameOf(anchor)}` : ""}`);
+        continue;
+      }
+
+      if (op.op === "connect") {
+        const f = resolve1(op.fromRef), t = resolve1(op.toRef);
+        if ("err" in f) { results.push(f.err); anyFail = true; continue; }
+        if ("err" in t) { results.push(t.err); anyFail = true; continue; }
+        if (!canConnect(f, t, op.connectorType ?? "sequence", els)) { results.push(`can’t connect ${nameOf(f)} → ${nameOf(t)}`); anyFail = true; continue; }
+        addConnector(f.id, t.id, op.connectorType ?? "sequence");
+        results.push(`connected ${nameOf(f)} → ${nameOf(t)}`);
+        continue;
+      }
+
+      if (op.op === "disconnect") {
+        const f = resolve1(op.fromRef), t = resolve1(op.toRef);
+        if ("err" in f) { results.push(f.err); anyFail = true; continue; }
+        if ("err" in t) { results.push(t.err); anyFail = true; continue; }
+        const conn = data.connectors.find((c) => (c.sourceId === f.id && c.targetId === t.id) || (c.sourceId === t.id && c.targetId === f.id));
+        if (!conn) { results.push(`no connection between ${nameOf(f)} and ${nameOf(t)}`); anyFail = true; continue; }
+        deleteConnector(conn.id);
+        results.push(`disconnected ${nameOf(f)} ↮ ${nameOf(t)}`);
+        continue;
+      }
+
+      if (op.op === "delete") {
+        const e = resolve1(op.ref);
+        if ("err" in e) { results.push(e.err); anyFail = true; continue; }
+        deleteElement(e.id);
+        if (abraLastId.current === e.id) abraLastId.current = null;
+        results.push(`deleted ${nameOf(e)}`);
+        continue;
+      }
+
+      if (op.op === "rename") {
+        const e = resolve1(op.ref);
+        if ("err" in e) { results.push(e.err); anyFail = true; continue; }
+        updateLabel(e.id, op.label);
+        results.push(`renamed ${nameOf(e)} → ${op.label}`);
+        continue;
+      }
+    }
+    return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, deleteElement, undo]);
+
+  // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
+  const runAbraCommand = useCallback(async (text: string) => {
+    const heard = text.trim();
+    if (!heard) return;
+    const entryId = nanoid();
+    const ops = parseCommand(heard);
+    if (ops) {
+      const res = applyAssistOps(ops);
+      setAbraLog((prev) => [...prev, { id: entryId, heard, summary: res.summary, ok: res.ok }]);
+      return;
+    }
+    // Deterministic parser didn't recognise it → AI fallback (Stage 4).
+    setAbraBusy(true);
+    try {
+      const res = await fetch("/api/ai/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instruction: heard, state: { elements: data.elements, connectors: data.connectors } }),
+      });
+      if (!res.ok) { setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "didn’t understand that", ok: false }]); return; }
+      const j = await res.json();
+      const aiOps = validateOps(j.ops);
+      if (aiOps.length === 0) { setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "didn’t understand that", ok: false }]); return; }
+      const r = applyAssistOps(aiOps);
+      setAbraLog((prev) => [...prev, { id: entryId, heard, summary: r.summary, ok: r.ok }]);
+    } catch {
+      setAbraLog((prev) => [...prev, { id: entryId, heard, summary: "command service unavailable", ok: false }]);
+    } finally {
+      setAbraBusy(false);
+    }
+  }, [applyAssistOps, data.elements, data.connectors]);
 
   const isContext = diagramType === "context" || diagramType === "basic";
   const defaultDirectionType: DirectionType =
@@ -4054,6 +4189,26 @@ export function DiagramEditor({
             👻 Assist{assistEnabled ? " ●" : ""}
           </button>
         )}
+        {/* Abracadabra Mode — live voice/typed command editing (BPMN only). */}
+        {!readOnly && diagramType === "bpmn" && (
+          <button
+            onClick={() => {
+              setAbracadabraOn((prev) => {
+                const nv = !prev;
+                try { localStorage.setItem(`abracadabra-${diagramId}`, String(nv)); } catch { /* ignore */ }
+                return nv;
+              });
+            }}
+            className={`px-2 py-0.5 text-[11px] rounded border ${
+              abracadabraOn
+                ? "text-fuchsia-700 border-fuchsia-400 bg-fuchsia-50"
+                : "text-gray-700 border-gray-300 hover:bg-gray-50"
+            }`}
+            title="Abracadabra Mode — speak or type commands and the diagram edits itself live"
+          >
+            🪄 Abracadabra{abracadabraOn ? " ●" : ""}
+          </button>
+        )}
         {!readOnly && (
           <div className="relative" ref={clearMenuRef}>
             <button
@@ -4326,6 +4481,20 @@ export function DiagramEditor({
           onRemoveSpace={(diagramType === "bpmn" || diagramType === "state-machine" || diagramType === "archimate") ? removeSpace : undefined}
           onAddSelfTransition={diagramType === "state-machine" ? addSelfTransition : undefined}
         />
+
+        {/* Abracadabra Mode command bar — voice/typed live editing. */}
+        {abracadabraOn && !readOnly && (
+          <AbracadabraBar
+            listening={abraListening}
+            engine={abraEngine}
+            interim={abraInterim}
+            busy={abraBusy}
+            log={abraLog}
+            onSubmitText={(t) => { void runAbraCommand(t); }}
+            onToggleListen={() => setAbraListening((v) => !v)}
+            onClose={() => { setAbracadabraOn(false); try { localStorage.setItem(`abracadabra-${diagramId}`, "false"); } catch {} }}
+          />
+        )}
 
         {/* Template-attach picker (assist "Template" ghost). Category → template
             cascade over inline-only templates; on pick, attach to the source. */}
