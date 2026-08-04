@@ -19,7 +19,25 @@ import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { validateOps } from "@/app/lib/assist/ops";
 import { serializeDiagramForCommand } from "@/app/lib/assist/serializeDiagram";
+import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
+import { prisma } from "@/app/lib/db";
 import type { DiagramData } from "@/app/lib/diagram/types";
+
+/** Load the admin-editable GREEN "assist" command rules (aliases / phrasing
+ *  hints). Red rules in that category are code-enforced invariants and are not
+ *  sent to the model. Returns "" on any error so the fallback still works. */
+async function loadAssistGreenRules(): Promise<string> {
+  try {
+    const dr = await prisma.diagramRules.findFirst({
+      where: { category: "assist", isDefault: true },
+      select: { rules: true },
+    });
+    if (!dr?.rules) return "";
+    return splitRulesByEnforcement(dr.rules).aiRules;
+  } catch {
+    return "";
+  }
+}
 
 const SYSTEM = `You interpret ONE spoken (often mis-transcribed) instruction from a process modeller editing a BPMN diagram. Output ONLY a JSON OBJECT — no prose, no markdown:
   { "canonical": string, "ops": [ …op objects… ] }
@@ -84,12 +102,17 @@ export async function POST(req: Request) {
   const apiKey = aiApiKey(model);
   if (!apiKey) return NextResponse.json({ canonical: "", ops: [] }); // no AI configured → no-op
 
+  const greenRules = await loadAssistGreenRules();
+  const system = greenRules
+    ? `${SYSTEM}\n\nAdmin-maintained command aliases / phrasing hints (use them when normalising the instruction):\n${greenRules}`
+    : SYSTEM;
+
   try {
     const client = makeAiClient(model, apiKey);
     const resp = await client.messages.create({
       model,
       max_tokens: 1024,
-      system: SYSTEM,
+      system,
       messages: [{
         role: "user",
         content: `CURRENT DIAGRAM:\n${serializeDiagramForCommand(state)}\n\nINSTRUCTION:\n${instruction}\n\nReturn the JSON object { "canonical", "ops" }.`,

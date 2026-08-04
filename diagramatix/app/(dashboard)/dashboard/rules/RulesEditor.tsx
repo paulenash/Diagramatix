@@ -38,9 +38,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   // its system prompt. Lives in the same editor so admins can tune
   // the voice / vocabulary without code changes.
   "staff-narrative": "Staff Narrative Briefing",
+  // "assist" holds the Abracadabra (voice/typed command) rules: GREEN command
+  // aliases / phrasing hints that reach the AI command fallback, plus RED
+  // code-enforced container naming & sizing invariants (reference only).
+  assist: "Assist / Voice Commands",
 };
 
-const CATEGORY_ORDER = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "staff-narrative"];
+const CATEGORY_ORDER = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "staff-narrative", "assist"];
 
 interface ClassifiedLine {
   index: number;       // original line index
