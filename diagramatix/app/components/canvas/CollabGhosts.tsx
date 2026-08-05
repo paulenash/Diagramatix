@@ -86,7 +86,15 @@ export function CollabGhosts({
             {/* Ghost CONNECTORS (#3) — dashed polyline through their waypoints */}
             {(conns ?? []).map((c) => {
               const local = localConnById.get(c.id);
-              const localSig = local ? `${(local.waypoints ?? []).map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(";")}|${local.label ?? ""}|${local.labelOffsetX ?? ""},${local.labelOffsetY ?? ""}` : "";
+              // Compare like-for-like: the VISIBLE path only (the sender already
+              // stripped the invisible leader points), or the ghost never clears.
+              let localSig = "";
+              if (local) {
+                const lall = local.waypoints ?? [];
+                const ls = local.sourceInvisibleLeader ? 1 : 0;
+                const le = local.targetInvisibleLeader ? Math.max(ls + 1, lall.length - 1) : lall.length;
+                localSig = `${lall.slice(ls, le).map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(";")}|${local.label ?? ""}|${local.labelOffsetX ?? ""},${local.labelOffsetY ?? ""}`;
+              }
               const remoteSig = `${c.pts.map((p) => `${p.x},${p.y}`).join(";")}|${c.label}|${c.lox ?? ""},${c.loy ?? ""}`;
               if (local && localSig === remoteSig) return null;   // unchanged for me
               if (c.pts.length < 2) return null;
