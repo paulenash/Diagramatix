@@ -1,0 +1,2282 @@
+{
+  "schemaVersion": "1.43",
+  "appVersion": "1.43.1902",
+  "exportedAt": "2026-07-29T00:27:23.700Z",
+  "project": {
+    "name": "(single diagram)",
+    "description": "",
+    "ownerName": "",
+    "colorConfig": {}
+  },
+  "diagrams": [
+    {
+      "originalId": "cms5bx5wv000701nnzfi63214",
+      "name": "Aardvark Consulting Process from Meeting Transcript 2",
+      "type": "bpmn",
+      "data": {
+        "elements": [
+          {
+            "id": "pCust",
+            "type": "pool",
+            "x": 50,
+            "y": 50,
+            "width": 2929.5,
+            "height": 92,
+            "label": "Customer /\nProspect",
+            "properties": {
+              "poolType": "black-box",
+              "isSystem": false,
+              "poolHeaderWidth": 37
+            }
+          },
+          {
+            "id": "pMS",
+            "type": "pool",
+            "x": 50,
+            "y": 240,
+            "width": 2929.5,
+            "height": 85,
+            "label": "Microsoft",
+            "properties": {
+              "poolType": "black-box",
+              "isSystem": false,
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "id": "p1",
+            "type": "pool",
+            "x": 50,
+            "y": 423,
+            "width": 2929.5,
+            "height": 1281.6666666666665,
+            "label": "Aardvark Consulting",
+            "properties": {
+              "poolType": "white-box"
+            }
+          },
+          {
+            "id": "lDM",
+            "type": "lane",
+            "x": 86,
+            "y": 423,
+            "width": 2893.5,
+            "height": 293,
+            "label": "Development Manager",
+            "properties": {},
+            "parentId": "p1"
+          },
+          {
+            "id": "ev_start",
+            "type": "start-event",
+            "x": 158,
+            "y": 553,
+            "width": 36,
+            "height": 36,
+            "label": "Lead Received",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            },
+            "parentId": "lDM"
+          },
+          {
+            "id": "gw_channel",
+            "type": "gateway",
+            "x": 264,
+            "y": 635.8333333333334,
+            "width": 40,
+            "height": 40,
+            "label": "Lead Channel?",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "decision",
+              "labelOffsetX": -70,
+              "labelOffsetY": -4,
+              "labelWidth": 80
+            },
+            "parentId": "lDM",
+            "gatewayType": "none"
+          },
+          {
+            "id": "tA4a",
+            "type": "task",
+            "x": 1257.5,
+            "y": 537,
+            "width": 107,
+            "height": 68,
+            "label": "Run Discovery Call\nwith Prospect",
+            "properties": {},
+            "parentId": "lDM",
+            "taskType": "send"
+          },
+          {
+            "id": "gw_avail_merge",
+            "type": "gateway",
+            "x": 1424.5,
+            "y": 551,
+            "width": 40,
+            "height": 40,
+            "label": "Discovery Call Complete",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "merge",
+              "labelOffsetX": -51,
+              "labelOffsetY": 18,
+              "labelWidth": 80
+            },
+            "parentId": "lDM",
+            "gatewayType": "none"
+          },
+          {
+            "id": "tB1",
+            "type": "task",
+            "x": 457.5,
+            "y": 488,
+            "width": 107,
+            "height": 68,
+            "label": "Attend Microsoft\nCustomer Introduction",
+            "properties": {},
+            "parentId": "lDM",
+            "taskType": "none"
+          },
+          {
+            "id": "tC1",
+            "type": "task",
+            "x": 460,
+            "y": 586,
+            "width": 102,
+            "height": 65,
+            "label": "Run Discovery\nWorkshop",
+            "properties": {},
+            "parentId": "lDM",
+            "taskType": "send"
+          },
+          {
+            "id": "tB2",
+            "type": "task",
+            "x": 624.5,
+            "y": 538.5,
+            "width": 102,
+            "height": 65,
+            "label": "Hold Joint\nSolution Workshops",
+            "properties": {},
+            "parentId": "lDM",
+            "taskType": "send"
+          },
+          {
+            "id": "lCSM",
+            "type": "lane",
+            "x": 86,
+            "y": 716,
+            "width": 2893.5,
+            "height": 290,
+            "label": "Customer Success Manager",
+            "properties": {},
+            "parentId": "p1"
+          },
+          {
+            "id": "tA1",
+            "type": "task",
+            "x": 460,
+            "y": 828.5,
+            "width": 102,
+            "height": 65,
+            "label": "Retrieve Lead\nfrom Inbox",
+            "properties": {},
+            "parentId": "lCSM",
+            "taskType": "user"
+          },
+          {
+            "id": "tA2",
+            "type": "task",
+            "x": 622,
+            "y": 827,
+            "width": 107,
+            "height": 68,
+            "label": "Run Qualifying Call\nwith Prospect",
+            "properties": {},
+            "parentId": "lCSM",
+            "taskType": "none"
+          },
+          {
+            "id": "gw_qual",
+            "type": "gateway",
+            "x": 789,
+            "y": 841,
+            "width": 40,
+            "height": 40,
+            "label": "Lead Qualified?",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "decision",
+              "labelOffsetX": -2,
+              "labelOffsetY": 30,
+              "labelWidth": 80
+            },
+            "parentId": "lCSM",
+            "gatewayType": "none"
+          },
+          {
+            "id": "tA_decline",
+            "type": "task",
+            "x": 940,
+            "y": 781,
+            "width": 102,
+            "height": 65,
+            "label": "Send Polite\nDecline",
+            "properties": {},
+            "parentId": "lCSM",
+            "taskType": "send"
+          },
+          {
+            "id": "tA3",
+            "type": "task",
+            "x": 940,
+            "y": 876,
+            "width": 102,
+            "height": 65,
+            "label": "Book Discovery\nCall",
+            "properties": {},
+            "parentId": "lCSM",
+            "taskType": "send"
+          },
+          {
+            "id": "ev_end_nq",
+            "type": "end-event",
+            "x": 1102,
+            "y": 795.5,
+            "width": 36,
+            "height": 36,
+            "label": "Lead Not Qualified",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            },
+            "parentId": "lCSM"
+          },
+          {
+            "id": "gw_avail",
+            "type": "gateway",
+            "x": 1102,
+            "y": 551,
+            "width": 40,
+            "height": 40,
+            "label": "Development Manager Available?",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "decision",
+              "labelOffsetX": -26,
+              "labelOffsetY": -105,
+              "labelWidth": 80
+            },
+            "parentId": "lDM",
+            "gatewayType": "none"
+          },
+          {
+            "id": "lPC",
+            "type": "lane",
+            "x": 86,
+            "y": 1006,
+            "width": 2893.5,
+            "height": 698.6666666666665,
+            "label": "Principal Consultants",
+            "properties": {},
+            "parentId": "p1"
+          },
+          {
+            "id": "tA4b",
+            "type": "task",
+            "x": 1257.5,
+            "y": 1569.6666666666665,
+            "width": 107,
+            "height": 68,
+            "label": "Run Discovery Call\nwith Prospect",
+            "properties": {},
+            "parentId": "lPC",
+            "taskType": "send"
+          },
+          {
+            "id": "gw_merge",
+            "type": "gateway",
+            "x": 1584.5,
+            "y": 1156.5,
+            "width": 40,
+            "height": 40,
+            "label": "Ready for Co-design",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "merge",
+              "labelOffsetX": -40,
+              "labelOffsetY": -92,
+              "labelWidth": 80
+            },
+            "parentId": "lPC",
+            "gatewayType": "none"
+          },
+          {
+            "id": "sp_codesign",
+            "type": "subprocess-expanded",
+            "x": 1714.5,
+            "y": 1111,
+            "width": 724,
+            "height": 131,
+            "label": "Repeat Until Design Agreed",
+            "properties": {},
+            "parentId": "lPC",
+            "repeatType": "loop"
+          },
+          {
+            "id": "t_prepare",
+            "type": "task",
+            "x": 2554.5,
+            "y": 1567.6666666666665,
+            "width": 112,
+            "height": 72,
+            "label": "Prepare Solution Design\nand Architecture",
+            "properties": {},
+            "parentId": "lPC",
+            "taskType": "user"
+          },
+          {
+            "id": "t_present",
+            "type": "task",
+            "x": 2726.5,
+            "y": 1569.6666666666665,
+            "width": 107,
+            "height": 68,
+            "label": "Present Solution Design\nto Customer",
+            "properties": {},
+            "parentId": "lPC",
+            "taskType": "send"
+          },
+          {
+            "id": "ev_end",
+            "type": "end-event",
+            "x": 2893.5,
+            "y": 1585.6666666666665,
+            "width": 36,
+            "height": 36,
+            "label": "Solution Design Presented",
+            "properties": {
+              "labelOffsetX": 0,
+              "labelOffsetY": 7
+            },
+            "parentId": "lPC"
+          },
+          {
+            "id": "do_map",
+            "type": "data-object",
+            "x": 2172.5,
+            "y": 1045,
+            "width": 36,
+            "height": 46,
+            "label": "Process Map",
+            "properties": {
+              "role": "output"
+            },
+            "parentId": "lPC"
+          },
+          {
+            "id": "do_design",
+            "type": "data-object",
+            "x": 2711.5,
+            "y": 1491.6666666666665,
+            "width": 36,
+            "height": 46,
+            "label": "Solution Design and Architecture",
+            "properties": {
+              "role": "output"
+            },
+            "parentId": "lPC"
+          },
+          {
+            "id": "pLeads",
+            "type": "pool",
+            "x": 50,
+            "y": 1802.6666666666665,
+            "width": 2929.5,
+            "height": 107,
+            "label": "Leads System",
+            "properties": {
+              "poolType": "black-box",
+              "isSystem": true,
+              "poolHeaderWidth": 36
+            }
+          },
+          {
+            "id": "sp_start",
+            "type": "start-event",
+            "x": 1744.5,
+            "y": 1161.5,
+            "width": 36,
+            "height": 36,
+            "label": "",
+            "properties": {},
+            "parentId": "sp_codesign"
+          },
+          {
+            "id": "sp_t1",
+            "type": "task",
+            "x": 1850.5,
+            "y": 1147,
+            "width": 102,
+            "height": 65,
+            "label": "Run Proposal\nCo-design Workshop",
+            "properties": {},
+            "parentId": "sp_codesign",
+            "taskType": "none"
+          },
+          {
+            "id": "sp_t2",
+            "type": "task",
+            "x": 2025.5,
+            "y": 1147,
+            "width": 102,
+            "height": 65,
+            "label": "Build Solution\nProcess Map",
+            "properties": {},
+            "parentId": "sp_codesign",
+            "taskType": "user"
+          },
+          {
+            "id": "sp_t3",
+            "type": "task",
+            "x": 2200.5,
+            "y": 1147,
+            "width": 102,
+            "height": 65,
+            "label": "Make AI\nDesign Decisions",
+            "properties": {},
+            "parentId": "sp_codesign",
+            "taskType": "user"
+          },
+          {
+            "id": "sp_end",
+            "type": "end-event",
+            "x": 2372.5,
+            "y": 1161.5,
+            "width": 36,
+            "height": 36,
+            "label": "",
+            "properties": {},
+            "parentId": "sp_codesign"
+          }
+        ],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.6
+        },
+        "connectors": [
+          {
+            "id": "conn-ev_start-gw_channel",
+            "sourceId": "ev_start",
+            "targetId": "gw_channel",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 176,
+                "y": 571
+              },
+              {
+                "x": 194,
+                "y": 571
+              },
+              {
+                "x": 212,
+                "y": 571
+              },
+              {
+                "x": 228,
+                "y": 571
+              },
+              {
+                "x": 228,
+                "y": 655.8333333333334
+              },
+              {
+                "x": 244,
+                "y": 655.8333333333334
+              },
+              {
+                "x": 264,
+                "y": 655.8333333333334
+              },
+              {
+                "x": 284,
+                "y": 655.8333333333334
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-gw_channel-tA1",
+            "sourceId": "gw_channel",
+            "targetId": "tA1",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 284,
+                "y": 655.8333333333334
+              },
+              {
+                "x": 284,
+                "y": 675.8333333333334
+              },
+              {
+                "x": 284,
+                "y": 861
+              },
+              {
+                "x": 460,
+                "y": 861
+              },
+              {
+                "x": 511,
+                "y": 861
+              }
+            ],
+            "label": "Web lead",
+            "labelOffsetX": 36,
+            "labelOffsetY": 10,
+            "labelWidth": 60,
+            "labelAnchor": "source",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-gw_channel-tB1",
+            "sourceId": "gw_channel",
+            "targetId": "tB1",
+            "sourceSide": "top",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 284,
+                "y": 655.8333333333334
+              },
+              {
+                "x": 284,
+                "y": 635.8333333333334
+              },
+              {
+                "x": 284,
+                "y": 522
+              },
+              {
+                "x": 457.5,
+                "y": 522
+              },
+              {
+                "x": 511,
+                "y": 522
+              }
+            ],
+            "label": "Microsoft channel",
+            "labelOffsetX": 63,
+            "labelOffsetY": -24,
+            "labelWidth": 60,
+            "labelAnchor": "source",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-gw_channel-tC1",
+            "sourceId": "gw_channel",
+            "targetId": "tC1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 284,
+                "y": 655.8333333333334
+              },
+              {
+                "x": 304,
+                "y": 655.8333333333334
+              },
+              {
+                "x": 324,
+                "y": 655.8333333333334
+              },
+              {
+                "x": 380,
+                "y": 655.8333333333334
+              },
+              {
+                "x": 380,
+                "y": 618.5
+              },
+              {
+                "x": 436,
+                "y": 618.5
+              },
+              {
+                "x": 460,
+                "y": 618.5
+              },
+              {
+                "x": 511,
+                "y": 618.5
+              }
+            ],
+            "label": "Existing customer referral",
+            "labelOffsetX": 87,
+            "labelOffsetY": 2,
+            "labelWidth": 60,
+            "labelAnchor": "source",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-pLeads-tA1",
+            "sourceId": "pLeads",
+            "targetId": "tA1",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1514.75,
+                "y": 1856.1666666666665
+              },
+              {
+                "x": 511,
+                "y": 1802.6666666666665
+              },
+              {
+                "x": 511,
+                "y": 893.5
+              },
+              {
+                "x": 511,
+                "y": 861
+              }
+            ],
+            "label": "Lead details",
+            "sourceOffsetAlong": 0.1573647380098993,
+            "targetOffsetAlong": 0.5,
+            "labelOffsetX": 0,
+            "labelOffsetY": 391.58333333333326,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-tA1-tA2",
+            "sourceId": "tA1",
+            "targetId": "tA2",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 511,
+                "y": 861
+              },
+              {
+                "x": 562,
+                "y": 861
+              },
+              {
+                "x": 586,
+                "y": 861
+              },
+              {
+                "x": 598,
+                "y": 861
+              },
+              {
+                "x": 622,
+                "y": 861
+              },
+              {
+                "x": 675.5,
+                "y": 861
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tA2-pCust",
+            "sourceId": "tA2",
+            "targetId": "pCust",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 675.5,
+                "y": 861
+              },
+              {
+                "x": 663.5,
+                "y": 827
+              },
+              {
+                "x": 663.5,
+                "y": 142
+              },
+              {
+                "x": 1514.75,
+                "y": 96
+              }
+            ],
+            "label": "Qualifying questions",
+            "targetOffsetAlong": 0.20942140296979006,
+            "labelOffsetX": 0,
+            "labelOffsetY": -307.5,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.3878504672897196
+          },
+          {
+            "id": "conn-pCust-tA2",
+            "sourceId": "pCust",
+            "targetId": "tA2",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1514.75,
+                "y": 96
+              },
+              {
+                "x": 687.5,
+                "y": 142
+              },
+              {
+                "x": 687.5,
+                "y": 827
+              },
+              {
+                "x": 675.5,
+                "y": 861
+              }
+            ],
+            "label": "Prospect responses",
+            "sourceOffsetAlong": 0.21761392729134665,
+            "targetOffsetAlong": 0.6121495327102804,
+            "labelOffsetX": 0,
+            "labelOffsetY": -293.5,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-tA2-gw_qual",
+            "sourceId": "tA2",
+            "targetId": "gw_qual",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 675.5,
+                "y": 861
+              },
+              {
+                "x": 729,
+                "y": 861
+              },
+              {
+                "x": 753,
+                "y": 861
+              },
+              {
+                "x": 769,
+                "y": 861
+              },
+              {
+                "x": 789,
+                "y": 861
+              },
+              {
+                "x": 809,
+                "y": 861
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-gw_qual-tA_decline",
+            "sourceId": "gw_qual",
+            "targetId": "tA_decline",
+            "sourceSide": "top",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 809,
+                "y": 861
+              },
+              {
+                "x": 809,
+                "y": 841
+              },
+              {
+                "x": 809,
+                "y": 813.5
+              },
+              {
+                "x": 940,
+                "y": 813.5
+              },
+              {
+                "x": 991,
+                "y": 813.5
+              }
+            ],
+            "label": "No",
+            "labelOffsetX": 21,
+            "labelOffsetY": -24,
+            "labelWidth": 60,
+            "labelAnchor": "source",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tA_decline-pCust",
+            "sourceId": "tA_decline",
+            "targetId": "pCust",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 991,
+                "y": 813.5
+              },
+              {
+                "x": 991,
+                "y": 781
+              },
+              {
+                "x": 991,
+                "y": 142
+              },
+              {
+                "x": 1514.75,
+                "y": 96
+              }
+            ],
+            "label": "Polite decline",
+            "targetOffsetAlong": 0.3212152244410309,
+            "labelOffsetX": 0,
+            "labelOffsetY": -284.5,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tA_decline-ev_end_nq",
+            "sourceId": "tA_decline",
+            "targetId": "ev_end_nq",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 991,
+                "y": 813.5
+              },
+              {
+                "x": 1042,
+                "y": 813.5
+              },
+              {
+                "x": 1066,
+                "y": 813.5
+              },
+              {
+                "x": 1084,
+                "y": 813.5
+              },
+              {
+                "x": 1102,
+                "y": 813.5
+              },
+              {
+                "x": 1120,
+                "y": 813.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gw_qual-tA3",
+            "sourceId": "gw_qual",
+            "targetId": "tA3",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 809,
+                "y": 861
+              },
+              {
+                "x": 809,
+                "y": 881
+              },
+              {
+                "x": 809,
+                "y": 908.5
+              },
+              {
+                "x": 940,
+                "y": 908.5
+              },
+              {
+                "x": 991,
+                "y": 908.5
+              }
+            ],
+            "label": "Yes",
+            "labelOffsetX": 21,
+            "labelOffsetY": 10,
+            "labelWidth": 60,
+            "labelAnchor": "source",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tA3-pCust",
+            "sourceId": "tA3",
+            "targetId": "pCust",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 991,
+                "y": 908.5
+              },
+              {
+                "x": 991,
+                "y": 876
+              },
+              {
+                "x": 991,
+                "y": 142
+              },
+              {
+                "x": 1514.75,
+                "y": 96
+              }
+            ],
+            "label": "Discovery call invitation",
+            "targetOffsetAlong": 0.3212152244410309,
+            "labelOffsetX": 0,
+            "labelOffsetY": -318,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tA3-gw_avail",
+            "sourceId": "tA3",
+            "targetId": "gw_avail",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 991,
+                "y": 908.5
+              },
+              {
+                "x": 1042,
+                "y": 908.5
+              },
+              {
+                "x": 1066,
+                "y": 908.5
+              },
+              {
+                "x": 1066,
+                "y": 571
+              },
+              {
+                "x": 1082,
+                "y": 571
+              },
+              {
+                "x": 1082,
+                "y": 571
+              },
+              {
+                "x": 1102,
+                "y": 571
+              },
+              {
+                "x": 1122,
+                "y": 571
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-gw_avail-tA4a",
+            "sourceId": "gw_avail",
+            "targetId": "tA4a",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1122,
+                "y": 571
+              },
+              {
+                "x": 1142,
+                "y": 571
+              },
+              {
+                "x": 1162,
+                "y": 571
+              },
+              {
+                "x": 1233.5,
+                "y": 571
+              },
+              {
+                "x": 1257.5,
+                "y": 571
+              },
+              {
+                "x": 1311,
+                "y": 571
+              }
+            ],
+            "label": "Available",
+            "labelOffsetX": 36,
+            "labelOffsetY": 2,
+            "labelWidth": 60,
+            "labelAnchor": "source",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-gw_avail-tA4b",
+            "sourceId": "gw_avail",
+            "targetId": "tA4b",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1122,
+                "y": 571
+              },
+              {
+                "x": 1122,
+                "y": 591
+              },
+              {
+                "x": 1122,
+                "y": 611
+              },
+              {
+                "x": 1122,
+                "y": 1613.6666666666665
+              },
+              {
+                "x": 1233.5,
+                "y": 1613.6666666666665
+              },
+              {
+                "x": 1233.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 1257.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 1311,
+                "y": 1603.6666666666665
+              }
+            ],
+            "label": "Unavailable",
+            "labelOffsetX": 45,
+            "labelOffsetY": 10,
+            "labelWidth": 60,
+            "labelAnchor": "source",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tA4a-pCust",
+            "sourceId": "tA4a",
+            "targetId": "pCust",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1311,
+                "y": 571
+              },
+              {
+                "x": 1311,
+                "y": 537
+              },
+              {
+                "x": 1311,
+                "y": 142
+              },
+              {
+                "x": 1514.75,
+                "y": 96
+              }
+            ],
+            "label": "Discovery discussion",
+            "targetOffsetAlong": 0.4304488820617853,
+            "labelOffsetX": 0,
+            "labelOffsetY": -162.5,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tA4b-pCust",
+            "sourceId": "tA4b",
+            "targetId": "pCust",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1311,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 1311,
+                "y": 1569.6666666666665
+              },
+              {
+                "x": 1311,
+                "y": 142
+              },
+              {
+                "x": 1514.75,
+                "y": 96
+              }
+            ],
+            "label": "Discovery discussion",
+            "targetOffsetAlong": 0.4304488820617853,
+            "labelOffsetX": 0,
+            "labelOffsetY": -664.8333333333333,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tA4a-gw_avail_merge",
+            "sourceId": "tA4a",
+            "targetId": "gw_avail_merge",
+            "sourceSide": "right",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1311,
+                "y": 571
+              },
+              {
+                "x": 1364.5,
+                "y": 571
+              },
+              {
+                "x": 1388.5,
+                "y": 571
+              },
+              {
+                "x": 1388.5,
+                "y": 521
+              },
+              {
+                "x": 1444.5,
+                "y": 521
+              },
+              {
+                "x": 1444.5,
+                "y": 531
+              },
+              {
+                "x": 1444.5,
+                "y": 551
+              },
+              {
+                "x": 1444.5,
+                "y": 571
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tA4b-gw_avail_merge",
+            "sourceId": "tA4b",
+            "targetId": "gw_avail_merge",
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1311,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 1364.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 1444.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 1444.5,
+                "y": 591
+              },
+              {
+                "x": 1444.5,
+                "y": 571
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-gw_avail_merge-gw_merge",
+            "sourceId": "gw_avail_merge",
+            "targetId": "gw_merge",
+            "sourceSide": "right",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1444.5,
+                "y": 571
+              },
+              {
+                "x": 1464.5,
+                "y": 571
+              },
+              {
+                "x": 1604.5,
+                "y": 571
+              },
+              {
+                "x": 1604.5,
+                "y": 1156.5
+              },
+              {
+                "x": 1604.5,
+                "y": 1176.5
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-pMS-tB1",
+            "sourceId": "pMS",
+            "targetId": "tB1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1514.75,
+                "y": 282.5
+              },
+              {
+                "x": 499,
+                "y": 325
+              },
+              {
+                "x": 499,
+                "y": 488
+              },
+              {
+                "x": 511,
+                "y": 522
+              }
+            ],
+            "label": "Customer introduction",
+            "sourceOffsetAlong": 0.153268475849121,
+            "targetOffsetAlong": 0.3878504672897196,
+            "labelOffsetX": 0,
+            "labelOffsetY": -46.5,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-tB1-pCust",
+            "sourceId": "tB1",
+            "targetId": "pCust",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 511,
+                "y": 522
+              },
+              {
+                "x": 523,
+                "y": 488
+              },
+              {
+                "x": 523,
+                "y": 142
+              },
+              {
+                "x": 1514.75,
+                "y": 96
+              }
+            ],
+            "label": "Introduction meeting",
+            "targetOffsetAlong": 0.16146100017067758,
+            "labelOffsetX": 0,
+            "labelOffsetY": -138,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.6121495327102804
+          },
+          {
+            "id": "conn-tB1-tB2",
+            "sourceId": "tB1",
+            "targetId": "tB2",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 511,
+                "y": 522
+              },
+              {
+                "x": 564.5,
+                "y": 522
+              },
+              {
+                "x": 588.5,
+                "y": 522
+              },
+              {
+                "x": 600.5,
+                "y": 522
+              },
+              {
+                "x": 600.5,
+                "y": 571
+              },
+              {
+                "x": 624.5,
+                "y": 571
+              },
+              {
+                "x": 675.5,
+                "y": 571
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tB2-pMS",
+            "sourceId": "tB2",
+            "targetId": "pMS",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 675.5,
+                "y": 571
+              },
+              {
+                "x": 663.5,
+                "y": 538.5
+              },
+              {
+                "x": 663.5,
+                "y": 325
+              },
+              {
+                "x": 1514.75,
+                "y": 282.5
+              }
+            ],
+            "label": "Joint workshop participation",
+            "targetOffsetAlong": 0.20942140296979006,
+            "labelOffsetX": 0,
+            "labelOffsetY": -71.75,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.38235294117647056
+          },
+          {
+            "id": "conn-tB2-pCust",
+            "sourceId": "tB2",
+            "targetId": "pCust",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 675.5,
+                "y": 571
+              },
+              {
+                "x": 687.5,
+                "y": 538.5
+              },
+              {
+                "x": 687.5,
+                "y": 142
+              },
+              {
+                "x": 1514.75,
+                "y": 96
+              }
+            ],
+            "label": "Solution discussion",
+            "targetOffsetAlong": 0.21761392729134665,
+            "labelOffsetX": 0,
+            "labelOffsetY": -170.25,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.6176470588235294
+          },
+          {
+            "id": "conn-tB2-gw_merge",
+            "sourceId": "tB2",
+            "targetId": "gw_merge",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 675.5,
+                "y": 571
+              },
+              {
+                "x": 726.5,
+                "y": 571
+              },
+              {
+                "x": 750.5,
+                "y": 571
+              },
+              {
+                "x": 750.5,
+                "y": 1647.6666666666665
+              },
+              {
+                "x": 1564.5,
+                "y": 1647.6666666666665
+              },
+              {
+                "x": 1564.5,
+                "y": 1176.5
+              },
+              {
+                "x": 1584.5,
+                "y": 1176.5
+              },
+              {
+                "x": 1604.5,
+                "y": 1176.5
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tC1-pCust",
+            "sourceId": "tC1",
+            "targetId": "pCust",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 511,
+                "y": 618.5
+              },
+              {
+                "x": 511,
+                "y": 586
+              },
+              {
+                "x": 511,
+                "y": 142
+              },
+              {
+                "x": 1514.75,
+                "y": 96
+              }
+            ],
+            "label": "Use case discovery",
+            "targetOffsetAlong": 0.1573647380098993,
+            "labelOffsetX": 0,
+            "labelOffsetY": -173,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tC1-gw_merge",
+            "sourceId": "tC1",
+            "targetId": "gw_merge",
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 511,
+                "y": 618.5
+              },
+              {
+                "x": 562,
+                "y": 618.5
+              },
+              {
+                "x": 586,
+                "y": 618.5
+              },
+              {
+                "x": 586,
+                "y": 1647.6666666666665
+              },
+              {
+                "x": 1604.5,
+                "y": 1647.6666666666665
+              },
+              {
+                "x": 1604.5,
+                "y": 1216.5
+              },
+              {
+                "x": 1604.5,
+                "y": 1196.5
+              },
+              {
+                "x": 1604.5,
+                "y": 1176.5
+              }
+            ],
+            "label": "",
+            "targetOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-gw_merge-sp_codesign",
+            "sourceId": "gw_merge",
+            "targetId": "sp_codesign",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1604.5,
+                "y": 1176.5
+              },
+              {
+                "x": 1624.5,
+                "y": 1176.5
+              },
+              {
+                "x": 1644.5,
+                "y": 1176.5
+              },
+              {
+                "x": 1690.5,
+                "y": 1176.5
+              },
+              {
+                "x": 1714.5,
+                "y": 1176.5
+              },
+              {
+                "x": 2076.5,
+                "y": 1176.5
+              }
+            ],
+            "label": "",
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-sp_start-sp_t1",
+            "sourceId": "sp_start",
+            "targetId": "sp_t1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1762.5,
+                "y": 1179.5
+              },
+              {
+                "x": 1780.5,
+                "y": 1179.5
+              },
+              {
+                "x": 1798.5,
+                "y": 1179.5
+              },
+              {
+                "x": 1826.5,
+                "y": 1179.5
+              },
+              {
+                "x": 1850.5,
+                "y": 1179.5
+              },
+              {
+                "x": 1901.5,
+                "y": 1179.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-sp_t1-sp_t2",
+            "sourceId": "sp_t1",
+            "targetId": "sp_t2",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1901.5,
+                "y": 1179.5
+              },
+              {
+                "x": 1952.5,
+                "y": 1179.5
+              },
+              {
+                "x": 1976.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2001.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2025.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2076.5,
+                "y": 1179.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-sp_t2-sp_t3",
+            "sourceId": "sp_t2",
+            "targetId": "sp_t3",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 2076.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2127.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2151.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2176.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2200.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2251.5,
+                "y": 1179.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-sp_t3-sp_end",
+            "sourceId": "sp_t3",
+            "targetId": "sp_end",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 2251.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2302.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2326.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2354.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2372.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2390.5,
+                "y": 1179.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-sp_t1-pCust",
+            "sourceId": "sp_t1",
+            "targetId": "pCust",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1901.5,
+                "y": 1179.5
+              },
+              {
+                "x": 1889.5,
+                "y": 1147
+              },
+              {
+                "x": 1889.5,
+                "y": 142
+              },
+              {
+                "x": 1514.75,
+                "y": 96
+              }
+            ],
+            "label": "Co-design workshop",
+            "targetOffsetAlong": 0.6279228537293053,
+            "labelOffsetX": 0,
+            "labelOffsetY": -467.5,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.38235294117647056
+          },
+          {
+            "id": "conn-pCust-sp_t1",
+            "sourceId": "pCust",
+            "targetId": "sp_t1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1514.75,
+                "y": 96
+              },
+              {
+                "x": 1913.5,
+                "y": 142
+              },
+              {
+                "x": 1913.5,
+                "y": 1147
+              },
+              {
+                "x": 1901.5,
+                "y": 1179.5
+              }
+            ],
+            "label": "Process and requirements",
+            "sourceOffsetAlong": 0.6361153780508619,
+            "targetOffsetAlong": 0.6176470588235294,
+            "labelOffsetX": 0,
+            "labelOffsetY": -453.5,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-sp_t2-do_map",
+            "sourceId": "sp_t2",
+            "targetId": "do_map",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "associationBPMN",
+            "directionType": "open-directed",
+            "routingType": "direct",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 2076.5,
+                "y": 1179.5
+              },
+              {
+                "x": 2109.7286995515697,
+                "y": 1147
+              },
+              {
+                "x": 2172.5,
+                "y": 1085.6052631578948
+              },
+              {
+                "x": 2190.5,
+                "y": 1068
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-sp_codesign-t_prepare",
+            "sourceId": "sp_codesign",
+            "targetId": "t_prepare",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 2076.5,
+                "y": 1176.5
+              },
+              {
+                "x": 2438.5,
+                "y": 1176.5
+              },
+              {
+                "x": 2462.5,
+                "y": 1176.5
+              },
+              {
+                "x": 2496.5,
+                "y": 1176.5
+              },
+              {
+                "x": 2496.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2530.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2554.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2610.5,
+                "y": 1603.6666666666665
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-do_map-t_prepare",
+            "sourceId": "do_map",
+            "targetId": "t_prepare",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "associationBPMN",
+            "directionType": "open-directed",
+            "routingType": "direct",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 2190.5,
+                "y": 1068
+              },
+              {
+                "x": 2208.5,
+                "y": 1090.9571428571428
+              },
+              {
+                "x": 2582.2734909769756,
+                "y": 1567.6666666666665
+              },
+              {
+                "x": 2610.5,
+                "y": 1603.6666666666665
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t_prepare-do_design",
+            "sourceId": "t_prepare",
+            "targetId": "do_design",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "associationBPMN",
+            "directionType": "open-directed",
+            "routingType": "direct",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 2610.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2658.6348314606744,
+                "y": 1567.6666666666665
+              },
+              {
+                "x": 2711.5,
+                "y": 1528.128851540616
+              },
+              {
+                "x": 2729.5,
+                "y": 1514.6666666666665
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t_prepare-t_present",
+            "sourceId": "t_prepare",
+            "targetId": "t_present",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 2610.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2666.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2690.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2702.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2726.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2780,
+                "y": 1603.6666666666665
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-do_design-t_present",
+            "sourceId": "do_design",
+            "targetId": "t_present",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "associationBPMN",
+            "directionType": "open-directed",
+            "routingType": "direct",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 2729.5,
+                "y": 1514.6666666666665
+              },
+              {
+                "x": 2742.550561797753,
+                "y": 1537.6666666666665
+              },
+              {
+                "x": 2760.7078651685392,
+                "y": 1569.6666666666665
+              },
+              {
+                "x": 2780,
+                "y": 1603.6666666666665
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t_present-pCust",
+            "sourceId": "t_present",
+            "targetId": "pCust",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 2780,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2780,
+                "y": 1569.6666666666665
+              },
+              {
+                "x": 2780,
+                "y": 142
+              },
+              {
+                "x": 1514.75,
+                "y": 96
+              }
+            ],
+            "label": "Solution design and architecture",
+            "targetOffsetAlong": 0.931899641577061,
+            "labelOffsetX": 0,
+            "labelOffsetY": -678.8333333333333,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-t_present-ev_end",
+            "sourceId": "t_present",
+            "targetId": "ev_end",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 2780,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2833.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2857.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2875.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2893.5,
+                "y": 1603.6666666666665
+              },
+              {
+                "x": 2911.5,
+                "y": 1603.6666666666665
+              }
+            ],
+            "label": ""
+          }
+        ],
+        "aiGeneration": {
+          "promptId": "cms5cf24o000d01nn293oiq9c",
+          "promptName": "Aardvark Consulting Process from Meeting Transcript 2 — AI prompt",
+          "promptText": "Build the BPMN process from this meeting transcript. Treat each distinct speaker as a role / lane, and use roles or job functions — never an individual person's name — in pool, lane, task and annotation names. Ignore small talk.\n\nProcess: Lead qualification for the development area at Aardvark Consulting.\n\nRoles / participants: Development Manager (process owner, also conducts discovery calls), Customer Success Manager (acts as \"setter\"), Principal Consultants, Microsoft (referral partner), Customer / Prospect.\nSystems / data: leads inbox (email), web ads as lead source, high-level solution design and architecture document, process map.\n\n1. Start: a lead arrives. Leads come through one of three channels, and the qualification path differs by channel.\n\nDecision — lead channel:\n   Branch A: Web lead (from web ads)\n   Branch B: Microsoft channel (existing Microsoft customer referred by Microsoft)\n   Branch C: Existing customer referral (new project for an existing customer)\n\nBranch A — Web lead:\n2. The lead arrives in the leads inbox.\n3. The Customer Success Manager picks up the lead from the inbox.\n4. The Customer Success Manager calls the prospect and runs a qualifying call: establishes what they are trying to do and works through qualifying questions covering who they are, budget authority, need and time to do it — i.e. confirming there is a real project rather than a tyre-kicker.\n5. Once qualification is established, the Customer Success Manager books a discovery call with the Development Manager or one of the Principal Consultants.\n6. The Development Manager or a Principal Consultant runs the discovery call with the prospect: what they are trying to do, their top two or three priorities, and their pain points.\n7. Proceed to the shared co-design stage (step 12).\n\nBranch B — Microsoft channel:\n8. Microsoft introduces Aardvark Consulting to the customer, either via an introduction call or via an innovation hub workshop.\n9. Aardvark Consulting holds a couple of shared meetings/workshops with Microsoft and the customer to talk through the solution.\n10. Proceed to the shared co-design stage (step 12).\n\nBranch C — Existing customer referral:\n11. No introductory calls are needed (the customer is already known). A single discovery workshop is held to discover the particular use case, then proceed directly to solution design (step 12).\n\nShared path — Proposal co-design:\n12. Run a proposal co-design workshop, or a series of workshops (one or many), with the customer: work through the problem or what is to be built, workshop the customer's process, build out a process map of the intended solution, and make design decisions including how AI will be used within it.\n13. After the workshop(s), Aardvark Consulting works offline to prepare a high-level solution design and architecture.\n14. Aardvark Consulting presents the high-level solution design and architecture back to the customer.\n15. End of the lead qualification portion of the process.\n\nCLARIFICATIONS (answers to open questions — incorporate these):\n- Disqualified lead path: Customer Success Manager sends a polite decline and the process ends as 'Lead Not Qualified'\n- Co-design stage owner: Principal Consultants\n- Discovery call assignment: Always the Development Manager unless unavailable, then a Principal Consultant\n- Microsoft branch owner: Development Manager with a Principal Consultant attending\n- Systems involved: Leads System\n- Workshop repetition & end: Co-design workshops as a looping subprocess ('Repeat Until Design Agreed'), then a single end event 'Solution Design Presented'",
+          "model": "claude-opus-5",
+          "generatedAt": "2026-07-29T00:25:04.693Z",
+          "autoNamed": true
+        },
+        "aiFeedback": {
+          "questions": [
+            {
+              "q": "Are there explicit disqualification/exit points — e.g. what happens if the qualifying call shows no budget, authority, need or timeline, or if the discovery call is unsuccessful?"
+            },
+            {
+              "q": "Who owns and runs the proposal co-design workshops and produces the high-level solution design and architecture (Development Manager, Principal Consultants, or both)?"
+            },
+            {
+              "q": "In the Microsoft branch, is any qualifying call or discovery call performed, or does the channel skip qualification entirely?"
+            },
+            {
+              "q": "What determines whether one or multiple co-design workshops are needed?"
+            },
+            {
+              "q": "What happens after the solution design and architecture is presented (e.g. formal proposal, pricing, contracting)? The transcript ends at the presentation."
+            },
+            {
+              "q": "Is the leads inbox used only for web leads, or also for Microsoft and existing-customer referrals?"
+            },
+            {
+              "q": "Is any CRM or other system used to record leads and qualification outcomes?"
+            },
+            {
+              "q": "Are there service levels or timeframes for picking up a lead, making the qualifying call, or booking the discovery call?"
+            }
+          ],
+          "createdAt": "2026-07-29T00:12:01.834Z"
+        }
+      },
+      "colorConfig": {},
+      "displayMode": "normal"
+    }
+  ]
+}
