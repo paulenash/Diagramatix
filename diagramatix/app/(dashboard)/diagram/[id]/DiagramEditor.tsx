@@ -2649,6 +2649,10 @@ export function DiagramEditor({
   const ABRA_SILENCE_MS = 2200;
   const ABRA_CONTINUE_MS = 3200;         // longer grace while waiting for the rest of a split command
   const ABRA_MAX_WAITS = 3;
+  // Auto-close after 2 min of no voice — an open Deepgram stream is billed by
+  // duration, so an idle mic keeps costing money. Reset on every voice fragment.
+  const abraIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ABRA_IDLE_MS = 120000;
   const flushAbraBuffer = useCallback((force = false) => {
     if (abraFlushTimer.current) { clearTimeout(abraFlushTimer.current); abraFlushTimer.current = null; }
     const cmd = abraBuffer.current.trim();
@@ -2667,11 +2671,21 @@ export function DiagramEditor({
 
   const stopAbraListening = useCallback(() => {
     abraStopRequested.current = true;
+    if (abraIdleTimer.current) { clearTimeout(abraIdleTimer.current); abraIdleTimer.current = null; }
     abraDictRef.current?.stop();
     abraDictRef.current = null;
     setAbraListening(false);
     flushAbraBuffer(true); // apply anything still buffered (force — no more is coming)
   }, [flushAbraBuffer]);
+
+  // (Re)arm the 2-minute idle auto-close; called on every voice fragment.
+  const bumpAbraIdle = useCallback(() => {
+    if (abraIdleTimer.current) clearTimeout(abraIdleTimer.current);
+    abraIdleTimer.current = setTimeout(() => {
+      setAbraLog((prev) => [...prev, { id: nanoid(), heard: "", summary: "Abracadabra closed — 2 minutes idle", ok: true }]);
+      stopAbraListening();
+    }, ABRA_IDLE_MS);
+  }, [stopAbraListening]);
 
   const toggleAbraListening = useCallback(async () => {
     if (abraListening || abraDictRef.current) { stopAbraListening(); return; }
@@ -2681,8 +2695,9 @@ export function DiagramEditor({
     const handle = await startDictation({
       onEngine: (e) => setAbraEngine(e),
       // Show the command building: buffered fragments + the in-progress words.
-      onInterim: (t) => setAbraInterim((abraBuffer.current ? abraBuffer.current + " " : "") + t),
+      onInterim: (t) => { bumpAbraIdle(); setAbraInterim((abraBuffer.current ? abraBuffer.current + " " : "") + t); },
       onText: (t) => {
+        bumpAbraIdle();
         const txt = t.trim();
         if (!txt) return;
         // Spoken "stop" ends the session immediately.
@@ -2704,7 +2719,8 @@ export function DiagramEditor({
     });
     if (!handle || abraStopRequested.current) { handle?.stop(); abraDictRef.current = null; setAbraListening(false); return; }
     abraDictRef.current = handle;
-  }, [abraListening, stopAbraListening, flushAbraBuffer]);
+    bumpAbraIdle(); // start the idle clock even if no voice ever arrives
+  }, [abraListening, stopAbraListening, flushAbraBuffer, bumpAbraIdle]);
 
   // Escape cancels the guided rename flow at any phase.
   useEffect(() => {
