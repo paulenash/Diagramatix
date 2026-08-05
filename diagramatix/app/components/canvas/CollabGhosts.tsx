@@ -98,8 +98,13 @@ export function CollabGhosts({
               if (local && (local.label ?? "") === (c.label ?? "")) return null;
               if (c.pts.length < 2) return null;
               const d = c.pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-              const mid = c.pts[Math.floor(c.pts.length / 2)];
-              // Label sits at the connector midpoint + its (moved) offset (#label-move).
+              // Anchor the label at the MIDPOINT of the first & last visible
+              // waypoints — the exact anchor ConnectorRenderer's InteractionLabel
+              // uses — so a ghost label previews where it will actually render on
+              // sync (where the author placed it), not at a middle waypoint (which
+              // for a message flow sits far from the real anchor).
+              const mid = { x: (c.pts[0].x + c.pts[c.pts.length - 1].x) / 2, y: (c.pts[0].y + c.pts[c.pts.length - 1].y) / 2 };
+              // Label sits at that anchor + its (moved) offset (#label-move).
               const lx = mid.x + (c.lox ?? 0);
               const ly = mid.y + (c.loy ?? 0);
               return (
