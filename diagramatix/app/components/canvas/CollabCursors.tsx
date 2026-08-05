@@ -12,9 +12,11 @@ import { useOthers, useUpdateMyPresence } from "@liveblocks/react";
 export function CollabCursors({
   clientToWorld,
   zoom,
+  broadcast = true,
 }: {
   clientToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   zoom: number;
+  broadcast?: boolean;
 }) {
   const others = useOthers();
   const updateMyPresence = useUpdateMyPresence();
@@ -22,6 +24,9 @@ export function CollabCursors({
   toWorld.current = clientToWorld;
 
   useEffect(() => {
+    // A Viewer session doesn't broadcast its cursor — it just watches. (Clears
+    // any cursor it had so others don't see it stuck.)
+    if (!broadcast) { updateMyPresence({ cursor: null }); return; }
     const onMove = (e: PointerEvent) => {
       const w = toWorld.current(e.clientX, e.clientY);
       updateMyPresence({ cursor: { x: Math.round(w.x), y: Math.round(w.y) } });
@@ -34,7 +39,7 @@ export function CollabCursors({
       window.removeEventListener("blur", onLeave);
       updateMyPresence({ cursor: null });
     };
-  }, [updateMyPresence]);
+  }, [updateMyPresence, broadcast]);
 
   const inv = 1 / (zoom || 1);
   return (

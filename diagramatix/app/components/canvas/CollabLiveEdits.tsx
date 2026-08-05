@@ -20,9 +20,9 @@ const GHOSTABLE = new Set<string>([
   "data-object", "data-store", "text-annotation", "pool",
 ]); // skip lanes/sub-lanes — they'd be noisy and follow their pool anyway
 
-const connSig = (c: Connector) => `${(c.waypoints ?? []).map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(";")}|${c.label ?? ""}`;
+const connSig = (c: Connector) => `${(c.waypoints ?? []).map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(";")}|${c.label ?? ""}|${c.labelOffsetX ?? ""},${c.labelOffsetY ?? ""}`;
 
-export function CollabLiveEdits({ elements, connectors }: { elements: DiagramElement[]; connectors: Connector[] }) {
+export function CollabLiveEdits({ elements, connectors, broadcast = true }: { elements: DiagramElement[]; connectors: Connector[]; broadcast?: boolean }) {
   const updateMyPresence = useUpdateMyPresence();
   // Baseline = the loaded (saved) state. Snapshotted on the first non-empty
   // render so both users share the same reference and don't ghost the whole
@@ -37,7 +37,13 @@ export function CollabLiveEdits({ elements, connectors }: { elements: DiagramEle
     baseConns.current = new Map(connectors.map((c) => [c.id, connSig(c)]));
   }
 
+  // A Viewer session doesn't broadcast its edits — clear any it had and stop.
   useEffect(() => {
+    if (!broadcast) { updateMyPresence({ liveEdits: null, liveConns: null }); lastSig.current = ""; }
+  }, [broadcast, updateMyPresence]);
+
+  useEffect(() => {
+    if (!broadcast) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       const base = baseEls.current;
@@ -59,7 +65,13 @@ export function CollabLiveEdits({ elements, connectors }: { elements: DiagramEle
       for (const c of connectors) {
         const sig = connSig(c);
         if (!cbase || cbase.get(c.id) !== sig) {
-          dirtyConns.push({ id: c.id, pts: (c.waypoints ?? []).map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })), label: c.label ?? "", t: c.type });
+          dirtyConns.push({
+            id: c.id,
+            pts: (c.waypoints ?? []).map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })),
+            label: c.label ?? "", t: c.type,
+            ...(c.labelOffsetX != null ? { lox: Math.round(c.labelOffsetX) } : {}),
+            ...(c.labelOffsetY != null ? { loy: Math.round(c.labelOffsetY) } : {}),
+          });
           if (dirtyConns.length >= MAX_LIVE_CONNS) break;
         }
       }

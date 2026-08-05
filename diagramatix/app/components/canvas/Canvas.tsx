@@ -278,6 +278,9 @@ interface Props {
   coEditLocks?: Record<string, { userId: string; userName: string; color: string }>;
   /** Phase 2: render live cursors (inside a Liveblocks room). */
   collabCursors?: boolean;
+  /** Whether THIS session broadcasts its cursor + live edits (Active) or just
+   *  watches (Viewer). Auto-swaps by window focus for same-machine testing. */
+  collabBroadcast?: boolean;
   /** Tier-1 assist: next-step ghost suggestions for the selected element. */
   nextStep?: { source: DiagramElement; candidates: NextStepCandidate[] };
   onAcceptNextStep?: (c: NextStepCandidate) => void;
@@ -567,6 +570,7 @@ export function Canvas({
   selectedConnectorId,
   coEditLocks,
   collabCursors,
+  collabBroadcast = true,
   nextStep,
   onAcceptNextStep,
   pcHighlightEnabled = true,
@@ -6343,7 +6347,7 @@ export function Canvas({
               edits and render everyone else's as ghosts, in the world group. */}
           {collabCursors && (
             <>
-              <CollabLiveEdits elements={data.elements} connectors={data.connectors} />
+              <CollabLiveEdits elements={data.elements} connectors={data.connectors} broadcast={collabBroadcast} />
               <CollabGhosts localElements={data.elements} localConnectors={data.connectors} zoom={zoom} />
             </>
           )}
@@ -6351,7 +6355,7 @@ export function Canvas({
           {/* Phase 2 live cursors (Liveblocks). In the world group so they
               pan/zoom with the diagram; counter-scaled to stay screen-constant. */}
           {collabCursors && (
-            <CollabCursors clientToWorld={clientToWorld} zoom={zoom} />
+            <CollabCursors clientToWorld={clientToWorld} zoom={zoom} broadcast={collabBroadcast} />
           )}
 
           {/* Tier-1 assist: next-step ghost suggestions for the selection. */}

@@ -1107,6 +1107,24 @@ export function DiagramEditor({
   const collabEnabled = !!currentUserId && templateEditState === null && !historyPreviewActive;
   // Phase 2: live cursors only when the server has Liveblocks configured.
   const liveCursors = !!collabRealtime && collabEnabled;
+  // Active (broadcasts my cursor + live edits) vs Viewer (watch only). Auto-swaps
+  // by window focus so two sessions on ONE machine hand the cursor back and forth
+  // automatically — the focused window is active, the others become viewers. The
+  // toggle below is a manual override until the next focus change.
+  const [collabActive, setCollabActive] = useState(true);
+  useEffect(() => {
+    if (!liveCursors) return;
+    const update = () => setCollabActive(typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus());
+    update();
+    window.addEventListener("focus", update);
+    window.addEventListener("blur", update);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      window.removeEventListener("focus", update);
+      window.removeEventListener("blur", update);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, [liveCursors]);
   const { roster: presenceRoster, locks: presenceLocks } = usePresence(diagramId, {
     enabled: collabEnabled,
     userName: currentUserName,
@@ -3993,6 +4011,25 @@ export function DiagramEditor({
           </button>
         )}
 
+        {/* Active vs Viewer — claim the live cursor (others become viewers to me)
+            or step back to watching. Useful for two sessions on one machine. */}
+        {liveCursors && (
+          <button
+            onClick={() => setCollabActive((v) => !v)}
+            title={collabActive
+              ? "You're the ACTIVE editor — your cursor and live edits are broadcast. Click to just watch."
+              : "You're a VIEWER — watching only. Click to become the active editor (claim the cursor)."}
+            className={`px-2 py-0.5 text-[11px] rounded border inline-flex items-center gap-1 ${
+              collabActive
+                ? "text-emerald-700 border-emerald-400 bg-emerald-50"
+                : "text-gray-600 border-gray-300 bg-gray-50 hover:bg-gray-100"
+            }`}
+          >
+            <span aria-hidden>{collabActive ? "🖱" : "👁"}</span>
+            {collabActive ? "Active" : "Viewer"}
+          </button>
+        )}
+
         {!readOnly && (
           <>
             <button
@@ -5034,6 +5071,7 @@ export function DiagramEditor({
           selectedConnectorId={selectedConnectorId}
           coEditLocks={presenceLocks}
           collabCursors={liveCursors}
+          collabBroadcast={collabActive}
           nextStep={selectedElement && nextStepCandidates.length > 0 ? { source: selectedElement, candidates: nextStepCandidates } : undefined}
           onAcceptNextStep={acceptNextStep}
           pcHighlightEnabled={highlightEnabled}

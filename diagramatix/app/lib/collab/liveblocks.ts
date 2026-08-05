@@ -14,8 +14,9 @@
  *  (Approach A: live preview over presence; the authoritative merge is still on
  *  save). Kept compact — id, position, size, label, type. */
 export type LiveEditEl = { id: string; x: number; y: number; w: number; h: number; label: string; t: string };
-/** One connector the user is currently editing, broadcast for the ghost preview. */
-export type LiveEditConn = { id: string; pts: Array<{ x: number; y: number }>; label: string; t: string };
+/** One connector the user is currently editing, broadcast for the ghost preview.
+ *  `lox`/`loy` carry the label offset so a MOVED label previews in place too. */
+export type LiveEditConn = { id: string; pts: Array<{ x: number; y: number }>; label: string; t: string; lox?: number; loy?: number };
 
 declare global {
   interface Liveblocks {

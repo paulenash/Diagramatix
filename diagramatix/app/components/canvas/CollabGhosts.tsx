@@ -44,20 +44,28 @@ export function CollabGhosts({
             {/* Ghost CONNECTORS (#3) — dashed polyline through their waypoints */}
             {(conns ?? []).map((c) => {
               const local = localConnById.get(c.id);
-              const localSig = local ? `${(local.waypoints ?? []).map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(";")}|${local.label ?? ""}` : "";
-              const remoteSig = `${c.pts.map((p) => `${p.x},${p.y}`).join(";")}|${c.label}`;
+              const localSig = local ? `${(local.waypoints ?? []).map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(";")}|${local.label ?? ""}|${local.labelOffsetX ?? ""},${local.labelOffsetY ?? ""}` : "";
+              const remoteSig = `${c.pts.map((p) => `${p.x},${p.y}`).join(";")}|${c.label}|${c.lox ?? ""},${c.loy ?? ""}`;
               if (local && localSig === remoteSig) return null;   // unchanged for me
               if (c.pts.length < 2) return null;
               const d = c.pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
               const mid = c.pts[Math.floor(c.pts.length / 2)];
+              // Label sits at the connector midpoint + its (moved) offset (#label-move).
+              const lx = mid.x + (c.lox ?? 0);
+              const ly = mid.y + (c.loy ?? 0);
               return (
                 <g key={`${connectionId}-c-${c.id}`}>
                   <path d={d} fill="none" stroke={color} strokeOpacity={0.8} strokeWidth={1.6 * inv} strokeDasharray={`${6 * inv} ${3 * inv}`} />
                   {c.label && (
-                    <g transform={`translate(${mid.x}, ${mid.y}) scale(${inv})`}>
-                      <rect x={-(c.label.length * 3.2 + 5)} y={-8} width={c.label.length * 6.4 + 10} height={15} rx={4} fill="#ffffff" stroke={color} strokeOpacity={0.5} />
-                      <text x={0} y={3} fontSize={10} fill={color} textAnchor="middle" fontWeight={600}>{c.label}</text>
-                    </g>
+                    <>
+                      {(c.lox || c.loy) && (
+                        <line x1={mid.x} y1={mid.y} x2={lx} y2={ly} stroke={color} strokeOpacity={0.4} strokeWidth={0.8 * inv} strokeDasharray={`${2 * inv} ${2 * inv}`} />
+                      )}
+                      <g transform={`translate(${lx}, ${ly}) scale(${inv})`}>
+                        <rect x={-(c.label.length * 3.2 + 5)} y={-8} width={c.label.length * 6.4 + 10} height={15} rx={4} fill="#ffffff" stroke={color} strokeOpacity={0.5} />
+                        <text x={0} y={3} fontSize={10} fill={color} textAnchor="middle" fontWeight={600}>{c.label}</text>
+                      </g>
+                    </>
                   )}
                 </g>
               );
