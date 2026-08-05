@@ -43,10 +43,11 @@ const XSD = read("public/diagramatix-export.xsd").toLowerCase();
 // Element types with no draggable palette symbol — created implicitly, not
 // dropped (lanes are added inside a pool; a group is drawn around elements).
 const PALETTE_EXCLUDED = new Set<string>(["lane"]);
-// Decorative problem markers (Pain Point + its dark-green twin Issue) are
-// user-placed on EVERY diagram type but are never AI-emitted and carry no BPMN
-// semantics — they're consciously excluded from the AI-emittable check.
-const AI_EMIT_EXCLUDED = new Set<string>(["uml-pain-point", "uml-issue"]);
+// Decorative problem markers (Pain Point + its dark-green twin Issue) plus the
+// pink author-review sticky are user-placed on EVERY diagram type but are never
+// AI-emitted and carry no BPMN semantics — consciously excluded from the
+// AI-emittable check.
+const AI_EMIT_EXCLUDED = new Set<string>(["uml-pain-point", "uml-issue", "review-comment"]);
 // Element/event types that intentionally have no standalone XSD export element.
 const XSD_EXCLUDED = new Set<string>([]);
 // Event types that don't need a distinct renderer branch.
