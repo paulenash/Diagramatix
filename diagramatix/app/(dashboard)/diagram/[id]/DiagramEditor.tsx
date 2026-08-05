@@ -33,6 +33,7 @@ import { Palette } from "@/app/components/canvas/Palette";
 import { PresenceBar } from "@/app/components/canvas/PresenceBar";
 import { usePresence } from "@/app/hooks/usePresence";
 import { CollabRoom } from "@/app/components/canvas/CollabRoom";
+import { CollabSyncSignal } from "@/app/components/canvas/CollabSyncSignal";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, placeAfterBoundaryEvent, boundaryOuterSide, findFreeSlot, HALF_TASK_W, HALF_TASK_H } from "@/app/lib/diagram/assistPlacement";
 import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
@@ -199,6 +200,8 @@ function useAutoSave(
   const [conflict, setConflict] = useState<SaveConflict | null>(null);
   // The last COMMITTED (synced) document — the baseline for ghosts + the merge base.
   const [syncedData, setSyncedData] = useState<DiagramData>(data);
+  // The committed version we're on — broadcast so idle peers auto-align when it advances.
+  const [committedVersion, setCommittedVersion] = useState<number>(initialVersion);
   const lastSaved = useRef<string>(JSON.stringify(data));
   // Optimistic-concurrency token: the diagram version this client last saw.
   const versionRef = useRef<number>(initialVersion);
@@ -248,6 +251,7 @@ function useAutoSave(
       if (updated && typeof updated.version === "number") versionRef.current = updated.version;
       lastSaved.current = current;
       setSyncedData(data);
+      setCommittedVersion(versionRef.current);
       setLastSavedAt(new Date().toISOString());
       setSaveStatus("saved");
     } catch {
@@ -290,6 +294,7 @@ function useAutoSave(
         versionRef.current = version;
         lastSaved.current = JSON.stringify(merged);
         setSyncedData(merged);
+        setCommittedVersion(version);
         setLastSavedAt(new Date().toISOString());
         setSaveStatus("saved");
         return merged;
@@ -298,6 +303,32 @@ function useAutoSave(
       return null;
     } catch {
       setSaveStatus("unsaved");
+      return null;
+    }
+  }, [data, diagramId]);
+
+  /** Auto-align: another participant advanced the committed version, so PULL their
+   *  committed doc and 3-way-merge it into ours (keeping our un-synced edits) —
+   *  but DON'T push, so a Sync by one person aligns the whole group without a
+   *  cascade. Returns the merged doc to apply, or null if nothing new. */
+  const pullMerge = useCallback(async (): Promise<DiagramData | null> => {
+    try {
+      const getRes = await fetch(`/api/diagrams/${diagramId}`);
+      if (!getRes.ok) return null;
+      const server = await getRes.json().catch(() => null);
+      const theirVersion = typeof server?.version === "number" ? server.version : versionRef.current;
+      if (theirVersion <= versionRef.current) return null; // nothing newer
+      const theirs = (server?.data ?? { elements: [], connectors: [] }) as DiagramData;
+      let base: DiagramData | null = null;
+      try { base = JSON.parse(lastSaved.current) as DiagramData; } catch { base = null; }
+      const merged = base ? mergeDiagram(base, data, theirs).merged : theirs;
+      versionRef.current = theirVersion;
+      lastSaved.current = JSON.stringify(theirs);   // baseline = their committed
+      setSyncedData(theirs);
+      setCommittedVersion(theirVersion);
+      setSaveStatus(JSON.stringify(merged) === JSON.stringify(theirs) ? "saved" : "unsaved");
+      return merged;
+    } catch {
       return null;
     }
   }, [data, diagramId]);
@@ -326,7 +357,7 @@ function useAutoSave(
     return () => clearTimeout(t);
   }, [data, disabled, delay, saveNow, conflict, manualSyncRef]);
 
-  return { saveStatus, lastSavedAt, saveNow, syncNow, conflict, acceptMerge, syncedData };
+  return { saveStatus, lastSavedAt, saveNow, syncNow, pullMerge, conflict, acceptMerge, syncedData, committedVersion };
 }
 
 function exportSvg(svgEl: SVGSVGElement, name: string) {
@@ -1094,12 +1125,18 @@ export function DiagramEditor({
   // Manual-Sync (co-authoring) is decided below once presence is known; the ref
   // lets useAutoSave read it without a hook-ordering problem.
   const manualSyncRef = useRef(false);
-  const { saveStatus, lastSavedAt, saveNow, syncNow, conflict, acceptMerge, syncedData } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly || historyPreviewActive, dataVersion, manualSyncRef);
+  const { saveStatus, lastSavedAt, saveNow, syncNow, pullMerge, conflict, acceptMerge, syncedData, committedVersion } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly || historyPreviewActive, dataVersion, manualSyncRef);
   // Sync button: pull everyone's committed changes, merge in ours, apply locally.
   const handleSync = useCallback(async () => {
     const merged = await syncNow();
     if (merged) setData(merged);
   }, [syncNow, setData]);
+  // Auto-align: a peer advanced the committed version → pull+merge (no push), so
+  // one person's Sync brings the whole group into alignment.
+  const handleAlign = useCallback(async () => {
+    const merged = await pullMerge();
+    if (merged) setData(merged);
+  }, [pullMerge, setData]);
   // Auto-merge on conflict (Phase 1d): apply the three-way merge to the canvas
   // and resume — silently when there were no true overlaps, or with a dismissible
   // note listing how many elements you both changed (theirs kept).
@@ -3819,6 +3856,7 @@ export function DiagramEditor({
 
   return (
     <CollabRoom diagramId={diagramId} enabled={liveCursors}>
+    {liveCursors && <CollabSyncSignal version={committedVersion} onRemoteAdvance={handleAlign} />}
     <div
       className={`flex flex-col h-screen ${isImpersonating ? "bg-orange-50" : "bg-white"}`}
       onContextMenu={(e) => {

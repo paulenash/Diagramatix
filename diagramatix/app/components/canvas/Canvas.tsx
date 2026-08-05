@@ -6351,7 +6351,7 @@ export function Canvas({
               edits and render everyone else's as ghosts, in the world group. */}
           {collabCursors && (
             <>
-              <CollabLiveEdits elements={data.elements} connectors={data.connectors} baselineElements={collabBaseline?.elements ?? data.elements} broadcast={collabBroadcast} />
+              <CollabLiveEdits elements={data.elements} connectors={data.connectors} baselineElements={collabBaseline?.elements ?? data.elements} baselineConnectors={collabBaseline?.connectors ?? data.connectors} broadcast={collabBroadcast} />
               <CollabGhosts localElements={data.elements} localConnectors={data.connectors} zoom={zoom} />
             </>
           )}

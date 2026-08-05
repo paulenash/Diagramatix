@@ -30,6 +30,11 @@ declare global {
       // Ids the user has DELETED since the last sync — shown as red "about to be
       // removed" ghosts over the viewer's still-present copy.
       liveDeletes?: string[] | null;
+      // Connector ids the user has deleted since the last sync — red ghost line.
+      liveConnDeletes?: string[] | null;
+      // The committed diagram version this user is on — when it advances, idle
+      // peers auto-align (pull+merge) so one person's Sync aligns the group.
+      syncedVersion?: number;
     };
     UserMeta: { id: string; info: { name: string; color: string } };
   }

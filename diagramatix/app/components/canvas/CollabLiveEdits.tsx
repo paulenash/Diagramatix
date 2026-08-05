@@ -24,13 +24,15 @@ export function CollabLiveEdits({
   elements,
   connectors,
   baselineElements,
+  baselineConnectors,
   broadcast = true,
 }: {
   elements: DiagramElement[];
   connectors: Connector[];
-  // The last SYNCED (committed) element set — used only to detect DELETIONS (an
-  // id that was committed but is gone from my local copy → a red delete ghost).
+  // The last SYNCED (committed) sets — used only to detect DELETIONS (an id that
+  // was committed but is gone from my local copy → a red delete ghost).
   baselineElements: DiagramElement[];
+  baselineConnectors: Connector[];
   broadcast?: boolean;
 }) {
   const updateMyPresence = useUpdateMyPresence();
@@ -39,7 +41,7 @@ export function CollabLiveEdits({
 
   // A Viewer session doesn't broadcast its edits — clear any it had and stop.
   useEffect(() => {
-    if (!broadcast) { updateMyPresence({ liveEdits: null, liveConns: null, liveDeletes: null }); lastSig.current = ""; }
+    if (!broadcast) { updateMyPresence({ liveEdits: null, liveConns: null, liveDeletes: null, liveConnDeletes: null }); lastSig.current = ""; }
   }, [broadcast, updateMyPresence]);
 
   useEffect(() => {
@@ -57,9 +59,16 @@ export function CollabLiveEdits({
       }
       const fullConns: LiveEditConn[] = [];
       for (const c of connectors) {
+        // Only the VISIBLE waypoints — strip the invisible leader points that run
+        // to each element's centre, so the ghost line looks like the real one
+        // (boundary to boundary), not spokes to the middles.
+        const wps = c.waypoints ?? [];
+        const s = c.sourceInvisibleLeader ? 1 : 0;
+        const e = c.targetInvisibleLeader ? Math.max(s + 1, wps.length - 1) : wps.length;
+        const vis = wps.slice(s, e);
         fullConns.push({
           id: c.id,
-          pts: (c.waypoints ?? []).map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })),
+          pts: vis.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })),
           label: c.label ?? "", t: c.type,
           ...(c.labelOffsetX != null ? { lox: Math.round(c.labelOffsetX) } : {}),
           ...(c.labelOffsetY != null ? { loy: Math.round(c.labelOffsetY) } : {}),
@@ -72,21 +81,27 @@ export function CollabLiveEdits({
       for (const b of baselineElements) {
         if (GHOSTABLE.has(b.type) && !liveIds.has(b.id)) { deletes.push(b.id); if (deletes.length >= MAX_LIVE_EDITS) break; }
       }
-      const sig = JSON.stringify(full) + "#" + JSON.stringify(fullConns) + "#" + deletes.join(",");
+      const liveConnIds = new Set(connectors.map((c) => c.id));
+      const connDeletes: string[] = [];
+      for (const b of baselineConnectors) {
+        if (!liveConnIds.has(b.id)) { connDeletes.push(b.id); if (connDeletes.length >= MAX_LIVE_CONNS) break; }
+      }
+      const sig = JSON.stringify(full) + "#" + JSON.stringify(fullConns) + "#" + deletes.join(",") + "#" + connDeletes.join(",");
       if (sig !== lastSig.current) {
         lastSig.current = sig;
         updateMyPresence({
           liveEdits: full.length ? full : null,
           liveConns: fullConns.length ? fullConns : null,
           liveDeletes: deletes.length ? deletes : null,
+          liveConnDeletes: connDeletes.length ? connDeletes : null,
         });
       }
     }, THROTTLE_MS);
     return () => { if (timer.current) clearTimeout(timer.current); };
-  }, [elements, connectors, baselineElements, broadcast, updateMyPresence]);
+  }, [elements, connectors, baselineElements, baselineConnectors, broadcast, updateMyPresence]);
 
   // Clear our live edits when we leave.
-  useEffect(() => () => { updateMyPresence({ liveEdits: null, liveConns: null, liveDeletes: null }); }, [updateMyPresence]);
+  useEffect(() => () => { updateMyPresence({ liveEdits: null, liveConns: null, liveDeletes: null, liveConnDeletes: null }); }, [updateMyPresence]);
 
   return null;
 }
