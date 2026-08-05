@@ -34,6 +34,8 @@ import { PresenceBar } from "@/app/components/canvas/PresenceBar";
 import { usePresence } from "@/app/hooks/usePresence";
 import { CollabRoom } from "@/app/components/canvas/CollabRoom";
 import { CollabSyncSignal } from "@/app/components/canvas/CollabSyncSignal";
+import { CollabFlushOnLeave } from "@/app/components/canvas/CollabFlushOnLeave";
+import { CollabDebug } from "@/app/components/canvas/CollabDebug";
 import { suggestNextSteps, type NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { sizeOf, placeInline, placeGatewayBranch, placeBoundaryEvent, placeAfterBoundaryEvent, boundaryOuterSide, findFreeSlot, HALF_TASK_W, HALF_TASK_H } from "@/app/lib/diagram/assistPlacement";
 import { matchIntent, matchAssistRules, type IntentRow } from "@/app/lib/diagram/intentMatch";
@@ -1236,6 +1238,11 @@ export function DiagramEditor({
   const collabEnabled = !!currentUserId && templateEditState === null && !historyPreviewActive;
   // Phase 2: live cursors only when the server has Liveblocks configured.
   const liveCursors = !!collabRealtime && collabEnabled;
+  // Opt-in diagnostic overlay (SuperAdmin, `localStorage.collab-debug = "1"`).
+  const [collabDebug, setCollabDebug] = useState(false);
+  useEffect(() => {
+    try { setCollabDebug(localStorage.getItem("collab-debug") === "1"); } catch { /* ignore */ }
+  }, []);
   // Active (broadcasts my cursor + live edits) vs Viewer (watch only). Auto-swaps
   // by window focus so two sessions on ONE machine hand the cursor back and forth
   // automatically — the focused window is active, the others become viewers. The
@@ -3894,6 +3901,8 @@ export function DiagramEditor({
   return (
     <CollabRoom diagramId={diagramId} enabled={liveCursors}>
     {liveCursors && <CollabSyncSignal version={committedVersion} onRemoteAdvance={handleAlign} />}
+    {liveCursors && <CollabFlushOnLeave diagramId={diagramId} />}
+    {liveCursors && collabDebug && <CollabDebug localConnectors={data.connectors} />}
     <div
       className={`flex flex-col h-screen ${isImpersonating ? "bg-orange-50" : "bg-white"}`}
       onContextMenu={(e) => {
