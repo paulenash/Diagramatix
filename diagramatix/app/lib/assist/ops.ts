@@ -17,7 +17,7 @@ export type AssistOp =
   | { op: "move"; ref: Ref; direction: "left" | "right" | "up" | "down"; count?: number }
   | { op: "wrapInPool"; label?: string }
   | { op: "addBoundary"; hostRef: Ref; label?: string; eventType?: EventType }
-  | { op: "addPool"; label?: string; poolType?: "black-box" | "white-box"; position?: "above" | "below" }
+  | { op: "addPool"; label?: string; poolType?: "black-box" | "white-box"; position?: "above" | "below"; relativeTo?: Ref }
   | { op: "addLanes"; poolRef: Ref; labels: string[] }
   | { op: "addLaneAt"; poolRef: Ref; label?: string; position: "above" | "below"; refLane: Ref }
   | { op: "addSublanes"; laneRef: Ref; labels: string[] }
@@ -129,6 +129,7 @@ export function validateOp(raw: unknown): AssistOp | null {
       if (isRef(o.label)) op.label = (o.label as string).trim();
       if (o.poolType === "black-box" || o.poolType === "white-box") op.poolType = o.poolType;
       if (o.position === "above" || o.position === "below") op.position = o.position;
+      if (isRef(o.relativeTo)) op.relativeTo = (o.relativeTo as string).trim();
       return op;
     }
     case "addLanes": {

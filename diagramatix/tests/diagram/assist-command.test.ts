@@ -143,6 +143,13 @@ describe("container maintenance — definitive set", () => {
     expect(parseCommand("add a black-box pool above existing pools")).toEqual([{ op: "addPool", poolType: "black-box", position: "above" }]);
     expect(parseCommand("add a black box pool below existing pools")).toEqual([{ op: "addPool", poolType: "black-box", position: "below" }]);
   });
+  it("8b. Add Pool called <name> above|below a NAMED pool (either clause order)", () => {
+    expect(parseCommand("add new pool called Participant above Customer")).toEqual([{ op: "addPool", position: "above", label: "Participant", relativeTo: "Customer" }]);
+    expect(parseCommand("add a pool above Customer called Participant")).toEqual([{ op: "addPool", position: "above", label: "Participant", relativeTo: "Customer" }]);
+    expect(parseCommand("add a black-box pool called Supplier below IT System")).toEqual([{ op: "addPool", poolType: "black-box", position: "below", label: "Supplier", relativeTo: "IT System" }]);
+    // "existing pools" stays a global position (no relativeTo)
+    expect(parseCommand("add a pool called Finance above existing pools")).toEqual([{ op: "addPool", position: "above", label: "Finance" }]);
+  });
   it("9. Swap two lanes", () => {
     expect(parseCommand("swap lane Sales with lane Marketing")).toEqual([{ op: "swapLanes", laneA: "lane Sales", laneB: "lane Marketing" }]);
     expect(parseCommand("swap Sales and Marketing")).toEqual([{ op: "swapLanes", laneA: "Sales", laneB: "Marketing" }]);

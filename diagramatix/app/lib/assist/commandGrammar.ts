@@ -132,12 +132,32 @@ export function parseCommand(utterance: string): AssistOp[] | null {
       return [{ op: "extendPools" }];
     }
 
-    // Create a NEW pool: "add a [black-box|white-box] pool [above|below existing pools] [called X]".
-    mm = raw.match(new RegExp(`^(?:add|insert|create|put|make|new|draw)\\s+(?:a\\s+|an\\s+|the\\s+)?(?:new\\s+|another\\s+|empty\\s+)?(black[- ]?box|white[- ]?box)?\\s*${P}(?:\\s+(above|below|under(?:neath)?|over)\\b.*?)?(?:\\s+called\\s+(.+))?$`, "i"));
+    // Create a NEW pool. The "called <name>" and "above|below <target>" clauses
+    // may come in EITHER order, and <target> may be a NAMED pool ("above
+    // Customer") or the whole stack ("above existing pools").
+    mm = raw.match(new RegExp(`^(?:add|insert|create|put|make|new|draw)\\s+(?:a\\s+|an\\s+|the\\s+)?(?:new\\s+|another\\s+|empty\\s+)?(black[- ]?box|white[- ]?box)?\\s*${P}\\b(.*)$`, "i"));
     if (mm) {
       const poolType = mm[1] ? (/black/i.test(mm[1]) ? "black-box" : "white-box") : undefined;
-      const position = mm[2] ? (/^(?:above|over)/i.test(mm[2]) ? "above" : "below") : undefined;
-      return [{ op: "addPool", ...(poolType ? { poolType } : {}), ...(position ? { position } : {}), ...(mm[3] ? { label: clean(mm[3]) } : {}) }];
+      const rest = mm[2].trim();
+      // position + target (target runs until a following "called …", or to end)
+      const pm = rest.match(/\b(above|below|under(?:neath)?|over)\s+(.+?)(?:\s+called\s+.+)?$/i);
+      let position: "above" | "below" | undefined;
+      let relativeTo: string | undefined;
+      if (pm) {
+        position = /^(?:above|over)/i.test(pm[1]) ? "above" : "below";
+        const tgt = clean(pm[2]);
+        // "existing/all/other pools" (or bare "pools") = the whole stack, not a
+        // specific pool → leave relativeTo unset (position relative to all).
+        if (!/^(?:existing\s+|all\s+|other\s+|the\s+other\s+)?(?:pools?)$/i.test(tgt)) relativeTo = tgt;
+      }
+      // name: "called <name>" up to a following position clause or end
+      const cm = rest.match(/\bcalled\s+(.+?)(?:\s+(?:above|below|under(?:neath)?|over)\b.*)?$/i);
+      const label = cm ? clean(cm[1]) : undefined;
+      // Trailing text we didn't recognise as a name/position clause → not a clean
+      // pool command; let the AI interpret it (matches "add a pool thingy blah").
+      const restRecognised = !rest || /^(?:on\s+the\s+diagram)$/i.test(rest);
+      if (!restRecognised && !label && !position) return null;
+      return [{ op: "addPool", ...(poolType ? { poolType } : {}), ...(position ? { position } : {}), ...(label ? { label } : {}), ...(relativeTo ? { relativeTo } : {}) }];
     }
 
     // Move / nudge a LANE up or down by ½ Task height (default 32px). Must name

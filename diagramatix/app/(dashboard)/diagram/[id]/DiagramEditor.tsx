@@ -2351,8 +2351,17 @@ export function DiagramEditor({
       }
 
       if (op.op === "addPool") {
-        addPool({ label: op.label, poolType: op.poolType, position: op.position });
-        results.push(`added a ${op.poolType === "black-box" ? "black-box " : ""}pool${op.position ? ` ${op.position} existing pools` : ""}`);
+        // "above|below <named pool>" — resolve the anchor pool so we position by it.
+        let relativeToId: string | undefined;
+        if (op.relativeTo) {
+          const r = resolve1(op.relativeTo);
+          if (!("err" in r) && r.type === "pool") relativeToId = r.id;
+          else if (!("err" in r)) { results.push(`${op.relativeTo} isn’t a pool`); anyFail = true; continue; }
+          else { results.push(r.err); anyFail = true; continue; }
+        }
+        addPool({ label: op.label, poolType: op.poolType, position: op.position, relativeToId });
+        const where = relativeToId ? `${op.position ?? "above"} ${op.relativeTo}` : op.position ? `${op.position} existing pools` : "";
+        results.push(`added a ${op.poolType === "black-box" ? "black-box " : ""}pool${op.label ? ` “${op.label}”` : ""}${where ? ` ${where}` : ""}`);
         continue;
       }
 
@@ -4768,8 +4777,9 @@ export function DiagramEditor({
             👻 Assist{assistEnabled ? " ●" : ""}
           </button>
         )}
-        {/* Abracadabra Mode — live voice/typed command editing (BPMN only). */}
-        {!readOnly && diagramType === "bpmn" && (
+        {/* Abracadabra Mode — live voice/typed command editing (BPMN only).
+            SuperAdmin-only for the time being. */}
+        {!readOnly && diagramType === "bpmn" && isActingAdmin && (
           <button
             onClick={() => {
               setAbracadabraOn((prev) => {
@@ -5062,8 +5072,8 @@ export function DiagramEditor({
           onAddSelfTransition={diagramType === "state-machine" ? addSelfTransition : undefined}
         />
 
-        {/* Abracadabra Mode command bar — voice/typed live editing. */}
-        {abracadabraOn && !readOnly && (
+        {/* Abracadabra Mode command bar — voice/typed live editing (SuperAdmin only). */}
+        {abracadabraOn && !readOnly && isActingAdmin && (
           <AbracadabraBar
             listening={abraListening}
             engine={abraEngine}

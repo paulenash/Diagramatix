@@ -434,7 +434,7 @@ export type Action =
   | { type: "SPLIT_POOL_EVEN"; payload: { poolId: string; labels: string[] } }
   | { type: "SPLIT_LANE_EVEN"; payload: { laneId: string; labels: string[] } }
   | { type: "WRAP_IN_POOL"; payload: { label?: string } }
-  | { type: "ADD_POOL"; payload: { label?: string; poolType?: string; position?: "above" | "below" } }
+  | { type: "ADD_POOL"; payload: { label?: string; poolType?: string; position?: "above" | "below"; relativeToId?: string } }
   | { type: "ADD_LANE_AT"; payload: { poolId: string; label?: string; position: "above" | "below"; refLaneId: string } }
   | { type: "COMPRESS_POOL"; payload: { poolId: string } }
   | { type: "EXTEND_POOLS"; payload: Record<string, never> }
@@ -8761,7 +8761,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     // starts black-box; adding a lane later flips it white-box. Position
     // above/below existing pools, else near the current content.
     case "ADD_POOL": {
-      const { label, poolType, position } = action.payload;
+      const { label, poolType, position, relativeToId } = action.payload;
       const poolFs = state.poolFontSize ?? 16;
       // Unique, never-bare pool name (rules: no "Pool", no duplicate of any
       // existing Pool/Lane). Black-box with no name defaults to "Participant".
@@ -8775,8 +8775,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         ? Math.max(...pools.map((p) => p.width))
         : Math.round(getSymbolDefinition("pool").defaultWidth * 0.8);
       const GAP = 40;
+      const anchor = relativeToId ? pools.find((p) => p.id === relativeToId) : undefined;
       let x: number, y: number;
-      if (pools.length > 0) {
+      if (anchor) {
+        // Position directly above / below the NAMED pool ("above Customer").
+        x = anchor.x;
+        y = position === "below"
+          ? anchor.y + anchor.height + GAP
+          : anchor.y - height - GAP;   // default to above when a pool is named
+      } else if (pools.length > 0) {
         x = Math.min(...pools.map((p) => p.x));
         y = position === "above"
           ? Math.min(...pools.map((p) => p.y)) - height - GAP
@@ -9967,9 +9974,9 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "WRAP_IN_POOL", payload: { label } });
   }, []);
 
-  const addPool = useCallback((opts?: { label?: string; poolType?: string; position?: "above" | "below" }) => {
+  const addPool = useCallback((opts?: { label?: string; poolType?: string; position?: "above" | "below"; relativeToId?: string }) => {
     pushHistory(snapshotData());
-    dispatch({ type: "ADD_POOL", payload: { label: opts?.label, poolType: opts?.poolType, position: opts?.position } });
+    dispatch({ type: "ADD_POOL", payload: { label: opts?.label, poolType: opts?.poolType, position: opts?.position, relativeToId: opts?.relativeToId } });
   }, []);
 
   const addLaneAt = useCallback((poolId: string, position: "above" | "below", refLaneId: string, label?: string) => {
