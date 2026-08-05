@@ -5,6 +5,7 @@
  */
 import type { AssistOp } from "./ops";
 import { SYMBOL_SYNONYMS, SYMBOL_PHRASES } from "./ops";
+import { parseRenameType } from "./renameTargets";
 import type { SymbolType, EventType, GatewayType } from "../diagram/types";
 
 const clean = (s: string) => s.trim().replace(/[.,!?;:]+$/g, "").replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
@@ -78,6 +79,15 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   if (m) return [{ op: "rename", ref: clean(m[1]), label: clean(m[2]) }];
   m = raw.match(/^call\s+(.+?)\s+(.+)$/i);
   if (m && !matchSymbol(m[1])) return [{ op: "rename", ref: clean(m[1]), label: clean(m[2]) }];
+
+  // Guided rename: "rename <type>" (a bare element/connector TYPE, no "to <name>")
+  // starts the numbered-badge pick flow. Types: pool · lane/sub-lane · message ·
+  // task · subprocess · gateway/decision · event · connector/sequence.
+  m = raw.match(/^(?:rename|relabel|edit)\s+(?:a\s+|an\s+|the\s+|all\s+)?(pools?|sub-?lanes?|lanes?|messages?|tasks?|activit(?:y|ies)|steps?|subprocess(?:es)?|sub-?process(?:es)?|gateways?|decisions?|events?|connectors?|sequence(?:\s+flows?)?|flows?)\s*$/i);
+  if (m) {
+    const rt = parseRenameType(m[1]);
+    if (rt) return [{ op: "renameByType", itemType: rt }];
+  }
 
   // ── Pool / lane container commands ("poll"/"pull"→pool, "line"→lane) ──
   {

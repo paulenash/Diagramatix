@@ -40,6 +40,7 @@ import { canConnect } from "@/app/lib/diagram/canConnect";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { resolveRef } from "@/app/lib/assist/resolveRef";
 import { validateOps, type AssistOp } from "@/app/lib/assist/ops";
+import { collectRenameTargets, type RenameType, type RenameTarget } from "@/app/lib/assist/renameTargets";
 import { AbracadabraBar, type CommandLogEntry } from "@/app/components/canvas/AbracadabraBar";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
@@ -2156,6 +2157,16 @@ export function DiagramEditor({
   // Remembers the last real command so "again" can repeat it (e.g. nudge again).
   const lastAbraOpsRef = useRef<AssistOp[]>([]);
   const abraDictRef = useRef<DictationHandle | null>(null);
+
+  // ── Guided "rename by number" flow (voice) ──
+  //   pick: green number badges shown; user says a number.
+  //   name: an item is selected/editing; user dictates the new name.
+  type RenameFlow =
+    | { phase: "pick"; itemType: RenameType; targets: RenameTarget[] }
+    | { phase: "name"; targetId: string; kind: "element" | "connector" };
+  const [renameFlow, setRenameFlowState] = useState<RenameFlow | null>(null);
+  const renameFlowRef = useRef<RenameFlow | null>(null);
+  const setRenameFlow = useCallback((f: RenameFlow | null) => { renameFlowRef.current = f; setRenameFlowState(f); }, []);
   const abraStopRequested = useRef(false);
   // Stable ref to the JSON export (a plain function redefined each render) so
   // the memoised apply layer can call it without churning its deps.
@@ -2459,6 +2470,15 @@ export function DiagramEditor({
         continue;
       }
 
+      if (op.op === "renameByType") {
+        const itemType = op.itemType as RenameType;
+        const targets = collectRenameTargets(els, data.connectors, itemType);
+        if (targets.length === 0) { results.push(`there are no ${itemType}s to rename`); anyFail = true; continue; }
+        setRenameFlow({ phase: "pick", itemType, targets });
+        results.push(`pick a ${itemType} by number, then say the new name (or “cancel”)`);
+        continue;
+      }
+
       if (op.op === "rename") {
         // #7 Reliable split. The grammar split "<name> to <new>" at the FIRST
         // " to ", which is wrong when the name (or the new name) itself contains
@@ -2522,12 +2542,62 @@ export function DiagramEditor({
       }
     }
     return { ok: !anyFail, summary: results.join("; ") || "nothing to do" };
-  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, removeSpace]);
+  }, [data.elements, data.connectors, addElementGated, updateProperties, updateLabel, addConnector, deleteConnector, updateConnectorLabel, deleteElement, undo, clearDiagram, setEventBoundary, splitPoolEven, splitLaneEven, wrapInPool, addPool, addLaneAt, compressPool, extendPools, swapLane, moveLane, moveElements, removeSpace, setRenameFlow]);
+
+  // Cancel the guided rename flow and clear any badge/edit state.
+  const cancelRenameFlow = useCallback((reason?: string) => {
+    setRenameFlow(null);
+    cancelLabelEdit();
+    if (reason) setAbraLog((prev) => [...prev, { id: nanoid(), heard: "", summary: reason, ok: true }]);
+  }, [setRenameFlow, cancelLabelEdit]);
+
+  // Apply a dictated name to the picked element or connector.
+  const applyRenameName = useCallback((target: { id: string; kind: "element" | "connector" }, name: string) => {
+    const clean = name.trim().replace(/[.,!?;:]+$/g, "").trim();
+    if (!clean) { cancelRenameFlow("rename cancelled (empty name)"); return; }
+    if (target.kind === "element") updateLabel(target.id, clean);
+    else updateConnectorLabel(target.id, clean);
+    cancelLabelEdit();
+    setRenameFlow(null);
+    setAbraLog((prev) => [...prev, { id: nanoid(), heard: clean, summary: `renamed to “${clean}”`, ok: true }]);
+  }, [updateLabel, updateConnectorLabel, cancelLabelEdit, setRenameFlow, cancelRenameFlow]);
+
+  // Handle one utterance while the guided rename flow is active.
+  const handleRenameUtterance = useCallback((text: string) => {
+    const flow = renameFlowRef.current;
+    if (!flow) return;
+    const t = text.trim();
+    const low = t.toLowerCase().replace(/[.,!?;:]+$/g, "").trim();
+    if (/^(escape|cancel|never ?mind|stop rename|quit|exit|forget it|abort)\b/.test(low)) { cancelRenameFlow("rename cancelled"); return; }
+    if (flow.phase === "pick") {
+      // Leading number (digit or number-word) selects a badge; trailing text is the name.
+      const digits = low.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/g, (m) => String(["zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty"].indexOf(m)));
+      const m = digits.match(/^(?:number\s+|item\s+|the\s+)?(\d+)\b\s*(.*)$/);
+      if (!m) { setAbraLog((prev) => [...prev, { id: nanoid(), heard: t, summary: "say the number of the item to rename", ok: false }]); return; }
+      const n = parseInt(m[1], 10);
+      const target = flow.targets.find((x) => x.n === n);
+      if (!target) { setAbraLog((prev) => [...prev, { id: nanoid(), heard: t, summary: `there’s no number ${n}`, ok: false }]); return; }
+      // Select + enter edit mode (+ zoom for elements) so the change is visible.
+      if (target.kind === "element") { setSelectedConnectorId(null); setSelectedElementIds(new Set([target.id])); beginLabelEdit(target.id); }
+      else { setSelectedElementIds(new Set()); setSelectedConnectorId(target.id); }
+      const trailing = m[2].trim();
+      if (trailing) { applyRenameName(target, trailing); }         // "14 Approve Invoice" in one breath
+      else { setRenameFlow({ phase: "name", targetId: target.id, kind: target.kind }); } // wait for the name
+      return;
+    }
+    // phase "name" — the whole utterance is the new name.
+    applyRenameName({ id: flow.targetId, kind: flow.kind }, t);
+  }, [applyRenameName, cancelRenameFlow, setRenameFlow, beginLabelEdit]);
+  const handleRenameUtteranceRef = useRef(handleRenameUtterance);
+  handleRenameUtteranceRef.current = handleRenameUtterance;
 
   // Interpret a raw command (deterministic first; AI fallback added in Stage 4).
   const runAbraCommand = useCallback(async (text: string) => {
     const heard = text.trim();
     if (!heard) return;
+    // While the guided rename flow is active, every utterance feeds it (a number,
+    // the new name, or "cancel") — never the general command parser.
+    if (renameFlowRef.current) { handleRenameUtteranceRef.current(heard); return; }
     const entryId = nanoid();
     const ops = parseCommand(heard);
     if (ops) {
@@ -2635,6 +2705,14 @@ export function DiagramEditor({
     if (!handle || abraStopRequested.current) { handle?.stop(); abraDictRef.current = null; setAbraListening(false); return; }
     abraDictRef.current = handle;
   }, [abraListening, stopAbraListening, flushAbraBuffer]);
+
+  // Escape cancels the guided rename flow at any phase.
+  useEffect(() => {
+    if (!renameFlow) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") cancelRenameFlow("rename cancelled"); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [renameFlow, cancelRenameFlow]);
 
   // Stop the mic when the mode is turned off or the editor unmounts.
   useEffect(() => {
@@ -4870,6 +4948,7 @@ export function DiagramEditor({
         <Canvas
           data={displayData}
           diagramType={diagramType}
+          renameBadges={renameFlow?.phase === "pick" ? renameFlow.targets : undefined}
           onAddElement={addElementGated}
           onMoveElement={(id, x, y, uc) => { if (!isCoLocked(id)) moveElement(id, x, y, uc); }}
           onResizeElement={(id, x, y, w, h) => { if (!isCoLocked(id)) resizeElement(id, x, y, w, h); }}

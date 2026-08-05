@@ -384,6 +384,9 @@ interface Props {
    *  then the prop is undefined and the lane-header ↑/↓ buttons are
    *  visible but no-op when clicked. */
   onSwapLane?: (laneId: string, direction: "up" | "down") => void;
+  /** Guided "rename by number": green number badges to draw on matching
+   *  elements/connectors while the voice rename-pick flow is active. */
+  renameBadges?: Array<{ n: number; x: number; y: number; height: number; kind: "element" | "connector" }>;
 }
 
 interface EditingLabel {
@@ -622,6 +625,7 @@ export function Canvas({
   onRemoveSpace,
   onAddSelfTransition,
   onSwapLane,
+  renameBadges,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
@@ -6421,6 +6425,24 @@ export function Canvas({
                   <title>Outside any pool — illegal in a saved BPMN diagram. Drag into a pool to clear the warning.</title>
                 </rect>
               ))}
+            </g>
+          )}
+
+          {/* Guided rename — large green number badges on every matching item.
+              Inverse-scaled by zoom so they stay a readable, constant screen size. */}
+          {renameBadges && renameBadges.length > 0 && (
+            <g pointerEvents="none">
+              {renameBadges.map((b) => {
+                const by = b.kind === "element" ? b.y + b.height / 2 + 16 / zoom : b.y; // below elements; on connectors
+                const digits = String(b.n).length;
+                const rw = 20 + digits * 11;
+                return (
+                  <g key={`rename-badge-${b.n}`} transform={`translate(${b.x}, ${by}) scale(${1 / zoom})`}>
+                    <rect x={-rw / 2} y={-13} width={rw} height={26} rx={13} ry={13} fill="#16a34a" stroke="#ffffff" strokeWidth={2} />
+                    <text x={0} y={1} fontSize={17} fontWeight={800} fill="#ffffff" textAnchor="middle" dominantBaseline="middle" fontFamily="sans-serif">{b.n}</text>
+                  </g>
+                );
+              })}
             </g>
           )}
 

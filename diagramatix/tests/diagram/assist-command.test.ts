@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest";
 import { parseCommand } from "@/app/lib/assist/commandGrammar";
 import { resolveRef } from "@/app/lib/assist/resolveRef";
 import { validateOps } from "@/app/lib/assist/ops";
+import { collectRenameTargets } from "@/app/lib/assist/renameTargets";
 import type { DiagramElement } from "@/app/lib/diagram/types";
 
 const el = (id: string, type: string, label = "", extra: Record<string, unknown> = {}): DiagramElement =>
@@ -265,6 +266,47 @@ describe("parseCommand — clear / export", () => {
     expect(parseCommand("export diagram to json")).toEqual([{ op: "export", format: "json" }]);
     expect(parseCommand("download as JSON")).toEqual([{ op: "export", format: "json" }]);
     expect(parseCommand("export the diagram")).toEqual([{ op: "export", format: "json" }]);
+  });
+});
+
+describe("guided rename (rename by type → numbered badges)", () => {
+  it("parses 'rename <type>' into a renameByType op", () => {
+    expect(parseCommand("rename task")).toEqual([{ op: "renameByType", itemType: "task" }]);
+    expect(parseCommand("rename the pools")).toEqual([{ op: "renameByType", itemType: "pool" }]);
+    expect(parseCommand("rename sub-lanes")).toEqual([{ op: "renameByType", itemType: "lane" }]);
+    expect(parseCommand("rename gateway")).toEqual([{ op: "renameByType", itemType: "gateway" }]);
+    expect(parseCommand("rename decisions")).toEqual([{ op: "renameByType", itemType: "gateway" }]);
+    expect(parseCommand("rename events")).toEqual([{ op: "renameByType", itemType: "event" }]);
+    expect(parseCommand("rename connectors")).toEqual([{ op: "renameByType", itemType: "connector" }]);
+    expect(parseCommand("rename messages")).toEqual([{ op: "renameByType", itemType: "message" }]);
+    expect(parseCommand("rename subprocess")).toEqual([{ op: "renameByType", itemType: "subprocess" }]);
+  });
+  it("still parses a direct 'rename <name> to <new>' as a normal rename", () => {
+    expect(parseCommand("rename Task 1 to Approve")).toEqual([{ op: "rename", ref: "Task 1", label: "Approve" }]);
+    // a type word WITH a target is a normal rename, not the guided flow
+    expect(parseCommand("rename task to Approve")).toEqual([{ op: "rename", ref: "task", label: "Approve" }]);
+  });
+});
+
+describe("collectRenameTargets", () => {
+  it("numbers matching elements in reading order (rows top-down, left-right)", () => {
+    const els = [
+      el("a", "task", "A", { x: 300, y: 0, width: 100, height: 60 }),
+      el("b", "task", "B", { x: 0, y: 0, width: 100, height: 60 }),
+      el("c", "task", "C", { x: 0, y: 200, width: 100, height: 60 }),
+      el("g", "gateway", "G", { x: 0, y: 400, width: 40, height: 40 }),
+    ];
+    const t = collectRenameTargets(els, [], "task");
+    expect(t.map((x) => [x.id, x.n])).toEqual([["b", 1], ["a", 2], ["c", 3]]); // gateway excluded
+  });
+  it("event type includes start/intermediate/end", () => {
+    const els = [
+      el("s", "start-event", "", { x: 0, y: 0, width: 36, height: 36 }),
+      el("i", "intermediate-event", "", { x: 100, y: 0, width: 36, height: 36 }),
+      el("e", "end-event", "", { x: 200, y: 0, width: 36, height: 36 }),
+      el("t", "task", "T"),
+    ];
+    expect(collectRenameTargets(els, [], "event").map((x) => x.id)).toEqual(["s", "i", "e"]);
   });
 });
 

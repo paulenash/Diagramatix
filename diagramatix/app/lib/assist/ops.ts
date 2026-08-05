@@ -13,6 +13,7 @@ export type AssistOp =
   | { op: "disconnect"; fromRef: Ref; toRef: Ref }
   | { op: "delete"; ref: Ref; compact?: boolean }
   | { op: "rename"; ref: Ref; label: string }
+  | { op: "renameByType"; itemType: string }
   | { op: "move"; ref: Ref; direction: "left" | "right" | "up" | "down"; count?: number }
   | { op: "wrapInPool"; label?: string }
   | { op: "addBoundary"; hostRef: Ref; label?: string; eventType?: EventType }
@@ -106,6 +107,8 @@ export function validateOp(raw: unknown): AssistOp | null {
       return isRef(o.ref) ? { op: "delete", ref: (o.ref as string).trim(), ...(o.compact ? { compact: true } : {}) } : null;
     case "rename":
       return isRef(o.ref) && isRef(o.label) ? { op: "rename", ref: (o.ref as string).trim(), label: (o.label as string).trim() } : null;
+    case "renameByType":
+      return isRef(o.itemType) ? { op: "renameByType", itemType: (o.itemType as string).trim() } : null;
     case "move": {
       const dir = ["left", "right", "up", "down"].includes(o.direction as string) ? o.direction as "left" | "right" | "up" | "down" : null;
       if (!isRef(o.ref) || !dir) return null;
