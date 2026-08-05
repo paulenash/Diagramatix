@@ -10,9 +10,19 @@
  * so the global augmentation below is in the compilation graph.
  */
 
+/** One element the user is currently editing, broadcast so others see it live
+ *  (Approach A: live preview over presence; the authoritative merge is still on
+ *  save). Kept compact — id, position, size, label, type. */
+export type LiveEditEl = { id: string; x: number; y: number; w: number; h: number; label: string; t: string };
+
 declare global {
   interface Liveblocks {
-    Presence: { cursor: { x: number; y: number } | null };
+    Presence: {
+      cursor: { x: number; y: number } | null;
+      // Elements this user has changed vs the loaded diagram (their in-progress
+      // edits), rendered as ghosts on everyone else's canvas. Null when idle.
+      liveEdits?: LiveEditEl[] | null;
+    };
     UserMeta: { id: string; info: { name: string; color: string } };
   }
 }
