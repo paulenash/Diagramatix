@@ -1063,6 +1063,8 @@ export function DiagramEditor({
     setValueChainFontSize,
     setDescriptionFontSize,
     setDatabase,
+    setDiagramPurpose,
+    setDiagramDescription,
     setRelaxedLayout,
     setShowPainPoints,
     setShowPainPointDescriptions,
@@ -5507,6 +5509,10 @@ export function DiagramEditor({
             diagramTitle={data.title}
             database={data.database}
             onSetDatabase={diagramType === "domain" && isAdmin && !superAdminHidden ? setDatabase : undefined}
+            purpose={data.purpose}
+            description={data.description}
+            onSetPurpose={setDiagramPurpose}
+            onSetDescription={setDiagramDescription}
             relaxedLayout={data.relaxedLayout}
             onSetRelaxedLayout={diagramType === "bpmn" ? setRelaxedLayout : undefined}
             painPoints={data.elements.filter(e => e.type === "uml-pain-point")}

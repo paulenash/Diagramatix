@@ -158,6 +158,11 @@ interface Props {
   onConvertEventType?: (id: string, newEventType: "start-event" | "intermediate-event" | "end-event") => void;
   database?: string;
   onSetDatabase?: (db: string) => void;
+  /** Diagram Details — Purpose (short) + Description (longer). All diagram types. */
+  purpose?: string;
+  description?: string;
+  onSetPurpose?: (v: string) => void;
+  onSetDescription?: (v: string) => void;
   /** BPMN "free-form / imported layout" — when set, pools may sit anywhere at
    *  any size and message flows may be rectilinear between non-aligned
    *  elements, with the geometry validation rules suppressed. */
@@ -808,6 +813,10 @@ export function PropertiesPanel({
   onConvertEventType,
   database,
   onSetDatabase,
+  purpose,
+  description,
+  onSetPurpose,
+  onSetDescription,
   relaxedLayout,
   onSetRelaxedLayout,
   painPoints,
@@ -892,12 +901,21 @@ export function PropertiesPanel({
   // collapses independently so the user can fold away parts they don't
   // care about. Defaults: title open, database/process-owner open,
   // bubble-help admin section closed (it's verbose).
+  // Each section starts COLLAPSED unless it already has content — and because
+  // this state resets on remount, a section the user manually collapses reverts
+  // to this rule the next time the panel is shown (item 6). Title always has a
+  // name so it stays open.
   const [titleSubOpen, setTitleSubOpen] = useState(true);
-  const [databaseSubOpen, setDatabaseSubOpen] = useState(true);
-  const [diagramOwnerSubOpen, setDiagramOwnerSubOpen] = useState(true);
-  const [processOwnerSubOpen, setProcessOwnerSubOpen] = useState(true);
-  const [procedureDocSubOpen, setProcedureDocSubOpen] = useState(true);
-  const [pcfSubOpen, setPcfSubOpen] = useState(true);
+  const [detailsSubOpen, setDetailsSubOpen] = useState(!!(purpose || description));
+  const [databaseSubOpen, setDatabaseSubOpen] = useState(!!database);
+  const [diagramOwnerSubOpen, setDiagramOwnerSubOpen] = useState(!!diagramOwner);
+  const [processOwnerSubOpen, setProcessOwnerSubOpen] = useState(!!(processOwner?.name || processOwner?.email));
+  const [procedureDocSubOpen, setProcedureDocSubOpen] = useState(!!procedureDoc?.url);
+  const [pcfSubOpen, setPcfSubOpen] = useState(!!pcf);
+  // Data-driven marker sections (only render when populated → open).
+  const [painPointsOpen, setPainPointsOpen] = useState(true);
+  const [issuesOpen, setIssuesOpen] = useState(true);
+  const [reviewCommentsOpen, setReviewCommentsOpen] = useState(true);
 
 
   // Confirm-and-delete modal for switching black-box (with messages) → white-box.
@@ -978,7 +996,7 @@ export function PropertiesPanel({
       <button onClick={onToggle}
         className={`w-full flex items-center justify-between py-0.5 border-b border-gray-200 mb-1${reserveRight ? " pr-6" : ""}`}>
         <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{label}</span>
-        <span className="text-gray-400 text-[10px]">{open ? "\u25BC" : "\u25B6"}</span>
+        <span className="text-gray-600 text-[20px] leading-none">{open ? "\u25BC" : "\u25B6"}</span>
       </button>
     );
   }
@@ -989,12 +1007,12 @@ export function PropertiesPanel({
 
   // Sub-section header inside DIAGRAM PROPERTIES. Smaller + italic
   // than the top-level SectionHeader.
-  function SubHeader({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
+  function SubHeader({ label, open, onToggle, labelClassName }: { label: string; open: boolean; onToggle: () => void; labelClassName?: string }) {
     return (
       <button onClick={onToggle}
         className="w-full flex items-center justify-between mt-1 mb-0.5">
-        <span className="text-[9px] italic font-semibold text-gray-600">{label}</span>
-        <span className="text-gray-400 text-[9px]">{open ? "▾" : "▸"}</span>
+        <span className={labelClassName ?? "text-[9px] italic font-semibold text-gray-600"}>{label}</span>
+        <span className="text-gray-600 text-[18px] leading-none">{open ? "▾" : "▸"}</span>
       </button>
     );
   }
@@ -1129,6 +1147,33 @@ export function PropertiesPanel({
         </div>
         </>)}
 
+        {/* Diagram Details \u2014 Purpose (2 lines) + Description (5 lines). All types. */}
+        {onSetPurpose && (<>
+          <SubHeader label="Diagram Details" open={detailsSubOpen} onToggle={() => setDetailsSubOpen(o => !o)} />
+          {detailsSubOpen && (
+            <div className="mb-0.5">
+              <label className="block text-[9px] text-gray-500 mb-0.5">Purpose</label>
+              <textarea
+                key={`diag-purpose-${diagramName}`}
+                defaultValue={purpose ?? ""}
+                onBlur={(e) => onSetPurpose(e.target.value)}
+                rows={2}
+                placeholder="What this diagram is for\u2026"
+                className="w-full text-[9px] border border-gray-300 rounded px-1 py-0.5 resize-none overflow-auto focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <label className="block text-[9px] text-gray-500 mb-0.5 mt-1">Description</label>
+              <textarea
+                key={`diag-desc-${diagramName}`}
+                defaultValue={description ?? ""}
+                onBlur={(e) => onSetDescription?.(e.target.value)}
+                rows={5}
+                placeholder="A fuller description\u2026"
+                className="w-full text-[9px] border border-gray-300 rounded px-1 py-0.5 resize-none overflow-auto focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+          )}
+        </>)}
+
         {/* Database sub-section \u2014 Domain diagrams only. */}
         {onSetDatabase && (<>
           <SubHeader label="Database" open={databaseSubOpen} onToggle={() => setDatabaseSubOpen(o => !o)} />
@@ -1168,7 +1213,8 @@ export function PropertiesPanel({
             (issues #3b/#3d/#3g). Shown for any diagram type that has pain points. */}
         {painPoints && painPoints.length > 0 && (
           <div className="mt-1 mb-1">
-            <div className="text-[9px] font-semibold text-gray-500 mb-0.5">Pain Points</div>
+            <SubHeader label="Pain Points" open={painPointsOpen} onToggle={() => setPainPointsOpen(o => !o)} labelClassName="text-[9px] font-semibold text-red-800" />
+            {painPointsOpen && (<>
             {/* Master toggle — when off, icons + descriptions are hidden on the
                 diagram and the description sub-toggle disappears (issue #4). */}
             {onSetShowPainPoints && (
@@ -1204,12 +1250,13 @@ export function PropertiesPanel({
                     {/* Delete this pain point (the rest renumber) — issue #2. */}
                     <button
                       onClick={() => onDeleteElement(pp.id)}
-                      className="text-gray-400 hover:text-red-600 text-xs leading-none mt-0.5 shrink-0"
+                      className="text-red-600 hover:text-red-700 text-xs leading-none mt-0.5 shrink-0 mr-2.5"
                       title="Delete this pain point"
                     >×</button>
                   </div>
                 ))}
             </div>
+            </>)}
           </div>
         )}
 
@@ -1217,7 +1264,8 @@ export function PropertiesPanel({
             shown for any diagram type that has issues. */}
         {issues && issues.length > 0 && (
           <div className="mt-1 mb-1">
-            <div className="text-[9px] font-semibold text-green-800 mb-0.5">Issues</div>
+            <SubHeader label="Issues" open={issuesOpen} onToggle={() => setIssuesOpen(o => !o)} labelClassName="text-[9px] font-semibold text-green-800" />
+            {issuesOpen && (<>
             {onSetShowIssues && (
               <label className="flex items-start gap-1.5 mb-1 cursor-pointer select-none" title="Show issue icons on the diagram">
                 <input type="checkbox" className="mt-[2px] cursor-pointer"
@@ -1250,27 +1298,29 @@ export function PropertiesPanel({
                     />
                     <button
                       onClick={() => onDeleteElement(iss.id)}
-                      className="text-gray-400 hover:text-red-600 text-xs leading-none mt-0.5 shrink-0"
+                      className="text-red-600 hover:text-red-700 text-xs leading-none mt-0.5 shrink-0 mr-2.5"
                       title="Delete this issue"
                     >×</button>
                   </div>
                 ))}
             </div>
+            </>)}
           </div>
         )}
 
-        {/* Review markers — the pink author-review stickies. A diagram-level
+        {/* Review Comments — the pink author-review stickies. A diagram-level
             Display toggle mirrors Pain Points / Issues; the notes themselves are
             added from the palette and their text is edited inline on canvas. */}
         {reviewComments && reviewComments.length > 0 && (
           <div className="mt-1 mb-1">
-            <div className="text-[9px] font-semibold text-pink-700 mb-0.5">Review Markers</div>
+            <SubHeader label="Review Comments" open={reviewCommentsOpen} onToggle={() => setReviewCommentsOpen(o => !o)} labelClassName="text-[9px] font-semibold text-pink-400" />
+            {reviewCommentsOpen && (<>
             {onSetShowReviewComments && (
               <label className="flex items-start gap-1.5 mb-1 cursor-pointer select-none" title="Show the pink review notes (and their tether links) on the diagram">
                 <input type="checkbox" className="mt-[2px] cursor-pointer"
                   checked={showReviewComments !== false}
                   onChange={e => onSetShowReviewComments(e.target.checked)} />
-                <span className="text-[9px] text-gray-600 leading-tight">Display Review markers</span>
+                <span className="text-[9px] text-gray-600 leading-tight">Display Review Comments</span>
               </label>
             )}
             <div className="space-y-1">
@@ -1282,12 +1332,13 @@ export function PropertiesPanel({
                   </span>
                   <button
                     onClick={() => onDeleteElement(rc.id)}
-                    className="text-gray-400 hover:text-red-600 text-xs leading-none mt-0.5 shrink-0"
-                    title="Delete this review marker"
+                    className="text-red-600 hover:text-red-700 text-xs leading-none mt-0.5 shrink-0 mr-2.5"
+                    title="Delete this review comment"
                   >×</button>
                 </div>
               ))}
             </div>
+            </>)}
           </div>
         )}
 

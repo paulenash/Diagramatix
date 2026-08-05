@@ -359,6 +359,11 @@ export interface DiagramData {
    *  stickies (and their tether links) on the canvas. Absent/true = shown;
    *  explicit false = hidden. Toggleable in Diagram Properties. */
   showReviewComments?: boolean;
+  /** Diagram Details — a short free-text Purpose (≈2 lines) and a longer
+   *  Description (≈5 lines). Edited in the "Diagram Details" section of the
+   *  Diagram Properties panel (all diagram types). Absent = not yet set. */
+  purpose?: string;
+  description?: string;
   /** Diagram-level list of all parent diagrams that currently link TO
    *  this diagram (managed by the project-wide "Scan Diagrams for Links"
    *  feature). A diagram can be linked from many parents — every one of

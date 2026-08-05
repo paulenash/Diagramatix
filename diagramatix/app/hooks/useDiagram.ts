@@ -407,6 +407,8 @@ export type Action =
   | { type: "SET_VALUE_CHAIN_FONT_SIZE"; payload: number }
   | { type: "SET_DESCRIPTION_FONT_SIZE"; payload: number }
   | { type: "SET_DATABASE"; payload: string }
+  | { type: "SET_DIAGRAM_PURPOSE"; payload: string }
+  | { type: "SET_DIAGRAM_DESCRIPTION"; payload: string }
   | { type: "SET_RELAXED_LAYOUT"; payload: boolean }
   | { type: "SET_SHOW_PAIN_POINTS"; payload: boolean }
   | { type: "SET_SHOW_PAIN_POINT_DESC"; payload: boolean }
@@ -7588,6 +7590,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "SET_DATABASE":
       return { ...state, database: action.payload || undefined };
 
+    case "SET_DIAGRAM_PURPOSE":
+      return { ...state, purpose: action.payload || undefined };
+
+    case "SET_DIAGRAM_DESCRIPTION":
+      return { ...state, description: action.payload || undefined };
+
     case "SET_RELAXED_LAYOUT":
       return { ...state, relaxedLayout: action.payload || undefined };
 
@@ -10148,6 +10156,18 @@ export function useDiagram(initialData: DiagramData) {
       (db: string) => {
         invalidateRedo();
         dispatch({ type: "SET_DATABASE", payload: db });
+      }, []
+    ),
+    setDiagramPurpose: useCallback(
+      (v: string) => {
+        invalidateRedo();
+        dispatch({ type: "SET_DIAGRAM_PURPOSE", payload: v });
+      }, []
+    ),
+    setDiagramDescription: useCallback(
+      (v: string) => {
+        invalidateRedo();
+        dispatch({ type: "SET_DIAGRAM_DESCRIPTION", payload: v });
       }, []
     ),
     setRelaxedLayout: useCallback(
