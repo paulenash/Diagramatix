@@ -357,7 +357,28 @@ function useAutoSave(
     return () => clearTimeout(t);
   }, [data, disabled, delay, saveNow, conflict, manualSyncRef]);
 
-  return { saveStatus, lastSavedAt, saveNow, syncNow, pullMerge, conflict, acceptMerge, syncedData, committedVersion };
+  /** Discard my un-synced local edits and load the last COMMITTED diagram fresh
+   *  (safeguard: bail out of a dirty/stale local session). Returns the server doc
+   *  for the caller to setData. */
+  const revertToSaved = useCallback(async (): Promise<DiagramData | null> => {
+    setSaveStatus("saving");
+    try {
+      const getRes = await fetch(`/api/diagrams/${diagramId}`, { cache: "no-store" });
+      if (!getRes.ok) { setSaveStatus("unsaved"); return null; }
+      const server = await getRes.json().catch(() => null);
+      const theirs = (server?.data ?? { elements: [], connectors: [] }) as DiagramData;
+      const theirVersion = typeof server?.version === "number" ? server.version : versionRef.current;
+      versionRef.current = theirVersion;
+      lastSaved.current = JSON.stringify(theirs);
+      setSyncedData(theirs);
+      setCommittedVersion(theirVersion);
+      setLastSavedAt(new Date().toISOString());
+      setSaveStatus("saved");
+      return theirs;
+    } catch { setSaveStatus("unsaved"); return null; }
+  }, [diagramId]);
+
+  return { saveStatus, lastSavedAt, saveNow, syncNow, pullMerge, revertToSaved, conflict, acceptMerge, syncedData, committedVersion };
 }
 
 function exportSvg(svgEl: SVGSVGElement, name: string) {
@@ -1125,12 +1146,20 @@ export function DiagramEditor({
   // Manual-Sync (co-authoring) is decided below once presence is known; the ref
   // lets useAutoSave read it without a hook-ordering problem.
   const manualSyncRef = useRef(false);
-  const { saveStatus, lastSavedAt, saveNow, syncNow, pullMerge, conflict, acceptMerge, syncedData, committedVersion } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly || historyPreviewActive, dataVersion, manualSyncRef);
+  const { saveStatus, lastSavedAt, saveNow, syncNow, pullMerge, revertToSaved, conflict, acceptMerge, syncedData, committedVersion } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly || historyPreviewActive, dataVersion, manualSyncRef);
   // Sync button: pull everyone's committed changes, merge in ours, apply locally.
   const handleSync = useCallback(async () => {
     const merged = await syncNow();
     if (merged) setData(merged);
   }, [syncNow, setData]);
+  // Revert: discard my un-synced local edits and reload the committed diagram.
+  const [revertArmed, setRevertArmed] = useState(false);
+  const handleRevert = useCallback(async () => {
+    const s = await revertToSaved();
+    if (s) setData(s);
+    setRevertArmed(false);
+  }, [revertToSaved, setData]);
+  const didFreshLoad = useRef(false);
   // Auto-align: a peer advanced the committed version → pull+merge (no push), so
   // one person's Sync brings the whole group into alignment.
   const handleAlign = useCallback(async () => {
@@ -1234,6 +1263,14 @@ export function DiagramEditor({
   // Others present → MANUAL Sync mode (autosave off, push+pull on the button).
   const othersPresent = presenceRoster.some((m) => !m.isSelf);
   manualSyncRef.current = collabEnabled && othersPresent;
+
+  // Reload-fresh on entry: once co-authoring is live, re-fetch the committed
+  // diagram so a session never starts from stale / un-synced local state.
+  useEffect(() => {
+    if (!collabEnabled || readOnly || didFreshLoad.current) return;
+    didFreshLoad.current = true;
+    void (async () => { const s = await revertToSaved(); if (s) setData(s); })();
+  }, [collabEnabled, readOnly, revertToSaved, setData]);
 
   // Soft lock: an element another editor is holding is not editable by us.
   const isCoLocked = useCallback((id: string) => !!presenceLocks[id], [presenceLocks]);
@@ -4112,6 +4149,20 @@ export function DiagramEditor({
           >
             <span aria-hidden>{saveStatus === "saving" ? "⟳" : "⇄"}</span>
             {saveStatus === "saving" ? "Syncing…" : saveStatus === "unsaved" ? "Sync" : "Sync"}
+          </button>
+        )}
+
+        {/* Revert — discard my un-synced local edits and reload the committed
+            diagram (two-click confirm). A clean bail-out of a dirty session. */}
+        {collabEnabled && othersPresent && !readOnly && (
+          <button
+            onClick={() => { if (revertArmed) void handleRevert(); else { setRevertArmed(true); setTimeout(() => setRevertArmed(false), 3000); } }}
+            title="Discard your un-synced local edits and reload the last saved diagram"
+            className={`px-2 py-0.5 text-[11px] rounded border inline-flex items-center gap-1 ${
+              revertArmed ? "text-white bg-red-600 border-red-700" : "text-gray-600 border-gray-300 hover:bg-gray-50"
+            }`}
+          >
+            <span aria-hidden>↺</span>{revertArmed ? "Discard my edits?" : "Revert"}
           </button>
         )}
 
