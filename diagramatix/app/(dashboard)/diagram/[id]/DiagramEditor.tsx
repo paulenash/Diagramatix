@@ -1533,6 +1533,24 @@ export function DiagramEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [addElement, addConnector, currentUserName, userEmail]
   );
+  // Author drops a Review Comment from the palette — stamp the bold header
+  // (name + timestamp, item 10) and auto-tether it to the element under the drop.
+  const handleAddAuthorReviewComment = useCallback(
+    (worldPos: { x: number; y: number }, targetElementId: string | null) => {
+      const commentId = nanoid();
+      addElementGated("review-comment", worldPos, undefined, undefined, commentId, {
+        label: "",
+        width: REVIEW_COMMENT_W,
+        height: REVIEW_COMMENT_H,
+        properties: { authorName: currentUserName ?? userEmail ?? "", createdStamp: fmtReviewStamp(new Date()) },
+      });
+      if (targetElementId) {
+        addConnector(commentId, targetElementId, "review-comment-link", "directed", "direct", "left", "right", undefined, undefined, true);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [addConnector, currentUserName, userEmail]
+  );
   // Post every non-empty pink note as feedback (body = note text, anchored to
   // its tethered element), then clear the sent notes from the local canvas.
   const handleSendFeedback = useCallback(async () => {
@@ -5333,7 +5351,7 @@ export function DiagramEditor({
             if (feedbackMode && !isFeedbackNote(sourceId) && !isFeedbackNote(targetId)) return;
             handleAddConnector(sourceId, targetId, type, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force, initialLabel);
           }}
-          onAddReviewComment={reviewMode ? handleAddReviewComment : feedbackMode ? handleAddFeedbackComment : undefined}
+          onAddReviewComment={reviewMode ? handleAddReviewComment : feedbackMode ? handleAddFeedbackComment : !readOnly ? handleAddAuthorReviewComment : undefined}
           onToggleReviewCollapse={readOnly && !feedbackMode ? undefined : toggleReviewCollapse}
           onBringReviewToFront={readOnly && !feedbackMode ? undefined : bringReviewToFront}
           onDeleteConnector={(id) => {
