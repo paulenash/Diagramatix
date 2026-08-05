@@ -3973,6 +3973,26 @@ export function DiagramEditor({
         {/* Co-authoring presence — who else is in this diagram right now. */}
         {collabEnabled && <PresenceBar members={presenceRoster} />}
 
+        {/* Co-authoring Sync — merge our changes with everyone else's and save.
+            Shown only in co-authoring mode while changes are outstanding. */}
+        {collabEnabled && !readOnly && (
+          <button
+            onClick={saveNow}
+            disabled={saveStatus !== "unsaved"}
+            title={saveStatus === "unsaved"
+              ? "Sync — merge your changes with the others' and save now"
+              : "Everyone is in sync"}
+            className={`px-2 py-0.5 text-[11px] rounded border inline-flex items-center gap-1 ${
+              saveStatus === "unsaved"
+                ? "text-white bg-blue-600 border-blue-700 hover:bg-blue-700"
+                : "text-gray-400 border-gray-200 bg-gray-50 cursor-default"
+            }`}
+          >
+            <span aria-hidden>{saveStatus === "saving" ? "⟳" : "⇄"}</span>
+            {saveStatus === "saving" ? "Syncing…" : saveStatus === "unsaved" ? "Sync" : "Synced"}
+          </button>
+        )}
+
         {!readOnly && (
           <>
             <button

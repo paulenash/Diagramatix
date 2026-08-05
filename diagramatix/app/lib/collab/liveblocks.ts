@@ -14,6 +14,8 @@
  *  (Approach A: live preview over presence; the authoritative merge is still on
  *  save). Kept compact — id, position, size, label, type. */
 export type LiveEditEl = { id: string; x: number; y: number; w: number; h: number; label: string; t: string };
+/** One connector the user is currently editing, broadcast for the ghost preview. */
+export type LiveEditConn = { id: string; pts: Array<{ x: number; y: number }>; label: string; t: string };
 
 declare global {
   interface Liveblocks {
@@ -22,6 +24,8 @@ declare global {
       // Elements this user has changed vs the loaded diagram (their in-progress
       // edits), rendered as ghosts on everyone else's canvas. Null when idle.
       liveEdits?: LiveEditEl[] | null;
+      // Connectors the user has changed (added / rerouted / relabelled), ghosted too.
+      liveConns?: LiveEditConn[] | null;
     };
     UserMeta: { id: string; info: { name: string; color: string } };
   }
