@@ -88,12 +88,14 @@ export function CollabGhosts({
             {/* Ghost CONNECTORS (#3) — dashed polyline through their waypoints */}
             {(conns ?? []).map((c) => {
               const local = localConnById.get(c.id);
-              // If I already HAVE this connector (same id) with the same label and
-              // label offset, it's mine — no ghost. We deliberately DON'T compare
-              // the path: connectors are re-routed per client, so a geometry
-              // compare flip-flops (ghost gone after Sync, back on any click).
-              const g = (n: number | undefined) => Math.round((n ?? 0) / 4) * 4;
-              if (local && (local.label ?? "") === (c.label ?? "") && g(local.labelOffsetX) === g(c.lox) && g(local.labelOffsetY) === g(c.loy)) return null;
+              // If I already HAVE this connector (same id) with the same label
+              // TEXT, it's mine — no ghost. We deliberately compare neither the
+              // path NOR the label offset: both are recomputed per client, so
+              // including them makes the SAME connector flip-flop as a ghost
+              // forever (it alternates screen to screen on any activity). Only a
+              // genuine rename (different label text) or a brand-new connector
+              // ghosts; label MOVES don't preview, which is the right trade.
+              if (local && (local.label ?? "") === (c.label ?? "")) return null;
               if (c.pts.length < 2) return null;
               const d = c.pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
               const mid = c.pts[Math.floor(c.pts.length / 2)];
