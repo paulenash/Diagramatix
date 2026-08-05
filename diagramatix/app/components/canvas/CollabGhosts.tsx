@@ -36,11 +36,31 @@ export function CollabGhosts({
       {others.map(({ connectionId, presence, info }) => {
         const edits = presence.liveEdits;
         const conns = presence.liveConns;
-        if ((!edits || edits.length === 0) && (!conns || conns.length === 0)) return null;
+        const deletes = presence.liveDeletes;
+        if ((!edits || edits.length === 0) && (!conns || conns.length === 0) && (!deletes || deletes.length === 0)) return null;
         const color = info?.color ?? "#2563eb";
         const name = info?.name ?? "Editor";
         return (
           <g key={`ghosts-${connectionId}`} style={{ pointerEvents: "none" }}>
+            {/* Ghost DELETIONS — red dashed outline + ✕ over my still-present copy. */}
+            {(deletes ?? []).map((id) => {
+              const el = localById.get(id);
+              if (!el) return null; // already gone for me
+              return (
+                <g key={`${connectionId}-del-${id}`} transform={`translate(${el.x}, ${el.y})`}>
+                  <rect x={0} y={0} width={el.width} height={el.height} rx={4}
+                    fill="#ef4444" fillOpacity={0.10} stroke="#ef4444" strokeOpacity={0.9}
+                    strokeWidth={1.6 * inv} strokeDasharray={`${6 * inv} ${3 * inv}`} />
+                  <line x1={el.width / 2 - 7 * inv} y1={el.height / 2 - 7 * inv} x2={el.width / 2 + 7 * inv} y2={el.height / 2 + 7 * inv} stroke="#ef4444" strokeWidth={2 * inv} />
+                  <line x1={el.width / 2 + 7 * inv} y1={el.height / 2 - 7 * inv} x2={el.width / 2 - 7 * inv} y2={el.height / 2 + 7 * inv} stroke="#ef4444" strokeWidth={2 * inv} />
+                  <g transform={`translate(0, ${-4 * inv}) scale(${inv})`}>
+                    <rect x={0} y={-13} width={name.length * 5.6 + 26} height={13} rx={6} fill="#ef4444" />
+                    <text x={5} y={-3} fontSize={9} fill="#ffffff" fontWeight={600}>{name} ✕</text>
+                  </g>
+                </g>
+              );
+            })}
+
             {/* Ghost CONNECTORS (#3) — dashed polyline through their waypoints */}
             {(conns ?? []).map((c) => {
               const local = localConnById.get(c.id);

@@ -27,6 +27,9 @@ declare global {
       liveEdits?: LiveEditEl[] | null;
       // Connectors the user has changed (added / rerouted / relabelled), ghosted too.
       liveConns?: LiveEditConn[] | null;
+      // Ids the user has DELETED since the last sync — shown as red "about to be
+      // removed" ghosts over the viewer's still-present copy.
+      liveDeletes?: string[] | null;
     };
     UserMeta: { id: string; info: { name: string; color: string } };
   }

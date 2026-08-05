@@ -281,6 +281,9 @@ interface Props {
   /** Whether THIS session broadcasts its cursor + live edits (Active) or just
    *  watches (Viewer). Auto-swaps by window focus for same-machine testing. */
   collabBroadcast?: boolean;
+  /** The last SYNCED document — the baseline the live-edit ghosts diff against
+   *  (so ghosts clear after a Sync). Falls back to the current data. */
+  collabBaseline?: DiagramData;
   /** Tier-1 assist: next-step ghost suggestions for the selected element. */
   nextStep?: { source: DiagramElement; candidates: NextStepCandidate[] };
   onAcceptNextStep?: (c: NextStepCandidate) => void;
@@ -571,6 +574,7 @@ export function Canvas({
   coEditLocks,
   collabCursors,
   collabBroadcast = true,
+  collabBaseline,
   nextStep,
   onAcceptNextStep,
   pcHighlightEnabled = true,
@@ -6347,7 +6351,7 @@ export function Canvas({
               edits and render everyone else's as ghosts, in the world group. */}
           {collabCursors && (
             <>
-              <CollabLiveEdits elements={data.elements} connectors={data.connectors} broadcast={collabBroadcast} />
+              <CollabLiveEdits elements={data.elements} connectors={data.connectors} baselineElements={collabBaseline?.elements ?? data.elements} broadcast={collabBroadcast} />
               <CollabGhosts localElements={data.elements} localConnectors={data.connectors} zoom={zoom} />
             </>
           )}

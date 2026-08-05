@@ -189,15 +189,22 @@ function useAutoSave(
   delay = 1500,
   disabled = false,
   initialVersion = 0,
+  // Co-authoring: when others are present we go MANUAL — the debounced auto-save
+  // is off and the user presses Sync (push + pull + 3-way merge) on each end.
+  // A ref (not a value) so it can be computed after presence, below the call.
+  manualSyncRef?: { current: boolean },
 ) {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [conflict, setConflict] = useState<SaveConflict | null>(null);
+  // The last COMMITTED (synced) document — the baseline for ghosts + the merge base.
+  const [syncedData, setSyncedData] = useState<DiagramData>(data);
   const lastSaved = useRef<string>(JSON.stringify(data));
   // Optimistic-concurrency token: the diagram version this client last saw.
   const versionRef = useRef<number>(initialVersion);
 
-  // Track unsaved changes (no auto-save timer)
+  // Track unsaved changes (no auto-save timer). Runs even in manual mode so the
+  // Sync button can show there's something to push.
   useEffect(() => {
     if (disabled) return;
     const current = JSON.stringify(data);
@@ -240,12 +247,60 @@ function useAutoSave(
       const updated = await res.json().catch(() => null);
       if (updated && typeof updated.version === "number") versionRef.current = updated.version;
       lastSaved.current = current;
+      setSyncedData(data);
       setLastSavedAt(new Date().toISOString());
       setSaveStatus("saved");
     } catch {
       setSaveStatus("unsaved");
     }
   }, [data, diagramId, conflict]);
+
+  /** Co-authoring Sync — PULL everyone's committed changes and PUSH ours, in one
+   *  3-way merge, even when we have no local edits. Returns the merged document
+   *  for the editor to apply locally (setData). Any party can call it. */
+  const syncNow = useCallback(async (): Promise<DiagramData | null> => {
+    setSaveStatus("saving");
+    try {
+      // PULL current server state.
+      const getRes = await fetch(`/api/diagrams/${diagramId}`);
+      if (!getRes.ok) { setSaveStatus("unsaved"); return null; }
+      const server = await getRes.json().catch(() => null);
+      const theirs = (server?.data ?? { elements: [], connectors: [] }) as DiagramData;
+      let base: DiagramData | null = null;
+      try { base = JSON.parse(lastSaved.current) as DiagramData; } catch { base = null; }
+      let merged = base ? mergeDiagram(base, data, theirs).merged : theirs;
+      let version = typeof server?.version === "number" ? server.version : versionRef.current;
+      // PUSH the merged doc (compare-and-swap); if someone slipped in, re-merge + retry.
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const putRes = await fetch(`/api/diagrams/${diagramId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: merged, version }),
+        });
+        if (putRes.status === 409) {
+          const p = await putRes.json().catch(() => ({}));
+          const t2 = p.data as DiagramData;
+          merged = base ? mergeDiagram(base, merged, t2).merged : t2;
+          version = typeof p.currentVersion === "number" ? p.currentVersion : version;
+          continue;
+        }
+        if (!putRes.ok) { setSaveStatus("unsaved"); return null; }
+        const updated = await putRes.json().catch(() => null);
+        version = updated && typeof updated.version === "number" ? updated.version : version + 1;
+        versionRef.current = version;
+        lastSaved.current = JSON.stringify(merged);
+        setSyncedData(merged);
+        setLastSavedAt(new Date().toISOString());
+        setSaveStatus("saved");
+        return merged;
+      }
+      setSaveStatus("unsaved");
+      return null;
+    } catch {
+      setSaveStatus("unsaved");
+      return null;
+    }
+  }, [data, diagramId]);
 
   /** Adopt the server's version as the new base after the caller has applied the
    *  merged document to the reducer. Set lastSaved to the SERVER's data so the
@@ -265,13 +320,13 @@ function useAutoSave(
   // browsing away) was silently lost. Force-saves on navigation still win;
   // this timer no-ops when there's nothing new to write.
   useEffect(() => {
-    if (disabled || conflict) return; // paused while a conflict is unresolved
+    if (disabled || conflict || manualSyncRef?.current) return; // manual: Sync only, no auto-save
     if (JSON.stringify(data) === lastSaved.current) return;
     const t = setTimeout(() => { void saveNow(); }, delay);
     return () => clearTimeout(t);
-  }, [data, disabled, delay, saveNow, conflict]);
+  }, [data, disabled, delay, saveNow, conflict, manualSyncRef]);
 
-  return { saveStatus, lastSavedAt, saveNow, conflict, acceptMerge };
+  return { saveStatus, lastSavedAt, saveNow, syncNow, conflict, acceptMerge, syncedData };
 }
 
 function exportSvg(svgEl: SVGSVGElement, name: string) {
@@ -1036,7 +1091,15 @@ export function DiagramEditor({
   // prePreviewDataRef holds the real diagram so a discard reverts the canvas.
   const [historyPreviewActive, setHistoryPreviewActive] = useState(false);
   const prePreviewDataRef = useRef<DiagramData | null>(null);
-  const { saveStatus, lastSavedAt, saveNow, conflict, acceptMerge } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly || historyPreviewActive, dataVersion);
+  // Manual-Sync (co-authoring) is decided below once presence is known; the ref
+  // lets useAutoSave read it without a hook-ordering problem.
+  const manualSyncRef = useRef(false);
+  const { saveStatus, lastSavedAt, saveNow, syncNow, conflict, acceptMerge, syncedData } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly || historyPreviewActive, dataVersion, manualSyncRef);
+  // Sync button: pull everyone's committed changes, merge in ours, apply locally.
+  const handleSync = useCallback(async () => {
+    const merged = await syncNow();
+    if (merged) setData(merged);
+  }, [syncNow, setData]);
   // Auto-merge on conflict (Phase 1d): apply the three-way merge to the canvas
   // and resume — silently when there were no true overlaps, or with a dismissible
   // note listing how many elements you both changed (theirs kept).
@@ -1131,6 +1194,10 @@ export function DiagramEditor({
     selection: presenceSelection,
     editingElementIds: presenceSelection,
   });
+  // Others present → MANUAL Sync mode (autosave off, push+pull on the button).
+  const othersPresent = presenceRoster.some((m) => !m.isSelf);
+  manualSyncRef.current = collabEnabled && othersPresent;
+
   // Soft lock: an element another editor is holding is not editable by us.
   const isCoLocked = useCallback((id: string) => !!presenceLocks[id], [presenceLocks]);
   const [pendingDragSymbol, setPendingDragSymbol] = useState<SymbolType | null>(null);
@@ -3991,23 +4058,22 @@ export function DiagramEditor({
         {/* Co-authoring presence — who else is in this diagram right now. */}
         {collabEnabled && <PresenceBar members={presenceRoster} />}
 
-        {/* Co-authoring Sync — merge our changes with everyone else's and save.
-            Shown only in co-authoring mode while changes are outstanding. */}
-        {collabEnabled && !readOnly && (
+        {/* Co-authoring Sync — PULL everyone's committed changes and PUSH ours in
+            one 3-way merge. Shown whenever others are present (autosave is OFF in
+            that mode); always clickable so you can pull even with no local edits. */}
+        {collabEnabled && othersPresent && !readOnly && (
           <button
-            onClick={saveNow}
-            disabled={saveStatus !== "unsaved"}
-            title={saveStatus === "unsaved"
-              ? "Sync — merge your changes with the others' and save now"
-              : "Everyone is in sync"}
+            onClick={handleSync}
+            disabled={saveStatus === "saving"}
+            title="Sync — pull everyone's changes and push yours (merge). Autosave is off while others are here."
             className={`px-2 py-0.5 text-[11px] rounded border inline-flex items-center gap-1 ${
               saveStatus === "unsaved"
                 ? "text-white bg-blue-600 border-blue-700 hover:bg-blue-700"
-                : "text-gray-400 border-gray-200 bg-gray-50 cursor-default"
+                : "text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100"
             }`}
           >
             <span aria-hidden>{saveStatus === "saving" ? "⟳" : "⇄"}</span>
-            {saveStatus === "saving" ? "Syncing…" : saveStatus === "unsaved" ? "Sync" : "Synced"}
+            {saveStatus === "saving" ? "Syncing…" : saveStatus === "unsaved" ? "Sync" : "Sync"}
           </button>
         )}
 
@@ -5072,6 +5138,7 @@ export function DiagramEditor({
           coEditLocks={presenceLocks}
           collabCursors={liveCursors}
           collabBroadcast={collabActive}
+          collabBaseline={syncedData}
           nextStep={selectedElement && nextStepCandidates.length > 0 ? { source: selectedElement, candidates: nextStepCandidates } : undefined}
           onAcceptNextStep={acceptNextStep}
           pcHighlightEnabled={highlightEnabled}
