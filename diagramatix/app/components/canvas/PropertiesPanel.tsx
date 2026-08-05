@@ -175,6 +175,10 @@ interface Props {
   onSetShowIssues?: (on: boolean) => void;
   showIssueDescriptions?: boolean;
   onSetShowIssueDescriptions?: (on: boolean) => void;
+  // Review markers (pink author-review stickies) + their display toggle.
+  reviewComments?: DiagramElement[];
+  showReviewComments?: boolean;
+  onSetShowReviewComments?: (on: boolean) => void;
   forceCollapseTitle?: boolean;
   /** Per-diagram process owner — surfaced in the new Process Owner
    *  sub-section. Both name + email are optional free-text. */
@@ -816,6 +820,9 @@ export function PropertiesPanel({
   onSetShowIssues,
   showIssueDescriptions,
   onSetShowIssueDescriptions,
+  reviewComments,
+  showReviewComments,
+  onSetShowReviewComments,
   forceCollapseTitle,
   processOwner,
   onSetProcessOwner,
@@ -1248,6 +1255,38 @@ export function PropertiesPanel({
                     >×</button>
                   </div>
                 ))}
+            </div>
+          </div>
+        )}
+
+        {/* Review markers — the pink author-review stickies. A diagram-level
+            Display toggle mirrors Pain Points / Issues; the notes themselves are
+            added from the palette and their text is edited inline on canvas. */}
+        {reviewComments && reviewComments.length > 0 && (
+          <div className="mt-1 mb-1">
+            <div className="text-[9px] font-semibold text-pink-700 mb-0.5">Review Markers</div>
+            {onSetShowReviewComments && (
+              <label className="flex items-start gap-1.5 mb-1 cursor-pointer select-none" title="Show the pink review notes (and their tether links) on the diagram">
+                <input type="checkbox" className="mt-[2px] cursor-pointer"
+                  checked={showReviewComments !== false}
+                  onChange={e => onSetShowReviewComments(e.target.checked)} />
+                <span className="text-[9px] text-gray-600 leading-tight">Display Review markers</span>
+              </label>
+            )}
+            <div className="space-y-1">
+              {reviewComments.map(rc => (
+                <div key={rc.id} className="flex items-start gap-1">
+                  <span className="text-pink-500 text-[10px] mt-0.5 shrink-0" aria-hidden>◆</span>
+                  <span className="flex-1 text-[9px] text-gray-600 leading-tight break-words">
+                    {(rc.label && rc.label.trim()) || "Review Comment"}
+                  </span>
+                  <button
+                    onClick={() => onDeleteElement(rc.id)}
+                    className="text-gray-400 hover:text-red-600 text-xs leading-none mt-0.5 shrink-0"
+                    title="Delete this review marker"
+                  >×</button>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -2339,6 +2378,26 @@ export function PropertiesPanel({
         if (!hasPcf && !(isActivity && diagramIsApqc)) return null;
         return <PcfRefEditor key={element.id} element={element} onUpdateProperties={onUpdateProperties} />;
       })()}
+
+      {/* Pain Point / Issue description — editable directly on the selected
+          marker on ANY diagram type (item 4). The number is the auto-assigned
+          label; the human text lives in properties.description (same field the
+          diagram-level list edits). */}
+      {(element.type === "uml-pain-point" || element.type === "uml-issue") && (
+        <div>
+          <label className="block text-[10px] font-medium text-gray-500 mb-0.5">
+            {element.type === "uml-pain-point" ? "Pain Point" : "Issue"} description
+          </label>
+          <textarea
+            key={`marker-desc-${element.id}`}
+            defaultValue={(element.properties.description as string | undefined) ?? ""}
+            onBlur={(e) => onUpdateProperties?.(element.id, { description: e.target.value })}
+            rows={3}
+            placeholder="Describe this issue…"
+            className="w-full text-xs border border-gray-300 rounded px-2 py-1 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+      )}
 
       {/* Pain points have no editable label — the number is auto-assigned and
           the text lives in the Pain Point list description (issue #1). */}

@@ -355,6 +355,10 @@ export interface DiagramData {
   /** Show each Issue's multi-line description caption under its icon. OPT-IN
    *  (off by default); only takes effect while `showIssues` is on. */
   showIssueDescriptions?: boolean;
+  /** "Display Review markers" master toggle — render the pink author-review
+   *  stickies (and their tether links) on the canvas. Absent/true = shown;
+   *  explicit false = hidden. Toggleable in Diagram Properties. */
+  showReviewComments?: boolean;
   /** Diagram-level list of all parent diagrams that currently link TO
    *  this diagram (managed by the project-wide "Scan Diagrams for Links"
    *  feature). A diagram can be linked from many parents — every one of

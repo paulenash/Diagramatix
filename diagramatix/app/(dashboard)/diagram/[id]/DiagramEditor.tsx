@@ -1064,6 +1064,7 @@ export function DiagramEditor({
     setShowPainPointDescriptions,
     setShowIssues,
     setShowIssueDescriptions,
+    setShowReviewComments,
     rerouteAll,
     setProcessOwner,
     setProcedureDoc,
@@ -1154,13 +1155,6 @@ export function DiagramEditor({
     const merged = await syncNow();
     if (merged) setData(merged);
   }, [syncNow, setData]);
-  // Revert: discard my un-synced local edits and reload the committed diagram.
-  const [revertArmed, setRevertArmed] = useState(false);
-  const handleRevert = useCallback(async () => {
-    const s = await revertToSaved();
-    if (s) setData(s);
-    setRevertArmed(false);
-  }, [revertToSaved, setData]);
   const didFreshLoad = useRef(false);
   // Auto-align: a peer advanced the committed version → pull+merge (no push), so
   // one person's Sync brings the whole group into alignment.
@@ -4161,20 +4155,6 @@ export function DiagramEditor({
           </button>
         )}
 
-        {/* Revert — discard my un-synced local edits and reload the committed
-            diagram (two-click confirm). A clean bail-out of a dirty session. */}
-        {collabEnabled && othersPresent && !readOnly && (
-          <button
-            onClick={() => { if (revertArmed) void handleRevert(); else { setRevertArmed(true); setTimeout(() => setRevertArmed(false), 3000); } }}
-            title="Discard your un-synced local edits and reload the last saved diagram"
-            className={`px-2 py-0.5 text-[11px] rounded border inline-flex items-center gap-1 ${
-              revertArmed ? "text-white bg-red-600 border-red-700" : "text-gray-600 border-gray-300 hover:bg-gray-50"
-            }`}
-          >
-            <span aria-hidden>↺</span>{revertArmed ? "Discard my edits?" : "Revert"}
-          </button>
-        )}
-
         {/* Active vs Viewer — claim the live cursor (others become viewers to me)
             or step back to watching. Useful for two sessions on one machine. */}
         {liveCursors && (
@@ -5423,6 +5403,9 @@ export function DiagramEditor({
             onSetShowIssues={setShowIssues}
             showIssueDescriptions={data.showIssueDescriptions}
             onSetShowIssueDescriptions={setShowIssueDescriptions}
+            reviewComments={data.elements.filter(e => e.type === "review-comment")}
+            showReviewComments={data.showReviewComments}
+            onSetShowReviewComments={setShowReviewComments}
             onUpdateDiagramTitle={updateDiagramTitle}
             processOwner={data.processOwner}
             onSetProcessOwner={diagramType === "bpmn" ? setProcessOwner : undefined}

@@ -21,7 +21,7 @@ import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
 import { BubbleHelp } from "./BubbleHelp";
 import { EntityNameInput } from "./EntityNameInput";
 import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
-import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, ShowReviewCommentsCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
 import { CollabCursors } from "./CollabCursors";
 import { CollabLiveEdits } from "./CollabLiveEdits";
 import { CollabGhosts } from "./CollabGhosts";
@@ -4919,6 +4919,7 @@ export function Canvas({
       <ShowPainPointDescCtx.Provider value={!!data.showPainPointDescriptions}>
       <ShowIssuesCtx.Provider value={data.showIssues !== false}>
       <ShowIssueDescCtx.Provider value={!!data.showIssueDescriptions}>
+      <ShowReviewCommentsCtx.Provider value={data.showReviewComments !== false}>
       <LaneDepthCtx.Provider value={laneDepthMap}>
       <ArchimateDepthCtx.Provider value={archimateDepthMap}>
       <DatabaseCtx.Provider value={data.database}>
@@ -7264,6 +7265,7 @@ export function Canvas({
       </DatabaseCtx.Provider>
       </ArchimateDepthCtx.Provider>
       </LaneDepthCtx.Provider>
+      </ShowReviewCommentsCtx.Provider>
       </ShowIssueDescCtx.Provider>
       </ShowIssuesCtx.Provider>
       </ShowPainPointDescCtx.Provider>

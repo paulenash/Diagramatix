@@ -8,6 +8,7 @@ import { buildConstraintText } from "@/app/lib/diagram/umlConstraints";
 import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
 import { ArchimateConnectorRenderer, isArchimateConnectorType } from "./ArchimateConnectorRenderer";
+import { ShowReviewCommentsCtx } from "./SymbolRenderer";
 
 interface Props {
   connector: Connector;
@@ -729,6 +730,7 @@ function ConstraintBox({
 export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, sourceType, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
+  const showReviewMarkers = useContext(ShowReviewCommentsCtx);
   const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
@@ -766,6 +768,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   // message flow (draggable spine).
   const isRectilinearMessage = isMessageBPMN && !!relaxedLayout && !connector.messageForcedVertical;
   const isReviewLink = connector.type === "review-comment-link";
+  // The pink tether hides with its stickies under the review-marker toggle.
+  if (isReviewLink && !showReviewMarkers) return null;
   const isBottleneck = connector.type === "sequence" && !!connector.bottleneck && !!showBottleneck;
   const strokeColor = selected ? "#2563eb"
     : highlight ? "#16a34a"   // Process-Context association highlight (green)

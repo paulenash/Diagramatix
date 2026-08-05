@@ -412,6 +412,7 @@ export type Action =
   | { type: "SET_SHOW_PAIN_POINT_DESC"; payload: boolean }
   | { type: "SET_SHOW_ISSUES"; payload: boolean }
   | { type: "SET_SHOW_ISSUE_DESC"; payload: boolean }
+  | { type: "SET_SHOW_REVIEW_COMMENTS"; payload: boolean }
   | { type: "REROUTE_ALL" }
   | { type: "SET_PROCESS_OWNER"; payload: { name?: string; email?: string } }
   | { type: "SET_PROCEDURE_DOC"; payload: { url?: string; name?: string } | undefined }
@@ -7603,6 +7604,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "SET_SHOW_ISSUE_DESC":
       return { ...state, showIssueDescriptions: action.payload || undefined };
 
+    case "SET_SHOW_REVIEW_COMMENTS":
+      // Default is "shown", so persist only the explicit OFF (false).
+      return { ...state, showReviewComments: action.payload ? undefined : false };
+
     // Recompute every connector's route — used to apply a live routing-mode
     // switch (e.g. the Domain UML sticky/optimal toggle) to the current diagram.
     case "REROUTE_ALL":
@@ -10173,6 +10178,12 @@ export function useDiagram(initialData: DiagramData) {
       (on: boolean) => {
         invalidateRedo();
         dispatch({ type: "SET_SHOW_ISSUE_DESC", payload: on });
+      }, []
+    ),
+    setShowReviewComments: useCallback(
+      (on: boolean) => {
+        invalidateRedo();
+        dispatch({ type: "SET_SHOW_REVIEW_COMMENTS", payload: on });
       }, []
     ),
     rerouteAll: useCallback(

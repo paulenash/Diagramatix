@@ -200,6 +200,9 @@ export const ShowIssuesCtx = createContext<boolean>(true);
 /** Whether Issue descriptions render as captions under their icons
  *  (diagram-level `showIssueDescriptions`). Provided by Canvas.tsx. */
 export const ShowIssueDescCtx = createContext<boolean>(false);
+/** Whether the pink author-review stickies render on the canvas (diagram-level
+ *  "Display Review markers" master toggle). Defaults true. Provided by Canvas.tsx. */
+export const ShowReviewCommentsCtx = createContext<boolean>(true);
 export const DatabaseCtx = createContext<string | undefined>(undefined);
 /** Map from archimate-shape id → descendant depth (0 = leaf, 1 = parent of
  *  leaves, 2 = grandparent, …). Drives the per-level lightening of
@@ -827,6 +830,9 @@ function TextAnnotationShape({ el }: { el: DiagramElement }) {
  *  top-right corner. The comment text is rendered by the shared label
  *  path (wrapped inside the box), modelled on text-annotation. */
 function ReviewCommentShape({ el }: { el: DiagramElement }) {
+  // Hidden when the diagram-level "Display Review markers" toggle is off.
+  const show = useContext(ShowReviewCommentsCtx);
+  if (!show) return null;
   const FILL = "#fce7f3";   // rose-100
   const STROKE = "#ec4899"; // pink-500
   const fold = 12;
@@ -2655,6 +2661,8 @@ export function SymbolRenderer({
   const isBoundaryStartOrEnd = !!element.boundaryHostId &&
     (element.type === "start-event" || element.type === "end-event");
   const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && element.type !== "flowchart-parallel" && element.type !== "flowchart-decision" && element.type !== "flowchart-vswimlane" && !isBoundaryStartOrEnd;
+  // Review stickies hide (shape AND label) under the diagram-level toggle.
+  const showReviewMarkers = useContext(ShowReviewCommentsCtx);
 
   // Events / gateways / data objects render a SEPARATE external label below
   // the shape, edited inline via the isEditingGatewayLabel foreignObject.
@@ -3195,6 +3203,7 @@ export function SymbolRenderer({
           </text>
         );
       })() : showLabel && element.type === 'review-comment' ? (() => {
+        if (!showReviewMarkers) return null; // hidden by the review-marker toggle
         const PAD = 8;
         const lines = wrapText(element.label, element.width - PAD - 6);
         const lineH = 13;

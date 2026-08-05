@@ -321,12 +321,16 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
 // Pain Point + Issue are type-agnostic problem markers offered on EVERY diagram
 // type's palette (appended to each list below).
 const PROBLEM_MARKERS: SymbolType[] = ["uml-pain-point", "uml-issue"];
+// The pink author-review sticky is likewise offered on EVERY diagram type, so an
+// author can tether review notes to any element. Its show/hide is a diagram-level
+// toggle (`showReviewComments`), exactly like the problem markers.
+const REVIEW_MARKERS: SymbolType[] = ["review-comment"];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
-  context: ["external-entity", "process-system", ...PROBLEM_MARKERS],
-  basic: ["external-entity", "process-system", ...PROBLEM_MARKERS],  // legacy alias
-  "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary", ...PROBLEM_MARKERS],
-  "state-machine": ["state", "submachine", "initial-state", "final-state", "composite-state", "gateway", "fork-join", ...PROBLEM_MARKERS],
+  context: ["external-entity", "process-system", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],
+  basic: ["external-entity", "process-system", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],  // legacy alias
+  "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],
+  "state-machine": ["state", "submachine", "initial-state", "final-state", "composite-state", "gateway", "fork-join", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],
   bpmn: [
     "start-event",
     "intermediate-event",
@@ -340,15 +344,15 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
     "data-store",
     "text-annotation",
     "group",
-    ...PROBLEM_MARKERS,
+    ...PROBLEM_MARKERS, ...REVIEW_MARKERS,
   ],
-  domain: ["uml-package", "uml-class", "uml-enumeration", "uml-note", ...PROBLEM_MARKERS],
-  "value-chain": ["chevron", "chevron-collapsed", "process-group", ...PROBLEM_MARKERS],
+  domain: ["uml-package", "uml-class", "uml-enumeration", "uml-note", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],
+  "value-chain": ["chevron", "chevron-collapsed", "process-group", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],
   // ArchiMate shapes are driven by the runtime catalogue (see
   // app/lib/archimate/catalogue.ts). The palette renders category accordions
   // reading that catalogue rather than this static list, so the registered
   // symbol type is a single generic placeholder — plus the shared markers.
-  archimate: ["archimate-shape", ...PROBLEM_MARKERS],
+  archimate: ["archimate-shape", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],
   flowchart: [
     "flowchart-terminator", "flowchart-process", "flowchart-decision", "flowchart-io",
     "flowchart-document", "flowchart-multidoc", "flowchart-predefined", "flowchart-preparation",
@@ -356,7 +360,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
     "flowchart-database", "flowchart-onpage", "flowchart-offpage", "flowchart-merge",
     "flowchart-parallel", "flowchart-comment",
     "flowchart-vswimlane",
-    ...PROBLEM_MARKERS,
+    ...PROBLEM_MARKERS, ...REVIEW_MARKERS,
   ],
 };
 
