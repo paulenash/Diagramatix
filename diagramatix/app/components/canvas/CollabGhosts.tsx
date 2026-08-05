@@ -86,17 +86,23 @@ export function CollabGhosts({
             {/* Ghost CONNECTORS (#3) — dashed polyline through their waypoints */}
             {(conns ?? []).map((c) => {
               const local = localConnById.get(c.id);
-              // Compare like-for-like: the VISIBLE path only (the sender already
-              // stripped the invisible leader points), or the ghost never clears.
+              // "Same connector for me?" — TOLERANT compare: the two ENDPOINTS on a
+              // coarse grid + the label + the label offset. Waypoints are re-routed
+              // per client so an exact path compare never matches and the ghost
+              // (its label especially) lingers forever after a sync.
+              const g = (n: number | undefined) => Math.round((n ?? 0) / 4) * 4;
               let localSig = "";
               if (local) {
                 const lall = local.waypoints ?? [];
                 const ls = local.sourceInvisibleLeader ? 1 : 0;
                 const le = local.targetInvisibleLeader ? Math.max(ls + 1, lall.length - 1) : lall.length;
-                localSig = `${lall.slice(ls, le).map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(";")}|${local.label ?? ""}|${local.labelOffsetX ?? ""},${local.labelOffsetY ?? ""}`;
+                const lvis = lall.slice(ls, le);
+                const a = lvis[0], b = lvis[lvis.length - 1];
+                if (a && b) localSig = `${g(a.x)},${g(a.y)};${g(b.x)},${g(b.y)}|${local.label ?? ""}|${g(local.labelOffsetX)},${g(local.labelOffsetY)}`;
               }
-              const remoteSig = `${c.pts.map((p) => `${p.x},${p.y}`).join(";")}|${c.label}|${c.lox ?? ""},${c.loy ?? ""}`;
-              if (local && localSig === remoteSig) return null;   // unchanged for me
+              const ra = c.pts[0], rb = c.pts[c.pts.length - 1];
+              const remoteSig = ra && rb ? `${g(ra.x)},${g(ra.y)};${g(rb.x)},${g(rb.y)}|${c.label}|${g(c.lox)},${g(c.loy)}` : "";
+              if (local && localSig !== "" && localSig === remoteSig) return null;   // same for me → no ghost
               if (c.pts.length < 2) return null;
               const d = c.pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
               const mid = c.pts[Math.floor(c.pts.length / 2)];

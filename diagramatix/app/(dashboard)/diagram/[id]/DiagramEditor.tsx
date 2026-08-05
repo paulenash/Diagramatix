@@ -266,7 +266,7 @@ function useAutoSave(
     setSaveStatus("saving");
     try {
       // PULL current server state.
-      const getRes = await fetch(`/api/diagrams/${diagramId}`);
+      const getRes = await fetch(`/api/diagrams/${diagramId}`, { cache: "no-store" });
       if (!getRes.ok) { setSaveStatus("unsaved"); return null; }
       const server = await getRes.json().catch(() => null);
       const theirs = (server?.data ?? { elements: [], connectors: [] }) as DiagramData;
@@ -313,7 +313,7 @@ function useAutoSave(
    *  cascade. Returns the merged doc to apply, or null if nothing new. */
   const pullMerge = useCallback(async (): Promise<DiagramData | null> => {
     try {
-      const getRes = await fetch(`/api/diagrams/${diagramId}`);
+      const getRes = await fetch(`/api/diagrams/${diagramId}`, { cache: "no-store" });
       if (!getRes.ok) return null;
       const server = await getRes.json().catch(() => null);
       const theirVersion = typeof server?.version === "number" ? server.version : versionRef.current;
