@@ -281,6 +281,13 @@ describe("guided rename (rename by type → numbered badges)", () => {
     expect(parseCommand("rename messages")).toEqual([{ op: "renameByType", itemType: "message" }]);
     expect(parseCommand("rename subprocess")).toEqual([{ op: "renameByType", itemType: "subprocess" }]);
   });
+  it("'add message' without from AND to does NOT fall through to a task", () => {
+    expect(parseCommand("add message to IT System")).toBeNull();
+    expect(parseCommand("add a message")).toBeNull();
+    expect(parseCommand("send a message flow")).toBeNull();
+    // a complete message still parses
+    expect(parseCommand("add message from Task 1 to IT System")).toEqual([{ op: "addMessage", fromRef: "Task 1", toRef: "IT System" }]);
+  });
   it("still parses a direct 'rename <name> to <new>' as a normal rename", () => {
     expect(parseCommand("rename Task 1 to Approve")).toEqual([{ op: "rename", ref: "Task 1", label: "Approve" }]);
     // a type word WITH a target is a normal rename, not the guided flow
@@ -298,6 +305,13 @@ describe("collectRenameTargets", () => {
     ];
     const t = collectRenameTargets(els, [], "task");
     expect(t.map((x) => [x.id, x.n])).toEqual([["b", 1], ["a", 2], ["c", 3]]); // gateway excluded
+  });
+  it("excludes merge gateways (they're never labelled)", () => {
+    const els = [
+      el("d", "gateway", "?", { x: 0, y: 0, properties: { gatewayRole: "decision" } }),
+      el("m", "gateway", "", { x: 200, y: 0, properties: { gatewayRole: "merge" } }),
+    ];
+    expect(collectRenameTargets(els, [], "gateway").map((x) => x.id)).toEqual(["d"]);
   });
   it("event type includes start/intermediate/end", () => {
     const els = [

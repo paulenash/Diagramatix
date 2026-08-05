@@ -333,6 +333,9 @@ function isIncompleteCommand(text: string): boolean {
   if (/^(rename|relabel|change|set|call)\b/.test(t) && !/\b(to|as)\b\s+\S+/.test(t)) return true;
   // connect / disconnect — missing the second operand.
   if (/^(connect|link|join|disconnect|unlink)\b/.test(t) && !/\b(to|and|with|from)\b\s+\S+/.test(t)) return true;
+  // "add message …" without BOTH a from and a to — wait for the rest instead of
+  // running it (which would create a stray task called "Message").
+  if (/^(add|create|send|draw|put)\b.*\bmessage\b/.test(t) && !(/\bfrom\b\s+\S+/.test(t) && /\bto\b\s+\S+/.test(t))) return true;
   return false;
 }
 
@@ -2163,7 +2166,7 @@ export function DiagramEditor({
   //   name: an item is selected/editing; user dictates the new name.
   type RenameFlow =
     | { phase: "pick"; itemType: RenameType; targets: RenameTarget[] }
-    | { phase: "name"; targetId: string; kind: "element" | "connector" };
+    | { phase: "name"; itemType: RenameType; targetId: string; kind: "element" | "connector" };
   const [renameFlow, setRenameFlowState] = useState<RenameFlow | null>(null);
   const renameFlowRef = useRef<RenameFlow | null>(null);
   const setRenameFlow = useCallback((f: RenameFlow | null) => { renameFlowRef.current = f; setRenameFlowState(f); }, []);
@@ -2551,16 +2554,19 @@ export function DiagramEditor({
     if (reason) setAbraLog((prev) => [...prev, { id: nanoid(), heard: "", summary: reason, ok: true }]);
   }, [setRenameFlow, cancelLabelEdit]);
 
-  // Apply a dictated name to the picked element or connector.
-  const applyRenameName = useCallback((target: { id: string; kind: "element" | "connector" }, name: string) => {
+  // Apply a dictated name to the picked element/connector, then STAY in the loop
+  // (#3): re-number the same type so the user can keep renaming until "stop"/Esc.
+  const applyRenameName = useCallback((target: { id: string; kind: "element" | "connector" }, name: string, itemType: RenameType) => {
     const clean = name.trim().replace(/[.,!?;:]+$/g, "").trim();
     if (!clean) { cancelRenameFlow("rename cancelled (empty name)"); return; }
     if (target.kind === "element") updateLabel(target.id, clean);
     else updateConnectorLabel(target.id, clean);
     cancelLabelEdit();
-    setRenameFlow(null);
-    setAbraLog((prev) => [...prev, { id: nanoid(), heard: clean, summary: `renamed to “${clean}”`, ok: true }]);
-  }, [updateLabel, updateConnectorLabel, cancelLabelEdit, setRenameFlow, cancelRenameFlow]);
+    const targets = collectRenameTargets(data.elements, data.connectors, itemType);
+    if (targets.length > 0) setRenameFlow({ phase: "pick", itemType, targets });
+    else setRenameFlow(null);
+    setAbraLog((prev) => [...prev, { id: nanoid(), heard: clean, summary: `renamed to “${clean}” — pick another or say “stop”`, ok: true }]);
+  }, [updateLabel, updateConnectorLabel, cancelLabelEdit, setRenameFlow, cancelRenameFlow, data.elements, data.connectors]);
 
   // Handle one utterance while the guided rename flow is active.
   const handleRenameUtterance = useCallback((text: string) => {
@@ -2568,7 +2574,8 @@ export function DiagramEditor({
     if (!flow) return;
     const t = text.trim();
     const low = t.toLowerCase().replace(/[.,!?;:]+$/g, "").trim();
-    if (/^(escape|cancel|never ?mind|stop rename|quit|exit|forget it|abort)\b/.test(low)) { cancelRenameFlow("rename cancelled"); return; }
+    // "stop"/"done"/Esc-words end the rename loop (mic stays on).
+    if (/^(stop|done|finished|that'?s all|all done|enough|escape|cancel|never ?mind|stop rename|quit|exit|forget it|abort)\b/.test(low)) { cancelRenameFlow("rename finished"); return; }
     if (flow.phase === "pick") {
       // Leading number (digit or number-word) selects a badge; trailing text is the name.
       const digits = low.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/g, (m) => String(["zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty"].indexOf(m)));
@@ -2581,12 +2588,12 @@ export function DiagramEditor({
       if (target.kind === "element") { setSelectedConnectorId(null); setSelectedElementIds(new Set([target.id])); beginLabelEdit(target.id); }
       else { setSelectedElementIds(new Set()); setSelectedConnectorId(target.id); }
       const trailing = m[2].trim();
-      if (trailing) { applyRenameName(target, trailing); }         // "14 Approve Invoice" in one breath
-      else { setRenameFlow({ phase: "name", targetId: target.id, kind: target.kind }); } // wait for the name
+      if (trailing) { applyRenameName(target, trailing, flow.itemType); }         // "14 Approve Invoice" in one breath
+      else { setRenameFlow({ phase: "name", itemType: flow.itemType, targetId: target.id, kind: target.kind }); } // wait for the name
       return;
     }
     // phase "name" — the whole utterance is the new name.
-    applyRenameName({ id: flow.targetId, kind: flow.kind }, t);
+    applyRenameName({ id: flow.targetId, kind: flow.kind }, t, flow.itemType);
   }, [applyRenameName, cancelRenameFlow, setRenameFlow, beginLabelEdit]);
   const handleRenameUtteranceRef = useRef(handleRenameUtterance);
   handleRenameUtteranceRef.current = handleRenameUtterance;
@@ -2700,8 +2707,9 @@ export function DiagramEditor({
         bumpAbraIdle();
         const txt = t.trim();
         if (!txt) return;
-        // Spoken "stop" ends the session immediately.
-        if (/^(stop|stop listening|stop it|that'?s enough|pause|abracadabra off|thank you gort)\b/i.test(txt)) {
+        // Spoken "stop" ends the session — UNLESS we're mid-rename, where "stop"
+        // just ends the rename loop (handled by the flow, mic stays on).
+        if (!renameFlowRef.current && /^(stop|stop listening|stop it|that'?s enough|pause|abracadabra off|thank you gort)\b/i.test(txt)) {
           abraBuffer.current = "";
           stopAbraListening();
           return;
@@ -2711,6 +2719,12 @@ export function DiagramEditor({
         abraBuffer.current = (abraBuffer.current ? abraBuffer.current + " " : "") + txt;
         abraWaits.current = 0;
         setAbraInterim(abraBuffer.current);
+        const buf = abraBuffer.current.trim();
+        // #5 Instant: show badges the moment a "rename <type>" is heard, and pick
+        // a number the moment it's spoken — skip the silence wait entirely.
+        const flow = renameFlowRef.current;
+        if (flow?.phase === "pick" && /(?:^|\s)(?:\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)(?:\s|$)/i.test(buf)) { flushAbraBuffer(true); return; }
+        if (!flow) { const p = parseCommand(buf); if (p && p.length === 1 && p[0].op === "renameByType") { flushAbraBuffer(true); return; } }
         if (abraFlushTimer.current) clearTimeout(abraFlushTimer.current);
         abraFlushTimer.current = setTimeout(() => flushAbraBuffer(), ABRA_SILENCE_MS);
       },

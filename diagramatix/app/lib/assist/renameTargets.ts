@@ -56,7 +56,8 @@ export function collectRenameTargets(
       itemType === "pool" ? e.type === "pool"
       : itemType === "lane" ? e.type === "lane"                 // sub-lanes are lanes too
       : itemType === "task" ? e.type === "task"
-      : itemType === "gateway" ? e.type === "gateway"
+      // A merge gateway is never labelled, so don't number it (#4).
+      : itemType === "gateway" ? e.type === "gateway" && (e.properties?.gatewayRole as string | undefined) !== "merge"
       : itemType === "event" ? EVENT_TYPES.has(e.type)
       : itemType === "subprocess" ? SUBPROCESS_TYPES.has(e.type)
       : false;

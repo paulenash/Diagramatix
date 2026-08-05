@@ -191,6 +191,10 @@ export function parseCommand(utterance: string): AssistOp[] | null {
   if (m) return [{ op: "addMessage", fromRef: clean(m[1]), toRef: clean(m[2]), ...(m[3] ? { label: clean(m[3]) } : {}) }];
   m = raw.match(new RegExp(`^(?:add|create|draw|put|send)\\s+(?:a\\s+)?message(?:\\s+flow)?\\s+to\\s+(.+?)\\s+from\\s+(.+?)${MSGLABEL}$`, "i"));
   if (m) return [{ op: "addMessage", fromRef: clean(m[2]), toRef: clean(m[1]), ...(m[3] ? { label: clean(m[3]) } : {}) }];
+  // A "message" command that DIDN'T match the from/to forms must NOT fall through
+  // to the generic add (which would make a task called "Message"). Bail to null
+  // so it goes to the AI interpreter instead of the add rule below.
+  if (/^(?:add|create|draw|put|send)\s+(?:a\s+)?(?:message|msg)(?:\s+flow)?\b/i.test(raw)) return null;
 
   // ── Boundary event (before the generic add) ──
   m = raw.match(/^(?:add|put|attach|create|place)\s+(?:a\s+)?boundary\s+event\s+(.+)$/i);

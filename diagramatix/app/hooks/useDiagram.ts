@@ -8110,7 +8110,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
       } else if (
         !initialEl.boundaryHostId &&
-        !BOUNDARY_EVENT_TYPES.has(initialEl.type)
+        !BOUNDARY_EVENT_TYPES.has(initialEl.type) &&
+        initialEl.type !== "pool"   // #1: a pool is a top-level participant — never
+                                    // adopt it into another pool (which then centred
+                                    // it "in the middle" of the white-box pool).
       ) {
         const cx = initialEl.x + initialEl.width / 2;
         const cy = initialEl.y + initialEl.height / 2;
