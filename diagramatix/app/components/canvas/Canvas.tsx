@@ -335,6 +335,9 @@ interface Props {
   onUpdateConnectorWaypoints?: (id: string, waypoints: Point[]) => void;
   onUpdateConnectorLabel?: (id: string, label?: string, offsetX?: number, offsetY?: number, width?: number) => void;
   onSplitConnector?: (symbolType: SymbolType, position: Point, connectorId: string, taskType?: BpmnTaskType, eventType?: EventType) => void;
+  /** Collapse/expand a review-comment (item 11) + bring it to front (item 14/15). */
+  onToggleReviewCollapse?: (id: string) => void;
+  onBringReviewToFront?: (id: string) => void;
   /** Review Mode: dropping a review-comment calls this with the drop
    *  point + the id of the element under the cursor (or null). The
    *  editor creates the pink note + a review-comment-link to it. */
@@ -603,6 +606,8 @@ export function Canvas({
   onUpdateConnectorWaypoints,
   onUpdateConnectorLabel,
   onSplitConnector,
+  onToggleReviewCollapse,
+  onBringReviewToFront,
   onAddReviewComment,
   onGenerateSopForElement,
   onElementMoveEnd,
@@ -5976,6 +5981,9 @@ export function Canvas({
               isCompensationTarget={elIsCompTarget}
               isErrorTarget={errorTargetIds.has(el.id) || obstacleViolationElementIds.has(el.id)}
               onSelect={(ev) => {
+                // A review comment jumps to the front whenever you grab it, so a
+                // note hidden under another comes forward (item 15).
+                if (el.type === "review-comment") onBringReviewToFront?.(el.id);
                 // Force-connect override (Shift+Ctrl+Click)
                 if (handleForceConnectSelect(el.id, ev)) return;
                 // ArchiMate tree-highlight is driven by SHIFT-click (item 1) —
@@ -6019,11 +6027,19 @@ export function Canvas({
                 onSelectConnector(null);
               }}
               onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
+              onToggleReviewCollapse={onToggleReviewCollapse}
               onDoubleClick={() => {
                 if (tryGroupConnectToGateway(el)) return;
                 // Gateway shape double-click never opens the label editor —
                 // the label rect has its own dblclick handler for that.
                 if (el.type === "gateway") return;
+                // Review comment: a COLLAPSED note expands + jumps to the front
+                // (item 14); an expanded note edits its body as usual.
+                if (el.type === "review-comment") {
+                  if (el.properties.collapsed) { onToggleReviewCollapse?.(el.id); onBringReviewToFront?.(el.id); }
+                  else startEditingLabel(el);
+                  return;
+                }
                 const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case" || el.type === "archimate-shape" || el.type === "uml-package") ? el.properties.linkedDiagramId as string | undefined : undefined;
                 if (linkedId && onDrillIntoSubprocess) {
                   onDrillIntoSubprocess(linkedId);

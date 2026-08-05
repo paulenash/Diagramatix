@@ -91,6 +91,8 @@ interface Props {
   onConnectionPointDragStart: (side: Side, worldPos: Point) => void;
   showConnectionPoints: boolean;
   onResizeDragStart?: (handle: ResizeHandle, e: React.MouseEvent) => void;
+  /** Collapse/expand a review-comment to/from its small icon (item 11). */
+  onToggleReviewCollapse?: (id: string) => void;
   svgToWorld?: (clientX: number, clientY: number) => Point;
   shouldSnapBack?: (x: number, y: number) => boolean;
   onMoveEnd?: () => void;
@@ -839,6 +841,7 @@ function ReviewCommentShape({ el }: { el: DiagramElement }) {
   const x = el.x, y = el.y, w = el.width, h = el.height;
   // Body path with a clipped (folded) top-right corner.
   const body = `M ${x} ${y} L ${x + w - fold} ${y} L ${x + w} ${y + fold} L ${x + w} ${y + h} L ${x} ${y + h} Z`;
+  const collapsed = !!el.properties.collapsed;
   return (
     <g>
       <path d={body} fill={FILL} stroke={STROKE} strokeWidth={1.5} strokeLinejoin="round" />
@@ -847,6 +850,12 @@ function ReviewCommentShape({ el }: { el: DiagramElement }) {
         fill="#f9a8d4" stroke={STROKE} strokeWidth={1} strokeLinejoin="round" />
       {/* Left accent bar to signal "comment" */}
       <rect x={x} y={y} width={3} height={h} fill={STROKE} />
+      {/* Collapsed icon — a few short "hidden text" lines so the small pill
+          reads as a folded note (double-click to expand). */}
+      {collapsed && [0, 1, 2].map((i) => (
+        <line key={i} x1={x + 10} y1={y + h / 2 - 8 + i * 8} x2={x + w - 10} y2={y + h / 2 - 8 + i * 8}
+          stroke={STROKE} strokeWidth={1.4} strokeLinecap="round" opacity={0.6} />
+      ))}
     </g>
   );
 }
@@ -2221,6 +2230,7 @@ export function SymbolRenderer({
   onConnectionPointDragStart,
   showConnectionPoints,
   onResizeDragStart,
+  onToggleReviewCollapse,
   svgToWorld,
   shouldSnapBack,
   onMoveEnd,
@@ -3460,6 +3470,19 @@ export function SymbolRenderer({
           );
         })
       }
+
+      {/* Review-comment collapse control — a small "–" button just left of the
+          folded corner. Collapses the note to its small icon (item 11). Always
+          shown while expanded so it's discoverable without selecting first. */}
+      {element.type === "review-comment" && !element.properties.collapsed && onToggleReviewCollapse && (
+        <g data-interactive style={{ cursor: "pointer" }}
+          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onToggleReviewCollapse(element.id); }}>
+          <rect x={element.x + element.width - 32} y={element.y + 3} width={16} height={13} rx={2}
+            fill="#ec4899" opacity={0.92} />
+          <line x1={element.x + element.width - 29} y1={element.y + 9.5} x2={element.x + element.width - 19} y2={element.y + 9.5}
+            stroke="#fff" strokeWidth={1.6} strokeLinecap="round" />
+        </g>
+      )}
 
       {/* Pool / Subprocess-Expanded edge resize handles. Hit zones
           (invisible, ~10px wide) straddle each of the four edges and are

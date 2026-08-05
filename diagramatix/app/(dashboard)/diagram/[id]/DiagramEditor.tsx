@@ -1073,6 +1073,8 @@ export function DiagramEditor({
     setDatabase,
     setDiagramPurpose,
     setDiagramDescription,
+    toggleReviewCollapse,
+    bringReviewToFront,
     setRelaxedLayout,
     setShowPainPoints,
     setShowPainPointDescriptions,
@@ -5332,6 +5334,8 @@ export function DiagramEditor({
             handleAddConnector(sourceId, targetId, type, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force, initialLabel);
           }}
           onAddReviewComment={reviewMode ? handleAddReviewComment : feedbackMode ? handleAddFeedbackComment : undefined}
+          onToggleReviewCollapse={readOnly && !feedbackMode ? undefined : toggleReviewCollapse}
+          onBringReviewToFront={readOnly && !feedbackMode ? undefined : bringReviewToFront}
           onDeleteConnector={(id) => {
             // Feedback mode: only a review tether may be removed, never a real connector.
             if (feedbackMode && data.connectors.find((c) => c.id === id)?.type !== "review-comment-link") return;

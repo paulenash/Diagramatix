@@ -409,6 +409,8 @@ export type Action =
   | { type: "SET_DATABASE"; payload: string }
   | { type: "SET_DIAGRAM_PURPOSE"; payload: string }
   | { type: "SET_DIAGRAM_DESCRIPTION"; payload: string }
+  | { type: "TOGGLE_REVIEW_COLLAPSE"; payload: string }
+  | { type: "BRING_REVIEW_TO_FRONT"; payload: string }
   | { type: "SET_RELAXED_LAYOUT"; payload: boolean }
   | { type: "SET_SHOW_PAIN_POINTS"; payload: boolean }
   | { type: "SET_SHOW_PAIN_POINT_DESC"; payload: boolean }
@@ -7596,6 +7598,43 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "SET_DIAGRAM_DESCRIPTION":
       return { ...state, description: action.payload || undefined };
 
+    case "TOGGLE_REVIEW_COLLAPSE": {
+      // Collapse a review-comment to a small icon (1/3 of the 340x288 default),
+      // stashing its expanded size; expand restores the stashed size (item 11).
+      const COLLAPSED_W = 113, COLLAPSED_H = 96;
+      return {
+        ...state,
+        elements: state.elements.map((e) => {
+          if (e.id !== action.payload || e.type !== "review-comment") return e;
+          const collapsed = !e.properties.collapsed;
+          const props = { ...e.properties };
+          if (collapsed) {
+            props.collapsed = true;
+            props.expandedWidth = e.width;
+            props.expandedHeight = e.height;
+            return { ...e, width: COLLAPSED_W, height: COLLAPSED_H, properties: props };
+          }
+          delete props.collapsed;
+          const w = (props.expandedWidth as number | undefined) ?? 340;
+          const h = (props.expandedHeight as number | undefined) ?? 288;
+          delete props.expandedWidth;
+          delete props.expandedHeight;
+          return { ...e, width: w, height: h, properties: props };
+        }),
+      };
+    }
+
+    case "BRING_REVIEW_TO_FRONT": {
+      // Move the element to the END of the array so it paints on top of its
+      // peers in the same render bucket (item 14/15).
+      const idx = state.elements.findIndex((e) => e.id === action.payload);
+      if (idx < 0 || idx === state.elements.length - 1) return state;
+      const next = state.elements.slice();
+      const [moved] = next.splice(idx, 1);
+      next.push(moved);
+      return { ...state, elements: next };
+    }
+
     case "SET_RELAXED_LAYOUT":
       return { ...state, relaxedLayout: action.payload || undefined };
 
@@ -10168,6 +10207,18 @@ export function useDiagram(initialData: DiagramData) {
       (v: string) => {
         invalidateRedo();
         dispatch({ type: "SET_DIAGRAM_DESCRIPTION", payload: v });
+      }, []
+    ),
+    toggleReviewCollapse: useCallback(
+      (id: string) => {
+        invalidateRedo();
+        dispatch({ type: "TOGGLE_REVIEW_COLLAPSE", payload: id });
+      }, []
+    ),
+    bringReviewToFront: useCallback(
+      (id: string) => {
+        invalidateRedo();
+        dispatch({ type: "BRING_REVIEW_TO_FRONT", payload: id });
       }, []
     ),
     setRelaxedLayout: useCallback(
