@@ -35,6 +35,9 @@ declare global {
       // The committed diagram version this user is on — when it advances, idle
       // peers auto-align (pull+merge) so one person's Sync aligns the group.
       syncedVersion?: number;
+      // Liveness heartbeat (ms). Ghosts only render from sessions whose heartbeat
+      // is recent, so stale/zombie presence from an earlier session is ignored.
+      t?: number;
     };
     UserMeta: { id: string; info: { name: string; color: string } };
   }

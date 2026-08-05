@@ -34,6 +34,8 @@ export function CollabGhosts({
   return (
     <>
       {others.map(({ connectionId, presence, info }) => {
+        // Ignore stale/zombie sessions — only render ghosts from a live heartbeat.
+        if (!presence.t || Date.now() - presence.t > 15000) return null;
         const edits = presence.liveEdits;
         const conns = presence.liveConns;
         const deletes = presence.liveDeletes;

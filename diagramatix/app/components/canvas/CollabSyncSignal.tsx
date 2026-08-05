@@ -20,6 +20,14 @@ export function CollabSyncSignal({ version, onRemoteAdvance }: { version: number
   // Broadcast our committed version.
   useEffect(() => { updateMyPresence({ syncedVersion: version }); }, [version, updateMyPresence]);
 
+  // Liveness heartbeat — ghosts only render from sessions whose `t` is recent, so
+  // a stale/zombie connection from an earlier session stops showing its ghosts.
+  useEffect(() => {
+    updateMyPresence({ t: Date.now() });
+    const iv = setInterval(() => updateMyPresence({ t: Date.now() }), 5000);
+    return () => clearInterval(iv);
+  }, [updateMyPresence]);
+
   // Someone else committed a newer version → align once (guard against firing on
   // every presence tick, e.g. cursor moves).
   useEffect(() => {
