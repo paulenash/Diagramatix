@@ -119,6 +119,9 @@ interface Props {
   createdAt?: string;
   updatedAt?: string;
   readOnly?: boolean;
+  /** A VIEW-only project share. Read-only for the shared diagram, but the
+   *  recipient may drop pink Review markers and Send Feedback (item 6). */
+  canGiveFeedback?: boolean;
   viewingAsName?: string;
   viewingAsEmail?: string;
   impersonationMode?: "view" | "edit";
@@ -603,6 +606,7 @@ export function DiagramEditor({
   createdAt,
   updatedAt,
   readOnly,
+  canGiveFeedback,
   viewingAsName,
   viewingAsEmail,
   impersonationMode,
@@ -1481,6 +1485,70 @@ export function DiagramEditor({
   }, [rcElementParam, data.elements, toggleRcSection]);
 
   const reviewMode = !!reviewCtx && !reviewCtx.isRequester;
+
+  // Feedback mode — a VIEW-only project share. The shared diagram stays
+  // read-only, but the recipient may drop pink Review markers, tether them to
+  // elements, and Send Feedback (each note → a DiagramFeedback row for the
+  // owner). The markers live only in local state (autosave is off in readOnly),
+  // so they never alter the shared diagram (item 6).
+  const feedbackMode = !!readOnly && !!canGiveFeedback;
+  const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+  const [sendingFeedback, setSendingFeedback] = useState(false);
+  useEffect(() => {
+    if (!feedbackToast) return;
+    const t = setTimeout(() => setFeedbackToast(null), 6000);
+    return () => clearTimeout(t);
+  }, [feedbackToast]);
+  const isFeedbackNote = useCallback(
+    (id: string) => data.elements.find((e) => e.id === id)?.type === "review-comment",
+    [data.elements]
+  );
+  // Drop a blank pink note (tethered to the element under the drop, if any).
+  const handleAddFeedbackComment = useCallback(
+    (worldPos: { x: number; y: number }, targetElementId: string | null) => {
+      const commentId = nanoid();
+      addElement("review-comment", worldPos, undefined, undefined, commentId, {
+        label: "",
+        width: 170,
+        height: 96,
+        properties: { feedbackAuthor: currentUserName ?? userEmail ?? "" },
+      });
+      if (targetElementId) {
+        addConnector(commentId, targetElementId, "review-comment-link", "directed", "direct", "left", "right", undefined, undefined, true);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [addElement, addConnector, currentUserName, userEmail]
+  );
+  // Post every non-empty pink note as feedback (body = note text, anchored to
+  // its tethered element), then clear the sent notes from the local canvas.
+  const handleSendFeedback = useCallback(async () => {
+    const withText = data.elements.filter((e) => e.type === "review-comment" && (e.label ?? "").trim().length > 0);
+    if (withText.length === 0) { setFeedbackToast("Add a note first — drop a pink marker, type your comment, then Send."); return; }
+    setSendingFeedback(true);
+    let ok = 0; let unpublished = false;
+    for (const note of withText) {
+      const link = data.connectors.find((c) => c.type === "review-comment-link" && (c.sourceId === note.id || c.targetId === note.id));
+      const attachedElementId = link ? (link.sourceId === note.id ? link.targetId : link.sourceId) : null;
+      try {
+        const res = await fetch(`/api/diagrams/${diagramId}/feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: note.label, attachedElementId }),
+        });
+        if (res.ok) ok++;
+        else if (res.status === 409) unpublished = true;
+      } catch { /* keep going, report the tally */ }
+    }
+    setSendingFeedback(false);
+    if (ok === 0 && unpublished) { setFeedbackToast("This diagram has no published version yet — ask the owner to publish it before sending feedback."); return; }
+    if (ok > 0) {
+      for (const note of withText) deleteElement(note.id);
+      setFeedbackToast(`Sent ${ok} feedback note${ok === 1 ? "" : "s"} to the owner. Thank you!`);
+    } else {
+      setFeedbackToast("Could not send feedback — please try again.");
+    }
+  }, [data.elements, data.connectors, diagramId, deleteElement]);
 
   async function reviewStatusAction(action: "submit" | "decline" | "approve") {
     if (!reviewCtx) return;
@@ -5131,6 +5199,26 @@ export function DiagramEditor({
 
       </header>
 
+      {/* Feedback banner — a VIEW-only recipient can comment without editing the
+          shared diagram; each pink note is sent as feedback to the owner (item 6). */}
+      {feedbackMode && (
+        <div className="bg-pink-50 border-b border-pink-200 px-4 py-1.5 flex items-center gap-3 text-xs">
+          <span className="font-semibold text-pink-800">Feedback</span>
+          <span className="text-[11px] text-pink-700">View-only — drag a Review note onto an element, type your comment, then Send Feedback. Your notes don't change the shared diagram.</span>
+          <div className="ml-auto flex items-center gap-2">
+            {feedbackToast && <span className="text-[11px] text-pink-800 bg-white border border-pink-200 rounded px-2 py-0.5">{feedbackToast}</span>}
+            <button
+              onClick={handleSendFeedback}
+              disabled={sendingFeedback}
+              className="text-[11px] text-white bg-pink-600 hover:bg-pink-700 disabled:opacity-60 rounded px-2 py-0.5"
+              title="Send your review notes to the diagram owner"
+            >
+              {sendingFeedback ? "Sending…" : "Send Feedback"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main editor area */}
       {reviewMode && reviewCtx && (
         <div className="bg-pink-50 border-b border-pink-200 px-4 py-1.5 flex items-center gap-3 text-xs">
@@ -5186,27 +5274,55 @@ export function DiagramEditor({
           />
         )}
 
+        {/* Feedback rail — a VIEW-only recipient's single tool: a draggable pink
+            Review note. Everything else stays locked (item 6). */}
+        {feedbackMode && (
+          <div className="w-40 shrink-0 border-r border-gray-200 bg-pink-50/60 p-2 overflow-y-auto">
+            <div className="text-[10px] font-semibold text-pink-700 mb-1">Give Feedback</div>
+            <div
+              draggable
+              onDragStart={() => { setPendingDragSymbol("review-comment"); setPendingArchimateShapeKey(null); setPendingArchimateIconOnly(false); }}
+              className="cursor-grab active:cursor-grabbing rounded border border-pink-300 bg-white px-2 py-2 flex items-center gap-2 hover:bg-pink-50 select-none"
+              title="Drag onto an element (or empty space) to add a review note"
+            >
+              <svg width={22} height={16} viewBox="0 0 22 16" aria-hidden>
+                <path d="M1 1 L16 1 L21 6 L21 15 L1 15 Z" fill="#fce7f3" stroke="#ec4899" strokeWidth={1.2} strokeLinejoin="round" />
+                <rect x={1} y={1} width={2.5} height={14} fill="#ec4899" />
+              </svg>
+              <span className="text-[10px] text-gray-700 leading-tight">Review note</span>
+            </div>
+            <p className="text-[9px] text-gray-500 mt-2 leading-snug">Drop a note on an element to attach it, type your comment, then click <strong>Send Feedback</strong>.</p>
+          </div>
+        )}
+
         <Canvas
           data={displayData}
           diagramType={diagramType}
           renameBadges={renameFlow?.phase === "pick" ? renameFlow.targets : undefined}
           onAddElement={addElementGated}
-          onMoveElement={(id, x, y, uc) => { if (!isCoLocked(id)) moveElement(id, x, y, uc); }}
-          onResizeElement={(id, x, y, w, h) => { if (!isCoLocked(id)) resizeElement(id, x, y, w, h); }}
-          onUpdateLabel={(id, label) => { if (!isCoLocked(id)) handleUpdateLabel(id, label); }}
+          onMoveElement={(id, x, y, uc) => { if (feedbackMode && !isFeedbackNote(id)) return; if (!isCoLocked(id)) moveElement(id, x, y, uc); }}
+          onResizeElement={(id, x, y, w, h) => { if (feedbackMode && !isFeedbackNote(id)) return; if (!isCoLocked(id)) resizeElement(id, x, y, w, h); }}
+          onUpdateLabel={(id, label) => { if (feedbackMode && !isFeedbackNote(id)) return; if (!isCoLocked(id)) handleUpdateLabel(id, label); }}
           entityStructure={entityStructure}
           onAddEntityNode={addEntityNode}
           onBeginLabelEdit={beginLabelEdit}
           onUpdateLabelLive={updateLabelLive}
           onCancelLabelEdit={cancelLabelEdit}
           onDeleteElement={(id) => {
+            if (feedbackMode && !isFeedbackNote(id)) return; // feedback: notes only
             if (isCoLocked(id)) return; // another editor is holding this element
             deleteElement(id);
             setSelectedElementIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
           }}
-          onAddConnector={handleAddConnector}
-          onAddReviewComment={reviewMode ? handleAddReviewComment : undefined}
+          onAddConnector={(sourceId, targetId, type, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force, initialLabel) => {
+            // In feedback mode only a review tether (one end a pink note) is allowed.
+            if (feedbackMode && !isFeedbackNote(sourceId) && !isFeedbackNote(targetId)) return;
+            handleAddConnector(sourceId, targetId, type, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force, initialLabel);
+          }}
+          onAddReviewComment={reviewMode ? handleAddReviewComment : feedbackMode ? handleAddFeedbackComment : undefined}
           onDeleteConnector={(id) => {
+            // Feedback mode: only a review tether may be removed, never a real connector.
+            if (feedbackMode && data.connectors.find((c) => c.id === id)?.type !== "review-comment-link") return;
             deleteConnector(id);
             setSelectedConnectorId(null);
           }}
@@ -5263,7 +5379,7 @@ export function DiagramEditor({
           diagramName={diagramName}
           createdAt={createdAt}
           updatedAt={effectiveUpdatedAt}
-          readOnly={readOnly}
+          readOnly={readOnly && !feedbackMode}
           onDrillIntoSubprocess={handleDrillIntoSubprocess}
           onDrillBack={parentDiagram ? handleDrillBack : undefined}
           parentDiagramName={parentDiagram?.name}

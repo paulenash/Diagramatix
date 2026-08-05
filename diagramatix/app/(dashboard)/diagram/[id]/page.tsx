@@ -253,6 +253,7 @@ export default async function DiagramPage({ params, searchParams }: Props) {
         createdAt={diagram.createdAt.toISOString()}
         updatedAt={diagram.updatedAt.toISOString()}
         readOnly={(viewing && impersonationMode === "view") || isReadOnlyShare}
+        canGiveFeedback={isReadOnlyShare}
         viewingAsName={viewingAsName}
         viewingAsEmail={viewingAsEmail}
         impersonationMode={impersonationMode}
