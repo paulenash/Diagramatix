@@ -14,6 +14,7 @@ import { folderSubtree, folderCode } from "@/app/lib/pcf/bulkFolders";
 import { usePcfLevelColors } from "@/app/lib/pcf/usePcfLevelColors";
 import { pcfLevelStyle, pcfLevelFromCode } from "@/app/lib/pcf/levelColors";
 import { ProjectPropertiesPanel } from "./ProjectPropertiesPanel";
+import { DiagramPropertiesPanel } from "./DiagramPropertiesPanel";
 import { NumberingDialog, type NumberingConfig } from "./NumberingDialog";
 import { resolveNumberingConfig } from "@/app/lib/numbering/renumber";
 import { PcfCoveragePanel } from "./PcfCoveragePanel";
@@ -333,6 +334,9 @@ interface DiagramSummary {
   createdAt: Date;
   updatedAt: Date;
   data?: unknown;
+  version?: number;
+  diagramOwnerId?: string | null;
+  diagramOwner?: { name: string | null; email: string | null } | null;
 }
 
 interface ProjectDetail {
@@ -782,6 +786,9 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   // diagram via plain click.
   const [selectedDiagramIds, setSelectedDiagramIds] = useState<Set<string>>(new Set());
   const [lastSelectedDiagramId, setLastSelectedDiagramId] = useState<string | null>(null);
+  // Single-clicked "preview" diagram → shows the read/edit Diagram Properties
+  // aside (item 1). Distinct from the Ctrl/Shift multi-select set above.
+  const [previewDiagramId, setPreviewDiagramId] = useState<string | null>(null);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showBulkMoveDialog, setShowBulkMoveDialog] = useState(false);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
@@ -1882,12 +1889,13 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       setLastSelectedDiagramId(diagramId);
       return;
     }
-    // Plain click: clear any existing selection and open the diagram.
+    // Plain click: clear any multi-select and SELECT this diagram for preview
+    // (show its Diagram Properties aside). Double-click opens the editor.
     if (selectedDiagramIds.size > 0) {
       setSelectedDiagramIds(new Set());
       setLastSelectedDiagramId(null);
     }
-    handleOpenDiagram(diagramId);
+    setPreviewDiagramId(diagramId);
   }
 
   function clearDiagramSelection() {
@@ -2925,7 +2933,9 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                   onTranslate={handleTranslateDiagram}
                   onMove={handleMoveDiagram}
                   onCardClick={handleDiagramCardClick}
+                  onOpen={handleOpenDiagram}
                   selected={selectedDiagramIds.has(d.id)}
+                  preview={previewDiagramId === d.id}
                   colorConfig={projectColorConfig}
                   nonApqc={highlightNonApqc && !diagramIsApqc(d)}
                   apqcColor={apqcTone.text}
@@ -2935,9 +2945,25 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           )}
         </main>
 
+        {/* Right: per-diagram Properties — shown when a tile is single-clicked
+            (double-click opens). Takes priority over the Project Properties. */}
+        {previewDiagramId && (() => {
+          const d = diagrams.find((x) => x.id === previewDiagramId);
+          if (!d) return null;
+          return (
+            <DiagramPropertiesPanel
+              diagram={d}
+              readOnly={!!readOnly}
+              onClose={() => setPreviewDiagramId(null)}
+              onOpen={() => handleOpenDiagram(d.id)}
+              onLocalPatch={(patch) => setDiagrams((prev) => prev.map((x) => x.id === d.id ? { ...x, ...patch } : x))}
+            />
+          );
+        })()}
+
         {/* Right: Project Properties — shown when the top ("whole project")
             folder is selected and nothing is multi-selected / focused. */}
-        {selectedFolderId === ROOT_ID && selectedDiagramIds.size === 0 && !selectedDiagram && (
+        {!previewDiagramId && selectedFolderId === ROOT_ID && selectedDiagramIds.size === 0 && !selectedDiagram && (
           <ProjectPropertiesPanel
             projectId={project.id}
             name={projectName}
@@ -4175,7 +4201,9 @@ function DiagramCard({
   onTranslate,
   onMove,
   onCardClick,
+  onOpen,
   selected,
+  preview,
   colorConfig,
   nonApqc,
   apqcColor,
@@ -4190,7 +4218,9 @@ function DiagramCard({
     diagramId: string,
     mods: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean },
   ) => void;
+  onOpen: (id: string) => void;
   selected: boolean;
+  preview?: boolean;
   colorConfig?: SymbolColorConfig;
   nonApqc?: boolean;
   apqcColor?: string;
@@ -4205,12 +4235,15 @@ function DiagramCard({
       onClick={(e) => onCardClick(diagram.id, {
         shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey,
       })}
-      title={diagram.name}
-      style={{ backgroundColor: tileTint, ...(nonApqc && apqcColor && !selected ? { boxShadow: `0 0 0 2px ${apqcColor}` } : {}) }}
+      onDoubleClick={(e) => { e.preventDefault(); onOpen(diagram.id); }}
+      title={`${diagram.name} — double-click to open`}
+      style={{ backgroundColor: tileTint, ...(nonApqc && apqcColor && !selected && !preview ? { boxShadow: `0 0 0 2px ${apqcColor}` } : {}) }}
       className={`rounded-md px-2 py-1.5 hover:shadow-sm cursor-pointer group transition-all relative ${
         selected
           ? "border-2 border-blue-500 ring-2 ring-blue-200"
-          : "border border-gray-200 hover:border-blue-300"
+          : preview
+            ? "border-2 border-emerald-500 ring-2 ring-emerald-200"
+            : "border border-gray-200 hover:border-blue-300"
       }`}
     >
       {/* Row 1: Name + action icons */}
