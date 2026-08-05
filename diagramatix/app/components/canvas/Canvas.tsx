@@ -2120,6 +2120,7 @@ export function Canvas({
         || elType === "uml-note"
         || elType === "uml-pain-point"
         || elType === "uml-issue"
+        || elType === "review-comment" // pink sticky resizes freely in both axes (item 12)
         || elType === "archimate-shape"; // all ArchiMate shapes resize freely (incl. icon-only)
       if (!isContainer && !freeResize && ar > 0) {
         if (handle.includes("e") || handle.includes("w")) {
@@ -7574,7 +7575,7 @@ export function Canvas({
               width: liveW,
               height: editH,
               fontSize: (data.fontSize ?? 12) * zoom,
-              textAlign: "center",
+              textAlign: editingEl?.type === "review-comment" ? "left" : "center",
               background: "white",
               border: "2px solid #2563eb",
               borderRadius: 4,

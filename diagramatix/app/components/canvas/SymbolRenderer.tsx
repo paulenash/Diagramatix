@@ -3204,17 +3204,28 @@ export function SymbolRenderer({
         );
       })() : showLabel && element.type === 'review-comment' ? (() => {
         if (!showReviewMarkers) return null; // hidden by the review-marker toggle
+        if (element.properties.collapsed) return null; // collapsed icon shows no body text
         const PAD = 8;
-        const lines = wrapText(element.label, element.width - PAD - 6);
         const lineH = 13;
+        // Bold, non-editable header ("Name · dd/mm/yy hh:mm am/pm") from
+        // properties, then the editable body (label) wrapped below — all
+        // left-justified. Old notes (header baked into label, no authorName)
+        // just render their label.
+        const authorName = element.properties.authorName as string | undefined;
+        const createdStamp = element.properties.createdStamp as string | undefined;
+        const header = authorName ? `${authorName}${createdStamp ? ` · ${createdStamp}` : ""}` : null;
+        const headerLines = header ? wrapText(header, element.width - PAD - 6) : [];
+        const bodyLines = element.label ? wrapText(element.label, element.width - PAD - 6) : [];
+        let y = element.y + PAD + lineH * 0.8;
         return (
           <text textAnchor="start" fontSize={fs(11)} fill="#831843"
             style={{ userSelect: "none", pointerEvents: "none" }}>
-            {lines.map((line, i) => (
-              <tspan key={i} x={element.x + PAD} y={element.y + PAD + i * lineH + lineH * 0.8}>
-                {line}
-              </tspan>
-            ))}
+            {headerLines.map((line, i) => { const ty = y; y += lineH; return (
+              <tspan key={`h${i}`} x={element.x + PAD} y={ty} fontWeight={700}>{line}</tspan>
+            ); })}
+            {bodyLines.map((line, i) => { const ty = y; y += lineH; return (
+              <tspan key={`b${i}`} x={element.x + PAD} y={ty}>{line}</tspan>
+            ); })}
           </text>
         );
       })() : showLabel && !(

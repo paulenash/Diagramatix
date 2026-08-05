@@ -104,6 +104,14 @@ interface VisioImportResult {
   };
 }
 
+// Review Comment default size (item 10). The collapsed icon is 1/3 of these.
+const REVIEW_COMMENT_W = 340;
+const REVIEW_COMMENT_H = 288;
+// Bold, non-editable header stamp on a review comment: "Name · dd/mm/yy hh:mm am/pm".
+function fmtReviewStamp(d: Date): string {
+  return d.toLocaleString("en-AU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true });
+}
+
 interface Props {
   diagramId: string;
   /** The saved SuperAdmin model-comparison matrix for this diagram (or {} if
@@ -1509,11 +1517,12 @@ export function DiagramEditor({
   const handleAddFeedbackComment = useCallback(
     (worldPos: { x: number; y: number }, targetElementId: string | null) => {
       const commentId = nanoid();
+      const authorName = currentUserName ?? userEmail ?? "";
       addElement("review-comment", worldPos, undefined, undefined, commentId, {
         label: "",
-        width: 170,
-        height: 96,
-        properties: { feedbackAuthor: currentUserName ?? userEmail ?? "" },
+        width: REVIEW_COMMENT_W,
+        height: REVIEW_COMMENT_H,
+        properties: { feedbackAuthor: authorName, authorName, createdStamp: fmtReviewStamp(new Date()) },
       });
       if (targetElementId) {
         addConnector(commentId, targetElementId, "review-comment-link", "directed", "direct", "left", "right", undefined, undefined, true);
@@ -3053,16 +3062,17 @@ export function DiagramEditor({
     (worldPos: { x: number; y: number }, targetElementId: string | null) => {
       if (!reviewCtx) return;
       const commentId = nanoid();
-      const header = `${reviewCtx.myName ?? "Reviewer"}\n${reviewCtx.myEmail ?? ""}\n---\n`;
       addElementGated("review-comment", worldPos, undefined, undefined, commentId, {
-        label: header,
-        width: 170,
-        height: 96,
+        label: "",
+        width: REVIEW_COMMENT_W,
+        height: REVIEW_COMMENT_H,
         properties: {
           reviewId: reviewCtx.reviewId,
           reviewerId: reviewCtx.myUserId,
           reviewerName: reviewCtx.myName,
           reviewerEmail: reviewCtx.myEmail,
+          authorName: reviewCtx.myName ?? "Reviewer",
+          createdStamp: fmtReviewStamp(new Date()),
         },
       });
       if (targetElementId) {
