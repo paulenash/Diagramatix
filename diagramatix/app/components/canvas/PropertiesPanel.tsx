@@ -2480,6 +2480,7 @@ export function PropertiesPanel({
             key={`rc-body-${element.id}`}
             value={element.label ?? ""}
             onChange={(html) => onUpdateLabel(element.id, html)}
+            dictation
           />
         </div>
       )}

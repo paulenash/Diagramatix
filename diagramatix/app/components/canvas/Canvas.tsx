@@ -7451,6 +7451,7 @@ export function Canvas({
                   key={`rc-zoom-${editingLabel.elementId}`}
                   value={editingLabel.value}
                   onChange={(html) => { rcZoomRef.current = html; }}
+                  dictation
                 />
                 <div className="flex justify-end mt-1">
                   <button onClick={commitRc}
