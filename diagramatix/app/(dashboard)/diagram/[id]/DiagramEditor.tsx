@@ -117,6 +117,13 @@ const REVIEW_COMMENT_H = 144;
 function fmtReviewStamp(d: Date): string {
   return d.toLocaleString("en-AU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true });
 }
+// Initial width wide enough for the bold header (name + timestamp). A long name
+// pushes past the cap, in which case the renderer drops the timestamp to line 2.
+function reviewCommentWidth(name: string, stamp: string): number {
+  const header = stamp ? `${name} · ${stamp}` : name;
+  const est = Math.ceil(header.length * 6.6) + 24; // ~char width @ 11px + padding
+  return Math.min(360, Math.max(REVIEW_COMMENT_W, est));
+}
 
 interface Props {
   diagramId: string;
@@ -1526,11 +1533,12 @@ export function DiagramEditor({
     (worldPos: { x: number; y: number }, targetElementId: string | null) => {
       const commentId = nanoid();
       const authorName = currentUserName ?? userEmail ?? "";
+      const stamp = fmtReviewStamp(new Date());
       addElement("review-comment", worldPos, undefined, undefined, commentId, {
         label: "",
-        width: REVIEW_COMMENT_W,
+        width: reviewCommentWidth(authorName, stamp),
         height: REVIEW_COMMENT_H,
-        properties: { feedbackAuthor: authorName, authorName, createdStamp: fmtReviewStamp(new Date()) },
+        properties: { feedbackAuthor: authorName, authorName, createdStamp: stamp },
       });
       if (targetElementId) {
         addConnector(commentId, targetElementId, "review-comment-link", "directed", "direct", "left", "right", undefined, undefined, true);
@@ -1544,11 +1552,13 @@ export function DiagramEditor({
   const handleAddAuthorReviewComment = useCallback(
     (worldPos: { x: number; y: number }, targetElementId: string | null) => {
       const commentId = nanoid();
+      const authorName = currentUserName ?? userEmail ?? "";
+      const stamp = fmtReviewStamp(new Date());
       addElementGated("review-comment", worldPos, undefined, undefined, commentId, {
         label: "",
-        width: REVIEW_COMMENT_W,
+        width: reviewCommentWidth(authorName, stamp),
         height: REVIEW_COMMENT_H,
-        properties: { authorName: currentUserName ?? userEmail ?? "", createdStamp: fmtReviewStamp(new Date()) },
+        properties: { authorName, createdStamp: stamp },
       });
       if (targetElementId) {
         addConnector(commentId, targetElementId, "review-comment-link", "directed", "direct", "left", "right", undefined, undefined, true);
@@ -3092,17 +3102,19 @@ export function DiagramEditor({
     (worldPos: { x: number; y: number }, targetElementId: string | null) => {
       if (!reviewCtx) return;
       const commentId = nanoid();
+      const authorName = reviewCtx.myName ?? "Reviewer";
+      const stamp = fmtReviewStamp(new Date());
       addElementGated("review-comment", worldPos, undefined, undefined, commentId, {
         label: "",
-        width: REVIEW_COMMENT_W,
+        width: reviewCommentWidth(authorName, stamp),
         height: REVIEW_COMMENT_H,
         properties: {
           reviewId: reviewCtx.reviewId,
           reviewerId: reviewCtx.myUserId,
           reviewerName: reviewCtx.myName,
           reviewerEmail: reviewCtx.myEmail,
-          authorName: reviewCtx.myName ?? "Reviewer",
-          createdStamp: fmtReviewStamp(new Date()),
+          authorName,
+          createdStamp: stamp,
         },
       });
       if (targetElementId) {

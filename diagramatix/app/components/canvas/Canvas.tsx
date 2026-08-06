@@ -5766,7 +5766,7 @@ export function Canvas({
             // In ArchiMate diagrams EVERY connector renders on top of all
             // elements (handled by the on-top pass below), so exclude them
             // all here. Elsewhere only associationBPMN/messageBPMN are on top.
-            const regularConns = data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN" && !(c.type.startsWith("archi-") || diagramType === "archimate"));
+            const regularConns = data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN" && c.type !== "review-comment-link" && !(c.type.startsWith("archi-") || diagramType === "archimate"));
             const humpEligible = regularConns.filter(c => c.type === "sequence" || c.type === "association" || c.type === "uml-association");
             return regularConns.filter(c => c.id !== selectedConnectorId).map((conn) => (
               <ConnectorRenderer
@@ -7317,6 +7317,24 @@ export function Canvas({
                 fill="none" stroke={nonApqcColor} strokeWidth={2.5 / zoom} rx={4} strokeDasharray={`${6 / zoom} ${3 / zoom}`} pointerEvents="none"
               />
             ))}
+
+          {/* Review-comment TETHERS — rendered here (just under the notes) so the
+              pink association floats on top of every element in every diagram
+              type, matching the notes themselves. */}
+          {data.connectors.filter(c => c.type === "review-comment-link" && c.id !== selectedConnectorId).map((conn) => (
+            <ConnectorRenderer
+              key={`rc-link-${conn.id}`}
+              connector={conn}
+              reviewLinkColor={reviewLinkColorFor(conn)}
+              selected={false}
+              onSelect={() => { onSelectConnector(conn.id); onSetSelectedElements(new Set()); }}
+              svgToWorld={clientToWorld}
+              onUpdateWaypoints={onUpdateConnectorWaypoints}
+              onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}
+              debugMode={debugMode}
+              relaxedLayout={data.relaxedLayout}
+            />
+          ))}
 
           {/* Review comments — ALWAYS the final pass so they float on top of
               every other element/overlay on the canvas (items 14/15 + D). Order

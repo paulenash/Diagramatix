@@ -3250,8 +3250,16 @@ export function SymbolRenderer({
         // just render their label.
         const authorName = element.properties.authorName as string | undefined;
         const createdStamp = element.properties.createdStamp as string | undefined;
-        const header = authorName ? `${authorName}${createdStamp ? ` · ${createdStamp}` : ""}` : null;
-        const headerLines = header ? wrapText(header, element.width - PAD - 6) : [];
+        // Header: "Name · timestamp" on one line when it fits; otherwise the
+        // name (wrapped) then the timestamp on its own line (item 2).
+        const hw = element.width - PAD - 6;
+        const namePart = authorName ?? "";
+        const stampPart = createdStamp ?? "";
+        const oneLine = stampPart ? `${namePart} · ${stampPart}` : namePart;
+        const oneLineWrapped = namePart ? wrapText(oneLine, hw) : [];
+        const headerLines = !namePart ? []
+          : oneLineWrapped.length <= 1 ? oneLineWrapped
+          : [...wrapText(namePart, hw), ...(stampPart ? [stampPart] : [])];
         let y = element.y + PAD + lineH * 0.8;
         const rcText = REVIEW_COMMENT_PALETTE[(reviewCommentColorMap.get(reviewCommentAuthorKey(element)) ?? 0) % REVIEW_COMMENT_PALETTE.length].text;
         // Body is RICH TEXT (item Q) — sanitized HTML rendered in a foreignObject
