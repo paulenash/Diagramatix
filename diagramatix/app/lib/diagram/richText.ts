@@ -34,6 +34,31 @@ export function plainToHtml(s: string): string {
 }
 
 /**
+ * Flatten a rich-text (or plain) string to plain-text LINES, so a compact
+ * list can preview the first few without HTML tags. Block boundaries
+ * (`</p>`, `</div>`, `</li>`, `<br>`) become line breaks; all other tags are
+ * dropped and a small set of HTML entities is decoded. Empty lines are removed.
+ */
+export function richToLines(s: string | undefined | null): string[] {
+  if (!s) return [];
+  const withBreaks = s
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\/\s*(p|div|li|ul|ol)\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, "");
+  const decoded = withBreaks
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"');
+  return decoded
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
+/**
  * Sanitise a contentEditable HTML fragment to the allowed-tag whitelist,
  * stripping ALL attributes. Implemented with a DOM walk when `document` is
  * available (the editor runs client-side); falls back to a conservative

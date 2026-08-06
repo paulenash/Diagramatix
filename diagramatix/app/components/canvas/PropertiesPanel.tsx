@@ -17,6 +17,7 @@ import type {
   UmlOperation,
 } from "@/app/lib/diagram/types";
 import { RichTextEditor } from "./RichTextEditor";
+import { richToLines } from "@/app/lib/diagram/richText";
 import { SimulationSection } from "./SimulationSection";
 import { useSharePointAvailable } from "@/app/lib/auth/useOrgPolicy";
 
@@ -1349,7 +1350,19 @@ export function PropertiesPanel({
                 <div key={rc.id} className="flex items-start gap-1">
                   <span className="text-pink-500 text-[10px] mt-0.5 shrink-0" aria-hidden>◆</span>
                   <span className="flex-1 text-[9px] text-gray-600 leading-tight break-words">
-                    {(rc.label && rc.label.trim()) || "Review Comment"}
+                    {(() => {
+                      // Preview only the first up to 4 lines (plain text) to save
+                      // space; the body is rich HTML, so flatten + truncate.
+                      const lines = richToLines(rc.label);
+                      if (!lines.length) return "Review Comment";
+                      const head = lines.slice(0, 4);
+                      return (
+                        <>
+                          {head.map((l, i) => (<span key={i} className="block truncate">{l}</span>))}
+                          {lines.length > 4 && <span className="block text-gray-400">…</span>}
+                        </>
+                      );
+                    })()}
                   </span>
                   <button
                     onClick={() => onDeleteElement(rc.id)}
@@ -3286,6 +3299,7 @@ export function PropertiesPanel({
               key={`desc-${element.id}`}
               value={(element.properties.description as string | undefined) ?? ""}
               onChange={(html) => onUpdateProperties(element.id, { description: html || undefined })}
+              dictation
             />
           </div>
           <label className="flex items-center gap-1 text-[10px] text-gray-700">
