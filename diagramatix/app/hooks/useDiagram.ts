@@ -7599,29 +7599,33 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, description: action.payload || undefined };
 
     case "TOGGLE_REVIEW_COLLAPSE": {
-      // Collapse a review-comment to a small icon (1/3 of the 340x288 default),
-      // stashing its expanded size; expand restores the stashed size (item 11).
-      const COLLAPSED_W = 113, COLLAPSED_H = 96;
-      return {
-        ...state,
-        elements: state.elements.map((e) => {
-          if (e.id !== action.payload || e.type !== "review-comment") return e;
-          const collapsed = !e.properties.collapsed;
-          const props = { ...e.properties };
-          if (collapsed) {
-            props.collapsed = true;
-            props.expandedWidth = e.width;
-            props.expandedHeight = e.height;
-            return { ...e, width: COLLAPSED_W, height: COLLAPSED_H, properties: props };
-          }
-          delete props.collapsed;
-          const w = (props.expandedWidth as number | undefined) ?? 340;
-          const h = (props.expandedHeight as number | undefined) ?? 288;
-          delete props.expandedWidth;
-          delete props.expandedHeight;
-          return { ...e, width: w, height: h, properties: props };
-        }),
-      };
+      // Collapse a review-comment to a small icon, stashing its expanded size;
+      // expand restores the stashed size (item 11). Collapsed = 38x32.
+      const COLLAPSED_W = 38, COLLAPSED_H = 32;
+      const elements = state.elements.map((e) => {
+        if (e.id !== action.payload || e.type !== "review-comment") return e;
+        const collapsed = !e.properties.collapsed;
+        const props = { ...e.properties };
+        if (collapsed) {
+          props.collapsed = true;
+          props.expandedWidth = e.width;
+          props.expandedHeight = e.height;
+          return { ...e, width: COLLAPSED_W, height: COLLAPSED_H, properties: props };
+        }
+        delete props.collapsed;
+        const w = (props.expandedWidth as number | undefined) ?? 227;
+        const h = (props.expandedHeight as number | undefined) ?? 144;
+        delete props.expandedWidth;
+        delete props.expandedHeight;
+        return { ...e, width: w, height: h, properties: props };
+      });
+      // Re-route the pink tether(s) so the endpoint follows the new boundary
+      // instead of being left behind at the old size (item 13 / issue C).
+      const connectors = state.connectors.map((c) => {
+        if (c.type !== "review-comment-link" || (c.sourceId !== action.payload && c.targetId !== action.payload)) return c;
+        return recomputeAllConnectors([c], elements, state.relaxedLayout)[0] ?? c;
+      });
+      return { ...state, elements, connectors };
     }
 
     case "BRING_REVIEW_TO_FRONT": {

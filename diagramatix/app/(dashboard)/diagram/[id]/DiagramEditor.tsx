@@ -104,9 +104,9 @@ interface VisioImportResult {
   };
 }
 
-// Review Comment default size (item 10). The collapsed icon is 1/3 of these.
-const REVIEW_COMMENT_W = 340;
-const REVIEW_COMMENT_H = 288;
+// Review Comment default creation size (2/3 W × 1/2 H of the old 340×288).
+const REVIEW_COMMENT_W = 227;
+const REVIEW_COMMENT_H = 144;
 // Bold, non-editable header stamp on a review comment: "Name · dd/mm/yy hh:mm am/pm".
 function fmtReviewStamp(d: Date): string {
   return d.toLocaleString("en-AU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true });

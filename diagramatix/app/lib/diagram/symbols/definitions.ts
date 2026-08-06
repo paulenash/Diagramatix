@@ -292,8 +292,8 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   {
     type: "review-comment",
     label: "Review Comment",
-    defaultWidth: 340,
-    defaultHeight: 288,
+    defaultWidth: 227,
+    defaultHeight: 144,
     description: "A reviewer's comment note (Phase 3) — pink sticky linked to the element it concerns",
   },
   // ── Standard Flowchart (monochrome ISO 5807 symbols) ──

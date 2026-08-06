@@ -10,7 +10,7 @@ import type { DiagramData } from "@/app/lib/diagram/types";
 const base = (): DiagramData => ({ elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } });
 const addRc = (id: string, x = 100): Action => ({
   type: "ADD_ELEMENT",
-  payload: { symbolType: "review-comment", position: { x, y: 100 }, id, initial: { width: 340, height: 288 } },
+  payload: { symbolType: "review-comment", position: { x, y: 100 }, id, initial: { width: 227, height: 144 } },
 });
 const addTask = (id: string): Action => ({
   type: "ADD_ELEMENT",
@@ -22,22 +22,22 @@ describe("review comment", () => {
   it("collapses to a 1/3 icon (stashing the expanded size) and expands back", () => {
     let d = base();
     d = reducer(d, addRc("r1"));
-    expect(at(d, "r1")?.width).toBe(340);
-    expect(at(d, "r1")?.height).toBe(288);
+    expect(at(d, "r1")?.width).toBe(227);
+    expect(at(d, "r1")?.height).toBe(144);
 
     d = reducer(d, { type: "TOGGLE_REVIEW_COLLAPSE", payload: "r1" });
     const c = at(d, "r1")!;
     expect(c.properties.collapsed).toBe(true);
-    expect(c.width).toBe(113);
-    expect(c.height).toBe(96);
-    expect(c.properties.expandedWidth).toBe(340);
-    expect(c.properties.expandedHeight).toBe(288);
+    expect(c.width).toBe(38);
+    expect(c.height).toBe(32);
+    expect(c.properties.expandedWidth).toBe(227);
+    expect(c.properties.expandedHeight).toBe(144);
 
     d = reducer(d, { type: "TOGGLE_REVIEW_COLLAPSE", payload: "r1" });
     const e = at(d, "r1")!;
     expect(e.properties.collapsed).toBeUndefined();
-    expect(e.width).toBe(340);
-    expect(e.height).toBe(288);
+    expect(e.width).toBe(227);
+    expect(e.height).toBe(144);
   });
 
   it("brings a review comment to the front (end of the elements array)", () => {

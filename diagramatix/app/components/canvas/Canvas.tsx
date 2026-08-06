@@ -5771,8 +5771,10 @@ export function Canvas({
 
           {/* Debug labels rendered at end of SVG for z-order */}
 
-          {/* Non-container elements */}
-          {nonContainers.filter(el => !inActiveGroup(el.id)).map((el) => {
+          {/* Non-container elements. Review comments are pulled OUT here and
+              rendered in a dedicated final pass so they always float on top of
+              everything else on the canvas (items 14/15 + D). */}
+          {nonContainers.filter(el => !inActiveGroup(el.id) && el.type !== "review-comment").map((el) => {
             let elIsDropTarget = false;
             let elIsMsgTarget = false;
             let elIsAssocTarget = false;
@@ -6400,7 +6402,7 @@ export function Canvas({
               ...pools, ...otherContainers,
               ...lanes,
               ...expandedSubprocesses,
-              ...nonContainers,
+              ...nonContainers.filter(e => e.type !== "review-comment"),
               ...boundaryEvents,
               ...groupElements,
             ].filter(el => selectedElementIds.has(el.id));
@@ -7276,6 +7278,49 @@ export function Canvas({
                 fill="none" stroke={nonApqcColor} strokeWidth={2.5 / zoom} rx={4} strokeDasharray={`${6 / zoom} ${3 / zoom}`} pointerEvents="none"
               />
             ))}
+
+          {/* Review comments — ALWAYS the final pass so they float on top of
+              every other element/overlay on the canvas (items 14/15 + D). Order
+              follows data.elements, so BRING_REVIEW_TO_FRONT (move-to-end) puts
+              the active note above its overlapping peers (item 15). */}
+          {data.elements.filter(el => el.type === "review-comment").map((el) => (
+            <SymbolRenderer
+              key={`rc-${el.id}`}
+              element={el}
+              selected={selectedElementIds.has(el.id)}
+              isDropTarget={false}
+              multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+              onSelect={(ev) => {
+                onBringReviewToFront?.(el.id); // grab a note → it comes forward (item 15)
+                if (ev?.shiftKey && !ev?.ctrlKey) {
+                  onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
+                } else if (!selectedElementIds.has(el.id)) {
+                  onSetSelectedElements(new Set([el.id]));
+                }
+                onSelectConnector(null);
+              }}
+              onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
+              onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
+              onToggleReviewCollapse={onToggleReviewCollapse}
+              onDoubleClick={() => {
+                // Collapsed icon → expand + front (item 14); expanded → edit body.
+                if (el.properties.collapsed) { onToggleReviewCollapse?.(el.id); onBringReviewToFront?.(el.id); }
+                else startEditingLabel(el);
+              }}
+              onConnectionPointDragStart={(side, worldPos) => handleConnectionPointDragStart(el.id, side, worldPos)}
+              showConnectionPoints={selectedElementIds.size <= 1 && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
+              onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
+              svgToWorld={clientToWorld}
+              onUpdateProperties={onUpdateProperties}
+              onUpdateLabel={onUpdateLabel}
+              onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
+              onLabelFocusEditEnd={exitFocusMode}
+              onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+              onGroupMoveEnd={onElementsMoveEnd}
+              colorConfig={colorConfig}
+              debugMode={debugMode}
+            />
+          ))}
 
         </g>
       </svg>
