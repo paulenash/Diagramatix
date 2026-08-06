@@ -1162,13 +1162,10 @@ export function PropertiesPanel({
                 className="w-full text-[9px] border border-gray-300 rounded px-1 py-0.5 resize-none overflow-auto focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
               <label className="block text-[9px] text-gray-500 mb-0.5 mt-1">Description</label>
-              <textarea
+              <RichTextEditor
                 key={`diag-desc-${diagramName}`}
-                defaultValue={description ?? ""}
-                onBlur={(e) => onSetDescription?.(e.target.value)}
-                rows={5}
-                placeholder="A fuller description\u2026"
-                className="w-full text-[9px] border border-gray-300 rounded px-1 py-0.5 resize-none overflow-auto focus:outline-none focus:ring-1 focus:ring-blue-500"
+                value={description ?? ""}
+                onChange={(html) => onSetDescription?.(html)}
               />
             </div>
           )}

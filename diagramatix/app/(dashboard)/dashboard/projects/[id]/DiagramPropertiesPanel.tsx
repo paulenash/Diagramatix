@@ -15,6 +15,8 @@
  * read-only here (their pickers live in the editor).
  */
 import { useState } from "react";
+import { RichTextEditor } from "@/app/components/canvas/RichTextEditor";
+import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
 interface DiagramLite {
@@ -44,6 +46,9 @@ export function DiagramPropertiesPanel({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const disabled = readOnly || saving;
+  const descHtml = data.description
+    ? (isRichText(data.description) ? sanitizeRichText(data.description) : plainToHtml(data.description))
+    : "<span class='text-gray-400'>—</span>";
 
   // Save a partial DiagramData patch: GET fresh → merge → PUT (compare-and-swap
   // on version), so we never clobber a concurrent editor.
@@ -133,8 +138,16 @@ export function DiagramPropertiesPanel({
         <textarea className={`${inputCls} resize-none overflow-auto`} rows={2} defaultValue={data.purpose ?? ""} disabled={disabled}
           onBlur={(e) => saveData({ purpose: e.target.value || undefined })} placeholder="What this diagram is for…" />
         <label className={`${labelCls} mt-1`}>Description</label>
-        <textarea className={`${inputCls} resize-none overflow-auto`} rows={5} defaultValue={data.description ?? ""} disabled={disabled}
-          onBlur={(e) => saveData({ description: e.target.value || undefined })} placeholder="A fuller description…" />
+        {disabled ? (
+          <div className="dgx-rich-desc text-[11px] border border-gray-200 rounded px-2 py-1 bg-gray-50 text-gray-600 min-h-[3rem]"
+            dangerouslySetInnerHTML={{ __html: descHtml }} />
+        ) : (
+          <RichTextEditor
+            key={`diag-desc-${diagram.id}`}
+            value={data.description ?? ""}
+            onChange={(html) => saveData({ description: html || undefined })}
+          />
+        )}
       </div>
 
       {/* Diagram Owner — read-only here (picker lives in the editor) */}
