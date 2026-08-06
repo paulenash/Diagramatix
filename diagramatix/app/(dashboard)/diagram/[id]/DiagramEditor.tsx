@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { flushSync } from "react-dom";
+import { filterAnnotations, NO_ANNOTATIONS, hasAnnotations, type AnnotationInclude } from "@/app/lib/diagram/annotationFilter";
 import { useRouter, useSearchParams } from "next/navigation";
 import { APQC_ATTRIBUTION, dataHasPcf } from "@/app/lib/pcf/attribution";
 import {
@@ -1776,8 +1778,13 @@ export function DiagramEditor({
   const fileMenuRef = useRef<HTMLDivElement>(null);
   // Which submenu (Export ▶ / Import ▶) is currently expanded.
   const [fileSubmenu, setFileSubmenu] = useState<"export" | "import" | null>(null);
-  const [showPdfScalePopover, setShowPdfScalePopover] = useState(false);
   const [pendingPdfScale, setPendingPdfScale] = useState(100);
+  // Export annotation options (items M): which of Review Comments / Pain Points
+  // / Issues to INCLUDE (default none), the pending dialog format, and a
+  // transient hide-override applied to the canvas during SVG/PDF DOM capture.
+  const [exportDlg, setExportDlg] = useState<null | "svg" | "pdf" | "json">(null);
+  const [exportInc, setExportInc] = useState<AnnotationInclude>(NO_ANNOTATIONS);
+  const [exportHide, setExportHide] = useState<{ reviewComments?: boolean; painPoints?: boolean; issues?: boolean } | null>(null);
   // SuperAdmin "Diagram Bundle" export result/error message (AlertDialog).
   const [bundleMsg, setBundleMsg] = useState<string | null>(null);
   const importJsonInputRef = useRef<HTMLInputElement>(null);
@@ -2181,19 +2188,18 @@ export function DiagramEditor({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [resizeDropdownOpen]);
 
-  // Close File menu on outside click (also dismisses any open PDF-scale popover)
+  // Close File menu on outside click
   useEffect(() => {
-    if (!fileMenuOpen && !showPdfScalePopover) return;
+    if (!fileMenuOpen) return;
     function handleClick(e: MouseEvent) {
       if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
         setFileMenuOpen(false);
         setFileSubmenu(null);
-        setShowPdfScalePopover(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [fileMenuOpen, showPdfScalePopover]);
+  }, [fileMenuOpen]);
 
   // Close Clear menu on outside click
   useEffect(() => {
@@ -3117,19 +3123,55 @@ export function DiagramEditor({
     }).catch(() => {/* best-effort persist */});
   }
 
-  function handleExport() {
-    const svgEl = document.querySelector<SVGSVGElement>("svg[data-canvas]");
-    if (svgEl) exportSvg(svgEl, diagramName);
+  // SVG/PDF capture the LIVE canvas DOM, so to exclude annotations we flip the
+  // show* toggles (via exportHide) with flushSync, capture, then restore — no
+  // data mutation, no flicker the user commits.
+  function withExportHidden<T>(inc: AnnotationInclude, run: () => T): T {
+    const hide = { reviewComments: !inc.reviewComments, painPoints: !inc.painPoints, issues: !inc.issues };
+    const needHide = hide.reviewComments || hide.painPoints || hide.issues;
+    if (needHide) flushSync(() => setExportHide(hide));
+    try { return run(); }
+    finally { if (needHide) setExportHide(null); }
   }
 
-  async function handleExportPdf() {
+  function handleExport(inc: AnnotationInclude = NO_ANNOTATIONS) {
+    withExportHidden(inc, () => {
+      const svgEl = document.querySelector<SVGSVGElement>("svg[data-canvas]");
+      if (svgEl) exportSvg(svgEl, diagramName);
+    });
+  }
+
+  async function handleExportPdf(inc: AnnotationInclude = NO_ANNOTATIONS) {
     const svgEl = document.querySelector<SVGSVGElement>("svg[data-canvas]");
-    if (svgEl) await exportPdf(svgEl, diagramName, data, pdfScale / 100);
+    if (!svgEl) return;
+    const hide = { reviewComments: !inc.reviewComments, painPoints: !inc.painPoints, issues: !inc.issues };
+    const needHide = hide.reviewComments || hide.painPoints || hide.issues;
+    if (needHide) flushSync(() => setExportHide(hide));
+    try {
+      // Bounds come from the filtered data so hidden annotations don't pad the page.
+      await exportPdf(svgEl, diagramName, filterAnnotations(data, inc), pdfScale / 100);
+    } finally {
+      if (needHide) setExportHide(null);
+    }
+  }
+
+  // Open the export-options dialog (PDF always needs it for scale; SVG/JSON only
+  // when the diagram actually has annotations to offer excluding).
+  function openExport(format: "svg" | "pdf" | "json") {
+    if (format !== "pdf" && !hasAnnotations(data)) {
+      if (format === "svg") handleExport(NO_ANNOTATIONS);
+      else void handleExportJson(NO_ANNOTATIONS);
+      return;
+    }
+    setExportInc(NO_ANNOTATIONS);
+    if (format === "pdf") setPendingPdfScale(pdfScale);
+    setExportDlg(format);
   }
 
   // Export the current diagram's data as a JSON file (single-diagram envelope
   // matching the project export format so it round-trips through Import JSON).
-  async function handleExportJson() {
+  async function handleExportJson(inc: AnnotationInclude = NO_ANNOTATIONS) {
+    const exportData = filterAnnotations(data, inc);
     const { SCHEMA_VERSION } = await import("@/app/lib/diagram/types");
     let appVersion = SCHEMA_VERSION;
     try {
@@ -3149,7 +3191,7 @@ export function DiagramEditor({
         originalId: diagramId,
         name: diagramName,
         type: diagramType,
-        data,
+        data: exportData,
         colorConfig: diagramColorConfig,
         displayMode,
       }],
@@ -3272,7 +3314,7 @@ export function DiagramEditor({
       appVersion,
       diagramName,
       diagramType,
-      diagramData: data,
+      diagramData: filterAnnotations(data, NO_ANNOTATIONS), // XML never carries annotations (item O)
       diagramId,
       displayMode,
       diagramColorConfig: diagramColorConfig,
@@ -4874,7 +4916,6 @@ export function DiagramEditor({
             onClick={() => {
               setFileMenuOpen((prev) => !prev);
               setFileSubmenu(null);
-              setShowPdfScalePopover(false);
             }}
             className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
           >
@@ -4935,27 +4976,9 @@ export function DiagramEditor({
                           <div className="absolute bg-white border border-gray-200 rounded shadow-lg py-1 z-[10001]" style={{ top: "100%", left: -100, minWidth: 160 }}>
                             {sect === "export" ? (
                               <>
-                                {/* PDF — opens scale popover */}
-                                <div className="relative">
-                                  <button onClick={() => { setPendingPdfScale(pdfScale); setShowPdfScalePopover(true); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">PDF</button>
-                                  {showPdfScalePopover && (
-                                    <div className="absolute right-full top-0 mr-1 w-36 bg-white border border-gray-300 rounded shadow-lg p-2 z-[10002]" onMouseDown={(e) => e.stopPropagation()}>
-                                      <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">PDF Scale</div>
-                                      {[100, 75, 50, 25].map((val) => (
-                                        <label key={val} className="flex items-center gap-2 py-0.5 text-xs text-gray-700 cursor-pointer">
-                                          <input type="radio" name="pdfScalePending" checked={pendingPdfScale === val} onChange={() => setPendingPdfScale(val)} className="accent-blue-600" />
-                                          {val}%
-                                        </label>
-                                      ))}
-                                      <div className="flex justify-end gap-1 mt-2">
-                                        <button onClick={() => setShowPdfScalePopover(false)} className="px-2 py-0.5 text-[10px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
-                                        <button onClick={() => { setPdfScale(pendingPdfScale); setShowPdfScalePopover(false); closeFm(); handleExportPdf(); }} className="px-2 py-0.5 text-[10px] text-white bg-blue-600 rounded hover:bg-blue-700">Confirm</button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                <button onClick={() => { handleExport(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">SVG</button>
-                                <button onClick={() => { handleExportJson(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download diagram as a single-diagram JSON file">JSON</button>
+                                <button onClick={() => { closeFm(); openExport("pdf"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Export as PDF (choose scale + which annotations to include)">PDF</button>
+                                <button onClick={() => { closeFm(); openExport("svg"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">SVG</button>
+                                <button onClick={() => { closeFm(); openExport("json"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download diagram as a single-diagram JSON file">JSON</button>
                                 {isActingAdmin && (
                                   <button onClick={() => { closeFm(); void handleExportBundle(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="SuperAdmin only — export the diagram together with its AI prompt, plan, comparison matrix & per-model diagrams as ONE bundle. Re-import via a project's 'Import Diagram Bundle'.">Diagram Bundle (AI)</button>
                                 )}
@@ -5396,6 +5419,7 @@ export function DiagramEditor({
           collabCursors={liveCursors}
           collabBroadcast={collabActive}
           collabBaseline={syncedData}
+          exportHide={exportHide}
           nextStep={selectedElement && nextStepCandidates.length > 0 ? { source: selectedElement, candidates: nextStepCandidates } : undefined}
           onAcceptNextStep={acceptNextStep}
           pcHighlightEnabled={highlightEnabled}
@@ -6505,6 +6529,63 @@ export function DiagramEditor({
             else await runVisioImport(p.file, p.baseName, false);
           }}
         />
+      )}
+
+      {/* Export options (items M) — annotation inclusion (default OFF) + PDF scale. */}
+      {exportDlg && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[70]" onMouseDown={() => setExportDlg(null)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-xs mx-4" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">Export as {exportDlg.toUpperCase()}</h3>
+              {exportDlg === "pdf" && (
+                <div className="mb-3">
+                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Scale</div>
+                  <div className="flex gap-3">
+                    {[100, 75, 50, 25].map((val) => (
+                      <label key={val} className="flex items-center gap-1 text-xs text-gray-700 cursor-pointer">
+                        <input type="radio" name="pdfScaleDlg" checked={pendingPdfScale === val} onChange={() => setPendingPdfScale(val)} className="accent-blue-600" />
+                        {val}%
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {hasAnnotations(data) ? (
+                <>
+                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Include annotations</div>
+                  {([
+                    ["reviewComments", "Review Comments"],
+                    ["painPoints", "Pain Points"],
+                    ["issues", "Issues"],
+                  ] as const).map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-2 py-0.5 text-xs text-gray-700 cursor-pointer">
+                      <input type="checkbox" checked={exportInc[key]}
+                        onChange={(e) => setExportInc((prev) => ({ ...prev, [key]: e.target.checked }))}
+                        className="accent-blue-600" />
+                      {label}
+                    </label>
+                  ))}
+                  <p className="text-[10px] text-gray-400 mt-1">Unchecked = excluded from the export.</p>
+                </>
+              ) : (
+                <p className="text-xs text-gray-500">This diagram has no annotations to exclude.</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-100">
+              <button onClick={() => setExportDlg(null)} className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+              <button
+                onClick={() => {
+                  const fmt = exportDlg; const inc = exportInc;
+                  setExportDlg(null);
+                  if (fmt === "pdf") { setPdfScale(pendingPdfScale); void handleExportPdf(inc); }
+                  else if (fmt === "svg") handleExport(inc);
+                  else void handleExportJson(inc);
+                }}
+                className="px-3 py-1.5 text-xs font-medium text-white rounded bg-blue-600 hover:bg-blue-700"
+              >Export</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {visioImportStatus && (

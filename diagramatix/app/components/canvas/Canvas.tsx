@@ -284,6 +284,9 @@ interface Props {
   /** The last SYNCED document — the baseline the live-edit ghosts diff against
    *  (so ghosts clear after a Sync). Falls back to the current data. */
   collabBaseline?: DiagramData;
+  /** Transient export-time override: force these annotation types hidden while
+   *  an SVG/PDF capture reads the live DOM (items M). Not persisted. */
+  exportHide?: { reviewComments?: boolean; painPoints?: boolean; issues?: boolean } | null;
   /** Tier-1 assist: next-step ghost suggestions for the selected element. */
   nextStep?: { source: DiagramElement; candidates: NextStepCandidate[] };
   onAcceptNextStep?: (c: NextStepCandidate) => void;
@@ -578,6 +581,7 @@ export function Canvas({
   collabCursors,
   collabBroadcast = true,
   collabBaseline,
+  exportHide,
   nextStep,
   onAcceptNextStep,
   pcHighlightEnabled = true,
@@ -4947,11 +4951,11 @@ export function Canvas({
       <SublaneIdsCtx.Provider value={sublaneIds}>
       <ProcessGroupDepthCtx.Provider value={processGroupDepthMap}>
       <UmlPackageDepthCtx.Provider value={umlPackageDepthMap}>
-      <ShowPainPointsCtx.Provider value={data.showPainPoints !== false}>
+      <ShowPainPointsCtx.Provider value={data.showPainPoints !== false && !exportHide?.painPoints}>
       <ShowPainPointDescCtx.Provider value={!!data.showPainPointDescriptions}>
-      <ShowIssuesCtx.Provider value={data.showIssues !== false}>
+      <ShowIssuesCtx.Provider value={data.showIssues !== false && !exportHide?.issues}>
       <ShowIssueDescCtx.Provider value={!!data.showIssueDescriptions}>
-      <ShowReviewCommentsCtx.Provider value={data.showReviewComments !== false}>
+      <ShowReviewCommentsCtx.Provider value={data.showReviewComments !== false && !exportHide?.reviewComments}>
       <ReviewCommentColorsCtx.Provider value={reviewCommentColors}>
       <LaneDepthCtx.Provider value={laneDepthMap}>
       <ArchimateDepthCtx.Provider value={archimateDepthMap}>

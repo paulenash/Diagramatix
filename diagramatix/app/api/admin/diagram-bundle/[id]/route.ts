@@ -11,13 +11,20 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
-import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { SCHEMA_VERSION, type DiagramData } from "@/app/lib/diagram/types";
+import { filterAnnotations, NO_ANNOTATIONS } from "@/app/lib/diagram/annotationFilter";
 import {
   BUNDLE_KIND, BUNDLE_VERSION, comparisonDiagramIds,
   type DiagramBundle, type BundledDiagram, type BundledPrompt,
 } from "@/app/lib/diagram/diagramBundle";
 
 type Params = { params: Promise<{ id: string }> };
+
+// Bundles never carry Review Comments / Pain Points / Issues (item P). Null-safe.
+function stripAnnotations(data: unknown): unknown {
+  if (!data || typeof data !== "object" || !Array.isArray((data as DiagramData).elements)) return data;
+  return filterAnnotations(data as DiagramData, NO_ANNOTATIONS);
+}
 
 export async function GET(_req: Request, { params }: Params) {
   const session = await auth();
@@ -33,7 +40,7 @@ export async function GET(_req: Request, { params }: Params) {
 
   const toBundled = (d: typeof diagram): BundledDiagram => ({
     originalId: d.id, name: d.name, type: d.type,
-    data: d.data, colorConfig: d.colorConfig, displayMode: d.displayMode,
+    data: stripAnnotations(d.data) as typeof d.data, colorConfig: d.colorConfig, displayMode: d.displayMode,
   });
 
   // Linked Prompt (via data.aiGeneration.promptId) — with planJson via raw SQL.
