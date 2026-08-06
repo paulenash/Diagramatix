@@ -4,8 +4,14 @@ import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { extractCode, stripCodeTail, normalize } from "@/app/lib/numbering/codes";
+import { LINK_BEARING_ELEMENT_TYPES } from "@/app/lib/diagram/linkClosure";
 
 type Params = { params: Promise<{ id: string }> };
+
+// Diagram types the link scan spans: the high-level group (Value Chain, Process
+// Context, ArchiMate) plus BPMN — so links WITHIN the high-level group and DOWN
+// to BPMN are both detected (item 2).
+const LINKABLE_DIAGRAM_TYPES = ["bpmn", "value-chain", "process-context", "archimate"];
 
 interface ElementLite {
   id: string;
@@ -87,10 +93,10 @@ export async function GET(_req: Request, { params }: Params) {
     throw err;
   }
 
-  // Pull all BPMN diagrams in the project. type === "bpmn" is the only
-  // value used in production for BPMN; the scan is scoped accordingly.
+  // Pull the high-level group (Value Chain, Process Context, ArchiMate) + BPMN
+  // diagrams, so we can link within the high-level group and down to BPMN.
   const diagrams = (await prisma.diagram.findMany({
-    where: { projectId: id, orgId, type: "bpmn" },
+    where: { projectId: id, orgId, type: { in: LINKABLE_DIAGRAM_TYPES } },
     select: { id: true, name: true, type: true, data: true },
     orderBy: { name: "asc" },
   })) as unknown as DiagramShape[];
@@ -118,7 +124,10 @@ export async function GET(_req: Request, { params }: Params) {
   for (const d of diagrams) {
     const elements = d.data?.elements ?? [];
     for (const e of elements) {
-      if (e.type !== "subprocess" && e.type !== "subprocess-expanded") continue;
+      // Any drill-down element across the high-level group + BPMN: BPMN
+      // subprocess/-expanded, Value Chain chevron-collapsed, Process Context
+      // use-case, ArchiMate archimate-shape (item 2).
+      if (!LINK_BEARING_ELEMENT_TYPES.has(e.type)) continue;
       // Return-link variants live on child diagrams and aren't candidates
       // themselves — skip them when scanning for parent-side subprocesses.
       if (e.properties?.isReturnLink) continue;
@@ -161,6 +170,31 @@ export async function GET(_req: Request, { params }: Params) {
           });
         }
         continue;
+      }
+
+      // Bare-code PREFIX match (item 2b): a label that is a single code token
+      // (e.g. "V01.07.1", no spaces) links to the diagram whose NAME STARTS
+      // WITH that code — "V01.07.1 Commence …". The " "/end word boundary keeps
+      // "V01.07.1" from matching "V01.07.10".
+      if (!/\s/.test(label)) {
+        const l = label.trim().toLowerCase();
+        let matched = false;
+        for (const c of diagrams) {
+          if (c.id === d.id) continue;
+          const n = c.name.trim().toLowerCase();
+          if (n === l || n.startsWith(l + " ")) {
+            definiteCandidates.push({
+              parentDiagramId: d.id,
+              parentDiagramName: d.name,
+              parentElementId: e.id,
+              parentElementLabel: label,
+              candidateDiagramId: c.id,
+              candidateDiagramName: c.name,
+            });
+            matched = true;
+          }
+        }
+        if (matched) continue;
       }
 
       // Probable match. Strongest signals first:
@@ -260,7 +294,7 @@ export async function POST(req: Request, { params }: Params) {
   // shape and write each modified diagram back via raw pg (Prisma 7 JSON
   // writes go through pgPool per project convention).
   const diagrams = (await prisma.diagram.findMany({
-    where: { projectId, orgId, type: "bpmn" },
+    where: { projectId, orgId, type: { in: LINKABLE_DIAGRAM_TYPES } },
     select: { id: true, name: true, data: true },
   })) as unknown as Array<{
     id: string;
