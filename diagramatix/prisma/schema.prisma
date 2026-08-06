@@ -906,6 +906,16 @@ model IntentKeywordMap {
   updatedAt          DateTime @updatedAt
 }
 
+// Admin-editable phrase catalogue for rich-text dictation commands (the mic in
+// the Review Comment editor). One row per formatting ACTION; positional actions
+// (addPointAfter/deletePoint) carry `{n}`-templated phrases.
+model DictationCommand {
+  id        String   @id @default(cuid())
+  action    String   @unique // newLine | numberedList | bold | addPointAfter | …
+  phrases   String[] @default([])
+  updatedAt DateTime @updatedAt
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Collaboration Groups + in-app Notifications (Phase 1 of the Collaboration
 // Groups feature). Phase 2 adds DiagramReview / DiagramReviewer; Phase 3

@@ -3,6 +3,10 @@
 import { useRef, useEffect, useState } from "react";
 import { sanitizeRichText, isRichText, plainToHtml } from "@/app/lib/diagram/richText";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
+import {
+  matchDictationCommand, DEFAULT_DICTATION_COMMANDS,
+  type DictationAction, type DictationCommandDef,
+} from "@/app/lib/dictation/commands";
 
 /**
  * Small contentEditable rich-text editor for descriptions + Review Comments:
@@ -27,6 +31,18 @@ export function RichTextEditor({
   const ref = useRef<HTMLDivElement>(null);
   const [listening, setListening] = useState(false);
   const dictRef = useRef<DictationHandle | null>(null);
+  // Live (admin-editable) command catalogue, fetched once; falls back to the
+  // built-in defaults. Held in a ref so the streaming callback reads the latest.
+  const commandsRef = useRef<DictationCommandDef[]>(DEFAULT_DICTATION_COMMANDS);
+  useEffect(() => {
+    if (!dictation) return;
+    let on = true;
+    fetch("/api/ai/dictation/commands")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (on && Array.isArray(j?.commands) && j.commands.length) commandsRef.current = j.commands; })
+      .catch(() => { /* keep defaults */ });
+    return () => { on = false; };
+  }, [dictation]);
 
   // Initialise the editor once on mount from the incoming value (legacy
   // plain-text descriptions are converted to HTML). Subsequent prop changes
@@ -103,37 +119,75 @@ export function RichTextEditor({
     commit();
   };
 
-  // Normalised utterance → formatting action. Returns true if handled as a
-  // command (otherwise the words are dictated in as text).
-  const applyCommand = (norm: string): boolean => {
-    switch (norm) {
-      case "new line": case "next line": case "line break": lineBreak(); return true;
-      case "new paragraph": run("insertParagraph"); return true;
-      case "numbered list": case "start a numbered list": case "start numbered list": case "ordered list":
-        run("insertOrderedList"); return true;
-      case "bullet list": case "bullet points": case "start a bullet list": case "start bullet list": case "bulleted list":
-        run("insertUnorderedList"); return true;
-      case "next point": case "new point": case "new item": case "next item": case "new bullet": case "next bullet": case "new number":
-        run("insertParagraph"); return true;
-      case "bold": run("bold"); return true;
-      case "italic": run("italic"); return true;
-      case "underline": run("underline"); return true;
-      case "delete": case "delete that": case "scratch that": case "delete last word": deleteLastWord(); return true;
-      default: return false;
+  // The `<li>`s of the list the caret is in — else the last list in the editor.
+  const listItems = (): HTMLLIElement[] => {
+    const el = ref.current;
+    if (!el) return [];
+    let node: Node | null = window.getSelection()?.anchorNode ?? null;
+    let list: HTMLElement | null = null;
+    while (node && node !== el) {
+      if (node instanceof HTMLElement && (node.tagName === "OL" || node.tagName === "UL")) { list = node; break; }
+      node = node.parentNode;
     }
+    if (!list) {
+      const lists = el.querySelectorAll("ol,ul");
+      list = lists.length ? (lists[lists.length - 1] as HTMLElement) : null;
+    }
+    return list ? (Array.from(list.querySelectorAll(":scope > li")) as HTMLLIElement[]) : [];
   };
 
-  const handleUtterance = (text: string) => {
-    const norm = text.toLowerCase().trim().replace(/[.,!?;:]+$/, "");
-    if (norm === "stop" || norm === "stop dictation" || norm === "done") { stopDictation(); return; }
-    if (applyCommand(norm)) return;
-    insertText(text);
+  // Positional: drop the caret at the end of the N-th item and open a new one.
+  const addPointAfter = (n: number) => {
+    const li = listItems()[n - 1];
+    if (!li) return;
+    const range = document.createRange();
+    range.selectNodeContents(li);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    ref.current?.focus();
+    document.execCommand("insertParagraph"); // a new <li> after the N-th
+    commit();
+  };
+
+  const deletePoint = (n: number) => {
+    const items = listItems();
+    const li = items[n - 1];
+    if (!li) return;
+    const list = li.parentElement;
+    li.remove();
+    if (list && list.children.length === 0) list.remove();
+    ensureCaret();
+    commit();
   };
 
   const stopDictation = () => {
     dictRef.current?.stop();
     dictRef.current = null;
     setListening(false);
+  };
+
+  const applyAction = (action: DictationAction, n?: number) => {
+    switch (action) {
+      case "newLine": lineBreak(); break;
+      case "newParagraph": case "nextPoint": run("insertParagraph"); break;
+      case "numberedList": run("insertOrderedList"); break;
+      case "bulletList": run("insertUnorderedList"); break;
+      case "bold": run("bold"); break;
+      case "italic": run("italic"); break;
+      case "underline": run("underline"); break;
+      case "deleteWord": deleteLastWord(); break;
+      case "stop": stopDictation(); break;
+      case "addPointAfter": if (n) addPointAfter(n); break;
+      case "deletePoint": if (n) deletePoint(n); break;
+    }
+  };
+
+  const handleUtterance = (text: string) => {
+    const cmd = matchDictationCommand(text, commandsRef.current);
+    if (cmd) { applyAction(cmd.action, cmd.n); return; }
+    insertText(text);
   };
 
   const toggleDictation = async () => {
