@@ -673,7 +673,9 @@ export function AiPanel({
           </p>
         )}
 
-        {aiModels.length > 0 && (
+        {/* The AI model in use is a SuperAdmin-only detail — regular users just
+            get the default model, chosen server-side. */}
+        {isAdmin && !superAdminHidden && aiModels.length > 0 && (
           <div className="flex items-center gap-2 text-[10px] text-gray-600">
             <span className="shrink-0">AI Model</span>
             <ModelSelect value={model} onChange={setModel} models={aiModels} disabled={generating}

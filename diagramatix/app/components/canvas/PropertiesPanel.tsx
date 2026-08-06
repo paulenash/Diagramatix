@@ -53,10 +53,13 @@ const ARCHI_REL_META: Record<string, { type: string; group: ArchiRelGroup }> = {
 
 /** Diagram-Properties "Regenerate from prompt" control: pick a (cost-gated) model
  *  and re-run the linked prompt's CURRENT text over the current diagram. */
-function RegenerateControl({ models, initialModel, onRegenerate }: {
+function RegenerateControl({ models, initialModel, onRegenerate, canSeeModel }: {
   models: AllowedModel[];
   initialModel: string;
   onRegenerate?: (model: string) => void;
+  /** The AI model picker is a SuperAdmin-only detail; others regenerate with
+   *  the recorded/default model (no dropdown shown). */
+  canSeeModel?: boolean;
 }) {
   const [model, setModel] = useState<string>(initialModel);
   // Re-sync when the diagram (and thus its recorded model) changes — so selecting
@@ -67,13 +70,15 @@ function RegenerateControl({ models, initialModel, onRegenerate }: {
   if (!onRegenerate) return null;
   return (
     <div className="mt-1 flex items-center gap-1">
-      <ModelSelect value={model} onChange={setModel} models={models}
-        className="flex-1 min-w-0 text-[9px] border border-gray-300 rounded px-1 py-0.5 bg-white" />
+      {canSeeModel && (
+        <ModelSelect value={model} onChange={setModel} models={models}
+          className="flex-1 min-w-0 text-[9px] border border-gray-300 rounded px-1 py-0.5 bg-white" />
+      )}
       <button
         type="button"
-        onClick={() => onRegenerate(model)}
-        className="text-[9px] px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 shrink-0"
-        title="Regenerate this diagram from the linked prompt's current text with the chosen model"
+        onClick={() => onRegenerate(canSeeModel ? model : initialModel)}
+        className={`text-[9px] px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 shrink-0 ${canSeeModel ? "" : "flex-1"}`}
+        title="Regenerate this diagram from the linked prompt's current text"
       >
         Regenerate
       </button>
@@ -1115,6 +1120,7 @@ export function PropertiesPanel({
                   // default only when the diagram has no recorded model).
                   initialModel={aiGeneration.model || currentAiModelId || ""}
                   onRegenerate={onRegenerate}
+                  canSeeModel={_isAdmin}
                 />
               </div>
             </div>
