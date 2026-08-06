@@ -40,6 +40,32 @@ describe("review comment", () => {
     expect(e.height).toBe(144);
   });
 
+  it("remembers expanded + collapsed positions across toggles (item E)", () => {
+    const move = (id: string, x: number, y: number): Action => ({ type: "MOVE_ELEMENT", payload: { id, x, y, unconstrained: true } });
+    const pos = (d: DiagramData) => { const e = at(d, "r1")!; return { x: e.x, y: e.y }; };
+    let d = base();
+    d = reducer(d, addRc("r1"));
+    const exp0 = pos(d); // expanded position
+
+    d = reducer(d, { type: "TOGGLE_REVIEW_COLLAPSE", payload: "r1" }); // collapse (stays at exp0)
+    d = reducer(d, move("r1", 400, 420));
+    const colA = pos(d); // where the collapsed icon was left
+
+    d = reducer(d, { type: "TOGGLE_REVIEW_COLLAPSE", payload: "r1" }); // expand → back to exp0
+    expect(pos(d)).toEqual(exp0);
+    expect(at(d, "r1")).toMatchObject({ width: 227, height: 144 });
+
+    d = reducer(d, move("r1", 250, 260));
+    const expB = pos(d); // new expanded position
+
+    d = reducer(d, { type: "TOGGLE_REVIEW_COLLAPSE", payload: "r1" }); // collapse → back to colA
+    expect(pos(d)).toEqual(colA);
+    expect(at(d, "r1")).toMatchObject({ width: 38, height: 32 });
+
+    d = reducer(d, { type: "TOGGLE_REVIEW_COLLAPSE", payload: "r1" }); // expand → back to expB
+    expect(pos(d)).toEqual(expB);
+  });
+
   it("brings a review comment to the front (end of the elements array)", () => {
     let d = base();
     d = reducer(d, addRc("r1"));

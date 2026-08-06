@@ -205,6 +205,28 @@ export const ShowIssueDescCtx = createContext<boolean>(false);
 /** Whether the pink author-review stickies render on the canvas (diagram-level
  *  "Display Review markers" master toggle). Defaults true. Provided by Canvas.tsx. */
 export const ShowReviewCommentsCtx = createContext<boolean>(true);
+
+/** Pale pastel palette for review comments — index 0 (pink) is the default /
+ *  first author; each additional distinct author gets the next colour so
+ *  different users' comments are easily told apart (item G). */
+export const REVIEW_COMMENT_PALETTE = [
+  { fill: "#fce7f3", stroke: "#ec4899", fold: "#f9a8d4", text: "#831843" }, // pink
+  { fill: "#dbeafe", stroke: "#3b82f6", fold: "#93c5fd", text: "#1e3a8a" }, // blue
+  { fill: "#dcfce7", stroke: "#22c55e", fold: "#86efac", text: "#14532d" }, // green
+  { fill: "#fef3c7", stroke: "#f59e0b", fold: "#fcd34d", text: "#78350f" }, // amber
+  { fill: "#ede9fe", stroke: "#8b5cf6", fold: "#c4b5fd", text: "#4c1d95" }, // purple
+  { fill: "#ccfbf1", stroke: "#14b8a6", fold: "#5eead4", text: "#134e4a" }, // teal
+  { fill: "#ffe4e6", stroke: "#f43f5e", fold: "#fda4af", text: "#881337" }, // rose
+  { fill: "#ecfccb", stroke: "#84cc16", fold: "#bef264", text: "#365314" }, // lime
+];
+/** Stable per-author key for a review comment (reviewer id/email, or the
+ *  author's display name). Empty = anonymous/legacy → all share colour 0. */
+export function reviewCommentAuthorKey(el: DiagramElement): string {
+  const p = el.properties;
+  return String(p.reviewerId ?? p.reviewerEmail ?? p.feedbackAuthor ?? p.authorName ?? "");
+}
+/** authorKey → palette index, assigned in creation order. Provided by Canvas. */
+export const ReviewCommentColorsCtx = createContext<Map<string, number>>(new Map());
 export const DatabaseCtx = createContext<string | undefined>(undefined);
 /** Map from archimate-shape id → descendant depth (0 = leaf, 1 = parent of
  *  leaves, 2 = grandparent, …). Drives the per-level lightening of
@@ -834,9 +856,13 @@ function TextAnnotationShape({ el }: { el: DiagramElement }) {
 function ReviewCommentShape({ el }: { el: DiagramElement }) {
   // Hidden when the diagram-level "Display Review markers" toggle is off.
   const show = useContext(ShowReviewCommentsCtx);
+  const colorMap = useContext(ReviewCommentColorsCtx);
   if (!show) return null;
-  const FILL = "#fce7f3";   // rose-100
-  const STROKE = "#ec4899"; // pink-500
+  // Colour by author so different users' comments are distinct (item G).
+  const pal = REVIEW_COMMENT_PALETTE[(colorMap.get(reviewCommentAuthorKey(el)) ?? 0) % REVIEW_COMMENT_PALETTE.length];
+  const FILL = pal.fill;
+  const STROKE = pal.stroke;
+  const FOLD = pal.fold;
   const fold = 12;
   const x = el.x, y = el.y, w = el.width, h = el.height;
   // Body path with a clipped (folded) top-right corner.
@@ -847,7 +873,7 @@ function ReviewCommentShape({ el }: { el: DiagramElement }) {
       <path d={body} fill={FILL} stroke={STROKE} strokeWidth={1.5} strokeLinejoin="round" />
       {/* Folded corner triangle */}
       <path d={`M ${x + w - fold} ${y} L ${x + w - fold} ${y + fold} L ${x + w} ${y + fold}`}
-        fill="#f9a8d4" stroke={STROKE} strokeWidth={1} strokeLinejoin="round" />
+        fill={FOLD} stroke={STROKE} strokeWidth={1} strokeLinejoin="round" />
       {/* Left accent bar to signal "comment" */}
       <rect x={x} y={y} width={3} height={h} fill={STROKE} />
       {/* Collapsed icon — a few short "hidden text" lines so the small pill
@@ -2673,6 +2699,7 @@ export function SymbolRenderer({
   const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && element.type !== "flowchart-parallel" && element.type !== "flowchart-decision" && element.type !== "flowchart-vswimlane" && !isBoundaryStartOrEnd;
   // Review stickies hide (shape AND label) under the diagram-level toggle.
   const showReviewMarkers = useContext(ShowReviewCommentsCtx);
+  const reviewCommentColorMap = useContext(ReviewCommentColorsCtx);
 
   // Events / gateways / data objects render a SEPARATE external label below
   // the shape, edited inline via the isEditingGatewayLabel foreignObject.
@@ -3227,8 +3254,9 @@ export function SymbolRenderer({
         const headerLines = header ? wrapText(header, element.width - PAD - 6) : [];
         const bodyLines = element.label ? wrapText(element.label, element.width - PAD - 6) : [];
         let y = element.y + PAD + lineH * 0.8;
+        const rcText = REVIEW_COMMENT_PALETTE[(reviewCommentColorMap.get(reviewCommentAuthorKey(element)) ?? 0) % REVIEW_COMMENT_PALETTE.length].text;
         return (
-          <text textAnchor="start" fontSize={fs(11)} fill="#831843"
+          <text textAnchor="start" fontSize={fs(11)} fill={rcText}
             style={{ userSelect: "none", pointerEvents: "none" }}>
             {headerLines.map((line, i) => { const ty = y; y += lineH; return (
               <tspan key={`h${i}`} x={element.x + PAD} y={ty} fontWeight={700}>{line}</tspan>

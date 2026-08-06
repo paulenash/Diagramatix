@@ -3848,6 +3848,11 @@ export function DiagramEditor({
   const handleUpdateLabel = useCallback((id: string, label: string) => {
     const el = data.elements.find((e) => e.id === id);
     updateLabel(id, label);
+    // A review-comment's header timestamp reflects the LAST edit — refresh it
+    // whenever the body text actually changes (item F).
+    if (el && el.type === "review-comment" && label !== (el.label ?? "")) {
+      updateProperties(id, { createdStamp: fmtReviewStamp(new Date()) });
+    }
     if (!el || el.type !== "uml-package") return;
     const linkedId = el.properties.linkedDiagramId as string | undefined;
     const { unlink, offer } = resolvePackageNameLink(el.label ?? "", label, linkedId, siblingDiagrams);

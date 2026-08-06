@@ -21,7 +21,7 @@ import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
 import { BubbleHelp } from "./BubbleHelp";
 import { EntityNameInput } from "./EntityNameInput";
 import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
-import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, ShowReviewCommentsCtx, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, ShowReviewCommentsCtx, ReviewCommentColorsCtx, reviewCommentAuthorKey, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
 import { CollabCursors } from "./CollabCursors";
 import { CollabLiveEdits } from "./CollabLiveEdits";
 import { CollabGhosts } from "./CollabGhosts";
@@ -4482,6 +4482,19 @@ export function Canvas({
   }, [data.elements]);
 
   // Sort non-containers by parent nesting depth so children of deeper subprocesses render on top
+  // Assign each distinct review-comment AUTHOR a palette index, in creation
+  // order (first author = pink), so different users' notes are distinct (item G).
+  const reviewCommentColors = (() => {
+    const map = new Map<string, number>();
+    let next = 0;
+    for (const el of data.elements) {
+      if (el.type !== "review-comment") continue;
+      const key = reviewCommentAuthorKey(el);
+      if (!map.has(key)) map.set(key, next++);
+    }
+    return map;
+  })();
+
   const nonContainers = (() => {
     const items = data.elements.filter(
       (el) => el.type !== "system-boundary" && el.type !== "composite-state"
@@ -4926,6 +4939,7 @@ export function Canvas({
       <ShowIssuesCtx.Provider value={data.showIssues !== false}>
       <ShowIssueDescCtx.Provider value={!!data.showIssueDescriptions}>
       <ShowReviewCommentsCtx.Provider value={data.showReviewComments !== false}>
+      <ReviewCommentColorsCtx.Provider value={reviewCommentColors}>
       <LaneDepthCtx.Provider value={laneDepthMap}>
       <ArchimateDepthCtx.Provider value={archimateDepthMap}>
       <DatabaseCtx.Provider value={data.database}>
@@ -7327,6 +7341,7 @@ export function Canvas({
       </DatabaseCtx.Provider>
       </ArchimateDepthCtx.Provider>
       </LaneDepthCtx.Provider>
+      </ReviewCommentColorsCtx.Provider>
       </ShowReviewCommentsCtx.Provider>
       </ShowIssueDescCtx.Provider>
       </ShowIssuesCtx.Provider>

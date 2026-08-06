@@ -7599,25 +7599,35 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, description: action.payload || undefined };
 
     case "TOGGLE_REVIEW_COLLAPSE": {
-      // Collapse a review-comment to a small icon, stashing its expanded size;
-      // expand restores the stashed size (item 11). Collapsed = 38x32.
+      // Collapse a review-comment to a small icon; expand restores it. Each note
+      // remembers BOTH its expanded geometry (x/y/w/h) AND its collapsed position
+      // and returns to the right one on toggle (item 11 + item E). The current
+      // x/y is saved into the slot we're leaving, so any moves are preserved.
       const COLLAPSED_W = 38, COLLAPSED_H = 32;
+      const num = (v: unknown, d: number) => (typeof v === "number" ? v : d);
       const elements = state.elements.map((e) => {
         if (e.id !== action.payload || e.type !== "review-comment") return e;
-        const collapsed = !e.properties.collapsed;
         const props = { ...e.properties };
-        if (collapsed) {
+        if (!e.properties.collapsed) {
+          // Expanded → collapsed: remember where/how big it was expanded, then
+          // return to its last collapsed position (or stay put the first time).
           props.collapsed = true;
-          props.expandedWidth = e.width;
-          props.expandedHeight = e.height;
-          return { ...e, width: COLLAPSED_W, height: COLLAPSED_H, properties: props };
+          props.expandedX = e.x; props.expandedY = e.y;
+          props.expandedWidth = e.width; props.expandedHeight = e.height;
+          return { ...e, x: num(props.collapsedX, e.x), y: num(props.collapsedY, e.y), width: COLLAPSED_W, height: COLLAPSED_H, properties: props };
         }
+        // Collapsed → expanded: remember the collapsed position, restore the
+        // last expanded geometry.
         delete props.collapsed;
-        const w = (props.expandedWidth as number | undefined) ?? 227;
-        const h = (props.expandedHeight as number | undefined) ?? 144;
-        delete props.expandedWidth;
-        delete props.expandedHeight;
-        return { ...e, width: w, height: h, properties: props };
+        props.collapsedX = e.x; props.collapsedY = e.y;
+        return {
+          ...e,
+          x: num(props.expandedX, e.x),
+          y: num(props.expandedY, e.y),
+          width: num(props.expandedWidth, 227),
+          height: num(props.expandedHeight, 144),
+          properties: props,
+        };
       });
       // Re-route the pink tether(s) so the endpoint follows the new boundary
       // instead of being left behind at the old size (item 13 / issue C).
