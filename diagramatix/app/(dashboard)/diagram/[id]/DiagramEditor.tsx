@@ -86,6 +86,10 @@ import { checkDiagram, rulesMetadata, type Violation } from "@/app/lib/diagram/c
 import { HistoryPanel } from "./HistoryPanel";
 
 interface VisioImportResult {
+  // Which importer produced this result — drives the result modal's wording
+  // (Visio talks about "masters/shapes on page"; BPMN about processes). Absent
+  // = Visio (the original consumer of this modal).
+  kind?: "visio" | "bpmn";
   // `data` is the parsed DiagramData payload — present only on overwrite
   // responses so the in-editor flow can push the new content into the
   // reducer without a page reload. On a fresh-create import we don't
@@ -3539,6 +3543,7 @@ export function DiagramEditor({
       }
       // Reshape into the existing single-import status modal shape.
       const reshaped: VisioImportResult & { overwrote?: boolean } = {
+        kind: "bpmn",
         diagram: result.diagram,
         warnings: [
           `Imported BPMN file (processes: ${result.stats.processCount}, participants: ${result.stats.participantCount}).`,
@@ -6512,23 +6517,27 @@ export function DiagramEditor({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-5 pt-4 pb-2 border-b border-gray-200">
-              <h2 className="text-base font-semibold text-gray-900">Visio Import — Results</h2>
+              <h2 className="text-base font-semibold text-gray-900">{visioImportStatus.kind === "bpmn" ? "BPMN Import — Results" : "Visio Import — Results"}</h2>
               <p className="mt-1 text-xs text-gray-600">
-                Page totals, per-master breakdown, and any warnings from this import.
-                Open the new diagram to see the result on canvas, or close to retry with a different file.
+                {visioImportStatus.kind === "bpmn"
+                  ? "Element/connector totals and any warnings from this BPMN 2.0 import. Open the new diagram to see the result on canvas, or close to retry with a different file."
+                  : "Page totals, per-master breakdown, and any warnings from this import. Open the new diagram to see the result on canvas, or close to retry with a different file."}
               </p>
             </div>
             <div className="px-5 py-3 border-b border-gray-200">
               <div className="grid grid-cols-3 gap-3 text-xs text-gray-700">
-                <div><span className="font-semibold">Total shapes on page:</span> {visioImportStatus.stats.totalShapesOnPage}</div>
+                <div><span className="font-semibold">{visioImportStatus.kind === "bpmn" ? "Total elements:" : "Total shapes on page:"}</span> {visioImportStatus.stats.totalShapesOnPage}</div>
                 <div><span className="font-semibold">Elements created:</span> {visioImportStatus.stats.elementsCreated}</div>
                 <div><span className="font-semibold">Connectors created:</span> {visioImportStatus.stats.connectorsCreated}</div>
-                <div><span className="font-semibold">Shapes skipped:</span> {visioImportStatus.stats.shapesSkipped}</div>
+                <div><span className="font-semibold">{visioImportStatus.kind === "bpmn" ? "Elements skipped:" : "Shapes skipped:"}</span> {visioImportStatus.stats.shapesSkipped}</div>
                 <div><span className="font-semibold">Connectors skipped:</span> {visioImportStatus.stats.connectorsSkipped}</div>
-                <div><span className="font-semibold">Implicit pools:</span> {visioImportStatus.stats.implicitPools}</div>
+                {visioImportStatus.kind !== "bpmn" && (
+                  <div><span className="font-semibold">Implicit pools:</span> {visioImportStatus.stats.implicitPools}</div>
+                )}
               </div>
             </div>
             <div className="overflow-y-auto px-5 py-3 flex-1 min-h-0">
+              {visioImportStatus.kind !== "bpmn" && (
               <div className="mb-4">
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Master breakdown</h3>
                 <div className="border border-gray-300 rounded text-[13px] text-gray-900">
@@ -6563,6 +6572,7 @@ export function DiagramEditor({
                   </table>
                 </div>
               </div>
+              )}
               {visioImportStatus.warnings.length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold text-gray-800 mb-1">
