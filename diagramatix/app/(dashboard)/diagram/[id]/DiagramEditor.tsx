@@ -1087,6 +1087,7 @@ export function DiagramEditor({
     setDiagramPurpose,
     setDiagramDescription,
     toggleReviewCollapse,
+    setAllReviewCollapsed,
     bringReviewToFront,
     setRelaxedLayout,
     setShowPainPoints,
@@ -5625,6 +5626,7 @@ export function DiagramEditor({
             reviewComments={data.elements.filter(e => e.type === "review-comment")}
             showReviewComments={data.showReviewComments}
             onSetShowReviewComments={setShowReviewComments}
+            onSetAllReviewCollapsed={setAllReviewCollapsed}
             onUpdateDiagramTitle={updateDiagramTitle}
             processOwner={data.processOwner}
             onSetProcessOwner={diagramType === "bpmn" ? setProcessOwner : undefined}

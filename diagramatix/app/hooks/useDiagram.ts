@@ -410,6 +410,7 @@ export type Action =
   | { type: "SET_DIAGRAM_PURPOSE"; payload: string }
   | { type: "SET_DIAGRAM_DESCRIPTION"; payload: string }
   | { type: "TOGGLE_REVIEW_COLLAPSE"; payload: string }
+  | { type: "SET_ALL_REVIEW_COLLAPSED"; payload: boolean }
   | { type: "BRING_REVIEW_TO_FRONT"; payload: string }
   | { type: "SET_RELAXED_LAYOUT"; payload: boolean }
   | { type: "SET_SHOW_PAIN_POINTS"; payload: boolean }
@@ -7638,6 +7639,36 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements, connectors };
     }
 
+    case "SET_ALL_REVIEW_COLLAPSED": {
+      // Collapse or expand EVERY review-comment at once (the panel's
+      // Expand All / Collapse All button). Same per-note geometry memory as the
+      // single toggle; only notes not already in the target state change.
+      const collapse = action.payload;
+      const COLLAPSED_W = 38, COLLAPSED_H = 32;
+      const num = (v: unknown, d: number) => (typeof v === "number" ? v : d);
+      const changed = new Set<string>();
+      const elements = state.elements.map((e) => {
+        if (e.type !== "review-comment" || !!e.properties.collapsed === collapse) return e;
+        changed.add(e.id);
+        const props = { ...e.properties };
+        if (collapse) {
+          props.collapsed = true;
+          props.expandedX = e.x; props.expandedY = e.y;
+          props.expandedWidth = e.width; props.expandedHeight = e.height;
+          return { ...e, x: num(props.collapsedX, e.x), y: num(props.collapsedY, e.y), width: COLLAPSED_W, height: COLLAPSED_H, properties: props };
+        }
+        delete props.collapsed;
+        props.collapsedX = e.x; props.collapsedY = e.y;
+        return { ...e, x: num(props.expandedX, e.x), y: num(props.expandedY, e.y), width: num(props.expandedWidth, 227), height: num(props.expandedHeight, 144), properties: props };
+      });
+      if (changed.size === 0) return state;
+      const connectors = state.connectors.map((c) => {
+        if (c.type !== "review-comment-link" || (!changed.has(c.sourceId) && !changed.has(c.targetId))) return c;
+        return recomputeAllConnectors([c], elements, state.relaxedLayout)[0] ?? c;
+      });
+      return { ...state, elements, connectors };
+    }
+
     case "BRING_REVIEW_TO_FRONT": {
       // Move the element to the END of the array so it paints on top of its
       // peers in the same render bucket (item 14/15).
@@ -10227,6 +10258,12 @@ export function useDiagram(initialData: DiagramData) {
       (id: string) => {
         invalidateRedo();
         dispatch({ type: "TOGGLE_REVIEW_COLLAPSE", payload: id });
+      }, []
+    ),
+    setAllReviewCollapsed: useCallback(
+      (collapsed: boolean) => {
+        invalidateRedo();
+        dispatch({ type: "SET_ALL_REVIEW_COLLAPSED", payload: collapsed });
       }, []
     ),
     bringReviewToFront: useCallback(

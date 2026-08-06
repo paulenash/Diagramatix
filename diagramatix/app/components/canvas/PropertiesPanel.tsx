@@ -189,6 +189,8 @@ interface Props {
   reviewComments?: DiagramElement[];
   showReviewComments?: boolean;
   onSetShowReviewComments?: (on: boolean) => void;
+  /** Collapse or expand EVERY review comment at once (panel button). */
+  onSetAllReviewCollapsed?: (collapsed: boolean) => void;
   forceCollapseTitle?: boolean;
   /** Per-diagram process owner — surfaced in the new Process Owner
    *  sub-section. Both name + email are optional free-text. */
@@ -837,6 +839,7 @@ export function PropertiesPanel({
   reviewComments,
   showReviewComments,
   onSetShowReviewComments,
+  onSetAllReviewCollapsed,
   forceCollapseTitle,
   processOwner,
   onSetProcessOwner,
@@ -1318,14 +1321,29 @@ export function PropertiesPanel({
           <div className="mt-1 mb-1">
             <SubHeader label="Review Comments" open={reviewCommentsOpen} onToggle={() => setReviewCommentsOpen(o => !o)} labelClassName="text-[9px] font-semibold text-pink-400" />
             {reviewCommentsOpen && (<>
-            {onSetShowReviewComments && (
-              <label className="flex items-start gap-1.5 mb-1 cursor-pointer select-none" title="Show the pink review notes (and their tether links) on the diagram">
-                <input type="checkbox" className="mt-[2px] cursor-pointer"
-                  checked={showReviewComments !== false}
-                  onChange={e => onSetShowReviewComments(e.target.checked)} />
-                <span className="text-[9px] text-gray-600 leading-tight">Display Review Comments</span>
-              </label>
-            )}
+            <div className="flex items-center justify-between gap-2 mb-1">
+              {onSetShowReviewComments ? (
+                <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Show the pink review notes (and their tether links) on the diagram">
+                  <input type="checkbox" className="cursor-pointer"
+                    checked={showReviewComments !== false}
+                    onChange={e => onSetShowReviewComments(e.target.checked)} />
+                  <span className="text-[9px] text-gray-600 leading-tight">Display Review Comments</span>
+                </label>
+              ) : <span />}
+              {/* Expand / Collapse ALL review comments at once (swaps by state). */}
+              {onSetAllReviewCollapsed && (() => {
+                const anyExpanded = reviewComments.some(rc => !rc.properties.collapsed);
+                return (
+                  <button
+                    onClick={() => onSetAllReviewCollapsed(anyExpanded)}
+                    className="text-[9px] px-1.5 py-0.5 rounded border border-pink-400 text-pink-600 hover:bg-pink-50 shrink-0"
+                    title="Collapse or expand every review comment on the diagram"
+                  >
+                    {anyExpanded ? "Collapse All" : "Expand All"}
+                  </button>
+                );
+              })()}
+            </div>
             <div className="space-y-1">
               {reviewComments.map(rc => (
                 <div key={rc.id} className="flex items-start gap-1">
