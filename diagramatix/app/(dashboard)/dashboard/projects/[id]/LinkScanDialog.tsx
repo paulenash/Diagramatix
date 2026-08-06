@@ -1,23 +1,28 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 
 interface ExistingLink {
   parentDiagramId: string;
   parentDiagramName: string;
+  parentDiagramType: string;
   parentElementId: string;
   parentElementLabel: string;
   childDiagramId: string;
   childDiagramName: string;
+  childDiagramType: string;
 }
 
 interface Candidate {
   parentDiagramId: string;
   parentDiagramName: string;
+  parentDiagramType: string;
   parentElementId: string;
   parentElementLabel: string;
   candidateDiagramId: string;
   candidateDiagramName: string;
+  candidateDiagramType: string;
 }
 
 interface ScanResult {
@@ -157,9 +162,10 @@ export function LinkScanDialog({ projectId, onClose, onApplied }: Props) {
         <div className="px-6 py-4 border-b border-gray-200 shrink-0">
           <h2 className="text-lg font-semibold text-gray-900">Scan Diagrams for Links</h2>
           <p className="text-xs text-gray-500 mt-1">
-            Find subprocesses in this project&apos;s BPMN diagrams whose name matches another
-            diagram in the project. Confirmed links navigate parent → child on double-click,
-            and a return marker is placed on the child diagram pointing back to the parent.
+            Find drill-down elements (BPMN subprocesses, Value Chain / Process Context / ArchiMate
+            links) whose name matches another diagram in the project — across all these diagram
+            types. Confirmed links navigate parent → child on double-click, and a return marker is
+            placed on the child diagram pointing back to the parent.
           </p>
         </div>
 
@@ -173,7 +179,7 @@ export function LinkScanDialog({ projectId, onClose, onApplied }: Props) {
           {!loading && scan && (
             <>
               <p className="text-xs text-gray-500">
-                Scanned {scan.diagramCount} BPMN diagram{scan.diagramCount === 1 ? "" : "s"}.
+                Scanned {scan.diagramCount} diagram{scan.diagramCount === 1 ? "" : "s"}.
                 Found {existing.length} existing link{existing.length === 1 ? "" : "s"},
                 {" "}{definite.length} definite candidate{definite.length === 1 ? "" : "s"},
                 {" "}{probable.length} probable candidate{probable.length === 1 ? "" : "s"}.
@@ -190,7 +196,10 @@ export function LinkScanDialog({ projectId, onClose, onApplied }: Props) {
                 ) : (
                   Array.from(existingByParent.entries()).map(([parentName, items]) => (
                     <div key={parentName} className="mb-2">
-                      <div className="text-xs font-medium text-gray-700 px-1">{parentName}</div>
+                      <div className="text-xs font-medium text-gray-700 px-1 flex items-center gap-1">
+                        <DiagramTypeBadge type={items[0].parentDiagramType} />
+                        <span className="truncate">{parentName}</span>
+                      </div>
                       {items.map((e) => {
                         const k = existingKey(e);
                         const checked = removeSelected.has(k);
@@ -205,10 +214,11 @@ export function LinkScanDialog({ projectId, onClose, onApplied }: Props) {
                               onChange={() => toggleRemove(e)}
                               className="h-3.5 w-3.5"
                             />
-                            <span className="text-gray-700 flex-1 truncate">
-                              <span className="font-medium">{e.parentElementLabel || "(unnamed)"}</span>
-                              <span className="text-gray-400 mx-1">→</span>
-                              <span>{e.childDiagramName}</span>
+                            <span className="text-gray-700 flex-1 inline-flex items-center gap-1 min-w-0">
+                              <span className="font-medium truncate">{e.parentElementLabel || "(unnamed)"}</span>
+                              <span className="text-gray-400 mx-0.5 shrink-0">→</span>
+                              <DiagramTypeBadge type={e.childDiagramType} />
+                              <span className="truncate">{e.childDiagramName}</span>
                             </span>
                             {checked && <span className="text-[10px] text-red-700 shrink-0">will remove</span>}
                           </label>
@@ -222,7 +232,7 @@ export function LinkScanDialog({ projectId, onClose, onApplied }: Props) {
               {/* Definite candidates */}
               <Section
                 title={`Definite Candidates (${definite.length})`}
-                subtitle="Subprocess name matches a diagram name exactly. Ticked by default."
+                subtitle="Element name matches a diagram name exactly (or by code prefix). Ticked by default."
                 accent="green"
               >
                 {definite.length === 0 ? (
@@ -230,7 +240,10 @@ export function LinkScanDialog({ projectId, onClose, onApplied }: Props) {
                 ) : (
                   Array.from(definiteByParent.entries()).map(([parentName, items]) => (
                     <div key={parentName} className="mb-2">
-                      <div className="text-xs font-medium text-gray-700 px-1">{parentName}</div>
+                      <div className="text-xs font-medium text-gray-700 px-1 flex items-center gap-1">
+                        <DiagramTypeBadge type={items[0].parentDiagramType} />
+                        <span className="truncate">{parentName}</span>
+                      </div>
                       {items.map((c) => {
                         const k = candidateKey(c);
                         const checked = addSelected.has(k);
@@ -245,10 +258,11 @@ export function LinkScanDialog({ projectId, onClose, onApplied }: Props) {
                               onChange={() => toggleAdd(c)}
                               className="h-3.5 w-3.5"
                             />
-                            <span className="text-gray-700 flex-1 truncate">
-                              <span className="font-medium">{c.parentElementLabel}</span>
-                              <span className="text-gray-400 mx-1">→</span>
-                              <span>{c.candidateDiagramName}</span>
+                            <span className="text-gray-700 flex-1 inline-flex items-center gap-1 min-w-0">
+                              <span className="font-medium truncate">{c.parentElementLabel}</span>
+                              <span className="text-gray-400 mx-0.5 shrink-0">→</span>
+                              <DiagramTypeBadge type={c.candidateDiagramType} />
+                              <span className="truncate">{c.candidateDiagramName}</span>
                             </span>
                           </label>
                         );
@@ -269,7 +283,10 @@ export function LinkScanDialog({ projectId, onClose, onApplied }: Props) {
                 ) : (
                   Array.from(probableByParent.entries()).map(([parentName, items]) => (
                     <div key={parentName} className="mb-2">
-                      <div className="text-xs font-medium text-gray-700 px-1">{parentName}</div>
+                      <div className="text-xs font-medium text-gray-700 px-1 flex items-center gap-1">
+                        <DiagramTypeBadge type={items[0].parentDiagramType} />
+                        <span className="truncate">{parentName}</span>
+                      </div>
                       {items.map((c) => {
                         const k = candidateKey(c);
                         const checked = addSelected.has(k);
@@ -284,10 +301,11 @@ export function LinkScanDialog({ projectId, onClose, onApplied }: Props) {
                               onChange={() => toggleAdd(c)}
                               className="h-3.5 w-3.5"
                             />
-                            <span className="text-gray-700 flex-1 truncate">
-                              <span className="font-medium">{c.parentElementLabel}</span>
-                              <span className="text-gray-400 mx-1">≈</span>
-                              <span>{c.candidateDiagramName}</span>
+                            <span className="text-gray-700 flex-1 inline-flex items-center gap-1 min-w-0">
+                              <span className="font-medium truncate">{c.parentElementLabel}</span>
+                              <span className="text-gray-400 mx-0.5 shrink-0">≈</span>
+                              <DiagramTypeBadge type={c.candidateDiagramType} />
+                              <span className="truncate">{c.candidateDiagramName}</span>
                             </span>
                           </label>
                         );

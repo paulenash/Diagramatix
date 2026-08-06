@@ -41,19 +41,23 @@ interface DiagramShape {
 interface ExistingLink {
   parentDiagramId: string;
   parentDiagramName: string;
+  parentDiagramType: string;
   parentElementId: string;
   parentElementLabel: string;
   childDiagramId: string;
   childDiagramName: string;
+  childDiagramType: string;
 }
 
 interface Candidate {
   parentDiagramId: string;
   parentDiagramName: string;
+  parentDiagramType: string;
   parentElementId: string;
   parentElementLabel: string;
   candidateDiagramId: string;
   candidateDiagramName: string;
+  candidateDiagramType: string;
 }
 
 /** Levenshtein distance, classic O(n*m) DP. Capped check via early exit
@@ -141,10 +145,12 @@ export async function GET(_req: Request, { params }: Params) {
           existingLinks.push({
             parentDiagramId: d.id,
             parentDiagramName: d.name,
+            parentDiagramType: d.type,
             parentElementId: e.id,
             parentElementLabel: label,
             childDiagramId: child.id,
             childDiagramName: child.name,
+            childDiagramType: child.type,
           });
         }
         continue; // already linked — never a candidate
@@ -163,10 +169,12 @@ export async function GET(_req: Request, { params }: Params) {
           definiteCandidates.push({
             parentDiagramId: d.id,
             parentDiagramName: d.name,
+            parentDiagramType: d.type,
             parentElementId: e.id,
             parentElementLabel: label,
             candidateDiagramId: c.id,
             candidateDiagramName: c.name,
+            candidateDiagramType: c.type,
           });
         }
         continue;
@@ -186,10 +194,12 @@ export async function GET(_req: Request, { params }: Params) {
             definiteCandidates.push({
               parentDiagramId: d.id,
               parentDiagramName: d.name,
+              parentDiagramType: d.type,
               parentElementId: e.id,
               parentElementLabel: label,
               candidateDiagramId: c.id,
               candidateDiagramName: c.name,
+              candidateDiagramType: c.type,
             });
             matched = true;
           }
@@ -242,10 +252,12 @@ export async function GET(_req: Request, { params }: Params) {
           probableCandidates.push({
             parentDiagramId: d.id,
             parentDiagramName: d.name,
+            parentDiagramType: d.type,
             parentElementId: e.id,
             parentElementLabel: label,
             candidateDiagramId: c.id,
             candidateDiagramName: c.name,
+            candidateDiagramType: c.type,
           });
         }
       }
