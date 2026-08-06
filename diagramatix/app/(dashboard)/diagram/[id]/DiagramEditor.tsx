@@ -3289,6 +3289,21 @@ export function DiagramEditor({
     await downloadMatchingXsd(SCHEMA_VERSION);
   }
 
+  // Export standard OMG BPMN 2.0 XML (.bpmn) — opens in Camunda / bpmn.io / etc.
+  async function handleExportBpmn() {
+    const { buildBpmnXml } = await import("@/app/lib/diagram/bpmn/exportBpmnXml");
+    const xml = buildBpmnXml(data, diagramName);
+    const blob = new Blob([xml], { type: "application/xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${diagramName}.bpmn`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   // ── SharePoint: Save the diagram's data files into a chosen folder ──
   // Uploads XML + matching XSD + JSON (and the Visio .vsdx for BPMN) — the
   // same artefacts the local Export menu produces, written straight to
@@ -4940,7 +4955,10 @@ export function DiagramEditor({
                                   <button onClick={() => { closeFm(); void handleExportBundle(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="SuperAdmin only — export the diagram together with its AI prompt, plan, comparison matrix & per-model diagrams as ONE bundle. Re-import via a project's 'Import Diagram Bundle'.">Diagram Bundle (AI)</button>
                                 )}
                                 {diagramType === "bpmn" && (
-                                  <button onClick={() => { handleExportXml(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download diagram XML and the matching XSD schema">XML</button>
+                                  <button onClick={() => { handleExportXml(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download diagram XML and the matching XSD schema">XML (Diagramatix)</button>
+                                )}
+                                {diagramType === "bpmn" && (
+                                  <button onClick={() => { void handleExportBpmn(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download standard OMG BPMN 2.0 XML (.bpmn) — opens in Camunda, bpmn.io, Signavio, etc.">BPMN 2.0 XML</button>
                                 )}
                                 {diagramType === "bpmn" && (
                                   <>
