@@ -18,6 +18,7 @@ const GHOSTABLE = new Set<string>([
   "task", "subprocess", "subprocess-expanded", "subprocess-collapsed",
   "gateway", "start-event", "intermediate-event", "end-event",
   "data-object", "data-store", "text-annotation", "pool",
+  "review-comment", // co-authoring: a new note must ghost to peers, not just its tether (item L)
 ]); // skip lanes/sub-lanes — they'd be noisy and follow their pool anyway
 
 export function CollabLiveEdits({

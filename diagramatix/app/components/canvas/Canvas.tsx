@@ -21,7 +21,7 @@ import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
 import { BubbleHelp } from "./BubbleHelp";
 import { EntityNameInput } from "./EntityNameInput";
 import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
-import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, ShowReviewCommentsCtx, ReviewCommentColorsCtx, reviewCommentAuthorKey, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, ShowReviewCommentsCtx, ReviewCommentColorsCtx, reviewCommentAuthorKey, REVIEW_COMMENT_PALETTE, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
 import { CollabCursors } from "./CollabCursors";
 import { CollabLiveEdits } from "./CollabLiveEdits";
 import { CollabGhosts } from "./CollabGhosts";
@@ -4495,6 +4495,19 @@ export function Canvas({
     return map;
   })();
 
+  // The stroke colour for a review-comment-link = its note's per-author colour,
+  // so the tether always matches the note even after colours reassign when
+  // another user's last comment is deleted (item K).
+  const reviewLinkColorFor = (conn: Connector): string | undefined => {
+    if (conn.type !== "review-comment-link") return undefined;
+    const src = data.elements.find((e) => e.id === conn.sourceId);
+    const tgt = data.elements.find((e) => e.id === conn.targetId);
+    const note = src?.type === "review-comment" ? src : tgt?.type === "review-comment" ? tgt : undefined;
+    if (!note) return undefined;
+    const idx = reviewCommentColors.get(reviewCommentAuthorKey(note)) ?? 0;
+    return REVIEW_COMMENT_PALETTE[idx % REVIEW_COMMENT_PALETTE.length].stroke;
+  };
+
   const nonContainers = (() => {
     const items = data.elements.filter(
       (el) => el.type !== "system-boundary" && el.type !== "composite-state"
@@ -5748,6 +5761,7 @@ export function Canvas({
               <ConnectorRenderer
                 key={conn.id}
                 connector={conn}
+                reviewLinkColor={reviewLinkColorFor(conn)}
                 selected={false}
                 onSelect={() => {
                   onSelectConnector(conn.id);
@@ -7317,8 +7331,9 @@ export function Canvas({
               onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
               onToggleReviewCollapse={onToggleReviewCollapse}
               onDoubleClick={() => {
-                // Collapsed icon → expand + front (item 14); expanded → edit body.
-                if (el.properties.collapsed) { onToggleReviewCollapse?.(el.id); onBringReviewToFront?.(el.id); }
+                // Collapsed icon → expand + front, and show it UN-selected
+                // (item H); expanded → edit body.
+                if (el.properties.collapsed) { onToggleReviewCollapse?.(el.id); onBringReviewToFront?.(el.id); onSetSelectedElements(new Set()); }
                 else startEditingLabel(el);
               }}
               onConnectionPointDragStart={(side, worldPos) => handleConnectionPointDragStart(el.id, side, worldPos)}

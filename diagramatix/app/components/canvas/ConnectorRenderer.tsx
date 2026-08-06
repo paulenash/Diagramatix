@@ -24,6 +24,9 @@ interface Props {
   debugMode?: boolean;
   onUpdateEndOffset?: (connectorId: string, field: string, offset: Point) => void;
   showBottleneck?: boolean;
+  /** Per-author colour for a review-comment-link, so the tether matches its
+   *  note's current colour (item K). Undefined → default pink. */
+  reviewLinkColor?: string;
   /** Process-Context association highlight: draw this connector green +
    *  thicker because one of its endpoints is the selected element. */
   highlight?: boolean;
@@ -727,7 +730,7 @@ function ConstraintBox({
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, sourceType, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, reviewLinkColor, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, sourceType, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const showReviewMarkers = useContext(ShowReviewCommentsCtx);
@@ -779,7 +782,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     : isMessageBPMN ? "#b0b7c3"
     : isAssocBPMN ? "#9ca3af"
     : isFlowchartAssoc ? "#9333ea"   // dotted comment association (purple)
-    : isReviewLink ? "#ec4899"   // pink-500, matches the note
+    : isReviewLink ? (reviewLinkColor ?? "#ec4899")   // matches the note's per-author colour (item K)
     : "#6b7280";
   const isUmlConn = isUmlConnType(connector.type);
   const markerId = `arrow-${connector.id}`;
