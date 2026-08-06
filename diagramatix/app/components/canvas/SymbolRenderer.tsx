@@ -3499,23 +3499,6 @@ export function SymbolRenderer({
         })
       }
 
-      {/* Review-comment collapse control — a "–" button just left of the folded
-          corner. Collapses the note to its small icon (item 11). Always shown
-          while expanded — including when the note is SELECTED (item I) — so it's
-          discoverable without selecting first, and 50% larger for easier
-          clicking (item J). Rendered after the resize handles so it stays on
-          top of them. */}
-      {element.type === "review-comment" && !element.properties.collapsed && onToggleReviewCollapse && (
-        <g data-interactive style={{ cursor: "pointer", pointerEvents: "all" }}
-          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onToggleReviewCollapse(element.id); }}
-          onClick={(e) => { e.stopPropagation(); }}>
-          <rect x={element.x + element.width - 42} y={element.y + 3} width={24} height={20} rx={3}
-            fill="#ec4899" opacity={0.92} />
-          <line x1={element.x + element.width - 37} y1={element.y + 13} x2={element.x + element.width - 23} y2={element.y + 13}
-            stroke="#fff" strokeWidth={2} strokeLinecap="round" />
-        </g>
-      )}
-
       {/* Pool / Subprocess-Expanded edge resize handles. Hit zones
           (invisible, ~10px wide) straddle each of the four edges and are
           ALWAYS active — a click near any edge initiates a drag on that
@@ -3762,6 +3745,22 @@ export function SymbolRenderer({
             window.addEventListener("mousemove", onMove);
           }}
         />
+      )}
+
+      {/* Review-comment collapse control — a "–" button just left of the folded
+          corner. Collapses the note to its small icon (item 11); 50% larger for
+          easier clicking (item J). Rendered AFTER the full-element connection
+          overlay so it stays clickable while the note is SELECTED (item I) — the
+          crosshair connector overlay would otherwise swallow the click. */}
+      {element.type === "review-comment" && !element.properties.collapsed && onToggleReviewCollapse && (
+        <g data-interactive style={{ cursor: "pointer", pointerEvents: "all" }}
+          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onToggleReviewCollapse(element.id); }}
+          onClick={(e) => { e.stopPropagation(); }}>
+          <rect x={element.x + element.width - 42} y={element.y + 3} width={24} height={20} rx={3}
+            fill="#ec4899" opacity={0.92} />
+          <line x1={element.x + element.width - 37} y1={element.y + 13} x2={element.x + element.width - 23} y2={element.y + 13}
+            stroke="#fff" strokeWidth={2} strokeLinecap="round" />
+        </g>
       )}
 
       {/* Interior label for task/subprocess/subprocess-expanded/use-case — rendered AFTER connection overlay so it is on top */}
