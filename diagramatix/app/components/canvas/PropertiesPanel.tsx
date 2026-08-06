@@ -2447,9 +2447,23 @@ export function PropertiesPanel({
         </div>
       )}
 
+      {/* Review Comment body — a rich-text editor (item Q). Replaces the plain
+          label editor for this type. Timestamp refreshes on edit (item F). */}
+      {element.type === "review-comment" && (
+        <div>
+          <label className="block text-[10px] font-medium text-gray-500 mb-0.5">Review Comment</label>
+          <RichTextEditor
+            key={`rc-body-${element.id}`}
+            value={element.label ?? ""}
+            onChange={(html) => onUpdateLabel(element.id, html)}
+          />
+        </div>
+      )}
+
       {/* Pain points have no editable label — the number is auto-assigned and
-          the text lives in the Pain Point list description (issue #1). */}
-      {element.type !== "uml-pain-point" && (
+          the text lives in the Pain Point list description (issue #1). Review
+          Comments use the rich-text editor above instead of this plain field. */}
+      {element.type !== "uml-pain-point" && element.type !== "review-comment" && (
       <div>
         <label className="block text-[10px] font-medium text-gray-500 mb-0.5">
           {element.type === "uml-class" || element.type === "uml-enumeration" ||

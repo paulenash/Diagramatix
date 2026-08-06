@@ -67,6 +67,7 @@ import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronTh
 import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { umlAttributeTypeList } from "@/app/lib/diagram/umlTypes";
 import { ConnectorRenderer } from "./ConnectorRenderer";
+import { RichTextEditor } from "./RichTextEditor";
 import { findShapeByKey as findArchimateShapeByKey } from "@/app/lib/archimate/catalogue";
 import { RemoveSpaceDialog, type RsRef, type RsSelection } from "@/app/components/RemoveSpaceDialog";
 
@@ -674,6 +675,9 @@ export function Canvas({
     baseZoomRef.current = Number.isFinite(stored) && stored > 0 ? stored : 0.7;
   }, []);
   const [editingLabel, setEditingLabel] = useState<EditingLabel | null>(null);
+  // Latest HTML from the review-comment zoom rich editor (item Q) — the editor
+  // commits on blur, so we mirror it here to read on Done/Escape.
+  const rcZoomRef = useRef<string>("");
   // Shift-near-boundary quick-add of UML class attributes/operations.
   // `umlQuickAddMenu` = the small Add-Attribute/Add-Operation flyout (shown
   // while Shift is held near a class's left/right/bottom edge). `umlRowEdit` =
@@ -3683,6 +3687,9 @@ export function Canvas({
     // it instead of opening the label editor (covers task double-clicks that
     // reach the label path rather than tryGroupConnectToGateway).
     if (tryDiamondConnect(el)) return;
+    // Seed the review-comment rich-editor ref so a Done with no edits keeps the
+    // existing HTML instead of wiping it (item Q).
+    if (el.type === "review-comment") rcZoomRef.current = el.label ?? "";
     // Snapshot history once at edit start (for task/subprocess this is used
     // by updateLabelLive per-keystroke without polluting the undo stack).
     onBeginLabelEdit?.(el.id);
@@ -7403,6 +7410,38 @@ export function Canvas({
             onUpdateLabelLive?.(editingEl.id, val);
           }
         };
+        if (editingEl?.type === "review-comment") {
+          // Rich-text editor in the zoomed focus box (item Q). Body is HTML;
+          // captured in rcZoomRef (RichTextEditor commits on blur). Done / click
+          // outside / Escape blur-flushes the latest HTML, commits, and restores
+          // the zoom (setEditingLabel(null) triggers the restore effect).
+          const commitRc = () => {
+            (document.activeElement as HTMLElement | null)?.blur(); // flush live HTML into rcZoomRef
+            onUpdateLabel(editingLabel.elementId, rcZoomRef.current);
+            setEditingLabel(null);
+          };
+          return (
+            <>
+              <div style={{ position: "absolute", inset: 0, zIndex: 49 }}
+                onMouseDown={() => commitRc()} />
+              <div
+                style={{ position: "absolute", left: editingLabel.x, top: editingLabel.y, width: Math.max(editingLabel.width, 240), zIndex: 50 }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); commitRc(); } }}
+              >
+                <RichTextEditor
+                  key={`rc-zoom-${editingLabel.elementId}`}
+                  value={editingLabel.value}
+                  onChange={(html) => { rcZoomRef.current = html; }}
+                />
+                <div className="flex justify-end mt-1">
+                  <button onClick={commitRc}
+                    className="px-2 py-0.5 text-[11px] text-white bg-blue-600 rounded hover:bg-blue-700">Done</button>
+                </div>
+              </div>
+            </>
+          );
+        }
         if (isUseCase) {
           return (
             <textarea
@@ -7670,7 +7709,7 @@ export function Canvas({
               width: liveW,
               height: editH,
               fontSize: (data.fontSize ?? 12) * zoom,
-              textAlign: editingEl?.type === "review-comment" ? "left" : "center",
+              textAlign: "center", // review-comment uses its own rich editor branch above (item Q)
               background: "white",
               border: "2px solid #2563eb",
               borderRadius: 4,

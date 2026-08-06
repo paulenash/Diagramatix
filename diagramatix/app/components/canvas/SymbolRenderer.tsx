@@ -3252,19 +3252,31 @@ export function SymbolRenderer({
         const createdStamp = element.properties.createdStamp as string | undefined;
         const header = authorName ? `${authorName}${createdStamp ? ` · ${createdStamp}` : ""}` : null;
         const headerLines = header ? wrapText(header, element.width - PAD - 6) : [];
-        const bodyLines = element.label ? wrapText(element.label, element.width - PAD - 6) : [];
         let y = element.y + PAD + lineH * 0.8;
         const rcText = REVIEW_COMMENT_PALETTE[(reviewCommentColorMap.get(reviewCommentAuthorKey(element)) ?? 0) % REVIEW_COMMENT_PALETTE.length].text;
+        // Body is RICH TEXT (item Q) — sanitized HTML rendered in a foreignObject
+        // below the header. Old plain-text notes upgrade via plainToHtml.
+        const raw = element.label ?? "";
+        const bodyHtml = raw ? (isRichText(raw) ? sanitizeRichText(raw) : plainToHtml(raw)) : "";
+        const headerH = headerLines.length * lineH;
+        const bodyTop = element.y + PAD + headerH + 2;
+        const bodyH = Math.max(0, element.height - (PAD + headerH + 2) - PAD);
         return (
-          <text textAnchor="start" fontSize={fs(11)} fill={rcText}
-            style={{ userSelect: "none", pointerEvents: "none" }}>
-            {headerLines.map((line, i) => { const ty = y; y += lineH; return (
-              <tspan key={`h${i}`} x={element.x + PAD} y={ty} fontWeight={700}>{line}</tspan>
-            ); })}
-            {bodyLines.map((line, i) => { const ty = y; y += lineH; return (
-              <tspan key={`b${i}`} x={element.x + PAD} y={ty}>{line}</tspan>
-            ); })}
-          </text>
+          <g style={{ pointerEvents: "none" }}>
+            {headerLines.length > 0 && (
+              <text textAnchor="start" fontSize={fs(11)} fill={rcText} style={{ userSelect: "none", pointerEvents: "none" }}>
+                {headerLines.map((line, i) => { const ty = y; y += lineH; return (
+                  <tspan key={`h${i}`} x={element.x + PAD} y={ty} fontWeight={700}>{line}</tspan>
+                ); })}
+              </text>
+            )}
+            {bodyHtml && bodyH > 4 && (
+              <foreignObject x={element.x + PAD} y={bodyTop} width={element.width - PAD * 2} height={bodyH} style={{ pointerEvents: "none" }}>
+                <div className="dgx-rich-desc" style={{ width: "100%", height: "100%", overflow: "hidden", fontSize: fs(11), lineHeight: 1.3, color: rcText, wordBreak: "break-word" }}
+                  dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+              </foreignObject>
+            )}
+          </g>
         );
       })() : showLabel && !(
         element.type === 'task' ||
