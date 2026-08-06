@@ -103,8 +103,10 @@ export async function GET(_req: Request, { params }: Params) {
     throw err;
   }
 
+  // The issue checks are BPMN-specific (pools/lanes/message flows), so only
+  // BPMN diagrams are scanned — "Scan BPMN Diagrams for Issues".
   const diagrams = await prisma.diagram.findMany({
-    where: { projectId: id, orgId },
+    where: { projectId: id, orgId, type: "bpmn" },
     select: { id: true, name: true, type: true, data: true },
     orderBy: { name: "asc" },
   });

@@ -2494,9 +2494,9 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                       setShowProjectMenu(false);
                       handleScanPoolConnectors();
                     }}
-                    title="Scan every diagram in this project for sequence/association connectors on a Pool/Lane, duplicate Pool/Lane names, Pools with a single Lane, and hanging messages (red on canvas)."
+                    title="Scan every BPMN diagram in this project for sequence/association connectors on a Pool/Lane, duplicate Pool/Lane names, Pools with a single Lane, and hanging messages (red on canvas)."
                   >
-                    {scanBusy ? "Scanning…" : "Scan Diagrams for Issues"}
+                    {scanBusy ? "Scanning…" : "Scan BPMN Diagrams for Issues"}
                   </button>
                   <button
                     className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
@@ -3530,7 +3530,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-gray-900">
-                Scan Diagrams for Issues
+                Scan BPMN Diagrams for Issues
               </h2>
               <div className="flex items-center gap-2">
                 <button

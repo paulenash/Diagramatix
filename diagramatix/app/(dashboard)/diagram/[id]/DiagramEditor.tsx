@@ -4261,8 +4261,9 @@ export function DiagramEditor({
         )}
 
         {/* Active vs Viewer — claim the live cursor (others become viewers to me)
-            or step back to watching. Useful for two sessions on one machine. */}
-        {liveCursors && (
+            or step back to watching. Only meaningful when someone else is here,
+            so it shows only with 2+ co-authors (like Sync). */}
+        {liveCursors && othersPresent && (
           <button
             onClick={() => setCollabActive((v) => !v)}
             title={collabActive
