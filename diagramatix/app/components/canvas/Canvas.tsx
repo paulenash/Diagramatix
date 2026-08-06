@@ -7340,7 +7340,7 @@ export function Canvas({
               every other element/overlay on the canvas (items 14/15 + D). Order
               follows data.elements, so BRING_REVIEW_TO_FRONT (move-to-end) puts
               the active note above its overlapping peers (item 15). */}
-          {data.elements.filter(el => el.type === "review-comment").map((el) => (
+          {data.elements.filter(el => el.type === "review-comment" && editingLabel?.elementId !== el.id).map((el) => (
             <SymbolRenderer
               key={`rc-${el.id}`}
               element={el}
