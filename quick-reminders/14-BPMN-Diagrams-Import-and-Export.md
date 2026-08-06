@@ -18,7 +18,9 @@ Diagramatix reads and writes BPMN diagrams in several interchange formats, so yo
 
 ### Exporting
 
-**Visio VSDX** — *File ▸ Export ▸ Visio.* The standard BPMN export, built against the shipped Visio stencil. Colours follow your layered colour configuration (defaults → project → diagram), and connectors and shape outlines are written with cached geometry so the diagram renders correctly the instant Visio opens it. A whole project can be exported as one **multi-page** `.vsdx` (non-BPMN diagrams are skipped).
+**BPMN 2.0 XML** (`.bpmn`) — *File ▸ Export ▸ BPMN 2.0 XML.* Writes standard OMG BPMN 2.0 interchange XML with a full BPMNDI layout section (shape bounds + connector waypoints), so the file opens **laid out** in Camunda, bpmn.io, Signavio, etc. Pools become participants (white-box pools carry a process, black-box pools don't); lanes, sub-processes, all task/event/gateway types, data objects, and sequence/message/association flows are all emitted. Round-trips back through *Import ▸ BPMN*.
+
+**Visio VSDX** — *File ▸ Export ▸ Visio.* Built against the shipped Visio stencil. Colours follow your layered colour configuration (defaults → project → diagram), and connectors and shape outlines are written with cached geometry so the diagram renders correctly the instant Visio opens it. A whole project can be exported as one **multi-page** `.vsdx` (non-BPMN diagrams are skipped).
 
 **PDF** — *File ▸ Export ▸ PDF*, with a scale option (100 / 75 / 50 / 25%).
 
@@ -32,7 +34,7 @@ Diagramatix reads and writes BPMN diagrams in several interchange formats, so yo
 
 ### Round-trip notes
 
-- BPMN travels **both ways** through Visio VSDX (import and export); Visio export covers BPMN diagrams only.
+- BPMN travels **both ways** natively as **BPMN 2.0 XML** (*Import ▸ BPMN* ↔ *Export ▸ BPMN 2.0 XML*) and also through **Visio VSDX**; both export paths cover BPMN diagrams only.
 - Colours survive to Visio via the diagram's colour configuration; per-shape colours carried in from a foreign file are kept only internally, not re-emitted.
 
 ---
