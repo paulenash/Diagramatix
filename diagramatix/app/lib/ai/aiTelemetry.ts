@@ -27,6 +27,7 @@ export const AI_INVOCATION_POINTS = {
   SimulationAssess: "simulation.assess", // as-is/to-be assessment
   StaffNarrative: "staff.narrative",
   GenerateSop: "sop.generate", // BPMN → SOP document prose (whole/lane/pool/subprocess)
+  ProcessDiff: "bpmn.process-diff", // Diff Processes: plain-English summary of the differences between two BPMN versions
   DictationRefine: "dictation.refine", // transcript clean-up / anonymise
   LiveCommand: "bpmn.live-command", // Abracadabra Mode: NL edit command → op list (Raw Attempt only)
   VoiceDictation: "voice.dictation", // one row per Deepgram dictation session (provider/model "deepgram")
@@ -63,6 +64,7 @@ export const AI_USER_METERED_POINTS: ReadonlySet<string> = new Set<string>([
   AI_INVOCATION_POINTS.DiagramGenerate,
   AI_INVOCATION_POINTS.StaffNarrative,
   AI_INVOCATION_POINTS.GenerateSop,
+  AI_INVOCATION_POINTS.ProcessDiff,
   AI_INVOCATION_POINTS.MiningDiscover,
   AI_INVOCATION_POINTS.MiningDiscoverSm,
   AI_INVOCATION_POINTS.MiningExplain,
@@ -73,6 +75,7 @@ export const AI_INVOCATION_POINT_LABELS: Record<string, string> = {
   [AI_INVOCATION_POINTS.BpmnPlan]: "BPMN Plan",
   [AI_INVOCATION_POINTS.BpmnGenerate]: "BPMN Generate",
   [AI_INVOCATION_POINTS.BpmnCompare]: "AI Compare",
+  [AI_INVOCATION_POINTS.ProcessDiff]: "Diff Processes Summary",
   [AI_INVOCATION_POINTS.BpmnRefine]: "BPMN Refine",
   [AI_INVOCATION_POINTS.FlowchartPlan]: "Flowchart Plan",
   [AI_INVOCATION_POINTS.FlowchartToBpmnRefine]: "Flowchart→BPMN Refine",

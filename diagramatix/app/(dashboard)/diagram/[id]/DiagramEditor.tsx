@@ -86,6 +86,7 @@ import { SharePointPreview } from "@/app/components/SharePointPreview";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { checkDiagram, rulesMetadata, type Violation } from "@/app/lib/diagram/checks/diagramChecks";
 import { HistoryPanel } from "./HistoryPanel";
+import { ProcessDiffDialog } from "./ProcessDiffDialog";
 
 interface VisioImportResult {
   // Which importer produced this result — drives the result modal's wording
@@ -1462,6 +1463,7 @@ export function DiagramEditor({
   // The Simulator (Matrix-style process simulation) is offered for BPMN.
   const supportsSimulator = diagramType === "bpmn";
   const [showSendReview, setShowSendReview] = useState(false);
+  const [showProcessDiff, setShowProcessDiff] = useState(false);
   const [reviewSentMsg, setReviewSentMsg] = useState<string | null>(null);
 
   // Review Mode — active when the diagram was opened from a Received-for-
@@ -5211,6 +5213,15 @@ export function DiagramEditor({
                 >
                   Get help
                 </button>
+                {diagramType === "bpmn" && (
+                  <button
+                    onClick={() => { setClearMenuOpen(false); setShowProcessDiff(true); }}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    title="Compare this process with another version — who does what, which systems, and what is done"
+                  >
+                    Diff Processes
+                  </button>
+                )}
                 <div className="border-t border-gray-100" />
                 <button
                   onClick={() => { setClearMenuOpen(false); setClearConfirmOpen("all"); }}
@@ -5755,6 +5766,16 @@ export function DiagramEditor({
             onAiFeedback={setAiFeedback}
             diagramId={diagramId}
             onComparison={setAiComparison}
+          />
+        )}
+
+        {showProcessDiff && (
+          <ProcessDiffDialog
+            currentId={diagramId}
+            currentName={diagramName}
+            currentData={data}
+            siblings={siblingDiagrams.filter((s) => s.type === "bpmn" && s.id !== diagramId).map((s) => ({ id: s.id, name: s.name }))}
+            onClose={() => setShowProcessDiff(false)}
           />
         )}
 
