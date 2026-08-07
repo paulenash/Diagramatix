@@ -2193,10 +2193,15 @@ export async function exportVisioV3(
             );
           }
 
-          // Write as new master file
-          const poolInstanceId = 200 + shapeId;
-          const poolFileName = `master${200 + shapeId}.xml`;
-          const poolRId = `rId${200 + shapeId}`;
+          // Write as new master file. Draw the master ID from the SHARED
+          // instance-master counter (not `200 + shapeId`) — the old scheme
+          // could land in createInstanceMaster's 1000+ range and emit a
+          // DUPLICATE Master ID / relationship Id (e.g. a Pool at shapeId 800
+          // → 1000, colliding with the first Task instance master), producing
+          // an invalid OPC package = Visio "Error 275: file is corrupt".
+          const poolInstanceId = nextInstanceMasterId++;
+          const poolFileName = `master${poolInstanceId}.xml`;
+          const poolRId = `rId${poolInstanceId}`;
           zip.file("visio/masters/" + poolFileName, poolMasterXml);
 
           // Add master entry with Visio naming convention
@@ -2480,8 +2485,11 @@ export async function exportVisioV3(
             );
           }
 
-          // Register the clone in the output file.
-          const poolInstanceId = 200 + shapeId;
+          // Register the clone in the output file. Master ID comes from the
+          // SHARED instance-master counter — see the note on the BPMN_M pool
+          // path above: `200 + shapeId` could collide with createInstanceMaster's
+          // 1000+ IDs and corrupt the package (Visio Error 275).
+          const poolInstanceId = nextInstanceMasterId++;
           const poolFileName = `master${poolInstanceId}.xml`;
           const poolRId = `rId${poolInstanceId}`;
           zip.file("visio/masters/" + poolFileName, poolMasterXml);
