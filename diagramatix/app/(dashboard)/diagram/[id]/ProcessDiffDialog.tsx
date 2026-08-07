@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
+import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { diffProcesses, type DiffStatus } from "@/app/lib/diagram/diff/processDiff";
 import { diffToCsv } from "@/app/lib/diagram/diff/processDiffFormat";
+import { mergeProcesses, type MergeDecision, type MergeKind } from "@/app/lib/diagram/diff/mergeProcess";
 
 interface Sibling { id: string; name: string }
 
@@ -62,6 +64,11 @@ export function ProcessDiffDialog({
   const [swapped, setSwapped] = useState(false);
   const [busy, setBusy] = useState<null | "docx" | "ai">(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
+  // Merge: cherry-pick which changed/added/removed rows to fold into a new diagram.
+  const [mergeMode, setMergeMode] = useState(false);
+  const [accepted, setAccepted] = useState<Set<number>>(new Set());
+  const [merging, setMerging] = useState(false);
+  const [mergeDone, setMergeDone] = useState<{ id: string } | null>(null);
 
   // Project scope. Defaults to the current project (its BPMN diagrams arrive as
   // `siblings`). Selecting another project fetches that project's BPMN diagrams.
@@ -150,6 +157,44 @@ export function ProcessDiffDialog({
   function exportCsv() {
     if (!diff) return;
     download(`${diff.a.title}-vs-${diff.b.title}.csv`, new Blob([diffToCsv(diff)], { type: "text/csv" }));
+  }
+
+  function toggleRow(i: number) {
+    setAccepted((prev) => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; });
+  }
+  function selectAllChanges() {
+    if (!diff) return;
+    const all = new Set<number>();
+    diff.rows.forEach((r, i) => { if (r.status !== "unchanged") all.add(i); });
+    setAccepted(all);
+  }
+
+  async function createMerge() {
+    if (!diff || !otherData) return;
+    const aData = swapped ? otherData : currentData;
+    const bData = swapped ? currentData : otherData;
+    const decisions: MergeDecision[] = [];
+    diff.rows.forEach((r, i) => {
+      if (!accepted.has(i)) return;
+      const kind: MergeKind | null =
+        r.status === "added" ? "add" : r.status === "removed" ? "remove" : r.status === "changed" ? "change" : null;
+      if (kind) decisions.push({ activity: r.activity, kind });
+    });
+    if (!decisions.length) { setErr("Select at least one change to merge."); return; }
+    setMerging(true); setErr(null); setMergeDone(null);
+    try {
+      const { model } = mergeProcesses(aData, bData, decisions);
+      const data = layoutBpmnDiagram(model.elements, model.connections);
+      const name = `${diff.a.title} + ${diff.b.title} (merged)`.slice(0, 120);
+      const res = await fetch("/api/diagrams", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, type: "bpmn", projectId: currentProjectId ?? undefined, data }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Merge failed");
+      setMergeDone({ id: j.id });
+    } catch (e) { setErr(e instanceof Error ? e.message : "Merge failed"); }
+    finally { setMerging(false); }
   }
 
   async function generateAi() {
@@ -252,6 +297,7 @@ export function ProcessDiffDialog({
                 <table className="w-full text-[11px] border-collapse">
                   <thead>
                     <tr className="bg-gray-50 text-gray-600 text-left">
+                      {mergeMode && <th className="px-2 py-1.5 font-medium w-8" title="Include this change in the merge">Take</th>}
                       <th className="px-2 py-1.5 font-medium">Activity</th>
                       <th className="px-2 py-1.5 font-medium">Change</th>
                       <th className="px-2 py-1.5 font-medium">Who (role)</th>
@@ -263,6 +309,14 @@ export function ProcessDiffDialog({
                   <tbody>
                     {diff.rows.map((r, i) => (
                       <tr key={i} className="border-t border-gray-100 align-top">
+                        {mergeMode && (
+                          <td className="px-2 py-1.5">
+                            {r.status !== "unchanged" && (
+                              <input type="checkbox" checked={accepted.has(i)} onChange={() => toggleRow(i)}
+                                title="Include this change in the merged diagram" />
+                            )}
+                          </td>
+                        )}
                         <td className="px-2 py-1.5 text-gray-900">{r.activity}</td>
                         <td className="px-2 py-1.5"><span className={`px-1.5 py-0.5 rounded ${STATUS_STYLE[r.status]}`}>{STATUS_LABEL[r.status]}</span></td>
                         <td className="px-2 py-1.5"><Cell a={r.who.a} b={r.who.b} changed={r.who.changed} /></td>
@@ -287,14 +341,36 @@ export function ProcessDiffDialog({
 
         {/* Footer actions */}
         {diff && (
-          <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
-            <button onClick={exportCsv} className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50">Export CSV</button>
-            <button onClick={exportDocx} disabled={busy === "docx"} className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50 disabled:opacity-50">
-              {busy === "docx" ? "Exporting…" : "Export Word"}
-            </button>
-            <button onClick={generateAi} disabled={busy === "ai"} className="text-xs text-white bg-blue-600 rounded px-3 py-1 hover:bg-blue-700 disabled:opacity-50">
-              {busy === "ai" ? "Summarising…" : "AI Summary"}
-            </button>
+          <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-gray-200">
+            <div className="flex items-center gap-2">
+              {!mergeMode ? (
+                <button onClick={() => { setMergeMode(true); selectAllChanges(); setMergeDone(null); }}
+                  className="text-xs text-emerald-700 border border-emerald-300 rounded px-3 py-1 hover:bg-emerald-50"
+                  title="Cherry-pick differences into a new merged diagram">Merge…</button>
+              ) : (
+                <>
+                  <button onClick={createMerge} disabled={merging || accepted.size === 0}
+                    className="text-xs text-white bg-emerald-600 rounded px-3 py-1 hover:bg-emerald-700 disabled:opacity-50">
+                    {merging ? "Merging…" : `Create Merged Diagram (${accepted.size})`}
+                  </button>
+                  <button onClick={selectAllChanges} className="text-xs text-gray-600 underline">All</button>
+                  <button onClick={() => setAccepted(new Set())} className="text-xs text-gray-600 underline">None</button>
+                  <button onClick={() => { setMergeMode(false); setMergeDone(null); }} className="text-xs text-gray-500">Cancel</button>
+                  {mergeDone && (
+                    <a href={`/diagram/${mergeDone.id}`} className="text-xs text-emerald-700 underline font-medium">Open merged diagram →</a>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={exportCsv} className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50">Export CSV</button>
+              <button onClick={exportDocx} disabled={busy === "docx"} className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50 disabled:opacity-50">
+                {busy === "docx" ? "Exporting…" : "Export Word"}
+              </button>
+              <button onClick={generateAi} disabled={busy === "ai"} className="text-xs text-white bg-blue-600 rounded px-3 py-1 hover:bg-blue-700 disabled:opacity-50">
+                {busy === "ai" ? "Summarising…" : "AI Summary"}
+              </button>
+            </div>
           </div>
         )}
       </div>
