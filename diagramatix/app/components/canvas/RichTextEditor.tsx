@@ -206,7 +206,7 @@ export function RichTextEditor({
   const btn = "w-6 h-6 rounded text-[11px] flex items-center justify-center text-gray-600 hover:bg-gray-200";
 
   return (
-    <div className="border border-gray-300 rounded">
+    <div className="border border-gray-300 rounded bg-white">
       <div className="flex items-center gap-0.5 border-b border-gray-200 px-1 py-0.5 bg-gray-50">
         <button type="button" title="Bold" className={`${btn} font-bold`}
           onMouseDown={(e) => { e.preventDefault(); run("bold"); }}>B</button>

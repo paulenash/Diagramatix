@@ -3116,19 +3116,13 @@ export function Canvas({
       return;
     }
 
-    // Review Mode: a review-comment drops as a pink note auto-linked to
-    // whatever element sits under the cursor (smallest enclosing element
-    // wins; review-comments themselves are never targets). The editor
-    // creates both the note and the review-comment-link.
+    // Review Mode: a review-comment drops as a standalone pink note — no
+    // auto-linking connector. (Previously it tethered to the smallest enclosing
+    // element, but in BPMN a pool/lane always encloses the drop point, so every
+    // note picked up a spurious association line.) Feedback still works: its
+    // element anchor is optional.
     if (pendingDragSymbol === "review-comment" && onAddReviewComment) {
-      const under = data.elements
-        .filter((el) =>
-          el.type !== "review-comment" &&
-          worldPos.x >= el.x && worldPos.x <= el.x + el.width &&
-          worldPos.y >= el.y && worldPos.y <= el.y + el.height,
-        )
-        .sort((a, b) => a.width * a.height - b.width * b.height);
-      onAddReviewComment(worldPos, under[0]?.id ?? null);
+      onAddReviewComment(worldPos, null);
       return;
     }
 
