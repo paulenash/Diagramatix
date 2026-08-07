@@ -1,0 +1,234 @@
+WEBVTT
+
+NOTE
+Process walkthrough — BPMN V01.02 "Validate Customer / Order"
+Second stage of the Order to Cash (O2C) value chain.
+Participants: Paul Nash, Mary Griffin
+
+1
+00:00:00.000 --> 00:00:05.400
+<v Paul Nash>Morning Mary, thanks for making the time. I want to walk you through V01.02, the Validate Customer and Order step.</v>
+
+2
+00:00:05.400 --> 00:00:09.800
+<v Mary Griffin>Morning Paul. That's the one right after we capture the order, isn't it?</v>
+
+3
+00:00:09.800 --> 00:00:16.200
+<v Paul Nash>Exactly. It's the second stage of the Order to Cash value chain. Order capture hands off to us, and our job is to prove the customer and the order are actually good before anyone talks about credit or pricing.</v>
+
+4
+00:00:16.200 --> 00:00:20.600
+<v Mary Griffin>Okay. Before we get into the flow — what are the pools? Who's actually involved?</v>
+
+5
+00:00:20.600 --> 00:00:27.400
+<v Paul Nash>Three pools. At the top we've got the Customer — that's the external party whose order we're validating. In the middle, the Sales Organisation, which is us. And at the bottom, the Customer Master Data System, the CRM slash ERP.</v>
+
+6
+00:00:27.400 --> 00:00:31.000
+<v Mary Griffin>So top to bottom: Customer, Sales Organisation, then the system.</v>
+
+7
+00:00:31.000 --> 00:00:34.800
+<v Paul Nash>That's the layout, yes. The Sales Organisation sits in the middle because it's doing the real work and talking to both the others.</v>
+
+8
+00:00:34.800 --> 00:00:38.400
+<v Mary Griffin>And the Sales Organisation has lanes inside it?</v>
+
+9
+00:00:38.400 --> 00:00:45.200
+<v Paul Nash>Two lanes, top to bottom: Customer Service on top, Order Processing underneath. The flow actually starts in Order Processing, which trips a few people up at first.</v>
+
+10
+00:00:45.200 --> 00:00:49.600
+<v Mary Griffin>Let me note the pool properties too — which are black-box and which hold the flow?</v>
+
+11
+00:00:49.600 --> 00:00:57.800
+<v Paul Nash>Good question. The Customer pool is a black-box, single instance — we don't model what happens inside the customer. The Sales Organisation is the white-box; that's the one that actually holds the process flow.</v>
+
+12
+00:00:57.800 --> 00:01:04.200
+<v Paul Nash>And the Customer Master Data System is also a black-box, single instance, but it's flagged as a System — System equals true — because it's an IT system rather than a party.</v>
+
+13
+00:01:04.200 --> 00:01:08.000
+<v Mary Griffin>Right. So two black-boxes on the outside, our white-box in the middle. Makes sense. Walk me through the flow.</v>
+
+14
+00:01:08.000 --> 00:01:14.600
+<v Paul Nash>We kick off in the Order Processing lane with a message start event — "Order to validate received". That message is the hand-off coming in from the order capture stage.</v>
+
+15
+00:01:14.600 --> 00:01:19.000
+<v Mary Griffin>A message start, not a plain start — because it's triggered by something arriving from outside this process.</v>
+
+16
+00:01:19.000 --> 00:01:26.400
+<v Paul Nash>Correct. First thing after that is a service task, "Look up customer master data". That's automated — it reaches down to the CRM slash ERP to pull the customer record.</v>
+
+17
+00:01:26.400 --> 00:01:30.200
+<v Mary Griffin>So that's a message flow going down to the bottom pool.</v>
+
+18
+00:01:30.200 --> 00:01:37.800
+<v Paul Nash>Yes — "Look up customer master data" sends a message down to the Customer Master Data System, and the system sends one back up into the next task with the customer status, the credit-block flag and the account terms.</v>
+
+19
+00:01:37.800 --> 00:01:41.400
+<v Mary Griffin>And the next task is the human one?</v>
+
+20
+00:01:41.400 --> 00:01:48.800
+<v Paul Nash>It is — a user task, "Validate order data". Someone checks the products, the SKUs, the quantities and the terms against what came back from the system. That's the judgement call a person still needs to make.</v>
+
+21
+00:01:48.800 --> 00:01:53.200
+<v Mary Griffin>Then I'm guessing a decision point after that?</v>
+
+22
+00:01:53.200 --> 00:02:00.600
+<v Paul Nash>Exclusive gateway — "Customer and order valid?". Two ways out. If it's a straight yes, we just continue on. If it's a no — customer missing or blocked — we branch off.</v>
+
+23
+00:02:00.600 --> 00:02:05.000
+<v Mary Griffin>What happens on the no branch?</v>
+
+24
+00:02:05.000 --> 00:02:12.400
+<v Paul Nash>On "No — customer missing or blocked" we hit a user task, "Refer to Customer Service", and then the flow carries on up into the Customer Service lane. Essentially Order Processing is saying "this one's not clean, you deal with it".</v>
+
+25
+00:02:12.400 --> 00:02:16.800
+<v Mary Griffin>So we cross from the Order Processing lane up into Customer Service. And what's waiting up there?</v>
+
+26
+00:02:16.800 --> 00:02:24.200
+<v Paul Nash>Another exclusive gateway — "New or blocked customer?". Because the fix is different depending on which it is. Two branches again: "New", or "Existing and clear".</v>
+
+27
+00:02:24.200 --> 00:02:28.000
+<v Mary Griffin>Take me down the "New" branch first.</v>
+
+28
+00:02:28.000 --> 00:02:36.400
+<v Paul Nash>"New" goes to a user task, "Request customer onboarding slash master-data setup". That's where Customer Service reaches out to the customer to get them properly set up in our records.</v>
+
+29
+00:02:36.400 --> 00:02:41.800
+<v Mary Griffin>And that's a message going out to the Customer pool at the top?</v>
+
+30
+00:02:41.800 --> 00:02:49.200
+<v Paul Nash>Yes — a message flow from "Request customer onboarding" up to the Customer. Then we wait. There's an intermediate message catch event, "Customer details confirmed", that sits and waits for the customer to come back.</v>
+
+31
+00:02:49.200 --> 00:02:53.600
+<v Mary Griffin>So the customer replying is the message that lands on that catch event.</v>
+
+32
+00:02:53.600 --> 00:03:01.000
+<v Paul Nash>Exactly — a message flow from the Customer back down into "Customer details confirmed". And once that fires, we loop all the way back to "Look up customer master data" and try again with the now-complete record.</v>
+
+33
+00:03:01.000 --> 00:03:06.400
+<v Mary Griffin>Ah, so it's a proper loop — you don't just push a half-set-up customer forward, you re-run the lookup.</v>
+
+34
+00:03:06.400 --> 00:03:12.800
+<v Paul Nash>Right. That loop back is deliberate. It means the validation always runs against real master data, never against a promise. It keeps the downstream credit and pricing step honest.</v>
+
+35
+00:03:12.800 --> 00:03:16.400
+<v Mary Griffin>Now — the onboarding task. What if the customer just goes quiet?</v>
+
+36
+00:03:16.400 --> 00:03:24.800
+<v Paul Nash>That's the boundary event. On "Request customer onboarding" there's a non-interrupting timer on the edge of the task — "No response in 2 business days".</v>
+
+37
+00:03:24.800 --> 00:03:28.200
+<v Mary Griffin>Non-interrupting, so the original task keeps waiting?</v>
+
+38
+00:03:28.200 --> 00:03:36.600
+<v Paul Nash>Correct — that's the whole point of non-interrupting. The onboarding request stays alive, but in parallel the timer spawns a send task, "Chase customer for details", and then returns to waiting.</v>
+
+39
+00:03:36.600 --> 00:03:41.000
+<v Mary Griffin>So we nudge them without cancelling the request. And it can fire more than once if they keep stalling.</v>
+
+40
+00:03:41.000 --> 00:03:46.400
+<v Paul Nash>Every two business days of silence, yes. It's a gentle escalation that doesn't blow up the case. The customer confirming is still what actually moves us on.</v>
+
+41
+00:03:46.400 --> 00:03:50.200
+<v Mary Griffin>Good. Now back up — the other branch of that gateway. "Existing and clear".</v>
+
+42
+00:03:50.200 --> 00:03:57.600
+<v Paul Nash>That one just continues straight through — no onboarding needed. Both the "Existing and clear" path and the point after the loop converge on a service task, "Flag order as validated".</v>
+
+43
+00:03:57.600 --> 00:04:01.000
+<v Mary Griffin>Automated again — it just stamps the order.</v>
+
+44
+00:04:01.000 --> 00:04:08.400
+<v Paul Nash>Just stamps it as validated in the system. And then we finish on the end event — "Order validated, ready for Check Credit and Pricing", which is V01.03, the next stage.</v>
+
+45
+00:04:08.400 --> 00:04:13.800
+<v Mary Griffin>Let me make sure I've got the yes path clean, without all the exceptions. The happy path.</v>
+
+46
+00:04:13.800 --> 00:04:23.200
+<v Paul Nash>Happy path: message start "Order to validate received", look up customer master data, validate order data, gateway says valid — yes — flag order as validated, end. Four steps and out. Everything else is handling the messy cases.</v>
+
+47
+00:04:23.200 --> 00:04:28.600
+<v Mary Griffin>And just to be thorough on the message flows — there are four of them, right?</v>
+
+48
+00:04:28.600 --> 00:04:38.000
+<v Paul Nash>Four. Look up customer master data down to the system; system back up to Validate order data with status, block flag and terms; Request onboarding up to the Customer; and Customer back down to "Customer details confirmed".</v>
+
+49
+00:04:38.000 --> 00:04:43.400
+<v Mary Griffin>Two with the system at the bottom, two with the customer at the top. Nicely symmetrical.</v>
+
+50
+00:04:43.400 --> 00:04:50.800
+<v Paul Nash>It is, and that's not an accident — the middle pool is the only one doing work, so every message either goes up to the customer or down to the system. The sequence flows all stay inside the Sales Organisation.</v>
+
+51
+00:04:50.800 --> 00:04:55.200
+<v Mary Griffin>So the black-box pools never have internal sequence flow — they only receive and send messages.</v>
+
+52
+00:04:55.200 --> 00:05:01.600
+<v Paul Nash>Exactly right. Customer and the CRM slash ERP are black-boxes; we don't care how they work internally, only what crosses the boundary.</v>
+
+53
+00:05:01.600 --> 00:05:06.000
+<v Mary Griffin>This is clear, Paul. What's the one-line purpose if I have to summarise it upward?</v>
+
+54
+00:05:06.000 --> 00:05:15.400
+<v Paul Nash>The stage confirms the customer exists, is active and unblocked, and that the order's products, quantities and terms are valid — onboarding or unblocking them where needed — and leaves a validated order ready for credit and pricing.</v>
+
+55
+00:05:15.400 --> 00:05:19.800
+<v Mary Griffin>Perfect. I'll write that up as the description and diagram it against V01.02.</v>
+
+56
+00:05:19.800 --> 00:05:24.200
+<v Paul Nash>Thanks Mary. Once you've got a draft, send it over and we'll dry-run the loop and the timer boundary together.</v>
+
+57
+00:05:24.200 --> 00:05:27.600
+<v Mary Griffin>Will do. Talk soon.</v>
