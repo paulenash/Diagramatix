@@ -5775,6 +5775,7 @@ export function DiagramEditor({
             currentName={diagramName}
             currentData={data}
             currentProjectId={projectId}
+            canMerge={isActingAdmin}
             siblings={siblingDiagrams.filter((s) => s.type === "bpmn" && s.id !== diagramId).map((s) => ({ id: s.id, name: s.name }))}
             onClose={() => setShowProcessDiff(false)}
           />

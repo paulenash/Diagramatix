@@ -46,7 +46,7 @@ function download(name: string, blob: Blob) {
  * through /api/diagrams/diff.
  */
 export function ProcessDiffDialog({
-  onClose, currentId, currentName, currentData, currentProjectId, siblings,
+  onClose, currentId, currentName, currentData, currentProjectId, siblings, canMerge = false,
 }: {
   onClose: () => void;
   currentId: string;
@@ -54,6 +54,8 @@ export function ProcessDiffDialog({
   currentData: DiagramData;
   currentProjectId: string | null;
   siblings: Sibling[];
+  /** Merge is SuperAdmin-only for now (still being finished). */
+  canMerge?: boolean;
 }) {
   const [otherId, setOtherId] = useState<string>("");
   const [otherData, setOtherData] = useState<DiagramData | null>(null);
@@ -343,10 +345,12 @@ export function ProcessDiffDialog({
         {diff && (
           <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-gray-200">
             <div className="flex items-center gap-2">
-              {!mergeMode ? (
+              {!canMerge ? (
+                <span />
+              ) : !mergeMode ? (
                 <button onClick={() => { setMergeMode(true); selectAllChanges(); setMergeDone(null); }}
                   className="text-xs text-emerald-700 border border-emerald-300 rounded px-3 py-1 hover:bg-emerald-50"
-                  title="Cherry-pick differences into a new merged diagram">Merge…</button>
+                  title="Cherry-pick differences into a new merged diagram (SuperAdmin — in progress)">Merge… <span className="text-[9px] text-emerald-500">(beta)</span></button>
               ) : (
                 <>
                   <button onClick={createMerge} disabled={merging || accepted.size === 0}
