@@ -5774,6 +5774,7 @@ export function DiagramEditor({
             currentId={diagramId}
             currentName={diagramName}
             currentData={data}
+            currentProjectId={projectId}
             siblings={siblingDiagrams.filter((s) => s.type === "bpmn" && s.id !== diagramId).map((s) => ({ id: s.id, name: s.name }))}
             onClose={() => setShowProcessDiff(false)}
           />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { diffProcesses, type DiffStatus } from "@/app/lib/diagram/diff/processDiff";
 import { diffToCsv } from "@/app/lib/diagram/diff/processDiffFormat";
@@ -44,12 +44,13 @@ function download(name: string, blob: Blob) {
  * through /api/diagrams/diff.
  */
 export function ProcessDiffDialog({
-  onClose, currentId, currentName, currentData, siblings,
+  onClose, currentId, currentName, currentData, currentProjectId, siblings,
 }: {
   onClose: () => void;
   currentId: string;
   currentName: string;
   currentData: DiagramData;
+  currentProjectId: string | null;
   siblings: Sibling[];
 }) {
   const [otherId, setOtherId] = useState<string>("");
@@ -61,6 +62,45 @@ export function ProcessDiffDialog({
   const [swapped, setSwapped] = useState(false);
   const [busy, setBusy] = useState<null | "docx" | "ai">(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
+
+  // Project scope. Defaults to the current project (its BPMN diagrams arrive as
+  // `siblings`). Selecting another project fetches that project's BPMN diagrams.
+  const CURRENT = currentProjectId ?? "__current__";
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [projectId, setProjectId] = useState<string>(CURRENT);
+  const [projectDiagrams, setProjectDiagrams] = useState<Sibling[]>([]);
+  const [loadingList, setLoadingList] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/projects", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((arr) => setProjects(Array.isArray(arr) ? arr.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })) : []))
+      .catch(() => { /* leave just the current project */ });
+  }, []);
+
+  // The BPMN diagrams to choose from: `siblings` for the current project, else
+  // the picked project's BPMN diagrams (fetched, current diagram excluded).
+  const diagramOptions = projectId === CURRENT ? siblings : projectDiagrams;
+
+  async function pickProject(pid: string) {
+    setProjectId(pid); setOtherId(""); setOtherData(null); setAiSummary(null); setErr(null);
+    if (pid === CURRENT) { setProjectDiagrams([]); return; }
+    setLoadingList(true);
+    try {
+      const res = await fetch(`/api/projects/${pid}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Could not load that project");
+      const p = await res.json();
+      const diags = (Array.isArray(p.diagrams) ? p.diagrams : [])
+        .filter((d: { type: string; id: string }) => d.type === "bpmn" && d.id !== currentId)
+        .map((d: { id: string; name: string }) => ({ id: d.id, name: d.name }));
+      setProjectDiagrams(diags);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Load failed");
+      setProjectDiagrams([]);
+    } finally {
+      setLoadingList(false);
+    }
+  }
 
   async function pickOther(id: string) {
     setOtherId(id); setOtherData(null); setAiSummary(null); setErr(null);
@@ -98,7 +138,8 @@ export function ProcessDiffDialog({
     try {
       const res = await fetch("/api/diagrams/diff", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aId, bId, mode: "docx" }),
+        // Include the AI narrative in the Word report when it's been generated.
+        body: JSON.stringify({ aId, bId, mode: "docx", aiSummary: aiSummary ?? undefined }),
       });
       if (!res.ok) throw new Error("Export failed");
       download(`${diff!.a.title}-vs-${diff!.b.title}.docx`, await res.blob());
@@ -139,19 +180,35 @@ export function ProcessDiffDialog({
           <span className="text-gray-600">Compare</span>
           <span className="font-medium text-gray-900 px-2 py-1 bg-gray-100 rounded">{currentName}</span>
           <span className="text-gray-500">with</span>
+          {/* Project scope — defaults to the current project; pick another to
+              compare against a BPMN diagram in a different project. */}
+          <select
+            value={projectId}
+            onChange={(e) => pickProject(e.target.value)}
+            className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+            title="Project to pick the other version from"
+          >
+            <option value={CURRENT}>This project</option>
+            {projects.filter((p) => p.id !== currentProjectId).map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
           <select
             value={otherId}
             onChange={(e) => pickOther(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[16rem]"
+            disabled={loadingList}
+            className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[14rem] disabled:opacity-50"
           >
-            <option value="">Select another BPMN diagram…</option>
-            {siblings.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            <option value="">{loadingList ? "Loading…" : "Select a BPMN diagram…"}</option>
+            {diagramOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           {diff && (
             <button onClick={() => setSwapped((s) => !s)} className="text-blue-600 hover:text-blue-800 underline"
               title="Swap which version is treated as 'before'">⇄ Swap before/after</button>
           )}
-          {siblings.length === 0 && <span className="text-gray-400">No other BPMN diagrams in this project.</span>}
+          {!loadingList && diagramOptions.length === 0 && (
+            <span className="text-gray-400">No other BPMN diagrams {projectId === CURRENT ? "in this project" : "in that project"}.</span>
+          )}
         </div>
 
         {/* Body */}

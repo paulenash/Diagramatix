@@ -64,8 +64,15 @@ export async function POST(req: Request) {
   const diff = diffProcesses(a.data, a.name, b.data, b.name);
 
   if (mode === "docx") {
+    // Optional AI narrative (already generated + shown to the user) is embedded
+    // as the first section so the Word report leads with the plain-English summary.
+    const aiSummary = typeof body.aiSummary === "string" ? body.aiSummary.trim() : "";
+    const sections = [
+      ...(aiSummary ? [{ heading: "AI Summary", bodyMarkdown: aiSummary }] : []),
+      { heading: aiSummary ? "Comparison" : null, bodyMarkdown: diffToMarkdown(diff) },
+    ];
     const buf = await buildDocx(
-      [{ title: `Process Comparison — ${a.name} vs ${b.name}`, sections: [{ heading: null, bodyMarkdown: diffToMarkdown(diff) }] }],
+      [{ title: `Process Comparison — ${a.name} vs ${b.name}`, sections }],
       { docTitle: `Process Comparison — ${a.name} vs ${b.name}` },
     );
     const safe = `${a.name}-vs-${b.name}`.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
