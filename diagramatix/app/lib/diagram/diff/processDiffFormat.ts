@@ -79,6 +79,18 @@ export function diffToMarkdown(diff: ProcessDiff): string {
     for (const m of md.added) out.push(`| Added | ${mdCell(m.from)} | ${mdCell(m.to)} | ${mdCell(m.label || "—")} |`);
     for (const m of md.changed) out.push(`| Changed | ${mdCell(m.from)} | ${mdCell(m.to)} | ${mdCell(`${m.a || "—"} → ${m.b || "—"}`)} |`);
   }
+
+  // Automation changes — task-marker shifts and what they signal.
+  if (diff.automationChanges.length) {
+    out.push("");
+    out.push("**Automation changes**");
+    out.push("");
+    out.push("| Activity | Marker | What it signals |");
+    out.push("| --- | --- | --- |");
+    for (const c of diff.automationChanges) {
+      out.push(`| ${mdCell(c.activity)} | ${mdCell(`${c.from} → ${c.to}`)} | ${mdCell(c.note)} |`);
+    }
+  }
   return out.join("\n");
 }
 
@@ -128,6 +140,7 @@ export function diffForAi(diff: ProcessDiff): unknown {
     systemChanges: diff.systemDiff,
     dataObjectChanges: diff.dataObjectDiff,
     messageChanges: diff.messageDiff,
+    automationChanges: diff.automationChanges,
     activities: diff.rows.filter(material).map((r) => ({
       activity: r.activity,
       change: r.status,

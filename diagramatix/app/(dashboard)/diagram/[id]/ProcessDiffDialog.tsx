@@ -328,7 +328,10 @@ export function ProcessDiffDialog({
                         <td className="px-2 py-1.5 text-gray-900">{r.activity}</td>
                         <td className="px-2 py-1.5"><span className={`px-1.5 py-0.5 rounded ${STATUS_STYLE[r.status]}`}>{STATUS_LABEL[r.status]}</span></td>
                         <td className="px-2 py-1.5"><Cell a={r.who.a} b={r.who.b} changed={r.who.changed} /></td>
-                        <td className="px-2 py-1.5"><Cell a={r.taskType.a} b={r.taskType.b} changed={r.taskType.changed} /></td>
+                        <td className="px-2 py-1.5">
+                          <Cell a={r.taskType.a} b={r.taskType.b} changed={r.taskType.changed} />
+                          {r.automationNote && <div className="text-[10px] text-indigo-600 italic mt-0.5">{r.automationNote}</div>}
+                        </td>
                         <td className="px-2 py-1.5"><Cell a={(r.systems.a ?? []).join(", ")} b={(r.systems.b ?? []).join(", ")} changed={r.systems.changed} /></td>
                         <td className="px-2 py-1.5"><Cell a={(r.data.a ?? []).join(", ")} b={(r.data.b ?? []).join(", ")} changed={r.data.changed} /></td>
                       </tr>
@@ -374,6 +377,34 @@ export function ProcessDiffDialog({
                             <td className="px-2 py-1.5 text-gray-700">{m.from}</td>
                             <td className="px-2 py-1.5 text-gray-700">{m.to}</td>
                             <td className="px-2 py-1.5"><span className="text-gray-400 line-through">{m.a || "—"}</span><span className="text-gray-400"> → </span><span className="text-gray-900 font-medium">{m.b || "—"}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Automation shifts — task-marker changes that signal IT support
+                  or automation being added/removed. */}
+              {diff.automationChanges.length > 0 && (
+                <div className="mt-3">
+                  <div className="text-[11px] font-medium text-gray-700 mb-1">Automation changes</div>
+                  <div className="overflow-x-auto border border-indigo-100 rounded bg-indigo-50/40">
+                    <table className="w-full text-[11px] border-collapse">
+                      <thead>
+                        <tr className="text-gray-600 text-left">
+                          <th className="px-2 py-1.5 font-medium">Activity</th>
+                          <th className="px-2 py-1.5 font-medium">Marker</th>
+                          <th className="px-2 py-1.5 font-medium">What it signals</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {diff.automationChanges.map((c, i) => (
+                          <tr key={i} className="border-t border-indigo-100">
+                            <td className="px-2 py-1.5 text-gray-900">{c.activity}</td>
+                            <td className="px-2 py-1.5 text-gray-600">{c.from} → <span className="text-gray-900 font-medium">{c.to}</span></td>
+                            <td className="px-2 py-1.5 text-indigo-700">{c.note}</td>
                           </tr>
                         ))}
                       </tbody>

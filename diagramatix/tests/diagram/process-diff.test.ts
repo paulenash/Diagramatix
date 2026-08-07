@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
-import { diffProcesses, normaliseLabel } from "@/app/lib/diagram/diff/processDiff";
+import { diffProcesses, normaliseLabel, interpretAutomationChange } from "@/app/lib/diagram/diff/processDiff";
 
 const build = (elements: AiElement[], connections: AiConnection[]) =>
   layoutBpmnDiagram(elements, connections);
@@ -123,6 +123,22 @@ describe("diffProcesses", () => {
     expect(diff.summary.removed).toBe(1);
     expect(diff.summary.changed).toBeGreaterThanOrEqual(2); // Validate + Look up
     expect(diff.b.stepCount).toBe(3);
+  });
+
+  it("interprets task-marker changes as automation shifts", () => {
+    expect(interpretAutomationChange("manual", "user")).toMatch(/IT system support/i);
+    expect(interpretAutomationChange("user", "service")).toMatch(/Automation introduced/i);
+    expect(interpretAutomationChange("user", "script")).toMatch(/Automation introduced/i);
+    expect(interpretAutomationChange("service", "user")).toMatch(/now performed by a person/i);
+    expect(interpretAutomationChange("user", "manual")).toMatch(/IT support removed/i);
+    expect(interpretAutomationChange("user", "user")).toBeNull();
+    expect(interpretAutomationChange("service", "script")).toMatch(/approach changed/i);
+  });
+
+  it("surfaces automation changes in the diff (Look up customer: user → service)", () => {
+    const ac = diff.automationChanges.find((c) => c.activity === "Look up customer");
+    expect(ac).toBeTruthy();
+    expect(ac?.note).toMatch(/Automation introduced/i);
   });
 
   it("normaliseLabel is case/space/punctuation insensitive", () => {

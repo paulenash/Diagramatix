@@ -36,10 +36,17 @@ export interface ProcessDiffRow {
   taskType: DiffField<string>;            // user/service/send/receive/… ("what is done")
   systems: DiffField<string[]>;           // IT systems / data stores ("what systems")
   data: DiffField<string[]>;              // inputs + outputs (data objects handled)
+  /** What a task-type (marker) change signifies — e.g. "Automation introduced".
+   *  Set only when the marker change crosses an automation boundary. */
+  automationNote?: string;
   /** Global step numbers in each version, for reference. */
   stepNoA?: number;
   stepNoB?: number;
 }
+
+/** A task whose marker (User / Service / Manual / Script …) changed in a way that
+ *  signals an automation shift. */
+export interface AutomationChange { activity: string; from: string; to: string; note: string }
 
 export interface ProcessDiffSide {
   title: string;
@@ -73,6 +80,41 @@ export interface ProcessDiff {
   dataObjectDiff: { added: string[]; removed: string[] };
   /** Message flows added / removed / relabelled between the versions. */
   messageDiff: MessageDiff;
+  /** Tasks whose marker change signals an automation shift (manual→user = IT
+   *  support added; user→service/script = automation / RPA / agent introduced). */
+  automationChanges: AutomationChange[];
+}
+
+// Automation "level" of a BPMN task marker: 0 = manual (no IT), 1 = user (human
+// with a system), 2 = system-performed (service / script / business-rule / send /
+// receive). Interpreting a marker change against these levels is what turns a raw
+// "User task → Service task" into "automation introduced".
+const AUTOMATED = new Set(["service", "script", "business-rule", "send", "receive"]);
+function automationLevel(t?: string): number | null {
+  if (!t || t === "none") return null;         // no marker → don't interpret
+  if (t === "manual") return 0;
+  if (t === "user") return 1;
+  if (AUTOMATED.has(t)) return 2;
+  return null;
+}
+
+/** Interpret a task-type (marker) change as an automation shift, or null when the
+ *  change doesn't cross an automation boundary. `a`/`b` are RAW task types. */
+export function interpretAutomationChange(a?: string, b?: string): string | null {
+  const la = automationLevel(a), lb = automationLevel(b);
+  if (la === null || lb === null || la === lb) {
+    // Same level but a different automated flavour (e.g. Service → Script) still
+    // signals a re-automation.
+    if (la === 2 && lb === 2 && a !== b) return "Automation approach changed";
+    return null;
+  }
+  if (la === 0 && lb === 1) return "IT system support introduced (was manual)";
+  if (la === 0 && lb === 2) return "Automated (was manual)";
+  if (la === 1 && lb === 2) return "Automation introduced (RPA / agent / service)";
+  if (la === 2 && lb === 1) return "Automation removed — now performed by a person";
+  if (la === 2 && lb === 0) return "Reverted to manual (automation removed)";
+  if (la === 1 && lb === 0) return "IT support removed — now manual";
+  return null;
 }
 
 /** Normalise an activity label for matching: case/space-insensitive, trailing
@@ -140,6 +182,8 @@ function buildRow(a: SopStep | undefined, b: SopStep | undefined): ProcessDiffRo
   if ((taskType.a ?? "") !== (taskType.b ?? "")) {
     taskType.changed = true;
     changes.push(`Type: ${taskType.a || "—"} → ${taskType.b || "—"}`);
+    const note = interpretAutomationChange(a?.taskType, b?.taskType);
+    if (note) { row.automationNote = note; changes.push(note); }
   }
   if (!sameSet(aSys, bSys)) {
     systems.changed = true;
@@ -202,6 +246,9 @@ export function diffProcesses(
     systemDiff: { added: only(sysB, sysA), removed: only(sysA, sysB) },
     dataObjectDiff: { added: only(objB, objA), removed: only(objA, objB) },
     messageDiff: diffMessages(extractMessages(aData), extractMessages(bData)),
+    automationChanges: rows
+      .filter((r) => r.automationNote)
+      .map((r) => ({ activity: r.activity, from: r.taskType.a || "—", to: r.taskType.b || "—", note: r.automationNote! })),
   };
 }
 

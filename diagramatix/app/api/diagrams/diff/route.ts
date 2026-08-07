@@ -28,7 +28,11 @@ const AI_BRIEFING =
   "You are a business analyst. Given a structured comparison of two versions of the " +
   "same business process, write a concise plain-English summary of what changed between " +
   "the 'before' and 'after' versions. Cover, where relevant: who does the work (roles / " +
-  "lanes), which IT systems are used, and what activities were added, removed or altered. " +
+  "lanes), which IT systems are used, message flows, data objects, and what activities were " +
+  "added, removed or altered. Call out AUTOMATION shifts implied by task-marker changes: " +
+  "manual→user means IT system support was introduced for a previously manual task; " +
+  "user→service/script means automation (RPA, an agent, or a system service) now performs " +
+  "work a person used to do; the reverse means automation/IT support was removed. " +
   "Use short paragraphs and bullet points. Do not invent changes that aren't in the data. " +
   "If nothing material changed, say so.";
 
