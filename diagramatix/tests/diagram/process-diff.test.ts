@@ -98,4 +98,43 @@ describe("diffProcesses", () => {
   it("normaliseLabel is case/space/punctuation insensitive", () => {
     expect(normaliseLabel("  Validate  Order. ")).toBe(normaliseLabel("validate order"));
   });
+
+  it("diffs message flows (added / removed / relabelled)", () => {
+    // A: one message Look up customer → CRM ("query"). B: relabels it ("lookup"),
+    // adds a new Validate order → Customer message, and drops nothing else.
+    const mkA = build(
+      [
+        { id: "p", type: "pool", label: "Sales", poolType: "white-box" },
+        { id: "crm", type: "pool", label: "CRM", poolType: "black-box", isSystem: true },
+        { id: "s", type: "start-event", label: "Start", pool: "p" },
+        { id: "t1", type: "task", label: "Look up customer", pool: "p" },
+        { id: "e", type: "end-event", label: "End", pool: "p" },
+      ],
+      [
+        { sourceId: "s", targetId: "t1" }, { sourceId: "t1", targetId: "e" },
+        { sourceId: "t1", targetId: "crm", type: "message", label: "query" },
+      ],
+    );
+    const mkB = build(
+      [
+        { id: "p", type: "pool", label: "Sales", poolType: "white-box" },
+        { id: "crm", type: "pool", label: "CRM", poolType: "black-box", isSystem: true },
+        { id: "cust", type: "pool", label: "Customer", poolType: "black-box" },
+        { id: "s", type: "start-event", label: "Start", pool: "p" },
+        { id: "t1", type: "task", label: "Look up customer", pool: "p" },
+        { id: "e", type: "end-event", label: "End", pool: "p" },
+      ],
+      [
+        { sourceId: "s", targetId: "t1" }, { sourceId: "t1", targetId: "e" },
+        { sourceId: "t1", targetId: "crm", type: "message", label: "lookup" },
+        { sourceId: "t1", targetId: "cust", type: "message", label: "confirm" },
+      ],
+    );
+    const md = diffProcesses(mkA, "v1", mkB, "v2").messageDiff;
+    // relabelled query → lookup on the same endpoint pair
+    expect(md.changed).toEqual([{ from: "Look up customer", to: "CRM", a: "query", b: "lookup" }]);
+    // brand-new message to the Customer pool
+    expect(md.added).toEqual([{ from: "Look up customer", to: "Customer", label: "confirm" }]);
+    expect(md.removed).toEqual([]);
+  });
 });

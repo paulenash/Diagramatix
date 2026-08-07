@@ -331,6 +331,51 @@ export function ProcessDiffDialog({
                 </table>
               </div>
 
+              {/* Message flows — added / removed / relabelled between versions. */}
+              {(diff.messageDiff.added.length > 0 || diff.messageDiff.removed.length > 0 || diff.messageDiff.changed.length > 0) && (
+                <div className="mt-3">
+                  <div className="text-[11px] font-medium text-gray-700 mb-1">Message flows</div>
+                  <div className="overflow-x-auto border border-gray-200 rounded">
+                    <table className="w-full text-[11px] border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-600 text-left">
+                          <th className="px-2 py-1.5 font-medium">Change</th>
+                          <th className="px-2 py-1.5 font-medium">From</th>
+                          <th className="px-2 py-1.5 font-medium">To</th>
+                          <th className="px-2 py-1.5 font-medium">Message</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {diff.messageDiff.removed.map((m, i) => (
+                          <tr key={`r${i}`} className="border-t border-gray-100">
+                            <td className="px-2 py-1.5"><span className="px-1.5 py-0.5 rounded bg-red-50 text-red-700">Removed</span></td>
+                            <td className="px-2 py-1.5 text-gray-700">{m.from}</td>
+                            <td className="px-2 py-1.5 text-gray-700">{m.to}</td>
+                            <td className="px-2 py-1.5 text-gray-600">{m.label || "—"}</td>
+                          </tr>
+                        ))}
+                        {diff.messageDiff.added.map((m, i) => (
+                          <tr key={`a${i}`} className="border-t border-gray-100">
+                            <td className="px-2 py-1.5"><span className="px-1.5 py-0.5 rounded bg-green-50 text-green-700">Added</span></td>
+                            <td className="px-2 py-1.5 text-gray-700">{m.from}</td>
+                            <td className="px-2 py-1.5 text-gray-700">{m.to}</td>
+                            <td className="px-2 py-1.5 text-gray-600">{m.label || "—"}</td>
+                          </tr>
+                        ))}
+                        {diff.messageDiff.changed.map((m, i) => (
+                          <tr key={`c${i}`} className="border-t border-gray-100">
+                            <td className="px-2 py-1.5"><span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">Changed</span></td>
+                            <td className="px-2 py-1.5 text-gray-700">{m.from}</td>
+                            <td className="px-2 py-1.5 text-gray-700">{m.to}</td>
+                            <td className="px-2 py-1.5"><span className="text-gray-400 line-through">{m.a || "—"}</span><span className="text-gray-400"> → </span><span className="text-gray-900 font-medium">{m.b || "—"}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {aiSummary && (
                 <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded text-[11px] text-gray-800 whitespace-pre-wrap">
                   <div className="font-medium text-blue-800 mb-1">AI summary</div>

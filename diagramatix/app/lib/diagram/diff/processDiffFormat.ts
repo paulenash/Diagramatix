@@ -59,6 +59,19 @@ export function diffToMarkdown(diff: ProcessDiff): string {
       mdCell(arrowList(r.data.a ?? [], r.data.b ?? [])),
     ].join(" | ") + " |");
   }
+
+  // Message flows — added / removed / relabelled between the versions.
+  const md = diff.messageDiff;
+  if (md.added.length || md.removed.length || md.changed.length) {
+    out.push("");
+    out.push("**Message flows**");
+    out.push("");
+    out.push("| Change | From | To | Message |");
+    out.push("| --- | --- | --- | --- |");
+    for (const m of md.removed) out.push(`| Removed | ${mdCell(m.from)} | ${mdCell(m.to)} | ${mdCell(m.label || "—")} |`);
+    for (const m of md.added) out.push(`| Added | ${mdCell(m.from)} | ${mdCell(m.to)} | ${mdCell(m.label || "—")} |`);
+    for (const m of md.changed) out.push(`| Changed | ${mdCell(m.from)} | ${mdCell(m.to)} | ${mdCell(`${m.a || "—"} → ${m.b || "—"}`)} |`);
+  }
   return out.join("\n");
 }
 
@@ -83,6 +96,16 @@ export function diffToCsv(diff: ProcessDiff): string {
       list(r.data.a ?? []), list(r.data.b ?? []),
     ].map((v) => csvCell(String(v))).join(","));
   }
+
+  // Message flows as a second block (blank-line separated).
+  const md = diff.messageDiff;
+  if (md.added.length || md.removed.length || md.changed.length) {
+    lines.push("");
+    lines.push(["Message change", "From", "To", "Before", "After"].map(csvCell).join(","));
+    for (const m of md.removed) lines.push(["Removed", m.from, m.to, m.label, ""].map((v) => csvCell(String(v))).join(","));
+    for (const m of md.added) lines.push(["Added", m.from, m.to, "", m.label].map((v) => csvCell(String(v))).join(","));
+    for (const m of md.changed) lines.push(["Changed", m.from, m.to, m.a, m.b].map((v) => csvCell(String(v))).join(","));
+  }
   return lines.join("\r\n");
 }
 
@@ -96,6 +119,7 @@ export function diffForAi(diff: ProcessDiff): unknown {
     summary: diff.summary,
     roleChanges: diff.roleDiff,
     systemChanges: diff.systemDiff,
+    messageChanges: diff.messageDiff,
     activities: diff.rows.filter(material).map((r) => ({
       activity: r.activity,
       change: r.status,

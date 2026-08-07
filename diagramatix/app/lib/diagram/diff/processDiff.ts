@@ -48,6 +48,18 @@ export interface ProcessDiffSide {
   stepCount: number;
 }
 
+/** A BPMN message flow, described by its endpoint labels + message name so it
+ *  can be matched across two diagrams (whose element ids differ). */
+export interface MessageFlow { from: string; to: string; label: string }
+
+export interface MessageDiff {
+  added: MessageFlow[];                                          // in B only
+  removed: MessageFlow[];                                        // in A only
+  /** Same endpoints, different message name. */
+  changed: { from: string; to: string; a: string; b: string }[];
+  unchanged: number;
+}
+
 export interface ProcessDiff {
   a: ProcessDiffSide;
   b: ProcessDiffSide;
@@ -57,6 +69,8 @@ export interface ProcessDiff {
   roleDiff: { added: string[]; removed: string[] };
   /** Systems present in only one version. */
   systemDiff: { added: string[]; removed: string[] };
+  /** Message flows added / removed / relabelled between the versions. */
+  messageDiff: MessageDiff;
 }
 
 /** Normalise an activity label for matching: case/space-insensitive, trailing
@@ -183,5 +197,54 @@ export function diffProcesses(
     summary,
     roleDiff: { added: only(rolesB, rolesA), removed: only(rolesA, rolesB) },
     systemDiff: { added: only(sysB, sysA), removed: only(sysA, sysB) },
+    messageDiff: diffMessages(extractMessages(aData), extractMessages(bData)),
   };
+}
+
+const MESSAGE_TYPES = new Set(["message", "messageBPMN"]);
+
+/** All BPMN message flows in a diagram, described by endpoint labels (element
+ *  label, else its type) + the message name — the form matched across versions. */
+export function extractMessages(data: DiagramData): MessageFlow[] {
+  const byId = new Map((data.elements ?? []).map((e) => [e.id, e]));
+  const nameOf = (id: string): string => {
+    const el = byId.get(id);
+    return (el?.label?.trim() || el?.type || id);
+  };
+  const out: MessageFlow[] = [];
+  for (const c of data.connectors ?? []) {
+    if (!MESSAGE_TYPES.has(c.type)) continue;
+    out.push({ from: nameOf(c.sourceId), to: nameOf(c.targetId), label: (c.label ?? "").trim() });
+  }
+  return out;
+}
+
+const pairKey = (m: MessageFlow) => `${normaliseLabel(m.from)}→${normaliseLabel(m.to)}`;
+const fullKey = (m: MessageFlow) => `${pairKey(m)}|${normaliseLabel(m.label)}`;
+
+/** Diff two message-flow lists. Exact (endpoints + name) matches are unchanged;
+ *  a leftover pair present on both sides = a relabelled message (changed); the
+ *  rest are added (B only) / removed (A only). */
+export function diffMessages(aMsgs: MessageFlow[], bMsgs: MessageFlow[]): MessageDiff {
+  // 1. Remove exact matches (same endpoints AND same message name).
+  const bRemaining = [...bMsgs];
+  const aRemaining: MessageFlow[] = [];
+  let unchanged = 0;
+  for (const m of aMsgs) {
+    const i = bRemaining.findIndex((n) => fullKey(n) === fullKey(m));
+    if (i >= 0) { bRemaining.splice(i, 1); unchanged++; }
+    else aRemaining.push(m);
+  }
+  // 2. Same endpoint-pair left on both sides = a relabel (changed).
+  const changed: MessageDiff["changed"] = [];
+  const removed: MessageFlow[] = [];
+  for (const m of aRemaining) {
+    const i = bRemaining.findIndex((n) => pairKey(n) === pairKey(m));
+    if (i >= 0) {
+      const b = bRemaining.splice(i, 1)[0];
+      changed.push({ from: m.from, to: m.to, a: m.label, b: b.label });
+    } else removed.push(m);
+  }
+  // 3. Whatever B has left is genuinely new.
+  return { added: bRemaining, removed, changed, unchanged };
 }
