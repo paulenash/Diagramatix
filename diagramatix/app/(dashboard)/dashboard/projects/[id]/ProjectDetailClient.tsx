@@ -2952,6 +2952,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           if (!d) return null;
           return (
             <DiagramPropertiesPanel
+              key={d.id}
               diagram={d}
               readOnly={!!readOnly}
               onClose={() => setPreviewDiagramId(null)}
