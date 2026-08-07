@@ -33,6 +33,14 @@ const AI_BRIEFING =
   "manual→user means IT system support was introduced for a previously manual task; " +
   "user→service/script means automation (RPA, an agent, or a system service) now performs " +
   "work a person used to do; the reverse means automation/IT support was removed. " +
+  "Assess REVIEW EVIDENCE from the reviewStatus data: Review Comments, Pain Points, Issues and " +
+  "Bottlenecks are annotations added during a review. If they were ADDED, a review has occurred. " +
+  "If they were REMOVED, judge whether the process changes plausibly RESOLVED them: did the changes " +
+  "implement what a removed Review Comment highlighted, and was a removed Pain Point or Bottleneck " +
+  "eliminated by a change AT OR NEAR its location (compare each annotation's 'location'/'near' to the " +
+  "activities that changed, moved role, or were automated)? Explicitly state, per removed annotation, " +
+  "whether the evidence suggests it was addressed, and flag any that appear removed WITHOUT a " +
+  "corresponding change (possibly dismissed rather than resolved). " +
   "Use short paragraphs and bullet points. Do not invent changes that aren't in the data. " +
   "If nothing material changed, say so.";
 

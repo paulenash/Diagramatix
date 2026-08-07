@@ -48,6 +48,23 @@ export interface ProcessDiffRow {
  *  signals an automation shift. */
 export interface AutomationChange { activity: string; from: string; to: string; note: string }
 
+/** Review evidence on a diagram — annotations that mean someone reviewed it. */
+export type ReviewKind = "review-comment" | "pain-point" | "issue" | "bottleneck";
+export interface ReviewItem {
+  kind: ReviewKind;
+  text: string;       // comment body / pain-point-issue description / bottleneck label
+  location: string;   // nearest activity (or tethered element / connector endpoints)
+}
+export interface ReviewDiff {
+  aCounts: Record<ReviewKind, number>;
+  bCounts: Record<ReviewKind, number>;
+  added: ReviewItem[];      // present only in the "after" version
+  removed: ReviewItem[];    // present only in the "before" version
+  unchanged: number;
+  /** Plain-English reading of what the annotation delta implies about review. */
+  status: string;
+}
+
 export interface ProcessDiffSide {
   title: string;
   roles: string[];
@@ -103,6 +120,9 @@ export interface ProcessDiff {
   /** Intermediate + boundary event changes — new/removed/retriggered timers,
    *  errors, escalations, cancellations, etc. */
   eventDiff: EventDiff;
+  /** Review evidence: Review Comments / Pain Points / Issues / Bottlenecks added
+   *  (review occurred) or removed (review concluded, changes made). */
+  reviewDiff: ReviewDiff;
   /** Tasks whose marker change signals an automation shift (manual→user = IT
    *  support added; user→service/script = automation / RPA / agent introduced). */
   automationChanges: AutomationChange[];
@@ -270,6 +290,7 @@ export function diffProcesses(
     dataObjectDiff: { added: only(objB, objA), removed: only(objA, objB) },
     messageDiff: diffMessages(extractMessages(aData), extractMessages(bData)),
     eventDiff: diffEvents(extractEvents(aData), extractEvents(bData)),
+    reviewDiff: diffReview(extractReview(aData), extractReview(bData), aTitle, bTitle),
     automationChanges: rows
       .filter((r) => r.automationNote)
       .map((r) => ({ activity: r.activity, from: r.taskType.a || "—", to: r.taskType.b || "—", note: r.automationNote! })),
@@ -365,6 +386,86 @@ const evExactKey = (e: EventFlow) =>
 // event's label. Unlabelled inline events have no anchor → pure add/remove.
 const evAnchor = (e: EventFlow): string | null =>
   e.kind === "boundary" ? `b|${normaliseLabel(e.host)}` : (normaliseLabel(e.label) ? `i|${normaliseLabel(e.label)}` : null);
+
+// Element types a Pain Point / Issue / Review Comment can sit "near" (its
+// location, for correlating with activity changes).
+const LOC_TYPES = new Set([
+  "task", "subprocess", "subprocess-expanded", "intermediate-event",
+  "start-event", "end-event", "gateway",
+]);
+const REVIEW_KINDS: ReviewKind[] = ["review-comment", "pain-point", "issue", "bottleneck"];
+const stripTags = (s: string) => s.replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+
+/** Review annotations on a diagram (Review Comments, Pain Points, Issues,
+ *  Bottlenecks), each tagged with the nearest activity so the AI can correlate a
+ *  removed pain point with a change at/near that activity. */
+export function extractReview(data: DiagramData): ReviewItem[] {
+  const els = data.elements ?? [];
+  const conns = data.connectors ?? [];
+  const byId = new Map(els.map((e) => [e.id, e]));
+  const nameOf = (id: string): string => { const e = byId.get(id); return (e?.label?.trim() || e?.type || id); };
+  const activities = els.filter((e) => LOC_TYPES.has(e.type));
+  const centre = (e: { x: number; y: number; width: number; height: number }) => ({ x: e.x + e.width / 2, y: e.y + e.height / 2 });
+  const nearest = (e: { x: number; y: number; width: number; height: number }): string => {
+    let best = "", bd = Infinity; const c = centre(e);
+    for (const a of activities) { const ac = centre(a); const d = (ac.x - c.x) ** 2 + (ac.y - c.y) ** 2; if (d < bd) { bd = d; best = a.label?.trim() || a.type; } }
+    return best;
+  };
+
+  const out: ReviewItem[] = [];
+  for (const e of els) {
+    if (e.type === "review-comment") {
+      const link = conns.find((c) => c.type === "review-comment-link" && (c.sourceId === e.id || c.targetId === e.id));
+      const loc = link ? nameOf(link.sourceId === e.id ? link.targetId : link.sourceId) : nearest(e);
+      out.push({ kind: "review-comment", text: stripTags(e.label ?? ""), location: loc });
+    } else if (e.type === "uml-pain-point" || e.type === "uml-issue") {
+      const desc = ((e.properties?.description as string | undefined) ?? "").trim();
+      out.push({ kind: e.type === "uml-issue" ? "issue" : "pain-point", text: desc || `#${e.label ?? ""}`.trim(), location: nearest(e) });
+    }
+  }
+  for (const c of conns) {
+    if (c.bottleneck) out.push({ kind: "bottleneck", text: (c.label ?? "").trim(), location: `${nameOf(c.sourceId)} → ${nameOf(c.targetId)}` });
+  }
+  return out;
+}
+
+const reviewKey = (r: ReviewItem) => `${r.kind}|${normaliseLabel(r.text)}|${normaliseLabel(r.location)}`;
+const emptyCounts = (): Record<ReviewKind, number> => ({ "review-comment": 0, "pain-point": 0, issue: 0, bottleneck: 0 });
+
+/** Diff review annotations and read the delta as review activity. */
+export function diffReview(aItems: ReviewItem[], bItems: ReviewItem[], aTitle: string, bTitle: string): ReviewDiff {
+  const aCounts = emptyCounts(), bCounts = emptyCounts();
+  for (const r of aItems) aCounts[r.kind]++;
+  for (const r of bItems) bCounts[r.kind]++;
+
+  const bRemaining = [...bItems];
+  const removed: ReviewItem[] = [];
+  let unchanged = 0;
+  for (const r of aItems) {
+    const i = bRemaining.findIndex((n) => reviewKey(n) === reviewKey(r));
+    if (i >= 0) { bRemaining.splice(i, 1); unchanged++; } else removed.push(r);
+  }
+  const added = bRemaining;
+
+  // Interpretation.
+  const label: Record<ReviewKind, string> = { "review-comment": "Review Comment", "pain-point": "Pain Point", issue: "Issue", bottleneck: "Bottleneck" };
+  const tally = (items: ReviewItem[]) => {
+    const c = emptyCounts(); for (const r of items) c[r.kind]++;
+    return REVIEW_KINDS.filter((k) => c[k] > 0).map((k) => `${c[k]} ${label[k]}${c[k] === 1 ? "" : "s"}`).join(", ");
+  };
+  const anyA = aItems.length > 0, anyB = bItems.length > 0;
+  let status: string;
+  if (!anyA && !anyB) status = "No review annotations in either version — no evidence of a review.";
+  else {
+    const parts: string[] = [];
+    if (added.length) parts.push(`${tally(added)} added in "${bTitle}" — the process has been reviewed / annotated.`);
+    if (removed.length) parts.push(`${tally(removed)} removed in "${bTitle}" — likely reviewed and resolved (changes made to address them).`);
+    if (!added.length && !removed.length) parts.push(`Review annotations unchanged (${tally(aItems) || "none"}).`);
+    status = parts.join(" ");
+  }
+
+  return { aCounts, bCounts, added, removed, unchanged, status };
+}
 
 /** Diff two event lists (same shape/approach as message flows). */
 export function diffEvents(aEvents: EventFlow[], bEvents: EventFlow[]): EventDiff {

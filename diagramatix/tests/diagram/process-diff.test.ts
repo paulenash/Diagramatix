@@ -6,7 +6,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
-import { diffProcesses, normaliseLabel, interpretAutomationChange } from "@/app/lib/diagram/diff/processDiff";
+import { diffProcesses, normaliseLabel, interpretAutomationChange, extractReview, diffReview } from "@/app/lib/diagram/diff/processDiff";
+import type { DiagramData } from "@/app/lib/diagram/types";
 
 const build = (elements: AiElement[], connections: AiConnection[]) =>
   layoutBpmnDiagram(elements, connections);
@@ -172,6 +173,51 @@ describe("diffProcesses", () => {
     expect(timer?.kind).toBe("boundary");
     expect(timer?.interrupting).toBe(false);
     expect(ed.removed).toEqual([]);
+  });
+
+  it("reports review status: pain point + review comment removed = review addressed", () => {
+    const el = (id: string, type: string, x: number, label = "", props: Record<string, unknown> = {}) =>
+      ({ id, type, label, x, y: 100, width: 80, height: 50, properties: props });
+    // Before: a task with a Pain Point next to it, a Review Comment, and a
+    // bottleneck connector. After: all annotations removed (review addressed).
+    const before = {
+      elements: [
+        el("t", "task", 100, "Slow approval"),
+        el("t2", "task", 300, "Notify"),
+        el("pp", "uml-pain-point", 110, "1", { description: "Takes too long" }),
+        el("rc", "review-comment", 500, "<p>Please automate this</p>", { authorName: "Mary" }),
+      ],
+      connectors: [{ id: "c", type: "sequence", sourceId: "t", targetId: "t2", bottleneck: true }],
+    } as unknown as DiagramData;
+    const after = {
+      elements: [el("t", "task", 100, "Slow approval"), el("t2", "task", 300, "Notify")],
+      connectors: [{ id: "c", type: "sequence", sourceId: "t", targetId: "t2" }],
+    } as unknown as DiagramData;
+
+    const items = extractReview(before);
+    expect(items.map((i) => i.kind).sort()).toEqual(["bottleneck", "pain-point", "review-comment"]);
+    // Pain point is located near the closest activity.
+    expect(items.find((i) => i.kind === "pain-point")?.location).toBe("Slow approval");
+
+    const rd = diffReview(extractReview(before), extractReview(after), "v1", "v2");
+    expect(rd.aCounts["pain-point"]).toBe(1);
+    expect(rd.bCounts["pain-point"]).toBe(0);
+    expect(rd.removed.map((r) => r.kind).sort()).toEqual(["bottleneck", "pain-point", "review-comment"]);
+    expect(rd.added).toEqual([]);
+    expect(rd.status).toMatch(/resolved|reviewed/i);
+  });
+
+  it("review status: annotations only added = review occurred", () => {
+    const el = (id: string, type: string, label = "", props: Record<string, unknown> = {}) =>
+      ({ id, type, label, x: 100, y: 100, width: 80, height: 50, properties: props });
+    const before = { elements: [el("t", "task", "Do")], connectors: [] } as unknown as DiagramData;
+    const after = {
+      elements: [el("t", "task", "Do"), el("i", "uml-issue", "1", { description: "Missing control" })],
+      connectors: [],
+    } as unknown as DiagramData;
+    const rd = diffReview(extractReview(before), extractReview(after), "v1", "v2");
+    expect(rd.added.map((r) => r.kind)).toEqual(["issue"]);
+    expect(rd.status).toMatch(/reviewed|annotated/i);
   });
 
   it("normaliseLabel is case/space/punctuation insensitive", () => {

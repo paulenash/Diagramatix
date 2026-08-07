@@ -54,6 +54,21 @@ export function diffToMarkdown(diff: ProcessDiff): string {
       `${objDiff.removed.length ? `removed ${list(objDiff.removed)}` : ""}`);
     out.push("");
   }
+  // Review status — evidence of review + what its change implies.
+  const rd = diff.reviewDiff;
+  const kindLabel: Record<string, string> = { "review-comment": "Review Comment", "pain-point": "Pain Point", issue: "Issue", bottleneck: "Bottleneck" };
+  if (rd.added.length || rd.removed.length || Object.values(rd.aCounts).some((n) => n > 0) || Object.values(rd.bCounts).some((n) => n > 0)) {
+    out.push(`**Review status:** ${rd.status}`);
+    out.push("");
+    if (rd.removed.length || rd.added.length) {
+      out.push("| Change | Kind | Note | Near |");
+      out.push("| --- | --- | --- | --- |");
+      for (const r of rd.removed) out.push(`| Removed | ${kindLabel[r.kind]} | ${mdCell(r.text || "—")} | ${mdCell(r.location || "—")} |`);
+      for (const r of rd.added) out.push(`| Added | ${kindLabel[r.kind]} | ${mdCell(r.text || "—")} | ${mdCell(r.location || "—")} |`);
+      out.push("");
+    }
+  }
+
   out.push("| Activity | Change | Who (role) | Type | Systems | Data |");
   out.push("| --- | --- | --- | --- | --- | --- |");
   for (const r of rows) {
@@ -156,6 +171,7 @@ export function diffForAi(diff: ProcessDiff): unknown {
     dataObjectChanges: diff.dataObjectDiff,
     messageChanges: diff.messageDiff,
     eventChanges: diff.eventDiff,
+    reviewStatus: diff.reviewDiff,
     automationChanges: diff.automationChanges,
     activities: diff.rows.filter(material).map((r) => ({
       activity: r.activity,
