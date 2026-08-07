@@ -277,7 +277,7 @@ export function ProcessDiffDialog({
                 <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800">{diff.summary.changed} changed</span>
                 <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600">{diff.summary.unchanged} unchanged</span>
               </div>
-              {(diff.roleDiff.added.length > 0 || diff.roleDiff.removed.length > 0 || diff.systemDiff.added.length > 0 || diff.systemDiff.removed.length > 0) && (
+              {(diff.roleDiff.added.length > 0 || diff.roleDiff.removed.length > 0 || diff.systemDiff.added.length > 0 || diff.systemDiff.removed.length > 0 || diff.dataObjectDiff.added.length > 0 || diff.dataObjectDiff.removed.length > 0) && (
                 <div className="text-[11px] text-gray-600 mb-3 space-y-0.5">
                   {(diff.roleDiff.added.length > 0 || diff.roleDiff.removed.length > 0) && (
                     <div><span className="font-medium">Roles:</span>{" "}
@@ -289,6 +289,12 @@ export function ProcessDiffDialog({
                     <div><span className="font-medium">Systems:</span>{" "}
                       {diff.systemDiff.added.map((r) => <span key={r} className="text-green-700">+{r} </span>)}
                       {diff.systemDiff.removed.map((r) => <span key={r} className="text-red-600">−{r} </span>)}
+                    </div>
+                  )}
+                  {(diff.dataObjectDiff.added.length > 0 || diff.dataObjectDiff.removed.length > 0) && (
+                    <div><span className="font-medium">Data objects:</span>{" "}
+                      {diff.dataObjectDiff.added.map((r) => <span key={r} className="text-green-700">+{r} </span>)}
+                      {diff.dataObjectDiff.removed.map((r) => <span key={r} className="text-red-600">−{r} </span>)}
                     </div>
                   )}
                 </div>

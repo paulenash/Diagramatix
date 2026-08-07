@@ -47,6 +47,13 @@ export function diffToMarkdown(diff: ProcessDiff): string {
       `${systemDiff.removed.length ? `removed ${list(systemDiff.removed)}` : ""}`);
     out.push("");
   }
+  const objDiff = diff.dataObjectDiff;
+  if (objDiff.added.length || objDiff.removed.length) {
+    out.push(`**Data objects:** ${objDiff.added.length ? `added ${list(objDiff.added)}` : ""}` +
+      `${objDiff.added.length && objDiff.removed.length ? "; " : ""}` +
+      `${objDiff.removed.length ? `removed ${list(objDiff.removed)}` : ""}`);
+    out.push("");
+  }
   out.push("| Activity | Change | Who (role) | Type | Systems | Data |");
   out.push("| --- | --- | --- | --- | --- | --- |");
   for (const r of rows) {
@@ -119,6 +126,7 @@ export function diffForAi(diff: ProcessDiff): unknown {
     summary: diff.summary,
     roleChanges: diff.roleDiff,
     systemChanges: diff.systemDiff,
+    dataObjectChanges: diff.dataObjectDiff,
     messageChanges: diff.messageDiff,
     activities: diff.rows.filter(material).map((r) => ({
       activity: r.activity,

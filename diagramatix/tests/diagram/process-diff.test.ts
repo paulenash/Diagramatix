@@ -88,6 +88,36 @@ describe("diffProcesses", () => {
     expect(diff.systemDiff.added).toContain("CRM");
   });
 
+  it("has a data-object section (added / removed across the diagram)", () => {
+    // A has no data objects; B adds nothing via this fixture, but the section
+    // must exist and be well-formed. A dedicated add/remove case:
+    const withObj = build(
+      [
+        { id: "p", type: "pool", label: "P", poolType: "white-box" },
+        { id: "s", type: "start-event", label: "S", pool: "p" },
+        { id: "t", type: "task", label: "Do it", pool: "p" },
+        { id: "e", type: "end-event", label: "E", pool: "p" },
+        { id: "d", type: "data-object", label: "Application form" },
+      ],
+      [
+        { sourceId: "s", targetId: "t" }, { sourceId: "t", targetId: "e" },
+        { sourceId: "d", targetId: "t" },
+      ],
+    );
+    const bare = build(
+      [
+        { id: "p", type: "pool", label: "P", poolType: "white-box" },
+        { id: "s", type: "start-event", label: "S", pool: "p" },
+        { id: "t", type: "task", label: "Do it", pool: "p" },
+        { id: "e", type: "end-event", label: "E", pool: "p" },
+      ],
+      [{ sourceId: "s", targetId: "t" }, { sourceId: "t", targetId: "e" }],
+    );
+    const d = diffProcesses(bare, "v1", withObj, "v2");
+    expect(d.dataObjectDiff.added).toContain("Application form");
+    expect(d.dataObjectDiff.removed).toEqual([]);
+  });
+
   it("summarises counts", () => {
     expect(diff.summary.added).toBe(1);
     expect(diff.summary.removed).toBe(1);

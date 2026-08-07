@@ -69,6 +69,8 @@ export interface ProcessDiff {
   roleDiff: { added: string[]; removed: string[] };
   /** Systems present in only one version. */
   systemDiff: { added: string[]; removed: string[] };
+  /** BPMN data objects present in only one version. */
+  dataObjectDiff: { added: string[]; removed: string[] };
   /** Message flows added / removed / relabelled between the versions. */
   messageDiff: MessageDiff;
 }
@@ -189,6 +191,7 @@ export function diffProcesses(
   const only = (xs: string[], ys: string[]) => xs.filter((v) => !ys.includes(v));
   const rolesA = sortedUniq(skA.roles), rolesB = sortedUniq(skB.roles);
   const sysA = sortedUniq(skA.systems), sysB = sortedUniq(skB.systems);
+  const objA = sortedUniq(skA.dataObjects), objB = sortedUniq(skB.dataObjects);
 
   return {
     a: { title: aTitle, roles: rolesA, systems: sysA, stepCount: skA.steps.length },
@@ -197,6 +200,7 @@ export function diffProcesses(
     summary,
     roleDiff: { added: only(rolesB, rolesA), removed: only(rolesA, rolesB) },
     systemDiff: { added: only(sysB, sysA), removed: only(sysA, sysB) },
+    dataObjectDiff: { added: only(objB, objA), removed: only(objA, objB) },
     messageDiff: diffMessages(extractMessages(aData), extractMessages(bData)),
   };
 }
