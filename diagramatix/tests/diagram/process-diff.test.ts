@@ -141,6 +141,39 @@ describe("diffProcesses", () => {
     expect(ac?.note).toMatch(/Automation introduced/i);
   });
 
+  it("diffs intermediate + boundary events (new timer / error triggers)", () => {
+    const base = build(
+      [
+        { id: "p", type: "pool", label: "P", poolType: "white-box" },
+        { id: "s", type: "start-event", label: "S", pool: "p" },
+        { id: "t", type: "task", label: "Wait for approval", pool: "p" },
+        { id: "e", type: "end-event", label: "E", pool: "p" },
+      ],
+      [{ sourceId: "s", targetId: "t" }, { sourceId: "t", targetId: "e" }],
+    );
+    // B adds a non-interrupting timer boundary event on the task + an inline
+    // error intermediate event.
+    const withEvents = build(
+      [
+        { id: "p", type: "pool", label: "P", poolType: "white-box" },
+        { id: "s", type: "start-event", label: "S", pool: "p" },
+        { id: "t", type: "task", label: "Wait for approval", pool: "p" },
+        { id: "bt", type: "intermediate-event", label: "2 days", pool: "p", eventType: "timer",
+          boundaryHost: "t", properties: { interruptionType: "non-interrupting" } },
+        { id: "ie", type: "intermediate-event", label: "Rejected", pool: "p", eventType: "error" },
+        { id: "e", type: "end-event", label: "E", pool: "p" },
+      ],
+      [{ sourceId: "s", targetId: "t" }, { sourceId: "t", targetId: "ie" }, { sourceId: "ie", targetId: "e" }],
+    );
+    const ed = diffProcesses(base, "v1", withEvents, "v2").eventDiff;
+    const triggers = ed.added.map((e) => e.trigger).sort();
+    expect(triggers).toEqual(["error", "timer"]);
+    const timer = ed.added.find((e) => e.trigger === "timer");
+    expect(timer?.kind).toBe("boundary");
+    expect(timer?.interrupting).toBe(false);
+    expect(ed.removed).toEqual([]);
+  });
+
   it("normaliseLabel is case/space/punctuation insensitive", () => {
     expect(normaliseLabel("  Validate  Order. ")).toBe(normaliseLabel("validate order"));
   });

@@ -67,6 +67,26 @@ export interface MessageDiff {
   unchanged: number;
 }
 
+/** An intermediate event — inline in the flow, or edge-mounted (boundary) on a
+ *  host activity. `trigger` = timer / error / escalation / cancel / message /
+ *  signal / compensation / conditional / link / none. */
+export interface EventFlow {
+  kind: "boundary" | "intermediate";
+  host: string;          // host activity label (boundary only, else "")
+  trigger: string;
+  label: string;
+  interrupting: boolean; // boundary: false = non-interrupting
+  throwing: boolean;     // inline throw event
+}
+
+export interface EventDiff {
+  added: EventFlow[];
+  removed: EventFlow[];
+  /** Same anchor (boundary host, or inline label), different trigger/flags. */
+  changed: { kind: EventFlow["kind"]; where: string; a: string; b: string }[];
+  unchanged: number;
+}
+
 export interface ProcessDiff {
   a: ProcessDiffSide;
   b: ProcessDiffSide;
@@ -80,6 +100,9 @@ export interface ProcessDiff {
   dataObjectDiff: { added: string[]; removed: string[] };
   /** Message flows added / removed / relabelled between the versions. */
   messageDiff: MessageDiff;
+  /** Intermediate + boundary event changes — new/removed/retriggered timers,
+   *  errors, escalations, cancellations, etc. */
+  eventDiff: EventDiff;
   /** Tasks whose marker change signals an automation shift (manual→user = IT
    *  support added; user→service/script = automation / RPA / agent introduced). */
   automationChanges: AutomationChange[];
@@ -246,6 +269,7 @@ export function diffProcesses(
     systemDiff: { added: only(sysB, sysA), removed: only(sysA, sysB) },
     dataObjectDiff: { added: only(objB, objA), removed: only(objA, objB) },
     messageDiff: diffMessages(extractMessages(aData), extractMessages(bData)),
+    eventDiff: diffEvents(extractEvents(aData), extractEvents(bData)),
     automationChanges: rows
       .filter((r) => r.automationNote)
       .map((r) => ({ activity: r.activity, from: r.taskType.a || "—", to: r.taskType.b || "—", note: r.automationNote! })),
@@ -297,5 +321,70 @@ export function diffMessages(aMsgs: MessageFlow[], bMsgs: MessageFlow[]): Messag
     } else removed.push(m);
   }
   // 3. Whatever B has left is genuinely new.
+  return { added: bRemaining, removed, changed, unchanged };
+}
+
+/** All intermediate + boundary events in a diagram (throw/catch, inline/edge). */
+export function extractEvents(data: DiagramData): EventFlow[] {
+  const byId = new Map((data.elements ?? []).map((e) => [e.id, e]));
+  const nameOf = (id: string): string => {
+    const el = byId.get(id);
+    return (el?.label?.trim() || el?.type || id);
+  };
+  const out: EventFlow[] = [];
+  for (const el of data.elements ?? []) {
+    if (el.type !== "intermediate-event") continue;
+    const boundary = !!el.boundaryHostId;
+    const p = (el.properties ?? {}) as Record<string, unknown>;
+    const interrupting = !(p.interruptionType === "non-interrupting" || p.interrupting === false);
+    out.push({
+      kind: boundary ? "boundary" : "intermediate",
+      host: boundary ? nameOf(el.boundaryHostId!) : "",
+      trigger: (el.eventType as string | undefined) || "none",
+      label: (el.label ?? "").trim(),
+      interrupting,
+      throwing: el.flowType === "throwing",
+    });
+  }
+  return out;
+}
+
+/** Human descriptor of an event's trigger + flags ("timer (non-interrupting)"). */
+export function eventTrigger(e: EventFlow): string {
+  const t = e.trigger === "none" ? "plain" : e.trigger;
+  const flags: string[] = [];
+  if (e.kind === "boundary" && !e.interrupting) flags.push("non-interrupting");
+  if (e.throwing) flags.push("throwing");
+  return flags.length ? `${t} (${flags.join(", ")})` : t;
+}
+
+const evExactKey = (e: EventFlow) =>
+  `${e.kind}|${normaliseLabel(e.host)}|${normaliseLabel(e.label)}|${e.trigger}|${e.interrupting ? 1 : 0}|${e.throwing ? 1 : 0}`;
+// Anchor = what identifies "the same event" across versions so a trigger change
+// reads as a change, not add+remove: a boundary event's host, or an inline
+// event's label. Unlabelled inline events have no anchor → pure add/remove.
+const evAnchor = (e: EventFlow): string | null =>
+  e.kind === "boundary" ? `b|${normaliseLabel(e.host)}` : (normaliseLabel(e.label) ? `i|${normaliseLabel(e.label)}` : null);
+
+/** Diff two event lists (same shape/approach as message flows). */
+export function diffEvents(aEvents: EventFlow[], bEvents: EventFlow[]): EventDiff {
+  const bRemaining = [...bEvents];
+  const aRemaining: EventFlow[] = [];
+  let unchanged = 0;
+  for (const e of aEvents) {
+    const i = bRemaining.findIndex((n) => evExactKey(n) === evExactKey(e));
+    if (i >= 0) { bRemaining.splice(i, 1); unchanged++; }
+    else aRemaining.push(e);
+  }
+  const changed: EventDiff["changed"] = [];
+  const removed: EventFlow[] = [];
+  for (const e of aRemaining) {
+    const anchor = evAnchor(e);
+    const i = anchor ? bRemaining.findIndex((n) => evAnchor(n) === anchor) : -1;
+    if (i >= 0) {
+      const b = bRemaining.splice(i, 1)[0];
+      changed.push({ kind: e.kind, where: e.kind === "boundary" ? e.host : e.label, a: eventTrigger(e), b: eventTrigger(b) });
+    } else removed.push(e);
+  }
   return { added: bRemaining, removed, changed, unchanged };
 }

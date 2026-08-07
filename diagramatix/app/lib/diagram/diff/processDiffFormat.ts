@@ -3,7 +3,7 @@
  * .docx via buildDocx, tables and all) and a flat CSV. Kept separate from the
  * pure diff engine so the engine has no formatting concerns.
  */
-import type { ProcessDiff, ProcessDiffRow, DiffStatus } from "./processDiff";
+import { eventTrigger as evTrig, type ProcessDiff, type ProcessDiffRow, type DiffStatus } from "./processDiff";
 
 const STATUS_LABEL: Record<DiffStatus, string> = {
   added: "Added", removed: "Removed", changed: "Changed", unchanged: "Unchanged",
@@ -80,6 +80,21 @@ export function diffToMarkdown(diff: ProcessDiff): string {
     for (const m of md.changed) out.push(`| Changed | ${mdCell(m.from)} | ${mdCell(m.to)} | ${mdCell(`${m.a || "—"} → ${m.b || "—"}`)} |`);
   }
 
+  // Intermediate + boundary events.
+  const ev = diff.eventDiff;
+  if (ev.added.length || ev.removed.length || ev.changed.length) {
+    out.push("");
+    out.push("**Intermediate & boundary events**");
+    out.push("");
+    out.push("| Change | Kind | Where | Trigger |");
+    out.push("| --- | --- | --- | --- |");
+    const kindLabel = (k: string) => (k === "boundary" ? "Boundary" : "Intermediate");
+    const whereOf = (k: string, w: string) => (k === "boundary" ? `on ${w}` : (w || "(inline)"));
+    for (const e of ev.removed) out.push(`| Removed | ${kindLabel(e.kind)} | ${mdCell(whereOf(e.kind, e.kind === "boundary" ? e.host : e.label))} | ${mdCell(evTrig(e))} |`);
+    for (const e of ev.added) out.push(`| Added | ${kindLabel(e.kind)} | ${mdCell(whereOf(e.kind, e.kind === "boundary" ? e.host : e.label))} | ${mdCell(evTrig(e))} |`);
+    for (const e of ev.changed) out.push(`| Changed | ${kindLabel(e.kind)} | ${mdCell(whereOf(e.kind, e.where))} | ${mdCell(`${e.a} → ${e.b}`)} |`);
+  }
+
   // Automation changes — task-marker shifts and what they signal.
   if (diff.automationChanges.length) {
     out.push("");
@@ -140,6 +155,7 @@ export function diffForAi(diff: ProcessDiff): unknown {
     systemChanges: diff.systemDiff,
     dataObjectChanges: diff.dataObjectDiff,
     messageChanges: diff.messageDiff,
+    eventChanges: diff.eventDiff,
     automationChanges: diff.automationChanges,
     activities: diff.rows.filter(material).map((r) => ({
       activity: r.activity,

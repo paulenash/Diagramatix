@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
-import { diffProcesses, type DiffStatus } from "@/app/lib/diagram/diff/processDiff";
+import { diffProcesses, eventTrigger, type DiffStatus } from "@/app/lib/diagram/diff/processDiff";
 import { diffToCsv } from "@/app/lib/diagram/diff/processDiffFormat";
 import { mergeProcesses, type MergeDecision, type MergeKind } from "@/app/lib/diagram/diff/mergeProcess";
 
@@ -385,6 +385,52 @@ export function ProcessDiffDialog({
                 </div>
               )}
 
+              {/* Intermediate + boundary event changes — new/removed/retriggered
+                  timers, errors, escalations, cancellations. */}
+              {(diff.eventDiff.added.length > 0 || diff.eventDiff.removed.length > 0 || diff.eventDiff.changed.length > 0) && (
+                <div className="mt-3">
+                  <div className="text-[11px] font-medium text-gray-700 mb-1">Intermediate &amp; boundary events</div>
+                  <div className="overflow-x-auto border border-gray-200 rounded">
+                    <table className="w-full text-[11px] border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-600 text-left">
+                          <th className="px-2 py-1.5 font-medium">Change</th>
+                          <th className="px-2 py-1.5 font-medium">Kind</th>
+                          <th className="px-2 py-1.5 font-medium">Where</th>
+                          <th className="px-2 py-1.5 font-medium">Trigger</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {diff.eventDiff.removed.map((e, i) => (
+                          <tr key={`er${i}`} className="border-t border-gray-100">
+                            <td className="px-2 py-1.5"><span className="px-1.5 py-0.5 rounded bg-red-50 text-red-700">Removed</span></td>
+                            <td className="px-2 py-1.5 text-gray-600">{e.kind === "boundary" ? "Boundary" : "Intermediate"}</td>
+                            <td className="px-2 py-1.5 text-gray-700">{e.kind === "boundary" ? `on ${e.host}` : (e.label || "(inline)")}</td>
+                            <td className="px-2 py-1.5 text-gray-600">{eventTrigger(e)}</td>
+                          </tr>
+                        ))}
+                        {diff.eventDiff.added.map((e, i) => (
+                          <tr key={`ea${i}`} className="border-t border-gray-100">
+                            <td className="px-2 py-1.5"><span className="px-1.5 py-0.5 rounded bg-green-50 text-green-700">Added</span></td>
+                            <td className="px-2 py-1.5 text-gray-600">{e.kind === "boundary" ? "Boundary" : "Intermediate"}</td>
+                            <td className="px-2 py-1.5 text-gray-700">{e.kind === "boundary" ? `on ${e.host}` : (e.label || "(inline)")}</td>
+                            <td className="px-2 py-1.5 text-gray-900 font-medium">{eventTrigger(e)}</td>
+                          </tr>
+                        ))}
+                        {diff.eventDiff.changed.map((e, i) => (
+                          <tr key={`ec${i}`} className="border-t border-gray-100">
+                            <td className="px-2 py-1.5"><span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">Changed</span></td>
+                            <td className="px-2 py-1.5 text-gray-600">{e.kind === "boundary" ? "Boundary" : "Intermediate"}</td>
+                            <td className="px-2 py-1.5 text-gray-700">{e.kind === "boundary" ? `on ${e.where}` : (e.where || "(inline)")}</td>
+                            <td className="px-2 py-1.5"><span className="text-gray-400 line-through">{e.a}</span><span className="text-gray-400"> → </span><span className="text-gray-900 font-medium">{e.b}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* Automation shifts — task-marker changes that signal IT support
                   or automation being added/removed. */}
               {diff.automationChanges.length > 0 && (
@@ -423,11 +469,10 @@ export function ProcessDiffDialog({
           )}
         </div>
 
-        {/* Footer actions */}
-        {diff && (
-          <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-gray-200">
-            <div className="flex items-center gap-2">
-              {!canMerge ? (
+        {/* Footer actions — Cancel always available; the rest once a diff exists. */}
+        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-gray-200">
+          <div className="flex items-center gap-2">
+            {diff && (!canMerge ? (
                 <span />
               ) : !mergeMode ? (
                 <button onClick={() => { setMergeMode(true); selectAllChanges(); setMergeDone(null); }}
@@ -446,9 +491,10 @@ export function ProcessDiffDialog({
                     <a href={`/diagram/${mergeDone.id}`} className="text-xs text-emerald-700 underline font-medium">Open merged diagram →</a>
                   )}
                 </>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
+              ))}
+          </div>
+          <div className="flex items-center gap-2">
+            {diff && (<>
               <button onClick={exportCsv} className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50">Export CSV</button>
               <button onClick={exportDocx} disabled={busy === "docx"} className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50 disabled:opacity-50">
                 {busy === "docx" ? "Exporting…" : "Export Word"}
@@ -456,9 +502,10 @@ export function ProcessDiffDialog({
               <button onClick={generateAi} disabled={busy === "ai"} className="text-xs text-white bg-blue-600 rounded px-3 py-1 hover:bg-blue-700 disabled:opacity-50">
                 {busy === "ai" ? "Summarising…" : "AI Summary"}
               </button>
-            </div>
+            </>)}
+            <button onClick={onClose} className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50">Cancel</button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
