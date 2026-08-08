@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import { computePerformance } from "@/app/lib/mining/performance";
 import { fitDuration, fitArrival, activeHoursToCalendar, calibrateSimulation } from "@/app/lib/mining/calibrateSimulation";
 import { discoverProcess } from "@/app/lib/mining/discoverProcess";
+import { badgeEdgeCounts } from "@/app/lib/mining/edgeBadges";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { getSimParams } from "@/app/lib/diagram/simParams";
 import { buildEventLog } from "@/app/lib/mining/parseEventLog";
@@ -78,6 +79,27 @@ describe("calibrate the twin", () => {
     // Mined team library.
     expect(cal.teams).toEqual(expect.arrayContaining([{ name: "alice", capacity: 2 }, { name: "bob", capacity: 1 }]));
     expect(cal.clockUnit).toBe("hour");
+  });
+
+  it("T2240 — gateway branch probabilities still calibrate after edge counts are badged (transitionCount)", () => {
+    // The discovered BPMN the calibrator actually loads has run through
+    // badgeEdgeCounts (count moved from the edge label → transitionCount). Branch
+    // probabilities must come from transitionCount, not the now-empty label.
+    const variants: Variant[] = [
+      { events: ["Create", "Submit", "Approve"], states: ["Draft", "Pending", "Approved"], count: 5 },
+      { events: ["Create", "Submit", "Reject"], states: ["Draft", "Pending", "Rejected"], count: 2 },
+    ];
+    const { plan } = discoverProcess(variants);
+    const data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections)); // labels → transitionCount
+    const perf = {
+      clockUnit: "hour" as const,
+      activityDurations: { Create: [2], Submit: [1], Approve: [3], Reject: [1] },
+      interArrival: [10], activityResource: {}, resourceConcurrency: {}, activeHours: new Array(168).fill(1),
+    };
+    const cal = calibrateSimulation(data, perf);
+    const gwOut = cal.data.connectors.filter((c) => cal.data.elements.find((e) => e.id === c.sourceId)?.type === "gateway");
+    const probs = gwOut.map((c) => c.branchProbability).filter((p): p is number => p !== undefined).sort((a, b) => a - b);
+    expect(probs).toEqual([29, 71]);
   });
 
   it("T0685 — tasks with no mined resource fall back to their pool team, which is in the library", () => {

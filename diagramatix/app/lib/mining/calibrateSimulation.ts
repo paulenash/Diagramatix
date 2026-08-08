@@ -93,17 +93,20 @@ export function calibrateSimulation(data: DiagramData, perf: Performance): Calib
     return el;
   });
 
-  // Gateway branch probabilities from the frequency labels discovery put on edges.
+  // Gateway branch probabilities from the mined edge frequencies. The count lives
+  // on `transitionCount` (the green count badge) OR, on older/AI diagrams, in the
+  // edge `label` — read whichever is present.
   const connectors = data.connectors.map((c) => ({ ...c }));
+  const edgeCount = (c: (typeof connectors)[number]) => c.transitionCount ?? (parseFloat(c.label ?? "") || 0);
   const gwOut = new Map<string, typeof connectors>();
   for (const c of connectors) {
     const src = byId.get(c.sourceId);
     if (src?.type === "gateway") (gwOut.get(c.sourceId) ?? gwOut.set(c.sourceId, []).get(c.sourceId)!).push(c);
   }
   for (const outs of gwOut.values()) {
-    const total = outs.reduce((a, c) => a + (parseFloat(c.label ?? "") || 0), 0);
+    const total = outs.reduce((a, c) => a + edgeCount(c), 0);
     if (total <= 0) continue;
-    for (const c of outs) c.branchProbability = Math.round(100 * (parseFloat(c.label ?? "") || 0) / total);
+    for (const c of outs) c.branchProbability = Math.round(100 * edgeCount(c) / total);
   }
 
   // One team per distinct team a task actually references — a mined resource

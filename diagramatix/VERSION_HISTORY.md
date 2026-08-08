@@ -13,6 +13,12 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2144 — 2026-08-09 — Fix: gateway branch probabilities calibrate from badged edges
+- The digital-twin calibrator read the gateway split from the edge `label`, but the edge-count
+  badge fix (1.44.2143 below) moves that number into `transitionCount` and clears the label — so a
+  freshly discovered process would calibrate with **no branch probabilities**. `calibrateSimulation`
+  now reads the mined count from `transitionCount` (falling back to `label`). Test T2240.
+
 ## 1.44.2143 — 2026-08-09 — Fix: spurious auto-connect on click in generated diagrams
 - **Root cause:** the auto-fuse feature (drop an element onto a connector to splice it in, creating
   an in + out connector) ran on **every** `MOVE_END` with no move-distance check. Generated / AI
