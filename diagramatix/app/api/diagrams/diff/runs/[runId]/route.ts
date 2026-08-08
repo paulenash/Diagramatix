@@ -11,15 +11,17 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { requireDiagramAccess } from "@/app/lib/auth/orgContext";
+import { requireDiagramAccess, requireOrgAdminFor } from "@/app/lib/auth/orgContext";
 import { isSuperuser } from "@/app/lib/superuser";
 
 type Sess = Parameters<typeof requireDiagramAccess>[0];
 
-async function canView(session: Sess, run: { createdById: string | null; aDiagramId: string | null; bDiagramId: string | null }): Promise<boolean> {
+async function canView(session: Sess, run: { createdById: string | null; orgId: string | null; aDiagramId: string | null; bDiagramId: string | null }): Promise<boolean> {
   if (!session?.user?.id) return false;
   if (run.createdById === session.user.id || isSuperuser(session)) return true;
   const jar = await cookies();
+  // OrgAdmin of the run's org (Feature B/C management).
+  if (run.orgId) { try { await requireOrgAdminFor(session, jar, run.orgId); return true; } catch { /* not an org admin */ } }
   for (const did of [run.aDiagramId, run.bDiagramId]) {
     if (!did) continue;
     try { await requireDiagramAccess(session, jar, did, "view"); return true; } catch { /* try the other */ }
@@ -45,7 +47,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ runId:
   const { runId } = await params;
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const run = await prisma.processDiffRun.findUnique({ where: { id: runId }, select: { createdById: true, aDiagramId: true, bDiagramId: true } });
+  const run = await prisma.processDiffRun.findUnique({ where: { id: runId }, select: { createdById: true, orgId: true, aDiagramId: true, bDiagramId: true } });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (!(await canView(session, run))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json().catch(() => ({}));
@@ -62,11 +64,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ runI
   const { runId } = await params;
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const run = await prisma.processDiffRun.findUnique({ where: { id: runId }, select: { createdById: true } });
+  const run = await prisma.processDiffRun.findUnique({ where: { id: runId }, select: { createdById: true, orgId: true } });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (run.createdById !== session.user.id && !isSuperuser(session)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  let allowed = run.createdById === session.user.id || isSuperuser(session);
+  if (!allowed && run.orgId) {
+    try { await requireOrgAdminFor(session, await cookies(), run.orgId); allowed = true; } catch { /* not an org admin */ }
   }
+  if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   await prisma.processDiffRun.delete({ where: { id: runId } });
   return NextResponse.json({ ok: true });
 }

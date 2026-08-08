@@ -58,6 +58,12 @@ const CARDS: MenuCard[] = [
       "Download a backup of your whole Org, or selectively restore an Org member's projects / diagrams.",
   },
   {
+    href: "/dashboard/org-admin/diff-runs",
+    title: "Diff Process Runs",
+    description:
+      "Every saved Diff Processes comparison in your Org, grouped by user. View the full results + AI summary, or remove runs.",
+  },
+  {
     href: "/dashboard/org-admin/sop-templates?from=/dashboard/org-admin",
     title: "SOP Templates",
     description:
