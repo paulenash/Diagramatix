@@ -24,12 +24,14 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     select: {
       id: true, aName: true, bName: true, createdAt: true, aiSummary: true, createdById: true,
+      aDiagramId: true, bDiagramId: true,
       createdBy: { select: { id: true, name: true, email: true } },
     },
   });
   return NextResponse.json({
     runs: runs.map((r) => ({
       id: r.id, aName: r.aName, bName: r.bName, createdAt: r.createdAt, hasAiSummary: !!r.aiSummary,
+      aDiagramId: r.aDiagramId, bDiagramId: r.bDiagramId,
       userId: r.createdById, userName: r.createdBy?.name ?? null, userEmail: r.createdBy?.email ?? null,
     })),
   });

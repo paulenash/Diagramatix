@@ -17,6 +17,7 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     select: {
       id: true, aName: true, bName: true, createdAt: true, aiSummary: true, orgId: true, createdById: true,
+      aDiagramId: true, bDiagramId: true,
       org: { select: { id: true, name: true } },
       createdBy: { select: { id: true, name: true, email: true } },
     },
@@ -24,6 +25,7 @@ export async function GET() {
   return NextResponse.json({
     runs: runs.map((r) => ({
       id: r.id, aName: r.aName, bName: r.bName, createdAt: r.createdAt, hasAiSummary: !!r.aiSummary,
+      aDiagramId: r.aDiagramId, bDiagramId: r.bDiagramId,
       orgId: r.orgId, orgName: r.org?.name ?? "(no org)",
       userId: r.createdById, userName: r.createdBy?.name ?? null, userEmail: r.createdBy?.email ?? null,
     })),

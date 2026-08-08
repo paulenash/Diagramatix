@@ -1027,6 +1027,8 @@ export function DiagramEditor({
   const backHref = backFromHref ?? (projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
   const backLabel = backHref.includes("mining=")
     ? "MINER"                                              // returned from a Process Mining console
+    : backHref.includes("diff-runs")
+      ? "Diff Process Runs"                                // opened from an Admin Diff Process Runs screen
     : backHref.startsWith("/notifications") || backHref.includes("notifications=1")
       ? "Notifications"
       : backHref.startsWith("/dashboard/projects")

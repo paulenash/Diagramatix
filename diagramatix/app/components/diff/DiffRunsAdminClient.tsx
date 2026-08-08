@@ -6,6 +6,7 @@ import { DiffRunViewer } from "./DiffRunViewer";
 
 interface AdminRun {
   id: string; aName: string; bName: string; createdAt: string; hasAiSummary: boolean;
+  aDiagramId: string | null; bDiagramId: string | null;
   userId: string | null; userName: string | null; userEmail: string | null;
   orgId?: string | null; orgName?: string;
 }
@@ -47,6 +48,10 @@ export function DiffRunsAdminClient({ scope }: { scope: "org" | "super" }) {
 
   const userLabel = (r: AdminRun) => r.userName || r.userEmail || "(unknown user)";
 
+  // Opening a diagram from here returns to THIS screen (Back link top-left).
+  const backPath = scope === "super" ? "/dashboard/admin/diff-runs" : "/dashboard/org-admin/diff-runs";
+  const openDiagram = (id: string) => router.push(`/diagram/${id}?from=${encodeURIComponent(backPath)}`);
+
   // Group: super = org → user → runs; org = user → runs.
   const grouped = useMemo(() => {
     const byOrg = new Map<string, { orgName: string; byUser: Map<string, AdminRun[]> }>();
@@ -65,7 +70,13 @@ export function DiffRunsAdminClient({ scope }: { scope: "org" | "super" }) {
     <div className="flex items-center gap-2 py-1 border-b border-gray-50 text-[11px]">
       <span className="text-gray-500 w-32 shrink-0">{fmt(r.createdAt)}</span>
       <span className="flex-1 text-gray-800 truncate">{r.aName} → {r.bName}{r.hasAiSummary ? " · AI" : ""}</span>
-      <button onClick={() => setViewId(r.id)} className="text-blue-600 hover:text-blue-800 underline">View</button>
+      <button onClick={() => r.aDiagramId && openDiagram(r.aDiagramId)} disabled={!r.aDiagramId}
+        title={r.aDiagramId ? "Open the 'before' process" : "Before diagram no longer exists"}
+        className="text-blue-600 hover:text-blue-800 underline disabled:text-gray-300 disabled:no-underline">View Before</button>
+      <button onClick={() => r.bDiagramId && openDiagram(r.bDiagramId)} disabled={!r.bDiagramId}
+        title={r.bDiagramId ? "Open the 'after' process" : "After diagram no longer exists"}
+        className="text-blue-600 hover:text-blue-800 underline disabled:text-gray-300 disabled:no-underline">View After</button>
+      <button onClick={() => setViewId(r.id)} className="text-blue-600 hover:text-blue-800 underline">View Diff</button>
       {pendingDelete === r.id ? (
         <>
           <button onClick={() => remove(r.id)} className="text-red-700 font-medium underline">Confirm</button>
