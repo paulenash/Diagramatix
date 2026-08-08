@@ -13,6 +13,29 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2137 — 2026-08-08 — DiagramatixMINER Insights (Process Mining v2)
+- New **Insights** workbench in the mining run console — closes the biggest gaps vs Apromore:
+  - **🔥 Heat** — colour the discovered model by Total time (bottleneck) / Frequency / Avg time,
+    with a legend + top-steps table.
+  - **🔀 Variants** — frequency Pareto, click-to-isolate a variant's path, multi-select overlay,
+    two-variant activity compare.
+  - **🎞 Cases** — per-case list (sortable by cycle time, filter by variant) + drill-down, plus a
+    self-contained log-**replay** animating real cases over the model (no simulator engine touched).
+  - **🎯 Outcomes** — set a case **SLA** → on-time vs late split + the activities/variants that
+    **drive lateness** (lift).
+  - **⬇ Export** — the whole analysis as Word / Excel / PDF.
+- Foundations: pure `computeAnalytics` (per-activity/edge metrics + capped per-case index) persisted
+  to new nullable `ProcessMiningRun.analytics`; `kpiConfig` (case SLA) persisted per run. Computed at
+  import + live refresh. `SymbolRenderer` now honours `properties.fillColor` on task/state/gateway/
+  event shapes (enables the non-destructive heat overlay).
+- Mining **examples** carry `analytics` + a demo SLA so the features land on adoption (regenerated
+  `miningExampleData.json`).
+- **Schema: no bump** — the two new `ProcessMiningRun` columns are operational mining tables, outside
+  the export XSD and the curated Logical DDL (`ddlGenerate.ts`), so the tracked data structure is
+  unchanged. Tests T2226-T2236.
+- **Prod follow-up:** re-run `scripts/seed-mining-examples.ts` so the adoptable examples carry the
+  new analytics + SLA.
+
 ## 1.44.2129 — 2026-08-08 — True-to-layout Word preview (LibreOffice)
 - SOP and Diff-Processes **Preview** now renders the real `.docx` → PDF via headless LibreOffice
   (`soffice`), reproducing styled headings, org Word-template branding, page breaks, and the
