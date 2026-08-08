@@ -193,13 +193,20 @@ function OutcomesTab({ analytics, variants, kpiConfig, onSave }: { analytics: Ru
 }
 
 /** Read-only fitted SVG of a diagram. `emphasize` fades everything not in the set
- *  (variant/case highlight in context); `visibleIds` hides everything not in it. */
-function ModelSvg({ data, visibleIds, emphasize, maxVh = 46 }: { data: DiagramData; visibleIds?: Set<string>; emphasize?: Set<string>; maxVh?: number }) {
+ *  (variant/case highlight in context); `visibleIds` hides everything not in it.
+ *  `captions` draws a small line of text under matching elements (e.g. the mined
+ *  time + team, so the "simulation data" is visible under each element). */
+function ModelSvg({ data, visibleIds, emphasize, captions, maxVh = 46 }: { data: DiagramData; visibleIds?: Set<string>; emphasize?: Set<string>; captions?: Map<string, string>; maxVh?: number }) {
   const viewBox = useMemo(() => boundsViewBox(data), [data]);
   return (
     <div className="bg-stone-100 rounded border border-stone-700 overflow-hidden">
       <svg viewBox={viewBox} className="w-full" style={{ maxHeight: `${maxVh}vh` }} preserveAspectRatio="xMidYMid meet">
         <ReplayDiagramBackdrop data={data} visibleIds={visibleIds} emphasize={emphasize} />
+        {captions && data.elements.map((el) => {
+          const t = captions.get(el.id);
+          if (!t) return null;
+          return <text key={`cap-${el.id}`} x={el.x + el.width / 2} y={el.y + el.height + 11} textAnchor="middle" fontSize={9} fontWeight={600} fill="#1e40af" style={{ pointerEvents: "none" }}>{t}</text>;
+        })}
       </svg>
     </div>
   );
@@ -210,7 +217,20 @@ function ModelSvg({ data, visibleIds, emphasize, maxVh = 46 }: { data: DiagramDa
 function HeatTab({ analytics, bpmn, hasBpmn, loading }: { analytics: RunAnalytics | null; bpmn: DiagramData | null; hasBpmn: boolean; loading: boolean }) {
   const [metric, setMetric] = useState<HeatMetric>("totalTime");
   const [expanded, setExpanded] = useState(false);
+  const [showData, setShowData] = useState(true);
   const heated = useMemo(() => (bpmn && analytics ? applyHeat(bpmn, analytics, metric) : null), [bpmn, analytics, metric]);
+  // The mined "simulation data" per task — median time-in-step + dominant team —
+  // shown as a caption under each element (matched by activity label).
+  const captions = useMemo(() => {
+    if (!bpmn || !analytics) return undefined;
+    const byAct = new Map(analytics.activities.map((a) => [a.activity, a]));
+    const m = new Map<string, string>();
+    for (const el of bpmn.elements) {
+      const a = byAct.get((el.label ?? "").trim());
+      if (a) m.set(el.id, `${formatDuration(a.medianDurMs, analytics.clockUnit)}${a.dominantResource ? " · " + a.dominantResource : ""}`);
+    }
+    return m;
+  }, [bpmn, analytics]);
   const metricOf = HEAT_METRICS.find((m) => m.key === metric)!.of;
   const fmt = useCallback((v: number) => (metric === "frequency" ? String(v) : analytics ? formatDuration(v, analytics.clockUnit) : String(v)), [metric, analytics]);
 
@@ -222,7 +242,7 @@ function HeatTab({ analytics, bpmn, hasBpmn, loading }: { analytics: RunAnalytic
   const maxV = Math.max(1, ...analytics.activities.map(metricOf));
 
   if (expanded) return (
-    <ExpandedView title="Insights — bottleneck heat" data={heated} onClose={() => setExpanded(false)}>
+    <ExpandedView title="Insights — bottleneck heat" data={heated} captions={showData ? captions : undefined} onClose={() => setExpanded(false)}>
       <table className="w-full text-[11px]">
         <thead><tr className="text-stone-500 text-left"><th></th><th className="font-normal">Step</th><th className="font-normal text-right">{HEAT_METRICS.find((m) => m.key === metric)!.label}</th><th className="font-normal text-right">Cases</th></tr></thead>
         <tbody>
@@ -249,9 +269,11 @@ function HeatTab({ analytics, bpmn, hasBpmn, loading }: { analytics: RunAnalytic
               {m.label}
             </button>
           ))}
+          <button onClick={() => setShowData((s) => !s)} title="Show the mined time + team under each task"
+            className={`text-[11px] rounded px-2 py-0.5 ${showData ? "bg-blue-800 text-white" : "bg-stone-800 text-stone-300 hover:bg-stone-700"}`}>🏷 time · team</button>
           <button onClick={() => setExpanded(true)} className={EXPAND_BTN}>⤢ Expand</button>
         </div>
-        {heated && <ModelSvg data={heated} />}
+        {heated && <ModelSvg data={heated} captions={showData ? captions : undefined} />}
         <div className="flex items-center gap-2 mt-2">
           <span className="text-[10px] text-stone-400">low</span>
           <div className="h-2 flex-1 rounded" style={{ background: `linear-gradient(90deg, ${heatColor(0)}, ${heatColor(0.5)}, ${heatColor(1)})` }} />

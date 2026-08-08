@@ -13,6 +13,12 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2146 — 2026-08-09 — Mining Insights: mined time + team caption under each task
+- The Insights model now shows the mined **"simulation data" under each task** — its median
+  time-in-step + dominant team — as a caption (toggle **🏷 time · team**, on by default), matched to
+  each activity from the log. Visible immediately after Discover (no need to calibrate first), and
+  carried into the expanded/zoom view. Schema: no bump.
+
 ## 1.44.2145 — 2026-08-09 — Mining: calibratable AI process, in-context variant/case highlight, fixes
 - **Variants / Cases** now highlight the selected path **in context** — the whole discovered model
   is shown with everything off the path **faded**, and the path's count badges stand out (no more

@@ -19,7 +19,7 @@ function diagramBounds(data: DiagramData, pad = 24) {
 }
 
 /** SVG diagram with click-to-zoom (Esc resets via `resetKey` bump from the parent). */
-function ZoomableDiagram({ data, visibleIds, emphasize, resetKey, extra }: { data: DiagramData; visibleIds?: Set<string>; emphasize?: Set<string>; resetKey: number; extra?: ReactNode }) {
+function ZoomableDiagram({ data, visibleIds, emphasize, captions, resetKey, extra }: { data: DiagramData; visibleIds?: Set<string>; emphasize?: Set<string>; captions?: Map<string, string>; resetKey: number; extra?: ReactNode }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const b = useMemo(() => diagramBounds(data), [data]);
   const [zoom, setZoom] = useState(1);
@@ -43,16 +43,21 @@ function ZoomableDiagram({ data, visibleIds, emphasize, resetKey, extra }: { dat
     <svg ref={svgRef} viewBox={`${vx} ${vy} ${vw} ${vh}`} onClick={onClick}
       className="w-full h-full cursor-zoom-in" preserveAspectRatio="xMidYMid meet" style={{ background: "#f5f5f4" }}>
       <ReplayDiagramBackdrop data={data} visibleIds={visibleIds} emphasize={emphasize} />
+      {captions && data.elements.map((el) => {
+        const t = captions.get(el.id);
+        return t ? <text key={`cap-${el.id}`} x={el.x + el.width / 2} y={el.y + el.height + 11} textAnchor="middle" fontSize={9} fontWeight={600} fill="#1e40af" style={{ pointerEvents: "none" }}>{t}</text> : null;
+      })}
       {extra}
     </svg>
   );
 }
 
-export function ExpandedView({ title, data, visibleIds, emphasize, extra, onClose, children }: {
+export function ExpandedView({ title, data, visibleIds, emphasize, captions, extra, onClose, children }: {
   title: string;
   data: DiagramData | null;
   visibleIds?: Set<string>;
   emphasize?: Set<string>;       // fade everything not in the set (variant/case highlight)
+  captions?: Map<string, string>; // small text under matching elements (mined time · team)
   extra?: ReactNode;              // extra SVG overlay drawn inside the zoomable svg (e.g. replay tokens)
   onClose: () => void;
   children?: ReactNode;          // the tables, shown under the diagram
@@ -79,7 +84,7 @@ export function ExpandedView({ title, data, visibleIds, emphasize, extra, onClos
       </div>
       <div className="flex-1 min-h-0 flex flex-col p-3 gap-3">
         <div className="flex-[3] min-h-0 rounded border border-stone-700 overflow-hidden">
-          {data ? <ZoomableDiagram data={data} visibleIds={visibleIds} emphasize={emphasize} resetKey={resetKey} extra={extra} />
+          {data ? <ZoomableDiagram data={data} visibleIds={visibleIds} emphasize={emphasize} captions={captions} resetKey={resetKey} extra={extra} />
             : <div className="p-4 text-stone-500 text-sm">No discovered diagram — Discover the process first.</div>}
         </div>
         {children && <div className="flex-[2] min-h-0 overflow-auto text-stone-200">{children}</div>}
