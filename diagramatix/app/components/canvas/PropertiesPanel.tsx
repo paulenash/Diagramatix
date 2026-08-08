@@ -17,6 +17,7 @@ import type {
   UmlOperation,
 } from "@/app/lib/diagram/types";
 import { RichTextEditor } from "./RichTextEditor";
+import { DiffRunsButton } from "@/app/components/diff/DiffRunsButton";
 import { richToLines } from "@/app/lib/diagram/richText";
 import { SimulationSection } from "./SimulationSection";
 import { useSharePointAvailable } from "@/app/lib/auth/useOrgPolicy";
@@ -91,6 +92,7 @@ interface Props {
   element: DiagramElement | null;
   connector: Connector | null;
   diagramType?: DiagramType;
+  diagramId?: string;
   onUpdateLabel: (id: string, label: string) => void;
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
   /** Project Risk & Control catalog items available to attach to a step. */
@@ -776,6 +778,7 @@ export function PropertiesPanel({
   element,
   connector,
   diagramType,
+  diagramId,
   onUpdateLabel,
   onUpdateProperties,
   onLinkSharePointFile,
@@ -1031,6 +1034,10 @@ export function PropertiesPanel({
     if (!onUpdateDiagramTitle) return null;
     return (
       <div className="pb-0.5">
+        {/* Diff Process Results — saved comparison runs for this diagram (BPMN). */}
+        {diagramType === "bpmn" && diagramId && (
+          <div className="mb-1.5"><DiffRunsButton diagramId={diagramId} /></div>
+        )}
         <SubHeader label="Title" open={titleSubOpen} onToggle={() => setTitleSubOpen(o => !o)} />
         {titleSubOpen && (<>
         <div className="flex items-center gap-1 mb-0.5">

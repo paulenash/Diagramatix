@@ -5579,6 +5579,7 @@ export function DiagramEditor({
             element={selectedElement}
             connector={selectedConnector}
             diagramType={diagramType}
+            diagramId={diagramId}
             multiSelectionCount={selectedElementIds.size}
             onUpdateLabel={handleUpdateLabel}
             onUpdateProperties={updateProperties}

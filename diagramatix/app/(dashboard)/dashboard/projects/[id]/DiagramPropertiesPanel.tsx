@@ -16,6 +16,7 @@
  */
 import { useState } from "react";
 import { RichTextEditor } from "@/app/components/canvas/RichTextEditor";
+import { DiffRunsButton } from "@/app/components/diff/DiffRunsButton";
 import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
@@ -109,6 +110,13 @@ export function DiagramPropertiesPanel({
       </div>
 
       {err && <div className="mb-2 text-[10px] text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">{err}</div>}
+
+      {/* Diff Process Results — saved comparison runs for this diagram (BPMN). */}
+      {isBpmn && (
+        <div className="mb-3">
+          <DiffRunsButton diagramId={diagram.id} />
+        </div>
+      )}
 
       {/* Title */}
       <div className="mb-3">
