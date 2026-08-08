@@ -3232,9 +3232,17 @@ export function DiagramEditor({
 
   // Build an export in-memory and show it in the preview pop-up instead of
   // downloading — so it can be demonstrated on camera during a screencast.
-  async function handlePreview(format: "pdf" | "svg" | "json" | "xml" | "bpmn") {
+  async function handlePreview(format: "pdf" | "svg" | "json" | "xml" | "bpmn" | "visio") {
     closeFm();
     try {
+      if (format === "visio") {
+        // Fake-Visio window: the live canvas SVG shown as if open in Visio.
+        const svgEl = document.querySelector<SVGSVGElement>("svg[data-canvas]");
+        if (!svgEl) return;
+        const svg = exportSvg(svgEl, diagramName, "string") as string;
+        setPreviewPayload({ kind: "vsdx", title: `${diagramName}.vsdx`, text: svg });
+        return;
+      }
       if (format === "svg" || format === "pdf") {
         const svgEl = document.querySelector<SVGSVGElement>("svg[data-canvas]");
         if (!svgEl) return;
@@ -5063,7 +5071,10 @@ export function DiagramEditor({
                                 )}
                                 {diagramType === "bpmn" && (
                                   <>
-                                    <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.6`; a.rel = "noopener"; a.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Export using the Diagramatix v1.6 stencil — recipient needs the v1.6 stencil installed in Visio.">Visio (for stencil v1.6)</button>
+                                    <div className="flex items-center hover:bg-gray-50">
+                                      <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.6`; a.rel = "noopener"; a.click(); }} className="flex-1 text-left px-3 py-2 text-xs text-gray-700" title="Export using the Diagramatix v1.6 stencil — recipient needs the v1.6 stencil installed in Visio.">Visio (for stencil v1.6)</button>
+                                      <button onClick={() => void handlePreview("visio")} className="px-2.5 py-2 text-gray-400 hover:text-blue-600" title="Preview in a fake Visio window (no download)">👁</button>
+                                    </div>
                                     {isActingAdmin && (
                                       <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=bpmn-m`; a.rel = "noopener"; a.click(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="SuperAdmin only — BPMN_M export needs further work before general release.">Visio (for stencil BPMN_M)</button>
                                     )}

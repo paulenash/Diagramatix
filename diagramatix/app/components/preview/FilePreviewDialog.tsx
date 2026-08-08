@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { renderHelpMarkdown } from "@/app/lib/help/renderMarkdown";
 import { formatXml } from "@/app/lib/preview/formatXml";
 import { highlightJson, highlightXml, highlightSql, PEACEFUL } from "@/app/lib/preview/highlight";
+import { VisioChrome } from "./VisioChrome";
 
 export type PreviewKind = "pdf" | "svg" | "json" | "xml" | "bpmn" | "ddl" | "markdown" | "docx" | "vsdx";
 
@@ -100,7 +101,7 @@ export function FilePreviewDialog({ payload, onClose }: { payload: PreviewPayloa
 
   return (
     <div data-no-capture className="fixed inset-0 bg-black/40 flex items-center justify-center z-[70] p-4" onMouseDown={onClose}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[88vh] flex flex-col" onMouseDown={(e) => e.stopPropagation()}>
+      <div className={`bg-white rounded-lg shadow-xl w-full ${kind === "vsdx" ? "max-w-6xl" : "max-w-4xl"} max-h-[88vh] flex flex-col`} onMouseDown={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
           <h3 className="text-sm font-semibold text-gray-900 truncate" title={title}>{title}</h3>
@@ -136,9 +137,7 @@ export function FilePreviewDialog({ payload, onClose }: { payload: PreviewPayloa
                 dangerouslySetInnerHTML={{ __html: docxHtml }} />
           )}
 
-          {kind === "vsdx" && (
-            <p className="text-xs text-gray-500">Preview for this type is added in a later update.</p>
-          )}
+          {kind === "vsdx" && <VisioChrome svg={text} title={title.replace(/\.vsdx$/i, "")} />}
         </div>
 
         {/* Footer */}
