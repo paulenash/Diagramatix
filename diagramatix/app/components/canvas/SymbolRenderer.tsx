@@ -317,7 +317,7 @@ function TaskShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill={resolveColor("task", colors)} stroke="#374151" strokeWidth={1.5} />
+        rx={4} ry={4} fill={(el.properties.fillColor as string | undefined) ?? resolveColor("task", colors)} stroke="#374151" strokeWidth={1.5} />
       <RepeatMarker el={el} cx={el.x + el.width / 2} cy={el.y + el.height - 10} />
       {/* ValueBadge rendered in main SymbolRenderer */}
     </g>
@@ -384,7 +384,7 @@ function GatewayShape({ el }: { el: DiagramElement }) {
   const points = `${cx},${el.y} ${el.x + el.width},${cy} ${cx},${el.y + el.height} ${el.x},${cy}`;
   return (
     <g>
-      <polygon points={points} fill={resolveColor("gateway", colors)} stroke="#374151" strokeWidth={1.5} />
+      <polygon points={points} fill={(el.properties.fillColor as string | undefined) ?? resolveColor("gateway", colors)} stroke="#374151" strokeWidth={1.5} />
       {el.gatewayType && <GatewayMarker type={el.gatewayType} cx={cx} cy={cy} />}
     </g>
   );
@@ -560,7 +560,7 @@ function StartEventShape({ el }: { el: DiagramElement }) {
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const r  = el.width / 2;
-  const fill = resolveColor("start-event", colors);
+  const fill = (el.properties.fillColor as string | undefined) ?? resolveColor("start-event", colors);
   const nonInterrupting = el.properties.interruptionType === "non-interrupting";
   return (
     <g>
@@ -577,7 +577,7 @@ function EndEventShape({ el }: { el: DiagramElement }) {
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const r  = el.width / 2;
-  const fill = resolveColor("end-event", colors);
+  const fill = (el.properties.fillColor as string | undefined) ?? resolveColor("end-event", colors);
   return (
     <g>
       <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={3.5} />
@@ -592,7 +592,7 @@ function IntermediateEventShape({ el }: { el: DiagramElement }) {
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const r  = el.width / 2;
-  const fill = resolveColor("intermediate-event", colors);
+  const fill = (el.properties.fillColor as string | undefined) ?? resolveColor("intermediate-event", colors);
   const nonInterrupting = el.properties.interruptionType === "non-interrupting";
   const dash = nonInterrupting ? "4 3" : undefined;
   return (
@@ -962,7 +962,7 @@ function StateShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   return (
     <rect x={el.x} y={el.y} width={el.width} height={el.height}
-      rx={12} ry={12} fill={resolveColor("state", colors)} stroke="#374151" strokeWidth={1.5} />
+      rx={12} ry={12} fill={(el.properties.fillColor as string | undefined) ?? resolveColor("state", colors)} stroke="#374151" strokeWidth={1.5} />
   );
 }
 

@@ -14,6 +14,7 @@ import { parseXes } from "@/app/lib/mining/formats/xes";
 import { parseOcel } from "@/app/lib/mining/formats/ocel";
 import { validateEventLogMapping } from "@/app/lib/mining/validateLog";
 import { MiningSourcesPanel } from "./MiningSourcesPanel";
+import { MiningInsightsPanel } from "./insights/MiningInsightsPanel";
 import type { LogMapping, MiningStats } from "@/app/lib/mining/types";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -832,6 +833,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 <div className="mt-3 rounded border border-amber-500/40 bg-stone-900/70 p-3 text-[11px] text-stone-200 leading-relaxed whitespace-pre-wrap">{explanation}</div>
               )}
             </div>
+
+            {/* Insights — bottleneck/frequency heat over the discovered model (+ Variants/Cases/Outcomes/Export). */}
+            <MiningInsightsPanel projectId={projectId} run={selected} />
 
             {/* Admin: capture this run into the Mining-Example catalog */}
             {isAdmin && <SaveRunAsExample projectId={projectId} runId={selected.id} defaultTitle={selected.name} />}
