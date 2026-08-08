@@ -3,34 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
-import { diffProcesses, eventTrigger, type DiffStatus } from "@/app/lib/diagram/diff/processDiff";
+import { diffProcesses } from "@/app/lib/diagram/diff/processDiff";
 import { diffToCsv } from "@/app/lib/diagram/diff/processDiffFormat";
 import { mergeProcesses, type MergeDecision, type MergeKind } from "@/app/lib/diagram/diff/mergeProcess";
+import { ProcessDiffResults } from "@/app/components/diff/ProcessDiffResults";
 
 interface Sibling { id: string; name: string }
-
-const STATUS_STYLE: Record<DiffStatus, string> = {
-  added: "bg-green-50 text-green-700",
-  removed: "bg-red-50 text-red-700",
-  changed: "bg-amber-50 text-amber-800",
-  unchanged: "text-gray-500",
-};
-const STATUS_LABEL: Record<DiffStatus, string> = {
-  added: "Added", removed: "Removed", changed: "Changed", unchanged: "Same",
-};
-
-/** Before/after cell — shows a single value if unchanged, else "a → b". */
-function Cell({ a, b, changed }: { a?: string; b?: string; changed: boolean }) {
-  const A = a || "—", B = b || "—";
-  if (!changed || A === B) return <span className="text-gray-600">{A}</span>;
-  return (
-    <span>
-      <span className="text-gray-400 line-through">{A}</span>
-      <span className="text-gray-400"> → </span>
-      <span className="text-gray-900 font-medium">{B}</span>
-    </span>
-  );
-}
 
 function download(name: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
@@ -71,6 +49,11 @@ export function ProcessDiffDialog({
   const [accepted, setAccepted] = useState<Set<number>>(new Set());
   const [merging, setMerging] = useState(false);
   const [mergeDone, setMergeDone] = useState<{ id: string } | null>(null);
+  // Persisted run for the CURRENT comparison. Created on explicit Save or auto on
+  // AI Summary / Export; reset whenever the compared pair or direction changes.
+  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+  const [savingRun, setSavingRun] = useState(false);
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
   // Project scope. Defaults to the current project (its BPMN diagrams arrive as
   // `siblings`). Selecting another project fetches that project's BPMN diagrams.
@@ -91,8 +74,11 @@ export function ProcessDiffDialog({
   // the picked project's BPMN diagrams (fetched, current diagram excluded).
   const diagramOptions = projectId === CURRENT ? siblings : projectDiagrams;
 
+  // A new comparison invalidates the saved-run handle + saved message.
+  function resetRun() { setCurrentRunId(null); setSavedMsg(null); }
+
   async function pickProject(pid: string) {
-    setProjectId(pid); setOtherId(""); setOtherData(null); setAiSummary(null); setErr(null);
+    setProjectId(pid); setOtherId(""); setOtherData(null); setAiSummary(null); setErr(null); resetRun();
     if (pid === CURRENT) { setProjectDiagrams([]); return; }
     setLoadingList(true);
     try {
@@ -112,7 +98,7 @@ export function ProcessDiffDialog({
   }
 
   async function pickOther(id: string) {
-    setOtherId(id); setOtherData(null); setAiSummary(null); setErr(null);
+    setOtherId(id); setOtherData(null); setAiSummary(null); setErr(null); resetRun();
     if (!id) return;
     setLoading(true);
     try {
@@ -142,6 +128,25 @@ export function ProcessDiffDialog({
   const aId = swapped ? otherId : currentId;
   const bId = swapped ? currentId : otherId;
 
+  /** Ensure a saved run exists for this comparison (create once), returning its
+   *  id. `explicit` shows the "Saved" confirmation. Used by Save + auto-save. */
+  async function ensureRunSaved(explicit = false): Promise<string | null> {
+    if (currentRunId) { if (explicit) setSavedMsg("Saved"); return currentRunId; }
+    if (!diff || !otherId) return null;
+    setSavingRun(true); setErr(null);
+    try {
+      const res = await fetch("/api/diagrams/diff/runs", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aId, bId, aiSummary: aiSummary ?? undefined }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Save failed");
+      setCurrentRunId(j.id); if (explicit) setSavedMsg("Saved");
+      return j.id as string;
+    } catch (e) { setErr(e instanceof Error ? e.message : "Save failed"); return null; }
+    finally { setSavingRun(false); }
+  }
+
   async function exportDocx() {
     setBusy("docx"); setErr(null);
     try {
@@ -152,6 +157,7 @@ export function ProcessDiffDialog({
       });
       if (!res.ok) throw new Error("Export failed");
       download(`${diff!.a.title}-vs-${diff!.b.title}.docx`, await res.blob());
+      void ensureRunSaved(); // auto-save on export
     } catch (e) { setErr(e instanceof Error ? e.message : "Export failed"); }
     finally { setBusy(null); }
   }
@@ -159,6 +165,7 @@ export function ProcessDiffDialog({
   function exportCsv() {
     if (!diff) return;
     download(`${diff.a.title}-vs-${diff.b.title}.csv`, new Blob([diffToCsv(diff)], { type: "text/csv" }));
+    void ensureRunSaved(); // auto-save on export
   }
 
   function toggleRow(i: number) {
@@ -208,7 +215,22 @@ export function ProcessDiffDialog({
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "Summary failed");
-      setAiSummary(j.summary as string);
+      const summary = j.summary as string;
+      setAiSummary(summary);
+      // Auto-save on AI: create the run (carrying the summary), or attach the
+      // summary to an already-saved run.
+      if (currentRunId) {
+        void fetch(`/api/diagrams/diff/runs/${currentRunId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ aiSummary: summary, aiModel: j.model }),
+        });
+      } else {
+        const res2 = await fetch("/api/diagrams/diff/runs", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ aId, bId, aiSummary: summary, aiModel: j.model }),
+        });
+        if (res2.ok) setCurrentRunId((await res2.json()).id);
+      }
     } catch (e) { setErr(e instanceof Error ? e.message : "Summary failed"); }
     finally { setBusy(null); }
   }
@@ -250,7 +272,7 @@ export function ProcessDiffDialog({
             {diagramOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           {diff && (
-            <button onClick={() => setSwapped((s) => !s)} className="text-blue-600 hover:text-blue-800 underline"
+            <button onClick={() => { setSwapped((s) => !s); resetRun(); }} className="text-blue-600 hover:text-blue-800 underline"
               title="Swap which version is treated as 'before'">⇄ Swap before/after</button>
           )}
           {!loadingList && diagramOptions.length === 0 && (
@@ -265,255 +287,8 @@ export function ProcessDiffDialog({
           {!diff && !loading && <p className="text-xs text-gray-400">Pick a diagram to compare.</p>}
 
           {diff && (
-            <>
-              {/* Direction + summary */}
-              <div className="text-xs text-gray-600 mb-2">
-                <span className="font-medium">{diff.a.title}</span> (before) →{" "}
-                <span className="font-medium">{diff.b.title}</span> (after)
-              </div>
-              <div className="flex flex-wrap gap-2 mb-3 text-[11px]">
-                <span className="px-2 py-0.5 rounded bg-green-50 text-green-700">{diff.summary.added} added</span>
-                <span className="px-2 py-0.5 rounded bg-red-50 text-red-700">{diff.summary.removed} removed</span>
-                <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800">{diff.summary.changed} changed</span>
-                <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600">{diff.summary.unchanged} unchanged</span>
-              </div>
-              {(diff.roleDiff.added.length > 0 || diff.roleDiff.removed.length > 0 || diff.systemDiff.added.length > 0 || diff.systemDiff.removed.length > 0 || diff.dataObjectDiff.added.length > 0 || diff.dataObjectDiff.removed.length > 0) && (
-                <div className="text-[11px] text-gray-600 mb-3 space-y-0.5">
-                  {(diff.roleDiff.added.length > 0 || diff.roleDiff.removed.length > 0) && (
-                    <div><span className="font-medium">Roles:</span>{" "}
-                      {diff.roleDiff.added.map((r) => <span key={r} className="text-green-700">+{r} </span>)}
-                      {diff.roleDiff.removed.map((r) => <span key={r} className="text-red-600">−{r} </span>)}
-                    </div>
-                  )}
-                  {(diff.systemDiff.added.length > 0 || diff.systemDiff.removed.length > 0) && (
-                    <div><span className="font-medium">Systems:</span>{" "}
-                      {diff.systemDiff.added.map((r) => <span key={r} className="text-green-700">+{r} </span>)}
-                      {diff.systemDiff.removed.map((r) => <span key={r} className="text-red-600">−{r} </span>)}
-                    </div>
-                  )}
-                  {(diff.dataObjectDiff.added.length > 0 || diff.dataObjectDiff.removed.length > 0) && (
-                    <div><span className="font-medium">Data objects:</span>{" "}
-                      {diff.dataObjectDiff.added.map((r) => <span key={r} className="text-green-700">+{r} </span>)}
-                      {diff.dataObjectDiff.removed.map((r) => <span key={r} className="text-red-600">−{r} </span>)}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Review status — evidence of review (Comments / Pain Points /
-                  Issues / Bottlenecks) and what its change implies. */}
-              {(() => {
-                const rd = diff.reviewDiff;
-                const hasAny = rd.added.length || rd.removed.length ||
-                  Object.values(rd.aCounts).some((n) => n > 0) || Object.values(rd.bCounts).some((n) => n > 0);
-                if (!hasAny) return null;
-                const kindLabel: Record<string, string> = { "review-comment": "Review Comment", "pain-point": "Pain Point", issue: "Issue", bottleneck: "Bottleneck" };
-                return (
-                  <div className="mb-3 p-2.5 bg-purple-50 border border-purple-100 rounded">
-                    <div className="text-[11px] font-medium text-purple-800 mb-1">Review status</div>
-                    <div className="text-[11px] text-gray-700 mb-1.5">{rd.status}</div>
-                    {(rd.added.length > 0 || rd.removed.length > 0) && (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-[10px] border-collapse">
-                          <thead>
-                            <tr className="text-gray-500 text-left">
-                              <th className="px-1.5 py-1 font-medium"> </th>
-                              <th className="px-1.5 py-1 font-medium">Kind</th>
-                              <th className="px-1.5 py-1 font-medium">Note</th>
-                              <th className="px-1.5 py-1 font-medium">Near</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rd.removed.map((r, i) => (
-                              <tr key={`rr${i}`} className="border-t border-purple-100">
-                                <td className="px-1.5 py-1"><span className="px-1 py-0.5 rounded bg-red-50 text-red-700">Removed</span></td>
-                                <td className="px-1.5 py-1 text-gray-600">{kindLabel[r.kind]}</td>
-                                <td className="px-1.5 py-1 text-gray-700">{r.text || "—"}</td>
-                                <td className="px-1.5 py-1 text-gray-500">{r.location || "—"}</td>
-                              </tr>
-                            ))}
-                            {rd.added.map((r, i) => (
-                              <tr key={`ra${i}`} className="border-t border-purple-100">
-                                <td className="px-1.5 py-1"><span className="px-1 py-0.5 rounded bg-green-50 text-green-700">Added</span></td>
-                                <td className="px-1.5 py-1 text-gray-600">{kindLabel[r.kind]}</td>
-                                <td className="px-1.5 py-1 text-gray-700">{r.text || "—"}</td>
-                                <td className="px-1.5 py-1 text-gray-500">{r.location || "—"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* Table */}
-              <div className="overflow-x-auto border border-gray-200 rounded">
-                <table className="w-full text-[11px] border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 text-gray-600 text-left">
-                      {mergeMode && <th className="px-2 py-1.5 font-medium w-8" title="Include this change in the merge">Take</th>}
-                      <th className="px-2 py-1.5 font-medium">Activity</th>
-                      <th className="px-2 py-1.5 font-medium">Change</th>
-                      <th className="px-2 py-1.5 font-medium">Who (role)</th>
-                      <th className="px-2 py-1.5 font-medium">Type</th>
-                      <th className="px-2 py-1.5 font-medium">Systems</th>
-                      <th className="px-2 py-1.5 font-medium">Data</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {diff.rows.map((r, i) => (
-                      <tr key={i} className="border-t border-gray-100 align-top">
-                        {mergeMode && (
-                          <td className="px-2 py-1.5">
-                            {r.status !== "unchanged" && (
-                              <input type="checkbox" checked={accepted.has(i)} onChange={() => toggleRow(i)}
-                                title="Include this change in the merged diagram" />
-                            )}
-                          </td>
-                        )}
-                        <td className="px-2 py-1.5 text-gray-900">{r.activity}</td>
-                        <td className="px-2 py-1.5"><span className={`px-1.5 py-0.5 rounded ${STATUS_STYLE[r.status]}`}>{STATUS_LABEL[r.status]}</span></td>
-                        <td className="px-2 py-1.5"><Cell a={r.who.a} b={r.who.b} changed={r.who.changed} /></td>
-                        <td className="px-2 py-1.5">
-                          <Cell a={r.taskType.a} b={r.taskType.b} changed={r.taskType.changed} />
-                          {r.automationNote && <div className="text-[10px] text-indigo-600 italic mt-0.5">{r.automationNote}</div>}
-                        </td>
-                        <td className="px-2 py-1.5"><Cell a={(r.systems.a ?? []).join(", ")} b={(r.systems.b ?? []).join(", ")} changed={r.systems.changed} /></td>
-                        <td className="px-2 py-1.5"><Cell a={(r.data.a ?? []).join(", ")} b={(r.data.b ?? []).join(", ")} changed={r.data.changed} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Message flows — added / removed / relabelled between versions. */}
-              {(diff.messageDiff.added.length > 0 || diff.messageDiff.removed.length > 0 || diff.messageDiff.changed.length > 0) && (
-                <div className="mt-3">
-                  <div className="text-[11px] font-medium text-gray-700 mb-1">Message flows</div>
-                  <div className="overflow-x-auto border border-gray-200 rounded">
-                    <table className="w-full text-[11px] border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 text-gray-600 text-left">
-                          <th className="px-2 py-1.5 font-medium">Change</th>
-                          <th className="px-2 py-1.5 font-medium">From</th>
-                          <th className="px-2 py-1.5 font-medium">To</th>
-                          <th className="px-2 py-1.5 font-medium">Message</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {diff.messageDiff.removed.map((m, i) => (
-                          <tr key={`r${i}`} className="border-t border-gray-100">
-                            <td className="px-2 py-1.5"><span className="px-1.5 py-0.5 rounded bg-red-50 text-red-700">Removed</span></td>
-                            <td className="px-2 py-1.5 text-gray-700">{m.from}</td>
-                            <td className="px-2 py-1.5 text-gray-700">{m.to}</td>
-                            <td className="px-2 py-1.5 text-gray-600">{m.label || "—"}</td>
-                          </tr>
-                        ))}
-                        {diff.messageDiff.added.map((m, i) => (
-                          <tr key={`a${i}`} className="border-t border-gray-100">
-                            <td className="px-2 py-1.5"><span className="px-1.5 py-0.5 rounded bg-green-50 text-green-700">Added</span></td>
-                            <td className="px-2 py-1.5 text-gray-700">{m.from}</td>
-                            <td className="px-2 py-1.5 text-gray-700">{m.to}</td>
-                            <td className="px-2 py-1.5 text-gray-600">{m.label || "—"}</td>
-                          </tr>
-                        ))}
-                        {diff.messageDiff.changed.map((m, i) => (
-                          <tr key={`c${i}`} className="border-t border-gray-100">
-                            <td className="px-2 py-1.5"><span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">Changed</span></td>
-                            <td className="px-2 py-1.5 text-gray-700">{m.from}</td>
-                            <td className="px-2 py-1.5 text-gray-700">{m.to}</td>
-                            <td className="px-2 py-1.5"><span className="text-gray-400 line-through">{m.a || "—"}</span><span className="text-gray-400"> → </span><span className="text-gray-900 font-medium">{m.b || "—"}</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Intermediate + boundary event changes — new/removed/retriggered
-                  timers, errors, escalations, cancellations. */}
-              {(diff.eventDiff.added.length > 0 || diff.eventDiff.removed.length > 0 || diff.eventDiff.changed.length > 0) && (
-                <div className="mt-3">
-                  <div className="text-[11px] font-medium text-gray-700 mb-1">Intermediate &amp; boundary events</div>
-                  <div className="overflow-x-auto border border-gray-200 rounded">
-                    <table className="w-full text-[11px] border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 text-gray-600 text-left">
-                          <th className="px-2 py-1.5 font-medium">Change</th>
-                          <th className="px-2 py-1.5 font-medium">Kind</th>
-                          <th className="px-2 py-1.5 font-medium">Where</th>
-                          <th className="px-2 py-1.5 font-medium">Trigger</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {diff.eventDiff.removed.map((e, i) => (
-                          <tr key={`er${i}`} className="border-t border-gray-100">
-                            <td className="px-2 py-1.5"><span className="px-1.5 py-0.5 rounded bg-red-50 text-red-700">Removed</span></td>
-                            <td className="px-2 py-1.5 text-gray-600">{e.kind === "boundary" ? "Boundary" : "Intermediate"}</td>
-                            <td className="px-2 py-1.5 text-gray-700">{e.kind === "boundary" ? `on ${e.host}` : (e.label || "(inline)")}</td>
-                            <td className="px-2 py-1.5 text-gray-600">{eventTrigger(e)}</td>
-                          </tr>
-                        ))}
-                        {diff.eventDiff.added.map((e, i) => (
-                          <tr key={`ea${i}`} className="border-t border-gray-100">
-                            <td className="px-2 py-1.5"><span className="px-1.5 py-0.5 rounded bg-green-50 text-green-700">Added</span></td>
-                            <td className="px-2 py-1.5 text-gray-600">{e.kind === "boundary" ? "Boundary" : "Intermediate"}</td>
-                            <td className="px-2 py-1.5 text-gray-700">{e.kind === "boundary" ? `on ${e.host}` : (e.label || "(inline)")}</td>
-                            <td className="px-2 py-1.5 text-gray-900 font-medium">{eventTrigger(e)}</td>
-                          </tr>
-                        ))}
-                        {diff.eventDiff.changed.map((e, i) => (
-                          <tr key={`ec${i}`} className="border-t border-gray-100">
-                            <td className="px-2 py-1.5"><span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">Changed</span></td>
-                            <td className="px-2 py-1.5 text-gray-600">{e.kind === "boundary" ? "Boundary" : "Intermediate"}</td>
-                            <td className="px-2 py-1.5 text-gray-700">{e.kind === "boundary" ? `on ${e.where}` : (e.where || "(inline)")}</td>
-                            <td className="px-2 py-1.5"><span className="text-gray-400 line-through">{e.a}</span><span className="text-gray-400"> → </span><span className="text-gray-900 font-medium">{e.b}</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Automation shifts — task-marker changes that signal IT support
-                  or automation being added/removed. */}
-              {diff.automationChanges.length > 0 && (
-                <div className="mt-3">
-                  <div className="text-[11px] font-medium text-gray-700 mb-1">Automation changes</div>
-                  <div className="overflow-x-auto border border-indigo-100 rounded bg-indigo-50/40">
-                    <table className="w-full text-[11px] border-collapse">
-                      <thead>
-                        <tr className="text-gray-600 text-left">
-                          <th className="px-2 py-1.5 font-medium">Activity</th>
-                          <th className="px-2 py-1.5 font-medium">Marker</th>
-                          <th className="px-2 py-1.5 font-medium">What it signals</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {diff.automationChanges.map((c, i) => (
-                          <tr key={i} className="border-t border-indigo-100">
-                            <td className="px-2 py-1.5 text-gray-900">{c.activity}</td>
-                            <td className="px-2 py-1.5 text-gray-600">{c.from} → <span className="text-gray-900 font-medium">{c.to}</span></td>
-                            <td className="px-2 py-1.5 text-indigo-700">{c.note}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {aiSummary && (
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded text-[11px] text-gray-800 whitespace-pre-wrap">
-                  <div className="font-medium text-blue-800 mb-1">AI summary</div>
-                  {aiSummary}
-                </div>
-              )}
-            </>
+            <ProcessDiffResults diff={diff} aiSummary={aiSummary}
+              merge={{ mergeMode, accepted, onToggleRow: toggleRow }} />
           )}
         </div>
 
@@ -543,6 +318,12 @@ export function ProcessDiffDialog({
           </div>
           <div className="flex items-center gap-2">
             {diff && (<>
+              {savedMsg && <span className="text-[11px] text-green-600">{savedMsg}</span>}
+              <button onClick={() => void ensureRunSaved(true)} disabled={savingRun || !!currentRunId}
+                className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50 disabled:opacity-50"
+                title="Save this comparison to the diagram's Diff Process Results history">
+                {savingRun ? "Saving…" : currentRunId ? "Saved ✓" : "Save run"}
+              </button>
               <button onClick={exportCsv} className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50">Export CSV</button>
               <button onClick={exportDocx} disabled={busy === "docx"} className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50 disabled:opacity-50">
                 {busy === "docx" ? "Exporting…" : "Export Word"}
