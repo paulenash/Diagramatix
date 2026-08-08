@@ -13,6 +13,7 @@ import { computePerformance } from "./performance";
 import { computeAnalytics } from "./analytics";
 import { computeGovernance, hasGovernance } from "./governance";
 import { discoverProcess } from "./discoverProcess";
+import { badgeEdgeCounts } from "./edgeBadges";
 import { discoverStateMachine } from "./discoverStateMachine";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { checkTransitionConformance, type ReferenceSm } from "./transitionConformance";
@@ -59,7 +60,7 @@ export async function refreshRunFromSource(source: RefreshableSource): Promise<R
     // Re-discover the BPMN in place (deterministic).
     if (run.discoveredBpmnId) {
       const { plan } = discoverProcess(log.variants, { edgeThreshold: 0 });
-      const data = layoutBpmnDiagram(plan.elements, plan.connections, { promptLabel: source.name });
+      const data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections, { promptLabel: source.name }));
       await pgPool.query('UPDATE "Diagram" SET data = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(data), run.discoveredBpmnId]);
     }
     // Re-discover the state machine in place (deterministic mirror + frequencies).

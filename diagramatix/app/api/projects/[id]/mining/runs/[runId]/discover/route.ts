@@ -21,6 +21,7 @@ import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { enterAiContext, AI_INVOCATION_POINTS, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 import { discoverProcess } from "@/app/lib/mining/discoverProcess";
+import { badgeEdgeCounts } from "@/app/lib/mining/edgeBadges";
 import { generateProcessViaAi } from "@/app/lib/mining/aiProcess";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
@@ -95,7 +96,7 @@ export async function POST(req: Request, { params }: Params) {
     nameSuffix = "discovered (AI)";
   } else {
     const { plan } = discoverProcess(variants, { edgeThreshold });
-    data = layoutBpmnDiagram(plan.elements, plan.connections, { promptLabel: run.name });
+    data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections, { promptLabel: run.name }));
   }
 
   const diagram = await prisma.diagram.create({

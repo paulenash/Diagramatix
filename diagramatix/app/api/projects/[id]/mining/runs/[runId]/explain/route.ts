@@ -90,7 +90,10 @@ export async function POST(_req: Request, { params }: Params) {
     if (userId) await recordUsage(userId, "aiAttempts");
     return NextResponse.json({ explanation });
   } catch (err) {
+    // AI unreachable (e.g. a gateway model with no local connectivity) — never leave
+    // the user with a spinner and nothing: fall back to the deterministic summary,
+    // 200, with a note so the failure is visible but the result still returns.
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Explain failed: ${msg}` }, { status: 502 });
+    return NextResponse.json({ explanation: summariseMiningResults(base), deterministic: true, aiError: msg });
   }
 }
