@@ -13,6 +13,14 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2128 — 2026-08-08 — Export menu: Preview / Download flyouts
+- Every File ▸ Export format (PDF, SVG, JSON, XML, XSD, BPMN, Visio) now opens a small flyout with
+  two explicit choices — **👁 Preview** (the in-app pop-up) and **⬇ Download** (export as usual) —
+  replacing the easily-missed inline eye icon (JSON preview was there but hard to spot).
+- New standalone **XSD (schema)** leaf: Preview renders the live `/api/schema` XSD; Download saves
+  the `.xsd` (it also rides along with the XML download).
+- Schema: no bump (menu UI only).
+
 ## 1.44.2127 — 2026-08-08 — Version-tracking process + history
 - Added [`schema/UPDATE_EVERYTHING.md`](schema/UPDATE_EVERYTHING.md) — the canonical, repeatable
   "update everything" procedure (Steps 0–12: version bump decision, the four schema-sync files,

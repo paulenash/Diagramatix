@@ -617,6 +617,42 @@ async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData, 
   }
 }
 
+/**
+ * One export format row in the File ▸ Export menu that opens a small flyout
+ * (on hover) offering two explicit actions: 👁 Preview (the in-app pop-up) and
+ * ⬇ Download (the real export). Replaces the easily-missed inline eye icon so
+ * every export makes both actions discoverable. The flyout opens to the LEFT
+ * (the File menu sits near the right edge, so its submenus cascade leftward).
+ */
+function ExportLeaf({ label, title, tone, onPreview, onDownload }: {
+  label: string;
+  title?: string;
+  tone?: "default" | "admin";
+  onPreview: () => void;
+  onDownload: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const base = tone === "admin" ? "text-red-700" : "text-gray-700";
+  return (
+    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button title={title}
+        className={`flex w-full items-center justify-between px-3 py-2 text-xs ${open ? "bg-blue-50 text-blue-700 font-medium" : `${base} hover:bg-gray-50`}`}>
+        <span>{label}</span><span className="text-gray-400">◂</span>
+      </button>
+      {open && (
+        <div className="absolute bg-white border border-gray-200 rounded shadow-lg py-1 z-[10002]" style={{ top: -1, right: "100%", minWidth: 132 }}>
+          <button onClick={onPreview} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Preview in a pop-up (no download)">
+            <span>👁</span><span>Preview</span>
+          </button>
+          <button onClick={onDownload} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download the file (export as usual)">
+            <span>⬇</span><span>Download</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DiagramEditor({
   diagramId,
   initialAiComparison,
@@ -3232,9 +3268,17 @@ export function DiagramEditor({
 
   // Build an export in-memory and show it in the preview pop-up instead of
   // downloading — so it can be demonstrated on camera during a screencast.
-  async function handlePreview(format: "pdf" | "svg" | "json" | "xml" | "bpmn" | "visio") {
+  async function handlePreview(format: "pdf" | "svg" | "json" | "xml" | "bpmn" | "visio" | "xsd") {
     closeFm();
     try {
+      if (format === "xsd") {
+        // The export XSD, rendered live by /api/schema (version placeholders resolved).
+        const res = await fetch("/api/schema", { cache: "no-store" });
+        if (!res.ok) return;
+        const xsd = await res.text();
+        setPreviewPayload({ kind: "xml", title: "diagramatix-export.xsd", text: xsd, downloadName: "diagramatix-export.xsd", downloadMime: "application/xml" });
+        return;
+      }
       if (format === "visio") {
         // Fake-Visio window: the live canvas SVG shown as if open in Visio.
         const svgEl = document.querySelector<SVGSVGElement>("svg[data-canvas]");
@@ -5042,39 +5086,38 @@ export function DiagramEditor({
                           <div className="absolute bg-white border border-gray-200 rounded shadow-lg py-1 z-[10001]" style={{ top: "100%", left: -100, minWidth: 160 }}>
                             {sect === "export" ? (
                               <>
-                                <div className="flex items-center hover:bg-gray-50">
-                                  <button onClick={() => { closeFm(); openExport("pdf"); }} className="flex-1 text-left px-3 py-2 text-xs text-gray-700" title="Export as PDF (choose scale + which annotations to include)">PDF</button>
-                                  <button onClick={() => void handlePreview("pdf")} className="px-2.5 py-2 text-gray-400 hover:text-blue-600" title="Preview in a pop-up (no download)">👁</button>
-                                </div>
-                                <div className="flex items-center hover:bg-gray-50">
-                                  <button onClick={() => { closeFm(); openExport("svg"); }} className="flex-1 text-left px-3 py-2 text-xs text-gray-700">SVG</button>
-                                  <button onClick={() => void handlePreview("svg")} className="px-2.5 py-2 text-gray-400 hover:text-blue-600" title="Preview in a pop-up (no download)">👁</button>
-                                </div>
-                                <div className="flex items-center hover:bg-gray-50">
-                                  <button onClick={() => { closeFm(); openExport("json"); }} className="flex-1 text-left px-3 py-2 text-xs text-gray-700" title="Download diagram as a single-diagram JSON file">JSON</button>
-                                  <button onClick={() => void handlePreview("json")} className="px-2.5 py-2 text-gray-400 hover:text-blue-600" title="Preview in a pop-up (no download)">👁</button>
-                                </div>
+                                <ExportLeaf label="PDF" title="Export as PDF (Preview, or Download to choose scale + annotations)"
+                                  onPreview={() => void handlePreview("pdf")}
+                                  onDownload={() => { closeFm(); openExport("pdf"); }} />
+                                <ExportLeaf label="SVG" title="Export as SVG"
+                                  onPreview={() => void handlePreview("svg")}
+                                  onDownload={() => { closeFm(); openExport("svg"); }} />
+                                <ExportLeaf label="JSON" title="Diagram as a single-diagram JSON file"
+                                  onPreview={() => void handlePreview("json")}
+                                  onDownload={() => { closeFm(); openExport("json"); }} />
                                 {isActingAdmin && (
                                   <button onClick={() => { closeFm(); void handleExportBundle(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="SuperAdmin only — export the diagram together with its AI prompt, plan, comparison matrix & per-model diagrams as ONE bundle. Re-import via a project's 'Import Diagram Bundle'.">Diagram Bundle (AI)</button>
                                 )}
                                 {diagramType === "bpmn" && (
-                                  <div className="flex items-center hover:bg-gray-50">
-                                    <button onClick={() => { handleExportXml(); closeFm(); }} className="flex-1 text-left px-3 py-2 text-xs text-gray-700" title="Download diagram XML and the matching XSD schema">XML (Diagramatix)</button>
-                                    <button onClick={() => void handlePreview("xml")} className="px-2.5 py-2 text-gray-400 hover:text-blue-600" title="Preview in a pop-up (no download)">👁</button>
-                                  </div>
+                                  <ExportLeaf label="XML (Diagramatix)" title="Diagram XML (the matching XSD downloads alongside it)"
+                                    onPreview={() => void handlePreview("xml")}
+                                    onDownload={() => { handleExportXml(); closeFm(); }} />
                                 )}
                                 {diagramType === "bpmn" && (
-                                  <div className="flex items-center hover:bg-gray-50">
-                                    <button onClick={() => { void handleExportBpmn(); closeFm(); }} className="flex-1 text-left px-3 py-2 text-xs text-gray-700" title="Download standard OMG BPMN 2.0 XML (.bpmn) — opens in Camunda, bpmn.io, Signavio, etc.">BPMN 2.0 XML</button>
-                                    <button onClick={() => void handlePreview("bpmn")} className="px-2.5 py-2 text-gray-400 hover:text-blue-600" title="Preview in a pop-up (no download)">👁</button>
-                                  </div>
+                                  <ExportLeaf label="XSD (schema)" title="The export XSD schema (bundled with the XML download)"
+                                    onPreview={() => void handlePreview("xsd")}
+                                    onDownload={() => { closeFm(); const a = document.createElement("a"); a.href = "/api/schema"; a.download = "diagramatix-export.xsd"; a.click(); }} />
+                                )}
+                                {diagramType === "bpmn" && (
+                                  <ExportLeaf label="BPMN 2.0 XML" title="Standard OMG BPMN 2.0 XML (.bpmn) — opens in Camunda, bpmn.io, Signavio, etc."
+                                    onPreview={() => void handlePreview("bpmn")}
+                                    onDownload={() => { void handleExportBpmn(); closeFm(); }} />
                                 )}
                                 {diagramType === "bpmn" && (
                                   <>
-                                    <div className="flex items-center hover:bg-gray-50">
-                                      <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.6`; a.rel = "noopener"; a.click(); }} className="flex-1 text-left px-3 py-2 text-xs text-gray-700" title="Export using the Diagramatix v1.6 stencil — recipient needs the v1.6 stencil installed in Visio.">Visio (for stencil v1.6)</button>
-                                      <button onClick={() => void handlePreview("visio")} className="px-2.5 py-2 text-gray-400 hover:text-blue-600" title="Preview in a fake Visio window (no download)">👁</button>
-                                    </div>
+                                    <ExportLeaf label="Visio (for stencil v1.6)" title="Export using the Diagramatix v1.6 stencil — recipient needs the v1.6 stencil installed in Visio."
+                                      onPreview={() => void handlePreview("visio")}
+                                      onDownload={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.6`; a.rel = "noopener"; a.click(); }} />
                                     {isActingAdmin && (
                                       <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=bpmn-m`; a.rel = "noopener"; a.click(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="SuperAdmin only — BPMN_M export needs further work before general release.">Visio (for stencil BPMN_M)</button>
                                     )}
