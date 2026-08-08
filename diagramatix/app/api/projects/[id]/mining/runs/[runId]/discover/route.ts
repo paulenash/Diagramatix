@@ -96,7 +96,9 @@ export async function POST(req: Request, { params }: Params) {
     nameSuffix = "discovered (AI)";
   } else {
     const { plan } = discoverProcess(variants, { edgeThreshold });
-    data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections, { promptLabel: run.name }));
+    // No promptLabel — that stamps an "AI Generated" annotation, which is wrong for
+    // the deterministic (1:1-with-the-log) discovery. The AI path keeps its label.
+    data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections));
   }
 
   const diagram = await prisma.diagram.create({

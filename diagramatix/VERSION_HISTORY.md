@@ -13,6 +13,21 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2145 — 2026-08-09 — Mining: calibratable AI process, in-context variant/case highlight, fixes
+- **Variants / Cases** now highlight the selected path **in context** — the whole discovered model
+  is shown with everything off the path **faded**, and the path's count badges stand out (no more
+  isolating/fragmenting). The variant-path resolver walks **through gateways** so the highlight stays
+  connected; the highlight now carries into the **expanded** view and is driven by the selected case
+  *or* the variant filter (fixes Cases selection not reaching the expanded view).
+- **AI-discovered process is now calibratable:** the AI keeps the log's exact activity names, and the
+  mined directly-follows frequencies are re-attached to its edges — so cycle times, teams AND gateway
+  branch probabilities calibrate onto the AI model too. Tests T2241-T2242.
+- **Readiness warning** now identifies an unrouted gateway by its neighbours (`Decision after "X"
+  (→ A / B)`) instead of a cryptic id.
+- **Fix:** the deterministic (non-AI) discovered process is no longer stamped with an "AI Generated"
+  annotation.
+- Schema: no bump.
+
 ## 1.44.2144 — 2026-08-09 — Fix: gateway branch probabilities calibrate from badged edges
 - The digital-twin calibrator read the gateway split from the edge `label`, but the edge-count
   badge fix (1.44.2143 below) moves that number into `transitionCount` and clears the label — so a

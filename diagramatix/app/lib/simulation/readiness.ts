@@ -91,6 +91,10 @@ export function checkSimReadiness(diagrams: DiagramData[], teams: TeamLite[]): R
     }
 
     // 3. Decision gateways: branch routing.
+    // Describe the gateway by its neighbours (source → targets) so an UNLABELLED
+    // one (common in discovered/AI processes — it shows only a cryptic id) is
+    // still identifiable on the diagram.
+    const describe = (e?: DiagramElement) => !e ? "?" : e.type === "end-event" ? "End" : e.type === "start-event" ? "Start" : nameOf(e);
     for (const el of d.elements) {
       if (el.type !== "gateway" || (el.properties?.gatewayRole as string | undefined) === "merge") continue;
       const outs = d.connectors.filter((c) => c.type === "sequence" && c.sourceId === el.id);
@@ -98,8 +102,13 @@ export function checkSimReadiness(diagrams: DiagramData[], teams: TeamLite[]): R
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const routed = outs.some((c: any) => c.branchProbability != null || c.branchCondition || c.isDefaultFlow);
       if (!routed) {
-        issues.push({ severity: "warn", elementId: el.id, elementLabel: nameOf(el),
-          message: `Decision "${nameOf(el)}" has ${outs.length} branches with no probabilities or conditions — they'll be split evenly.` });
+        const rawName = el.label?.trim();
+        const from = d.connectors.find((c) => c.type === "sequence" && c.targetId === el.id);
+        const fromLbl = from ? describe(byId.get(from.sourceId)) : null;
+        const toLbls = [...new Set(outs.map((c) => describe(byId.get(c.targetId))))];
+        const which = rawName ? `"${rawName}"` : fromLbl ? `after "${fromLbl}"` : "(unnamed)";
+        issues.push({ severity: "warn", elementId: el.id, elementLabel: rawName || fromLbl || el.id,
+          message: `Decision ${which} (→ ${toLbls.join(" / ")}) has ${outs.length} branches with no probabilities or conditions — they'll be split evenly.` });
       }
     }
 

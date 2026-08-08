@@ -192,13 +192,14 @@ function OutcomesTab({ analytics, variants, kpiConfig, onSave }: { analytics: Ru
   );
 }
 
-/** Read-only fitted SVG of a diagram (optionally isolating a path via visibleIds). */
-function ModelSvg({ data, visibleIds, maxVh = 46 }: { data: DiagramData; visibleIds?: Set<string>; maxVh?: number }) {
+/** Read-only fitted SVG of a diagram. `emphasize` fades everything not in the set
+ *  (variant/case highlight in context); `visibleIds` hides everything not in it. */
+function ModelSvg({ data, visibleIds, emphasize, maxVh = 46 }: { data: DiagramData; visibleIds?: Set<string>; emphasize?: Set<string>; maxVh?: number }) {
   const viewBox = useMemo(() => boundsViewBox(data), [data]);
   return (
     <div className="bg-stone-100 rounded border border-stone-700 overflow-hidden">
       <svg viewBox={viewBox} className="w-full" style={{ maxHeight: `${maxVh}vh` }} preserveAspectRatio="xMidYMid meet">
-        <ReplayDiagramBackdrop data={data} visibleIds={visibleIds} />
+        <ReplayDiagramBackdrop data={data} visibleIds={visibleIds} emphasize={emphasize} />
       </svg>
     </div>
   );
@@ -358,17 +359,18 @@ function VariantsTab({ variants, bpmn, hasBpmn }: { variants: Variant[]; bpmn: D
             <DiffRow label="Shared" items={diff.common} tone="text-stone-400" />
           </div>
         )}
-        {checked.size !== 2 && <p className="mt-1 text-[10px] text-stone-500">Tick two variants to compare; tick any to isolate their paths on the model.</p>}
+        {checked.size !== 2 && <p className="mt-1 text-[10px] text-stone-500">Click a variant to highlight its path on the model; tick two to compare.</p>}
       </div>
 
-      {/* Model with the selected path(s) isolated */}
+      {/* Right: the FULL model, with the selected variant's path (+ its numbers)
+          emphasised and everything else faded. */}
       <div>
         {!hasBpmn ? <NeedBpmn what="path view" /> : bpmn ? (
           <>
             <div className="text-xs font-semibold text-amber-200 mb-1">
-              {visibleIds ? "Selected path(s) isolated" : "Full discovered model"}
+              {visibleIds ? (focus != null ? `Variant #${focus + 1} highlighted — ${variants[focus].count} cases` : "Selected path(s) highlighted") : "Full discovered model"}
             </div>
-            <ModelSvg data={bpmn} visibleIds={visibleIds} />
+            <ModelSvg data={bpmn} emphasize={visibleIds} />
           </>
         ) : <p className="text-[11px] text-stone-500">Loading model…</p>}
       </div>
@@ -394,11 +396,13 @@ function CasesTab({ analytics, variants, bpmn, hasBpmn }: { analytics: RunAnalyt
   if (!analytics || analytics.cases.length === 0) return <NoAnalytics />;
   const fmt = (ms: number) => formatDuration(ms, analytics.clockUnit);
   const sel = selected != null ? analytics.cases.find((c) => c.idx === selected) : null;
-  // In the expanded view, isolate the selected case's variant path on the model.
-  const selPath = expanded && bpmn && sel ? variantPathIds(bpmn, variants[sel.variantIdx]?.events ?? []) : undefined;
+  // Highlight the selected case's variant path — or, if none selected, the filtered
+  // variant's path — on the FULL model (emphasise in context). Works inline + expanded.
+  const emphVariantIdx = sel ? sel.variantIdx : variantFilter !== "all" ? variantFilter : null;
+  const emphPath = bpmn && emphVariantIdx != null ? variantPathIds(bpmn, variants[emphVariantIdx]?.events ?? []) : undefined;
 
   if (expanded) return (
-    <ExpandedView title={sel ? `Cases — case ${sel.caseId} path` : "Cases — discovered model"} data={bpmn} visibleIds={selPath} onClose={() => setExpanded(false)}>
+    <ExpandedView title={sel ? `Cases — case ${sel.caseId} (variant #${sel.variantIdx + 1})` : emphVariantIdx != null ? `Cases — variant #${emphVariantIdx + 1}` : "Cases — discovered model"} data={bpmn} emphasize={emphPath} onClose={() => setExpanded(false)}>
       <table className="w-full text-[11px]">
         <thead><tr className="text-stone-500 text-left"><th className="font-normal">Case</th><th className="font-normal">Variant</th><th className="font-normal text-right">Steps</th><th className="font-normal text-right">Cycle</th></tr></thead>
         <tbody>
@@ -417,9 +421,9 @@ function CasesTab({ analytics, variants, bpmn, hasBpmn }: { analytics: RunAnalyt
 
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      {/* Replay */}
+      {/* Replay — with the selected case's / variant's path emphasised */}
       <div>
-        {hasBpmn && bpmn ? <CaseReplay data={bpmn} variants={variants} /> : <NeedBpmn what="replay" />}
+        {hasBpmn && bpmn ? <CaseReplay data={bpmn} variants={variants} emphasize={emphPath} /> : <NeedBpmn what="replay" />}
       </div>
       {/* Case list */}
       <div>
@@ -465,7 +469,7 @@ function CasesTab({ analytics, variants, bpmn, hasBpmn }: { analytics: RunAnalyt
 
 /** Self-contained log-replay: tokens flow over the discovered model, weighted by
  *  variant frequency. Reuses ReplayDiagramBackdrop as the backdrop; no simulator. */
-function CaseReplay({ data, variants }: { data: DiagramData; variants: Variant[] }) {
+function CaseReplay({ data, variants, emphasize }: { data: DiagramData; variants: Variant[]; emphasize?: Set<string> }) {
   const runners = useMemo(() => buildRunners(data, variants), [data, variants]);
   const [playing, setPlaying] = useState(true);
   const [t, setT] = useState(0);
@@ -502,7 +506,7 @@ function CaseReplay({ data, variants }: { data: DiagramData; variants: Variant[]
       </div>
       <div className="bg-stone-100 rounded border border-stone-700 overflow-hidden">
         <svg viewBox={viewBox} className="w-full" style={{ maxHeight: "50vh" }} preserveAspectRatio="xMidYMid meet">
-          <ReplayDiagramBackdrop data={data} />
+          <ReplayDiagramBackdrop data={data} emphasize={emphasize} />
           {tokens}
         </svg>
       </div>

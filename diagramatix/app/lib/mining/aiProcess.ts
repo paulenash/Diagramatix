@@ -13,6 +13,7 @@
 import type { Variant, MiningStats } from "./types";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
+import { annotateGatewayFrequencies } from "./aiFrequencies";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 
 const MAX_PATHS = 40; // cap the brief so a very spaghetti log stays within budget
@@ -43,7 +44,7 @@ export function describeMinedProcess(variants: Variant[], stats?: Partial<Mining
     `- One start event; add end event(s) for the genuine ways cases finish.`,
     `- Insert exclusive gateways where paths diverge and converge.`,
     `- Represent an activity that recurs (a path that loops back to an earlier activity) as a rework loop, not a duplicate task.`,
-    `- Give activities clear, business-friendly labels (expand cryptic codes); merge duplicates.`,
+    `- Keep each activity's name EXACTLY as observed above — do not rename, reword or expand it — so the model stays linked to the source log (this lets the mined timings + teams calibrate onto it). You may merge only EXACT duplicates.`,
     `- Keep the dominant behaviour; omit obvious one-off anomalies and noise.`,
     `Return ONLY the diagram JSON per the format.`,
   ].join("\n");
@@ -62,5 +63,8 @@ export async function generateProcessViaAi(input: AiProcessInput): Promise<Diagr
   const prompt = describeMinedProcess(input.variants, input.stats);
   const res = await planBpmn({ apiKey: input.apiKey, prompt, rules: input.rules, model: input.model });
   if (!res.ok) throw new Error(res.error);
-  return layoutBpmnDiagram(res.plan.elements, res.plan.connections, { promptLabel: "Mined process (AI)" });
+  // Re-attach the mined directly-follows frequencies (the AI drops them) so the
+  // twin can calibrate gateway branch probabilities off the AI model too.
+  const data = layoutBpmnDiagram(res.plan.elements, res.plan.connections, { promptLabel: "Mined process (AI)" });
+  return annotateGatewayFrequencies(data, input.variants);
 }

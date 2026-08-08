@@ -27,33 +27,38 @@ function depthOf(el: DiagramElement, byId: Map<string, DiagramElement>): number 
 // too — otherwise their box paints over the connectors drawn within.
 const CONTAINER = new Set(["pool", "lane", "subprocess-expanded"]);
 
-export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data, visibleIds }: { data: DiagramData; visibleIds?: Set<string> }) {
+export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data, visibleIds, emphasize }: { data: DiagramData; visibleIds?: Set<string>; emphasize?: Set<string> }) {
   const byId = new Map(data.elements.map((e) => [e.id, e]));
   // Optional progressive-reveal gate (the Animate feature): render only ids in
   // the set. Undefined = render everything (the normal replay backdrop).
   const showEl = (id: string) => !visibleIds || visibleIds.has(id);
+  // Optional emphasis (variant/case highlight): render EVERYTHING, but fade the
+  // elements/connectors NOT in the set so the highlighted path stands out in
+  // context. Undefined = no fading.
+  const dim = (id: string) => (emphasize && !emphasize.has(id) ? 0.1 : 1);
   const containers = data.elements.filter((e) => CONTAINER.has(e.type) && showEl(e.id)).sort((a, b) => depthOf(a, byId) - depthOf(b, byId));
   const others = data.elements.filter((e) => !CONTAINER.has(e.type) && showEl(e.id));
 
   const sym = (el: DiagramElement) => (
-    <SymbolRenderer
-      key={el.id}
-      element={el}
-      selected={false}
-      isDropTarget={false}
-      showConnectionPoints={false}
-      onSelect={noop}
-      onMove={noop}
-      onDoubleClick={noop}
-      onConnectionPointDragStart={noop}
-    />
+    <g key={el.id} opacity={dim(el.id)}>
+      <SymbolRenderer
+        element={el}
+        selected={false}
+        isDropTarget={false}
+        showConnectionPoints={false}
+        onSelect={noop}
+        onMove={noop}
+        onDoubleClick={noop}
+        onConnectionPointDragStart={noop}
+      />
+    </g>
   );
 
   return (
     <g style={{ pointerEvents: "none" }}>
       {/* pools + lanes (background), then connectors, then the flow shapes on top */}
       {containers.map(sym)}
-      {data.connectors.filter((c) => showEl(c.id)).map((c) => <ConnectorRenderer key={c.id} connector={c} selected={false} onSelect={noop} />)}
+      {data.connectors.filter((c) => showEl(c.id)).map((c) => <g key={c.id} opacity={dim(c.id)}><ConnectorRenderer connector={c} selected={false} onSelect={noop} /></g>)}
       {others.map(sym)}
     </g>
   );

@@ -19,7 +19,7 @@ function diagramBounds(data: DiagramData, pad = 24) {
 }
 
 /** SVG diagram with click-to-zoom (Esc resets via `resetKey` bump from the parent). */
-function ZoomableDiagram({ data, visibleIds, resetKey, extra }: { data: DiagramData; visibleIds?: Set<string>; resetKey: number; extra?: ReactNode }) {
+function ZoomableDiagram({ data, visibleIds, emphasize, resetKey, extra }: { data: DiagramData; visibleIds?: Set<string>; emphasize?: Set<string>; resetKey: number; extra?: ReactNode }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const b = useMemo(() => diagramBounds(data), [data]);
   const [zoom, setZoom] = useState(1);
@@ -42,16 +42,17 @@ function ZoomableDiagram({ data, visibleIds, resetKey, extra }: { data: DiagramD
   return (
     <svg ref={svgRef} viewBox={`${vx} ${vy} ${vw} ${vh}`} onClick={onClick}
       className="w-full h-full cursor-zoom-in" preserveAspectRatio="xMidYMid meet" style={{ background: "#f5f5f4" }}>
-      <ReplayDiagramBackdrop data={data} visibleIds={visibleIds} />
+      <ReplayDiagramBackdrop data={data} visibleIds={visibleIds} emphasize={emphasize} />
       {extra}
     </svg>
   );
 }
 
-export function ExpandedView({ title, data, visibleIds, extra, onClose, children }: {
+export function ExpandedView({ title, data, visibleIds, emphasize, extra, onClose, children }: {
   title: string;
   data: DiagramData | null;
   visibleIds?: Set<string>;
+  emphasize?: Set<string>;       // fade everything not in the set (variant/case highlight)
   extra?: ReactNode;              // extra SVG overlay drawn inside the zoomable svg (e.g. replay tokens)
   onClose: () => void;
   children?: ReactNode;          // the tables, shown under the diagram
@@ -78,7 +79,7 @@ export function ExpandedView({ title, data, visibleIds, extra, onClose, children
       </div>
       <div className="flex-1 min-h-0 flex flex-col p-3 gap-3">
         <div className="flex-[3] min-h-0 rounded border border-stone-700 overflow-hidden">
-          {data ? <ZoomableDiagram data={data} visibleIds={visibleIds} resetKey={resetKey} extra={extra} />
+          {data ? <ZoomableDiagram data={data} visibleIds={visibleIds} emphasize={emphasize} resetKey={resetKey} extra={extra} />
             : <div className="p-4 text-stone-500 text-sm">No discovered diagram — Discover the process first.</div>}
         </div>
         {children && <div className="flex-[2] min-h-0 overflow-auto text-stone-200">{children}</div>}
