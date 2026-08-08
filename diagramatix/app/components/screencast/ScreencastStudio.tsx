@@ -16,6 +16,7 @@ import { insetRect, coverCrop, type InsetCorner } from "@/app/lib/video/composit
 import { useDraggable } from "@/app/components/useDraggable";
 import { useMatrixRunning } from "@/app/components/useMatrixRunning";
 import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
+import { beginSession, appendChunk, listPending, getSessionBlob, clearSession, type RecMeta } from "@/app/lib/screencast/recordingStore";
 
 type Phase = "idle" | "setup" | "recording" | "paused" | "review";
 
@@ -104,6 +105,11 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const recordedBlobRef = useRef<Blob | null>(null);
+  // Crash-proof persistence: id of the IndexedDB session for the current/last
+  // recording, and any recoverable session found on mount.
+  const sessionIdRef = useRef<string | null>(null);
+  const sessionMimeRef = useRef<string>("video/webm");
+  const [recoverable, setRecoverable] = useState<RecMeta | null>(null);
   const rafRef = useRef<number>(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const levelRafRef = useRef<number>(0);
@@ -186,6 +192,49 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     return () => navigator.mediaDevices?.removeEventListener?.("devicechange", onChange);
   }, [show, enumerate]);
 
+  // On mount, surface any recording that was interrupted (navigation, reload,
+  // crash) and never saved — its chunks are safe in IndexedDB.
+  useEffect(() => {
+    if (!show) return;
+    let on = true;
+    void listPending().then((list) => { if (on) setRecoverable((cur) => cur ?? list[0] ?? null); });
+    return () => { on = false; };
+  }, [show]);
+
+  // Best-effort flush of the final partial chunk when the page is being torn down
+  // (navigating to the Portal, reload, close). The per-second chunks are already
+  // persisted, so at most the last second is at risk; recovery restores the rest.
+  useEffect(() => {
+    const flush = () => {
+      const rec = recorderRef.current;
+      if (rec && rec.state !== "inactive") { try { rec.requestData(); } catch { /* */ } }
+    };
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flush);
+    return () => { window.removeEventListener("pagehide", flush); window.removeEventListener("beforeunload", flush); };
+  }, []);
+
+  // Rebuild the recorded blob from the persisted session and jump to review.
+  const recoverLast = useCallback(async () => {
+    const meta = recoverable;
+    if (!meta) return;
+    const blob = await getSessionBlob(meta.id, meta.mime);
+    if (!blob) { await clearSession(meta.id); setRecoverable(null); return; }
+    sessionIdRef.current = meta.id;
+    sessionMimeRef.current = meta.mime;
+    recordedBlobRef.current = blob;
+    setNativeExt(meta.ext === "mp4" ? "mp4" : "webm");
+    setRecordedUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(blob); });
+    setRecoverable(null);
+    setOpen(true);
+    setPhase("review");
+  }, [recoverable]);
+
+  const discardRecoverable = useCallback(async () => {
+    if (recoverable) await clearSession(recoverable.id);
+    setRecoverable(null);
+  }, [recoverable]);
+
   const cleanupRecording = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
     displayStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -246,8 +295,19 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     chunksRef.current = [];
     const chosen = pickMime();
     setNativeExt(chosen.ext);
+    sessionMimeRef.current = chosen.mime;
+    // Open a fresh persisted session BEFORE recording, so every chunk is written
+    // to IndexedDB as it arrives — the recording survives navigation/reload/crash.
+    sessionIdRef.current = await beginSession(chosen.mime, chosen.ext).catch(() => null);
+    setRecoverable(null); // this new recording supersedes any old recoverable one
     const rec = new MediaRecorder(mixed, { mimeType: chosen.mime });
-    rec.ondataavailable = (ev) => { if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data); };
+    rec.ondataavailable = (ev) => {
+      if (ev.data && ev.data.size > 0) {
+        chunksRef.current.push(ev.data);
+        const sid = sessionIdRef.current;
+        if (sid) void appendChunk(sid, ev.data); // best-effort persist
+      }
+    };
     rec.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: rec.mimeType || "video/webm" });
       recordedBlobRef.current = blob;
@@ -300,6 +360,8 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
       });
       if (!res.ok) { const j = await res.json().catch(() => ({})); setError(j.error ?? `Conversion failed (HTTP ${res.status}). ffmpeg may be unavailable in this environment.`); return; }
       download(await res.blob(), to);
+      // Saved → the persisted session is no longer needed.
+      if (sessionIdRef.current) { void clearSession(sessionIdRef.current); sessionIdRef.current = null; }
     } catch (e) {
       setError(ac.signal.aborted ? "Conversion cancelled or timed out." : `Conversion error: ${(e as Error).message}`);
     } finally {
@@ -318,6 +380,8 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     setRecordedUrl((old) => { if (old) URL.revokeObjectURL(old); return null; });
     recordedBlobRef.current = null;
     setElapsed(0); setError(null);
+    // Explicit discard → drop the persisted session so it stops being offered.
+    if (sessionIdRef.current) { void clearSession(sessionIdRef.current); sessionIdRef.current = null; }
   }, []);
 
   const reRecord = useCallback(() => { discardRecording(); setPhase("setup"); void arm(); }, [discardRecording, arm]);
@@ -394,6 +458,16 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
           </svg>
         </button>
       )}
+      {recoverable && !open && (
+        <div data-no-capture className="fixed bottom-16 left-4 z-[96] w-72 bg-amber-50 border border-amber-300 rounded-lg shadow-xl p-3 text-xs">
+          <div className="font-semibold text-amber-800 mb-1">Unsaved recording found</div>
+          <p className="text-gray-700 mb-2">A screencast was interrupted before it was saved (e.g. a page change). You can recover it.</p>
+          <div className="flex gap-2">
+            <button onClick={() => void recoverLast()} className="flex-1 py-1.5 bg-amber-600 text-white rounded font-medium active:bg-amber-700">Recover</button>
+            <button onClick={() => void discardRecoverable()} className="px-3 py-1.5 border border-gray-300 rounded text-gray-600">Discard</button>
+          </div>
+        </div>
+      )}
       {open && (
         <div data-no-capture className="fixed bottom-16 left-4 z-[95] w-72 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-xs text-gray-800">
           <div className="flex items-center justify-between mb-2">
@@ -454,7 +528,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
             <>
               <video src={recordedUrl} controls className="w-full rounded border border-gray-200 mb-2 bg-black" />
               <div className="grid grid-cols-2 gap-1.5">
-                <button onClick={() => recordedBlobRef.current && download(recordedBlobRef.current, nativeExt)} disabled={transcoding} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50 disabled:opacity-50" title="Save the recording as-is (instant, no conversion)">Save .{nativeExt}</button>
+                <button onClick={() => { if (recordedBlobRef.current) { download(recordedBlobRef.current, nativeExt); if (sessionIdRef.current) { void clearSession(sessionIdRef.current); sessionIdRef.current = null; } } }} disabled={transcoding} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50 disabled:opacity-50" title="Save the recording as-is (instant, no conversion)">Save .{nativeExt}</button>
                 <button onClick={() => saveConverted(nativeExt === "mp4" ? "webm" : "mp4")} disabled={transcoding} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50 disabled:opacity-50" title="Convert on the server, then save">Save .{nativeExt === "mp4" ? "webm" : "mp4"}</button>
                 <button onClick={reRecord} disabled={transcoding} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50 disabled:opacity-50">Re-record</button>
                 <button onClick={() => { discardRecording(); setPhase("setup"); void arm(); }} disabled={transcoding} className="py-1.5 border border-red-300 text-red-700 font-medium rounded hover:bg-red-50 disabled:opacity-50">Discard</button>
