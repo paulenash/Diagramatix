@@ -7,7 +7,7 @@
  * shared by the example "adopt" route AND the user-facing "Import simulation".
  */
 import { prisma } from "@/app/lib/db";
-import type { ExamplePackage } from "./examplePackage";
+import { validateExamplePackage, type ExamplePackage } from "./examplePackage";
 
 export interface AdoptCtx {
   userId: string;
@@ -78,6 +78,34 @@ export async function adoptPackageInto(
       },
     });
   }
+}
+
+/**
+ * Replay a `{ originalProjectId → packages }` map (as embedded in a scoped
+ * backup / project JSON export) into already-restored projects, remapping ids via
+ * the caller's project + diagram id maps. Skips structurally-invalid packages and
+ * projects that weren't restored. Returns how many studies were recreated. Must
+ * run inside the caller's restore transaction.
+ */
+export async function replaySimulationPackages(
+  tx: Tx,
+  simPackages: Record<string, ExamplePackage[]> | undefined | null,
+  projectIdMap: Map<string, string>,
+  diagramIdMap: Map<string, string>,
+  userId: string | null,
+): Promise<number> {
+  if (!simPackages) return 0;
+  let n = 0;
+  for (const [origProjectId, pkgs] of Object.entries(simPackages)) {
+    const newProjectId = projectIdMap.get(origProjectId);
+    if (!newProjectId) continue;
+    for (const pkg of pkgs ?? []) {
+      if (validateExamplePackage(pkg).length) continue;
+      await adoptPackageInto(tx, pkg, { projectId: newProjectId, keyToDiagramId: diagramIdMap, userId });
+      n++;
+    }
+  }
+  return n;
 }
 
 export async function adoptPackage(pkg: ExamplePackage, ctx: AdoptCtx): Promise<{ projectId: string; openDiagramId: string | null }> {

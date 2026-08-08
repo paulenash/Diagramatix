@@ -19,6 +19,9 @@ import JSZip from "jszip";
 import { prisma } from "./db";
 import { SCHEMA_VERSION } from "./diagram/types";
 import { getBackupSchema, reviveDates } from "./backupSchema";
+import { captureAllProjectPackages } from "./simulation/captureProject";
+import { replaySimulationPackages } from "./simulation/adoptPackage";
+import type { ExamplePackage } from "./simulation/examplePackage";
 import {
   FULL_BACKUP_KIND,
   type FullBackupPayload,
@@ -139,6 +142,17 @@ export async function buildOrgBackup(
   };
   const serialise = (rows: Record<string, unknown>[]) => rows.map(toIso);
 
+  // Simulation configuration per project (studies + scenarios + team/calendar
+  // libraries; config only). The scoped backup carries this as portable packages
+  // rather than raw Simulation* tables, so it's replayed (not row-inserted) on
+  // restore — see replaySimulationPackages.
+  const simulationPackages: Record<string, ExamplePackage[]> = {};
+  for (const p of projects) {
+    const pkgs = await captureAllProjectPackages(String(p.id));
+    if (pkgs.length) simulationPackages[String(p.id)] = pkgs;
+  }
+  onProgress?.("Simulation", Object.keys(simulationPackages).length);
+
   const payload: FullBackupPayload = {
     schemaVersion: SCHEMA_VERSION,
     appVersion,
@@ -218,6 +232,7 @@ export async function buildOrgBackup(
       SopDocument: serialise(sopDocuments as Record<string, unknown>[]),
       SopSection: serialise(sopSections as Record<string, unknown>[]),
     },
+    ...(Object.keys(simulationPackages).length ? { simulationPackages } : {}),
   };
 
   onProgress?.("Compressing", 0);
@@ -541,6 +556,12 @@ export async function restoreOrgBackupAdditive(
         await tx.sopSection.createMany({ data: sopSectionData as any[] });
         inserted.SopSection = (inserted.SopSection ?? 0) + sopSectionData.length;
       }
+
+      // Simulation configuration (portable packages) → replay per project.
+      const simRestored = await replaySimulationPackages(
+        tx, payload.simulationPackages, projectIdMap, diagramIdMap, null,
+      );
+      if (simRestored) inserted.SimulationStudy = (inserted.SimulationStudy ?? 0) + simRestored;
     });
   } catch (err) {
     log.push(`✘ Restore failed: ${err instanceof Error ? err.message : String(err)}`);

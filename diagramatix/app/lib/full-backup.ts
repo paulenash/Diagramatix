@@ -64,6 +64,11 @@ export interface FullBackupPayload {
    *  (Org/User/Project/Diagram/…) are still accessed directly by the
    *  inspect + additive-restore paths. */
   tables: Record<string, unknown[]>;
+  /** Scoped (org/user) backups only: simulation configuration per original
+   *  project id (study + scenarios + team/calendar libraries; config only, no run
+   *  results), replayed on restore after diagrams are recreated. The full backup
+   *  carries the real simulation TABLES instead, so this stays undefined there. */
+  simulationPackages?: Record<string, import("./simulation/examplePackage").ExamplePackage[]>;
 }
 
 /** Per-section progress callback for the streaming backup endpoints. Fired
