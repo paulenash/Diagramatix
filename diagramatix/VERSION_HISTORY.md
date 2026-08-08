@@ -13,6 +13,16 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2140 — 2026-08-08 — DiagramatixMINER Insights — feedback pass 1
+- **Expand to full-screen** on the Insights / Variants / Cases tabs — the discovered process gets
+  maximum space with the tables underneath, **click-to-zoom** on the diagram (Esc resets to fit) and
+  a **Return** button. Path isolation carries over into the big view.
+- Discovered **BPMN edge frequencies** now render as the same green **count badge** the discovered
+  state machine uses (not a plain number floating by the line).
+- **Explain results** no longer spins with nothing to show — on an AI failure it falls back to the
+  deterministic summary so a result always returns.
+- Schema: no bump. Tests T2237.
+
 ## 1.44.2137 — 2026-08-08 — DiagramatixMINER Insights (Process Mining v2)
 - New **Insights** workbench in the mining run console — closes the biggest gaps vs Apromore:
   - **🔥 Heat** — colour the discovered model by Total time (bottleneck) / Frequency / Avg time,
