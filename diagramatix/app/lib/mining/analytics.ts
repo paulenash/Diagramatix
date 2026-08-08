@@ -187,3 +187,7 @@ export function formatDuration(ms: number, unit: ClockUnit): string {
   const rounded = v >= 100 ? Math.round(v) : Math.round(v * 10) / 10;
   return `${rounded} ${unit}${rounded === 1 ? "" : "s"}`;
 }
+
+/** Convert between the run's clock unit and milliseconds (for the SLA input). */
+export function toMs(value: number, unit: ClockUnit): number { return value * MS_PER_UNIT[unit]; }
+export function fromMs(ms: number, unit: ClockUnit): number { return ms / MS_PER_UNIT[unit]; }

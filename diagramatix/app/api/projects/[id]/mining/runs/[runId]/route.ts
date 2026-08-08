@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
-import { prisma } from "@/app/lib/db";
+import { prisma, pgPool } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 
@@ -48,10 +48,16 @@ export async function PATCH(req: Request, { params }: Params) {
   // Persist the chosen conformance reference so selecting one survives navigating
   // away to edit it (and back) — not just after a conformance run.
   if ("referenceSmId" in (body ?? {})) data.referenceSmId = typeof body.referenceSmId === "string" && body.referenceSmId ? body.referenceSmId : null;
-  if (Object.keys(data).length === 0) {
-    return NextResponse.json({ error: "Nothing to update (excludeFromCompliance or referenceSmId)" }, { status: 400 });
+  // KPI/SLA outcome config is a JSON column — Prisma 7 omits JSON writes, so use raw SQL.
+  const hasKpi = "kpiConfig" in (body ?? {});
+  if (Object.keys(data).length === 0 && !hasKpi) {
+    return NextResponse.json({ error: "Nothing to update (excludeFromCompliance, referenceSmId or kpiConfig)" }, { status: 400 });
   }
-  await prisma.processMiningRun.update({ where: { id: runId }, data });
+  if (Object.keys(data).length > 0) await prisma.processMiningRun.update({ where: { id: runId }, data });
+  if (hasKpi) {
+    const kpi = body.kpiConfig && typeof body.kpiConfig === "object" ? body.kpiConfig : null;
+    await pgPool.query('UPDATE "ProcessMiningRun" SET "kpiConfig" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(kpi), runId]);
+  }
   return NextResponse.json({ ok: true, id: runId, ...data });
 }
 
