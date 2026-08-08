@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { PromptDialog } from "@/app/components/PromptDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
+import { FilePreviewDialog, type PreviewPayload } from "@/app/components/preview/FilePreviewDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
 import { displayOrgRole } from "@/app/lib/auth/orgRoleLabels";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
@@ -652,7 +653,9 @@ function GenerateDdlButton() {
   const [model, setModel] = useState<"logical" | "physical">("logical");
   const [dbType, setDbType] = useState("postgres");
   const [generating, setGenerating] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [previewPayload, setPreviewPayload] = useState<PreviewPayload | null>(null);
 
   function download(text: string, filename: string) {
     const blob = new Blob([text], { type: "text/sql" });
@@ -666,28 +669,46 @@ function GenerateDdlButton() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  // Produce the DDL text + a filename for the chosen model — shared by
+  // Download and Preview.
+  async function buildDdl(): Promise<{ text: string; filename: string }> {
+    if (model === "physical") {
+      // Introspects the live database server-side (SuperAdmin-gated).
+      const res = await fetch("/api/admin/physical-ddl");
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error ?? `Request failed (${res.status})`);
+      }
+      return { text: await res.text(), filename: "diagramatix-physical-ddl-PostgreSQL.sql" };
+    }
+    const { generateDiagramatixDDL } = await import("@/app/lib/diagram/ddlGenerate");
+    const dbLabel = { postgres: "PostgreSQL", mysql: "MySQL", mssql: "SQLServer" }[dbType] ?? dbType;
+    return { text: generateDiagramatixDDL(dbType), filename: `diagramatix-logical-ddl-${dbLabel}.sql` };
+  }
+
   async function handleGenerate() {
     setGenerating(true);
     try {
-      if (model === "physical") {
-        // Introspects the live database server-side (SuperAdmin-gated).
-        const res = await fetch("/api/admin/physical-ddl");
-        if (!res.ok) {
-          const j = await res.json().catch(() => ({}));
-          throw new Error(j.error ?? `Request failed (${res.status})`);
-        }
-        download(await res.text(), "diagramatix-physical-ddl-PostgreSQL.sql");
-      } else {
-        const { generateDiagramatixDDL } = await import("@/app/lib/diagram/ddlGenerate");
-        const ddl = generateDiagramatixDDL(dbType);
-        const dbLabel = { postgres: "PostgreSQL", mysql: "MySQL", mssql: "SQLServer" }[dbType] ?? dbType;
-        download(ddl, `diagramatix-logical-ddl-${dbLabel}.sql`);
-      }
+      const { text, filename } = await buildDdl();
+      download(text, filename);
       setOpen(false);
     } catch (err) {
       setErrorMessage(`Failed to generate ${model} DDL: ` + (err instanceof Error ? err.message : String(err)));
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handlePreview() {
+    setPreviewing(true);
+    try {
+      const { text, filename } = await buildDdl();
+      setPreviewPayload({ kind: "ddl", title: filename, text, downloadName: filename, downloadMime: "text/sql" });
+      setOpen(false);
+    } catch (err) {
+      setErrorMessage(`Failed to generate ${model} DDL: ` + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setPreviewing(false);
     }
   }
 
@@ -721,6 +742,11 @@ function GenerateDdlButton() {
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={() => setOpen(false)}
               className="px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+            <button onClick={handlePreview} disabled={previewing || generating}
+              className="px-2 py-1 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              title="Preview the DDL in a pop-up (no download)">
+              {previewing ? "Opening…" : "👁 Preview"}
+            </button>
             <button onClick={handleGenerate} disabled={generating}
               className="px-2 py-1 text-xs text-white bg-orange-600 rounded hover:bg-orange-700 disabled:opacity-50">
               {generating ? "Generating…" : "Download"}
@@ -728,6 +754,7 @@ function GenerateDdlButton() {
           </div>
         </div>
       )}
+      {previewPayload && <FilePreviewDialog payload={previewPayload} onClose={() => setPreviewPayload(null)} />}
       {errorMessage && (
         <AlertDialog
           title="DDL generation failed"
