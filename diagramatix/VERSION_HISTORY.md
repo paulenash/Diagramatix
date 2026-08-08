@@ -13,6 +13,16 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2143 — 2026-08-09 — Fix: spurious auto-connect on click in generated diagrams
+- **Root cause:** the auto-fuse feature (drop an element onto a connector to splice it in, creating
+  an in + out connector) ran on **every** `MOVE_END` with no move-distance check. Generated / AI
+  layouts place tasks and gateways exactly on the centre-line of skip/branch (gateway) edges, so a
+  plain **click** (a zero-move drop) spliced the element into the through-connector and spawned
+  spurious connectors to/from it — usually to the nearby gateway.
+- **Fix:** the splice now only fires when the element was actually **dragged** a meaningful distance
+  (`MOVE_END` carries the pre-drag position; a click is ignored). Also enlarged the transition-count
+  badges so multi-digit numbers fit inside the circle. Tests T2238-T2239.
+
 ## 1.44.2140 — 2026-08-08 — DiagramatixMINER Insights — feedback pass 1
 - **Expand to full-screen** on the Insights / Variants / Cases tabs — the discovered process gets
   maximum space with the tables underneath, **click-to-zoom** on the diagram (Esc resets to fit) and

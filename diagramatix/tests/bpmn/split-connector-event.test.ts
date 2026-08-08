@@ -400,4 +400,39 @@ describe("insert an existing activity onto a connector, halves parallel (T0725)"
     expect(after.x).toBe(before.x);
     expect(after.y).toBe(before.y);
   });
+
+  // A task sitting ON a foreign connector's flow line (the norm in generated /
+  // AI-laid-out diagrams, where tasks are collinear and skip/branch edges run
+  // straight through them). A CLICK must not splice it in; only a real DRAG onto
+  // the line should. Gated by the move-distance passed in MOVE_END (fromX/fromY).
+  const onLine = () => ({
+    elements: [
+      { id: "a", type: "task", x: 100, y: 200, width: 100, height: 60, label: "A", properties: {} },
+      { id: "b", type: "task", x: 500, y: 200, width: 100, height: 60, label: "B", properties: {} },
+      { id: "f", type: "task", x: 300, y: 200, width: 100, height: 60, label: "F", properties: {} }, // centre on A→B line
+    ],
+    connectors: [{
+      id: "ab", type: "sequence", sourceId: "a", targetId: "b", sourceSide: "right", targetSide: "left",
+      directionType: "directed", routingType: "rectilinear",
+      waypoints: [{ x: 150, y: 230 }, { x: 200, y: 230 }, { x: 500, y: 230 }, { x: 550, y: 230 }],
+    }],
+  } as unknown as DiagramData);
+
+  it("T2238 — a click (zero-move) on an element on a flow line does NOT auto-fuse it", () => {
+    const out = reducer(onLine(), { type: "MOVE_END", payload: { id: "f", fromX: 300, fromY: 200 } });
+    expect(out.connectors.some((c) => c.id === "ab")).toBe(true);          // connector intact
+    expect(out.connectors.some((c) => c.sourceId === "a" && c.targetId === "f")).toBe(false);
+    expect(out.connectors.some((c) => c.sourceId === "f" && c.targetId === "b")).toBe(false);
+    expect(out.connectors.length).toBe(1);
+    const f = out.elements.find((e) => e.id === "f")!;
+    expect(f.x).toBe(300); expect(f.y).toBe(200);                          // not snapped
+  });
+
+  it("T2239 — a real DRAG onto the line still splices (the guard only blocks clicks)", () => {
+    // F ends on the line but came from far below (fromY 500) → a genuine drop.
+    const out = reducer(onLine(), { type: "MOVE_END", payload: { id: "f", fromX: 300, fromY: 500 } });
+    expect(out.connectors.some((c) => c.id === "ab")).toBe(false);
+    expect(out.connectors.some((c) => c.sourceId === "a" && c.targetId === "f")).toBe(true);
+    expect(out.connectors.some((c) => c.sourceId === "f" && c.targetId === "b")).toBe(true);
+  });
 });

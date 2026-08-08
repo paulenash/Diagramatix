@@ -427,7 +427,7 @@ export type Action =
   | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number } }
   | { type: "REMOVE_SPACE"; payload: { zone: { x: number; y: number; width: number; height: number }; preserveIds?: string[]; extraDeleteIds?: string[]; leaveAloneIds?: string[] } }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
-  | { type: "MOVE_END"; payload: { id: string } }
+  | { type: "MOVE_END"; payload: { id: string; fromX?: number; fromY?: number } }
   | { type: "SPLIT_CONNECTOR"; payload: {
       symbolType: SymbolType;
       position: Point;
@@ -8290,6 +8290,17 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (!finalEl) {
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
+      // Auto-fuse (splice an element INTO a connector, creating an in + out pair)
+      // must only fire on a real DRAG onto the line — never on a click or a
+      // sub-threshold jiggle. Generated/AI layouts place tasks and gateways exactly
+      // on the centre-line of skip / branch (gateway) edges, so without this guard a
+      // plain click on such an element splices it into the through-connector and
+      // spawns spurious connectors to/from it (often to the nearby gateway).
+      const { fromX, fromY } = action.payload;
+      const fuseMoved = fromX == null || fromY == null || Math.hypot(finalEl.x - fromX, finalEl.y - fromY) >= 6;
+      if (!fuseMoved) {
+        return { ...state, elements: updatePoolTypes(elements), connectors };
+      }
       const SPLITTABLE_TYPES = new Set([
         "gateway", "intermediate-event", "task", "subprocess", "subprocess-expanded",
       ]);
@@ -9929,12 +9940,14 @@ export function useDiagram(initialData: DiagramData) {
   );
 
   const elementMoveEnd = useCallback((id: string) => {
+    // Capture the pre-drag position so MOVE_END can tell a real drag from a click.
+    const before = preMoveRef.current?.elements.find((e) => e.id === id) ?? null;
     if (draggingRef.current === id && preMoveRef.current) {
       pushHistory(preMoveRef.current);
       preMoveRef.current = null;
       draggingRef.current = null;
     }
-    dispatch({ type: "MOVE_END", payload: { id } });
+    dispatch({ type: "MOVE_END", payload: { id, fromX: before?.x, fromY: before?.y } });
   }, []);
 
   const splitConnector = useCallback((
