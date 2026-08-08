@@ -98,6 +98,9 @@ const SCOPED_OMITTED = new Set<string>([
   // (AiModelRate) is global admin config like AppSetting / DiagramTypeStyle — none
   // is per-user/org data. Carried by the SuperAdmin full backup (catalog-driven) only.
   "AiInvocation", "AiDiagramGeneration", "AiModelRate", "DictationSession",
+  // Saved Diff Processes runs are analysis history/observability (like AuditLog),
+  // not per-user/org content — carried by the SuperAdmin full backup only.
+  "ProcessDiffRun",
   ...SIMULATOR_TABLES,
   ...RISK_CONTROL_TABLES,
   ...PCF_TABLES,

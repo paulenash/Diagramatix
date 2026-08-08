@@ -20,9 +20,29 @@ import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { buildDocx } from "@/app/lib/documents/exportDocx";
+import { isSuperuser } from "@/app/lib/superuser";
 import type { DiagramData } from "@/app/lib/diagram/types";
-import { diffProcesses } from "@/app/lib/diagram/diff/processDiff";
+import { diffProcesses, type ProcessDiff } from "@/app/lib/diagram/diff/processDiff";
 import { diffToMarkdown, diffForAi } from "@/app/lib/diagram/diff/processDiffFormat";
+
+/** Build the .docx comparison report response from a computed diff + optional AI summary. */
+function diffDocxResponse(aName: string, bName: string, diff: ProcessDiff, aiSummary: string) {
+  const sections = [
+    ...(aiSummary ? [{ heading: "AI Summary", bodyMarkdown: aiSummary }] : []),
+    { heading: aiSummary ? "Comparison" : null, bodyMarkdown: diffToMarkdown(diff) },
+  ];
+  const title = `Process Comparison — ${aName} vs ${bName}`;
+  const safe = `${aName}-vs-${bName}`.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
+  return buildDocx([{ title, sections }], { docTitle: title }).then((buf) =>
+    new NextResponse(new Uint8Array(buf), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Content-Disposition": `attachment; filename="${safe}.docx"`,
+      },
+    }),
+  );
+}
 
 const AI_BRIEFING =
   "You are a business analyst. Given a structured comparison of two versions of the " +
@@ -58,6 +78,24 @@ export async function POST(req: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
+
+  // Export a SAVED run to Word (renders from the stored snapshot, not a recompute).
+  const runId = typeof body.runId === "string" ? body.runId : "";
+  if (runId && body.mode === "docx") {
+    const run = await prisma.processDiffRun.findUnique({ where: { id: runId } });
+    if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    let ok = run.createdById === session.user.id || isSuperuser(session);
+    if (!ok) {
+      const jar = await cookies();
+      for (const did of [run.aDiagramId, run.bDiagramId]) {
+        if (!did) continue;
+        try { await requireDiagramAccess(session, jar, did, "view"); ok = true; break; } catch { /* try other */ }
+      }
+    }
+    if (!ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return diffDocxResponse(run.aName, run.bName, run.result as unknown as ProcessDiff, run.aiSummary?.trim() ?? "");
+  }
+
   const aId = typeof body.aId === "string" ? body.aId : "";
   const bId = typeof body.bId === "string" ? body.bId : "";
   const mode = body.mode === "docx" || body.mode === "ai" ? body.mode : "";
@@ -76,25 +114,9 @@ export async function POST(req: Request) {
   const diff = diffProcesses(a.data, a.name, b.data, b.name);
 
   if (mode === "docx") {
-    // Optional AI narrative (already generated + shown to the user) is embedded
-    // as the first section so the Word report leads with the plain-English summary.
+    // Optional AI narrative (already generated + shown to the user) leads the doc.
     const aiSummary = typeof body.aiSummary === "string" ? body.aiSummary.trim() : "";
-    const sections = [
-      ...(aiSummary ? [{ heading: "AI Summary", bodyMarkdown: aiSummary }] : []),
-      { heading: aiSummary ? "Comparison" : null, bodyMarkdown: diffToMarkdown(diff) },
-    ];
-    const buf = await buildDocx(
-      [{ title: `Process Comparison — ${a.name} vs ${b.name}`, sections }],
-      { docTitle: `Process Comparison — ${a.name} vs ${b.name}` },
-    );
-    const safe = `${a.name}-vs-${b.name}`.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
-    return new NextResponse(new Uint8Array(buf), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "Content-Disposition": `attachment; filename="${safe}.docx"`,
-      },
-    });
+    return diffDocxResponse(a.name, b.name, diff, aiSummary);
   }
 
   // mode === "ai"

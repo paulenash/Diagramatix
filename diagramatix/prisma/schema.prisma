@@ -121,6 +121,7 @@ model Org {
   simulationTeams     SimulationTeam[]
   simulationCalendars SimulationCalendar[]
   processMiningRuns   ProcessMiningRun[]
+  processDiffRuns     ProcessDiffRun[]
 }
 
 model OrgMember {
@@ -276,6 +277,7 @@ model User {
   // Simulator (Phase 6) — example catalog entries this user authored.
   simulationExamplesCreated     SimulationExample[]        @relation("SimulationExampleAuthor")
   miningExamplesCreated         MiningExample[]            @relation("MiningExampleAuthor")
+  processDiffRunsCreated        ProcessDiffRun[]           @relation("ProcessDiffRunAuthor")
 }
 
 model Project {
@@ -436,6 +438,8 @@ model Diagram {
   @@index([diagramOwnerId])
   @@index([lifecycle])
   @@index([orgId, lifecycle])
+  diffRunsA ProcessDiffRun[] @relation("ProcessDiffRunA")
+  diffRunsB ProcessDiffRun[] @relation("ProcessDiffRunB")
 }
 
 // Live co-authoring presence: one row per (diagram, user) currently in the
@@ -914,6 +918,35 @@ model DictationCommand {
   action    String   @unique // newLine | numberedList | bold | addPointAfter | …
   phrases   String[] @default([])
   updatedAt DateTime @updatedAt
+}
+
+// A saved "Diff Processes" run — a timestamped snapshot of the full ProcessDiff
+// between two BPMN diagrams (+ optional AI summary), so it re-displays exactly as
+// first produced. Reachable from BOTH diagrams' properties; managed by
+// OrgAdmin (by user) / SuperAdmin (by org→user). History/observability only —
+// omitted from scoped backups. Diagram FKs SetNull (denormalised names keep the
+// run readable after a diagram is renamed/deleted).
+model ProcessDiffRun {
+  id          String   @id @default(cuid())
+  orgId       String?
+  org         Org?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdBy   User?    @relation("ProcessDiffRunAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  aDiagramId  String?
+  aDiagram    Diagram? @relation("ProcessDiffRunA", fields: [aDiagramId], references: [id], onDelete: SetNull)
+  bDiagramId  String?
+  bDiagram    Diagram? @relation("ProcessDiffRunB", fields: [bDiagramId], references: [id], onDelete: SetNull)
+  aName       String
+  bName       String
+  result      Json // the ProcessDiff snapshot (renders identically to the original run)
+  aiSummary   String?
+  aiModel     String?
+  createdAt   DateTime @default(now())
+
+  @@index([aDiagramId])
+  @@index([bDiagramId])
+  @@index([orgId])
+  @@index([createdById])
 }
 
 // ────────────────────────────────────────────────────────────────────────────
