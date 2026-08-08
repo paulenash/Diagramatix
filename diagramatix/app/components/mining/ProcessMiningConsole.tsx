@@ -9,6 +9,8 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseCsv, guessMapping, distinctActivities } from "@/app/lib/mining/parseEventLog";
+import { enrichResources, enrichStates } from "@/app/lib/mining/enrich";
+import type { DiagramData } from "@/app/lib/diagram/types";
 import { activityToState } from "@/app/lib/mining/stateNaming";
 import { parseXes } from "@/app/lib/mining/formats/xes";
 import { parseOcel } from "@/app/lib/mining/formats/ocel";
@@ -273,6 +275,34 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   const stateFor = (a: string) => mapping.activityState?.[a] ?? activityToState(a);
   const setActivityState = (a: string, s: string) =>
     setMapping((m) => ({ ...m, activityState: { ...(m.activityState ?? {}), [a]: s } }));
+
+  // Enrichment — when no resource/state column, fill the activity→team / activity→
+  // state tables from the project's own models (Process Diagram lanes / State
+  // Machine transitions). Editable after (it just seeds mapping.activity*).
+  const needsTeamTable = !mapping.resource && activities.length > 0;
+  const teamFor = (a: string) => mapping.activityResource?.[a] ?? "";
+  const setActivityResource = (a: string, r: string) =>
+    setMapping((m) => ({ ...m, activityResource: { ...(m.activityResource ?? {}), [a]: r || undefined } as Record<string, string> }));
+  const [enrichDiagrams, setEnrichDiagrams] = useState<{ id: string; name: string; type: string }[]>([]);
+  const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}/mining/diagrams`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { diagrams: [] })).then((j) => setEnrichDiagrams(j.diagrams ?? [])).catch(() => {});
+  }, [projectId]);
+  async function fillFrom(diagramId: string, kind: "resource" | "state") {
+    if (!diagramId) return;
+    try {
+      const res = await fetch(`/api/diagrams/${diagramId}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = ((await res.json())?.data ?? null) as DiagramData | null;
+      if (!data) return;
+      const e = kind === "resource" ? enrichResources(activities, data) : enrichStates(activities, data);
+      setMapping((m) => kind === "resource"
+        ? { ...m, activityResource: { ...(m.activityResource ?? {}), ...e.map } }
+        : { ...m, activityState: { ...(m.activityState ?? {}), ...e.map } });
+      setEnrichMsg(`Filled ${e.rows.length} of ${activities.length} ${kind === "resource" ? "teams" : "states"}${e.unmatched.length ? ` — ${e.unmatched.length} unmatched (edit below)` : ""}.`);
+    } catch { /* best-effort */ }
+  }
   // Advisory pre-import validation off the already-parsed rows — confirm the
   // mapping is right + see what would be discarded, before ingesting.
   const validation = useMemo(
@@ -482,11 +512,40 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                 ))}
               </div>
 
+              {/* Activity → Team table — shown when no Resource column is mapped.
+                  Fill from the Process Diagram's lanes, or set per activity. */}
+              {needsTeamTable && (
+                <div className="rounded border border-blue-500/40 bg-blue-950/20 p-2.5 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="text-[11px] text-blue-200 flex-1 min-w-[12rem]">No <span className="font-semibold">Resource</span> column — set the team per activity, or fill from a Process Diagram&apos;s lanes.</div>
+                    <select defaultValue="" onChange={(e) => { void fillFrom(e.target.value, "resource"); e.currentTarget.value = ""; }} className={`${inp} py-0.5 text-[10px]`}>
+                      <option value="">✨ Fill from Process Diagram…</option>
+                      {enrichDiagrams.filter((d) => d.type === "bpmn").map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto grid grid-cols-[1fr_auto_1fr] gap-x-2 gap-y-1 items-center">
+                    {activities.map((a) => (
+                      <Fragment key={a}>
+                        <span className="text-[10px] text-stone-300 truncate" title={a}>{a}</span>
+                        <span className="text-stone-500 text-[10px]">→</span>
+                        <input value={teamFor(a)} placeholder="(team)" onChange={(e) => setActivityResource(a, e.target.value)} className={`${inp} py-0.5 text-[10px]`} />
+                      </Fragment>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Activity → State table — shown when no State column is mapped.
-                  Completes the lifecycle the miner + State Machine need. */}
+                  Fill from a State Machine's transitions, or set per activity. */}
               {needsStateTable && (
                 <div className="rounded border border-amber-500/40 bg-amber-950/20 p-2.5 flex flex-col gap-1.5">
-                  <div className="text-[11px] text-amber-200">No <span className="font-semibold">State</span> column mapped — set the state each activity produces. Defaults to the activity name; edit to merge activities into shared lifecycle states.</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="text-[11px] text-amber-200 flex-1 min-w-[12rem]">No <span className="font-semibold">State</span> column mapped — set the state each activity produces, or fill from a State Machine. Defaults to the activity name.</div>
+                    <select defaultValue="" onChange={(e) => { void fillFrom(e.target.value, "state"); e.currentTarget.value = ""; }} className={`${inp} py-0.5 text-[10px]`}>
+                      <option value="">✨ Fill from State Machine…</option>
+                      {enrichDiagrams.filter((d) => d.type === "state-machine").map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
                   <div className="max-h-48 overflow-y-auto grid grid-cols-[1fr_auto_1fr] gap-x-2 gap-y-1 items-center">
                     {activities.map((a) => (
                       <Fragment key={a}>
@@ -499,6 +558,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                   <p className="text-[10px] text-stone-400">{activities.length.toLocaleString()} distinct activities</p>
                 </div>
               )}
+              {enrichMsg && <p className="text-[10px] text-emerald-300">✨ {enrichMsg}</p>}
 
               {/* Preview */}
               <div className="overflow-x-auto border border-stone-700 rounded">

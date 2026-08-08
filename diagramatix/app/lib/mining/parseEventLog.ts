@@ -145,7 +145,9 @@ export function buildEventLog(headers: string[], rows: string[][], mapping: LogM
     const timestamp = parseTimestamp(r[ti] ?? "");
     if (!caseId || timestamp === null) { unmapped++; continue; }
     const activity = (r[ai] ?? "").trim();
-    const resource = ri >= 0 ? (r[ri] ?? "").trim() : "";
+    // No resource column? Fall back to the activity→team table (e.g. enriched from
+    // the Process Diagram's lanes) — mirrors the activityState fallback above.
+    const resource = ri >= 0 ? (r[ri] ?? "").trim() : (mapping.activityResource?.[activity] ?? "");
     const controlId = cti >= 0 ? (r[cti] ?? "").trim() : "";
     const riskId = rki >= 0 ? (r[rki] ?? "").trim() : "";
     const policyId = pli >= 0 ? (r[pli] ?? "").trim() : "";

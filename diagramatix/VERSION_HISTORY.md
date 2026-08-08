@@ -13,6 +13,16 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2147 — 2026-08-09 — Mining: enrich a sparse log from the project's models
+- On import, when the log has **no resource** and/or **no state** column, the console now offers to
+  fill them from the project's own models: **teams from a Process Diagram** (activity → task → lane)
+  and **states from a State Machine** (activity → transition → target state), matched by label
+  (exact, then fuzzy). Result is an **editable table** you confirm before import — never silent.
+  So a minimal (case/activity/timestamp) log can climb to full fidelity without editing the log.
+- Engine: `app/lib/mining/enrich.ts` (pure), `LogMapping.activityResource` (mirrors the existing
+  `activityState` fallback in `buildEventLog`), a project-diagrams list route. Tests T2243-T2246.
+- Schema: no bump (the maps ride in the import mapping JSON).
+
 ## 1.44.2146 — 2026-08-09 — Mining Insights: mined time + team caption under each task
 - The Insights model now shows the mined **"simulation data" under each task** — its median
   time-in-step + dominant team — as a caption (toggle **🏷 time · team**, on by default), matched to

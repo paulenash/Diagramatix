@@ -25,6 +25,9 @@ export interface LogMapping {
    *  state each activity produces (defaults to the activity's own name). It
    *  completes the lifecycle the rest of the miner + the State Machine need. */
   activityState?: Record<string, string>;
+  /** When no `resource` column is mapped, this activity→team table supplies the
+   *  team for each activity (e.g. enriched from the Process Diagram's lanes). */
+  activityResource?: Record<string, string>;
 }
 
 /** One normalised event row. `timestamp` is epoch milliseconds. */
