@@ -1194,6 +1194,21 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       const folderCount = (folderTree.folders ?? []).length;
       log(`\u2714 ${folderCount} folder(s) exported`);
 
+      // Simulation configuration (studies + scenarios + team/calendar libraries)
+      // travels with a JSON export so it's recreated on import. Config only — no
+      // run results. XML export doesn't carry it (kept diagram-structural).
+      let simulationPackages: unknown[] = [];
+      if (format !== "xml") {
+        try {
+          log("Exporting simulation configuration...");
+          const simRes = await fetch(`/api/projects/${project.id}/simulation/packages`);
+          if (simRes.ok) {
+            simulationPackages = (await simRes.json())?.packages ?? [];
+            log(`✔ ${simulationPackages.length} simulation study/studies exported`);
+          }
+        } catch { /* best-effort — simulation is optional */ }
+      }
+
       log("Assembling export file...");
       const exportData = {
         schemaVersion: SCHEMA_VERSION,
@@ -1214,6 +1229,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           displayMode: d.displayMode,
         })),
         folderTree,
+        ...(simulationPackages.length ? { simulationPackages } : {}),
         // APQC licence: any export carrying PCF-derived content must include the notice.
         ...(anyDiagramHasPcf(diagramsWithData as { data?: unknown }[]) ? { pcfAttribution: APQC_ATTRIBUTION } : {}),
       };
@@ -1619,10 +1635,40 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       });
     }
 
+    // Simulation configuration (studies + scenarios + team/calendar libraries) \u2014
+    // replay each package into the new project, mapping original diagram ids \u2192
+    // the freshly created ones.
+    await adoptSimulationPackages(exportData, newProject.id, idMap, log);
+
     log("");
     log(`\u2714 Import complete: ${successCount}/${diags.length} diagram(s) imported`);
     setImportResult("success");
     setImportedProjectId(newProject.id);
+  }
+
+  // Replay any `simulationPackages` from an import payload into `targetProjectId`.
+  async function adoptSimulationPackages(
+    exportData: Record<string, unknown>,
+    targetProjectId: string,
+    idMap: Map<string, string>,
+    log: (m: string) => void,
+  ) {
+    const packages = exportData.simulationPackages as unknown[] | undefined;
+    if (!Array.isArray(packages) || packages.length === 0) return;
+    try {
+      log(`Importing ${packages.length} simulation study/studies\u2026`);
+      const res = await fetch(`/api/projects/${targetProjectId}/simulation/adopt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packages, keyMap: Object.fromEntries(idMap) }),
+      });
+      if (res.ok) {
+        const { adopted } = await res.json();
+        log(`\u2714 ${adopted} simulation study/studies imported`);
+      } else {
+        log("\u26a0 Simulation configuration could not be imported (diagrams imported OK)");
+      }
+    } catch { log("\u26a0 Simulation configuration could not be imported (diagrams imported OK)"); }
   }
 
   // Project-screen JSON import: parse + validate, then show a preview of the
@@ -1781,6 +1827,10 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
         body: JSON.stringify({ folderTree: merged }),
       });
     } catch { /* best-effort */ }
+
+    // Simulation configuration \u2192 replay into THIS project.
+    await adoptSimulationPackages(exportData, project.id, diagIdMap, log);
+
     setFolderTree(merged);
     await refreshProjectData();
 

@@ -17,6 +17,69 @@ export interface AdoptCtx {
   sourceExampleId?: string;
 }
 
+/** Prisma interactive-transaction client type (inferred, no Prisma namespace import). */
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Recreate a package's simulation LIBRARY (calendars + teams) and its STUDY +
+ * scenarios inside an EXISTING project. Diagrams must already exist; their
+ * package keys are resolved to real diagram ids via `keyToDiagramId`. Shared by
+ * adoptPackage (fresh project) and the JSON-export / backup replay paths, so all
+ * three build the simulation graph the same, tested way. Run results are not
+ * part of a package (config only), by design.
+ */
+export async function adoptPackageInto(
+  tx: Tx,
+  pkg: ExamplePackage,
+  ctx: { projectId: string; keyToDiagramId: Map<string, string>; userId: string | null },
+): Promise<void> {
+  const { projectId, keyToDiagramId, userId } = ctx;
+
+  // Working-calendar library (create first so teams can reference by id).
+  const calendarNameToId = new Map<string, string>();
+  for (const c of pkg.calendars ?? []) {
+    const cal = await tx.simulationCalendar.create({ data: { name: c.name, projectId } });
+    calendarNameToId.set(c.name, cal.id);
+    await tx.$executeRaw`UPDATE "SimulationCalendar" SET pattern = ${JSON.stringify(c.pattern ?? { intervals: [] })}::jsonb WHERE id = ${cal.id}`;
+  }
+
+  // Team library (link each team to its calendar by name → new id).
+  for (const t of pkg.teams) {
+    await tx.simulationTeam.create({
+      data: {
+        name: t.name, projectId,
+        capacity: Math.max(1, Math.round(t.capacity ?? 1)),
+        costPerHour: t.costPerHour ?? null,
+        efficiency: t.efficiency && t.efficiency > 0 ? t.efficiency : 1,
+        calendarId: t.calendarName ? calendarNameToId.get(t.calendarName) ?? null : null,
+      },
+    });
+  }
+
+  // Study + roots (remap package keys → new diagram ids).
+  const study = await tx.simulationStudy.create({ data: { name: pkg.study.name, projectId, createdById: userId } });
+  for (const rk of pkg.study.rootKeys) {
+    const diagramId = keyToDiagramId.get(rk);
+    if (diagramId) await tx.simulationStudyRoot.create({ data: { studyId: study.id, diagramId } });
+  }
+
+  // Scenarios — config + overrides + variant roots (remapped).
+  for (const sc of pkg.scenarios) {
+    const variantRootIds = (sc.variantRootKeys ?? []).map((k) => keyToDiagramId.get(k)).filter((x): x is string => !!x);
+    await tx.simulationScenario.create({
+      data: {
+        name: sc.name, studyId: study.id, isBaseline: !!sc.isBaseline,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        runConfig: (sc.runConfig ?? {}) as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        overrides: (sc.overrides ?? {}) as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...(variantRootIds.length ? { variantRootIds: variantRootIds as any } : {}),
+      },
+    });
+  }
+}
+
 export async function adoptPackage(pkg: ExamplePackage, ctx: AdoptCtx): Promise<{ projectId: string; openDiagramId: string | null }> {
   // One transaction so a partial failure never leaves a half-built project.
   return prisma.$transaction(async (tx) => {
@@ -46,49 +109,8 @@ export async function adoptPackage(pkg: ExamplePackage, ctx: AdoptCtx): Promise<
       });
     }
 
-    // Working-calendar library (create first so teams can reference by id).
-    const calendarNameToId = new Map<string, string>();
-    for (const c of pkg.calendars ?? []) {
-      const cal = await tx.simulationCalendar.create({ data: { name: c.name, projectId: project.id } });
-      calendarNameToId.set(c.name, cal.id);
-      await tx.$executeRaw`UPDATE "SimulationCalendar" SET pattern = ${JSON.stringify(c.pattern ?? { intervals: [] })}::jsonb WHERE id = ${cal.id}`;
-    }
-
-    // Team library (link each team to its calendar by name → new id).
-    for (const t of pkg.teams) {
-      await tx.simulationTeam.create({
-        data: {
-          name: t.name, projectId: project.id,
-          capacity: Math.max(1, Math.round(t.capacity ?? 1)),
-          costPerHour: t.costPerHour ?? null,
-          efficiency: t.efficiency && t.efficiency > 0 ? t.efficiency : 1,
-          calendarId: t.calendarName ? calendarNameToId.get(t.calendarName) ?? null : null,
-        },
-      });
-    }
-
-    // Study + roots (remap package keys → new diagram ids).
-    const study = await tx.simulationStudy.create({ data: { name: pkg.study.name, projectId: project.id, createdById: ctx.userId } });
-    for (const rk of pkg.study.rootKeys) {
-      const diagramId = keyToDiagramId.get(rk);
-      if (diagramId) await tx.simulationStudyRoot.create({ data: { studyId: study.id, diagramId } });
-    }
-
-    // Scenarios — config + overrides + variant roots (remapped).
-    for (const sc of pkg.scenarios) {
-      const variantRootIds = (sc.variantRootKeys ?? []).map((k) => keyToDiagramId.get(k)).filter((x): x is string => !!x);
-      await tx.simulationScenario.create({
-        data: {
-          name: sc.name, studyId: study.id, isBaseline: !!sc.isBaseline,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          runConfig: (sc.runConfig ?? {}) as any,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          overrides: (sc.overrides ?? {}) as any,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(variantRootIds.length ? { variantRootIds: variantRootIds as any } : {}),
-        },
-      });
-    }
+    // Library + study + scenarios (shared with the JSON/backup replay path).
+    await adoptPackageInto(tx, pkg, { projectId: project.id, keyToDiagramId, userId: ctx.userId });
 
     const openDiagramId = pkg.study.rootKeys.map((k) => keyToDiagramId.get(k)).find(Boolean)
       ?? keyToDiagramId.values().next().value ?? null;

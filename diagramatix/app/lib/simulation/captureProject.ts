@@ -21,6 +21,20 @@ const variantIdsOf = (id: unknown): string[] =>
 
 export interface CaptureResult { pkg: ExamplePackage; studyName: string }
 
+/** Capture EVERY simulation study in a project as portable packages (config only:
+ *  study + scenarios + team/calendar libraries; no run results). Used to embed a
+ *  project's simulation configuration in JSON exports + scoped backups so it
+ *  survives export/import. Invalid/empty studies are skipped, never fatal. */
+export async function captureAllProjectPackages(projectId: string): Promise<ExamplePackage[]> {
+  const studies = await prisma.simulationStudy.findMany({ where: { projectId }, select: { id: true } });
+  const out: ExamplePackage[] = [];
+  for (const s of studies) {
+    try { out.push((await captureProjectPackage(projectId, s.id)).pkg); }
+    catch { /* skip a study that can't be captured (e.g. no roots) */ }
+  }
+  return out;
+}
+
 /** Build the portable package for one study in a project. Throws on a missing
  *  study or a package that fails structural validation. */
 export async function captureProjectPackage(projectId: string, studyId: string): Promise<CaptureResult> {
