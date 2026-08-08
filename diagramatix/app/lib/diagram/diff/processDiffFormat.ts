@@ -54,23 +54,7 @@ export function diffToMarkdown(diff: ProcessDiff): string {
       `${objDiff.removed.length ? `removed ${list(objDiff.removed)}` : ""}`);
     out.push("");
   }
-  // Review status — evidence of review + what its change implies.
-  const rd = diff.reviewDiff;
-  const kindLabel: Record<string, string> = { "review-comment": "Review Comment", "pain-point": "Pain Point", issue: "Issue", bottleneck: "Bottleneck" };
-  if (rd.added.length || rd.removed.length || Object.values(rd.aCounts).some((n) => n > 0) || Object.values(rd.bCounts).some((n) => n > 0)) {
-    out.push("## Review status");
-    out.push("");
-    out.push(rd.status);
-    out.push("");
-    if (rd.removed.length || rd.added.length) {
-      out.push("| Change | Kind | Note | Near |");
-      out.push("| --- | --- | --- | --- |");
-      for (const r of rd.removed) out.push(`| Removed | ${kindLabel[r.kind]} | ${mdCell(r.text || "—")} | ${mdCell(r.location || "—")} |`);
-      for (const r of rd.added) out.push(`| Added | ${kindLabel[r.kind]} | ${mdCell(r.text || "—")} | ${mdCell(r.location || "—")} |`);
-      out.push("");
-    }
-  }
-
+  // Activities — the primary comparison table (first column "Activity").
   out.push("## Activities");
   out.push("");
   out.push("| Activity | Change | Who (role) | Type | Systems | Data |");
@@ -84,6 +68,25 @@ export function diffToMarkdown(diff: ProcessDiff): string {
       mdCell(arrowList(r.systems.a ?? [], r.systems.b ?? [])),
       mdCell(arrowList(r.data.a ?? [], r.data.b ?? [])),
     ].join(" | ") + " |");
+  }
+
+  // Review status — its own heading + table (first column "Change"), kept a
+  // clearly separate section AFTER the activities table.
+  const rd = diff.reviewDiff;
+  const kindLabel: Record<string, string> = { "review-comment": "Review Comment", "pain-point": "Pain Point", issue: "Issue", bottleneck: "Bottleneck" };
+  if (rd.added.length || rd.removed.length || Object.values(rd.aCounts).some((n) => n > 0) || Object.values(rd.bCounts).some((n) => n > 0)) {
+    out.push("");
+    out.push("## Review status");
+    out.push("");
+    out.push(rd.status);
+    out.push("");
+    if (rd.removed.length || rd.added.length) {
+      out.push("| Change | Kind | Note | Near |");
+      out.push("| --- | --- | --- | --- |");
+      for (const r of rd.removed) out.push(`| Removed | ${kindLabel[r.kind]} | ${mdCell(r.text || "—")} | ${mdCell(r.location || "—")} |`);
+      for (const r of rd.added) out.push(`| Added | ${kindLabel[r.kind]} | ${mdCell(r.text || "—")} | ${mdCell(r.location || "—")} |`);
+      out.push("");
+    }
   }
 
   // Message flows — added / removed / relabelled between the versions.

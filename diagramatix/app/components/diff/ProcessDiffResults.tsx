@@ -111,53 +111,6 @@ export function ProcessDiffResults({ diff, aiSummary, merge }: {
         </div>
       )}
 
-      {/* Review status */}
-      {(() => {
-        const rd = diff.reviewDiff;
-        const hasAny = rd.added.length || rd.removed.length ||
-          Object.values(rd.aCounts).some((n) => n > 0) || Object.values(rd.bCounts).some((n) => n > 0);
-        if (!hasAny) return null;
-        const kindLabel: Record<string, string> = { "review-comment": "Review Comment", "pain-point": "Pain Point", issue: "Issue", bottleneck: "Bottleneck" };
-        return (
-          <div className="mb-3 p-2.5 bg-purple-50 border border-purple-100 rounded">
-            <div className="text-[11px] font-medium text-purple-800 mb-1">Review status</div>
-            <div className="text-[11px] text-gray-700 mb-1.5">{rd.status}</div>
-            {(rd.added.length > 0 || rd.removed.length > 0) && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-[10px] border-collapse">
-                  <thead>
-                    <tr className="text-gray-500 text-left">
-                      <th className="px-1.5 py-1 font-medium"> </th>
-                      <th className="px-1.5 py-1 font-medium">Kind</th>
-                      <th className="px-1.5 py-1 font-medium">Note</th>
-                      <th className="px-1.5 py-1 font-medium">Near</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rd.removed.map((r, i) => (
-                      <tr key={`rr${i}`} className="border-t border-purple-100">
-                        <td className="px-1.5 py-1"><span className="px-1 py-0.5 rounded bg-red-50 text-red-700">Removed</span></td>
-                        <td className="px-1.5 py-1 text-gray-600">{kindLabel[r.kind]}</td>
-                        <td className="px-1.5 py-1 text-gray-700">{r.text || "—"}</td>
-                        <td className="px-1.5 py-1 text-gray-500">{r.location || "—"}</td>
-                      </tr>
-                    ))}
-                    {rd.added.map((r, i) => (
-                      <tr key={`ra${i}`} className="border-t border-purple-100">
-                        <td className="px-1.5 py-1"><span className="px-1 py-0.5 rounded bg-green-50 text-green-700">Added</span></td>
-                        <td className="px-1.5 py-1 text-gray-600">{kindLabel[r.kind]}</td>
-                        <td className="px-1.5 py-1 text-gray-700">{r.text || "—"}</td>
-                        <td className="px-1.5 py-1 text-gray-500">{r.location || "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
       {/* Activity table */}
       <div className="overflow-x-auto border border-gray-200 rounded">
         <table className="w-full text-[11px] border-collapse">
@@ -197,6 +150,53 @@ export function ProcessDiffResults({ diff, aiSummary, merge }: {
           </tbody>
         </table>
       </div>
+
+      {/* Review status — its own section, after the activities table. */}
+      {(() => {
+        const rd = diff.reviewDiff;
+        const hasAny = rd.added.length || rd.removed.length ||
+          Object.values(rd.aCounts).some((n) => n > 0) || Object.values(rd.bCounts).some((n) => n > 0);
+        if (!hasAny) return null;
+        const kindLabel: Record<string, string> = { "review-comment": "Review Comment", "pain-point": "Pain Point", issue: "Issue", bottleneck: "Bottleneck" };
+        return (
+          <div className="mt-3 p-2.5 bg-purple-50 border border-purple-100 rounded">
+            <div className="text-[11px] font-medium text-purple-800 mb-1">Review status</div>
+            <div className="text-[11px] text-gray-700 mb-1.5">{rd.status}</div>
+            {(rd.added.length > 0 || rd.removed.length > 0) && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[10px] border-collapse">
+                  <thead>
+                    <tr className="text-gray-500 text-left">
+                      <th className="px-1.5 py-1 font-medium"> </th>
+                      <th className="px-1.5 py-1 font-medium">Kind</th>
+                      <th className="px-1.5 py-1 font-medium">Note</th>
+                      <th className="px-1.5 py-1 font-medium">Near</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rd.removed.map((r, i) => (
+                      <tr key={`rr${i}`} className="border-t border-purple-100">
+                        <td className="px-1.5 py-1"><span className="px-1 py-0.5 rounded bg-red-50 text-red-700">Removed</span></td>
+                        <td className="px-1.5 py-1 text-gray-600">{kindLabel[r.kind]}</td>
+                        <td className="px-1.5 py-1 text-gray-700">{r.text || "—"}</td>
+                        <td className="px-1.5 py-1 text-gray-500">{r.location || "—"}</td>
+                      </tr>
+                    ))}
+                    {rd.added.map((r, i) => (
+                      <tr key={`ra${i}`} className="border-t border-purple-100">
+                        <td className="px-1.5 py-1"><span className="px-1 py-0.5 rounded bg-green-50 text-green-700">Added</span></td>
+                        <td className="px-1.5 py-1 text-gray-600">{kindLabel[r.kind]}</td>
+                        <td className="px-1.5 py-1 text-gray-700">{r.text || "—"}</td>
+                        <td className="px-1.5 py-1 text-gray-500">{r.location || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Message flows */}
       {(diff.messageDiff.added.length > 0 || diff.messageDiff.removed.length > 0 || diff.messageDiff.changed.length > 0) && (
