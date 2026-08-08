@@ -17,7 +17,10 @@ import { variantPathIds, variantDiff, variantPareto } from "@/app/lib/mining/var
 import { buildRunners, pointAt } from "@/app/lib/mining/replayRunners";
 import { computeOutcomes, type KpiConfig } from "@/app/lib/mining/outcomes";
 import { ReplayDiagramBackdrop } from "@/app/components/simulation/replay/ReplayDiagramBackdrop";
+import { ExpandedView } from "./ExpandedView";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
+
+const EXPAND_BTN = "ml-auto text-[11px] rounded px-2 py-0.5 bg-stone-800 text-amber-200 hover:bg-stone-700";
 
 interface RunLite { id: string; discoveredBpmnId: string | null; discoveredSmId: string | null }
 
@@ -205,6 +208,7 @@ function ModelSvg({ data, visibleIds, maxVh = 46 }: { data: DiagramData; visible
 
 function HeatTab({ analytics, bpmn, hasBpmn, loading }: { analytics: RunAnalytics | null; bpmn: DiagramData | null; hasBpmn: boolean; loading: boolean }) {
   const [metric, setMetric] = useState<HeatMetric>("totalTime");
+  const [expanded, setExpanded] = useState(false);
   const heated = useMemo(() => (bpmn && analytics ? applyHeat(bpmn, analytics, metric) : null), [bpmn, analytics, metric]);
   const metricOf = HEAT_METRICS.find((m) => m.key === metric)!.of;
   const fmt = useCallback((v: number) => (metric === "frequency" ? String(v) : analytics ? formatDuration(v, analytics.clockUnit) : String(v)), [metric, analytics]);
@@ -215,6 +219,23 @@ function HeatTab({ analytics, bpmn, hasBpmn, loading }: { analytics: RunAnalytic
 
   const top = [...analytics.activities].sort((a, b) => metricOf(b) - metricOf(a)).slice(0, 8);
   const maxV = Math.max(1, ...analytics.activities.map(metricOf));
+
+  if (expanded) return (
+    <ExpandedView title="Insights — bottleneck heat" data={heated} onClose={() => setExpanded(false)}>
+      <table className="w-full text-[11px]">
+        <thead><tr className="text-stone-500 text-left"><th></th><th className="font-normal">Step</th><th className="font-normal text-right">{HEAT_METRICS.find((m) => m.key === metric)!.label}</th><th className="font-normal text-right">Cases</th></tr></thead>
+        <tbody>
+          {[...analytics.activities].sort((a, b) => metricOf(b) - metricOf(a)).map((a) => { const v = metricOf(a); return (
+            <tr key={a.activity} className="border-b border-stone-800">
+              <td className="py-1 pr-1"><span className="inline-block w-2.5 h-2.5 rounded-sm align-middle" style={{ background: heatColor(v / maxV) }} /></td>
+              <td className="py-1 pr-2 text-stone-200">{a.activity}</td>
+              <td className="py-1 text-right text-stone-300 tabular-nums">{fmt(v)}</td>
+              <td className="py-1 text-right text-stone-400 tabular-nums">{a.caseFreq}</td>
+            </tr>); })}
+        </tbody>
+      </table>
+    </ExpandedView>
+  );
 
   return (
     <div className="grid gap-3 md:grid-cols-3">
@@ -227,6 +248,7 @@ function HeatTab({ analytics, bpmn, hasBpmn, loading }: { analytics: RunAnalytic
               {m.label}
             </button>
           ))}
+          <button onClick={() => setExpanded(true)} className={EXPAND_BTN}>⤢ Expand</button>
         </div>
         {heated && <ModelSvg data={heated} />}
         <div className="flex items-center gap-2 mt-2">
@@ -261,6 +283,7 @@ function HeatTab({ analytics, bpmn, hasBpmn, loading }: { analytics: RunAnalytic
 function VariantsTab({ variants, bpmn, hasBpmn }: { variants: Variant[]; bpmn: DiagramData | null; hasBpmn: boolean }) {
   const [focus, setFocus] = useState<number | null>(null);   // single-click: isolate this variant's path
   const [checked, setChecked] = useState<Set<number>>(new Set()); // multi-select for filter / compare
+  const [expanded, setExpanded] = useState(false);
   const pareto = useMemo(() => variantPareto(variants), [variants]);
 
   // visibleIds = focused variant's path, or the union of checked variants' paths.
@@ -279,13 +302,35 @@ function VariantsTab({ variants, bpmn, hasBpmn }: { variants: Variant[]; bpmn: D
 
   if (variants.length === 0) return <p className="text-[11px] text-stone-400">No variants for this run.</p>;
 
+  if (expanded) return (
+    <ExpandedView title={visibleIds ? "Variants — selected path(s) isolated" : "Variants — discovered model"} data={bpmn} visibleIds={visibleIds} onClose={() => setExpanded(false)}>
+      <table className="w-full text-[11px]">
+        <thead><tr className="text-stone-500 text-left"><th className="font-normal">#</th><th className="font-normal text-right">Cases</th><th className="font-normal text-right">Share</th><th className="font-normal text-right">Cum</th><th className="font-normal">Path</th></tr></thead>
+        <tbody>
+          {pareto.map((r) => (
+            <tr key={r.idx} className={`border-b border-stone-800 cursor-pointer ${focus === r.idx ? "bg-amber-600/20" : "hover:bg-stone-800"}`} onClick={() => setFocus(focus === r.idx ? null : r.idx)}>
+              <td className="py-1 pr-2 text-stone-400">#{r.idx + 1}</td>
+              <td className="py-1 pr-2 text-right text-stone-200 tabular-nums">{r.count}</td>
+              <td className="py-1 pr-2 text-right text-stone-500 tabular-nums">{(r.share * 100).toFixed(1)}%</td>
+              <td className="py-1 pr-2 text-right text-stone-600 tabular-nums">{(r.cumulative * 100).toFixed(0)}%</td>
+              <td className="py-1 text-stone-300">{r.events.join(" → ")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </ExpandedView>
+  );
+
   return (
     <div className="grid gap-3 md:grid-cols-2">
       {/* Pareto list */}
       <div>
         <div className="flex items-center justify-between mb-1">
           <div className="text-xs font-semibold text-amber-200">Variants ({variants.length}) — most frequent first</div>
-          {checked.size > 0 && <button onClick={() => setChecked(new Set())} className="text-[10px] text-amber-300 hover:text-amber-200 underline">clear</button>}
+          <div className="flex items-center gap-2">
+            {checked.size > 0 && <button onClick={() => setChecked(new Set())} className="text-[10px] text-amber-300 hover:text-amber-200 underline">clear</button>}
+            <button onClick={() => setExpanded(true)} className="text-[11px] rounded px-2 py-0.5 bg-stone-800 text-amber-200 hover:bg-stone-700">⤢ Expand</button>
+          </div>
         </div>
         <div className="max-h-[46vh] overflow-auto pr-1">
           {pareto.map((r) => (
@@ -337,6 +382,7 @@ function CasesTab({ analytics, variants, bpmn, hasBpmn }: { analytics: RunAnalyt
   const [sortDesc, setSortDesc] = useState(true);
   const [variantFilter, setVariantFilter] = useState<number | "all">("all");
   const [selected, setSelected] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const rows = useMemo(() => {
     if (!analytics) return [];
@@ -348,6 +394,26 @@ function CasesTab({ analytics, variants, bpmn, hasBpmn }: { analytics: RunAnalyt
   if (!analytics || analytics.cases.length === 0) return <NoAnalytics />;
   const fmt = (ms: number) => formatDuration(ms, analytics.clockUnit);
   const sel = selected != null ? analytics.cases.find((c) => c.idx === selected) : null;
+  // In the expanded view, isolate the selected case's variant path on the model.
+  const selPath = expanded && bpmn && sel ? variantPathIds(bpmn, variants[sel.variantIdx]?.events ?? []) : undefined;
+
+  if (expanded) return (
+    <ExpandedView title={sel ? `Cases — case ${sel.caseId} path` : "Cases — discovered model"} data={bpmn} visibleIds={selPath} onClose={() => setExpanded(false)}>
+      <table className="w-full text-[11px]">
+        <thead><tr className="text-stone-500 text-left"><th className="font-normal">Case</th><th className="font-normal">Variant</th><th className="font-normal text-right">Steps</th><th className="font-normal text-right">Cycle</th></tr></thead>
+        <tbody>
+          {rows.map((c) => (
+            <tr key={c.idx} onClick={() => setSelected(selected === c.idx ? null : c.idx)} className={`cursor-pointer border-b border-stone-800 ${selected === c.idx ? "bg-amber-600/20" : "hover:bg-stone-800"}`}>
+              <td className="py-1 pr-2 text-stone-300">{c.caseId}</td>
+              <td className="py-1 pr-2 text-stone-500">#{c.variantIdx + 1}</td>
+              <td className="py-1 pr-2 text-right text-stone-500">{c.events}</td>
+              <td className="py-1 text-right text-stone-200 tabular-nums">{fmt(c.cycleMs)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </ExpandedView>
+  );
 
   return (
     <div className="grid gap-3 md:grid-cols-2">
@@ -360,7 +426,8 @@ function CasesTab({ analytics, variants, bpmn, hasBpmn }: { analytics: RunAnalyt
         <div className="flex items-center gap-2 mb-1 text-[11px]">
           <span className="text-xs font-semibold text-amber-200">Cases</span>
           <span className="text-stone-500">{analytics.totalCases}{analytics.capped ? " (sampled)" : ""}</span>
-          <button onClick={() => setSortDesc((s) => !s)} className="ml-auto rounded px-2 py-0.5 bg-stone-800 hover:bg-stone-700 text-stone-300">
+          <button onClick={() => setExpanded(true)} className="ml-auto rounded px-2 py-0.5 bg-stone-800 text-amber-200 hover:bg-stone-700">⤢ Expand</button>
+          <button onClick={() => setSortDesc((s) => !s)} className="rounded px-2 py-0.5 bg-stone-800 hover:bg-stone-700 text-stone-300">
             cycle {sortDesc ? "↓ longest" : "↑ shortest"}
           </button>
           <select value={String(variantFilter)} onChange={(e) => setVariantFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
