@@ -1,4 +1,9 @@
 import type { NextAuthConfig } from "next-auth";
+import { NextResponse } from "next/server";
+
+// Coarse mobile-phone detection from the UA (tablets deliberately excluded — the
+// desktop canvas is usable on a tablet). Drives the auto-redirect to the /m UI.
+const MOBILE_UA = /Android.+Mobile|iPhone|iPod|Windows Phone|BlackBerry|Opera Mini|IEMobile/i;
 
 // Minimal auth config used by the proxy (middleware) — no Prisma imports.
 // JWT and session callbacks are defined in auth.ts (they need Prisma + token refresh).
@@ -15,13 +20,27 @@ export const authConfig = {
   pages: { signIn: "/login" },
   session: { strategy: "jwt" as const, maxAge: SESSION_MAX_AGE, updateAge: SESSION_UPDATE_AGE },
   callbacks: {
-    authorized({ auth, request: { nextUrl } }) {
+    authorized({ auth, request }) {
+      const { nextUrl } = request;
+      const path = nextUrl.pathname;
       const isLoggedIn = !!auth?.user;
       const isProtected =
-        nextUrl.pathname.startsWith("/dashboard") ||
-        nextUrl.pathname.startsWith("/diagram") ||
-        nextUrl.pathname.startsWith("/portal");
-      if (isProtected) return isLoggedIn;
+        path.startsWith("/dashboard") ||
+        path.startsWith("/diagram") ||
+        path.startsWith("/portal") ||
+        path.startsWith("/m");
+      if (isProtected && !isLoggedIn) return false; // → signIn page (keeps callbackUrl)
+
+      // Phone auto-redirect: a logged-in mobile user landing on the desktop
+      // dashboard is sent to the mobile UI, unless they've opted for desktop
+      // (?desktop=1 or the dgx-desktop cookie set by the "Desktop version" link).
+      const prefersDesktop =
+        request.cookies.get("dgx-desktop")?.value === "1" ||
+        nextUrl.searchParams.get("desktop") === "1";
+      const isMobile = MOBILE_UA.test(request.headers.get("user-agent") ?? "");
+      if (isLoggedIn && isMobile && !prefersDesktop && path === "/dashboard") {
+        return NextResponse.redirect(new URL("/m", nextUrl));
+      }
       return true;
     },
   },
