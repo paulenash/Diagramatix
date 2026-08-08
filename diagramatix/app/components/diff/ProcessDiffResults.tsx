@@ -1,6 +1,37 @@
 "use client";
 
+import { type ReactNode } from "react";
 import { eventTrigger, type ProcessDiff, type DiffStatus } from "@/app/lib/diagram/diff/processDiff";
+
+/** Inline **bold** → <strong>. */
+function inlineMd(text: string): ReactNode {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((p, i) =>
+    p.startsWith("**") && p.endsWith("**") ? <strong key={i}>{p.slice(2, -2)}</strong> : <span key={i}>{p}</span>,
+  );
+}
+
+/** Minimal markdown → elements for the AI summary: #/##/### become heading
+ *  levels (not literal ## text), `- ` bullets, `**bold**`, blank-line paragraphs. */
+function MarkdownLite({ text }: { text: string }) {
+  const out: ReactNode[] = [];
+  let bullets: string[] = [];
+  const flush = (key: string) => {
+    if (bullets.length) {
+      out.push(<ul key={key} className="list-disc pl-4 my-1 space-y-0.5">{bullets.map((l, i) => <li key={i}>{inlineMd(l)}</li>)}</ul>);
+      bullets = [];
+    }
+  };
+  text.split(/\r?\n/).forEach((ln, i) => {
+    const h = ln.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { flush(`u${i}`); const lvl = h[1].length; out.push(<div key={i} className={`${lvl <= 1 ? "text-[13px]" : "text-[12px]"} font-semibold text-gray-900 mt-2 mb-0.5`}>{inlineMd(h[2])}</div>); return; }
+    const b = ln.match(/^\s*[-*]\s+(.*)$/);
+    if (b) { bullets.push(b[1]); return; }
+    flush(`u${i}`);
+    if (ln.trim() !== "") out.push(<p key={i} className="my-1">{inlineMd(ln)}</p>);
+  });
+  flush("uend");
+  return <>{out}</>;
+}
 
 const STATUS_STYLE: Record<DiffStatus, string> = {
   added: "bg-green-50 text-green-700",
@@ -285,9 +316,9 @@ export function ProcessDiffResults({ diff, aiSummary, merge }: {
       )}
 
       {aiSummary && (
-        <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded text-[11px] text-gray-800 whitespace-pre-wrap">
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded text-[11px] text-gray-800">
           <div className="font-medium text-blue-800 mb-1">AI summary</div>
-          {aiSummary}
+          <MarkdownLite text={aiSummary} />
         </div>
       )}
     </>

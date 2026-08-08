@@ -21,19 +21,35 @@ import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { buildDocx } from "@/app/lib/documents/exportDocx";
 import { isSuperuser } from "@/app/lib/superuser";
+import JSZip from "jszip";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { diffProcesses, type ProcessDiff } from "@/app/lib/diagram/diff/processDiff";
 import { diffToMarkdown, diffForAi } from "@/app/lib/diagram/diff/processDiffFormat";
 
+/** Org Word-template style adoption: lift word/styles.xml from the org's default
+ *  (or newest) SOP template's uploaded .docx, so the diff report matches the org's
+ *  Word branding — the same style source SOP export uses. */
+async function orgWordStyles(orgId: string | null): Promise<string | undefined> {
+  if (!orgId) return undefined;
+  const tpl =
+    (await prisma.sopTemplate.findFirst({ where: { orgId, isDefault: true, NOT: { docxTemplate: null } }, select: { docxTemplate: true } }))
+    ?? (await prisma.sopTemplate.findFirst({ where: { orgId, NOT: { docxTemplate: null } }, orderBy: { updatedAt: "desc" }, select: { docxTemplate: true } }));
+  if (!tpl?.docxTemplate) return undefined;
+  try {
+    const zip = await JSZip.loadAsync(Buffer.from(tpl.docxTemplate));
+    return await zip.file("word/styles.xml")?.async("text");
+  } catch { return undefined; }
+}
+
 /** Build the .docx comparison report response from a computed diff + optional AI summary. */
-function diffDocxResponse(aName: string, bName: string, diff: ProcessDiff, aiSummary: string) {
+function diffDocxResponse(aName: string, bName: string, diff: ProcessDiff, aiSummary: string, externalStyles?: string) {
   const sections = [
     ...(aiSummary ? [{ heading: "AI Summary", bodyMarkdown: aiSummary }] : []),
     { heading: aiSummary ? "Comparison" : null, bodyMarkdown: diffToMarkdown(diff) },
   ];
   const title = `Process Comparison — ${aName} vs ${bName}`;
   const safe = `${aName}-vs-${bName}`.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
-  return buildDocx([{ title, sections }], { docTitle: title }).then((buf) =>
+  return buildDocx([{ title, sections }], { docTitle: title, externalStyles }).then((buf) =>
     new NextResponse(new Uint8Array(buf), {
       status: 200,
       headers: {
@@ -68,9 +84,9 @@ type Sess = Parameters<typeof requireDiagramAccess>[0];
 type Jar = Parameters<typeof requireDiagramAccess>[1];
 async function loadDiagram(session: Sess, jar: Jar, id: string) {
   await requireDiagramAccess(session, jar, id, "view");
-  const d = await prisma.diagram.findUnique({ where: { id }, select: { id: true, name: true, data: true } });
+  const d = await prisma.diagram.findUnique({ where: { id }, select: { id: true, name: true, data: true, orgId: true } });
   if (!d) throw new OrgContextError("Diagram not found", 404);
-  return { name: d.name, data: (d.data ?? { elements: [], connectors: [] }) as unknown as DiagramData };
+  return { name: d.name, orgId: d.orgId, data: (d.data ?? { elements: [], connectors: [] }) as unknown as DiagramData };
 }
 
 export async function POST(req: Request) {
@@ -93,7 +109,7 @@ export async function POST(req: Request) {
       }
     }
     if (!ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    return diffDocxResponse(run.aName, run.bName, run.result as unknown as ProcessDiff, run.aiSummary?.trim() ?? "");
+    return diffDocxResponse(run.aName, run.bName, run.result as unknown as ProcessDiff, run.aiSummary?.trim() ?? "", await orgWordStyles(run.orgId));
   }
 
   const aId = typeof body.aId === "string" ? body.aId : "";
@@ -116,7 +132,7 @@ export async function POST(req: Request) {
   if (mode === "docx") {
     // Optional AI narrative (already generated + shown to the user) leads the doc.
     const aiSummary = typeof body.aiSummary === "string" ? body.aiSummary.trim() : "";
-    return diffDocxResponse(a.name, b.name, diff, aiSummary);
+    return diffDocxResponse(a.name, b.name, diff, aiSummary, await orgWordStyles(a.orgId));
   }
 
   // mode === "ai"

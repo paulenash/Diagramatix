@@ -58,7 +58,9 @@ export function diffToMarkdown(diff: ProcessDiff): string {
   const rd = diff.reviewDiff;
   const kindLabel: Record<string, string> = { "review-comment": "Review Comment", "pain-point": "Pain Point", issue: "Issue", bottleneck: "Bottleneck" };
   if (rd.added.length || rd.removed.length || Object.values(rd.aCounts).some((n) => n > 0) || Object.values(rd.bCounts).some((n) => n > 0)) {
-    out.push(`**Review status:** ${rd.status}`);
+    out.push("## Review status");
+    out.push("");
+    out.push(rd.status);
     out.push("");
     if (rd.removed.length || rd.added.length) {
       out.push("| Change | Kind | Note | Near |");
@@ -69,6 +71,8 @@ export function diffToMarkdown(diff: ProcessDiff): string {
     }
   }
 
+  out.push("## Activities");
+  out.push("");
   out.push("| Activity | Change | Who (role) | Type | Systems | Data |");
   out.push("| --- | --- | --- | --- | --- | --- |");
   for (const r of rows) {
@@ -86,7 +90,7 @@ export function diffToMarkdown(diff: ProcessDiff): string {
   const md = diff.messageDiff;
   if (md.added.length || md.removed.length || md.changed.length) {
     out.push("");
-    out.push("**Message flows**");
+    out.push("## Message flows");
     out.push("");
     out.push("| Change | From | To | Message |");
     out.push("| --- | --- | --- | --- |");
@@ -99,7 +103,7 @@ export function diffToMarkdown(diff: ProcessDiff): string {
   const ev = diff.eventDiff;
   if (ev.added.length || ev.removed.length || ev.changed.length) {
     out.push("");
-    out.push("**Intermediate & boundary events**");
+    out.push("## Intermediate & boundary events");
     out.push("");
     out.push("| Change | Kind | Where | Trigger |");
     out.push("| --- | --- | --- | --- |");
@@ -113,7 +117,7 @@ export function diffToMarkdown(diff: ProcessDiff): string {
   // Automation changes — task-marker shifts and what they signal.
   if (diff.automationChanges.length) {
     out.push("");
-    out.push("**Automation changes**");
+    out.push("## Automation changes");
     out.push("");
     out.push("| Activity | Marker | What it signals |");
     out.push("| --- | --- | --- |");
@@ -146,15 +150,54 @@ export function diffToCsv(diff: ProcessDiff): string {
     ].map((v) => csvCell(String(v))).join(","));
   }
 
-  // Message flows as a second block (blank-line separated).
+  const row = (cells: (string | number)[]) => lines.push(cells.map((v) => csvCell(String(v))).join(","));
+  const block = (title: string, header: string[]) => { lines.push(""); lines.push(csvCell(title)); lines.push(header.map(csvCell).join(",")); };
+  const kindLabel: Record<string, string> = { "review-comment": "Review Comment", "pain-point": "Pain Point", issue: "Issue", bottleneck: "Bottleneck" };
+
+  // Roles / Systems / Data objects deltas (each a labelled block).
+  const delta = (title: string, d: { added: string[]; removed: string[] }) => {
+    if (!d.added.length && !d.removed.length) return;
+    block(title, ["Change", "Value"]);
+    for (const v of d.removed) row(["Removed", v]);
+    for (const v of d.added) row(["Added", v]);
+  };
+  delta("Roles", diff.roleDiff);
+  delta("Systems", diff.systemDiff);
+  delta("Data objects", diff.dataObjectDiff);
+
+  // Message flows.
   const md = diff.messageDiff;
   if (md.added.length || md.removed.length || md.changed.length) {
-    lines.push("");
-    lines.push(["Message change", "From", "To", "Before", "After"].map(csvCell).join(","));
-    for (const m of md.removed) lines.push(["Removed", m.from, m.to, m.label, ""].map((v) => csvCell(String(v))).join(","));
-    for (const m of md.added) lines.push(["Added", m.from, m.to, "", m.label].map((v) => csvCell(String(v))).join(","));
-    for (const m of md.changed) lines.push(["Changed", m.from, m.to, m.a, m.b].map((v) => csvCell(String(v))).join(","));
+    block("Message flows", ["Change", "From", "To", "Before", "After"]);
+    for (const m of md.removed) row(["Removed", m.from, m.to, m.label, ""]);
+    for (const m of md.added) row(["Added", m.from, m.to, "", m.label]);
+    for (const m of md.changed) row(["Changed", m.from, m.to, m.a, m.b]);
   }
+
+  // Intermediate + boundary events.
+  const ev = diff.eventDiff;
+  if (ev.added.length || ev.removed.length || ev.changed.length) {
+    block("Intermediate & boundary events", ["Change", "Kind", "Where", "Trigger (before)", "Trigger (after)"]);
+    const where = (kind: string, w: string) => (kind === "boundary" ? `on ${w}` : (w || "(inline)"));
+    for (const e of ev.removed) row(["Removed", e.kind, where(e.kind, e.kind === "boundary" ? e.host : e.label), evTrig(e), ""]);
+    for (const e of ev.added) row(["Added", e.kind, where(e.kind, e.kind === "boundary" ? e.host : e.label), "", evTrig(e)]);
+    for (const e of ev.changed) row(["Changed", e.kind, where(e.kind, e.where), e.a, e.b]);
+  }
+
+  // Automation changes.
+  if (diff.automationChanges.length) {
+    block("Automation changes", ["Activity", "Marker (before)", "Marker (after)", "What it signals"]);
+    for (const c of diff.automationChanges) row([c.activity, c.from, c.to, c.note]);
+  }
+
+  // Review status.
+  const rd = diff.reviewDiff;
+  if (rd.added.length || rd.removed.length) {
+    block(`Review status — ${rd.status}`, ["Change", "Kind", "Note", "Near"]);
+    for (const r of rd.removed) row(["Removed", kindLabel[r.kind], r.text, r.location]);
+    for (const r of rd.added) row(["Added", kindLabel[r.kind], r.text, r.location]);
+  }
+
   return lines.join("\r\n");
 }
 
