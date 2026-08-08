@@ -3173,9 +3173,13 @@ export function DiagramEditor({
   // Open the export-options dialog (PDF always needs it for scale; SVG/JSON only
   // when the diagram actually has annotations to offer excluding).
   function openExport(format: "svg" | "pdf" | "json") {
+    // JSON is a full-fidelity envelope — it ALWAYS carries everything (Review
+    // Comments, Pain Points, Issues, bottleneck, all properties + simulation
+    // params), so it never shows the include/exclude dialog. Only the visual
+    // exports (SVG/PDF) offer hiding annotations.
+    if (format === "json") { void handleExportJson(); return; }
     if (format !== "pdf" && !hasAnnotations(data)) {
-      if (format === "svg") handleExport(NO_ANNOTATIONS);
-      else void handleExportJson(NO_ANNOTATIONS);
+      handleExport(NO_ANNOTATIONS);
       return;
     }
     setExportInc(NO_ANNOTATIONS);
@@ -3185,8 +3189,10 @@ export function DiagramEditor({
 
   // Export the current diagram's data as a JSON file (single-diagram envelope
   // matching the project export format so it round-trips through Import JSON).
-  async function handleExportJson(inc: AnnotationInclude = NO_ANNOTATIONS) {
-    const exportData = filterAnnotations(data, inc);
+  async function handleExportJson() {
+    // Full fidelity: JSON export/import must ALWAYS include annotations, so no
+    // filterAnnotations here (unlike SVG/PDF which can hide them visually).
+    const exportData = data;
     const { SCHEMA_VERSION } = await import("@/app/lib/diagram/types");
     let appVersion = SCHEMA_VERSION;
     try {
@@ -6615,8 +6621,7 @@ export function DiagramEditor({
                   const fmt = exportDlg; const inc = exportInc;
                   setExportDlg(null);
                   if (fmt === "pdf") { setPdfScale(pendingPdfScale); void handleExportPdf(inc); }
-                  else if (fmt === "svg") handleExport(inc);
-                  else void handleExportJson(inc);
+                  else handleExport(inc); // svg (JSON no longer routes through this dialog)
                 }}
                 className="px-3 py-1.5 text-xs font-medium text-white rounded bg-blue-600 hover:bg-blue-700"
               >Export</button>
