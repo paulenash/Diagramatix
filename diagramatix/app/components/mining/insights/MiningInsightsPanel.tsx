@@ -7,22 +7,24 @@
  * Self-fetches the run's full detail (analytics + variants + kpiConfig) and the
  * discovered diagram data once, shared across tabs.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import type { RunAnalytics } from "@/app/lib/mining/analytics";
 import type { Variant } from "@/app/lib/mining/types";
 import { formatDuration } from "@/app/lib/mining/analytics";
 import { applyHeat, heatColor, HEAT_METRICS, type HeatMetric } from "@/app/lib/mining/heat";
 import { variantPathIds, variantDiff, variantPareto } from "@/app/lib/mining/variantView";
+import { buildRunners, pointAt } from "@/app/lib/mining/replayRunners";
 import { ReplayDiagramBackdrop } from "@/app/components/simulation/replay/ReplayDiagramBackdrop";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 
 interface RunLite { id: string; discoveredBpmnId: string | null; discoveredSmId: string | null }
 
-type TabKey = "heat" | "variants";
+type TabKey = "heat" | "variants" | "cases";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "heat", label: "🔥 Insights" },
   { key: "variants", label: "🔀 Variants" },
+  { key: "cases", label: "🎞 Cases" },
 ];
 
 export function MiningInsightsPanel({ projectId, run }: { projectId: string; run: RunLite }) {
@@ -63,6 +65,7 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
       </div>
       {tab === "heat" && <HeatTab analytics={analytics} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} loading={loading} />}
       {tab === "variants" && <VariantsTab variants={variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
+      {tab === "cases" && <CasesTab analytics={analytics} variants={variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
     </div>
   );
 }
@@ -206,6 +209,118 @@ function VariantsTab({ variants, bpmn, hasBpmn }: { variants: Variant[]; bpmn: D
         ) : <p className="text-[11px] text-stone-500">Loading model…</p>}
       </div>
     </div>
+  );
+}
+
+// ── Cases tab (list + drill-down + log replay) ───────────────────────────────
+
+function CasesTab({ analytics, variants, bpmn, hasBpmn }: { analytics: RunAnalytics | null; variants: Variant[]; bpmn: DiagramData | null; hasBpmn: boolean }) {
+  const [sortDesc, setSortDesc] = useState(true);
+  const [variantFilter, setVariantFilter] = useState<number | "all">("all");
+  const [selected, setSelected] = useState<number | null>(null);
+
+  const rows = useMemo(() => {
+    if (!analytics) return [];
+    let cs = analytics.cases;
+    if (variantFilter !== "all") cs = cs.filter((c) => c.variantIdx === variantFilter);
+    return [...cs].sort((a, b) => (sortDesc ? b.cycleMs - a.cycleMs : a.cycleMs - b.cycleMs)).slice(0, 60);
+  }, [analytics, sortDesc, variantFilter]);
+
+  if (!analytics || analytics.cases.length === 0) return <NoAnalytics />;
+  const fmt = (ms: number) => formatDuration(ms, analytics.clockUnit);
+  const sel = selected != null ? analytics.cases.find((c) => c.idx === selected) : null;
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {/* Replay */}
+      <div>
+        {hasBpmn && bpmn ? <CaseReplay data={bpmn} variants={variants} /> : <NeedBpmn what="replay" />}
+      </div>
+      {/* Case list */}
+      <div>
+        <div className="flex items-center gap-2 mb-1 text-[11px]">
+          <span className="text-xs font-semibold text-amber-200">Cases</span>
+          <span className="text-stone-500">{analytics.totalCases}{analytics.capped ? " (sampled)" : ""}</span>
+          <button onClick={() => setSortDesc((s) => !s)} className="ml-auto rounded px-2 py-0.5 bg-stone-800 hover:bg-stone-700 text-stone-300">
+            cycle {sortDesc ? "↓ longest" : "↑ shortest"}
+          </button>
+          <select value={String(variantFilter)} onChange={(e) => setVariantFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
+            className="bg-stone-800 border border-stone-600 rounded px-1 py-0.5 text-stone-100">
+            <option value="all">all variants</option>
+            {variants.map((_, i) => <option key={i} value={i}>variant #{i + 1}</option>)}
+          </select>
+        </div>
+        <div className="max-h-[44vh] overflow-auto">
+          <table className="w-full text-[11px]">
+            <tbody>
+              {rows.map((c) => (
+                <tr key={c.idx} onClick={() => setSelected(selected === c.idx ? null : c.idx)}
+                  className={`cursor-pointer border-b border-stone-800 ${selected === c.idx ? "bg-amber-600/20" : "hover:bg-stone-800"}`}>
+                  <td className="py-1 pr-2 text-stone-300 truncate max-w-[8rem]" title={c.caseId}>{c.caseId}</td>
+                  <td className="py-1 pr-2 text-stone-500">#{c.variantIdx + 1}</td>
+                  <td className="py-1 pr-2 text-stone-500">{c.events} steps</td>
+                  <td className="py-1 text-right text-stone-200 tabular-nums whitespace-nowrap">{fmt(c.cycleMs)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {sel && (
+          <div className="mt-2 rounded border border-stone-700 p-2 text-[11px]">
+            <div className="font-semibold text-amber-200 mb-0.5">Case {sel.caseId}</div>
+            <div className="text-stone-400">cycle {fmt(sel.cycleMs)} · {sel.events} steps · variant #{sel.variantIdx + 1}</div>
+            <div className="text-[10px] text-stone-400 mt-1">{(variants[sel.variantIdx]?.events ?? []).join(" → ")}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Self-contained log-replay: tokens flow over the discovered model, weighted by
+ *  variant frequency. Reuses ReplayDiagramBackdrop as the backdrop; no simulator. */
+function CaseReplay({ data, variants }: { data: DiagramData; variants: Variant[] }) {
+  const runners = useMemo(() => buildRunners(data, variants), [data, variants]);
+  const [playing, setPlaying] = useState(true);
+  const [t, setT] = useState(0);
+  const raf = useRef(0);
+  const last = useRef<number | null>(null);
+  const PERIOD = 9000; // ms for one full timeline sweep
+
+  useEffect(() => {
+    if (!playing) { last.current = null; return; }
+    const step = (now: number) => {
+      if (last.current != null) { const dt = now - last.current; setT((prev) => (prev + dt / PERIOD) % 1); }
+      last.current = now;
+      raf.current = requestAnimationFrame(step);
+    };
+    raf.current = requestAnimationFrame(step);
+    return () => { cancelAnimationFrame(raf.current); last.current = null; };
+  }, [playing]);
+
+  const viewBox = useMemo(() => boundsViewBox(data), [data]);
+  const tokens = runners.map((r, i) => {
+    const local = (t - r.start) / r.dur;
+    if (local < 0 || local > 1) return null;
+    const p = pointAt(r.points, local);
+    return <circle key={i} cx={p.x} cy={p.y} r={7} fill="#f59e0b" fillOpacity={0.85} stroke="#78350f" strokeWidth={1} />;
+  });
+
+  return (
+    <>
+      <div className="flex items-center gap-2 mb-1">
+        <button onClick={() => setPlaying((p) => !p)} className="text-[11px] rounded px-2 py-0.5 bg-amber-700 hover:bg-amber-600 text-white">
+          {playing ? "⏸ Pause" : "▶ Play"}
+        </button>
+        <span className="text-[10px] text-stone-400">{runners.length} case flows (top variants)</span>
+      </div>
+      <div className="bg-stone-100 rounded border border-stone-700 overflow-hidden">
+        <svg viewBox={viewBox} className="w-full" style={{ maxHeight: "50vh" }} preserveAspectRatio="xMidYMid meet">
+          <ReplayDiagramBackdrop data={data} />
+          {tokens}
+        </svg>
+      </div>
+    </>
   );
 }
 
