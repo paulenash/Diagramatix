@@ -13,6 +13,7 @@ import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext
 import { gateFeature } from "@/app/lib/subscription-route";
 import { buildEventLog } from "@/app/lib/mining/parseEventLog";
 import { computePerformance } from "@/app/lib/mining/performance";
+import { computeAnalytics } from "@/app/lib/mining/analytics";
 import { computeGovernance, hasGovernance } from "@/app/lib/mining/governance";
 import type { LogMapping } from "@/app/lib/mining/types";
 
@@ -51,17 +52,20 @@ export async function POST(req: Request, { params }: Params) {
   if (log.stats.cases === 0) {
     return NextResponse.json({ error: "No usable events — check the case id + timestamp columns." }, { status: 400 });
   }
-  // Performance + governance aggregates must be computed NOW — raw events are transient.
+  // Performance + analytics + governance aggregates must be computed NOW — raw events are transient.
   const performance = computePerformance(log.traces);
+  const analytics = computeAnalytics(log);
   const governance = computeGovernance(log.traces);
+  // Optional KPI/SLA config carried through from an example adoption (Slice 7); else null.
+  const kpiConfig = body.kpiConfig && typeof body.kpiConfig === "object" ? body.kpiConfig : null;
 
   // Scalars via Prisma; the JSON columns via raw SQL (Prisma 7 omits JSON writes).
   const run = await prisma.processMiningRun.create({
     data: { name, projectId: id, orgId, createdById: session?.user?.id ?? null },
   });
   await pgPool.query(
-    'UPDATE "ProcessMiningRun" SET mapping = $1::jsonb, stats = $2::jsonb, variants = $3::jsonb, performance = $4::jsonb, governance = $5::jsonb, "updatedAt" = NOW() WHERE id = $6',
-    [JSON.stringify(mapping), JSON.stringify(log.stats), JSON.stringify(log.variants), JSON.stringify(performance), JSON.stringify(hasGovernance(governance) ? governance : null), run.id],
+    'UPDATE "ProcessMiningRun" SET mapping = $1::jsonb, stats = $2::jsonb, variants = $3::jsonb, performance = $4::jsonb, analytics = $5::jsonb, "kpiConfig" = $6::jsonb, governance = $7::jsonb, "updatedAt" = NOW() WHERE id = $8',
+    [JSON.stringify(mapping), JSON.stringify(log.stats), JSON.stringify(log.variants), JSON.stringify(performance), JSON.stringify(analytics), JSON.stringify(kpiConfig), JSON.stringify(hasGovernance(governance) ? governance : null), run.id],
   );
 
   return NextResponse.json({ run: { id: run.id, name, stats: log.stats } }, { status: 201 });

@@ -10,6 +10,7 @@
 import { prisma, pgPool } from "@/app/lib/db";
 import { buildEventLog } from "./parseEventLog";
 import { computePerformance } from "./performance";
+import { computeAnalytics } from "./analytics";
 import { computeGovernance, hasGovernance } from "./governance";
 import { discoverProcess } from "./discoverProcess";
 import { discoverStateMachine } from "./discoverStateMachine";
@@ -40,11 +41,13 @@ export async function refreshRunFromSource(source: RefreshableSource): Promise<R
 
   const log = buildEventLog(headers, rows, mapping);
   const performance = computePerformance(log.traces);
+  const analytics = computeAnalytics(log);
   const governance = computeGovernance(log.traces);
 
+  // kpiConfig is preserved (not overwritten) across a live refresh.
   await pgPool.query(
-    'UPDATE "ProcessMiningRun" SET stats = $1::jsonb, variants = $2::jsonb, performance = $3::jsonb, governance = $4::jsonb, "updatedAt" = NOW() WHERE id = $5',
-    [JSON.stringify(log.stats), JSON.stringify(log.variants), JSON.stringify(performance), JSON.stringify(hasGovernance(governance) ? governance : null), source.runId],
+    'UPDATE "ProcessMiningRun" SET stats = $1::jsonb, variants = $2::jsonb, performance = $3::jsonb, analytics = $4::jsonb, governance = $5::jsonb, "updatedAt" = NOW() WHERE id = $6',
+    [JSON.stringify(log.stats), JSON.stringify(log.variants), JSON.stringify(performance), JSON.stringify(analytics), JSON.stringify(hasGovernance(governance) ? governance : null), source.runId],
   );
 
   const run = await prisma.processMiningRun.findUnique({
