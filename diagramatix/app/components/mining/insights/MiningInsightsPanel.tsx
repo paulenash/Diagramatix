@@ -21,12 +21,13 @@ import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 
 interface RunLite { id: string; discoveredBpmnId: string | null; discoveredSmId: string | null }
 
-type TabKey = "heat" | "variants" | "cases" | "outcomes";
+type TabKey = "heat" | "variants" | "cases" | "outcomes" | "export";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "heat", label: "🔥 Insights" },
   { key: "variants", label: "🔀 Variants" },
   { key: "cases", label: "🎞 Cases" },
   { key: "outcomes", label: "🎯 Outcomes" },
+  { key: "export", label: "⬇ Export" },
 ];
 
 export function MiningInsightsPanel({ projectId, run }: { projectId: string; run: RunLite }) {
@@ -80,6 +81,26 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
       {tab === "variants" && <VariantsTab variants={variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
       {tab === "cases" && <CasesTab analytics={analytics} variants={variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
       {tab === "outcomes" && <OutcomesTab analytics={analytics} variants={variants} kpiConfig={kpiConfig} onSave={saveKpi} />}
+      {tab === "export" && <ExportTab projectId={projectId} runId={run.id} hasAnalytics={!!analytics && analytics.activities.length > 0} />}
+    </div>
+  );
+}
+
+// ── Export tab (Word / Excel / PDF) ──────────────────────────────────────────
+
+function ExportTab({ projectId, runId, hasAnalytics }: { projectId: string; runId: string; hasAnalytics: boolean }) {
+  if (!hasAnalytics) return <NoAnalytics />;
+  const base = `/api/projects/${projectId}/mining/runs/${runId}/analysis-export`;
+  const btn = "text-xs rounded px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white";
+  return (
+    <div>
+      <p className="text-[11px] text-stone-400 mb-2">Download the full analysis — summary, bottleneck table, variant Pareto and the on-time/late outcomes — as a report.</p>
+      <div className="flex items-center gap-2">
+        <a className={btn} href={`${base}?format=docx`}>Word (.docx)</a>
+        <a className={btn} href={`${base}?format=xlsx`}>Excel (.xlsx)</a>
+        <a className={btn} href={`${base}?format=pdf`} target="_blank" rel="noopener">PDF</a>
+      </div>
+      <p className="text-[10px] text-stone-500 mt-2">PDF is rendered server-side (needs LibreOffice on the host); Word/Excel download directly.</p>
     </div>
   );
 }
