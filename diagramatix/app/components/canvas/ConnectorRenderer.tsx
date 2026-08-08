@@ -1427,7 +1427,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         const illegal = !!connector.transitionIllegal;
         const fill = illegal ? "#dc2626" : "#16a34a";
         const digits = String(count).length;
-        const r = Math.max(11, 8 + digits * 3.2);
+        // Size the circle so the number always fits: radius covers the glyph run
+        // (~0.6em advance each) at a fixed readable font, plus padding.
+        const badgeFont = 12;
+        const r = Math.max(11, Math.ceil((digits * badgeFont * 0.6) / 2) + 4);
         const moved = ox !== 0 || oy !== 0;
         const isDragging = draggingEndLabel === "transitionCountOffset";
         function handleBadgeMouseDown(e: React.MouseEvent) {
@@ -1460,7 +1463,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
               <title>{count.toLocaleString()} case{count === 1 ? "" : "s"} took this transition{illegal ? " — not allowed by the reference" : ""}</title>
             </circle>
             <text x={bx} y={by} textAnchor="middle" dominantBaseline="central"
-              fontSize={Math.round(r * 0.95)} fontWeight={700} fill="#ffffff"
+              fontSize={badgeFont} fontWeight={700} fill="#ffffff"
               style={{ pointerEvents: "none", userSelect: "none" }}>{count}</text>
           </g>
         );
