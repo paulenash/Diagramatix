@@ -32,6 +32,9 @@ export interface AdoptMiningResult {
   /** Set when the package ships several choosable scenarios — the console shows
    *  a scenario picker and pre-loads the default (last) one. */
   sampleLogs?: MiningExamplePackage["sampleLogs"];
+  /** The example's KPI/SLA config — threaded into the re-import so the Outcomes
+   *  tab has a target out of the box (sample-log examples). */
+  kpiConfig?: unknown;
 }
 
 export async function adoptMiningPackage(
@@ -126,7 +129,7 @@ export async function adoptMiningPackage(
         const run = await tx.processMiningRun.create({
           data: { name: r.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId: refId, discoveredSmId: smId, ocelGroupId, objectType: r.objectType ?? null, domainDiagramId },
         });
-        await tx.$executeRaw`UPDATE "ProcessMiningRun" SET mapping = ${JSON.stringify(r.mapping)}::jsonb, stats = ${JSON.stringify(r.stats)}::jsonb, variants = ${JSON.stringify(r.variants)}::jsonb, performance = ${JSON.stringify(r.performance)}::jsonb, governance = ${r.governance ? JSON.stringify(r.governance) : null}::jsonb, "updatedAt" = NOW() WHERE id = ${run.id}`;
+        await tx.$executeRaw`UPDATE "ProcessMiningRun" SET mapping = ${JSON.stringify(r.mapping)}::jsonb, stats = ${JSON.stringify(r.stats)}::jsonb, variants = ${JSON.stringify(r.variants)}::jsonb, performance = ${JSON.stringify(r.performance)}::jsonb, analytics = ${r.analytics ? JSON.stringify(r.analytics) : null}::jsonb, "kpiConfig" = ${r.kpiConfig ? JSON.stringify(r.kpiConfig) : null}::jsonb, governance = ${r.governance ? JSON.stringify(r.governance) : null}::jsonb, "updatedAt" = NOW() WHERE id = ${run.id}`;
         await createTwin(r, run.id);
         firstRunId ??= run.id;
       }
@@ -140,7 +143,7 @@ export async function adoptMiningPackage(
     // With a sampleLog, DON'T pre-create the run — the user imports it in the
     // console (confirm-the-analysis flow). Otherwise recreate the run as usual.
     if (pkg.sampleLog || pkg.sampleLogs?.length) {
-      return { projectId: project.id, projectName: project.name, openDiagramId, sampleLog: pkg.sampleLog, sampleLogs: pkg.sampleLogs };
+      return { projectId: project.id, projectName: project.name, openDiagramId, sampleLog: pkg.sampleLog, sampleLogs: pkg.sampleLogs, kpiConfig: pkg.run?.kpiConfig };
     }
 
     // The run — scalars via Prisma, the four JSON columns via raw SQL (Prisma 7
@@ -149,7 +152,7 @@ export async function adoptMiningPackage(
     const run = await tx.processMiningRun.create({
       data: { name: r.name, projectId: project.id, orgId: ctx.orgId, createdById: ctx.userId, referenceSmId },
     });
-    await tx.$executeRaw`UPDATE "ProcessMiningRun" SET mapping = ${JSON.stringify(r.mapping)}::jsonb, stats = ${JSON.stringify(r.stats)}::jsonb, variants = ${JSON.stringify(r.variants)}::jsonb, performance = ${JSON.stringify(r.performance)}::jsonb, governance = ${r.governance ? JSON.stringify(r.governance) : null}::jsonb, "updatedAt" = NOW() WHERE id = ${run.id}`;
+    await tx.$executeRaw`UPDATE "ProcessMiningRun" SET mapping = ${JSON.stringify(r.mapping)}::jsonb, stats = ${JSON.stringify(r.stats)}::jsonb, variants = ${JSON.stringify(r.variants)}::jsonb, performance = ${JSON.stringify(r.performance)}::jsonb, analytics = ${r.analytics ? JSON.stringify(r.analytics) : null}::jsonb, "kpiConfig" = ${r.kpiConfig ? JSON.stringify(r.kpiConfig) : null}::jsonb, governance = ${r.governance ? JSON.stringify(r.governance) : null}::jsonb, "updatedAt" = NOW() WHERE id = ${run.id}`;
     await createTwin(r, run.id);
 
     return { projectId: project.id, projectName: project.name, runId: run.id, openDiagramId };

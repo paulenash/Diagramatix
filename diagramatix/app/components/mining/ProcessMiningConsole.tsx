@@ -7,7 +7,7 @@
  * digital-twin simulator calibration lands in the final slice.
  */
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseCsv, guessMapping, distinctActivities } from "@/app/lib/mining/parseEventLog";
 import { activityToState } from "@/app/lib/mining/stateNaming";
 import { parseXes } from "@/app/lib/mining/formats/xes";
@@ -128,6 +128,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+  // Holds an adopted example's SLA between the pre-load and the import POST.
+  const pendingKpi = useRef<unknown>(null);
+
   // Adopted-example hand-off: if the gallery stashed a raw sample log for this
   // project, pre-load the Import panel with it (confirm the analysis, then import).
   // Several scenarios → keep the set for the picker + pre-load the default (last).
@@ -137,6 +140,8 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       const raw = sessionStorage.getItem(key);
       if (!raw) return;
       sessionStorage.removeItem(key);
+      // Adopted example's SLA — apply it to the run created by this re-import.
+      try { const kraw = sessionStorage.getItem(`mining-kpi:${projectId}`); if (kraw) { sessionStorage.removeItem(`mining-kpi:${projectId}`); pendingKpi.current = JSON.parse(kraw); } } catch { /* ignore */ }
       const parsed = JSON.parse(raw) as SampleScenario | { scenarios: SampleScenario[] };
       const set = "scenarios" in parsed ? parsed.scenarios : null;
       if (set && Array.isArray(set) && set.length) {
@@ -281,10 +286,11 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     try {
       const res = await fetch(`/api/projects/${projectId}/mining/import`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: runName.trim() || "Event log", mapping, headers, rows }),
+        body: JSON.stringify({ name: runName.trim() || "Event log", mapping, headers, rows, kpiConfig: pendingKpi.current ?? undefined }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Import failed"); return; }
+      pendingKpi.current = null;
       setFileName(null); setHeaders([]); setRows([]); setMapping({}); setRunName("");
       await load();
       setSelectedId(json.run?.id ?? null);

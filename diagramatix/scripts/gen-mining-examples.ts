@@ -16,6 +16,15 @@ import { writeFileSync } from "fs";
 import { join } from "path";
 import { buildEventLog } from "../app/lib/mining/parseEventLog";
 import { computePerformance } from "../app/lib/mining/performance";
+import { computeAnalytics } from "../app/lib/mining/analytics";
+import type { EventLog } from "../app/lib/mining/types";
+
+/** A demo SLA between the median and p90 cycle time, so a meaningful slice of
+ *  cases breach it (the Outcomes tab shows a real on-time/late split). */
+const demoKpi = (log: EventLog) => {
+  const a = computeAnalytics(log);
+  return { analytics: a, kpiConfig: { slaMs: Math.round((a.cycle.medianMs + a.cycle.p90Ms) / 2) } };
+};
 import { layoutGenericDiagram } from "../app/lib/diagram/genericLayout";
 import type { DiagramData } from "../app/lib/diagram/types";
 import type { LogMapping } from "../app/lib/mining/types";
@@ -193,6 +202,7 @@ const pkg: MiningExamplePackage = {
     stats: log.stats,
     variants: log.variants,
     performance,
+    ...demoKpi(log),
     referenceSmKey: "ap-reference",
   },
   // The recommended/default log (the console pre-loads this one, back-compat).
@@ -328,7 +338,7 @@ const o2cExample = {
   package: {
     version: 1 as const,
     diagrams: [{ key: "o2c-reference", name: "Order Lifecycle (Reference)", type: "state-machine", data: buildRef(O2C_REF_ELEMENTS, O2C_CONNS) }],
-    run: { name: o2cSampleLog.runName, mapping: O2C_MAP, stats: o2cLog.stats, variants: o2cLog.variants, performance: o2cPerformance, referenceSmKey: "o2c-reference" },
+    run: { name: o2cSampleLog.runName, mapping: O2C_MAP, stats: o2cLog.stats, variants: o2cLog.variants, performance: o2cPerformance, ...demoKpi(o2cLog), referenceSmKey: "o2c-reference" },
     sampleLog: { ...o2cSampleLog },
   } as MiningExamplePackage,
 };
@@ -459,7 +469,7 @@ const serviceDeskExample = {
   package: {
     version: 1 as const,
     diagrams: [{ key: "sd-reference", name: "Ticket Lifecycle (Reference)", type: "state-machine", data: buildRef(SD_REF_ELEMENTS, SD_CONNS) }],
-    run: { name: sdCurrent.runName, mapping: SD_MAP, stats: sdLog.stats, variants: sdLog.variants, performance: sdPerformance, referenceSmKey: "sd-reference" },
+    run: { name: sdCurrent.runName, mapping: SD_MAP, stats: sdLog.stats, variants: sdLog.variants, performance: sdPerformance, ...demoKpi(sdLog), referenceSmKey: "sd-reference" },
     sampleLog: { ...sdCurrent },
     sampleLogs: sdSampleLogs.map((s) => ({ ...s })),
   } as MiningExamplePackage,

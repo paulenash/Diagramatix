@@ -25,7 +25,7 @@ export interface CaptureMiningResult { pkg: MiningExamplePackage; runName: strin
 
 /** The ProcessMiningRun fields capture reads (a structural subset of the model). */
 type DbRun = {
-  name: string; mapping: unknown; stats: unknown; variants: unknown; performance: unknown; governance: unknown;
+  name: string; mapping: unknown; stats: unknown; variants: unknown; performance: unknown; analytics: unknown; kpiConfig: unknown; governance: unknown;
   referenceSmId: string | null; discoveredSmId: string | null; objectType: string | null;
   discoveredBpmnId: string | null; studyId: string | null;
 };
@@ -96,6 +96,8 @@ export async function captureMiningPackage(projectId: string, runId: string): Pr
       stats: (r.stats ?? {}) as unknown as MiningStats,
       variants,
       performance,
+      ...(r.analytics ? { analytics: r.analytics as unknown as import("./analytics").RunAnalytics } : {}),
+      ...(r.kpiConfig ? { kpiConfig: r.kpiConfig as unknown as import("./outcomes").KpiConfig } : {}),
       ...(governance && Object.keys(governance.controls ?? {}).length ? { governance } : {}),
       ...(referenceSmKey ? { referenceSmKey } : {}),
       ...(r.objectType ? { objectType: r.objectType } : {}),

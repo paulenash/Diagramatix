@@ -59,6 +59,8 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
       if (json.projectId && (json.sampleLogs?.length || json.sampleLog)) {
         const payload = json.sampleLogs?.length ? { scenarios: json.sampleLogs } : json.sampleLog;
         try { sessionStorage.setItem(`mining-sample:${json.projectId}`, JSON.stringify(payload)); } catch { /* quota — fall back to an empty console */ }
+        // The example's SLA — threaded into the re-import so Outcomes has a target.
+        if (json.kpiConfig) { try { sessionStorage.setItem(`mining-kpi:${json.projectId}`, JSON.stringify(json.kpiConfig)); } catch { /* ignore */ } }
       } else if (json.projectId && json.runId) {
         // A ready-made run (no sample log to confirm) — tell the console to open
         // ON that run's details, not the empty Import panel (reuses mining-return).

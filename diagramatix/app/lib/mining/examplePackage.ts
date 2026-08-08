@@ -20,6 +20,8 @@
 
 import type { DiagramData } from "../diagram/types";
 import type { LogMapping, MiningStats, Variant, Performance, GovernanceStats } from "./types";
+import type { RunAnalytics } from "./analytics";
+import type { KpiConfig } from "./outcomes";
 // The simulation twin embedded in a mining run reuses the simulator's portable
 // shapes verbatim (team + calendar library, scenario config) so capture/adopt
 // stay symmetric with app/lib/simulation.
@@ -41,6 +43,12 @@ export interface MiningExampleRun {
   stats: MiningStats;
   variants: Variant[];
   performance: Performance;
+  /** Insight-layer analytics (per-activity/edge metrics + per-case index) — carried
+   *  so a cloned example shows the Insights heat/variants/cases without re-import. */
+  analytics?: RunAnalytics;
+  /** KPI/SLA outcome config (a case SLA) so the Outcomes view has a target out of
+   *  the box on adoption. */
+  kpiConfig?: KpiConfig;
   /** Governance aggregate (Change B) — carried so an adopted run reproduces mined
    *  control operating-effectiveness. Present only when the log had governance ids. */
   governance?: GovernanceStats;
