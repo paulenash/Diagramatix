@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GuideEditor } from "@/app/(dashboard)/dashboard/admin/user-guide/GuideEditor";
+import { FilePreviewDialog, type PreviewPayload } from "@/app/components/preview/FilePreviewDialog";
 
 interface Section {
   heading: string;
@@ -43,6 +44,17 @@ export function SopEditorClient({
   );
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [previewPayload, setPreviewPayload] = useState<PreviewPayload | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+
+  async function previewDocx() {
+    setPreviewing(true);
+    try {
+      const res = await fetch(`/api/sop/${sopId}/export`, { cache: "no-store" });
+      if (res.ok) setPreviewPayload({ kind: "docx", title: `${title}.docx`, blob: await res.blob(), downloadName: `${title}.docx` });
+    } catch { /* best-effort */ }
+    finally { setPreviewing(false); }
+  }
   const [regenerating, setRegenerating] = useState(false);
   const [confirmRegen, setConfirmRegen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -162,6 +174,9 @@ export function SopEditorClient({
               {regenerating ? "Regenerating…" : "Regenerate"}
             </button>
           )}
+          <button onClick={previewDocx} disabled={previewing}
+            className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50" title="Preview the SOP as a document (no download)">
+            {previewing ? "Opening…" : "👁 Preview"}</button>
           <a href={`/api/sop/${sopId}/export`}
             className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50">Export .docx</a>
           <button onClick={save} disabled={!dirty || saving}
@@ -245,6 +260,7 @@ export function SopEditorClient({
             className="absolute top-4 right-5 text-white/90 hover:text-white text-2xl leading-none" title="Close (Esc)">✕</button>
         </div>
       )}
+      {previewPayload && <FilePreviewDialog payload={previewPayload} onClose={() => setPreviewPayload(null)} />}
     </div>
   );
 }

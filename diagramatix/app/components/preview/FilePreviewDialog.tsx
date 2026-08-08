@@ -54,6 +54,27 @@ export function FilePreviewDialog({ payload, onClose }: { payload: PreviewPayloa
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // DOCX → HTML via mammoth (lazy-loaded). Content preview only — exact Word
+  // template styling / figure pages aren't reproduced.
+  const [docxHtml, setDocxHtml] = useState<string | null>(null);
+  const [docxError, setDocxError] = useState(false);
+  useEffect(() => {
+    if (kind !== "docx" || !blob) return;
+    let on = true;
+    setDocxHtml(null); setDocxError(false);
+    (async () => {
+      try {
+        const ab = await blob.arrayBuffer();
+        const mod = await import("mammoth");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mm: any = (mod as any).default ?? mod;
+        const r = await mm.convertToHtml({ arrayBuffer: ab });
+        if (on) setDocxHtml(r.value as string);
+      } catch { if (on) setDocxError(true); }
+    })();
+    return () => { on = false; };
+  }, [kind, blob]);
+
   const isText = kind === "json" || kind === "xml" || kind === "bpmn" || kind === "ddl";
 
   // Pretty (plain) text — used for Copy/Download — and the colour-highlighted HTML.
@@ -108,7 +129,14 @@ export function FilePreviewDialog({ payload, onClose }: { payload: PreviewPayloa
               dangerouslySetInnerHTML={{ __html: renderHelpMarkdown(text) }} />
           )}
 
-          {(kind === "docx" || kind === "vsdx") && (
+          {kind === "docx" && (
+            docxError ? <p className="text-xs text-red-600">Couldn&apos;t render this document for preview.</p>
+            : docxHtml == null ? <p className="text-xs text-gray-500">Rendering document…</p>
+            : <div className="prose prose-sm max-w-none bg-white border border-gray-200 rounded p-6"
+                dangerouslySetInnerHTML={{ __html: docxHtml }} />
+          )}
+
+          {kind === "vsdx" && (
             <p className="text-xs text-gray-500">Preview for this type is added in a later update.</p>
           )}
         </div>

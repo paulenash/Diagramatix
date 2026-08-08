@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ProcessDiff } from "@/app/lib/diagram/diff/processDiff";
 import { ProcessDiffResults } from "./ProcessDiffResults";
+import { FilePreviewDialog, type PreviewPayload } from "@/app/components/preview/FilePreviewDialog";
 
 interface RunRow { id: string; aName: string; bName: string; createdAt: string; hasAiSummary: boolean; author: string | null }
 interface RunDetail { id: string; aName: string; bName: string; createdAt: string; result: ProcessDiff; aiSummary: string | null }
@@ -31,8 +32,9 @@ export function DiffRunsDialog({ diagramId, onClose }: { diagramId: string; onCl
   const [detail, setDetail] = useState<RunDetail | null>(null);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [busy, setBusy] = useState<null | "docx" | "delete">(null);
+  const [busy, setBusy] = useState<null | "docx" | "delete" | "preview">(null);
   const [err, setErr] = useState<string | null>(null);
+  const [previewPayload, setPreviewPayload] = useState<PreviewPayload | null>(null);
 
   async function loadList(selectFirst = true) {
     setLoadingList(true);
@@ -71,6 +73,21 @@ export function DiffRunsDialog({ diagramId, onClose }: { diagramId: string; onCl
       if (!res.ok) throw new Error("Export failed");
       download(`${detail.aName}-vs-${detail.bName}.docx`, await res.blob());
     } catch (e) { setErr(e instanceof Error ? e.message : "Export failed"); }
+    finally { setBusy(null); }
+  }
+
+  async function previewDocx() {
+    if (!selectedId || !detail) return;
+    setBusy("preview"); setErr(null);
+    try {
+      const res = await fetch("/api/diagrams/diff", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId: selectedId, mode: "docx" }),
+      });
+      if (!res.ok) throw new Error("Preview failed");
+      const name = `${detail.aName}-vs-${detail.bName}.docx`;
+      setPreviewPayload({ kind: "docx", title: name, blob: await res.blob(), downloadName: name });
+    } catch (e) { setErr(e instanceof Error ? e.message : "Preview failed"); }
     finally { setBusy(null); }
   }
 
@@ -125,6 +142,10 @@ export function DiffRunsDialog({ diagramId, onClose }: { diagramId: string; onCl
         </div>
 
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
+          <button onClick={previewDocx} disabled={!selectedId || busy === "preview"}
+            className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50 disabled:opacity-50" title="Preview the Word report (no download)">
+            {busy === "preview" ? "Opening…" : "👁 Preview Word"}
+          </button>
           <button onClick={exportDocx} disabled={!selectedId || busy === "docx"}
             className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50 disabled:opacity-50">
             {busy === "docx" ? "Exporting…" : "Export to Word"}
@@ -136,6 +157,7 @@ export function DiffRunsDialog({ diagramId, onClose }: { diagramId: string; onCl
           <button onClick={onClose} className="text-xs text-white bg-blue-600 rounded px-3 py-1 hover:bg-blue-700">Continue</button>
         </div>
       </div>
+      {previewPayload && <FilePreviewDialog payload={previewPayload} onClose={() => setPreviewPayload(null)} />}
     </div>
   );
 }

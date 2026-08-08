@@ -7,6 +7,7 @@ import { diffProcesses } from "@/app/lib/diagram/diff/processDiff";
 import { diffToCsv } from "@/app/lib/diagram/diff/processDiffFormat";
 import { mergeProcesses, type MergeDecision, type MergeKind } from "@/app/lib/diagram/diff/mergeProcess";
 import { ProcessDiffResults } from "@/app/components/diff/ProcessDiffResults";
+import { FilePreviewDialog, type PreviewPayload } from "@/app/components/preview/FilePreviewDialog";
 
 interface Sibling { id: string; name: string }
 
@@ -42,7 +43,8 @@ export function ProcessDiffDialog({
   const [err, setErr] = useState<string | null>(null);
   // Direction: false = current is "before" (A); true = swapped.
   const [swapped, setSwapped] = useState(false);
-  const [busy, setBusy] = useState<null | "docx" | "ai">(null);
+  const [busy, setBusy] = useState<null | "docx" | "ai" | "preview">(null);
+  const [previewPayload, setPreviewPayload] = useState<PreviewPayload | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   // Merge: cherry-pick which changed/added/removed rows to fold into a new diagram.
   const [mergeMode, setMergeMode] = useState(false);
@@ -145,6 +147,20 @@ export function ProcessDiffDialog({
       return j.id as string;
     } catch (e) { setErr(e instanceof Error ? e.message : "Save failed"); return null; }
     finally { setSavingRun(false); }
+  }
+
+  async function previewDocx() {
+    setBusy("preview"); setErr(null);
+    try {
+      const res = await fetch("/api/diagrams/diff", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aId, bId, mode: "docx", aiSummary: aiSummary ?? undefined }),
+      });
+      if (!res.ok) throw new Error("Preview failed");
+      const name = `${diff!.a.title}-vs-${diff!.b.title}.docx`;
+      setPreviewPayload({ kind: "docx", title: name, blob: await res.blob(), downloadName: name });
+    } catch (e) { setErr(e instanceof Error ? e.message : "Preview failed"); }
+    finally { setBusy(null); }
   }
 
   async function exportDocx() {
@@ -325,6 +341,9 @@ export function ProcessDiffDialog({
                 {savingRun ? "Saving…" : currentRunId ? "Saved ✓" : "Save run"}
               </button>
               <button onClick={exportCsv} className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50">Export CSV</button>
+              <button onClick={previewDocx} disabled={busy === "preview"} className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50 disabled:opacity-50" title="Preview the Word report in a pop-up (no download)">
+                {busy === "preview" ? "Opening…" : "👁 Preview Word"}
+              </button>
               <button onClick={exportDocx} disabled={busy === "docx"} className="text-xs text-gray-700 border border-gray-300 rounded px-3 py-1 hover:bg-gray-50 disabled:opacity-50">
                 {busy === "docx" ? "Exporting…" : "Export Word"}
               </button>
@@ -336,6 +355,7 @@ export function ProcessDiffDialog({
           </div>
         </div>
       </div>
+      {previewPayload && <FilePreviewDialog payload={previewPayload} onClose={() => setPreviewPayload(null)} />}
     </div>
   );
 }
