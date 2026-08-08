@@ -87,6 +87,7 @@ import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { checkDiagram, rulesMetadata, type Violation } from "@/app/lib/diagram/checks/diagramChecks";
 import { HistoryPanel } from "./HistoryPanel";
 import { ProcessDiffDialog } from "./ProcessDiffDialog";
+import { FilePreviewDialog, type PreviewPayload } from "@/app/components/preview/FilePreviewDialog";
 
 interface VisioImportResult {
   // Which importer produced this result — drives the result modal's wording
@@ -408,11 +409,12 @@ function useAutoSave(
   return { saveStatus, lastSavedAt, saveNow, syncNow, pullMerge, revertToSaved, conflict, acceptMerge, syncedData, committedVersion };
 }
 
-function exportSvg(svgEl: SVGSVGElement, name: string) {
+function exportSvg(svgEl: SVGSVGElement, name: string, output: "save" | "string" = "save"): string | void {
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
   clone.removeAttribute("tabindex");
   const serializer = new XMLSerializer();
   const svgStr = serializer.serializeToString(clone);
+  if (output === "string") return svgStr;
   const blob = new Blob([svgStr], { type: "image/svg+xml" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1466,6 +1468,8 @@ export function DiagramEditor({
   const supportsSimulator = diagramType === "bpmn";
   const [showSendReview, setShowSendReview] = useState(false);
   const [showProcessDiff, setShowProcessDiff] = useState(false);
+  // File-preview pop-up (for demonstrating exports on camera during a screencast).
+  const [previewPayload, setPreviewPayload] = useState<PreviewPayload | null>(null);
   const [reviewSentMsg, setReviewSentMsg] = useState<string | null>(null);
 
   // Review Mode — active when the diagram was opened from a Received-for-
@@ -3191,10 +3195,9 @@ export function DiagramEditor({
 
   // Export the current diagram's data as a JSON file (single-diagram envelope
   // matching the project export format so it round-trips through Import JSON).
-  async function handleExportJson() {
-    // Full fidelity: JSON export/import must ALWAYS include annotations, so no
-    // filterAnnotations here (unlike SVG/PDF which can hide them visually).
-    const exportData = data;
+  // Build the single-diagram JSON envelope string (shared by export + preview).
+  async function buildDiagramJsonString(): Promise<string> {
+    // Full fidelity: JSON export/import must ALWAYS include annotations.
     const { SCHEMA_VERSION } = await import("@/app/lib/diagram/types");
     let appVersion = SCHEMA_VERSION;
     try {
@@ -3210,16 +3213,13 @@ export function DiagramEditor({
       appVersion,
       exportedAt: new Date().toISOString(),
       project: { name: "(single diagram)", description: "", ownerName: "", colorConfig: {} },
-      diagrams: [{
-        originalId: diagramId,
-        name: diagramName,
-        type: diagramType,
-        data: exportData,
-        colorConfig: diagramColorConfig,
-        displayMode,
-      }],
+      diagrams: [{ originalId: diagramId, name: diagramName, type: diagramType, data, colorConfig: diagramColorConfig, displayMode }],
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    return JSON.stringify(payload, null, 2);
+  }
+
+  async function handleExportJson() {
+    const blob = new Blob([await buildDiagramJsonString()], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -3228,6 +3228,41 @@ export function DiagramEditor({
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // Build an export in-memory and show it in the preview pop-up instead of
+  // downloading — so it can be demonstrated on camera during a screencast.
+  async function handlePreview(format: "pdf" | "svg" | "json" | "xml" | "bpmn") {
+    closeFm();
+    try {
+      if (format === "svg" || format === "pdf") {
+        const svgEl = document.querySelector<SVGSVGElement>("svg[data-canvas]");
+        if (!svgEl) return;
+        if (format === "svg") {
+          const svg = exportSvg(svgEl, diagramName, "string") as string;
+          setPreviewPayload({ kind: "svg", title: `${diagramName}.svg`, text: svg, downloadName: `${diagramName}.svg`, downloadMime: "image/svg+xml" });
+        } else {
+          const blob = (await exportPdf(svgEl, diagramName, data, pdfScale / 100, "blob")) as Blob;
+          if (blob) setPreviewPayload({ kind: "pdf", title: `${diagramName}.pdf`, blob, downloadName: `${diagramName}.pdf` });
+        }
+        return;
+      }
+      if (format === "json") {
+        setPreviewPayload({ kind: "json", title: `${diagramName}.json`, text: await buildDiagramJsonString(), downloadName: `${diagramName}.json`, downloadMime: "application/json" });
+        return;
+      }
+      if (format === "xml") {
+        const { buildSingleDiagramXml } = await import("@/app/lib/diagram/xmlExport");
+        const { SCHEMA_VERSION } = await import("@/app/lib/diagram/types");
+        const xml = buildSingleDiagramXml({ schemaVersion: SCHEMA_VERSION, appVersion: SCHEMA_VERSION, diagramName, diagramType, diagramData: filterAnnotations(data, NO_ANNOTATIONS), diagramId, displayMode, diagramColorConfig });
+        setPreviewPayload({ kind: "xml", title: `${diagramName}.xml`, text: xml, downloadName: `${diagramName}.xml`, downloadMime: "application/xml" });
+        return;
+      }
+      if (format === "bpmn") {
+        const { buildBpmnXml } = await import("@/app/lib/diagram/bpmn/exportBpmnXml");
+        setPreviewPayload({ kind: "bpmn", title: `${diagramName}.bpmn`, text: buildBpmnXml(data, diagramName), downloadName: `${diagramName}.bpmn`, downloadMime: "application/xml" });
+      }
+    } catch { /* preview is best-effort */ }
   }
 
   // SuperAdmin: export the full diagram BUNDLE — the diagram plus its linked AI
@@ -4999,17 +5034,32 @@ export function DiagramEditor({
                           <div className="absolute bg-white border border-gray-200 rounded shadow-lg py-1 z-[10001]" style={{ top: "100%", left: -100, minWidth: 160 }}>
                             {sect === "export" ? (
                               <>
-                                <button onClick={() => { closeFm(); openExport("pdf"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Export as PDF (choose scale + which annotations to include)">PDF</button>
-                                <button onClick={() => { closeFm(); openExport("svg"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">SVG</button>
-                                <button onClick={() => { closeFm(); openExport("json"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download diagram as a single-diagram JSON file">JSON</button>
+                                <div className="flex items-center hover:bg-gray-50">
+                                  <button onClick={() => { closeFm(); openExport("pdf"); }} className="flex-1 text-left px-3 py-2 text-xs text-gray-700" title="Export as PDF (choose scale + which annotations to include)">PDF</button>
+                                  <button onClick={() => void handlePreview("pdf")} className="px-2.5 py-2 text-gray-400 hover:text-blue-600" title="Preview in a pop-up (no download)">👁</button>
+                                </div>
+                                <div className="flex items-center hover:bg-gray-50">
+                                  <button onClick={() => { closeFm(); openExport("svg"); }} className="flex-1 text-left px-3 py-2 text-xs text-gray-700">SVG</button>
+                                  <button onClick={() => void handlePreview("svg")} className="px-2.5 py-2 text-gray-400 hover:text-blue-600" title="Preview in a pop-up (no download)">👁</button>
+                                </div>
+                                <div className="flex items-center hover:bg-gray-50">
+                                  <button onClick={() => { closeFm(); openExport("json"); }} className="flex-1 text-left px-3 py-2 text-xs text-gray-700" title="Download diagram as a single-diagram JSON file">JSON</button>
+                                  <button onClick={() => void handlePreview("json")} className="px-2.5 py-2 text-gray-400 hover:text-blue-600" title="Preview in a pop-up (no download)">👁</button>
+                                </div>
                                 {isActingAdmin && (
                                   <button onClick={() => { closeFm(); void handleExportBundle(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="SuperAdmin only — export the diagram together with its AI prompt, plan, comparison matrix & per-model diagrams as ONE bundle. Re-import via a project's 'Import Diagram Bundle'.">Diagram Bundle (AI)</button>
                                 )}
                                 {diagramType === "bpmn" && (
-                                  <button onClick={() => { handleExportXml(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download diagram XML and the matching XSD schema">XML (Diagramatix)</button>
+                                  <div className="flex items-center hover:bg-gray-50">
+                                    <button onClick={() => { handleExportXml(); closeFm(); }} className="flex-1 text-left px-3 py-2 text-xs text-gray-700" title="Download diagram XML and the matching XSD schema">XML (Diagramatix)</button>
+                                    <button onClick={() => void handlePreview("xml")} className="px-2.5 py-2 text-gray-400 hover:text-blue-600" title="Preview in a pop-up (no download)">👁</button>
+                                  </div>
                                 )}
                                 {diagramType === "bpmn" && (
-                                  <button onClick={() => { void handleExportBpmn(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download standard OMG BPMN 2.0 XML (.bpmn) — opens in Camunda, bpmn.io, Signavio, etc.">BPMN 2.0 XML</button>
+                                  <div className="flex items-center hover:bg-gray-50">
+                                    <button onClick={() => { void handleExportBpmn(); closeFm(); }} className="flex-1 text-left px-3 py-2 text-xs text-gray-700" title="Download standard OMG BPMN 2.0 XML (.bpmn) — opens in Camunda, bpmn.io, Signavio, etc.">BPMN 2.0 XML</button>
+                                    <button onClick={() => void handlePreview("bpmn")} className="px-2.5 py-2 text-gray-400 hover:text-blue-600" title="Preview in a pop-up (no download)">👁</button>
+                                  </div>
                                 )}
                                 {diagramType === "bpmn" && (
                                   <>
@@ -5776,6 +5826,10 @@ export function DiagramEditor({
             diagramId={diagramId}
             onComparison={setAiComparison}
           />
+        )}
+
+        {previewPayload && (
+          <FilePreviewDialog payload={previewPayload} onClose={() => setPreviewPayload(null)} />
         )}
 
         {showProcessDiff && (
