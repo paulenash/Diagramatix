@@ -152,13 +152,22 @@ export function ProcessDiffDialog({
   async function previewDocx() {
     setBusy("preview"); setErr(null);
     try {
-      const res = await fetch("/api/diagrams/diff", {
+      const base = `${diff!.a.title}-vs-${diff!.b.title}`;
+      // True-to-layout PDF (LibreOffice); fall back to the mammoth content preview.
+      const pdf = await fetch("/api/diagrams/diff", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aId, bId, mode: "pdf", aiSummary: aiSummary ?? undefined }),
+      });
+      if (pdf.ok && (pdf.headers.get("content-type") ?? "").includes("pdf")) {
+        setPreviewPayload({ kind: "pdf", title: `${base}.pdf`, blob: await pdf.blob(), downloadName: `${base}.pdf` });
+        return;
+      }
+      const dx = await fetch("/api/diagrams/diff", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ aId, bId, mode: "docx", aiSummary: aiSummary ?? undefined }),
       });
-      if (!res.ok) throw new Error("Preview failed");
-      const name = `${diff!.a.title}-vs-${diff!.b.title}.docx`;
-      setPreviewPayload({ kind: "docx", title: name, blob: await res.blob(), downloadName: name });
+      if (!dx.ok) throw new Error("Preview failed");
+      setPreviewPayload({ kind: "docx", title: `${base}.docx`, blob: await dx.blob(), downloadName: `${base}.docx` });
     } catch (e) { setErr(e instanceof Error ? e.message : "Preview failed"); }
     finally { setBusy(null); }
   }

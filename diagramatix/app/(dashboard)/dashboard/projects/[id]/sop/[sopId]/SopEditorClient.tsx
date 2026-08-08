@@ -50,8 +50,16 @@ export function SopEditorClient({
   async function previewDocx() {
     setPreviewing(true);
     try {
-      const res = await fetch(`/api/sop/${sopId}/export`, { cache: "no-store" });
-      if (res.ok) setPreviewPayload({ kind: "docx", title: `${title}.docx`, blob: await res.blob(), downloadName: `${title}.docx` });
+      // True-to-layout: render the .docx to PDF (headings, org template, landscape
+      // figure page). If LibreOffice isn't available, fall back to the mammoth
+      // content preview so Preview always shows something.
+      const pdf = await fetch(`/api/sop/${sopId}/export?format=pdf`, { cache: "no-store" });
+      if (pdf.ok && (pdf.headers.get("content-type") ?? "").includes("pdf")) {
+        setPreviewPayload({ kind: "pdf", title: `${title}.pdf`, blob: await pdf.blob(), downloadName: `${title}.pdf` });
+        return;
+      }
+      const dx = await fetch(`/api/sop/${sopId}/export`, { cache: "no-store" });
+      if (dx.ok) setPreviewPayload({ kind: "docx", title: `${title}.docx`, blob: await dx.blob(), downloadName: `${title}.docx` });
     } catch { /* best-effort */ }
     finally { setPreviewing(false); }
   }

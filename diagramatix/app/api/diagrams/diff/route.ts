@@ -20,6 +20,7 @@ import { resolveAiRouteContext } from "@/app/lib/ai/aiTelemetryRoute";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import { buildDocx } from "@/app/lib/documents/exportDocx";
+import { docxToPdf } from "@/app/lib/documents/docxToPdf";
 import { isSuperuser } from "@/app/lib/superuser";
 import JSZip from "jszip";
 import type { DiagramData } from "@/app/lib/diagram/types";
@@ -41,23 +42,37 @@ async function orgWordStyles(orgId: string | null): Promise<string | undefined> 
   } catch { return undefined; }
 }
 
-/** Build the .docx comparison report response from a computed diff + optional AI summary. */
-function diffDocxResponse(aName: string, bName: string, diff: ProcessDiff, aiSummary: string, externalStyles?: string) {
+/** Build the comparison report response from a computed diff + optional AI summary.
+ *  `asPdf` renders the .docx to PDF (LibreOffice) for a true-to-layout preview; on
+ *  conversion failure returns 503 so the client falls back to the mammoth preview. */
+async function diffReportResponse(aName: string, bName: string, diff: ProcessDiff, aiSummary: string, externalStyles: string | undefined, asPdf: boolean) {
   const sections = [
     ...(aiSummary ? [{ heading: "AI Summary", bodyMarkdown: aiSummary }] : []),
     { heading: aiSummary ? "Comparison" : null, bodyMarkdown: diffToMarkdown(diff) },
   ];
   const title = `Process Comparison — ${aName} vs ${bName}`;
   const safe = `${aName}-vs-${bName}`.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
-  return buildDocx([{ title, sections }], { docTitle: title, externalStyles }).then((buf) =>
-    new NextResponse(new Uint8Array(buf), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "Content-Disposition": `attachment; filename="${safe}.docx"`,
-      },
-    }),
-  );
+  const buf = await buildDocx([{ title, sections }], { docTitle: title, externalStyles });
+
+  if (asPdf) {
+    try {
+      const pdf = await docxToPdf(Buffer.from(buf));
+      return new NextResponse(new Uint8Array(pdf), {
+        status: 200,
+        headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${safe}.pdf"` },
+      });
+    } catch {
+      return NextResponse.json({ error: "pdf-unavailable" }, { status: 503 });
+    }
+  }
+
+  return new NextResponse(new Uint8Array(buf), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "Content-Disposition": `attachment; filename="${safe}.docx"`,
+    },
+  });
 }
 
 const AI_BRIEFING =
@@ -95,9 +110,9 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
 
-  // Export a SAVED run to Word (renders from the stored snapshot, not a recompute).
+  // Export a SAVED run to Word / PDF (renders from the stored snapshot, not a recompute).
   const runId = typeof body.runId === "string" ? body.runId : "";
-  if (runId && body.mode === "docx") {
+  if (runId && (body.mode === "docx" || body.mode === "pdf")) {
     const run = await prisma.processDiffRun.findUnique({ where: { id: runId } });
     if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
     let ok = run.createdById === session.user.id || isSuperuser(session);
@@ -109,12 +124,12 @@ export async function POST(req: Request) {
       }
     }
     if (!ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    return diffDocxResponse(run.aName, run.bName, run.result as unknown as ProcessDiff, run.aiSummary?.trim() ?? "", await orgWordStyles(run.orgId));
+    return diffReportResponse(run.aName, run.bName, run.result as unknown as ProcessDiff, run.aiSummary?.trim() ?? "", await orgWordStyles(run.orgId), body.mode === "pdf");
   }
 
   const aId = typeof body.aId === "string" ? body.aId : "";
   const bId = typeof body.bId === "string" ? body.bId : "";
-  const mode = body.mode === "docx" || body.mode === "ai" ? body.mode : "";
+  const mode = body.mode === "docx" || body.mode === "pdf" || body.mode === "ai" ? body.mode : "";
   if (!aId || !bId || !mode) return NextResponse.json({ error: "aId, bId and mode are required" }, { status: 400 });
 
   let a, b;
@@ -129,10 +144,10 @@ export async function POST(req: Request) {
 
   const diff = diffProcesses(a.data, a.name, b.data, b.name);
 
-  if (mode === "docx") {
+  if (mode === "docx" || mode === "pdf") {
     // Optional AI narrative (already generated + shown to the user) leads the doc.
     const aiSummary = typeof body.aiSummary === "string" ? body.aiSummary.trim() : "";
-    return diffDocxResponse(a.name, b.name, diff, aiSummary, await orgWordStyles(a.orgId));
+    return diffReportResponse(a.name, b.name, diff, aiSummary, await orgWordStyles(a.orgId), mode === "pdf");
   }
 
   // mode === "ai"

@@ -70,7 +70,20 @@ WORKDIR /app
 # native modules that ship glibc binaries (pg's native bindings, bcryptjs
 # fallbacks, etc.). ffmpeg for the SuperAdmin Screencast Studio server-side
 # transcode (webm→mp4) — see app/api/video/transcode.
-RUN apk add --no-cache libc6-compat openssl ffmpeg
+#
+# libreoffice + fonts power the TRUE-to-layout Word preview (DOCX→PDF via
+# headless `soffice`, app/lib/documents/docxToPdf.ts) for SOP documents and
+# Diff reports — reproducing headings, org Word-template branding, page breaks
+# and the landscape figure page that the mammoth content preview can't.
+# ttf-liberation (Arial/Times/Courier metric-compatible) + font-noto (broad
+# Unicode) so rendered text isn't tofu.
+RUN apk add --no-cache libc6-compat openssl ffmpeg libreoffice ttf-liberation font-noto
+
+# LibreOffice writes a user profile to $HOME; the unprivileged nextjs user's
+# home (/) isn't writable, so point HOME at the writable /tmp. (Each conversion
+# also passes its own -env:UserInstallation, but this keeps any stray writes
+# landing somewhere writable.)
+ENV HOME=/tmp
 
 # Run as an unprivileged user. UID 1001 / GID 1001 follows the upstream
 # Next.js Docker example so log analyzers that expect it work unchanged.

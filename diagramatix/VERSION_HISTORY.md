@@ -13,6 +13,18 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2129 — 2026-08-08 — True-to-layout Word preview (LibreOffice)
+- SOP and Diff-Processes **Preview** now renders the real `.docx` → PDF via headless LibreOffice
+  (`soffice`), reproducing styled headings, org Word-template branding, page breaks, and the
+  landscape figure page — replacing the mammoth content-only approximation.
+- New `app/lib/documents/docxToPdf.ts` (per-call temp profile, concurrency-safe, 60s timeout);
+  SOP route gains `?format=pdf`, the Diff route gains `mode:"pdf"` (live + saved runs).
+- Robust fallback: if conversion fails (e.g. local dev without LibreOffice) Preview
+  automatically falls back to the mammoth content preview, so it never breaks. Download stays
+  `.docx`.
+- Docker: runner image adds `libreoffice` + `ttf-liberation` + `font-noto`, `HOME=/tmp`.
+- Schema: no bump (infra + route param only).
+
 ## 1.44.2128 — 2026-08-08 — Export menu: Preview / Download flyouts
 - Every File ▸ Export format (PDF, SVG, JSON, XML, XSD, BPMN, Visio) now opens a small flyout with
   two explicit choices — **👁 Preview** (the in-app pop-up) and **⬇ Download** (export as usual) —

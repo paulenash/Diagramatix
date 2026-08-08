@@ -12,6 +12,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { buildDocx, type DocxChapter, type ResolvedImage } from "@/app/lib/documents/exportDocx";
+import { docxToPdf } from "@/app/lib/documents/docxToPdf";
 
 /** Read the real pixel size from a PNG's IHDR (bytes 16-24). SOP figures are PNGs
  *  (canvas toDataURL), so this gives the true aspect ratio — without it the image
@@ -34,8 +35,10 @@ async function resolveImage(url: string): Promise<ResolvedImage | null> {
   return { data, width: dims.width, height: dims.height, type: t };
 }
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // ?format=pdf → render the .docx to PDF (LibreOffice) for a true-to-layout preview.
+  const asPdf = new URL(req.url).searchParams.get("format") === "pdf";
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -83,6 +86,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const buf = await buildDocx(chapters, { docTitle: doc.title, imageResolver: resolveImage, externalStyles, figure });
   const safe = doc.title.replace(/[^a-z0-9\-_. ]/gi, "_").slice(0, 80) || "SOP";
+
+  if (asPdf) {
+    // Best-effort: on any conversion failure (e.g. no LibreOffice locally) the
+    // client falls back to the mammoth content preview.
+    try {
+      const pdf = await docxToPdf(Buffer.from(buf));
+      return new NextResponse(new Uint8Array(pdf), {
+        status: 200,
+        headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${safe}.pdf"` },
+      });
+    } catch {
+      return NextResponse.json({ error: "pdf-unavailable" }, { status: 503 });
+    }
+  }
+
   return new NextResponse(new Uint8Array(buf), {
     status: 200,
     headers: {

@@ -55,9 +55,18 @@ export function DiffRunViewer({ runId, onClose }: { runId: string; onClose: () =
     if (!detail) return;
     setBusy("preview"); setErr(null);
     try {
+      const base = `${detail.aName}-vs-${detail.bName}`;
+      // True-to-layout PDF (LibreOffice); fall back to the mammoth content preview.
+      const pdf = await fetch("/api/diagrams/diff", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId, mode: "pdf" }),
+      });
+      if (pdf.ok && (pdf.headers.get("content-type") ?? "").includes("pdf")) {
+        setPreviewPayload({ kind: "pdf", title: `${base}.pdf`, blob: await pdf.blob(), downloadName: `${base}.pdf` });
+        return;
+      }
       const blob = await fetchDocx();
-      const name = `${detail.aName}-vs-${detail.bName}.docx`;
-      if (blob) setPreviewPayload({ kind: "docx", title: name, blob, downloadName: name });
+      if (blob) setPreviewPayload({ kind: "docx", title: `${base}.docx`, blob, downloadName: `${base}.docx` });
     } catch (e) { setErr(e instanceof Error ? e.message : "Preview failed"); }
     finally { setBusy(false); }
   }
