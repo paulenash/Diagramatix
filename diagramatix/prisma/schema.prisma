@@ -278,6 +278,31 @@ model User {
   simulationExamplesCreated     SimulationExample[]        @relation("SimulationExampleAuthor")
   miningExamplesCreated         MiningExample[]            @relation("MiningExampleAuthor")
   processDiffRunsCreated        ProcessDiffRun[]           @relation("ProcessDiffRunAuthor")
+  // Per-user "bring-your-own SharePoint" OAuth connection (delegated Graph tokens,
+  // encrypted at rest). Decoupled from login so any web user can connect their own
+  // Microsoft 365. See MicrosoftConnection.
+  microsoftConnection           MicrosoftConnection?
+}
+
+// A single web user's delegated Microsoft 365 connection for SharePoint/OneDrive.
+// Purely operational OAuth-token storage — NEVER serialized into any diagram/project
+// export (outside the export XSD + ddlGenerate), so it rides the current schemaVersion.
+// Access + refresh tokens are AES-256-GCM ciphertext (app/lib/crypto/tokenCrypto.ts);
+// plaintext never touches the DB or the client. One row per user (per-user isolation).
+model MicrosoftConnection {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId     String   // connecting org's tenant (id_token `tid`) — selects the refresh endpoint + audit
+  accountUpn   String   // preferred_username / UPN — powers "Connected as …"
+  accountName  String?  // display name, if present
+  scope        String   // granted delegated scopes
+  accessToken  String   // AES-256-GCM ciphertext
+  refreshToken String   // AES-256-GCM ciphertext
+  expiresAt    DateTime // access-token expiry
+  source       String   @default("connect") // "connect" | "login" — which flow minted it
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Project {

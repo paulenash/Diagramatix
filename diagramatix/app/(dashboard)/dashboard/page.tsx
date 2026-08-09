@@ -7,10 +7,15 @@ import { getEffectiveUserId, isImpersonating, isSuperuser, getImpersonationMode 
 import { ARCHIVE_PROJECT_NAME } from "@/app/lib/archive";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { getUsageSnapshot } from "@/app/lib/subscription";
+import { isMicrosoftConnected } from "@/app/lib/microsoft/connection";
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+
+  // SharePoint connection is now a per-user DB link (bring-your-own), no longer
+  // tied to logging in with Microsoft.
+  const hasMicrosoft = await isMicrosoftConnected(session.user.id);
 
   const cookieStore = await cookies();
   let effectiveUserId = getEffectiveUserId(session, cookieStore);
@@ -54,7 +59,7 @@ export default async function DashboardPage() {
         viewingAsName=""
         viewingAsEmail=""
         isSuperuser={isSuperuser(session)}
-        hasMicrosoft={!!(session as unknown as { hasMicrosoft?: boolean }).hasMicrosoft}
+        hasMicrosoft={hasMicrosoft}
         usageSnapshot={null}
         showTierPicker={false}
         tierCards={[]}
@@ -190,7 +195,7 @@ export default async function DashboardPage() {
       viewingAsEmail={viewingAsEmail}
       impersonationMode={impersonationMode}
       isSuperuser={isSuperuser(session)}
-      hasMicrosoft={!!(session as unknown as { hasMicrosoft?: boolean }).hasMicrosoft}
+      hasMicrosoft={hasMicrosoft}
       usageSnapshot={usageSnapshot}
       showTierPicker={showTierPicker}
       tierCards={tierCards}

@@ -7,6 +7,7 @@ import type { DiagramType } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
+import { MicrosoftConnectionSettings } from "@/app/components/MicrosoftConnectionSettings";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
 import { NotificationsBell } from "@/app/components/NotificationsBell";
@@ -2562,6 +2563,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   onChange={e => setAcctOrgName(e.target.value)}
                   className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
               </div>
+
+              {/* SharePoint / Microsoft 365 — bring-your-own connection */}
+              <MicrosoftConnectionSettings />
 
               {/* Change Password */}
               <div className="border-t border-gray-100 pt-3">

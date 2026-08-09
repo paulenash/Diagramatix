@@ -6,6 +6,8 @@ import { prisma } from "@/app/lib/db";
 import { rateLimit, clientIp } from "@/app/lib/rateLimit";
 import { verifyCredentials } from "@/app/lib/auth/credentials";
 import { joinDomainOrgOrCreatePersonal } from "@/app/lib/auth/domainOrg";
+import { encryptSecret, tokenCryptoConfigured } from "@/app/lib/crypto/tokenCrypto";
+import { decodeIdToken, MS_SCOPES } from "@/app/lib/microsoft/oauth";
 
 /**
  * Idempotent: ensures the user has at least one OrgMember row. If none, either
@@ -150,6 +152,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.msAccessToken = account.access_token;
         token.msRefreshToken = account.refresh_token;
         token.msTokenExpires = account.expires_at ? account.expires_at * 1000 : 0;
+
+        // Auto-seed a per-user MicrosoftConnection (source:"login") so users who
+        // sign in with Microsoft are "connected" for SharePoint with no extra
+        // click, and the DB stays the single source of truth (the SharePoint
+        // routes read tokens from it, not the JWT). Best-effort — never block login.
+        if (token.id && account.access_token && account.refresh_token && tokenCryptoConfigured()) {
+          try {
+            const { tid, upn, name } = decodeIdToken(account.id_token as string | undefined);
+            const data = {
+              tenantId: tid ?? process.env.AZURE_TENANT_ID ?? "organizations",
+              accountUpn: upn ?? (token.email as string) ?? "unknown",
+              accountName: name ?? null,
+              scope: MS_SCOPES,
+              accessToken: encryptSecret(account.access_token),
+              refreshToken: encryptSecret(account.refresh_token),
+              expiresAt: new Date(account.expires_at ? account.expires_at * 1000 : Date.now() + 3_600_000),
+              source: "login",
+            };
+            await prisma.microsoftConnection.upsert({
+              where: { userId: token.id as string },
+              create: { userId: token.id as string, ...data },
+              update: data,
+            });
+          } catch { /* best-effort — never block login */ }
+        }
       }
       // Refresh expired Microsoft access token
       if (token.msAccessToken && token.msTokenExpires &&

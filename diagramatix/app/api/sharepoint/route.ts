@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { listSites, searchSites, listDrives, listDriveRoot, listFolder, getItem, getMyDrive, listMyDriveRoot, listMyDriveFolder, getPreviewUrl } from "@/app/lib/sharepoint";
-import { getMsAccessToken } from "@/app/lib/sharepoint-token";
+import { getMsAccessTokenForUser } from "@/app/lib/microsoft/getMsAccessTokenForUser";
 
 /**
  * GET /api/sharepoint?action=sites                          — list all sites
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const _pol = await gateOrgPolicy(session, "allowSharePoint");
   if (_pol) return _pol;
 
-  const token = await getMsAccessToken(request);
+  const token = await getMsAccessTokenForUser(session.user.id);
   if (!token) {
     return NextResponse.json({ error: "Microsoft account not connected" }, { status: 403 });
   }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { uploadToFolder } from "@/app/lib/sharepoint";
-import { getMsAccessToken } from "@/app/lib/sharepoint-token";
+import { getMsAccessTokenForUser } from "@/app/lib/microsoft/getMsAccessTokenForUser";
 
 /**
  * POST /api/sharepoint/upload  (multipart/form-data)
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   const _pol = (await gateOrgPolicy(session, "allowSharePoint"))
     ?? (await gateOrgPolicy(session, "allowExternalExport"));
   if (_pol) return _pol;
-  const token = await getMsAccessToken(request);
+  const token = await getMsAccessTokenForUser(session.user.id);
   if (!token) {
     return NextResponse.json({ error: "Microsoft account not connected" }, { status: 403 });
   }

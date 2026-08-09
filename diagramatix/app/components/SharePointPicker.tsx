@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { signIn } from "next-auth/react";
 
 /** What the caller gets back. For a folder pick, `itemId` is the folder id
  *  (null = drive root) and `webUrl` is the folder URL. For a file pick,
@@ -181,13 +180,13 @@ export function SharePointPicker({
         <div className="flex-1 overflow-y-auto px-5 py-3 min-h-[16rem]">
           {notConnected ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
-              <p className="text-sm text-gray-700 mb-1">Your Microsoft account isn&apos;t connected.</p>
-              <p className="text-xs text-gray-500 mb-4">Sign in with Microsoft to browse SharePoint and OneDrive.</p>
+              <p className="text-sm text-gray-700 mb-1">Your SharePoint isn&apos;t connected.</p>
+              <p className="text-xs text-gray-500 mb-4">Connect your Microsoft 365 account to browse SharePoint and OneDrive.</p>
               <button
-                onClick={() => signIn("microsoft-entra-id", { callbackUrl: window.location.href })}
+                onClick={() => { window.location.href = "/api/microsoft/connect?returnTo=" + encodeURIComponent(window.location.href); }}
                 className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
               >
-                Connect Microsoft
+                Connect SharePoint
               </button>
             </div>
           ) : (

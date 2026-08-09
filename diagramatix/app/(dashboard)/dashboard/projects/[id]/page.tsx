@@ -6,12 +6,16 @@ import { ProjectDetailClient } from "./ProjectDetailClient";
 import { getEffectiveUserId, isImpersonating, getImpersonationMode, isSuperuser } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId, getProjectAccess } from "@/app/lib/auth/orgContext";
 import { getEntitlements } from "@/app/lib/subscription";
+import { isMicrosoftConnected } from "@/app/lib/microsoft/connection";
 
 type Props = { params: Promise<{ id: string }> };
 
 export default async function ProjectPage({ params }: Props) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+
+  // SharePoint = per-user DB connection (bring-your-own), not login-based.
+  const hasMicrosoft = await isMicrosoftConnected(session.user.id);
 
   const cookieStore = await cookies();
   let effectiveUserId = getEffectiveUserId(session, cookieStore);
@@ -114,7 +118,7 @@ export default async function ProjectPage({ params }: Props) {
       viewingAsEmail={viewingAsEmail}
       impersonationMode={impersonationMode}
       isAdmin={isSuperuser(session)}
-      hasMicrosoft={!!(session as unknown as { hasMicrosoft?: boolean }).hasMicrosoft}
+      hasMicrosoft={hasMicrosoft}
       entitlements={entitlements}
     />
   );
