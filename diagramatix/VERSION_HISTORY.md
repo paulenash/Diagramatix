@@ -13,7 +13,7 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
-## 1.45.<build> — 2026-08-10 — Schema-version policy widened + catch-up bump
+## 1.45.2153 — 2026-08-10 — Schema-version policy widened + catch-up bump
 - **Policy (Paul):** `schemaVersion` now bumps on ANY change to the **entire physical database**
   (any table/column/enum/relation anywhere — operational/auth/billing/telemetry/mining/connection
   tables included, not just the curated diagram Logical DDL) **and** on ANY **in-DB JSON structure**
