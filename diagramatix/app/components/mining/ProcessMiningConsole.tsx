@@ -17,6 +17,7 @@ import { parseOcel } from "@/app/lib/mining/formats/ocel";
 import { validateEventLogMapping } from "@/app/lib/mining/validateLog";
 import { MiningSourcesPanel } from "./MiningSourcesPanel";
 import { MiningInsightsPanel } from "./insights/MiningInsightsPanel";
+import { MiningLogViewer } from "./MiningLogViewer";
 import type { LogMapping, MiningStats } from "@/app/lib/mining/types";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
@@ -285,6 +286,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     setMapping((m) => ({ ...m, activityResource: { ...(m.activityResource ?? {}), [a]: r || undefined } as Record<string, string> }));
   const [enrichDiagrams, setEnrichDiagrams] = useState<{ id: string; name: string; type: string }[]>([]);
   const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
+  const [showLog, setShowLog] = useState(false);
   useEffect(() => {
     fetch(`/api/projects/${projectId}/mining/diagrams`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { diagrams: [] })).then((j) => setEnrichDiagrams(j.diagrams ?? [])).catch(() => {});
@@ -605,6 +607,11 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
 
               <div className="flex items-center gap-2">
                 <input value={runName} onChange={(e) => setRunName(e.target.value)} placeholder="run name" className={`${inp} flex-1`} />
+                {rows.length > 0 && (
+                  <button onClick={() => setShowLog(true)} className="text-xs bg-stone-700 hover:bg-stone-600 text-stone-100 rounded px-3 py-1.5 whitespace-nowrap">
+                    🔍 View / filter log
+                  </button>
+                )}
                 <button onClick={doImport} disabled={!canImport || busy} className="text-xs bg-amber-700 hover:bg-amber-600 disabled:opacity-40 text-white rounded px-3 py-1.5">
                   {busy ? "Importing…" : "Import log"}
                 </button>
@@ -916,6 +923,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
       {deletingStudy && (
         <ConfirmDialog title="Delete import" message={`Delete the whole "${deletingStudy.name}" import — all ${deletingStudy.count} object-type run${deletingStudy.count === 1 ? "" : "s"}? (Discovered diagrams are kept.)`} destructive
           onConfirm={() => removeStudy(deletingStudy.groupId)} onCancel={() => setDeletingStudy(null)} />
+      )}
+      {showLog && (
+        <MiningLogViewer headers={headers} rows={rows} title={fileName ?? "Event log"} onClose={() => setShowLog(false)} />
       )}
     </div>
   );

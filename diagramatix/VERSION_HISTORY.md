@@ -13,6 +13,14 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2149 — 2026-08-09 — Mining: view / filter the imported event log
+- New **🔍 View / filter log** button in the import staging area (shown once a CSV/XES log is loaded) →
+  a full-screen table of exactly what's being imported: **free-text search** across all columns plus a
+  **per-column dropdown filter** on low-cardinality columns (activity / resource / state / …). Render-
+  capped at 2,000 rows (narrow the filters to see more); Esc or Close to return. Lets you verify the
+  parse before committing the run.
+- New `app/components/mining/MiningLogViewer.tsx` (pure, `data-no-capture`). Schema: no bump.
+
 ## 1.44.2148 — 2026-08-09 — Mining Insights: per-activity summary + fixes
 - New **📋 Activities** tab (now the default) — **one row per activity type** with its cases, events,
   median / total time, and the **team(s) + state(s)** it carries (normally one each; multiples flagged
