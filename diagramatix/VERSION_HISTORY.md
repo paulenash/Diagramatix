@@ -13,6 +13,17 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2151 — 2026-08-09 — Mining: whitespace-insensitive state/activity matching
+- **Fix (Paul):** states weren't matching in the **Conformance Check** when a label carried an internal
+  **newline** (a long multi-word state like *"Level 1 In Progress"* wrapped across lines in the reference).
+  The comparison only `.trim()`-med — stripping leading/trailing whitespace but leaving an embedded newline
+  intact — so *"Level 1 In\nProgress"* ≠ *"Level 1 In Progress"* and every case read as an illegal transition.
+- Now every label comparison in the conformance path **collapses internal whitespace** (`\s+`→single space)
+  before matching: `checkTransitionConformance`, `flagIllegalTransitions` (the red-badge pass),
+  `stateMachineCoverage`, and `referenceScope`. **Activities** are the transition labels (conformance itself
+  matches by state) — those, plus states, are now also **cleaned at ingestion** (`parseEventLog`) so a value
+  never stores an embedded newline in the first place. Test T2250. Schema: no bump.
+
 ## 1.44.2150 — 2026-08-09 — Mining: generated State Machine must cover the whole log
 - **Rule (Paul):** any *generated* reference State Machine must show **every state and activity that is in
   the event log** — else conformance replays the log against a partial model and reports a flood of false

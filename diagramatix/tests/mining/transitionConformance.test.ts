@@ -67,6 +67,31 @@ describe("state-change conformance", () => {
     expect(mixed.violations.some((v) => v.rule === "unknown-state" && v.data?.state === "rejected")).toBe(true);
   });
 
+  it("T2250 — matching is whitespace-insensitive: a reference label wrapped across lines still conforms", () => {
+    // A long state label ("Level 1 In Progress") can be stored/entered with an
+    // embedded newline in the reference; the log value is single-line. Collapsing
+    // internal whitespace makes them match (else every case reads as illegal).
+    const wrapRef: ReferenceSm = {
+      elements: [
+        { id: "init", type: "initial-state", label: "" },
+        { id: "fin", type: "final-state", label: "" },
+        { id: "s_a", type: "state", label: "Assessed" },
+        { id: "s_p", type: "state", label: "Level 1 In\nProgress" },   // wrapped across two lines
+        { id: "s_c", type: "state", label: "Completed" },
+      ],
+      connectors: [
+        { id: "c_init", sourceId: "init", targetId: "s_a", type: "transition" },
+        { id: "c_ap", sourceId: "s_a", targetId: "s_p", type: "transition" },
+        { id: "c_pc", sourceId: "s_p", targetId: "s_c", type: "transition" },
+        { id: "c_fin", sourceId: "s_c", targetId: "fin", type: "transition" },
+      ],
+    };
+    const log: Variant[] = [{ events: ["Assess", "Start Level 1", "Complete Level 1 Request"], states: ["Assessed", "Level 1 In Progress", "Completed"], count: 4 }];
+    const r = checkTransitionConformance(log, wrapRef);
+    expect(r.fitness).toBe(1);
+    expect(r.violations.filter((v) => v.severity === "error")).toHaveLength(0);
+  });
+
   it("T0599 — a reference transition never seen in the log is flagged as dead", () => {
     // Log only ever does Draft→Pending; Pending→Approved is never exercised.
     const partial: Variant[] = [{ events: ["Create", "Submit"], states: ["Draft", "Pending"], count: 3 }];

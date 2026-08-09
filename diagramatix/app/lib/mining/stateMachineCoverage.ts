@@ -21,7 +21,7 @@ import type { Variant } from "./types";
 
 const SEP = String.fromCharCode(1);
 const INIT = "__init", FINAL = "__final";
-const norm = (s: string) => (s ?? "").trim().toLowerCase();
+const norm = (s: string) => (s ?? "").replace(/\s+/g, " ").trim().toLowerCase();
 
 export interface SmPlanElement { id: string; type: string; label: string }
 export interface SmPlanConnection { sourceId: string; targetId: string; label: string; type: string; count?: number }

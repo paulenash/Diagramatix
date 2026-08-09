@@ -10,7 +10,7 @@
 /** Distinct observed state labels of a run (from its variants). */
 export function runStates(variants: { states: string[] }[]): string[] {
   const set = new Set<string>();
-  for (const v of variants) for (const s of v.states) { const t = (s ?? "").trim(); if (t) set.add(t); }
+  for (const v of variants) for (const s of v.states) { const t = (s ?? "").replace(/\s+/g, " ").trim(); if (t) set.add(t); }
   return [...set];
 }
 
@@ -18,9 +18,10 @@ export function runStates(variants: { states: string[] }[]): string[] {
  *  enough overlap to be that entity's reference; a different entity's SM (little
  *  or no overlap) is excluded. With no run states to judge by, allow it. */
 export function isRelevantReference(smStateLabels: string[], states: string[]): boolean {
-  const runSet = new Set(states.map((s) => s.trim().toLowerCase()).filter(Boolean));
+  const norm = (s: string) => (s ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  const runSet = new Set(states.map(norm).filter(Boolean));
   if (runSet.size === 0) return true;
-  const smSet = new Set(smStateLabels.map((s) => (s ?? "").trim().toLowerCase()).filter(Boolean));
+  const smSet = new Set(smStateLabels.map(norm).filter(Boolean));
   let hit = 0;
   for (const s of runSet) if (smSet.has(s)) hit++;
   return hit / runSet.size >= 0.5;

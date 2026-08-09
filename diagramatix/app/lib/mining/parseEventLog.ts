@@ -134,7 +134,12 @@ export function buildEventLog(headers: string[], rows: string[][], mapping: LogM
   // (S1.06) so a discovered SM reads consistently and lines up with a
   // conventionally-capitalised reference — e.g. an OCEL status "placed" → "Placed".
   const stateMap = mapping.activityState ?? {};
-  const cap = (s: string): string => { const t = (s ?? "").trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; };
+  // Collapse ALL internal whitespace (newlines/tabs/runs) to a single space so a
+  // state or activity value never carries an embedded newline — otherwise the SM
+  // node label and the conformance comparison (which match by label) silently
+  // disagree ("Level 1 In\nProgress" ≠ "Level 1 In Progress").
+  const clean = (s: string): string => (s ?? "").replace(/\s+/g, " ").trim();
+  const cap = (s: string): string => { const t = clean(s); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; };
   const stateFor = (activity: string, raw: string): string =>
     cap(si >= 0 ? raw : (stateMap[activity] ?? activityToState(activity)));
 
@@ -144,7 +149,7 @@ export function buildEventLog(headers: string[], rows: string[][], mapping: LogM
     const caseId = (r[ci] ?? "").trim();
     const timestamp = parseTimestamp(r[ti] ?? "");
     if (!caseId || timestamp === null) { unmapped++; continue; }
-    const activity = (r[ai] ?? "").trim();
+    const activity = clean(r[ai] ?? "");
     // No resource column? Fall back to the activity→team table (e.g. enriched from
     // the Process Diagram's lanes) — mirrors the activityState fallback above.
     const resource = ri >= 0 ? (r[ri] ?? "").trim() : (mapping.activityResource?.[activity] ?? "");

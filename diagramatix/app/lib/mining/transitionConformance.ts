@@ -49,7 +49,9 @@ export function checkTransitionConformance(variants: Variant[], ref: ReferenceSm
   }
   // State matching is CASE-INSENSITIVE (+ trimmed): a discovered "placed" must
   // conform to a reference "Placed". Original labels are kept for the messages.
-  const norm = (s: string) => (s ?? "").trim().toLowerCase();
+  // Collapse internal whitespace too (not just trim) so a reference label wrapped
+  // across lines — "Level 1 In\nProgress" — still matches the log's "Level 1 In Progress".
+  const norm = (s: string) => (s ?? "").replace(/\s+/g, " ").trim().toLowerCase();
   const refStates = new Set<string>();
   for (const v of kindById.values()) if (v.kind === "state" && v.label) refStates.add(norm(v.label));
   const refEdges = new Map<string, { id: string; from: string; to: string }>();   // norm "from→to" → { connId, original labels }
