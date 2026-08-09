@@ -15,6 +15,7 @@ import type { Variant, MiningStats } from "./types";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { layoutGenericDiagram } from "@/app/lib/diagram/genericLayout";
 import { planGeneric } from "@/app/lib/ai/planGeneric";
+import { reconcileStateMachineCoverage } from "./stateMachineCoverage";
 
 const SEP = String.fromCharCode(1);
 
@@ -68,12 +69,16 @@ export function describeMinedLifecycle(variants: Variant[], stats?: Partial<Mini
     ...termLines,
     ``,
     `TASK: Produce the REFERENCE state machine that is the single source of truth for this entity's lifecycle.`,
-    `Curate it into a clean, governable model rather than a literal copy:`,
-    `- Give every state and transition a clear, business-friendly label (expand cryptic codes).`,
-    `- Merge near-duplicate or synonymous states.`,
-    `- Keep the dominant real behaviour; omit obvious one-off anomalies and noise.`,
-    `- Use exactly one initial state; make the genuine end state(s) final (ignore in-flight cases when deciding what is truly terminal).`,
+    `Lay it out cleanly and governably, but it MUST cover the log completely:`,
+    `- COMPLETENESS IS MANDATORY: include EVERY state listed above and EVERY observed transition. Do NOT drop,`,
+    `  merge, or summarise any state or transition as "noise" — conformance replays the log against this model,`,
+    `  so any missing state or transition makes every case that touches it fail as an illegal transition.`,
+    `- Use each state's EXACT label as it appears in the log — do NOT rename, expand, or merge labels`,
+    `  (conformance matches states by label; a renamed state reads as a brand-new unknown state).`,
+    `- Use exactly one initial state and one final state; connect the observed entry state(s) from the initial`,
+    `  and the observed terminal state(s) to the final (ignore in-flight cases when deciding what is truly terminal).`,
     `- Label each transition with the activity/event that triggers it.`,
+    `You may tidy the LAYOUT and add a short description, but never at the cost of dropping or renaming a state/transition.`,
     `Return ONLY the diagram JSON per the format.`,
   ].join("\n");
 }
@@ -96,11 +101,16 @@ export async function generateStateMachineViaAi(input: AiStateMachineInput): Pro
     rules: input.rules,
     prompt,
   });
-  const data = layoutGenericDiagram(
+  // Enforce the coverage rule in code: whatever the model curated, add back every
+  // observed state/transition it left out (matched by label) so the reference is
+  // conformance-complete against the log — the prompt asks for this, this guarantees it.
+  const covered = reconcileStateMachineCoverage(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     { elements: (parsed.elements ?? []) as any, connections: (parsed.connections ?? []) as any },
-    "state-machine",
+    input.variants,
   );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = layoutGenericDiagram(covered as any, "state-machine");
   for (const c of data.connectors) {
     if (c.type === "transition" && c.label) { c.labelMode = "formal"; c.transitionEvent = c.label; }
   }

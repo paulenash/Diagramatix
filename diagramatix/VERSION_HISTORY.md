@@ -13,6 +13,20 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2150 — 2026-08-09 — Mining: generated State Machine must cover the whole log
+- **Rule (Paul):** any *generated* reference State Machine must show **every state and activity that is in
+  the event log** — else conformance replays the log against a partial model and reports a flood of false
+  **illegal transitions**. Enforced in **code** (not just the prompt) on both generation paths via a new pure
+  `reconcileStateMachineCoverage`: after discovery it adds back any observed state, entry, transition or
+  terminal the generator left out (matched case-insensitively by state label, transition labelled with its
+  triggering activity).
+- The **AI-curated** path previously told the model to *merge near-duplicate states* and *omit anomalies as
+  noise* — the exact cause. That instruction is replaced with a **completeness-mandatory / keep-exact-labels**
+  brief, and the code pass guarantees it regardless of what the model returns.
+- The deterministic `discoverStateMachine` was already complete → the pass is an idempotent no-op there, but
+  both paths now flow through the single enforced coverage guarantee. Tests T2247-T2249 (incl. a 100%-fitness
+  conformance guard). Schema: no bump.
+
 ## 1.44.2149 — 2026-08-09 — Mining: view / filter the imported event log
 - New **🔍 View / filter log** button in the import staging area (shown once a CSV/XES log is loaded) →
   a full-screen table of exactly what's being imported: **free-text search** across all columns plus a

@@ -11,6 +11,7 @@
 import type { Variant } from "./types";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { layoutGenericDiagram } from "@/app/lib/diagram/genericLayout";
+import { reconcileStateMachineCoverage } from "./stateMachineCoverage";
 
 const SEP = String.fromCharCode(1);
 const INIT = "__init", FINAL = "__final";
@@ -88,10 +89,14 @@ export function buildStateMachinePlan(variants: Variant[]): StateMachinePlan {
 /** Full discovered state-machine DiagramData (positioned + routed). */
 export function discoverStateMachine(variants: Variant[]): DiagramData {
   const plan = buildStateMachinePlan(variants);
-  const data = layoutGenericDiagram({ elements: plan.elements, connections: plan.connections }, "state-machine");
+  // Coverage guarantee: every observed state/transition present (idempotent here —
+  // the deterministic plan is already complete — but the single enforced path).
+  const covered = reconcileStateMachineCoverage({ elements: plan.elements, connections: plan.connections }, variants);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = layoutGenericDiagram(covered as any, "state-machine");
   // Frequency per edge (source→target) so each connector carries its case count.
   const countByEdge = new Map<string, number>();
-  for (const c of plan.connections) if (c.count != null) countByEdge.set(`${c.sourceId}${SEP}${c.targetId}`, c.count);
+  for (const c of covered.connections) if (c.count != null) countByEdge.set(`${c.sourceId}${SEP}${c.targetId}`, c.count);
   for (const c of data.connectors) {
     const count = countByEdge.get(`${c.sourceId}${SEP}${c.targetId}`);
     if (count != null) c.transitionCount = count;   // green frequency badge
