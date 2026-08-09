@@ -101,6 +101,11 @@ const SCOPED_OMITTED = new Set<string>([
   // Saved Diff Processes runs are analysis history/observability (like AuditLog),
   // not per-user/org content — carried by the SuperAdmin full backup only.
   "ProcessDiffRun",
+  // Per-user SharePoint OAuth connection: encrypted Graph access/refresh tokens
+  // bound to the Entra app registration + the MS_TOKEN_ENC_KEY of THIS deployment.
+  // Deliberately never backed up or restored — copying it elsewhere would be wrong
+  // (and useless: it re-obtains itself when the user clicks "Connect SharePoint").
+  "MicrosoftConnection",
   ...SIMULATOR_TABLES,
   ...RISK_CONTROL_TABLES,
   ...PCF_TABLES,
