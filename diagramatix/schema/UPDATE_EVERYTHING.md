@@ -33,47 +33,53 @@ derived from it automatically at deploy/runtime, or is a companion file that mus
 ## Step 0 — Decide whether `schemaVersion` bumps
 
 ### What "persisted data structure change" means
-The version tracks the **declared structure** — the *named* fields and their arrangement in
-anything Diagramatix writes to durable storage and reads back — **not the values inside them**.
-Two surfaces:
+> **Policy (Paul, 2026-08-10 — widened):** the version tracks the **structure of everything
+> Diagramatix persists**, across the WHOLE physical database *and* every JSON structure stored in
+> it — not just the diagram export shape. It tracks the *named* fields / tables / columns / enums
+> and their arrangement, **not the values inside them**. (This replaces the earlier
+> "export-shape-only, curated-Logical-DDL-only" rule, under which operational tables and open
+> `properties` keys quietly rode without a bump — that drift is what kept us on 1.44.)
 
-- **A. Export/interchange shape** — the first-class, *named* elements/attributes and
-  *enumerated* values in the diagram/project export (`.xml`/`.json`), `.diag_tems`, `.dgxsim`,
-  and backup payloads (the XSD).
-- **B. Physical database** — the tables, columns, enums, and relations (Prisma models → the
-  Logical DDL in [`../app/lib/diagram/ddlGenerate.ts`](../app/lib/diagram/ddlGenerate.ts)).
+Three surfaces now count:
+
+- **A. Export/interchange shape** — first-class, *named* elements/attributes and *enumerated*
+  values in the diagram/project export (`.xml`/`.json`), `.diag_tems`, `.dgxsim`, and backup
+  payloads (the XSD).
+- **B. Physical database — the ENTIRE schema.** Any table, column, enum, or relation added /
+  removed / renamed / retyped **anywhere** in `prisma/schema.prisma` — including operational,
+  auth, billing, telemetry, mining, and connection tables (not just the curated diagram Logical
+  DDL in `ddlGenerate.ts`). The source of truth for "did the DB change" is the Prisma schema, not
+  `ddlGenerate.ts`.
+- **C. In-DB JSON structure.** A new **persisted diagram/project attribute** — *including* a new
+  `element.properties.*` / `data.*` key — or a **change to the set of allowed values** an
+  attribute may take (an enum/union, whether or not it's a first-class XSD type).
 
 **✅ Counts → BUMP**
-- Add / remove / rename a **first-class** XSD element or attribute (e.g. `<dgx:processOwner>`,
-  `nameCode`, `relaxedLayout`).
-- Add a value to a **typed enum** — `SymbolType`, `ConnectorType`, `GatewayType`, `EventType`,
-  `DiagramType` (e.g. `"review-comment"`, `GatewayType "complex"`, `uml-issue`).
-- Add a **diagram-level field** that gets its own XSD attribute (e.g. `showPainPoints`,
-  `showIssues`).
-- Any **DB structure** change: new Prisma model, column, enum, or relation.
+- Any new/removed/renamed **first-class** XSD element or attribute.
+- Any value added to a **typed enum** (`SymbolType`, `ConnectorType`, `GatewayType`, `EventType`,
+  `DiagramType`, …) **or** a change to the allowed values of any persisted attribute.
+- Any new **diagram-level field** or any new **`properties` / `data` key** that is persisted
+  (round-tripped by the serialiser or written to the DB).
+- **Any DB structure change anywhere** — new Prisma model, column, enum, or relation, in *any*
+  table (e.g. `MicrosoftConnection`, `ProcessMiningRun.analytics`, `DiagramTemplate.thumbnailSvg`).
 
-**❌ Does NOT count → no bump (it "rides")**
-- A new key inside the **open `element.properties` / `data` bag** with no dedicated XSD
-  attribute. `PropertiesType` is `xs:any processContents="lax"` — the declared structure is
-  unchanged (this is how `properties.risk`, `.sim`, `.pcfId`, `.description` all persisted
-  without a shape change).
-- Behaviour / UI / routing / rendering changes with identical written fields.
+**❌ Does NOT count → no bump**
+- Behaviour / UI / routing / rendering changes with **identical persisted fields**.
 - New **rows** in existing tables (BubbleHelp, IntentKeywords, templates, AI prompts) — that's
   data, not structure.
 - Runtime/server-only state never written to an export or the DB.
-- A field that exists in a TS type but the serialiser **drops** (not round-tripped) — it isn't
-  persisted until the exporter emits *and* the importer reads it.
-
-**Gray area — open-bag-only additions:** a change that persists *only* as a new
-`properties`/`data` key (no first-class XSD field, no DB column) is **not** a declared-structure
-change. **Default: do not bump.** You may deliberately bump to mark a "feature window", but that
-is a conscious Step-0 choice, never an accident.
+- A field that exists only in a TS type but is **never persisted** (the serialiser drops it and no
+  DB column holds it) — it isn't structure until something writes it.
 
 ### The 10-second test
-> *"Side by side with the last release, is there a **named** field, attribute, enum value,
-> table, or column present in one and absent in the other?"*
-> - **Yes** → bump. Pick **N**: **minor** for additive/optional (`1.44 → 1.45`), **major** for
->   a breaking change (`1.44 → 2.0`). Do Steps 1–4.
+> *"Side by side with the last release, is there a **named** field, attribute, enum value, allowed
+> value, table, or column — anywhere in the DB, the export, or a persisted `properties` bag —
+> present in one and absent in the other?"*
+> - **Yes** → bump. Pick **N**: **minor** for additive/optional (`1.45 → 1.46`), **major** for a
+>   breaking change (`1.45 → 2.0`). Do Steps 1, 4, 5 always; do Steps 2–3 for the surfaces that
+>   actually changed (Step 2 XSD only if the export shape changed; Step 3 `ddlGenerate.ts` only if
+>   the *diagram-model* DDL changed — a bump driven purely by an operational table still bumps the
+>   number and logs it, but needs no XSD/DDL edit).
 > - **No** → skip Steps 1–4; `schemaVersion` stays. (Step 5 still runs.)
 
 ---

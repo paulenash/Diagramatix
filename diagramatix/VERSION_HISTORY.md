@@ -13,6 +13,23 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.45.<build> — 2026-08-10 — Schema-version policy widened + catch-up bump
+- **Policy (Paul):** `schemaVersion` now bumps on ANY change to the **entire physical database**
+  (any table/column/enum/relation anywhere — operational/auth/billing/telemetry/mining/connection
+  tables included, not just the curated diagram Logical DDL) **and** on ANY **in-DB JSON structure**
+  change (a new persisted diagram/project attribute — including an `element.properties.*` key — or a
+  change to an attribute's allowed values). Previously the rule was export-shape-only + curated-DDL-only,
+  so operational tables and open `properties` keys rode without a bump — which is why the number sat at
+  1.44 for so long. Rule rewritten in [`schema/UPDATE_EVERYTHING.md`](schema/UPDATE_EVERYTHING.md) Step 0
+  and [`schema/SCHEMA_CHANGELOG.md`](schema/SCHEMA_CHANGELOG.md).
+- **Catch-up bump 1.44 → 1.45** accounting for structure added since 1.44 without one: new tables
+  (`MicrosoftConnection`, `ProcessDiffRun`, `IntentKeywordMap`), new columns
+  (`ProcessMiningRun.analytics`/`kpiConfig`, `DiagramTemplate.description`/`thumbnailSvg`), and new
+  diagram `properties` attributes (`sharepointLink`, `fillColor`, review-comment fields).
+- **No export-XSD shape change** — the diagram `.xml`/`.json` interchange is unchanged; the bump is
+  driven by DB tables/columns + open-`properties` attributes. `types.ts` SCHEMA_VERSION + the four
+  schema-sync files updated together. Going forward, each such change bumps on its own release.
+
 ## 1.44.2153 — 2026-08-09 — SharePoint for web users (bring-your-own, multi-tenant)
 - **New:** any signed-in web user can now **Connect SharePoint** with their own Microsoft 365 — regardless of
   how they logged in (email/password or Microsoft) and regardless of org. Previously SharePoint was welded to

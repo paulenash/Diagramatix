@@ -451,6 +451,16 @@
     Issues are now offered on EVERY diagram type's palette (type-agnostic).
     Non-shape: Domain connector routing settled permanently on "sticky" (the legacy
     Optimal A/B toggle removed); the Database selector is now SuperAdmin-only.
+
+  v1.45 — Catch-up bump + WIDENED bump policy. NO SHAPE CHANGE to this XSD: the
+    version now tracks the entire physical database + any in-DB JSON structure
+    (new persisted diagram attribute or changed allowed-values), not just the
+    export shape — so operational tables and open properties keys added since
+    v1.44 now count. This bump records that structure (new tables/columns +
+    diagram properties keys); the diagram XML interchange is unchanged. See
+    schema/SCHEMA_CHANGELOG.md and schema/UPDATE_EVERYTHING.md Step 0.
+    (Inline entries for v1.42-1.44 were not added here; those releases' shape
+    notes live in schema/SCHEMA_CHANGELOG.md.)
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

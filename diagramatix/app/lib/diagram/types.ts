@@ -1109,6 +1109,17 @@ export interface TemplateData {
  *             appVersion (major.minor.BUILD) still advances automatically via the git commit
  *             count in /api/schema, so the release is reflected there.
  *
+ *  2026-08-10 (v1.45 — CATCH-UP + POLICY WIDENED, no export-shape change): the bump rule now
+ *             tracks the ENTIRE physical database (any table/column/enum/relation anywhere, not
+ *             just the curated diagram Logical DDL) AND any in-DB JSON structure change (a new
+ *             persisted diagram/project attribute — incl. an `element.properties.*` key — or a
+ *             change to an attribute's allowed values). This single catch-up bump accounts for
+ *             structure added since 1.44 without one: new tables (MicrosoftConnection,
+ *             ProcessDiffRun, IntentKeywordMap), new columns (ProcessMiningRun.analytics/kpiConfig,
+ *             DiagramTemplate.description/thumbnailSvg), and new diagram `properties` attributes
+ *             (sharepointLink, fillColor, review-comment fields). The diagram XML interchange (XSD)
+ *             is unchanged. See schema/UPDATE_EVERYTHING.md Step 0 for the widened criteria.
+ *
  *  2026-08-03 (v1.44 — SHAPE CHANGE): Full BPMN Tier-1 palette added the `complex`
  *             GatewayType and the `multiple` / `parallel-multiple` EventTypes to the export
  *             (new enumerations in diagramatix-export.xsd, marked "schema 1.44").
@@ -1122,4 +1133,4 @@ export interface TemplateData {
  *             thumbnailSvg) — nothing in the diagram XML interchange — so schemaVersion stays
  *             1.44 and the XSD is unchanged. appVersion (build) advances via /api/schema.
  */
-export const SCHEMA_VERSION = "1.44";
+export const SCHEMA_VERSION = "1.45";
