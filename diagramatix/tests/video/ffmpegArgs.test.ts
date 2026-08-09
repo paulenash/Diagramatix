@@ -20,6 +20,15 @@ describe("ffmpegWebmToMp4Args", () => {
     expect(args).toContain("-y");
   });
 
+  it("T2251 — preserves VFR timestamps + async-resamples audio so A/V stays in sync", () => {
+    const args = ffmpegWebmToMp4Args("/tmp/in.webm", "/tmp/out.mp4");
+    // Passthrough keeps MediaRecorder's real (variable) frame timing rather than
+    // forcing a constant rate (which would drop/dupe frames and shift alignment).
+    expect(args[args.indexOf("-fps_mode") + 1]).toBe("passthrough");
+    // async audio resample compensates a mic track that started a beat late.
+    expect(args[args.indexOf("-af") + 1]).toBe("aresample=async=1:first_pts=0");
+  });
+
   it("T0976 — builds a VP9/Opus webm transcode tuned for reasonable speed", () => {
     const args = ffmpegToWebmArgs("/tmp/in.mp4", "/tmp/out.webm");
     expect(args[0]).toBe("-i");
@@ -29,5 +38,8 @@ describe("ffmpegWebmToMp4Args", () => {
     expect(args).toContain("libopus");
     // realtime deadline keeps otherwise-glacial VP9 usable for a screencast.
     expect(args[args.indexOf("-deadline") + 1]).toBe("realtime");
+    // same A/V-sync handling as the mp4 path.
+    expect(args[args.indexOf("-fps_mode") + 1]).toBe("passthrough");
+    expect(args[args.indexOf("-af") + 1]).toBe("aresample=async=1:first_pts=0");
   });
 });

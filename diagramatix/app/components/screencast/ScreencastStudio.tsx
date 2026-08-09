@@ -259,35 +259,48 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
       return;
     }
     displayStreamRef.current = display;
-    const sv = screenVideoRef.current!;
-    sv.srcObject = display; await sv.play().catch(() => {});
     // Stop if the user ends the share from the browser's own bar.
     display.getVideoTracks()[0].addEventListener("ended", () => stop());
 
-    const cv = canvasRef.current!;
-    const draw = () => {
-      const ctx = cv.getContext("2d");
-      if (ctx && sv.videoWidth) {
-        if (cv.width !== sv.videoWidth) { cv.width = sv.videoWidth; cv.height = sv.videoHeight; }
-        ctx.drawImage(sv, 0, 0, cv.width, cv.height);
-        const camV = camVideoRef.current;
-        if (camOnRef.current && camV && camV.videoWidth) {
-          const r = insetRect(cv.width, cv.height, cornerRef.current, scaleRef.current);
-          const crop = coverCrop(camV.videoWidth, camV.videoHeight, r.w, r.h);
-          ctx.save(); roundRect(ctx, r.x, r.y, r.w, r.h, 12); ctx.clip();
-          ctx.drawImage(camV, crop.x, crop.y, crop.w, crop.h, r.x, r.y, r.w, r.h);
-          ctx.restore();
-          ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,0.9)";
-          roundRect(ctx, r.x, r.y, r.w, r.h, 12); ctx.stroke();
+    // VIDEO SOURCE — the crux of audio/video sync. When the webcam PiP is OFF we
+    // record the getDisplayMedia track DIRECTLY: its frames are hardware/OS-clocked,
+    // so they mux tightly with the mic audio and stay in sync for the whole clip.
+    // Only when the PiP is ON do we composite screen+cam onto a canvas and record
+    // canvas.captureStream — whose rAF-driven frame clock can drift from the audio
+    // clock under load (the small desync you saw). camOn is fixed once recording
+    // starts (the camera toggle only exists in setup), so this choice is stable.
+    let videoTrack: MediaStreamTrack;
+    if (camOnRef.current) {
+      const sv = screenVideoRef.current!;
+      sv.srcObject = display; await sv.play().catch(() => {});
+      const cv = canvasRef.current!;
+      const draw = () => {
+        const ctx = cv.getContext("2d");
+        if (ctx && sv.videoWidth) {
+          if (cv.width !== sv.videoWidth) { cv.width = sv.videoWidth; cv.height = sv.videoHeight; }
+          ctx.drawImage(sv, 0, 0, cv.width, cv.height);
+          const camV = camVideoRef.current;
+          if (camOnRef.current && camV && camV.videoWidth) {
+            const r = insetRect(cv.width, cv.height, cornerRef.current, scaleRef.current);
+            const crop = coverCrop(camV.videoWidth, camV.videoHeight, r.w, r.h);
+            ctx.save(); roundRect(ctx, r.x, r.y, r.w, r.h, 12); ctx.clip();
+            ctx.drawImage(camV, crop.x, crop.y, crop.w, crop.h, r.x, r.y, r.w, r.h);
+            ctx.restore();
+            ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,0.9)";
+            roundRect(ctx, r.x, r.y, r.w, r.h, 12); ctx.stroke();
+          }
         }
-      }
+        rafRef.current = requestAnimationFrame(draw);
+      };
       rafRef.current = requestAnimationFrame(draw);
-    };
-    rafRef.current = requestAnimationFrame(draw);
+      const canvasStream = (cv as HTMLCanvasElement & { captureStream: (fps?: number) => MediaStream }).captureStream(30);
+      videoTrack = canvasStream.getVideoTracks()[0];
+    } else {
+      videoTrack = display.getVideoTracks()[0];
+    }
 
     // Mix mic audio into the recorded stream.
-    const canvasStream = (cv as HTMLCanvasElement & { captureStream: (fps?: number) => MediaStream }).captureStream(30);
-    const tracks: MediaStreamTrack[] = [...canvasStream.getVideoTracks()];
+    const tracks: MediaStreamTrack[] = [videoTrack];
     const micTrack = previewStreamRef.current?.getAudioTracks()[0];
     if (micTrack) tracks.push(micTrack);
     const mixed = new MediaStream(tracks);
