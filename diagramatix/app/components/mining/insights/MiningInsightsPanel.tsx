@@ -24,8 +24,9 @@ const EXPAND_BTN = "ml-auto text-[11px] rounded px-2 py-0.5 bg-stone-800 text-am
 
 interface RunLite { id: string; discoveredBpmnId: string | null; discoveredSmId: string | null }
 
-type TabKey = "heat" | "variants" | "cases" | "outcomes" | "export";
+type TabKey = "activities" | "heat" | "variants" | "cases" | "outcomes" | "export";
 const TABS: { key: TabKey; label: string }[] = [
+  { key: "activities", label: "📋 Activities" },
   { key: "heat", label: "🔥 Insights" },
   { key: "variants", label: "🔀 Variants" },
   { key: "cases", label: "🎞 Cases" },
@@ -34,7 +35,7 @@ const TABS: { key: TabKey; label: string }[] = [
 ];
 
 export function MiningInsightsPanel({ projectId, run }: { projectId: string; run: RunLite }) {
-  const [tab, setTab] = useState<TabKey>("heat");
+  const [tab, setTab] = useState<TabKey>("activities");
   const [analytics, setAnalytics] = useState<RunAnalytics | null>(null);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [kpiConfig, setKpiConfig] = useState<KpiConfig | null>(null);
@@ -80,6 +81,7 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
         ))}
         {loading && <DiagramatixThrobber size={16} tone="amber" />}
       </div>
+      {tab === "activities" && <ActivitiesTab analytics={analytics} loading={loading} />}
       {tab === "heat" && <HeatTab analytics={analytics} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} loading={loading} />}
       {tab === "variants" && <VariantsTab variants={variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
       {tab === "cases" && <CasesTab analytics={analytics} variants={variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
@@ -208,6 +210,72 @@ function ModelSvg({ data, visibleIds, emphasize, captions, maxVh = 46 }: { data:
           return <text key={`cap-${el.id}`} x={el.x + el.width / 2} y={el.y + el.height + 11} textAnchor="middle" fontSize={9} fontWeight={600} fill="#1e40af" style={{ pointerEvents: "none" }}>{t}</text>;
         })}
       </svg>
+    </div>
+  );
+}
+
+// ── Activities tab (one row per activity: stats + team(s) + state(s)) ────────
+
+function ActivitiesTab({ analytics, loading }: { analytics: RunAnalytics | null; loading: boolean }) {
+  if (loading && !analytics) return <p className="text-[11px] text-stone-500">Loading analytics…</p>;
+  if (!analytics || analytics.activities.length === 0) return <NoAnalytics />;
+  const unit = analytics.clockUnit;
+  // Every distinct state observed across the log (with event counts) + every team.
+  const stateCount = new Map<string, number>();
+  const teamCount = new Map<string, number>();
+  for (const a of analytics.activities) {
+    for (const s of a.states ?? []) stateCount.set(s, (stateCount.get(s) ?? 0) + a.eventFreq);
+    for (const r of a.resources ?? []) teamCount.set(r, (teamCount.get(r) ?? 0) + a.eventFreq);
+  }
+  const reimport = analytics.activities.some((a) => a.resources === undefined && a.states === undefined);
+  const states = [...stateCount.entries()].sort((a, b) => b[1] - a[1]);
+  const teams = [...teamCount.entries()].sort((a, b) => b[1] - a[1]);
+  return (
+    <div>
+      <div className="text-[11px] text-stone-400 mb-2">
+        {analytics.activities.length} activity types · {analytics.totalCases}{analytics.capped ? " (sampled)" : ""} cases — one row each (normally 1 team + 1 state; multiples are flagged amber). Sorted by total time.
+      </div>
+      {reimport && <p className="text-[10px] text-amber-400 mb-2">Teams / states are blank — this run was imported before the per-activity summary. Re-import the log to populate them.</p>}
+      <div className="flex flex-wrap gap-1.5 items-center mb-1">
+        <span className="text-[10px] uppercase tracking-wide text-stone-500">States ({states.length}):</span>
+        {states.map(([s, n]) => <span key={s} className="text-[10px] rounded bg-amber-900/40 border border-amber-800/50 px-1.5 py-0.5 text-amber-100">{s} <span className="text-amber-300/60">{n.toLocaleString()}</span></span>)}
+      </div>
+      <div className="flex flex-wrap gap-1.5 items-center mb-2">
+        <span className="text-[10px] uppercase tracking-wide text-stone-500">Teams ({teams.length}):</span>
+        {teams.length ? teams.map(([t, n]) => <span key={t} className="text-[10px] rounded bg-blue-900/40 border border-blue-800/50 px-1.5 py-0.5 text-blue-100">{t} <span className="text-blue-300/60">{n.toLocaleString()}</span></span>) : <span className="text-[10px] text-stone-500">none (no resource column / enrichment)</span>}
+      </div>
+      <div className="overflow-x-auto max-h-[52vh]">
+        <table className="w-full text-[11px]">
+          <thead className="text-stone-400 text-left sticky top-0 bg-stone-900">
+            <tr>
+              <th className="font-normal py-1 pr-3">Activity</th>
+              <th className="font-normal py-1 pr-2 text-right">Cases</th>
+              <th className="font-normal py-1 pr-2 text-right">Events</th>
+              <th className="font-normal py-1 pr-2 text-right">Median</th>
+              <th className="font-normal py-1 pr-2 text-right">Total time</th>
+              <th className="font-normal py-1 pr-3">Team(s)</th>
+              <th className="font-normal py-1">State(s)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {analytics.activities.map((a) => {
+              const res = a.resources ?? [], sts = a.states ?? [];
+              const multiRes = res.length > 1, multiState = sts.length > 1;
+              return (
+                <tr key={a.activity} className="border-b border-stone-800 hover:bg-stone-800/60">
+                  <td className="py-1 pr-3 text-stone-200">{a.activity}</td>
+                  <td className="py-1 pr-2 text-right text-stone-300 tabular-nums">{a.caseFreq.toLocaleString()}</td>
+                  <td className="py-1 pr-2 text-right text-stone-400 tabular-nums">{a.eventFreq.toLocaleString()}</td>
+                  <td className="py-1 pr-2 text-right text-stone-300 tabular-nums whitespace-nowrap">{formatDuration(a.medianDurMs, unit)}</td>
+                  <td className="py-1 pr-2 text-right text-stone-300 tabular-nums whitespace-nowrap">{formatDuration(a.totalTimeMs, unit)}</td>
+                  <td className={`py-1 pr-3 ${multiRes ? "text-amber-300" : "text-stone-300"}`} title={multiRes ? "More than one team seen for this activity" : undefined}>{res.length ? res.join(", ") : "—"}</td>
+                  <td className={`py-1 ${multiState ? "text-amber-300" : "text-stone-300"}`} title={multiState ? "More than one state seen for this activity" : undefined}>{sts.length ? sts.join(", ") : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

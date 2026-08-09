@@ -13,6 +13,17 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 1.44.2148 — 2026-08-09 — Mining Insights: per-activity summary + fixes
+- New **📋 Activities** tab (now the default) — **one row per activity type** with its cases, events,
+  median / total time, and the **team(s) + state(s)** it carries (normally one each; multiples flagged
+  amber). Plus an all-**states** and all-**teams** chip summary so every distinct state/team is visible.
+  Analytics now capture per-activity resources + states.
+- **Fix:** the enrichment "✨ Filled N of M…" message no longer lingers — it clears on each new
+  file/scenario load and only shows while a fill table is actually open (so a log that already has the
+  resource/state columns won't show it).
+- Runs imported before this show a "re-import to populate teams/states" hint (analytics predates it).
+- Schema: no bump.
+
 ## 1.44.2147 — 2026-08-09 — Mining: enrich a sparse log from the project's models
 - On import, when the log has **no resource** and/or **no state** column, the console now offers to
   fill them from the project's own models: **teams from a Process Diagram** (activity → task → lane)

@@ -245,7 +245,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     }
     if (h.length === 0 || r.length === 0) { setErr("Couldn't read any rows from that file."); return; }
     setFileName(file.name); setHeaders(h); setRows(r);
-    setMapping(map);
+    setMapping(map); setEnrichMsg(null);
     setRunName(file.name.replace(/\.[^.]+$/, ""));
     // A hand-picked file replaces any scenario choice.
     setScenarios(null); setScenarioIdx(-1);
@@ -254,7 +254,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   // Load a scenario/sample log into the Import staging (confirm-the-analysis flow).
   function loadStaging(s: SampleScenario) {
     if (!Array.isArray(s?.headers) || !Array.isArray(s?.rows) || !s.headers.length || !s.rows.length) return;
-    setErr(null); setOcelText(null); setOcelTypes([]);
+    setErr(null); setOcelText(null); setOcelTypes([]); setEnrichMsg(null);
     setHeaders(s.headers); setRows(s.rows);
     setMapping(s.mapping ?? guessMapping(s.headers));
     setFileName(s.fileName ?? "sample.csv");
@@ -558,7 +558,7 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
                   <p className="text-[10px] text-stone-400">{activities.length.toLocaleString()} distinct activities</p>
                 </div>
               )}
-              {enrichMsg && <p className="text-[10px] text-emerald-300">✨ {enrichMsg}</p>}
+              {(needsTeamTable || needsStateTable) && enrichMsg && <p className="text-[10px] text-emerald-300">✨ {enrichMsg}</p>}
 
               {/* Preview */}
               <div className="overflow-x-auto border border-stone-700 rounded">

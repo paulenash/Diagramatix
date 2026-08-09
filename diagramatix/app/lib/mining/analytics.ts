@@ -41,6 +41,8 @@ export interface ActivityMetric {
   p90DurMs: number;
   totalTimeMs: number;    // sum of sojourn over all occurrences (the true bottleneck signal)
   dominantResource?: string;
+  resources: string[];    // distinct teams/resources seen for this activity (usually 1)
+  states: string[];       // distinct states this activity produced (usually 1)
 }
 export interface EdgeMetric {
   from: string;
@@ -86,6 +88,7 @@ export function computeAnalytics(log: EventLog): RunAnalytics {
   const caseCountByActivity: Record<string, Set<number>> = {};
   const eventCountByActivity: Record<string, number> = {};
   const resByActivity: Record<string, Record<string, number>> = {};
+  const stateByActivity: Record<string, Set<string>> = {};
   const edgeDur = new Map<string, number[]>();   // edgeKey(from,to) -> transition ms samples
   const allDur: number[] = [];
   const cycleAll: number[] = [];
@@ -99,6 +102,7 @@ export function computeAnalytics(log: EventLog): RunAnalytics {
       if (evs[i].resource) {
         (resByActivity[a] ??= {})[evs[i].resource!] = (resByActivity[a]?.[evs[i].resource!] ?? 0) + 1;
       }
+      if (evs[i].state) (stateByActivity[a] ??= new Set()).add(evs[i].state);
       if (i < evs.length - 1) {
         const d = evs[i + 1].timestamp - evs[i].timestamp;
         if (d >= 0) {
@@ -127,6 +131,8 @@ export function computeAnalytics(log: EventLog): RunAnalytics {
       p90DurMs: quantile(ds, 0.9),
       totalTimeMs: ds.reduce((s, d) => s + d, 0),
       ...(dominantResource ? { dominantResource } : {}),
+      resources: res ? Object.keys(res).sort() : [],
+      states: [...(stateByActivity[a] ?? [])].sort(),
     };
   }).sort((x, y) => y.totalTimeMs - x.totalTimeMs);
 
