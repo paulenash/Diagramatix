@@ -73,14 +73,17 @@ export function allAvailable(): FeatureStateMap {
   return m;
 }
 
-/** The stored matrix for one subscription level (default `hidden` for any gap). */
+/** The stored matrix for one subscription level. Gaps FAIL OPEN → `available`: an
+ *  unconfigured matrix (e.g. before the seed runs, or a newly-added feature not yet
+ *  seeded for this level) never silently locks a feature out. Restriction only
+ *  applies once a row explicitly sets `hidden`/`disabled`. */
 export async function getLevelMatrix(levelId: string): Promise<FeatureStateMap> {
   const rows = await prisma.featureAvailability.findMany({
     where: { levelId },
     select: { featureKey: true, state: true },
   });
   const m: FeatureStateMap = {};
-  for (const k of FEATURE_KEYS) m[k] = "hidden";
+  for (const k of FEATURE_KEYS) m[k] = "available";
   for (const r of rows) if (FEATURE_KEYS.includes(r.featureKey)) m[r.featureKey] = coerceState(r.state);
   return m;
 }

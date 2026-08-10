@@ -27,7 +27,7 @@ export async function GET() {
   const matrix: Record<string, Record<string, FeatureState>> = {};
   for (const l of levels) {
     matrix[l.id] = {};
-    for (const k of FEATURE_KEYS) matrix[l.id][k] = "hidden"; // default until a row exists
+    for (const k of FEATURE_KEYS) matrix[l.id][k] = "available"; // fail-open default until a row exists
   }
   for (const r of rows) if (matrix[r.levelId] && FEATURE_KEYS.includes(r.featureKey)) matrix[r.levelId][r.featureKey] = coerceState(r.state);
   return NextResponse.json({ levels, features: FEATURES, matrix });
