@@ -13,6 +13,13 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.1.1 (build 2159) — 2026-08-10 — Mobile fix: diagram now displays (height chain + fit)
+- **Fix:** the `/m` diagram viewer showed the ＋Comment/Save controls but a blank/off-centre canvas. The
+  shell root was `min-h-[100dvh]` (a *min* height), which broke the `h-full` percentage chain so the viewer
+  container collapsed to zero height → `fit()` bailed and parked the transform on an empty corner. Switched
+  to a definite `h-[100dvh]` app-shell, and replaced run-once `fit()` with a **ResizeObserver** that centres
+  the diagram as soon as the container has a real size (re-fits on rotation; preserves manual zoom).
+
 ## 2.1.1 (build 2158) — 2026-08-10 — Mobile fixes: route diagrams to /m + hide desktop overlays
 - **Fix:** opening a diagram on a phone showed the **desktop editor** (Matrix/Camera/Video toolbar + a
   mouse-oriented canvas that didn't display well) because the phone auto-redirect only fired on exactly
