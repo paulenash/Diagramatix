@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { isMobileSupportedType } from "@/app/lib/diagram/mobileSupport";
 
 interface DiagramRow { id: string; name: string; type: string }
 const TYPE_BADGE: Record<string, string> = { bpmn: "BP", flowchart: "FC", archimate: "AR", "value-chain": "VC", "state-machine": "SM", "process-context": "PC" };
@@ -86,16 +87,32 @@ export function MobileProjectClient({ projectId }: { projectId: string }) {
         <p className="text-sm text-gray-400 mt-6 text-center">No diagrams yet. Tap “+ Diagram”.</p>
       ) : (
         <ul className="space-y-2">
-          {diagrams.map((d) => (
-            <li key={d.id}>
-              <button onClick={() => router.push(`/m/diagram/${d.id}`)}
-                className="w-full text-left bg-white rounded-xl shadow-sm px-4 py-3.5 active:bg-gray-50 flex items-start gap-3">
-                <span className="w-8 h-8 rounded bg-blue-100 text-blue-700 text-[11px] font-semibold flex items-center justify-center shrink-0">{TYPE_BADGE[d.type] ?? d.type.slice(0, 2).toUpperCase()}</span>
-                <span className="flex-1 font-medium text-gray-900 break-words min-w-0">{d.name}</span>
-                <span className="text-gray-400 shrink-0 mt-1.5">›</span>
-              </button>
-            </li>
-          ))}
+          {diagrams.map((d) => {
+            const ok = isMobileSupportedType(d.type);
+            if (!ok) {
+              return (
+                <li key={d.id}>
+                  <div aria-disabled className="w-full text-left bg-white/60 rounded-xl shadow-sm px-4 py-3.5 flex items-start gap-3 opacity-50 cursor-not-allowed">
+                    <span className="w-8 h-8 rounded bg-gray-200 text-gray-500 text-[11px] font-semibold flex items-center justify-center shrink-0">{TYPE_BADGE[d.type] ?? d.type.slice(0, 2).toUpperCase()}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block font-medium text-gray-500 break-words">{d.name}</span>
+                      <span className="block text-[11px] text-gray-400">Not available on mobile</span>
+                    </span>
+                  </div>
+                </li>
+              );
+            }
+            return (
+              <li key={d.id}>
+                <button onClick={() => router.push(`/m/diagram/${d.id}`)}
+                  className="w-full text-left bg-white rounded-xl shadow-sm px-4 py-3.5 active:bg-gray-50 flex items-start gap-3">
+                  <span className="w-8 h-8 rounded bg-blue-100 text-blue-700 text-[11px] font-semibold flex items-center justify-center shrink-0">{TYPE_BADGE[d.type] ?? d.type.slice(0, 2).toUpperCase()}</span>
+                  <span className="flex-1 font-medium text-gray-900 break-words min-w-0">{d.name}</span>
+                  <span className="text-gray-400 shrink-0 mt-1.5">›</span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

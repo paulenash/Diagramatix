@@ -63,6 +63,16 @@ export function MiningSourcesPanel({ projectId }: { projectId: string }) {
     } finally { setBusy(null); }
   }
 
+  async function toggleAuto(s: Source) {
+    setBusy(s.id + "auto"); setErr(null);
+    try {
+      const r = await fetch(`${base}/${s.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ autoRefresh: !s.autoRefresh }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) setErr(j.error ?? "Could not update polling");
+      await load();
+    } finally { setBusy(null); }
+  }
+
   async function act(idPath: string, path: string, method = "POST") {
     setBusy(idPath + path); setErr(null);
     try {
@@ -141,6 +151,15 @@ export function MiningSourcesPanel({ projectId }: { projectId: string }) {
               <span className="font-medium text-stone-100 flex-1 truncate" title={s.name}>{s.name}<span className="ml-1.5 text-[9px] text-stone-500">{KIND_LABEL[s.kind] ?? s.kind}</span></span>
               <span className="text-stone-400 tabular-nums shrink-0">{s.eventCount} events</span>
               <span className="text-stone-500 shrink-0" title="last refresh">{s.lastRefreshAt ? new Date(s.lastRefreshAt).toLocaleString() : "never"}</span>
+              {s.kind === "sharepoint" ? (
+                <span className="text-stone-500 shrink-0" title="SharePoint sources refresh manually only">manual</span>
+              ) : (
+                <button onClick={() => toggleAuto(s)} disabled={!!busy}
+                  className={`shrink-0 px-1.5 py-0.5 rounded border disabled:opacity-50 ${s.autoRefresh ? "border-emerald-700/60 text-emerald-300 hover:bg-emerald-950/40" : "border-stone-700 text-stone-500 hover:bg-stone-800"}`}
+                  title="Turn automatic live-source polling on/off">
+                  {s.autoRefresh ? "Polling ● On" : "Polling ○ Off"}
+                </button>
+              )}
               <button onClick={() => act(s.id, "/refresh")} disabled={!!busy} className="text-amber-300 hover:text-amber-200 shrink-0 disabled:opacity-50">Refresh</button>
               {s.runId && <button onClick={() => act(`../runs/${s.runId}`, "/snapshot")} disabled={!!busy} className="text-emerald-300 hover:text-emerald-200 shrink-0 disabled:opacity-50" title="Freeze a dated run for the Compliance trend">Snapshot</button>}
               <button onClick={() => act(s.id, "", "DELETE")} disabled={!!busy} className="text-stone-500 hover:text-red-400 shrink-0">✕</button>

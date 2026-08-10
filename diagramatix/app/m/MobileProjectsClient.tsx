@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-interface ProjectRow { id: string; name: string; _count?: { diagrams?: number } }
+interface ProjectRow { id: string; name: string; _count?: { diagrams?: number }; mobileSupported?: boolean }
 
 /**
  * Mobile Projects list + Create Project (steps 1-2). Tapping a project opens its
@@ -78,15 +78,33 @@ export function MobileProjectsClient() {
         <p className="text-sm text-gray-400 mt-6 text-center">No projects yet. Tap “+ New” to create one.</p>
       ) : (
         <ul className="space-y-2">
-          {projects.map((p) => (
-            <li key={p.id}>
-              <button onClick={() => router.push(`/m/project/${p.id}`)}
-                className="w-full text-left bg-white rounded-xl shadow-sm px-4 py-3.5 active:bg-gray-50 flex items-start justify-between gap-2">
-                <span className="font-medium text-gray-900 break-words min-w-0">{p.name}</span>
-                <span className="text-xs text-gray-400 shrink-0 mt-0.5">{p._count?.diagrams ?? 0} diagram{(p._count?.diagrams ?? 0) === 1 ? "" : "s"} ›</span>
-              </button>
-            </li>
-          ))}
+          {projects.map((p) => {
+            const count = p._count?.diagrams ?? 0;
+            // Disable a project that has diagrams but none the phone can open.
+            const disabled = count > 0 && p.mobileSupported === false;
+            if (disabled) {
+              return (
+                <li key={p.id}>
+                  <div aria-disabled className="w-full text-left bg-white/60 rounded-xl shadow-sm px-4 py-3.5 flex items-start justify-between gap-2 opacity-50 cursor-not-allowed">
+                    <span className="min-w-0">
+                      <span className="block font-medium text-gray-500 break-words">{p.name}</span>
+                      <span className="block text-[11px] text-gray-400">No mobile-viewable diagrams</span>
+                    </span>
+                    <span className="text-xs text-gray-400 shrink-0 mt-0.5">{count} diagram{count === 1 ? "" : "s"}</span>
+                  </div>
+                </li>
+              );
+            }
+            return (
+              <li key={p.id}>
+                <button onClick={() => router.push(`/m/project/${p.id}`)}
+                  className="w-full text-left bg-white rounded-xl shadow-sm px-4 py-3.5 active:bg-gray-50 flex items-start justify-between gap-2">
+                  <span className="font-medium text-gray-900 break-words min-w-0">{p.name}</span>
+                  <span className="text-xs text-gray-400 shrink-0 mt-0.5">{count} diagram{count === 1 ? "" : "s"} ›</span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

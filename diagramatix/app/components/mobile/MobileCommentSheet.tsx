@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
+import { isRichText, sanitizeRichText } from "@/app/lib/diagram/richText";
 
 /**
  * Bottom sheet for a mobile review comment. `mode:"edit"` = textarea + dictation
@@ -14,6 +15,7 @@ export function MobileCommentSheet({
   heading,
   targetLabel,
   initialText = "",
+  html,
   authorLine,
   onSave,
   onClose,
@@ -22,6 +24,9 @@ export function MobileCommentSheet({
   heading?: string;
   targetLabel?: string;
   initialText?: string;
+  /** Read mode: original rich-text (HTML) body — rendered with formatting
+   *  (bold/lists/line breaks) when present, sanitised to a safe tag whitelist. */
+  html?: string;
   authorLine?: string;
   onSave?: (text: string) => void;
   onClose: () => void;
@@ -73,7 +78,15 @@ export function MobileCommentSheet({
         {read && authorLine && <p className="text-[11px] text-pink-700 mb-2">{authorLine}</p>}
 
         {read ? (
-          <div className="text-sm text-gray-800 whitespace-pre-wrap min-h-[3rem] max-h-[45vh] overflow-y-auto">{text || "(empty)"}</div>
+          html && isRichText(html) ? (
+            <>
+              <style>{`.mobile-rich ul{list-style:disc;padding-left:1.25rem}.mobile-rich ol{list-style:decimal;padding-left:1.25rem}.mobile-rich li{margin:0.1rem 0}.mobile-rich p{margin:0.25rem 0}.mobile-rich b,.mobile-rich strong{font-weight:600}`}</style>
+              <div className="mobile-rich text-sm text-gray-800 min-h-[3rem] max-h-[45vh] overflow-y-auto"
+                dangerouslySetInnerHTML={{ __html: sanitizeRichText(html) }} />
+            </>
+          ) : (
+            <div className="text-sm text-gray-800 whitespace-pre-wrap min-h-[3rem] max-h-[45vh] overflow-y-auto">{text || "(empty)"}</div>
+          )
         ) : (
           <>
             <div className="relative">

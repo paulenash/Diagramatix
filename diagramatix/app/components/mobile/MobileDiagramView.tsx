@@ -23,12 +23,16 @@ export function MobileDiagramView({
   overlay,
   pickMode = false,
   onPick,
+  onTapView,
 }: {
   data: DiagramData;
   colorConfig?: SymbolColorConfig;
   overlay?: React.ReactNode;
   pickMode?: boolean;
   onPick?: (svgX: number, svgY: number) => void;
+  /** A clean single tap while NOT in pickMode — used to open an element's
+   *  details / follow a linked diagram. Not fired after a pan/pinch/double-tap. */
+  onTapView?: (svgX: number, svgY: number) => void;
 }) {
   // Render with the diagram's REAL colours + full labels (zoom in to read them).
   const svg = useMemo(
@@ -166,6 +170,9 @@ export function MobileDiagramView({
     if (pickMode && onPick) {
       const p = toSvg(e.clientX, e.clientY);
       onPick(p.x, p.y);
+    } else if (!pickMode && onTapView) {
+      const p = toSvg(e.clientX, e.clientY);
+      onTapView(p.x, p.y);
     }
   }
 

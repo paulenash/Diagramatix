@@ -65,7 +65,8 @@ function fillFor(e: DiagramElement, opts?: ThumbnailOpts): string {
   return palFor(e.type as string).fill;
 }
 function strokeFor(e: DiagramElement, opts?: ThumbnailOpts): string {
-  return opts?.trueColors ? "#374151" : palFor(e.type as string).stroke;
+  if (opts?.trueColors) return (e.properties?.strokeColor as string | undefined) ?? "#374151";
+  return palFor(e.type as string).stroke;
 }
 
 function label(e: DiagramElement, tx: number, ty: number, dy = 4, full = false): string {
@@ -80,6 +81,20 @@ function label(e: DiagramElement, tx: number, ty: number, dy = 4, full = false):
   const fs = 11, lineH = fs * 1.2;
   const lines = wrapText(t, Math.max(12, e.width - 8), fs);
   const startY = cy(e) + ty - ((lines.length - 1) * lineH) / 2 + fs * 0.34;
+  return lines.map((ln, i) =>
+    `<text x="${mx}" y="${(startY + i * lineH).toFixed(1)}" text-anchor="middle" font-size="${fs}" fill="#0f172a" font-family="sans-serif">${esc(ln)}</text>`,
+  ).join("");
+}
+
+// Label placed just BELOW a small shape (events / gateways) — BPMN convention,
+// since the glyph fills the diamond/circle. Wrapped like the desktop external label.
+function belowLabel(e: DiagramElement, tx: number, ty: number, full: boolean): string {
+  const t = (e.label ?? "").trim();
+  if (!t) return "";
+  const fs = 10, lineH = fs * 1.2;
+  const lines = (full ? wrapText(t, Math.max(48, e.width + 30), fs) : [short(t)]).slice(0, 3);
+  const mx = (cx(e) + tx).toFixed(1);
+  const startY = e.y + ty + e.height + fs + 1;
   return lines.map((ln, i) =>
     `<text x="${mx}" y="${(startY + i * lineH).toFixed(1)}" text-anchor="middle" font-size="${fs}" fill="#0f172a" font-family="sans-serif">${esc(ln)}</text>`,
   ).join("");
@@ -189,7 +204,7 @@ function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpt
   if (t === "gateway" || t === "fork-join" || t === "flowchart-parallel") {
     const s = Math.min(w, h) / 2;
     const mx = cx(e) + tx, my = cy(e) + ty;
-    return `<polygon points="${mx},${my - s} ${mx + s},${my} ${mx},${my + s} ${mx - s},${my}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"${VE}/>` + gatewayMarker(e, mx, my, s, stroke);
+    return `<polygon points="${mx},${my - s} ${mx + s},${my} ${mx},${my + s} ${mx - s},${my}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"${VE}/>` + gatewayMarker(e, mx, my, s, stroke) + belowLabel(e, tx, ty, full);
   }
   if (t === "start-event" || t === "intermediate-event" || t === "end-event") {
     const r = Math.min(w, h) / 2;
@@ -198,7 +213,21 @@ function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpt
     const sw = t === "end-event" ? 2.6 : 1.4;
     let out = `<circle cx="${ecx.toFixed(1)}" cy="${ecy.toFixed(1)}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${VE}/>`;
     if (dbl) out += `<circle cx="${ecx.toFixed(1)}" cy="${ecy.toFixed(1)}" r="${(r - 3).toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="1"${VE}/>`;
-    return out + eventMarker(e, ecx, ecy, r, stroke);
+    return out + eventMarker(e, ecx, ecy, r, stroke) + belowLabel(e, tx, ty, full);
+  }
+  if (t === "chevron" || t === "chevron-collapsed") {
+    // Value-chain "Process" — a right-pointing chevron with a matching left notch
+    // so they tile. Geometry mirrors the desktop SymbolRenderer chevron exactly.
+    const notch = Math.min(20, w * 0.15);
+    const pts = `${x},${y} ${(x + w - notch).toFixed(1)},${y} ${(x + w).toFixed(1)},${(y + h / 2).toFixed(1)} ${(x + w - notch).toFixed(1)},${(y + h).toFixed(1)} ${x},${(y + h).toFixed(1)} ${(x + notch).toFixed(1)},${(y + h / 2).toFixed(1)}`;
+    let out = `<polygon points="${pts}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"${VE}/>` + label(e, tx, ty, 4, full);
+    if (t === "chevron-collapsed") {
+      // small [+] drill marker (bottom-centre) — a collapsed process links to detail
+      const bx = cx(e) + tx - 5, by = y + h - 13;
+      out += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="10" height="10" rx="1.5" fill="#ffffff" stroke="${stroke}" stroke-width="1"${VE}/>`
+        + `<path d="M${(bx + 5).toFixed(1)},${(by + 2.5).toFixed(1)} L${(bx + 5).toFixed(1)},${(by + 7.5).toFixed(1)} M${(bx + 2.5).toFixed(1)},${(by + 5).toFixed(1)} L${(bx + 7.5).toFixed(1)},${(by + 5).toFixed(1)}" stroke="${stroke}" stroke-width="1"${VE}/>`;
+    }
+    return out;
   }
   if (t === "data-object") {
     return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`;

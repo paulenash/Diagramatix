@@ -5,6 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { gateLimit } from "@/app/lib/subscription-route";
 import { ARCHIVE_PROJECT_NAME } from "@/app/lib/archive";
+import { isMobileSupportedType } from "@/app/lib/diagram/mobileSupport";
 import {
   getCurrentOrgId,
   requireRole,
@@ -61,7 +62,23 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json(projects);
+  // `mobileSupported` — does this project contain at least one diagram the
+  // mobile viewer can open (Value Chain / BPMN / State Machine)? Lets the /m
+  // project list disable projects that have nothing viewable on a phone.
+  // One distinct query; desktop callers simply ignore the extra field.
+  const distinctTypes = projects.length
+    ? await prisma.diagram.findMany({
+        where: { projectId: { in: projects.map((p) => p.id) } },
+        select: { projectId: true, type: true },
+        distinct: ["projectId", "type"],
+      })
+    : [];
+  const supportedByProject = new Set<string>();
+  for (const d of distinctTypes) if (d.projectId && isMobileSupportedType(d.type)) supportedByProject.add(d.projectId);
+
+  return NextResponse.json(
+    projects.map((p) => ({ ...p, mobileSupported: supportedByProject.has(p.id) })),
+  );
 }
 
 export async function POST(req: Request) {
