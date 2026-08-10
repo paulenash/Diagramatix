@@ -13,6 +13,19 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.1.1 (build 2161) — 2026-08-10 — Mobile viewer fidelity: real colours, labels, rotate, pan-anywhere
+- **Real colours (#1):** the mobile viewer now renders the diagram's ACTUAL colours (per-element
+  `properties.fillColor`, else the project `colorConfig`, else the type default — same resolution as the
+  desktop) instead of the generic preview palette. `renderTemplateThumbnailSvg` gained a `{ trueColors,
+  colorConfig, fullLabels }` option; the template-menu / mining thumbnails keep the compact look.
+- **Labels (#3):** pool / lane / sublane **names** (rotated in the header strip), **connector & message
+  labels** (at the line midpoint with a white halo), and full task labels now render — tiny when zoomed out,
+  readable when you zoom in.
+- **Rotate (#4):** the viewer re-fits on a portrait↔landscape flip (aspect-change detection in a
+  ResizeObserver) without disturbing your manual zoom on incidental URL-bar resizes.
+- **Pan anywhere (#5):** the diagram backdrop is now `pointer-events:none`, so a pan/pinch that starts ON a
+  shape scrolls too (previously only empty canvas panned). Schema: no change.
+
 ## 2.1.1 (build 2159) — 2026-08-10 — Mobile fix: diagram now displays (height chain + fit)
 - **Fix:** the `/m` diagram viewer showed the ＋Comment/Save controls but a blank/off-centre canvas. The
   shell root was `min-h-[100dvh]` (a *min* height), which broke the `h-full` percentage chain so the viewer

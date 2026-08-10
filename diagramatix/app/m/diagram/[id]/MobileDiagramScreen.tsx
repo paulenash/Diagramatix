@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { MobileDiagramView } from "@/app/components/mobile/MobileDiagramView";
 import { MobileReviewLayer } from "@/app/components/mobile/MobileReviewLayer";
 import { MobileCommentSheet } from "@/app/components/mobile/MobileCommentSheet";
@@ -13,6 +14,7 @@ import { collapseAllReviewComments } from "@/app/lib/diagram/reviewCollapse";
 interface Loaded {
   name: string; data: DiagramData; projectId: string | null;
   version: number; canReview: boolean; viewer: { id: string; name: string };
+  colorConfig?: SymbolColorConfig;
 }
 
 const isContainer = (e: DiagramElement) => e.type === "pool" || e.type === "lane" || e.type === "sublane";
@@ -51,6 +53,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         version: j.version ?? 0,
         canReview: !!j.canReview,
         viewer: j.viewer ?? { id: "", name: "" },
+        colorConfig: j.colorConfig ?? undefined,
       }); })
       .catch((e) => { if (on) setErr(e.message); })
       .finally(() => { if (on) setLoading(false); });
@@ -163,6 +166,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
         {d && !empty && (
           <MobileDiagramView
             data={backdrop}
+            colorConfig={d.colorConfig}
             pickMode={picking}
             onPick={onPick}
             overlay={

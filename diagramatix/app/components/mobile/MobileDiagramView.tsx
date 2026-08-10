@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { renderTemplateThumbnailSvg, thumbnailTransform } from "@/app/lib/diagram/templateThumbnail";
 
 interface Transform { s: number; x: number; y: number }
@@ -18,16 +19,22 @@ interface Transform { s: number; x: number; y: number }
  */
 export function MobileDiagramView({
   data,
+  colorConfig,
   overlay,
   pickMode = false,
   onPick,
 }: {
   data: DiagramData;
+  colorConfig?: SymbolColorConfig;
   overlay?: React.ReactNode;
   pickMode?: boolean;
   onPick?: (svgX: number, svgY: number) => void;
 }) {
-  const svg = useMemo(() => renderTemplateThumbnailSvg(data as never), [data]);
+  // Render with the diagram's REAL colours + full labels (zoom in to read them).
+  const svg = useMemo(
+    () => renderTemplateThumbnailSvg(data as never, { trueColors: true, colorConfig, fullLabels: true }),
+    [data, colorConfig],
+  );
   // Same transform the SVG uses internally, so the overlay lines up exactly.
   const dims = useMemo(() => {
     const { w, h } = thumbnailTransform((data.elements ?? []) as never);
@@ -46,10 +53,12 @@ export function MobileDiagramView({
   // True once the current touch interaction has moved/pinched — so the trailing
   // click isn't misread as a tap (pick / double-tap-fit).
   const movedRef = useRef(false);
-  // Whether we've centred/scaled the current diagram yet. Reset on a new diagram
-  // or an orientation change so it re-fits; NOT reset on incidental resizes (URL
-  // bar show/hide) so the user's manual zoom/pan is preserved.
+  // Whether we've centred/scaled the current diagram yet + the container size at
+  // that fit. Reset on a new diagram. NOT reset on incidental resizes (URL-bar
+  // show/hide) so the user's manual zoom/pan survives — but a portrait↔landscape
+  // flip or a big resize DOES re-fit.
   const fittedRef = useRef(false);
+  const lastFit = useRef({ w: 0, h: 0 });
 
   function fit() {
     const el = containerRef.current;
@@ -58,26 +67,30 @@ export function MobileDiagramView({
     if (!cw || !ch) return;
     const s = Math.min(cw / dims.w, ch / dims.h) * 0.96;
     setT({ s, x: (cw - dims.w * s) / 2, y: (ch - dims.h * s) / 2 });
+    fittedRef.current = true;
+    lastFit.current = { w: cw, h: ch };
   }
 
-  // Fit once the container actually HAS a size. A ResizeObserver covers the case
-  // where the flex layout sizes the container a frame or two after mount (the old
-  // "fit on mount" ran while clientHeight was still 0, leaving an uncentred view).
+  // A ResizeObserver drives fitting: it fires once the flex layout has actually
+  // sized the container (the old "fit on mount" ran while clientHeight was still 0,
+  // leaving an uncentred view), and again on a rotation (aspect flip) / big resize.
   useEffect(() => { fittedRef.current = false; }, [dims.w, dims.h]);
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const tryFit = () => { if (!fittedRef.current && el.clientWidth && el.clientHeight) { fit(); fittedRef.current = true; } };
+    const tryFit = () => {
+      const cw = el.clientWidth, ch = el.clientHeight;
+      if (!cw || !ch) return;
+      if (!fittedRef.current) { fit(); return; }
+      const { w: lw, h: lh } = lastFit.current;
+      const flipped = cw > ch !== lw > lh;                                   // portrait ↔ landscape
+      const big = Math.abs(cw - lw) > lw * 0.3 || Math.abs(ch - lh) > lh * 0.3;
+      if (flipped || big) fit();
+    };
     tryFit();
     const ro = new ResizeObserver(tryFit);
     ro.observe(el);
     return () => ro.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dims.w, dims.h]);
-  useEffect(() => {
-    const onRot = () => { fittedRef.current = false; requestAnimationFrame(() => fit()); };
-    window.addEventListener("orientationchange", onRot);
-    return () => window.removeEventListener("orientationchange", onRot);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dims.w, dims.h]);
 
@@ -162,9 +175,11 @@ export function MobileDiagramView({
       className={`relative w-full h-full overflow-hidden bg-white select-none ${pickMode ? "cursor-crosshair" : ""}`}
       style={{ touchAction: "none" }}
     >
-      {/* Backdrop — the diagram picture (identical to the read-only viewer). */}
+      {/* Backdrop — the diagram picture. pointer-events:none so a pan/pinch that
+          starts ON a diagram shape still reaches the container (scroll anywhere,
+          not just on empty canvas). */}
       <div
-        style={{ position: "absolute", left: 0, top: 0, width: dims.w, height: dims.h, transformOrigin: "0 0", transform: `translate(${t.x}px, ${t.y}px) scale(${t.s})` }}
+        style={{ position: "absolute", left: 0, top: 0, width: dims.w, height: dims.h, transformOrigin: "0 0", transform: `translate(${t.x}px, ${t.y}px) scale(${t.s})`, pointerEvents: "none" }}
         dangerouslySetInnerHTML={{ __html: svg.replace("<svg ", `<svg width="${dims.w}" height="${dims.h}" `) }}
       />
       {/* Interactive overlay — a SEPARATE layer with the SAME transform, so review
