@@ -17,7 +17,7 @@ export function MobileChrome({ userName, children }: { userName: string; childre
   }
 
   return (
-    <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
+    <div className="h-[100dvh] bg-gray-50 flex flex-col">
       <header className="sticky top-0 z-20 bg-blue-900 text-white flex items-center justify-between px-4 h-12 shadow">
         <span className="font-semibold tracking-wide">Diagramatix</span>
         <div className="relative">

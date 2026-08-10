@@ -46,6 +46,10 @@ export function MobileDiagramView({
   // True once the current touch interaction has moved/pinched — so the trailing
   // click isn't misread as a tap (pick / double-tap-fit).
   const movedRef = useRef(false);
+  // Whether we've centred/scaled the current diagram yet. Reset on a new diagram
+  // or an orientation change so it re-fits; NOT reset on incidental resizes (URL
+  // bar show/hide) so the user's manual zoom/pan is preserved.
+  const fittedRef = useRef(false);
 
   function fit() {
     const el = containerRef.current;
@@ -56,13 +60,24 @@ export function MobileDiagramView({
     setT({ s, x: (cw - dims.w * s) / 2, y: (ch - dims.h * s) / 2 });
   }
 
-  // Fit on mount, on data change, and on resize / orientation change.
-  useEffect(() => { fit(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [dims.w, dims.h]);
+  // Fit once the container actually HAS a size. A ResizeObserver covers the case
+  // where the flex layout sizes the container a frame or two after mount (the old
+  // "fit on mount" ran while clientHeight was still 0, leaving an uncentred view).
+  useEffect(() => { fittedRef.current = false; }, [dims.w, dims.h]);
   useEffect(() => {
-    const onResize = () => fit();
-    window.addEventListener("resize", onResize);
-    window.addEventListener("orientationchange", onResize);
-    return () => { window.removeEventListener("resize", onResize); window.removeEventListener("orientationchange", onResize); };
+    const el = containerRef.current;
+    if (!el) return;
+    const tryFit = () => { if (!fittedRef.current && el.clientWidth && el.clientHeight) { fit(); fittedRef.current = true; } };
+    tryFit();
+    const ro = new ResizeObserver(tryFit);
+    ro.observe(el);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dims.w, dims.h]);
+  useEffect(() => {
+    const onRot = () => { fittedRef.current = false; requestAnimationFrame(() => fit()); };
+    window.addEventListener("orientationchange", onRot);
+    return () => window.removeEventListener("orientationchange", onRot);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dims.w, dims.h]);
 
