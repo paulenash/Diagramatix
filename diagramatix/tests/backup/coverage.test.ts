@@ -66,6 +66,10 @@ const SCOPED_OMITTED = new Set<string>([
   "CollaborationGroup", "CollaborationGroupMember", "DiagramReview", "DiagramReviewer",
   "OwnershipTransfer", "ScannerRule", "SubscriptionLevel", "Feature", "BubbleHelp",
   "DiagramTypeStyle", "IntentKeywordMap", "DictationCommand",
+  // Feature Availability matrix is global platform config (per subscription level),
+  // like SubscriptionLevel — carried by the SuperAdmin full backup only, not a
+  // per-user/org backup.
+  "FeatureAvailability",
   // Entity Structures are org MASTERS (like the org-master EntityLists) — the
   // scoped org/user backup recreates only project COPIES of EntityList (which
   // carry no structureId), never the masters, so EntityStructure is not carried

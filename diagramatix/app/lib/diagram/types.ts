@@ -1159,7 +1159,7 @@ export const SCHEMA_VERSION = "45";
  *   • major   → manual, for a breaking / headline release.
  * When the middle bumps, reset patch to 0. See schema/UPDATE_EVERYTHING.md Step 0.
  */
-export const PRODUCT_VERSION = "2.1.1";
+export const PRODUCT_VERSION = "2.2.0";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the

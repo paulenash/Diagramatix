@@ -12,14 +12,13 @@
 import { NextResponse } from "next/server";
 import {
   checkLimit,
-  hasFeatureAccess,
+  isFeatureAvailable,
   recordUsage as recordUsageLib,
-  FEATURE_LABELS,
   type CheckContext,
   type EventMetric,
-  type FeatureKey,
   type LimitMetric,
 } from "./subscription";
+import { FEATURE_DEF } from "./features/registry";
 
 /**
  * Feature entitlement gate. Returns null when the user's tier includes the
@@ -27,18 +26,19 @@ import {
  * `metric: "feature"` and the offending feature key so the UI can distinguish a
  * "not in your subscription" block from a usage-cap block.
  *
- * Use at the ENTRY route(s) of each gated feature (Simulator, Process Mining,
- * Risk & Control / Compliance, APQC) so a locked feature can't be reached by
- * calling the API directly.
+ * Use at the ENTRY route(s) of each gated feature so a locked feature can't be
+ * reached by calling the API directly. `feature` is any key from the feature
+ * registry (app/lib/features/registry.ts). A `disabled` or `hidden` state blocks.
  */
 export async function gateFeature(
   userId: string,
-  feature: FeatureKey,
+  feature: string,
 ): Promise<NextResponse | null> {
-  if (await hasFeatureAccess(userId, feature)) return null;
+  if (await isFeatureAvailable(userId, feature)) return null;
+  const label = FEATURE_DEF[feature]?.label ?? feature;
   return NextResponse.json(
     {
-      error: `${FEATURE_LABELS[feature]} is not included in your subscription.`,
+      error: `${label} is not available on your subscription.`,
       metric: "feature",
       feature,
     },

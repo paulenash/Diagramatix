@@ -416,17 +416,31 @@ function isAdminEmail(email: string): boolean {
   return SUPERUSER_EMAILS.has(email);
 }
 
-/** Resolve a user's feature entitlements from their EFFECTIVE tier (comp /
- *  grace-period aware). SuperAdmins get everything. */
+/** Resolve a user's four legacy feature booleans — now DERIVED from the unified
+ *  Feature Availability matrix (app/lib/features/availability.ts), so the whole
+ *  system has one source of truth. Kept for the many existing `entitlements`
+ *  call sites; new gating should use the state map / isFeatureAvailable directly.
+ *  (Dynamic import avoids a static import cycle with availability.ts.) */
 export async function getEntitlements(userId: string): Promise<Entitlements> {
-  const user = await loadUserWithTier(userId);
-  if (!user) return { ...ALL_FEATURES_OFF };
-  return entitlementsForLevel(user.subscriptionLevel, isAdminEmail(user.email));
+  const { getFeatureStates } = await import("@/app/lib/features/availability");
+  const s = await getFeatureStates(userId);
+  return {
+    simulator: s["simulator"] === "available",
+    processMining: s["processMining"] === "available",
+    riskControl: s["riskControl"] === "available",
+    apqc: s["apqc"] === "available",
+  };
 }
 
-/** Single-feature check used by API-route gates. */
+/** Single-feature availability check for ANY registry key — used by route gates. */
+export async function isFeatureAvailable(userId: string, key: string): Promise<boolean> {
+  const { getFeatureStates } = await import("@/app/lib/features/availability");
+  return (await getFeatureStates(userId))[key] === "available";
+}
+
+/** Legacy 4-key check (delegates to isFeatureAvailable). */
 export async function hasFeatureAccess(userId: string, key: FeatureKey): Promise<boolean> {
-  return (await getEntitlements(userId))[key];
+  return isFeatureAvailable(userId, key);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

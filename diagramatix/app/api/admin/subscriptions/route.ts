@@ -18,7 +18,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 
-const ALLOWED_TIER_IDS = new Set(["free", "introductory", "professional", "expert"]);
+const ALLOWED_TIER_IDS = new Set(["free", "introductory", "professional", "expert", "enterprise"]);
 
 export async function GET() {
   const session = await auth();

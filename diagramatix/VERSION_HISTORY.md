@@ -13,6 +13,26 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.2.0 — 2026-08-10 — Feature Availability by Subscription Level (3-state, editable, per-user + per-org)
+- New **Feature Availability** system from *Feature by Subscription Level v1.4.xlsx* — a **33-feature × 5-level**
+  (Free / Introductory / Professional / **Enterprise** new) matrix with **three states** per cell: **Available**,
+  **Disabled** (shown, not selectable — selectable in the editor, not seeded yet), **Not Available** (hidden).
+  SuperAdmin edits the grid at **/dashboard/admin/feature-availability**; seeded from the xlsx (1→hidden, 80→
+  available) via `scripts/seed-feature-availability.ts`.
+- **Unified** — this matrix is now the single source of truth: the old 4 boolean entitlements
+  (`getEntitlements`) derive from it, and `gateFeature` blocks anything not `available`. Resolution
+  (`app/lib/features/availability.ts`): SuperAdmin → all available; else effective level's matrix overlaid with
+  **per-user overrides** (SuperUser sets them from the Registered-Users "Features" button).
+- **Enterprise Organizations** (Paul): a SuperAdmin can assign a whole **Org** to a subscription level — every
+  member, including anyone in the org's claimed email domains (e.g. getai.com.au), resolves to at least that
+  level. Managed on the same admin screen; new `Org.subscriptionLevelId`.
+- Client gate helpers `useFeatureStates()` + `<FeatureGate>` + `/api/features`; SuperAdmin view-mode gains an
+  **Enterprise** preview. **Schema: DB change → product version 2.1.1 → 2.2.0** (XSD schema integer 45 unchanged).
+  Tests T2264-T2266. **Prod post-deploy:** run `seed-subscriptions.ts` (adds Enterprise) then
+  `seed-feature-availability.ts`.
+- *Phase 2 (follow-ups):* wire the remaining ~28 features' menus/routes to `FeatureGate`/`gateFeature`; make the
+  view-mode preview fully data-driven; retire the now-legacy `has*` checkboxes in the Subscriptions editor.
+
 ## 2.1.1 (build 2162) — 2026-08-10 — Mobile viewer: wrapped labels, annotation icons, message arrows
 - **Wrapped text (#1):** element labels now **wrap to the shape width** (reusing the desktop `wrapText`) and
   pool/lane/sublane names wrap into rotated columns — long names/labels are readable instead of overflowing.

@@ -24,7 +24,7 @@ import "dotenv/config";
 import { prisma } from "../app/lib/db";
 
 type TierSeed = {
-  id: "free" | "introductory" | "professional" | "expert";
+  id: "free" | "introductory" | "professional" | "expert" | "enterprise";
   name: string;
   priceMonthly: number;                    // AUD cents
   sortOrder: number;
@@ -107,6 +107,24 @@ const TIERS: TierSeed[] = [
     maxNonBpmnElementsPerDiagram: null,
     maxBpmnElementsPerDiagram: null,
     maxAiAttempts: 500, aiAttemptsResetMonthly: true,
+    maxIndividualExports: null, individualExportsResetMonthly: true,
+    maxIndividualImports: null, individualImportsResetMonthly: true,
+    maxBulkExports: null,
+    maxBulkImports: null,
+    trialDays: null,
+    hasSimulator: true, hasProcessMining: true, hasRiskControl: true, hasApqc: true,
+  },
+  {
+    // Enterprise — top tier (Feature by Subscription Level v1.4). Everything
+    // unlimited; Stripe price set later. Feature availability is driven by the
+    // FeatureAvailability matrix (seed-feature-availability.ts), not the has* flags.
+    id: "enterprise", name: "Enterprise", priceMonthly: 0, sortOrder: 4,
+    maxProjects: null,
+    maxDiagramsPerTypePerProject: null,
+    maxArchimateDiagramsTotal: null,
+    maxNonBpmnElementsPerDiagram: null,
+    maxBpmnElementsPerDiagram: null,
+    maxAiAttempts: null, aiAttemptsResetMonthly: true,
     maxIndividualExports: null, individualExportsResetMonthly: true,
     maxIndividualImports: null, individualImportsResetMonthly: true,
     maxBulkExports: null,

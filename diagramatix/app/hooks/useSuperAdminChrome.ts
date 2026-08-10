@@ -26,13 +26,14 @@ import { useCallback, useEffect, useState } from "react";
  * consumer that reads `hidden` keeps working (SuperAdmin chrome shows only in the
  * superadmin view). Strictly a no-op for non-SuperAdmins.
  */
-export type AdminViewMode = "superadmin" | "orgadmin" | "expert" | "professional" | "introductory";
+export type AdminViewMode = "superadmin" | "orgadmin" | "enterprise" | "expert" | "professional" | "introductory";
 
 /** The subscription tier a given view mode previews as — used to relabel the
  *  tier chip. null = show the real tier (superadmin / orgadmin aren't tier views). */
 export const VIEW_MODE_TIER: Record<AdminViewMode, string | null> = {
   superadmin: null,
   orgadmin: null,
+  enterprise: "Enterprise",
   expert: "Expert",
   professional: "Professional",
   introductory: "Introductory",
@@ -55,6 +56,7 @@ export interface ViewModeEntitlements {
 const VIEW_MODE_ENTITLEMENTS: Record<AdminViewMode, ViewModeEntitlements | null> = {
   superadmin:   null,
   orgadmin:     null,
+  enterprise:   { simulator: true,  processMining: true,  riskControl: true,  apqc: true  },
   expert:       { simulator: true,  processMining: true,  riskControl: true,  apqc: true  },
   professional: { simulator: false, processMining: false, riskControl: false, apqc: true  },
   introductory: { simulator: false, processMining: false, riskControl: false, apqc: false },
@@ -77,7 +79,7 @@ const KEY = "dgx.superAdminViewMode";
 const VER_KEY = "dgx.superAdminViewModeBuild";
 const EVENT = "dgx:superadmin-chrome";
 const COOKIE = "dgx_sa_mode";
-const ORDER: AdminViewMode[] = ["superadmin", "orgadmin", "expert", "professional", "introductory"];
+const ORDER: AdminViewMode[] = ["superadmin", "orgadmin", "enterprise", "expert", "professional", "introductory"];
 // Build stamp (commit count, baked in per deploy). A new build resets the view
 // mode to "superadmin" so the demo mode never survives a deployment (local or prod).
 const BUILD = process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0";

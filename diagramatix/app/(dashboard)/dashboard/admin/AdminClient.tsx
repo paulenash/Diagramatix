@@ -7,6 +7,7 @@ import { PromptDialog } from "@/app/components/PromptDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { FilePreviewDialog, type PreviewPayload } from "@/app/components/preview/FilePreviewDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
+import { FeatureOverridePanel } from "@/app/components/FeatureOverridePanel";
 import { displayOrgRole } from "@/app/lib/auth/orgRoleLabels";
 import { PRODUCT_VERSION } from "@/app/lib/diagram/types";
 import { safeInternalPath } from "@/app/lib/safeRedirect";
@@ -192,6 +193,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
     userEmail: string;
     userName: string | null;
   } | null>(null);
+  const [featureOverrideFor, setFeatureOverrideFor] = useState<{ userId: string; name: string } | null>(null);
 
   // Two-stage delete confirmation. Stage 1: confirm the destructive
   // action with a project/diagram count summary. Stage 2: require the
@@ -491,6 +493,15 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
                         >
                           Edit
                         </button>
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => setFeatureOverrideFor({ userId: u.id, name: u.email })}
+                            className="text-xs text-blue-700 hover:text-blue-800 font-medium border border-blue-300 rounded px-2 py-1 hover:bg-blue-50"
+                            title="Per-user feature availability overrides"
+                          >
+                            Features
+                          </button>
+                        )}
                         {/* Delete is SuperAdmin only. OrgAdmin gets View
                             + Edit but cannot purge users — that's a
                             platform-level action. */}
@@ -556,6 +567,11 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
           onClose={() => setUsagePopover(null)}
           onTierChanged={() => router.refresh()}
         />
+      )}
+
+      {featureOverrideFor && (
+        <FeatureOverridePanel userId={featureOverrideFor.userId} userName={featureOverrideFor.name}
+          onClose={() => setFeatureOverrideFor(null)} />
       )}
 
       {/* Delete user — stage 1: count summary + warning, click-to-continue */}
@@ -793,6 +809,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "ddl", title: "DDL Generation", description: "Download the Diagramatix schema as DDL — the curated LOGICAL model (PostgreSQL / MySQL / SQL Server) or the PHYSICAL DDL of the live database.", ddl: true },
   { id: "archive", title: "System Archive", description: "Archived projects and diagrams across the system.", href: "/dashboard/admin/archive" },
   { id: "subscriptions", title: "Subscription Prices & Limits", description: "Tier pricing and per-tier feature limits.", href: "/dashboard/admin/subscriptions" },
+  { id: "feature-availability", title: "Feature Availability", description: "Per subscription level, set each feature to Available / Disabled / Not Available (the 34-feature × 5-level matrix). Override per user from Registered Users.", href: "/dashboard/admin/feature-availability" },
   { id: "features", title: "Features Catalog", description: "Edit the public feature catalog (draft / publish).", href: "/dashboard/admin/features" },
   { id: "simulator-examples", title: "Simulator Examples", description: "Curate the simulation sample processes users can adopt — capture a study, edit metadata, publish / unpublish.", href: "/dashboard/admin/simulator-examples", feature: "simulator" },
   { id: "mining-examples", title: "Process Mining Examples", description: "Curate the process-mining samples users can adopt — capture a run, edit metadata, publish / unpublish.", href: "/dashboard/admin/mining-examples", feature: "mining" },

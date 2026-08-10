@@ -82,6 +82,14 @@ model Org {
   // (DEFAULT_DOMAIN_JOIN_ROLE). Set per-org by a SuperAdmin.
   domainJoinRole OrgRole?
 
+  // SuperAdmin-assigned subscription level for the WHOLE org — every member
+  // (incl. domain auto-joiners for the claimed emailDomains above) resolves to
+  // at least this level (e.g. Enterprise), unless an active per-user comp grant
+  // is higher. Null → members use their own tier. Managed from the Feature
+  // Availability admin screen ("Enterprise Organizations").
+  subscriptionLevelId String?
+  subscriptionLevel   SubscriptionLevel? @relation(fields: [subscriptionLevelId], references: [id])
+
   // Per-org admin setting (managed by Org Owner/Admin via /dashboard/admin).
   // When false, project sharing is restricted to users in the same Org as
   // the project owner. When true, the owner can share with any registered
@@ -240,6 +248,11 @@ model User {
   // group field is the source of truth; this just remembers which
   // headers the user wants folded.
   templateGroupPrefs            Json?
+  // Per-user SuperUser feature-availability OVERRIDES: a map of
+  // `{ featureKey: "available"|"disabled"|"hidden" }`. Overrides the user's
+  // subscription-level matrix for the listed keys only; absent keys inherit.
+  // Set from the admin Registered-Users popover. See app/lib/features/availability.ts.
+  featureOverrides              Json?
   createdAt                     DateTime                   @default(now())
   // Updated (throttled) from the Auth.js jwt callback to power the
   // admin "online / last seen" indicator. Nullable for legacy rows.
@@ -819,9 +832,29 @@ model SubscriptionLevel {
   hasApqc          Boolean @default(true)
   hasCollaboration Boolean @default(false) // live diagram co-authoring (premium)
 
-  users     User[]
+  users                User[]
+  orgs                  Org[]
+  featureAvailabilities FeatureAvailability[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Feature Availability matrix — the SuperAdmin-editable "Feature by Subscription
+// Level" grid (app/lib/features/registry.ts × the subscription tiers). One row per
+// (level, featureKey); `state` is "available" | "disabled" | "hidden". This is the
+// SINGLE SOURCE OF TRUTH for feature gating (the has* booleans above are legacy).
+// Resolution: app/lib/features/availability.ts. Seeded from
+// menus_and_features/feature-availability.seed.json.
+model FeatureAvailability {
+  id         String            @id @default(cuid())
+  levelId    String
+  level      SubscriptionLevel @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  featureKey String            // stable key from FEATURES registry
+  state      String            @default("hidden") // "available" | "disabled" | "hidden"
+  updatedAt  DateTime          @updatedAt
+
+  @@unique([levelId, featureKey])
+  @@index([levelId])
 }
 
 model UsageCounter {
