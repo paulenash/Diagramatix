@@ -8,7 +8,7 @@ import { getCurrentOrgId, requireRole, WRITE_ROLES, OrgContextError } from "@/ap
 import { buildUserBackup, restoreUserBackup } from "@/app/lib/backup";
 import { streamBackup } from "@/app/lib/backupStream";
 import { previewUserBackup } from "@/app/lib/backupPreview";
-import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { PRODUCT_VERSION } from "@/app/lib/diagram/types";
 
 /**
  * GET /api/backup
@@ -22,10 +22,9 @@ import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
  */
 
 function appVersion(): string {
-  // Commit count baked into the build via NEXT_PUBLIC_COMMIT_COUNT
-  // (set from --build-arg GIT_COMMIT_COUNT in the Dockerfile).
-  const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
-  return `${SCHEMA_VERSION}.${commitCount}`;
+  // Stamp the Diagramatix PRODUCT version (major.middle.patch). The git build
+  // count is a display-only suffix on the header badge, not part of this stamp.
+  return PRODUCT_VERSION;
 }
 
 export async function GET(req: Request) {

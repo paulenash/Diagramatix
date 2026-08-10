@@ -5,7 +5,7 @@
  * "Logical DDL Generation".
  */
 
-import { SCHEMA_VERSION } from "./types";
+import { SCHEMA_VERSION, PRODUCT_VERSION } from "./types";
 
 type Dialect = "postgres" | "mysql" | "mssql";
 
@@ -357,7 +357,7 @@ export function generateDiagramatixDDL(dbType: string): string {
 
   lines.push(`-- ============================================================================`);
   lines.push(`-- Diagramatix Logical Data Model — Relational DDL`);
-  lines.push(`-- Schema Version: ${SCHEMA_VERSION}`);
+  lines.push(`-- XSD Schema Version: ${SCHEMA_VERSION}   Product Version: ${PRODUCT_VERSION}`);
   lines.push(`-- Generated: ${new Date().toISOString().slice(0, 10)}`);
   lines.push(`-- Dialect: ${dbLabel}`);
   lines.push(`-- ============================================================================`);
@@ -473,7 +473,7 @@ export function generateDiagramatixDDL(dbType: string): string {
   }
   lines.push("");
 
-  lines.push(`-- Schema version: ${SCHEMA_VERSION}`);
+  lines.push(`-- XSD Schema version: ${SCHEMA_VERSION}   Product version: ${PRODUCT_VERSION}`);
   lines.push(`-- End of DDL`);
 
   return lines.join("\n");

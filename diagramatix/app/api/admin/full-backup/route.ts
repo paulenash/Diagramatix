@@ -31,13 +31,11 @@ import {
 import { streamBackup } from "@/app/lib/backupStream";
 import { previewFullBackup } from "@/app/lib/backupPreview";
 import { buildOrgBackup } from "@/app/lib/org-backup";
-import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { PRODUCT_VERSION } from "@/app/lib/diagram/types";
 
 function appVersion(): string {
-  // Commit count baked into the build via NEXT_PUBLIC_COMMIT_COUNT
-  // (set from --build-arg GIT_COMMIT_COUNT in the Dockerfile).
-  const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
-  return `${SCHEMA_VERSION}.${commitCount}`;
+  // Diagramatix PRODUCT version (build count is a display-only badge suffix).
+  return PRODUCT_VERSION;
 }
 
 export async function GET(req: Request) {

@@ -3,21 +3,23 @@
   Diagramatix Export Schema
   Namespace: http://diagramatix.com/export/1.0
 
-  Two version numbers are tracked:
-    schemaVersion (major.minor) — the export data structure version.
-      Only bumped when fields are added, removed, or renamed.
-      Major bump = breaking change; minor bump = additive (new optional fields).
-    appVersion (major.minor.build) — the Diagramatix application version.
-      Build number = git commit count; changes every commit.
+  Two INDEPENDENT version numbers are tracked (split 2026-08-10):
+    schemaVersion — a standalone INTEGER (e.g. "45") = the XSD schema version.
+      Bumped ONLY when THIS XSD / the Diagram JSON export SHAPE changes (a new
+      first-class element/attribute or typed-enum value). The original criterion.
+      Legacy exports carry the old "major.minor" form (e.g. "1.45"); importers read
+      either via structuralSchemaVersion() (the "1.NN" minor == the new integer).
+    appVersion (major.middle.patch, e.g. "2.1.1") — the Diagramatix PRODUCT version.
+      MIDDLE increments on any physical DB table/column change; patch on fixes; major
+      manually. The header badge appends "(build <git commit count>)" for display only.
 
-  The xs:schema version attribute carries the schemaVersion.
-  The appVersion is recorded as an annotation below and injected at runtime via /api/schema.
+  The xs:schema version attribute carries the schemaVersion (integer).
+  The appVersion (product version) is recorded as an annotation below and injected at
+  runtime via /api/schema.
 
-  WHEN TO BUMP schemaVersion: ONLY when the data structure actually changes —
-  either this XSD / the Diagram JSON export shape, OR the physical database as
-  described by the Logical DDL (app/lib/diagram/ddlGenerate.ts). The version number
-  tracks the persisted data structure; if neither the export shape nor the DDL
-  changes, DO NOT bump it (feature-only releases ride the current version).
+  WHEN TO BUMP schemaVersion (the integer): ONLY when THIS XSD / the Diagram JSON export
+  SHAPE changes. Physical-DB or open-`properties` changes do NOT bump the schema integer —
+  they move appVersion's MIDDLE instead. See schema/UPDATE_EVERYTHING.md Step 0.
 
   MAINTENANCE — these FOUR must always be kept in sync, and move together on a bump:
     1. app/lib/diagram/types.ts   — the SCHEMA_VERSION constant + its history comment
@@ -476,14 +478,18 @@
   <!-- ============================================================ -->
   <!-- Version patterns                                              -->
   <!-- ============================================================ -->
-  <!-- Schema version: major.minor  e.g. "1.0", "1.1", "2.0" -->
+  <!-- Schema (XSD) version: a standalone integer, e.g. "45". Bumps only on an
+       XSD export-shape change. Legacy files carry the old "major.minor" form
+       (e.g. "1.45"); the importer reads either via structuralSchemaVersion(). -->
   <xs:simpleType name="SchemaVersionString">
     <xs:restriction base="xs:string">
-      <xs:pattern value="\d+\.\d+"/>
+      <xs:pattern value="\d+(\.\d+)?"/>
     </xs:restriction>
   </xs:simpleType>
 
-  <!-- App version: major.minor.build  e.g. "1.0.147" -->
+  <!-- App = Diagramatix PRODUCT version: major.middle.patch  e.g. "2.1.1".
+       Middle increments on any physical DB change; the header badge adds a
+       "(build <commitCount>)" suffix that is display-only, not stamped here. -->
   <xs:simpleType name="AppVersionString">
     <xs:restriction base="xs:string">
       <xs:pattern value="\d+\.\d+\.\d+"/>

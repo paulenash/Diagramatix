@@ -16,7 +16,7 @@ import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
-import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { checkSchemaCompatibility } from "@/app/lib/diagram/types";
 import {
   isDiagramBundle, remapDiagramData, remapAiComparison,
   type BundledDiagram,
@@ -33,14 +33,11 @@ export async function POST(req: Request) {
   if (!isDiagramBundle(bundle)) {
     return NextResponse.json({ error: "Not a diagram bundle (kind mismatch)" }, { status: 400 });
   }
-  // Refuse a bundle from a newer schema major (mirrors the JSON-import guard).
-  const fileMajor = parseInt(String(bundle.schemaVersion ?? "0").split(".")[0] ?? "0", 10);
-  const appMajor = parseInt(SCHEMA_VERSION.split(".")[0] ?? "0", 10);
-  if (fileMajor > appMajor) {
-    return NextResponse.json(
-      { error: `Bundle schema ${bundle.schemaVersion} is newer than this app (${SCHEMA_VERSION}).` },
-      { status: 400 },
-    );
+  // Refuse a bundle from a newer XSD schema version (mirrors the JSON-import guard;
+  // structural integer, tolerant of legacy "1.NN").
+  const compat = checkSchemaCompatibility(String(bundle.schemaVersion ?? ""));
+  if (!compat.ok) {
+    return NextResponse.json({ error: compat.message }, { status: 400 });
   }
 
   // Target project decides org + owner (same rule as POST /api/diagrams).

@@ -93,9 +93,15 @@ async function refreshGuids(inputPath, outputPath, renameV15ToV16Strings) {
       next = next
         .replace(/Diagramatix Shapes v1\.5/g, "Diagramatix Shapes v1.6")
         .replace(/Diagramatix v1\.5/g, "Diagramatix v1.6")
-        // Internal references to "v15" in property names — be cautious:
+        // Also remap the v1.4 display strings that were never renamed at the
+        // v1.4→v1.5 hop and carried through into docProps (title/description/
+        // Template) — otherwise Visio shows the stale "v1.4" title.
+        .replace(/Diagramatix Shapes v1\.4/g, "Diagramatix Shapes v1.6")
+        .replace(/Diagramatix v1\.4/g, "Diagramatix v1.6")
+        // Internal references to "v15"/"v14" in property names — be cautious:
         // limit to the standalone token, don't touch arbitrary substrings.
-        .replace(/\bv1\.5\b/g, "v1.6");
+        .replace(/\bv1\.5\b/g, "v1.6")
+        .replace(/\bv1\.4\b/g, "v1.6");
     }
     zip.file(name, next);
   }

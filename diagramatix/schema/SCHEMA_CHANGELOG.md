@@ -3,12 +3,12 @@
 Canonical human-readable changelog for the export schema. Mirrors the inline history block in [`../public/diagramatix-export.xsd`](../public/diagramatix-export.xsd) and the `SCHEMA_VERSION` history comment in [`../app/lib/diagram/types.ts`](../app/lib/diagram/types.ts).
 
 **Two version numbers are tracked**
-- **`schemaVersion`** (major.minor) — the export *data-structure* version. Bumped only when fields are added, removed, or renamed. *Major* = breaking change; *minor* = additive (new optional fields). Carried on the `<xs:schema version="…">` attribute.
-- **`appVersion`** (major.minor.build) — the Diagramatix *application* version. The build number is the git commit count, so it changes every commit. Injected at runtime via `/api/schema`.
+- **`schemaVersion`** — a standalone **integer** (the XSD schema version). Bumped only when the XSD **export shape** changes (a field/element/enum added, removed, or renamed). Carried on `<xs:schema version="…">`. This changelog tracks THIS number.
+- **`appVersion`** = **`PRODUCT_VERSION`** (`major.middle.patch`) — the Diagramatix *product* version. Its MIDDLE increments on any physical DB change; patch on fixes; major manually. The header badge appends `(build <git-commit-count>)` for display. Product-version history lives in [`../VERSION_HISTORY.md`](../VERSION_HISTORY.md).
 
-**Current version:** `1.45`. Versioning began at **v1.0** (dual `schemaVersion` / `appVersion` stamping across every export + a versioned XSD root); **v1.2** was the first release of the enumerated XSD content that every later version evolves from. The XSD's own inline history block starts at **v1.10**; the earlier **v1.0–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`../app/lib/diagram/types.ts`](../app/lib/diagram/types.ts) and git.
+**Current XSD schema version:** `45` · **Product version:** `2.1.1` (split 2026-08-10 — the old single `major.minor` reached `1.45`; the `45` minor became this standalone integer, and the product version restarted at `2.1.1`). Versioning began at **v1.0**; **v1.2** was the first enumerated XSD content; the XSD inline history block starts at **v1.10**.
 
-> **When to bump `schemaVersion` (widened 2026-08-10):** bump whenever the persisted **structure** changes across ANY of three surfaces — (A) the Diagram/project **export shape** (the XSD); (B) the **entire physical database** — any table/column/enum/relation added, removed, renamed, or retyped **anywhere** in `prisma/schema.prisma` (operational, auth, billing, telemetry, mining, connection tables all count — NOT just the curated Logical DDL); or (C) any **in-DB JSON structure** — a new persisted diagram/project attribute (including an `element.properties.*` key) or a change to the allowed values an attribute may take. Only *values/rows* and pure UI/behaviour changes don't bump. Every bump gets a `VERSION_HISTORY.md` entry. *(Earlier the rule was export-shape-only + curated-DDL-only, so operational tables and `properties` keys rode without a bump — that drift is why the number sat at 1.44; see the [`UPDATE_EVERYTHING.md`](UPDATE_EVERYTHING.md) Step 0 for the full criteria.)*
+> **When to bump the schema integer:** ONLY when the **XSD export shape** changes (the original, narrow criterion) — a new first-class element/attribute or a typed-enum value. Physical-DB changes and open-`properties` additions do NOT bump it — they move `PRODUCT_VERSION.middle` instead (recorded in `VERSION_HISTORY.md`, not here). See [`UPDATE_EVERYTHING.md`](UPDATE_EVERYTHING.md) Step 0 (Q1 = DB → product middle; Q2 = XSD → schema integer).
 
 > **Maintenance — keep these FOUR in sync, moving together on every bump:** (1) [`../app/lib/diagram/types.ts`](../app/lib/diagram/types.ts) — the `SCHEMA_VERSION` constant + its history comment; (2) [`../public/diagramatix-export.xsd`](../public/diagramatix-export.xsd) — the shape + its history block; (3) [`../app/lib/diagram/ddlGenerate.ts`](../app/lib/diagram/ddlGenerate.ts) — the Logical DDL (physical DB structure); (4) **this file** — a summary-table row *and* a detail section.
 
@@ -20,7 +20,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 
 | Version | Title | Schema shape change? |
 |---|---|---|
-| **1.45** | Catch-up bump + widened bump policy — the version now tracks the WHOLE physical DB + any in-DB JSON structure, not just the export shape. Accounts for structure added since 1.44 (see detail). | **No export-XSD change** — the bump is driven by new DB tables/columns + new diagram `properties` attributes, none of which alter the diagram XML interchange. |
+| **schema 45** (was 1.45) | **Version model split** — `schemaVersion` became a standalone integer (this changelog); the product version restarted at **2.1.1** and now carries DB/JSON structure changes (its middle bumps on any physical-DB change, logged in VERSION_HISTORY.md). The XSD integer stays **45** and moves only on an XSD-shape change. | **No** — pure renumbering; no XSD shape change. |
 | **1.44** | Full BPMN Tier-1 palette + compensation. *(Feature window 2026-08-04 also carries the AI Assist + Abracadabra Mode suite — assist-while-you-draw ghosts, live voice/typed command editing, the editable Assist/NL-Rules catalog, and voice-dictation metering — but that half is feature-only, no export-shape change.)* | **Yes** — new `GatewayType "complex"` + `EventType "multiple"` / `"parallel-multiple"` enumerations. The Assist/Abracadabra half changes nothing in the diagram XML (existing types + open `properties` + DB/telemetry tables only). |
 | **1.43** | AI-Prompt link — persist the prompt that generated a diagram (any type): on-canvas "AI Prompt: … Generated on: …" annotation, Diagram-Properties linked-prompt + Regenerate, show/hide toggle | **No XSD change** — new optional `DiagramData.aiGeneration` (link + snapshot) + `showAiPromptAnnotation` boolean; JSON metadata only (like `aiFeedback`), not in the BPMN XML interchange |
 | **1.42** | Project re-numbering system (hierarchical folder/diagram/activity codes; APQC-preserving or full renumber; preview + apply) + ArchiMate 3.2 directed Association | **Yes** — new optional `<dgx:data nameCode>` (Diagram Name Code) + new `ConnectorType` `archi-association-directed`; also open key `properties.nameCode` (Activity Name Code, no XSD change) |
@@ -71,25 +71,23 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 
 ## Details (newest first)
 
-### v1.45 — Catch-up bump + widened bump policy  · no export-XSD change
-The bump rule was widened (see the "When to bump" note above + [`UPDATE_EVERYTHING.md`](UPDATE_EVERYTHING.md)
-Step 0): `schemaVersion` now tracks the **entire physical database** (any table/column/enum/relation
-anywhere, not just the curated Logical DDL) **and** any **in-DB JSON structure** change (a new persisted
-diagram/project attribute, including an `element.properties.*` key, or a change to an attribute's allowed
-values) — not just the export shape. Under the previous export-shape-only rule these rode without a bump,
-which is why the number sat at 1.44.
+### schema 45 (was v1.45) — Version model SPLIT into two numbers  · no export-XSD change
+The single `major.minor` scheme (which had reached `1.45`) was split into two independent numbers
+(see the note above + [`UPDATE_EVERYTHING.md`](UPDATE_EVERYTHING.md) Step 0):
+- **`SCHEMA_VERSION`** — a standalone **integer** = the XSD schema version. The old `1.45` **minor (45)**
+  became this number. It bumps ONLY on an XSD export-shape change (the original, narrow criterion). This
+  changelog tracks it.
+- **`PRODUCT_VERSION`** — the Diagramatix product version, **restarted at `2.1.1`**. Its **middle**
+  increments on ANY physical DB table/column change; patch on fixes; major manually. Product releases are
+  logged in [`../VERSION_HISTORY.md`](../VERSION_HISTORY.md), not here.
 
-This single catch-up bump accounts for the structure that landed **since 1.44** without one:
-- **New physical tables:** `MicrosoftConnection` (per-user SharePoint OAuth tokens), `ProcessDiffRun`,
-  `IntentKeywordMap` (+ the review/co-authoring/presence tables from that window).
-- **New physical columns:** `ProcessMiningRun.analytics` + `kpiConfig`, `DiagramTemplate.description` +
-  `thumbnailSvg`.
-- **New diagram JSON attributes (open `properties`):** `sharepointLink`, `fillColor` (mining heat overlay),
-  review-comment fields, template `hasContainer`.
-
-**No diagram XML interchange (export XSD) shape changed** in this bump — every item above is a DB
-table/column or an open-`properties` key, so the `.xml`/`.json` export structure is unchanged. Going
-forward, each such change bumps the number on its own release.
+So the widened "whole-DB + JSON" tracking briefly folded into `1.45` now lives on the **product version**
+instead; the schema integer reverts to the narrow XSD-only criterion. The DB/JSON structure that had
+accrued since 1.44 (tables `MicrosoftConnection` / `ProcessDiffRun` / `IntentKeywordMap`; columns
+`ProcessMiningRun.analytics`/`kpiConfig`, `DiagramTemplate.description`/`thumbnailSvg`; diagram
+`properties` `sharepointLink` / `fillColor` / review fields) is what the product version's baseline
+`2.1.x` now represents. **No XSD shape change** — this is pure renumbering. Legacy files stamped `1.NN`
+still import: `structuralSchemaVersion()` maps the `NN` minor to this integer.
 
 ### v1.43 — AI-Prompt link + annotation + Regenerate  · JSON metadata only
 Every AI generation (any diagram type) now records the prompt that produced the diagram.

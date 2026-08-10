@@ -15,7 +15,7 @@
 import { describe, it, expect } from "vitest";
 import { SCENARIOS, build } from "../visio/_helpers/scenarios";
 import { layoutFlowchartDiagram } from "@/app/lib/diagram/layoutFlowchart";
-import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { SCHEMA_VERSION, PRODUCT_VERSION } from "@/app/lib/diagram/types";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
 type El = { type: string; label?: string };
@@ -30,7 +30,7 @@ const labels = (xs: { label?: string }[]) =>
 /** Mirrors the editor's "Export as JSON" envelope (the meaningful subset). */
 const makeEnvelope = (name: string, type: string, data: DiagramData) => ({
   schemaVersion: SCHEMA_VERSION,
-  appVersion: SCHEMA_VERSION,
+  appVersion: PRODUCT_VERSION,
   exportedAt: new Date().toISOString(),
   project: { name: "Test", description: "", ownerName: "", colorConfig: {} },
   diagrams: [{ originalId: "d1", name, type, data }],

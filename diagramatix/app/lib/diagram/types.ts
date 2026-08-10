@@ -1109,20 +1109,30 @@ export interface TemplateData {
  *             appVersion (major.minor.BUILD) still advances automatically via the git commit
  *             count in /api/schema, so the release is reflected there.
  *
- *  2026-08-10 (v1.45 — CATCH-UP + POLICY WIDENED, no export-shape change): the bump rule now
- *             tracks the ENTIRE physical database (any table/column/enum/relation anywhere, not
- *             just the curated diagram Logical DDL) AND any in-DB JSON structure change (a new
- *             persisted diagram/project attribute — incl. an `element.properties.*` key — or a
- *             change to an attribute's allowed values). This single catch-up bump accounts for
- *             structure added since 1.44 without one: new tables (MicrosoftConnection,
- *             ProcessDiffRun, IntentKeywordMap), new columns (ProcessMiningRun.analytics/kpiConfig,
- *             DiagramTemplate.description/thumbnailSvg), and new diagram `properties` attributes
- *             (sharepointLink, fillColor, review-comment fields). The diagram XML interchange (XSD)
- *             is unchanged. See schema/UPDATE_EVERYTHING.md Step 0 for the widened criteria.
+ *  2026-08-10 (VERSION MODEL SPLIT — two independent numbers, per Paul):
+ *             • SCHEMA_VERSION is now a STANDALONE INTEGER = the XSD schema version (currently
+ *               "45", the old `1.45` minor). It is stamped as `schemaVersion` in every export and
+ *               is the `<xs:schema version=…>` value. It bumps ONLY when the XSD export shape
+ *               changes (the ORIGINAL criterion) — a new first-class element/attribute or a new
+ *               typed-enum value.
+ *             • PRODUCT_VERSION (below) is the Diagramatix product version `major.middle.patch`
+ *               (currently "2.1.1"). Its MIDDLE increments on ANY physical DB table/column change;
+ *               patch on fixes; major manually. It is what the header badge shows (with a
+ *               "(build <commitCount>)" suffix) and what exports stamp as `appVersion`.
+ *             The previous single `major.minor` scheme (which reached "1.45") is retired; legacy
+ *             files stamped "1.NN" are read via structuralSchemaVersion() below (their NN == the
+ *             new integer). See schema/UPDATE_EVERYTHING.md Step 0.
  *
- *  2026-08-03 (v1.44 — SHAPE CHANGE): Full BPMN Tier-1 palette added the `complex`
+ *  2026-08-10 (schema 45 — was the v1.45 catch-up; no export-shape change): widened DB/JSON
+ *             structure tracking; structure added since 1.44 (MicrosoftConnection, ProcessDiffRun,
+ *             IntentKeywordMap tables; ProcessMiningRun.analytics/kpiConfig,
+ *             DiagramTemplate.description/thumbnailSvg columns; diagram `properties` sharepointLink/
+ *             fillColor/review). XSD unchanged. (Under the new split, DB changes move PRODUCT_VERSION,
+ *             not the schema integer — the schema integer stays 45 until an XSD-shape change.)
+ *
+ *  2026-08-03 (schema 44 — SHAPE CHANGE): Full BPMN Tier-1 palette added the `complex`
  *             GatewayType and the `multiple` / `parallel-multiple` EventTypes to the export
- *             (new enumerations in diagramatix-export.xsd, marked "schema 1.44").
+ *             (new enumerations in diagramatix-export.xsd, marked "schema 1.44"/"schema 44").
  *
  *  2026-08-04 (NO version bump — feature-only, no export-shape change): the AI Assist +
  *             Abracadabra Mode suite shipped — assist-while-you-draw ghosts (next-step,
@@ -1133,4 +1143,47 @@ export interface TemplateData {
  *             thumbnailSvg) — nothing in the diagram XML interchange — so schemaVersion stays
  *             1.44 and the XSD is unchanged. appVersion (build) advances via /api/schema.
  */
-export const SCHEMA_VERSION = "1.45";
+/**
+ * XSD SCHEMA VERSION — a standalone integer (as a string). Stamped as `schemaVersion`
+ * in every export and carried on `<xs:schema version=…>`. Bumps ONLY on an XSD export-shape
+ * change (new first-class element/attribute or typed-enum value). NOT bumped by DB-only or
+ * open-`properties` changes — those move PRODUCT_VERSION instead.
+ */
+export const SCHEMA_VERSION = "45";
+
+/**
+ * DIAGRAMATIX PRODUCT VERSION — `major.middle.patch`. The user-facing app version (header badge
+ * shows `v{PRODUCT_VERSION} (build {commitCount})`) and the `appVersion` stamped in exports.
+ *   • MIDDLE  → increment on ANY physical DB table/column/enum/relation change.
+ *   • patch   → increment on fixes / releases within the same DB structure.
+ *   • major   → manual, for a breaking / headline release.
+ * When the middle bumps, reset patch to 0. See schema/UPDATE_EVERYTHING.md Step 0.
+ */
+export const PRODUCT_VERSION = "2.1.1";
+
+/**
+ * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the
+ * new bare-integer form ("45") and the legacy `1.NN` form ("1.45" → 45, since the old major was
+ * always 1 and the minor WAS the structural version). Used by import-compatibility checks.
+ */
+export function structuralSchemaVersion(raw: string): number {
+  const parts = (raw ?? "").split(".").map((p) => parseInt(p, 10));
+  if (parts.length >= 2 && parts[0] === 1) return Number.isFinite(parts[1]) ? parts[1] : 0; // legacy "1.NN"
+  return Number.isFinite(parts[0]) ? parts[0] : 0;
+}
+
+/**
+ * Import compatibility: compare a file's reported schemaVersion (either form) against the current
+ * XSD schema integer. Newer-than-app → blocked; older → accepted with an upgrade note; equal → ok.
+ */
+export function checkSchemaCompatibility(fileSchema: string): { ok: boolean; message?: string } {
+  const app = structuralSchemaVersion(SCHEMA_VERSION);
+  const file = structuralSchemaVersion(fileSchema);
+  if (file > app) {
+    return { ok: false, message: `This file uses schema version ${fileSchema} which is newer than this version of Diagramatix supports (schema v${app}). Please upgrade Diagramatix to import this file.` };
+  }
+  if (file < app) {
+    return { ok: true, message: `This file uses an older schema version (${fileSchema}). It will be upgraded to the current format (schema v${app}).` };
+  }
+  return { ok: true };
+}

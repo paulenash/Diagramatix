@@ -13,6 +13,25 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.1.1 — 2026-08-10 — Version model split (product version 2.1.1 + XSD schema v45) + Visio/preview
+- **Two independent version numbers now** (per Paul). `PRODUCT_VERSION` (`major.middle.patch`, restarted
+  at **`2.1.1`**) is the Diagramatix product version — its **middle increments on any physical DB
+  table/column change**, patch on fixes, major manually. The header badge shows `v2.1.1 (build <commit
+  count>)`. `SCHEMA_VERSION` is now a standalone **integer `45`** (the old `1.45` minor) = the XSD schema
+  version, bumping **only** on an XSD export-shape change (the original criterion). Exports stamp
+  `schemaVersion="45"` + `appVersion="2.1.1"`; legacy `1.NN` files still import via
+  `structuralSchemaVersion()` / `checkSchemaCompatibility()`. Rule rewritten in
+  [`schema/UPDATE_EVERYTHING.md`](schema/UPDATE_EVERYTHING.md) Step 0 (Q1 DB→product middle; Q2 XSD→schema
+  integer).
+- **XSD (schema v45)** export leaf now shows the version; **Preview pop-ups** for XSD *and* DDL get
+  **Cancel / Export** buttons (Export primary) — the colour, scrollable modal already existed.
+- **Visio Stencil fix:** the shipped `public/BPMN Diagramatix Shapes v1.6.vssx` displayed **v1.4** in Visio
+  because its internal `docProps` (title/description/Template) were never renamed past v1.4. Patched those
+  to **v1.6** (no GUID churn) and hardened `scripts/build-v16-from-v15.cjs` so future regenerations remap
+  v1.4 too. The stencil is a static repo file served directly — not DB, not runtime-generated.
+- Tests T2258-T2260 (version split + legacy-tolerant compat). **Schema integer: unchanged (still 45)** —
+  pure renumbering, no XSD shape change.
+
 ## 1.45.2153 — 2026-08-10 — Schema-version policy widened + catch-up bump
 - **Policy (Paul):** `schemaVersion` now bumps on ANY change to the **entire physical database**
   (any table/column/enum/relation anywhere — operational/auth/billing/telemetry/mining/connection

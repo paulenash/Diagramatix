@@ -28,11 +28,10 @@ import { buildOrgBackup, scopePayloadToOrg, restoreOrgBackupAdditive } from "@/a
 import { streamBackup } from "@/app/lib/backupStream";
 import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
 import { previewOrgBackup } from "@/app/lib/backupPreview";
-import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { PRODUCT_VERSION } from "@/app/lib/diagram/types";
 
 function appVersion(): string {
-  const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
-  return `${SCHEMA_VERSION}.${commitCount}`;
+  return PRODUCT_VERSION; // product version; build count is a display-only badge suffix
 }
 
 // Resolve the caller's active Org and confirm they may administer it

@@ -8,7 +8,7 @@ import { AlertDialog } from "@/app/components/AlertDialog";
 import { FilePreviewDialog, type PreviewPayload } from "@/app/components/preview/FilePreviewDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
 import { displayOrgRole } from "@/app/lib/auth/orgRoleLabels";
-import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { PRODUCT_VERSION } from "@/app/lib/diagram/types";
 import { safeInternalPath } from "@/app/lib/safeRedirect";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { tonesFor, readableTextOn, type FeatureColorKey } from "@/app/lib/theme/featureColors";
@@ -49,7 +49,7 @@ interface Props {
   users: UserRow[];
   currentUserId: string;
   /** Build commit count baked in via NEXT_PUBLIC_COMMIT_COUNT. Shown
-   *  in the page header as `v{SCHEMA_VERSION}.{commitCount}`. */
+   *  in the page header as `v{PRODUCT_VERSION} (build {commitCount})`. */
   commitCount: number;
   /** True when the caller is a SuperAdmin (SUPERUSER_EMAILS). False
    *  for an OrgAdmin viewing the scoped Org-only list. Drives:
@@ -272,7 +272,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
               ? (showUsers ? "Registered Users" : "SuperAdmin")
               : `Registered Users — ${activeOrgName ?? "Your Org"}`}
           </h1>
-          <span className="text-[10px] text-gray-900">v{SCHEMA_VERSION}.{commitCount}</span>
+          <span className="text-[10px] text-gray-900" title="Diagramatix product version">v{PRODUCT_VERSION}{commitCount ? ` (build ${commitCount})` : ""}</span>
         </div>
         <div className="flex items-center gap-2" />
       </header>
@@ -703,7 +703,7 @@ function GenerateDdlButton() {
     setPreviewing(true);
     try {
       const { text, filename } = await buildDdl();
-      setPreviewPayload({ kind: "ddl", title: filename, text, downloadName: filename, downloadMime: "text/sql" });
+      setPreviewPayload({ kind: "ddl", title: filename, text, downloadName: filename, downloadMime: "text/sql", cancelLabel: "Cancel", exportLabel: "Export" });
       setOpen(false);
     } catch (err) {
       setErrorMessage(`Failed to generate ${model} DDL: ` + (err instanceof Error ? err.message : String(err)));

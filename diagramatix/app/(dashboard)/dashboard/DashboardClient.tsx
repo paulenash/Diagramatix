@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { DiagramType } from "@/app/lib/diagram/types";
-import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { PRODUCT_VERSION, checkSchemaCompatibility } from "@/app/lib/diagram/types";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { MicrosoftConnectionSettings } from "@/app/components/MicrosoftConnectionSettings";
@@ -1034,21 +1034,6 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     }
   }
 
-  function checkSchemaCompatibility(fileSchema: string): { ok: boolean; message?: string } {
-    const [appMajor, appMinor] = SCHEMA_VERSION.split(".").map(Number);
-    const [fileMajor, fileMinor] = fileSchema.split(".").map(Number);
-    if (fileMajor > appMajor) {
-      return { ok: false, message: `This file uses schema version ${fileSchema} which is incompatible with this version of Diagramatix (schema ${SCHEMA_VERSION}). Please upgrade Diagramatix to import this file.` };
-    }
-    if (fileMajor === appMajor && fileMinor > appMinor) {
-      return { ok: false, message: `This file uses schema version ${fileSchema} which is newer than this version of Diagramatix supports (schema ${SCHEMA_VERSION}). Please upgrade Diagramatix to import this file.` };
-    }
-    if (fileMajor < appMajor) {
-      return { ok: true, message: `This file uses an older schema version (${fileSchema}). It will be upgraded to the current format (${SCHEMA_VERSION}).` };
-    }
-    return { ok: true };
-  }
-
   async function handleFileSelected(file: File) {
     const text = await file.text();
     let data: Record<string, unknown> | null = null;
@@ -1081,10 +1066,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       alert("Invalid export file — missing required fields");
       return;
     }
-    // Parse schema version (strip build number if present in legacy "version" field, e.g. "1.0.147" → "1.0")
-    const parts = schemaVer.split(".");
-    const normalised = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : schemaVer;
-    const compat = checkSchemaCompatibility(normalised);
+    // Compat check reads the structural (XSD) version from either the new integer
+    // form ("45") or the legacy "1.NN" / "1.NN.build" form.
+    const compat = checkSchemaCompatibility(schemaVer);
     if (!compat.ok) {
       alert(compat.message);
       return;
@@ -1484,7 +1468,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             onDoubleClick={toggleSuperAdminChrome}
             draggable={false}
           />
-          {version ? <span className="text-xs text-gray-900 ml-1">v{SCHEMA_VERSION}.{version}</span> : null}
+          <span className="text-xs text-gray-900 ml-1" title="Diagramatix product version">v{PRODUCT_VERSION}{version ? ` (build ${version})` : ""}</span>
           {usageSnapshot && (
             <button
               onClick={() => setShowUsagePopover(true)}

@@ -16,7 +16,7 @@
  *   - the Diagramatix XML path (buildSingleDiagramXml → parseDiagramatixXml).
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { SCHEMA_VERSION, PRODUCT_VERSION } from "@/app/lib/diagram/types";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { buildSingleDiagramXml, parseDiagramatixXml } from "@/app/lib/diagram/xmlExport";
 import { installDomParser } from "../xml/_helpers/domParserShim";
@@ -76,7 +76,7 @@ const findLink = (data: DiagramData, id: string) =>
 describe("SharePoint link survives the JSON export → import path", () => {
   const makeEnvelope = (data: DiagramData) => ({
     schemaVersion: SCHEMA_VERSION,
-    appVersion: SCHEMA_VERSION,
+    appVersion: PRODUCT_VERSION,
     exportedAt: new Date().toISOString(),
     project: { name: "Test", description: "", ownerName: "", colorConfig: {} },
     diagrams: [{ originalId: "d1", name: "links", type: "bpmn", data }],
@@ -108,7 +108,7 @@ describe("SharePoint link survives the Diagramatix XML export → import path", 
   const exportXml = (data: DiagramData) =>
     buildSingleDiagramXml({
       schemaVersion: SCHEMA_VERSION,
-      appVersion: `${SCHEMA_VERSION}.0`,
+      appVersion: PRODUCT_VERSION,
       diagramName: "links",
       diagramType: "bpmn",
       diagramData: data,

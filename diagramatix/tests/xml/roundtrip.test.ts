@@ -29,7 +29,7 @@ import { parseDocument } from "htmlparser2";
 import { validateXML } from "xmllint-wasm";
 import { SCENARIOS, build } from "../visio/_helpers/scenarios";
 import { buildSingleDiagramXml, parseDiagramatixXml, NS } from "@/app/lib/diagram/xmlExport";
-import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { SCHEMA_VERSION, PRODUCT_VERSION } from "@/app/lib/diagram/types";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { installDomParser } from "./_helpers/domParserShim";
 
@@ -53,7 +53,7 @@ const labels = (xs: { label?: string }[]) =>
 const exportXml = (name: string, data: DiagramData) =>
   buildSingleDiagramXml({
     schemaVersion: SCHEMA_VERSION,
-    appVersion: `${SCHEMA_VERSION}.0`,
+    appVersion: PRODUCT_VERSION,
     diagramName: name,
     diagramType: "bpmn",
     diagramData: data,

@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
-import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { SCHEMA_VERSION, PRODUCT_VERSION } from "@/app/lib/diagram/types";
 import {
   BUNDLE_KIND, BUNDLE_VERSION, comparisonDiagramIds,
   type DiagramBundle, type BundledDiagram, type BundledPrompt,
@@ -69,7 +69,7 @@ export async function GET(_req: Request, { params }: Params) {
     bundleVersion: BUNDLE_VERSION,
     kind: BUNDLE_KIND,
     schemaVersion: SCHEMA_VERSION,
-    appVersion: SCHEMA_VERSION,
+    appVersion: PRODUCT_VERSION,
     exportedAt: new Date().toISOString(),
     diagram: { ...toBundled(diagram), aiComparison: diagram.aiComparison },
     prompt,

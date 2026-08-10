@@ -18,6 +18,10 @@ export interface PreviewPayload {
   /** Optional real-file download from the footer. */
   downloadName?: string;
   downloadMime?: string;
+  /** Footer button labels. Default to "Continue" / "Download"; the XSD and DDL
+   *  export previews override these to "Cancel" / "Export". */
+  cancelLabel?: string;
+  exportLabel?: string;
 }
 
 const MONO = "text-[11px] leading-relaxed whitespace-pre font-mono";
@@ -147,8 +151,19 @@ export function FilePreviewDialog({ payload, onClose }: { payload: PreviewPayloa
               {copied ? "Copied ✓" : "Copy"}
             </button>
           )}
-          <button onClick={doDownload} className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50">Download</button>
-          <button onClick={onClose} className="px-4 py-1.5 text-xs font-medium text-white rounded bg-blue-600 hover:bg-blue-700">Continue</button>
+          {payload.exportLabel || payload.cancelLabel ? (
+            // Export-mode (XSD / DDL): Cancel secondary, Export primary.
+            <>
+              <button onClick={onClose} className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50">{payload.cancelLabel ?? "Cancel"}</button>
+              <button onClick={doDownload} className="px-4 py-1.5 text-xs font-medium text-white rounded bg-blue-600 hover:bg-blue-700">{payload.exportLabel ?? "Export"}</button>
+            </>
+          ) : (
+            // Default preview: Download secondary, Continue (dismiss) primary.
+            <>
+              <button onClick={doDownload} className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50">Download</button>
+              <button onClick={onClose} className="px-4 py-1.5 text-xs font-medium text-white rounded bg-blue-600 hover:bg-blue-700">Continue</button>
+            </>
+          )}
         </div>
       </div>
     </div>

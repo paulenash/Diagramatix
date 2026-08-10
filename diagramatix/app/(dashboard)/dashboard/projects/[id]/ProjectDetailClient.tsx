@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { UserGuideLink } from "@/app/components/UserGuideLink";
 import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
-import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { SCHEMA_VERSION, PRODUCT_VERSION, checkSchemaCompatibility } from "@/app/lib/diagram/types";
 import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceModal";
 import { LinkScanDialog } from "./LinkScanDialog";
@@ -1212,7 +1212,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       log("Assembling export file...");
       const exportData = {
         schemaVersion: SCHEMA_VERSION,
-        appVersion: `${SCHEMA_VERSION}.${version ?? 0}`,
+        appVersion: PRODUCT_VERSION,
         exportedAt: new Date().toISOString(),
         project: {
           name: projectName,
@@ -1521,20 +1521,12 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       return;
     }
 
-    // Schema version check (additive: warn if older, block if newer major)
+    // Schema version check (structural XSD integer, tolerant of legacy "1.NN")
     const schemaVer: string = (exportData.schemaVersion as string) ?? (exportData.version as string) ?? "";
     if (schemaVer) {
-      const parts = schemaVer.split(".");
-      const fileMajor = parseInt(parts[0] ?? "0", 10);
-      const appMajor = parseInt(SCHEMA_VERSION.split(".")[0] ?? "0", 10);
-      if (fileMajor > appMajor) {
-        log(`\u2718 File schema version ${schemaVer} is newer than this app (${SCHEMA_VERSION}).`);
-        setImportResult("failed");
-        return;
-      }
-      if (fileMajor < appMajor) {
-        log(`Note: file uses older schema ${schemaVer}, will be upgraded to ${SCHEMA_VERSION}.`);
-      }
+      const compat = checkSchemaCompatibility(schemaVer);
+      if (!compat.ok) { log(`\u2718 ${compat.message}`); setImportResult("failed"); return; }
+      if (compat.message) log(`Note: ${compat.message}`);
     }
 
     // Create new project
@@ -1691,11 +1683,10 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     }
     const schemaVer: string = (exportData.schemaVersion as string) ?? (exportData.version as string) ?? "";
     if (schemaVer) {
-      const fileMajor = parseInt(schemaVer.split(".")[0] ?? "0", 10);
-      const appMajor = parseInt(SCHEMA_VERSION.split(".")[0] ?? "0", 10);
-      if (fileMajor > appMajor) {
+      const compat = checkSchemaCompatibility(schemaVer);
+      if (!compat.ok) {
         setImporting(true);
-        setImportLog([`\u2718 File schema version ${schemaVer} is newer than this app (${SCHEMA_VERSION}).`]);
+        setImportLog([`\u2718 ${compat.message}`]);
         setImportResult("failed");
         return;
       }
@@ -2498,7 +2489,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           {/* Export Owner display hidden 2026-06-06 — kept off the
               project header to match the sidebar. Value still lives on
               project.ownerName and round-trips through exports. */}
-          <span className="text-[10px] text-gray-900 shrink-0" title="Diagramatix version">v{SCHEMA_VERSION}{version ? `.${version}` : ""}</span>
+          <span className="text-[10px] text-gray-900 shrink-0" title="Diagramatix product version">v{PRODUCT_VERSION}{version ? ` (build ${version})` : ""}</span>
           {/* Org Owner — the owning Org drives org-wide RCM code numbering + the
               compliance roll-up. Read-only chip; re-homing moved to the SuperAdmin
               "Project Org Maintenance" tile (it also renumbers both Orgs). */}
