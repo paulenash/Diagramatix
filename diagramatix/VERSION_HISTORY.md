@@ -13,6 +13,17 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.2.0 (build 2165) — 2026-08-10 — Mobile viewer: subprocess/gateway/event/connector fidelity
+- **Expanded subprocesses** are now drawn as **containers** (behind their contents) with the name at the **top**,
+  so their child elements **and the connectors inside them** render on top instead of being hidden behind the fill
+  (fixes #1 name-in-middle and #2 missing inner connectors).
+- **Gateway & event markers** now render — gateway type (exclusive ✕ / parallel + / inclusive ○ / event-based /
+  complex ✳) and event type (message envelope, timer, signal, error, terminate, else a trigger dot) (#3).
+- **Message flows** fixed (#4): dropped the invisible-leader segment that drew a spurious line to the pool centre
+  (same trim the desktop router uses), and rendered in the proper BPMN style — **dashed, dark grey, hollow circle
+  at the source, open arrowhead at the target**. Associations render dashed with no arrowhead.
+- **Sequence flows** get a clear filled **arrowhead** at the target (#5). Schema: no change.
+
 ## 2.2.0 — 2026-08-10 — Feature Availability by Subscription Level (3-state, editable, per-user + per-org)
 - New **Feature Availability** system from *Feature by Subscription Level v1.4.xlsx* — a **33-feature × 5-level**
   (Free / Introductory / Professional / **Enterprise** new) matrix with **three states** per cell: **Available**,

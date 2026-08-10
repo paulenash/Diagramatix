@@ -101,6 +101,56 @@ function stripLabel(e: DiagramElement, tx: number, ty: number): string {
   }).join("");
 }
 
+// Label anchored to the TOP of an element (expanded subprocess / value-chain
+// container) so it doesn't sit over the child elements + connectors inside it.
+function topLabel(e: DiagramElement, tx: number, ty: number, full: boolean): string {
+  const t = (e.label ?? "").trim();
+  if (!t) return "";
+  const fs = 11, lineH = fs * 1.2;
+  const lines = (full ? wrapText(t, Math.max(12, e.width - 10), fs) : [short(t)]).slice(0, 3);
+  const mx = (cx(e) + tx).toFixed(1);
+  const startY = e.y + ty + fs + 2;
+  return lines.map((ln, i) =>
+    `<text x="${mx}" y="${(startY + i * lineH).toFixed(1)}" text-anchor="middle" font-size="${fs}" fill="#0f172a" font-family="sans-serif">${esc(ln)}</text>`,
+  ).join("");
+}
+
+// Inner marker (glyph) for a gateway, keyed by gatewayType. `k` ≈ half the marker.
+function gatewayMarker(e: DiagramElement, mx: number, my: number, s: number, stroke: string): string {
+  const g = e.gatewayType;
+  if (!g || g === "none") return "";
+  const k = s * 0.42, sw = 1.4;
+  const line = (d: string) => `<path d="${d}" stroke="${stroke}" stroke-width="${sw}" fill="none"${VE}/>`;
+  if (g === "exclusive") return line(`M${(mx - k).toFixed(1)},${(my - k).toFixed(1)} L${(mx + k).toFixed(1)},${(my + k).toFixed(1)} M${(mx + k).toFixed(1)},${(my - k).toFixed(1)} L${(mx - k).toFixed(1)},${(my + k).toFixed(1)}`);
+  if (g === "parallel") return line(`M${mx},${(my - k).toFixed(1)} L${mx},${(my + k).toFixed(1)} M${(mx - k).toFixed(1)},${my} L${(mx + k).toFixed(1)},${my}`);
+  if (g === "inclusive") return `<circle cx="${mx}" cy="${my}" r="${k.toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="${sw}"${VE}/>`;
+  if (g === "event-based") return `<circle cx="${mx}" cy="${my}" r="${k.toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="1"${VE}/><circle cx="${mx}" cy="${my}" r="${(k * 0.6).toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="1"${VE}/>`;
+  if (g === "complex") { const q = k * 0.7; return line(`M${mx},${(my - k).toFixed(1)} L${mx},${(my + k).toFixed(1)} M${(mx - k).toFixed(1)},${my} L${(mx + k).toFixed(1)},${my} M${(mx - q).toFixed(1)},${(my - q).toFixed(1)} L${(mx + q).toFixed(1)},${(my + q).toFixed(1)} M${(mx + q).toFixed(1)},${(my - q).toFixed(1)} L${(mx - q).toFixed(1)},${(my + q).toFixed(1)}`); }
+  return "";
+}
+
+// Inner marker (glyph) for an event, keyed by eventType. `r` = event radius.
+function eventMarker(e: DiagramElement, cxp: number, cyp: number, r: number, stroke: string): string {
+  const ev = e.eventType;
+  if (!ev || ev === "none") return "";
+  const sw = 1.2;
+  if (ev === "message") {
+    const w = r * 1.0, hh = r * 0.66, x0 = cxp - w / 2, y0 = cyp - hh / 2;
+    return `<rect x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="${sw}"${VE}/>`
+      + `<path d="M${x0.toFixed(1)},${y0.toFixed(1)} L${cxp.toFixed(1)},${cyp.toFixed(1)} L${(x0 + w).toFixed(1)},${y0.toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="${sw}"${VE}/>`;
+  }
+  if (ev === "timer") {
+    const rr = r * 0.72;
+    return `<circle cx="${cxp}" cy="${cyp}" r="${rr.toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="${sw}"${VE}/>`
+      + `<path d="M${cxp},${cyp} L${cxp},${(cyp - rr * 0.7).toFixed(1)} M${cxp},${cyp} L${(cxp + rr * 0.55).toFixed(1)},${cyp}" stroke="${stroke}" stroke-width="${sw}" fill="none"${VE}/>`;
+  }
+  if (ev === "signal") { const k = r * 0.62; return `<path d="M${cxp},${(cyp - k).toFixed(1)} L${(cxp + k * 0.87).toFixed(1)},${(cyp + k * 0.5).toFixed(1)} L${(cxp - k * 0.87).toFixed(1)},${(cyp + k * 0.5).toFixed(1)} z" fill="none" stroke="${stroke}" stroke-width="${sw}"${VE}/>`; }
+  if (ev === "error") { const k = r * 0.68; return `<path d="M${(cxp - k).toFixed(1)},${(cyp + k * 0.6).toFixed(1)} L${(cxp - k * 0.2).toFixed(1)},${(cyp - k * 0.6).toFixed(1)} L${(cxp + k * 0.2).toFixed(1)},${(cyp + k * 0.3).toFixed(1)} L${(cxp + k).toFixed(1)},${(cyp - k * 0.6).toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="${sw}"${VE}/>`; }
+  if (ev === "terminate") return `<circle cx="${cxp}" cy="${cyp}" r="${(r * 0.5).toFixed(1)}" fill="${stroke}"${VE}/>`;
+  // escalation / link / conditional / compensation / multiple / … → a small dot (has a trigger)
+  return `<circle cx="${cxp}" cy="${cyp}" r="1.6" fill="${stroke}"${VE}/>`;
+}
+
 /** Point where the ray from a box centre toward (tx0,ty0) exits the box — used to
  *  land a connector on an element's boundary (e.g. a message flow on a pool edge). */
 function boxEdge(cxp: number, cyp: number, hw: number, hh: number, tx0: number, ty0: number): { x: number; y: number } {
@@ -117,7 +167,6 @@ function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpt
   const t = e.type as string;
   const fill = fillFor(e, opts), stroke = strokeFor(e, opts);
   const full = !!opts?.fullLabels;
-  const emid = `${(cx(e) + tx).toFixed(1)} ${(cy(e) + ty).toFixed(1)}`;
 
   if (t === "pool" || t === "lane" || t === "sublane") {
     // rect with a header strip on the left; the strip is tinted with the real
@@ -127,22 +176,29 @@ function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpt
       + `<rect x="${x}" y="${y}" width="18" height="${h}" fill="${stripFill}" stroke="${stroke}" stroke-width="1"${VE}/>`
       + (full ? stripLabel(e, tx, ty) : "");
   }
-  if (t === "task" || t === "subprocess" || t === "subprocess-expanded" || t === "process-group") {
+  if (t === "subprocess-expanded" || t === "process-group") {
+    // Container — drawn in the BACK pass so its child elements + connectors render
+    // ON TOP (not hidden behind its fill); name anchored at the TOP.
+    const bg = opts?.trueColors ? fill : "#f8fafc";
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="${bg}" stroke="${stroke}" stroke-width="1.4"${VE}/>` + topLabel(e, tx, ty, full);
+  }
+  if (t === "task" || t === "subprocess") {
     const call = (e.properties?.subprocessType as string) === "call";
     return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="${call ? 3 : 1.4}"${VE}/>` + label(e, tx, ty, 4, full);
   }
   if (t === "gateway" || t === "fork-join" || t === "flowchart-parallel") {
     const s = Math.min(w, h) / 2;
     const mx = cx(e) + tx, my = cy(e) + ty;
-    return `<polygon points="${mx},${my - s} ${mx + s},${my} ${mx},${my + s} ${mx - s},${my}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"${VE}/>`;
+    return `<polygon points="${mx},${my - s} ${mx + s},${my} ${mx},${my + s} ${mx - s},${my}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"${VE}/>` + gatewayMarker(e, mx, my, s, stroke);
   }
   if (t === "start-event" || t === "intermediate-event" || t === "end-event") {
     const r = Math.min(w, h) / 2;
+    const [ecx, ecy] = [cx(e) + tx, cy(e) + ty];
     const dbl = t !== "start-event";
     const sw = t === "end-event" ? 2.6 : 1.4;
-    let out = `<circle cx="${emid.split(" ")[0]}" cy="${emid.split(" ")[1]}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${VE}/>`;
-    if (dbl) out += `<circle cx="${emid.split(" ")[0]}" cy="${emid.split(" ")[1]}" r="${(r - 3).toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="1"${VE}/>`;
-    return out;
+    let out = `<circle cx="${ecx.toFixed(1)}" cy="${ecy.toFixed(1)}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${VE}/>`;
+    if (dbl) out += `<circle cx="${ecx.toFixed(1)}" cy="${ecy.toFixed(1)}" r="${(r - 3).toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="1"${VE}/>`;
+    return out + eventMarker(e, ecx, ecy, r, stroke);
   }
   if (t === "data-object") {
     return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="1"${VE}/>`;
@@ -156,16 +212,26 @@ function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpt
 }
 
 function connFor(c: Connector, els: DiagramElement[], tx: number, ty: number, opts?: ThumbnailOpts): string {
-  const dashed = c.type === "associationBPMN" || c.type === "messageBPMN" || c.type === "message";
+  const type = c.type as string;
+  const isMessage = type === "messageBPMN" || type === "message";
+  const isAssoc = type === "associationBPMN" || type === "association" || type === "flowchart-association" || type === "text-annotation";
+  const dashed = isMessage || isAssoc;
+
   const wps = Array.isArray(c.waypoints) && c.waypoints.length >= 2 ? c.waypoints : null;
   let pts: { x: number; y: number }[];
   if (wps) {
-    pts = wps.map((p) => ({ x: p.x + tx, y: p.y + ty }));
+    // Drop the INVISIBLE-LEADER segments (the hidden bits from an element's CENTRE
+    // to its boundary) so a message flow doesn't show a spurious line to the pool
+    // centre — same trim the desktop router does (routing.ts).
+    const s = c.sourceInvisibleLeader ? 1 : 0;
+    const e = c.targetInvisibleLeader ? wps.length - 2 : wps.length - 1;
+    const vis = e >= s + 1 ? wps.slice(s, e + 1) : wps;
+    pts = vis.map((p) => ({ x: p.x + tx, y: p.y + ty }));
   } else {
     const s = els.find((e) => e.id === c.sourceId), t = els.find((e) => e.id === c.targetId);
     if (!s || !t) return "";
     // No stored route: land each end on the ELEMENT BOUNDARY (not the centre) so a
-    // message flow meets the pool edge, with a clear direction arrow at the target.
+    // message flow meets the pool edge.
     const sC = { x: cx(s) + tx, y: cy(s) + ty }, tC = { x: cx(t) + tx, y: cy(t) + ty };
     pts = [
       boxEdge(sC.x, sC.y, s.width / 2, s.height / 2, tC.x, tC.y),
@@ -173,7 +239,13 @@ function connFor(c: Connector, els: DiagramElement[], tx: number, ty: number, op
     ];
   }
   const d = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
-  let out = `<path d="${d}" fill="none" stroke="#475569" stroke-width="1.2"${VE} ${dashed ? 'stroke-dasharray="4 3"' : ""} marker-end="url(#tmarr)"/>`;
+  // Message flow: dashed, dark grey, hollow circle at source + open arrow at target.
+  // Association: dashed, no arrowhead. Everything else (sequence/flow/transition):
+  // solid filled arrowhead.
+  const markers = isMessage ? ' marker-start="url(#tmcirc)" marker-end="url(#tmopen)"'
+    : isAssoc ? ""
+    : ' marker-end="url(#tmarr)"';
+  let out = `<path d="${d}" fill="none" stroke="#475569" stroke-width="1.2"${VE} ${dashed ? 'stroke-dasharray="4 3"' : ""}${markers}/>`;
   // Connector / message label at the polyline midpoint (white halo for legibility).
   const lbl = (c.label ?? "").trim();
   if (opts?.fullLabels && lbl) {
@@ -214,14 +286,24 @@ export function renderTemplateThumbnailSvg(data: TemplateData, opts?: ThumbnailO
   if (els.length === 0) return "";
   const { tx, ty, w, h } = thumbnailTransform(els);
 
-  // containers (pools/lanes) behind, then connectors, then everything else on top
-  const isContainer = (e: DiagramElement) => e.type === "pool" || e.type === "lane" || e.type === "sublane";
-  const back = els.filter(isContainer).map((e) => shapeFor(e, tx, ty, opts)).join("");
+  // Containers (pools/lanes AND expanded subprocesses / value-chain groups) draw
+  // BEHIND — largest first — so connectors + child elements render on top of them
+  // (previously a subprocess-expanded fill hid the connectors inside it). Then
+  // connectors, then leaf shapes on top.
+  const isContainer = (e: DiagramElement) =>
+    e.type === "pool" || e.type === "lane" || e.type === "sublane" ||
+    e.type === "subprocess-expanded" || e.type === "process-group";
+  const containers = els.filter(isContainer).slice().sort((a, b) => b.width * b.height - a.width * a.height);
+  const back = containers.map((e) => shapeFor(e, tx, ty, opts)).join("");
   const conns = (data.connectors ?? []).map((c) => connFor(c, els, tx, ty, opts)).join("");
   const front = els.filter((e) => !isContainer(e)).map((e) => shapeFor(e, tx, ty, opts)).join("");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w.toFixed(0)} ${h.toFixed(0)}" preserveAspectRatio="xMidYMid meet">`
-    + `<defs><marker id="tmarr" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#475569"/></marker></defs>`
+    + `<defs>`
+    + `<marker id="tmarr" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#475569"/></marker>`
+    + `<marker id="tmopen" markerWidth="8" markerHeight="8" refX="6.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#475569" stroke-width="1"/></marker>`
+    + `<marker id="tmcirc" markerWidth="7" markerHeight="7" refX="3.2" refY="3" orient="auto"><circle cx="3" cy="3" r="2" fill="#ffffff" stroke="#475569" stroke-width="1"/></marker>`
+    + `</defs>`
     + back + conns + front
     + `</svg>`;
 }
