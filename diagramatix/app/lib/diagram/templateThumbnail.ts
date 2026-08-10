@@ -102,17 +102,34 @@ function connFor(c: Connector, els: DiagramElement[], tx: number, ty: number): s
   return `<path d="${d}" fill="none" stroke="#475569" stroke-width="1.2"${VE} ${dashed ? 'stroke-dasharray="4 3"' : ""} marker-end="url(#tmarr)"/>`;
 }
 
-export function renderTemplateThumbnailSvg(data: TemplateData): string {
-  const els = data.elements ?? [];
-  if (els.length === 0) return "";
+/** Padding (px) around the diagram bounds in the thumbnail SVG. */
+export const THUMBNAIL_PAD = 14;
+
+/**
+ * The coordinate mapping from diagram space → thumbnail-SVG space (viewBox 0 0 w h).
+ * A diagram point (x, y) is drawn at (x + tx, y + ty). Exported so an interactive
+ * overlay (e.g. the mobile review layer) can position itself in the SAME space as
+ * `renderTemplateThumbnailSvg`. Returns a zero transform for an empty element set.
+ */
+export function thumbnailTransform(els: { x: number; y: number; width: number; height: number }[]): { tx: number; ty: number; w: number; h: number } {
+  if (!els.length) return { tx: 0, ty: 0, w: 1, h: 1 };
   const minX = Math.min(...els.map((e) => e.x));
   const minY = Math.min(...els.map((e) => e.y));
   const maxX = Math.max(...els.map((e) => e.x + e.width));
   const maxY = Math.max(...els.map((e) => e.y + e.height));
-  const pad = 14;
-  const w = Math.max(1, maxX - minX + pad * 2);
-  const h = Math.max(1, maxY - minY + pad * 2);
-  const tx = pad - minX, ty = pad - minY;
+  const pad = THUMBNAIL_PAD;
+  return {
+    tx: pad - minX,
+    ty: pad - minY,
+    w: Math.max(1, maxX - minX + pad * 2),
+    h: Math.max(1, maxY - minY + pad * 2),
+  };
+}
+
+export function renderTemplateThumbnailSvg(data: TemplateData): string {
+  const els = data.elements ?? [];
+  if (els.length === 0) return "";
+  const { tx, ty, w, h } = thumbnailTransform(els);
 
   // containers (pools/lanes) behind, then connectors, then everything else on top
   const isContainer = (e: DiagramElement) => e.type === "pool" || e.type === "lane" || e.type === "sublane";

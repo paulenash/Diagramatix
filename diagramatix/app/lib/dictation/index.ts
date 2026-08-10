@@ -83,6 +83,9 @@ async function startDeepgram(token: string, scheme: string, cb: DictationCallbac
 
   const AC: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
   const ctx = new AC();
+  // iOS Safari can start an AudioContext in "suspended" state; resume it (we're
+  // inside a user gesture) so the mic actually captures on a phone.
+  if (ctx.state === "suspended") { try { await ctx.resume(); } catch { /* best-effort */ } }
   const params = new URLSearchParams({
     model: "nova-2",
     encoding: "linear16",

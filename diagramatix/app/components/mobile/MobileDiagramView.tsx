@@ -2,22 +2,37 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
-import { renderTemplateThumbnailSvg } from "@/app/lib/diagram/templateThumbnail";
+import { renderTemplateThumbnailSvg, thumbnailTransform } from "@/app/lib/diagram/templateThumbnail";
 
 interface Transform { s: number; x: number; y: number }
 
 /**
  * Read-only diagram viewer for mobile: scroll (1-finger pan) + zoom (pinch, +/−
- * buttons, double-tap-to-fit). Renders the diagram as a pure SVG string (no
- * editing surface). Re-fits on orientation change so portrait↔landscape both use
- * the available space. The underlying BPMN is never mutated here — only viewed.
+ * buttons, double-tap-to-fit). Renders the diagram as a pure SVG string.
+ *
+ * An optional `overlay` is rendered INSIDE the same transformed layer, so it shares
+ * the SVG coordinate space (viewBox 0 0 w h) and pans/zooms with the diagram — used
+ * by the mobile review layer to draw comment pins + tethers. In `pickMode`, a plain
+ * tap (not a pan/pinch) is reported to `onPick(svgX, svgY)` so the caller can
+ * hit-test an element and attach a review comment. The BPMN is never mutated here.
  */
-export function MobileDiagramView({ data }: { data: DiagramData }) {
+export function MobileDiagramView({
+  data,
+  overlay,
+  pickMode = false,
+  onPick,
+}: {
+  data: DiagramData;
+  overlay?: React.ReactNode;
+  pickMode?: boolean;
+  onPick?: (svgX: number, svgY: number) => void;
+}) {
   const svg = useMemo(() => renderTemplateThumbnailSvg(data as never), [data]);
+  // Same transform the SVG uses internally, so the overlay lines up exactly.
   const dims = useMemo(() => {
-    const m = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
-    return m ? { w: parseFloat(m[1]), h: parseFloat(m[2]) } : { w: 1, h: 1 };
-  }, [svg]);
+    const { w, h } = thumbnailTransform((data.elements ?? []) as never);
+    return { w, h };
+  }, [data]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [t, setT] = useState<Transform>({ s: 1, x: 0, y: 0 });
@@ -28,6 +43,9 @@ export function MobileDiagramView({ data }: { data: DiagramData }) {
   const g = useRef<{ mode: "none" | "pan" | "pinch"; x: number; y: number; dist: number; startS: number; midX: number; midY: number }>(
     { mode: "none", x: 0, y: 0, dist: 0, startS: 1, midX: 0, midY: 0 },
   );
+  // True once the current touch interaction has moved/pinched — so the trailing
+  // click isn't misread as a tap (pick / double-tap-fit).
+  const movedRef = useRef(false);
 
   function fit() {
     const el = containerRef.current;
@@ -62,9 +80,11 @@ export function MobileDiagramView({ data }: { data: DiagramData }) {
   function onTouchStart(e: React.TouchEvent) {
     const el = containerRef.current!;
     const rect = el.getBoundingClientRect();
+    movedRef.current = false;
     if (e.touches.length === 1) {
       g.current = { ...g.current, mode: "pan", x: e.touches[0].clientX, y: e.touches[0].clientY };
     } else if (e.touches.length === 2) {
+      movedRef.current = true; // a two-finger interaction is never a tap
       g.current = {
         mode: "pinch",
         x: 0, y: 0,
@@ -79,6 +99,7 @@ export function MobileDiagramView({ data }: { data: DiagramData }) {
     if (g.current.mode === "pan" && e.touches.length === 1) {
       const dx = e.touches[0].clientX - g.current.x;
       const dy = e.touches[0].clientY - g.current.y;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) movedRef.current = true;
       g.current.x = e.touches[0].clientX; g.current.y = e.touches[0].clientY;
       setT((cur) => ({ ...cur, x: cur.x + dx, y: cur.y + dy }));
     } else if (g.current.mode === "pinch" && e.touches.length === 2) {
@@ -99,24 +120,47 @@ export function MobileDiagramView({ data }: { data: DiagramData }) {
     zoomAround(e.deltaY < 0 ? 1.1 : 0.9, e.clientX - rect.left, e.clientY - rect.top);
   }
 
-  // Double-tap to fit.
+  // Screen point → SVG (diagram-thumbnail) coordinate.
+  function toSvg(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = containerRef.current!.getBoundingClientRect();
+    const cur = tRef.current;
+    return { x: (clientX - rect.left - cur.x) / cur.s, y: (clientY - rect.top - cur.y) / cur.s };
+  }
+
+  // Double-tap to fit + (in pickMode) single-tap to pick.
   const lastTap = useRef(0);
-  function onTap() {
+  function onClick(e: React.MouseEvent) {
+    if (movedRef.current) return; // trailing click after a pan/pinch — ignore
     const now = Date.now();
-    if (now - lastTap.current < 300) fit();
+    const isDouble = now - lastTap.current < 300;
     lastTap.current = now;
+    if (isDouble) { fit(); return; }
+    if (pickMode && onPick) {
+      const p = toSvg(e.clientX, e.clientY);
+      onPick(p.x, p.y);
+    }
   }
 
   return (
-    <div ref={containerRef} onWheel={onWheel} onClick={onTap}
+    <div ref={containerRef} onWheel={onWheel} onClick={onClick}
       onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-      className="relative w-full h-full overflow-hidden bg-white select-none"
+      className={`relative w-full h-full overflow-hidden bg-white select-none ${pickMode ? "cursor-crosshair" : ""}`}
       style={{ touchAction: "none" }}
     >
       <div
         style={{ position: "absolute", left: 0, top: 0, width: dims.w, height: dims.h, transformOrigin: "0 0", transform: `translate(${t.x}px, ${t.y}px) scale(${t.s})` }}
-        dangerouslySetInnerHTML={{ __html: svg.replace("<svg ", `<svg width="${dims.w}" height="${dims.h}" `) }}
-      />
+      >
+        <div style={{ position: "absolute", left: 0, top: 0, width: dims.w, height: dims.h }}
+          dangerouslySetInnerHTML={{ __html: svg.replace("<svg ", `<svg width="${dims.w}" height="${dims.h}" `) }}
+        />
+        {/* Interactive overlay shares the SVG coordinate space (0..w, 0..h). */}
+        {overlay && (
+          <svg width={dims.w} height={dims.h} viewBox={`0 0 ${dims.w} ${dims.h}`}
+            style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }}>
+            {overlay}
+          </svg>
+        )}
+      </div>
       {/* Zoom controls */}
       <div className="absolute bottom-3 right-3 flex flex-col gap-1.5">
         <button onClick={(e) => { e.stopPropagation(); const r = containerRef.current!.getBoundingClientRect(); zoomAround(1.25, r.width / 2, r.height / 2); }}

@@ -13,6 +13,21 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.1.1 (build 2157) — 2026-08-10 — Mobile: view a diagram + add/save Review Comments
+- The `/m` mobile diagram screen goes from read-only to **reviewable**: pan/zoom stays, and owners/editors/
+  **assigned reviewers** can now **tap ＋ Comment → tap an element → type or dictate a Review Comment**, then
+  **Save**. Review comments are **always collapsed on mobile save** (38×32 icons) so they open tidily on desktop.
+- **Dictation** reuses the shared `startDictation` primitive (Deepgram streaming, auto-falling back to the
+  phone's native speech-to-text) via a 🎤 mic in the comment sheet; added an iOS `AudioContext.resume()`.
+- Existing review comments show as tappable pink pins tethered to their element (read sheet on tap); honours
+  the `showReviewComments` toggle. Save uses the optimistic-concurrency `PUT` (409 → reload prompt); the
+  diagram itself stays view-only. Pure viewers get no ＋/Save.
+- Engine: `MobileReviewLayer` + `MobileCommentSheet`; `MobileDiagramView` gains an aligned overlay + tap-pick
+  (shared `thumbnailTransform`); pure `reviewCollapse.ts` + `reviewComment.ts` (desktop-identical note/tether
+  shape); GET `/api/diagrams/[id]` returns `canReview` + viewer. Tests T2261-T2263.
+- **Schema: no change** (only `review-comment` elements/links in existing diagram JSON — Q1 no, Q2 no →
+  feature-only; product version stays 2.1.1).
+
 ## 2.1.1 — 2026-08-10 — Version model split (product version 2.1.1 + XSD schema v45) + Visio/preview
 - **Two independent version numbers now** (per Paul). `PRODUCT_VERSION` (`major.middle.patch`, restarted
   at **`2.1.1`**) is the Diagramatix product version — its **middle increments on any physical DB

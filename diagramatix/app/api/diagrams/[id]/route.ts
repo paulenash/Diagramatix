@@ -29,6 +29,7 @@ export async function GET(_req: Request, { params }: Params) {
   }
 
   const { id } = await params;
+  const cookieStore = await cookies();
 
   // View access satisfies GET. requireDiagramAccess handles:
   //   • shared-project access (view/edit/owner all qualify),
@@ -38,7 +39,7 @@ export async function GET(_req: Request, { params }: Params) {
   // may read a diagram they have no project access to.
   let allowed = false;
   try {
-    await requireDiagramAccess(session, await cookies(), id, "view");
+    await requireDiagramAccess(session, cookieStore, id, "view");
     allowed = true;
   } catch (err) {
     if (err instanceof OrgContextError) {
@@ -62,7 +63,21 @@ export async function GET(_req: Request, { params }: Params) {
   if (!diagram) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json(diagram);
+
+  // canReview = may this user PUT `data`? Editors/owners (edit access) OR assigned
+  // reviewers (data-only write). Powers the mobile Add-comment / Save affordances.
+  let canReview = false;
+  try {
+    await requireDiagramAccess(session, cookieStore, id, "edit");
+    canReview = true;
+  } catch {
+    canReview = await isAssignedReviewer(session.user.id, id);
+  }
+  return NextResponse.json({
+    ...diagram,
+    canReview,
+    viewer: { id: session.user.id, name: session.user.name ?? session.user.email ?? "" },
+  });
 }
 
 export async function PUT(req: Request, { params }: Params) {
