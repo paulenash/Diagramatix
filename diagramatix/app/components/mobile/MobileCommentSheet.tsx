@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { startDictation, type DictationHandle } from "@/app/lib/dictation";
+import { useState } from "react";
 import { isRichText, sanitizeRichText } from "@/app/lib/diagram/richText";
+import { RichTextEditor } from "@/app/components/canvas/RichTextEditor";
 import { MicTest } from "./MicTest";
 
 /**
- * Bottom sheet for a mobile review comment. `mode:"edit"` = textarea + dictation
- * mic + Save/Cancel (attach a new note). `mode:"read"` = show an existing note's
- * text + Close. Dictation reuses the shared startDictation primitive (Deepgram,
- * falling back to native mobile speech-to-text).
+ * Bottom sheet for a mobile review comment.
+ *   mode:"edit" = rich-text editor (bold/italic/underline + lists) with the shared
+ *     dictation mic (Deepgram → browser fallback) and voice formatting commands;
+ *     Save/Cancel attach a new note as sanitised HTML.
+ *   mode:"read" = render an existing note (rich text) + Close.
  */
 export function MobileCommentSheet({
   mode,
@@ -29,41 +30,16 @@ export function MobileCommentSheet({
    *  (bold/lists/line breaks) when present, sanitised to a safe tag whitelist. */
   html?: string;
   authorLine?: string;
-  onSave?: (text: string) => void;
+  /** Edit mode returns sanitised HTML (rich text). */
+  onSave?: (html: string) => void;
   onClose: () => void;
 }) {
-  const [text, setText] = useState(initialText);
-  const [interim, setInterim] = useState("");
-  const [listening, setListening] = useState(false);
-  const [hint, setHint] = useState<string | null>(null);
+  const [editHtml, setEditHtml] = useState("");
   const [showMicTest, setShowMicTest] = useState(false);
-  const handleRef = useRef<DictationHandle | null>(null);
-
-  // Stop dictation if the sheet unmounts.
-  useEffect(() => () => { handleRef.current?.stop(); handleRef.current = null; }, []);
-
-  async function toggleMic() {
-    if (listening) {
-      handleRef.current?.stop();
-      handleRef.current = null;
-      setListening(false);
-      setInterim("");
-      return;
-    }
-    setHint(null);
-    setListening(true);
-    const h = await startDictation({
-      onText: (chunk) => setText((cur) => (cur ? `${cur} ${chunk}` : chunk).replace(/\s+/g, " ")),
-      onInterim: (t) => setInterim(t),
-      onError: (m) => setHint(m),
-      onEnd: () => { setListening(false); setInterim(""); handleRef.current = null; },
-      onEngine: (e) => { if (e === "browser") setHint("Using your phone's built-in dictation."); },
-    });
-    if (!h) { setListening(false); setHint("Couldn't start the microphone. Check its permission."); return; }
-    handleRef.current = h;
-  }
 
   const read = mode === "read";
+  // Plain-text length of the current edit, to enable/disable Save.
+  const plain = editHtml.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim();
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={onClose}>
@@ -87,29 +63,12 @@ export function MobileCommentSheet({
                 dangerouslySetInnerHTML={{ __html: sanitizeRichText(html) }} />
             </>
           ) : (
-            <div className="text-sm text-gray-800 whitespace-pre-wrap min-h-[3rem] max-h-[45vh] overflow-y-auto">{text || "(empty)"}</div>
+            <div className="text-sm text-gray-800 whitespace-pre-wrap min-h-[3rem] max-h-[45vh] overflow-y-auto">{sanitizeRichText(html ?? "").replace(/<[^>]+>/g, "") || initialText || "(empty)"}</div>
           )
         ) : (
           <>
-            <div className="relative">
-              <textarea
-                value={interim ? `${text}${text ? " " : ""}${interim}` : text}
-                onChange={(e) => setText(e.target.value)}
-                readOnly={listening}
-                rows={4}
-                autoFocus
-                placeholder="Type your comment, or tap the mic to dictate…"
-                className="w-full text-sm border border-gray-300 rounded-lg p-2.5 pr-12 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <button
-                onClick={toggleMic}
-                aria-label={listening ? "Stop dictation" : "Dictate"}
-                className={`absolute right-2 top-2 w-9 h-9 rounded-full flex items-center justify-center text-lg active:scale-95 ${listening ? "bg-red-600 text-white animate-pulse" : "bg-pink-100 text-pink-700 border border-pink-300"}`}
-              >
-                {listening ? "■" : "🎤"}
-              </button>
-            </div>
-            {hint && <p className="text-[11px] text-amber-600 mt-1">{hint}</p>}
+            <RichTextEditor value={initialText} onChange={setEditHtml} dictation mobile />
+            <p className="text-[11px] text-gray-500 mt-1">Type or tap 🎤 to dictate. Say “bullet list”, “new line”, “bold”, “stop”.</p>
             <button type="button" onClick={() => setShowMicTest((v) => !v)}
               className="mt-1.5 text-[11px] text-gray-500 underline active:text-gray-700">
               {showMicTest ? "Hide mic test" : "Mic not working? Test it"}
@@ -118,8 +77,8 @@ export function MobileCommentSheet({
             <div className="flex gap-2 mt-3">
               <button onClick={onClose} className="flex-1 py-2.5 text-sm text-gray-700 border border-gray-300 rounded-lg active:bg-gray-50">Cancel</button>
               <button
-                onClick={() => { handleRef.current?.stop(); onSave?.(text.trim()); }}
-                disabled={!text.trim()}
+                onClick={() => onSave?.(editHtml)}
+                disabled={!plain}
                 className="flex-1 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg disabled:opacity-40 active:bg-blue-700"
               >
                 Save note

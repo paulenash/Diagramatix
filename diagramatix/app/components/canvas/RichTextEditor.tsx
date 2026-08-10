@@ -23,13 +23,17 @@ export function RichTextEditor({
   value,
   onChange,
   dictation = false,
+  mobile = false,
 }: {
   value: string;
   onChange: (html: string) => void;
   dictation?: boolean;
+  /** Touch-first sizing (bigger toolbar buttons + text) for the mobile sheet. */
+  mobile?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [listening, setListening] = useState(false);
+  const [dictMsg, setDictMsg] = useState<string | null>(null);
   const dictRef = useRef<DictationHandle | null>(null);
   // Live (admin-editable) command catalogue, fetched once; falls back to the
   // built-in defaults. Held in a ref so the streaming callback reads the latest.
@@ -192,18 +196,25 @@ export function RichTextEditor({
 
   const toggleDictation = async () => {
     if (dictRef.current) { stopDictation(); return; }
+    setDictMsg(null);
     setListening(true);
     ensureCaret();
     const handle = await startDictation({
       onText: handleUtterance,
-      onError: () => { /* transient — keep the session */ },
+      onError: (m) => { if (mobile) setDictMsg(m); /* desktop: transient — keep the session */ },
       onEnd: () => { dictRef.current = null; setListening(false); },
     });
-    if (!handle) { setListening(false); return; }
+    if (!handle) {
+      setListening(false);
+      if (mobile && !dictMsg) setDictMsg("Voice couldn't start on this device. Use the Microphone test → “Voice check” to see why.");
+      return;
+    }
     dictRef.current = handle;
   };
 
-  const btn = "w-6 h-6 rounded text-[11px] flex items-center justify-center text-gray-600 hover:bg-gray-200";
+  const btn = mobile
+    ? "w-8 h-8 rounded text-sm flex items-center justify-center text-gray-600 hover:bg-gray-200 active:bg-gray-300"
+    : "w-6 h-6 rounded text-[11px] flex items-center justify-center text-gray-600 hover:bg-gray-200";
 
   return (
     <div className="border border-gray-300 rounded bg-white">
@@ -228,16 +239,20 @@ export function RichTextEditor({
                 : "Dictate — speak your comment; say 'numbered list', 'bullet list', 'next point', 'new line', 'bold', 'delete', 'stop'"}
               className={`${btn} ${listening ? "text-red-600 bg-red-50 animate-pulse" : ""}`}
               onMouseDown={(e) => { e.preventDefault(); void toggleDictation(); }}>🎤</button>
-            {listening && <span className="text-[9px] text-red-600 ml-0.5">listening…</span>}
+            {listening && <span className={`${mobile ? "text-[11px]" : "text-[9px]"} text-red-600 ml-0.5`}>listening…</span>}
           </>
         )}
       </div>
+      {mobile && dictMsg && <p className="text-[11px] text-amber-600 px-2 py-1">{dictMsg}</p>}
       <div
         ref={ref}
         contentEditable
         suppressContentEditableWarning
         onBlur={commit}
-        className="dgx-rich-edit text-[11px] px-2 py-1.5 min-h-[150px] max-h-[300px] overflow-y-auto outline-none leading-snug text-gray-800"
+        onInput={mobile ? commit : undefined}
+        className={mobile
+          ? "dgx-rich-edit text-sm px-2.5 py-2 min-h-[120px] max-h-[45vh] overflow-y-auto outline-none leading-snug text-gray-800"
+          : "dgx-rich-edit text-[11px] px-2 py-1.5 min-h-[150px] max-h-[300px] overflow-y-auto outline-none leading-snug text-gray-800"}
         style={{ wordBreak: "break-word" }}
       />
     </div>

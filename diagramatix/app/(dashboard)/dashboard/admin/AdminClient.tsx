@@ -851,6 +851,7 @@ function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
   const scheme = useFeatureColors();
   const [order, setOrder] = useState<string[]>(ADMIN_TILES.map(t => t.id));
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
 
   // Load the saved order on mount; merge so newly-added tiles always
   // appear (appended) and removed ids are dropped.
@@ -880,15 +881,31 @@ function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
   }
 
   const tileById = new Map(ADMIN_TILES.map(t => [t.id, t]));
-  const tiles = order.map(id => tileById.get(id)).filter((t): t is AdminTile => !!t);
+  const ordered = order.map(id => tileById.get(id)).filter((t): t is AdminTile => !!t);
+  const q = filter.trim().toLowerCase();
+  const tiles = q ? ordered.filter(t => (`${t.title} ${t.description}`).toLowerCase().includes(q)) : ordered;
+  const filtering = q.length > 0;
 
   return (
     <section className="mb-8">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-900">SuperAdmin Tools</h2>
-        <span className="text-[11px] text-gray-400">Drag tiles to reorder</span>
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <h2 className="text-sm font-semibold text-gray-900 shrink-0">SuperAdmin Tools</h2>
+        <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
+          <div className="relative w-full max-w-xs">
+            <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter tools…"
+              className="w-full text-sm border border-gray-300 rounded px-3 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {filter && (
+              <button onClick={() => setFilter("")} aria-label="Clear filter"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm leading-none px-1">×</button>
+            )}
+          </div>
+          <span className="text-[11px] text-gray-400 shrink-0 whitespace-nowrap">{filtering ? `${tiles.length} match${tiles.length === 1 ? "" : "es"}` : "Drag to reorder"}</span>
+        </div>
       </div>
       <div className="pr-1">
+        {filtering && tiles.length === 0 && (
+          <p className="text-sm text-gray-400 py-4">No tools match “{filter}”.</p>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {tiles.map(t => {
             const interactive = !!(t.href || t.users);
@@ -903,10 +920,10 @@ function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
             return (
             <div
               key={t.id}
-              draggable
-              onDragStart={() => setDraggingId(t.id)}
+              draggable={!filtering}
+              onDragStart={() => { if (!filtering) setDraggingId(t.id); }}
               onDragOver={e => e.preventDefault()}
-              onDrop={() => onDrop(t.id)}
+              onDrop={() => { if (!filtering) onDrop(t.id); }}
               onClick={() => { if (t.users) onShowUsers(); else if (t.href) router.push(t.href); }}
               style={fv}
               className={`relative rounded-md p-4 border transition-colors ${
