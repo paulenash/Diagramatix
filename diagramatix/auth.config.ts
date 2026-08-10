@@ -38,8 +38,15 @@ export const authConfig = {
         request.cookies.get("dgx-desktop")?.value === "1" ||
         nextUrl.searchParams.get("desktop") === "1";
       const isMobile = MOBILE_UA.test(request.headers.get("user-agent") ?? "");
-      if (isLoggedIn && isMobile && !prefersDesktop && path === "/dashboard") {
-        return NextResponse.redirect(new URL("/m", nextUrl));
+      if (isLoggedIn && isMobile && !prefersDesktop) {
+        // Send phones to the touch-optimised /m UI instead of the desktop screens.
+        // Diagrams open in the mobile viewer (not the desktop editor with its
+        // Matrix/Camera/Video toolbar + mouse canvas); projects → the mobile list.
+        if (path === "/dashboard") return NextResponse.redirect(new URL("/m", nextUrl));
+        const diag = path.match(/^\/diagram\/([^/]+)\/?$/);
+        if (diag) return NextResponse.redirect(new URL(`/m/diagram/${diag[1]}`, nextUrl));
+        const proj = path.match(/^\/dashboard\/projects\/([^/]+)\/?$/);
+        if (proj) return NextResponse.redirect(new URL(`/m/project/${proj[1]}`, nextUrl));
       }
       return true;
     },

@@ -13,6 +13,17 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.1.1 (build 2158) — 2026-08-10 — Mobile fixes: route diagrams to /m + hide desktop overlays
+- **Fix:** opening a diagram on a phone showed the **desktop editor** (Matrix/Camera/Video toolbar + a
+  mouse-oriented canvas that didn't display well) because the phone auto-redirect only fired on exactly
+  `/dashboard`. Now phones are also redirected `/diagram/[id]` → `/m/diagram/[id]` and
+  `/dashboard/projects/[id]` → `/m/project/[id]` (still honouring the "Desktop version" opt-out).
+- **Fix:** the global floating tools (**Matrix screensaver toggle, screenshot, screencast** — rendered in the
+  root layout) leaked onto the `/m` mobile screens. They're now hidden on the `/m` route tree
+  (`GlobalOverlays`).
+- Hardened `MobileDiagramView`: the review overlay is a separate transformed layer, so the diagram backdrop
+  renders exactly as the read-only viewer did (guards against a blank canvas). Schema: no change.
+
 ## 2.1.1 (build 2157) — 2026-08-10 — Mobile: view a diagram + add/save Review Comments
 - The `/m` mobile diagram screen goes from read-only to **reviewable**: pan/zoom stays, and owners/editors/
   **assigned reviewers** can now **tap ＋ Comment → tap an element → type or dictate a Review Comment**, then

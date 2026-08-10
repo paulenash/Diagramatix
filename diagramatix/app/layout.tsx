@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Caveat } from "next/font/google";
 import { SessionProvider } from "@/app/components/SessionProvider";
-import { MatrixToggle } from "@/app/components/MatrixToggle";
-import { ScreenCapture } from "@/app/components/ScreenCapture";
-import { ScreencastStudio } from "@/app/components/screencast/ScreencastStudio";
+import { GlobalOverlays } from "@/app/components/GlobalOverlays";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
 import "./globals.css";
@@ -37,9 +35,7 @@ export default async function RootLayout({
       <body className={`${geist.variable} ${caveat.variable} antialiased`}>
           <SessionProvider>
             {children}
-            <MatrixToggle />
-            <ScreenCapture />
-            <ScreencastStudio enabled={screencastEnabled} />
+            <GlobalOverlays screencastEnabled={screencastEnabled} />
           </SessionProvider>
         </body>
     </html>

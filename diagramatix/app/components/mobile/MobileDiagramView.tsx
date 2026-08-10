@@ -147,20 +147,23 @@ export function MobileDiagramView({
       className={`relative w-full h-full overflow-hidden bg-white select-none ${pickMode ? "cursor-crosshair" : ""}`}
       style={{ touchAction: "none" }}
     >
+      {/* Backdrop — the diagram picture (identical to the read-only viewer). */}
       <div
         style={{ position: "absolute", left: 0, top: 0, width: dims.w, height: dims.h, transformOrigin: "0 0", transform: `translate(${t.x}px, ${t.y}px) scale(${t.s})` }}
-      >
-        <div style={{ position: "absolute", left: 0, top: 0, width: dims.w, height: dims.h }}
-          dangerouslySetInnerHTML={{ __html: svg.replace("<svg ", `<svg width="${dims.w}" height="${dims.h}" `) }}
-        />
-        {/* Interactive overlay shares the SVG coordinate space (0..w, 0..h). */}
-        {overlay && (
-          <svg width={dims.w} height={dims.h} viewBox={`0 0 ${dims.w} ${dims.h}`}
-            style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }}>
+        dangerouslySetInnerHTML={{ __html: svg.replace("<svg ", `<svg width="${dims.w}" height="${dims.h}" `) }}
+      />
+      {/* Interactive overlay — a SEPARATE layer with the SAME transform, so review
+          pins line up with the backdrop. pointer-events:none lets gestures pass to
+          the container; the pins themselves opt back in. */}
+      {overlay && (
+        <div
+          style={{ position: "absolute", left: 0, top: 0, width: dims.w, height: dims.h, transformOrigin: "0 0", transform: `translate(${t.x}px, ${t.y}px) scale(${t.s})`, pointerEvents: "none" }}
+        >
+          <svg width={dims.w} height={dims.h} viewBox={`0 0 ${dims.w} ${dims.h}`} style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }}>
             {overlay}
           </svg>
-        )}
-      </div>
+        </div>
+      )}
       {/* Zoom controls */}
       <div className="absolute bottom-3 right-3 flex flex-col gap-1.5">
         <button onClick={(e) => { e.stopPropagation(); const r = containerRef.current!.getBoundingClientRect(); zoomAround(1.25, r.width / 2, r.height / 2); }}
