@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { probeDictation, type DictationDiagnostics } from "@/app/lib/dictation";
 
 /**
  * Microphone self-test for mobile: shows a live input-level meter, records a short
@@ -17,6 +18,14 @@ export function MicTest({ compact = false }: { compact?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [diag, setDiag] = useState<DictationDiagnostics | null>(null);
+  const [diagBusy, setDiagBusy] = useState(false);
+
+  async function runVoiceCheck() {
+    setDiagBusy(true);
+    try { setDiag(await probeDictation()); }
+    finally { setDiagBusy(false); }
+  }
 
   const streamRef = useRef<MediaStream | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -150,7 +159,20 @@ export function MicTest({ compact = false }: { compact?: boolean }) {
             {state === "recorded" || state === "error" ? "Record again" : "🎤 Record"}
           </button>
         )}
+        <button onClick={runVoiceCheck} disabled={diagBusy}
+          className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg active:bg-gray-50 disabled:opacity-50">
+          {diagBusy ? "Checking…" : "Voice check"}
+        </button>
       </div>
+
+      {diag && (
+        <div className="mt-2 rounded-md bg-white border border-gray-200 p-2 text-[11px] text-gray-600 space-y-0.5">
+          <div>Secure (https): <b className={diag.secureContext ? "text-green-600" : "text-red-600"}>{diag.secureContext ? "yes" : "no"}</b></div>
+          <div>Cloud dictation: <b className={diag.cloud.available ? "text-green-600" : "text-red-600"}>{diag.cloud.available ? "ready" : "unavailable"}</b>{!diag.cloud.available && <span className="text-gray-500"> — {diag.cloud.reason}</span>}</div>
+          <div>On-device speech: <b className={diag.browserSpeech ? "text-green-600" : "text-amber-600"}>{diag.browserSpeech ? "yes" : "no (e.g. iPhone)"}</b></div>
+          <div className="pt-1 text-gray-700">{diag.recommend}</div>
+        </div>
+      )}
     </div>
   );
 }

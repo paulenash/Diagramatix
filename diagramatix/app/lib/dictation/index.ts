@@ -25,6 +25,43 @@ export interface DictationHandle {
 
 const LANG = "en-AU";
 
+export interface DictationDiagnostics {
+  secureContext: boolean;
+  cloud: { available: boolean; status: number | null; reason: string };
+  browserSpeech: boolean;
+  recommend: string;
+}
+
+/** Probe why dictation may not be working — used by the mobile mic-test panel.
+ *  Reports secure-context, whether cloud (Deepgram) dictation is available (and
+ *  why not), and whether this browser has on-device speech (absent on iPhone). */
+export async function probeDictation(): Promise<DictationDiagnostics> {
+  const secureContext = typeof window === "undefined" ? true : window.isSecureContext !== false;
+  const browserSpeech = typeof window !== "undefined"
+    && !!((window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition
+      || (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition);
+
+  let cloud = { available: false, status: null as number | null, reason: "not checked" };
+  try {
+    const r = await fetch("/api/ai/dictation/token", { method: "POST" });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d?.token) cloud = { available: true, status: r.status, reason: "ready" };
+    else if (r.status === 503) cloud = { available: false, status: 503, reason: "not configured on the server (no Deepgram key)" };
+    else if (r.status === 403) cloud = { available: false, status: 403, reason: "blocked by org policy (allowVoiceAi)" };
+    else if (r.status === 401) cloud = { available: false, status: 401, reason: "not signed in" };
+    else cloud = { available: false, status: r.status, reason: (d?.error as string) ?? `error ${r.status}` };
+  } catch {
+    cloud = { available: false, status: null, reason: "network error reaching the token endpoint" };
+  }
+
+  let recommend: string;
+  if (!secureContext) recommend = "Open the app over https — voice can't access the mic on a plain http:// address.";
+  else if (cloud.available) recommend = "Cloud dictation is ready — voice should work.";
+  else if (browserSpeech) recommend = `Cloud dictation unavailable (${cloud.reason}); falling back to on-device speech — works on Android, NOT on iPhone.`;
+  else recommend = `No voice engine available on this device: cloud is ${cloud.reason}, and this browser has no on-device speech (e.g. iPhone/Safari). Configure Deepgram on the server to enable voice here.`;
+  return { secureContext, cloud, browserSpeech, recommend };
+}
+
 /** Best-effort report of a finished dictation session (voice minutes visibility;
  *  Deepgram is billed separately). sendBeacon survives page unload. */
 function reportDictationUsage(engine: "deepgram" | "browser", seconds: number) {
@@ -42,6 +79,15 @@ function reportDictationUsage(engine: "deepgram" | "browser", seconds: number) {
 /** Start a dictation session. Resolves to a handle, or null if nothing could
  *  start (e.g. mic blocked, or no engine available). */
 export async function startDictation(cb: DictationCallbacks): Promise<DictationHandle | null> {
+  // Voice needs a secure context — a plain http:// LAN address (e.g. testing the
+  // dev server from a phone at http://192.168.x.x:3000) blocks getUserMedia
+  // entirely, so neither engine can start. Fail with a clear message.
+  if (typeof window !== "undefined" && window.isSecureContext === false) {
+    cb.onError?.("Voice needs a secure (https) connection. Open the app over https, not a plain http:// address.");
+    cb.onEnd?.();
+    return null;
+  }
+
   let token: string | null = null;
   let scheme = "token";   // "bearer" for grant tokens, "token" for API keys
   try {
