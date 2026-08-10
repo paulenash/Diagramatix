@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { sanitizeRichText } from "@/app/lib/diagram/richText";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
@@ -33,6 +33,12 @@ function elementLabel(e: DiagramElement): string {
  */
 export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Where "‹ Back" returns to: the diagram we were invoked FROM (a linked/parent
+  // diagram carries ?from=…), else the project's diagram list. Link so a chain of
+  // drill-ins each step back to their invoker rather than jumping to the list.
+  const fromParam = searchParams.get("from");
+  const linkHref = (id: string) => `/m/diagram/${id}?from=${encodeURIComponent(`/m/diagram/${diagramId}`)}`;
   const [d, setD] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -209,7 +215,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
   return (
     <div ref={rootRef} className={`${fullscreen ? "fixed inset-0 z-50 bg-white" : "h-full"} flex flex-col`}>
       <div className="shrink-0 flex items-center gap-2 px-3 h-11 border-b border-gray-200 bg-white">
-        <button onClick={() => router.push(d?.projectId ? `/m/project/${d.projectId}` : "/m")}
+        <button onClick={() => router.push(fromParam || (d?.projectId ? `/m/project/${d.projectId}` : "/m"))}
           className="text-blue-600 text-sm">‹ Back</button>
         <span className="flex-1 text-sm font-medium text-gray-900 truncate text-center">{d?.name ?? "Diagram"}</span>
         {d && !empty && !unsupported && (d.data.parentDiagramIds?.length ?? 0) > 0 && (
@@ -306,7 +312,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
                 </>
               )}
               {linked && (
-                <button onClick={() => { setDetail(null); router.push(`/m/diagram/${linked}`); }}
+                <button onClick={() => { setDetail(null); router.push(linkHref(linked)); }}
                   className="w-full py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg active:bg-blue-700">Open linked diagram →</button>
               )}
             </div>
@@ -330,7 +336,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
               <ul className="space-y-1.5 max-h-[45vh] overflow-y-auto">
                 {parents.map((p) => (
                   <li key={p.id}>
-                    <button onClick={() => { setShowParents(false); router.push(`/m/diagram/${p.id}`); }}
+                    <button onClick={() => { setShowParents(false); router.push(linkHref(p.id)); }}
                       className="w-full text-left bg-gray-50 rounded-lg px-3 py-2.5 active:bg-gray-100 flex items-center justify-between gap-2">
                       <span className="font-medium text-gray-900 break-words min-w-0">{p.name}</span>
                       <span className="text-gray-400 shrink-0">›</span>
