@@ -81,9 +81,9 @@ export function MobileProjectsClient() {
           {projects.map((p) => (
             <li key={p.id}>
               <button onClick={() => router.push(`/m/project/${p.id}`)}
-                className="w-full text-left bg-white rounded-xl shadow-sm px-4 py-3.5 active:bg-gray-50 flex items-center justify-between">
-                <span className="font-medium text-gray-900 truncate">{p.name}</span>
-                <span className="text-xs text-gray-400 shrink-0 ml-2">{p._count?.diagrams ?? 0} diagram{(p._count?.diagrams ?? 0) === 1 ? "" : "s"} ›</span>
+                className="w-full text-left bg-white rounded-xl shadow-sm px-4 py-3.5 active:bg-gray-50 flex items-start justify-between gap-2">
+                <span className="font-medium text-gray-900 break-words min-w-0">{p.name}</span>
+                <span className="text-xs text-gray-400 shrink-0 mt-0.5">{p._count?.diagrams ?? 0} diagram{(p._count?.diagrams ?? 0) === 1 ? "" : "s"} ›</span>
               </button>
             </li>
           ))}

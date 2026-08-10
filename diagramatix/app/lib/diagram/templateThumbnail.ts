@@ -7,6 +7,7 @@
  */
 import type { TemplateData, DiagramElement, Connector, SymbolType } from "./types";
 import { resolveColor, type SymbolColorConfig } from "./colors";
+import { wrapText } from "./textMetrics";
 
 /**
  * Options for a higher-fidelity render (used by the mobile viewer): the diagram's
@@ -70,7 +71,18 @@ function strokeFor(e: DiagramElement, opts?: ThumbnailOpts): string {
 function label(e: DiagramElement, tx: number, ty: number, dy = 4, full = false): string {
   const t = (e.label ?? "").trim();
   if (!t) return "";
-  return `<text x="${(cx(e) + tx).toFixed(1)}" y="${(cy(e) + ty + dy).toFixed(1)}" text-anchor="middle" font-size="11" fill="#0f172a" font-family="sans-serif">${esc(full ? t : short(t))}</text>`;
+  const mx = (cx(e) + tx).toFixed(1);
+  if (!full) {
+    return `<text x="${mx}" y="${(cy(e) + ty + dy).toFixed(1)}" text-anchor="middle" font-size="11" fill="#0f172a" font-family="sans-serif">${esc(short(t))}</text>`;
+  }
+  // Wrap to the element width, matching the desktop (same wrapText util), so long
+  // task/element labels are readable instead of overflowing on one line.
+  const fs = 11, lineH = fs * 1.2;
+  const lines = wrapText(t, Math.max(12, e.width - 8), fs);
+  const startY = cy(e) + ty - ((lines.length - 1) * lineH) / 2 + fs * 0.34;
+  return lines.map((ln, i) =>
+    `<text x="${mx}" y="${(startY + i * lineH).toFixed(1)}" text-anchor="middle" font-size="${fs}" fill="#0f172a" font-family="sans-serif">${esc(ln)}</text>`,
+  ).join("");
 }
 
 // Pool / lane / sublane NAME — rotated vertically inside the left header strip,
@@ -78,8 +90,26 @@ function label(e: DiagramElement, tx: number, ty: number, dy = 4, full = false):
 function stripLabel(e: DiagramElement, tx: number, ty: number): string {
   const t = (e.label ?? "").trim();
   if (!t) return "";
-  const lx = e.x + tx + 9, ly = e.y + ty + e.height / 2;
-  return `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" transform="rotate(-90 ${lx.toFixed(1)} ${ly.toFixed(1)})" text-anchor="middle" font-size="10" fill="#0f172a" font-family="sans-serif">${esc(t)}</text>`;
+  // Rotated name; wrap along the element HEIGHT into vertical columns for readability.
+  const fs = 10, colW = fs * 1.15;
+  const lines = wrapText(t, Math.max(12, e.height - 8), fs);
+  const midY = e.y + ty + e.height / 2;
+  const startX = e.x + tx + 9 - ((lines.length - 1) * colW) / 2;
+  return lines.map((ln, i) => {
+    const lx = startX + i * colW;
+    return `<text x="${lx.toFixed(1)}" y="${midY.toFixed(1)}" transform="rotate(-90 ${lx.toFixed(1)} ${midY.toFixed(1)})" text-anchor="middle" font-size="${fs}" fill="#0f172a" font-family="sans-serif">${esc(ln)}</text>`;
+  }).join("");
+}
+
+/** Point where the ray from a box centre toward (tx0,ty0) exits the box — used to
+ *  land a connector on an element's boundary (e.g. a message flow on a pool edge). */
+function boxEdge(cxp: number, cyp: number, hw: number, hh: number, tx0: number, ty0: number): { x: number; y: number } {
+  const dx = tx0 - cxp, dy = ty0 - cyp;
+  if (dx === 0 && dy === 0) return { x: cxp, y: cyp };
+  const sx = dx !== 0 ? hw / Math.abs(dx) : Infinity;
+  const sy = dy !== 0 ? hh / Math.abs(dy) : Infinity;
+  const s = Math.min(sx, sy);
+  return { x: cxp + dx * s, y: cyp + dy * s };
 }
 
 function shapeFor(e: DiagramElement, tx: number, ty: number, opts?: ThumbnailOpts): string {
@@ -134,7 +164,13 @@ function connFor(c: Connector, els: DiagramElement[], tx: number, ty: number, op
   } else {
     const s = els.find((e) => e.id === c.sourceId), t = els.find((e) => e.id === c.targetId);
     if (!s || !t) return "";
-    pts = [{ x: cx(s) + tx, y: cy(s) + ty }, { x: cx(t) + tx, y: cy(t) + ty }];
+    // No stored route: land each end on the ELEMENT BOUNDARY (not the centre) so a
+    // message flow meets the pool edge, with a clear direction arrow at the target.
+    const sC = { x: cx(s) + tx, y: cy(s) + ty }, tC = { x: cx(t) + tx, y: cy(t) + ty };
+    pts = [
+      boxEdge(sC.x, sC.y, s.width / 2, s.height / 2, tC.x, tC.y),
+      boxEdge(tC.x, tC.y, t.width / 2, t.height / 2, sC.x, sC.y),
+    ];
   }
   const d = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
   let out = `<path d="${d}" fill="none" stroke="#475569" stroke-width="1.2"${VE} ${dashed ? 'stroke-dasharray="4 3"' : ""} marker-end="url(#tmarr)"/>`;

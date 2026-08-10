@@ -52,8 +52,8 @@ export function MobileProjectClient({ projectId }: { projectId: string }) {
   return (
     <div className="p-4">
       <button onClick={() => router.push("/m")} className="text-blue-600 text-sm mb-2">‹ Projects</button>
-      <div className="flex items-center justify-between mb-3">
-        <h1 className="text-lg font-semibold text-gray-900 truncate">{name}</h1>
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <h1 className="text-lg font-semibold text-gray-900 break-words min-w-0">{name}</h1>
         {!creating && (
           <button onClick={() => setCreating(true)}
             className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg active:bg-blue-700 shrink-0">+ Diagram</button>
@@ -89,10 +89,10 @@ export function MobileProjectClient({ projectId }: { projectId: string }) {
           {diagrams.map((d) => (
             <li key={d.id}>
               <button onClick={() => router.push(`/m/diagram/${d.id}`)}
-                className="w-full text-left bg-white rounded-xl shadow-sm px-4 py-3.5 active:bg-gray-50 flex items-center gap-3">
+                className="w-full text-left bg-white rounded-xl shadow-sm px-4 py-3.5 active:bg-gray-50 flex items-start gap-3">
                 <span className="w-8 h-8 rounded bg-blue-100 text-blue-700 text-[11px] font-semibold flex items-center justify-center shrink-0">{TYPE_BADGE[d.type] ?? d.type.slice(0, 2).toUpperCase()}</span>
-                <span className="flex-1 font-medium text-gray-900 truncate">{d.name}</span>
-                <span className="text-gray-400 shrink-0">›</span>
+                <span className="flex-1 font-medium text-gray-900 break-words min-w-0">{d.name}</span>
+                <span className="text-gray-400 shrink-0 mt-1.5">›</span>
               </button>
             </li>
           ))}

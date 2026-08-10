@@ -11,6 +11,7 @@ import { startDictation, type DictationHandle } from "@/app/lib/dictation";
  */
 export function MobileCommentSheet({
   mode,
+  heading,
   targetLabel,
   initialText = "",
   authorLine,
@@ -18,6 +19,7 @@ export function MobileCommentSheet({
   onClose,
 }: {
   mode: "edit" | "read";
+  heading?: string;
   targetLabel?: string;
   initialText?: string;
   authorLine?: string;
@@ -63,7 +65,7 @@ export function MobileCommentSheet({
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" />
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-gray-900">
-            {read ? "Review comment" : "Add review comment"}
+            {read ? (heading ?? "Review comment") : "Add review comment"}
           </h2>
           <button onClick={onClose} className="text-gray-400 text-xl leading-none px-1">×</button>
         </div>

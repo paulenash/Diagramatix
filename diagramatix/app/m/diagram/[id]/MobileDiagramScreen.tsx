@@ -65,16 +65,22 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
   // Split the diagram: review comments render in the interactive overlay; the
   // backdrop (everything else) is the read-only picture. Same element set drives
   // the shared thumbnail transform, so the overlay lines up.
-  const { backdrop, comments, tx, ty } = useMemo(() => {
+  const { backdrop, comments, annotations, tx, ty } = useMemo(() => {
     const data: DiagramData = d?.data ?? { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } };
     const comments = data.elements.filter((e) => e.type === "review-comment");
+    const annotations = data.elements.filter((e) => e.type === "text-annotation");
+    // Review comments AND text annotations render as tappable overlay icons (the
+    // dark annotation boxes read badly on a phone), so keep them out of the backdrop.
+    const overlayIds = new Set([...comments, ...annotations].map((e) => e.id));
     const backdrop: DiagramData = {
       ...data,
-      elements: data.elements.filter((e) => e.type !== "review-comment"),
-      connectors: (data.connectors ?? []).filter((c) => c.type !== "review-comment-link"),
+      elements: data.elements.filter((e) => e.type !== "review-comment" && e.type !== "text-annotation"),
+      connectors: (data.connectors ?? []).filter(
+        (c) => c.type !== "review-comment-link" && !overlayIds.has(c.sourceId) && !overlayIds.has(c.targetId),
+      ),
     };
     const tr = thumbnailTransform(backdrop.elements as never);
-    return { backdrop, comments, tx: tr.tx, ty: tr.ty };
+    return { backdrop, comments, annotations, tx: tr.tx, ty: tr.ty };
   }, [d]);
 
   function onPick(svgX: number, svgY: number) {
@@ -170,7 +176,7 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
             pickMode={picking}
             onPick={onPick}
             overlay={
-              <MobileReviewLayer data={d.data} comments={comments} tx={tx} ty={ty} disabled={picking}
+              <MobileReviewLayer data={d.data} comments={comments} annotations={annotations} tx={tx} ty={ty} disabled={picking}
                 onOpen={(c) => setReading(c)} />
             }
           />
@@ -198,8 +204,11 @@ export function MobileDiagramScreen({ diagramId }: { diagramId: string }) {
           onSave={saveNote} onClose={() => setAddTarget(null)} />
       )}
       {reading && (
-        <MobileCommentSheet mode="read" initialText={stripHtml(reading.label ?? "")}
-          authorLine={readerAuthor(reading)} onClose={() => setReading(null)} />
+        <MobileCommentSheet mode="read"
+          heading={reading.type === "text-annotation" ? "Annotation" : "Review comment"}
+          initialText={stripHtml(reading.label ?? "")}
+          authorLine={reading.type === "text-annotation" ? undefined : readerAuthor(reading)}
+          onClose={() => setReading(null)} />
       )}
     </div>
   );

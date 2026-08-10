@@ -13,6 +13,17 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.1.1 (build 2162) — 2026-08-10 — Mobile viewer: wrapped labels, annotation icons, message arrows
+- **Wrapped text (#1):** element labels now **wrap to the shape width** (reusing the desktop `wrapText`) and
+  pool/lane/sublane names wrap into rotated columns — long names/labels are readable instead of overflowing.
+- **Annotations (#2):** text annotations (which rendered as dark, unreadable boxes) now show as a tappable
+  **📝 amber icon** tethered to their element — tap to read the full text in a sheet, like review comments.
+- **Message flows (#3):** connectors without a stored route now **land on the element boundary** (so a
+  message flow meets the pool edge, not its centre) with a direction **arrowhead** at the target.
+- **List names:** Project-list and Diagram-list names (and the project header) now **wrap** so the full name
+  is visible instead of being truncated.
+- Schema: no change.
+
 ## 2.1.1 (build 2161) — 2026-08-10 — Mobile viewer fidelity: real colours, labels, rotate, pan-anywhere
 - **Real colours (#1):** the mobile viewer now renders the diagram's ACTUAL colours (per-element
   `properties.fillColor`, else the project `colorConfig`, else the type default — same resolution as the
