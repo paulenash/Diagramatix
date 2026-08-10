@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { isRichText, sanitizeRichText } from "@/app/lib/diagram/richText";
+import { MicTest } from "./MicTest";
 
 /**
  * Bottom sheet for a mobile review comment. `mode:"edit"` = textarea + dictation
@@ -35,6 +36,7 @@ export function MobileCommentSheet({
   const [interim, setInterim] = useState("");
   const [listening, setListening] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
+  const [showMicTest, setShowMicTest] = useState(false);
   const handleRef = useRef<DictationHandle | null>(null);
 
   // Stop dictation if the sheet unmounts.
@@ -108,6 +110,11 @@ export function MobileCommentSheet({
               </button>
             </div>
             {hint && <p className="text-[11px] text-amber-600 mt-1">{hint}</p>}
+            <button type="button" onClick={() => setShowMicTest((v) => !v)}
+              className="mt-1.5 text-[11px] text-gray-500 underline active:text-gray-700">
+              {showMicTest ? "Hide mic test" : "Mic not working? Test it"}
+            </button>
+            {showMicTest && <div className="mt-2"><MicTest compact /></div>}
             <div className="flex gap-2 mt-3">
               <button onClick={onClose} className="flex-1 py-2.5 text-sm text-gray-700 border border-gray-300 rounded-lg active:bg-gray-50">Cancel</button>
               <button
