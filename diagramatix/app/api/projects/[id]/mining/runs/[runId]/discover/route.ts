@@ -21,6 +21,7 @@ import { getAiGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { enterAiContext, AI_INVOCATION_POINTS, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 import { discoverProcess } from "@/app/lib/mining/discoverProcess";
+import { isTaskRun, collapseNavForDiscovery } from "@/app/lib/mining/taskMining/insights";
 import { badgeEdgeCounts } from "@/app/lib/mining/edgeBadges";
 import { generateProcessViaAi } from "@/app/lib/mining/aiProcess";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
@@ -95,7 +96,12 @@ export async function POST(req: Request, { params }: Params) {
     await recordDiagramGenerated({ userId, orgId, diagramType: "bpmn", source: "mining-discover" });
     nameSuffix = "discovered (AI)";
   } else {
-    const { plan } = discoverProcess(variants, { edgeThreshold });
+    // Task runs: collapse the pure app-switch/open steps for the ROUTINE MAP — they
+    // are the same node at multiple points, which turns DFG discovery into a tangled
+    // gateway mesh. Collapsing yields a clean work-step routine whose only cycle is
+    // the genuine rework loop (the switching is still measured by the Automation tab).
+    const dv = isTaskRun(variants) ? collapseNavForDiscovery(variants) : variants;
+    const { plan } = discoverProcess(dv, { edgeThreshold });
     // No promptLabel — that stamps an "AI Generated" annotation, which is wrong for
     // the deterministic (1:1-with-the-log) discovery. The AI path keeps its label.
     data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections));

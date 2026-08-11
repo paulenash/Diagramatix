@@ -91058,15 +91058,15 @@
               "Switch to Excel"
             ],
             "states": [
-              "Chrome:ed Paste Amount",
-              "Chrome:ed Paste Vendor",
-              "Chrome:ed Submit",
-              "Chrome:ed Validate",
-              "Excel:ed Copy Amount",
-              "Excel:ed Copy Vendor",
-              "Opened Excel",
-              "Switched to Chrome",
-              "Switched to Excel"
+              "Chrome: Paste Amount",
+              "Chrome: Paste Vendor",
+              "Chrome: Submit",
+              "Chrome: Validate",
+              "Excel: Copy Amount",
+              "Excel: Copy Vendor",
+              "Open Excel",
+              "Switch to Chrome",
+              "Switch to Excel"
             ],
             "variants": 2,
             "from": 1772442000000,
@@ -91075,16 +91075,16 @@
           "variants": [
             {
               "states": [
-                "Opened Excel",
-                "Excel:ed Copy Vendor",
-                "Switched to Chrome",
-                "Chrome:ed Paste Vendor",
-                "Switched to Excel",
-                "Excel:ed Copy Amount",
-                "Switched to Chrome",
-                "Chrome:ed Paste Amount",
-                "Chrome:ed Validate",
-                "Chrome:ed Submit"
+                "Open Excel",
+                "Excel: Copy Vendor",
+                "Switch to Chrome",
+                "Chrome: Paste Vendor",
+                "Switch to Excel",
+                "Excel: Copy Amount",
+                "Switch to Chrome",
+                "Chrome: Paste Amount",
+                "Chrome: Validate",
+                "Chrome: Submit"
               ],
               "events": [
                 "Open Excel",
@@ -91102,21 +91102,21 @@
             },
             {
               "states": [
-                "Opened Excel",
-                "Excel:ed Copy Vendor",
-                "Switched to Chrome",
-                "Chrome:ed Paste Vendor",
-                "Switched to Excel",
-                "Excel:ed Copy Amount",
-                "Switched to Chrome",
-                "Chrome:ed Paste Amount",
-                "Chrome:ed Validate",
-                "Switched to Excel",
-                "Excel:ed Copy Amount",
-                "Switched to Chrome",
-                "Chrome:ed Paste Amount",
-                "Chrome:ed Validate",
-                "Chrome:ed Submit"
+                "Open Excel",
+                "Excel: Copy Vendor",
+                "Switch to Chrome",
+                "Chrome: Paste Vendor",
+                "Switch to Excel",
+                "Excel: Copy Amount",
+                "Switch to Chrome",
+                "Chrome: Paste Amount",
+                "Chrome: Validate",
+                "Switch to Excel",
+                "Excel: Copy Amount",
+                "Switch to Chrome",
+                "Chrome: Paste Amount",
+                "Chrome: Validate",
+                "Chrome: Submit"
               ],
               "events": [
                 "Open Excel",
@@ -92513,7 +92513,7 @@
                   "Sam Turner"
                 ],
                 "states": [
-                  "Switched to Chrome"
+                  "Switch to Chrome"
                 ]
               },
               {
@@ -92530,7 +92530,7 @@
                   "Sam Turner"
                 ],
                 "states": [
-                  "Chrome:ed Validate"
+                  "Chrome: Validate"
                 ]
               },
               {
@@ -92547,7 +92547,7 @@
                   "Sam Turner"
                 ],
                 "states": [
-                  "Chrome:ed Paste Amount"
+                  "Chrome: Paste Amount"
                 ]
               },
               {
@@ -92564,7 +92564,7 @@
                   "Sam Turner"
                 ],
                 "states": [
-                  "Opened Excel"
+                  "Open Excel"
                 ]
               },
               {
@@ -92581,7 +92581,7 @@
                   "Sam Turner"
                 ],
                 "states": [
-                  "Switched to Excel"
+                  "Switch to Excel"
                 ]
               },
               {
@@ -92598,7 +92598,7 @@
                   "Sam Turner"
                 ],
                 "states": [
-                  "Chrome:ed Paste Vendor"
+                  "Chrome: Paste Vendor"
                 ]
               },
               {
@@ -92615,7 +92615,7 @@
                   "Sam Turner"
                 ],
                 "states": [
-                  "Excel:ed Copy Amount"
+                  "Excel: Copy Amount"
                 ]
               },
               {
@@ -92632,7 +92632,7 @@
                   "Sam Turner"
                 ],
                 "states": [
-                  "Excel:ed Copy Vendor"
+                  "Excel: Copy Vendor"
                 ]
               },
               {
@@ -92649,7 +92649,7 @@
                   "Sam Turner"
                 ],
                 "states": [
-                  "Chrome:ed Submit"
+                  "Chrome: Submit"
                 ]
               }
             ],

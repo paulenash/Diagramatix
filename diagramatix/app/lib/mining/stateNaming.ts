@@ -45,6 +45,14 @@ export function pastParticiple(word: string): string {
 export function activityToState(activity: string): string {
   const a = (activity ?? "").trim();
   if (!a) return a;
+  // Task-mining UI-step labels ("Excel: Copy Amount", "Switch to Chrome",
+  // "Open Excel") aren't verbs to past-tense — a task log has no real lifecycle
+  // state, so use the step name as-is instead of mangling it ("Chrome:ed …").
+  // Only conventional activity names (no colon, not a Switch/Open hop) get
+  // participled into a state ("Ship" → "Shipped").
+  if (a.includes(":") || /^(Switch to|Open)\s/.test(a)) {
+    return a.charAt(0).toUpperCase() + a.slice(1);
+  }
   const parts = a.split(/\s+/);
   parts[0] = pastParticiple(parts[0]);
   const s = parts.join(" ");

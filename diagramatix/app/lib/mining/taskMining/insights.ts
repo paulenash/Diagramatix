@@ -38,6 +38,27 @@ export function isTaskRun(variants: Variant[]): boolean {
   return false;
 }
 
+/** For the discovered ROUTINE MAP only: drop the pure app-switch / open steps
+ *  ("Switch to X" / "Open X") and re-merge now-identical variants. Those hops are
+ *  the same node at multiple points in the flow, which turns DFG discovery into a
+ *  tangled gateway mesh (repeated activities → false merges → a runaway layout).
+ *  Collapsing them yields a clean work-step routine where the ONLY cycle is the
+ *  genuine rework loop. Ping-pong/automation still read the FULL log, so the app
+ *  switching is never lost — it's just not drawn as nodes. */
+export function collapseNavForDiscovery(variants: Variant[]): Variant[] {
+  const merged = new Map<string, Variant>();
+  for (const v of variants) {
+    const events: string[] = [], states: string[] = [];
+    v.events.forEach((a, i) => { if (a && !isNav(a)) { events.push(a); states.push(v.states?.[i] ?? a); } });
+    if (!events.length) continue;
+    const key = events.join("");
+    const ex = merged.get(key);
+    if (ex) ex.count += v.count;
+    else merged.set(key, { states, events, count: v.count });
+  }
+  return [...merged.values()];
+}
+
 /** Total A→B→A application bounces across all variants (weighted by frequency),
  *  derived from the activity labels alone — the stored form of a run. */
 export function pingPongFromVariants(variants: Variant[]): number {

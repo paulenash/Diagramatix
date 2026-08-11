@@ -10,7 +10,7 @@ import { discoverProcess, edgeKey } from "@/app/lib/mining/discoverProcess";
 import { computePerformance } from "@/app/lib/mining/performance";
 import { toEventLog, taskStepLabel, TASK_LOG_MAPPING } from "@/app/lib/mining/taskMining/schema";
 import { INVOICE_PROCESSING_TASK_LOG } from "@/app/lib/mining/taskMining/sampleInvoiceProcessing";
-import { detectPingPong, detectReworkActivities, automationSignal, isTaskRun, pingPongFromVariants } from "@/app/lib/mining/taskMining/insights";
+import { detectPingPong, detectReworkActivities, automationSignal, isTaskRun, pingPongFromVariants, collapseNavForDiscovery } from "@/app/lib/mining/taskMining/insights";
 import { automationOpportunities, taskAutomationScore, buildAutomationSpec, automationRoi } from "@/app/lib/mining/taskMining/automation";
 import { buildTaskProcedure } from "@/app/lib/mining/taskMining/procedure";
 import { buildTaskMiningExample } from "@/app/lib/mining/taskMining/example";
@@ -120,6 +120,17 @@ describe("Task Mining Phase 1 — Automation Opportunities + flagship example", 
 
   it("T2276 — pingPongFromVariants matches the interaction-based ping-pong count", () => {
     expect(pingPongFromVariants(log.variants)).toBe(detectPingPong(INVOICE_PROCESSING_TASK_LOG).total);
+  });
+
+  it("T2280 — collapseNavForDiscovery drops app-switch steps, keeping a clean rework loop", () => {
+    const dv = collapseNavForDiscovery(log.variants);
+    expect(dv.length).toBe(2); // happy + rework, still distinct
+    // No pure navigation steps remain.
+    for (const v of dv) for (const a of v.events) expect(a.startsWith("Switch to ") || a.startsWith("Open ")).toBe(false);
+    // The rework variant repeats a work step (the loop) — the happy one doesn't.
+    const happy = dv.find((v) => v.count === 70)!, rework = dv.find((v) => v.count === 30)!;
+    expect(new Set(happy.events).size).toBe(happy.events.length);           // no repeats
+    expect(rework.events.filter((a) => a === "Excel: Copy Amount").length).toBe(2); // the loop
   });
 
   it("T2277 — automationRoi estimates savings from the automatable routines", () => {
