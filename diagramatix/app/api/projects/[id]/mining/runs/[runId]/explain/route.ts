@@ -16,6 +16,7 @@ import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { enterAiContext, AI_INVOCATION_POINTS } from "@/app/lib/ai/aiTelemetry";
 import { makeRedactor } from "@/app/lib/ai/redaction";
 import { explainMiningResults, summariseMiningResults } from "@/app/lib/mining/explainResults";
+import { isTaskRun } from "@/app/lib/mining/taskMining/insights";
 import type { Variant, MiningStats, Performance } from "@/app/lib/mining/types";
 import type { ConformanceResult } from "@/app/lib/mining/transitionConformance";
 
@@ -58,6 +59,7 @@ export async function POST(_req: Request, { params }: Params) {
     hasStateMachine: !!run.discoveredSmId,
     hasTwin: !!run.studyId,
     referenceName,
+    isTask: isTaskRun(variants),
   };
 
   // Branch: AI narrates only when the org allows AI AND a key is configured.

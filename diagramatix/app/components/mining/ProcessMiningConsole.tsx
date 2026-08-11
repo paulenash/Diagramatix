@@ -66,6 +66,11 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
   // Choosable scenarios (an example may ship several period logs to pick between).
   const [scenarios, setScenarios] = useState<SampleScenario[] | null>(null);
   const [scenarioIdx, setScenarioIdx] = useState(-1);
+  // The adopted example's built-in log — RETAINED so it can always be re-loaded
+  // (alongside "Choose file…"), even after picking a different file. For a single
+  // sample this backs a "Load built-in example data" button; multi-scenario
+  // examples use the scenario picker instead.
+  const [builtInSample, setBuiltInSample] = useState<SampleScenario | null>(null);
   // OCEL 2.0 object-centric study: the raw log + the object types the user picks
   // to mine (one state machine + run each) tied together by a Domain Diagram.
   const [ocelText, setOcelText] = useState<string | null>(null);
@@ -151,8 +156,10 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
         setScenarios(set);
         const def = set.length - 1;             // last = recommended/current
         setScenarioIdx(def);
+        setBuiltInSample(set[def]);
         loadStaging(set[def]);
       } else {
+        setBuiltInSample(parsed as SampleScenario);
         loadStaging(parsed as SampleScenario);
       }
     } catch { /* ignore */ }
@@ -248,8 +255,9 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
     setFileName(file.name); setHeaders(h); setRows(r);
     setMapping(map); setEnrichMsg(null);
     setRunName(file.name.replace(/\.[^.]+$/, ""));
-    // A hand-picked file replaces any scenario choice.
-    setScenarios(null); setScenarioIdx(-1);
+    // A hand-picked file deselects the scenario/built-in choice, but we KEEP the
+    // scenario picker + built-in sample available so the user can switch back.
+    setScenarioIdx(-1);
   }
 
   // Load a scenario/sample log into the Import staging (confirm-the-analysis flow).
@@ -460,10 +468,21 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
             </div>
           )}
 
-          <label className="inline-block cursor-pointer text-xs bg-amber-700 hover:bg-amber-600 text-white rounded px-3 py-1.5">
-            {fileName ? `↻ ${fileName}` : "⭱ Choose file…"}
-            <input type="file" accept=".csv,.tsv,.txt,text/csv,.xes,.json,.ocel,.jsonocel,.xml,application/xml,application/json" onChange={onFile} className="hidden" />
-          </label>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Always offer the built-in example data (when there's no multi-scenario
+                picker) — so you can re-load it and Import even after browsing a file. */}
+            {builtInSample && (!scenarios || scenarios.length === 0) && (
+              <button onClick={() => loadStaging(builtInSample)}
+                className="text-xs rounded px-3 py-1.5 border border-amber-700 text-amber-200 hover:bg-amber-950/40">
+                📋 Load built-in example data
+              </button>
+            )}
+            <label className="inline-block cursor-pointer text-xs bg-amber-700 hover:bg-amber-600 text-white rounded px-3 py-1.5">
+              ⭱ Choose file…
+              <input type="file" accept=".csv,.tsv,.txt,text/csv,.xes,.json,.ocel,.jsonocel,.xml,application/xml,application/json" onChange={onFile} className="hidden" />
+            </label>
+            {fileName && <span className="text-[11px] text-stone-400 truncate max-w-[18rem]" title={fileName}>loaded: <span className="text-stone-300">{fileName}</span></span>}
+          </div>
 
           {/* OCEL 2.0 object-centric study — one lifecycle per object type + a Domain Diagram. */}
           {ocelText && ocelTypes.length > 0 && (

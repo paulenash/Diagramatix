@@ -11,9 +11,11 @@ import { computePerformance } from "@/app/lib/mining/performance";
 import { toEventLog, taskStepLabel, TASK_LOG_MAPPING } from "@/app/lib/mining/taskMining/schema";
 import { INVOICE_PROCESSING_TASK_LOG } from "@/app/lib/mining/taskMining/sampleInvoiceProcessing";
 import { detectPingPong, detectReworkActivities, automationSignal, isTaskRun, pingPongFromVariants } from "@/app/lib/mining/taskMining/insights";
-import { automationOpportunities, taskAutomationScore, buildAutomationSpec } from "@/app/lib/mining/taskMining/automation";
+import { automationOpportunities, taskAutomationScore, buildAutomationSpec, automationRoi } from "@/app/lib/mining/taskMining/automation";
+import { buildTaskProcedure } from "@/app/lib/mining/taskMining/procedure";
 import { buildTaskMiningExample } from "@/app/lib/mining/taskMining/example";
 import { validateMiningExamplePackage } from "@/app/lib/mining/examplePackage";
+import { summariseMiningResults } from "@/app/lib/mining/explainResults";
 
 describe("Task Mining Phase 0 spike (Invoice Processing / Enter Invoice)", () => {
   const { headers, rows, mapping } = toEventLog(INVOICE_PROCESSING_TASK_LOG);
@@ -30,7 +32,7 @@ describe("Task Mining Phase 0 spike (Invoice Processing / Enter Invoice)", () =>
   });
 
   it("T2268 — the existing buildEventLog compresses the task log into cases + variants", () => {
-    expect(log.stats.cases).toBe(10);
+    expect(log.stats.cases).toBe(100);
     expect(log.stats.variants).toBe(2); // happy path vs rework
     expect(log.stats.activities).toEqual(expect.arrayContaining([
       "Open Excel", "Excel: Copy Vendor", "Switch to Chrome", "Chrome: Paste Vendor",
@@ -60,12 +62,12 @@ describe("Task Mining Phase 0 spike (Invoice Processing / Enter Invoice)", () =>
 
   it("T2271 — task-specific insights: ping-pong, rework, automation signal", () => {
     const pp = detectPingPong(INVOICE_PROCESSING_TASK_LOG);
-    expect(Object.keys(pp.byCase).length).toBe(10); // every case bounces Excel↔Chrome
-    expect(pp.total).toBeGreaterThanOrEqual(14);
+    expect(Object.keys(pp.byCase).length).toBe(100); // every case bounces Excel↔Chrome
+    expect(pp.total).toBeGreaterThanOrEqual(200);
 
     const rework = detectReworkActivities(log.variants);
     expect(rework.map((r) => r.activity)).toEqual(expect.arrayContaining(["Excel: Copy Amount", "Chrome: Paste Amount"]));
-    expect(rework[0].cases).toBe(3); // the 3 rework cases
+    expect(rework[0].cases).toBe(30); // the 30 rework cases
 
     const sig = automationSignal(INVOICE_PROCESSING_TASK_LOG, log.variants);
     expect(sig.copyPasteRate).toBeGreaterThan(0);
@@ -82,8 +84,8 @@ describe("Task Mining Phase 1 — Automation Opportunities + flagship example", 
   it("T2272 — automationOpportunities ranks the dominant routine first, from variants alone", () => {
     const opps = automationOpportunities(log.variants);
     expect(opps.length).toBe(2);
-    // Most-followed routine first (the 7 happy-path cases).
-    expect(opps[0].cases).toBe(7);
+    // Most-followed routine first (the 70 happy-path cases).
+    expect(opps[0].cases).toBe(70);
     expect(opps[0].copyPasteSteps).toBeGreaterThan(0);
     expect(opps[0].appSwitches).toBeGreaterThan(0);
     expect(opps[0].steps).toContain("Chrome: Submit");
@@ -118,5 +120,37 @@ describe("Task Mining Phase 1 — Automation Opportunities + flagship example", 
 
   it("T2276 — pingPongFromVariants matches the interaction-based ping-pong count", () => {
     expect(pingPongFromVariants(log.variants)).toBe(detectPingPong(INVOICE_PROCESSING_TASK_LOG).total);
+  });
+
+  it("T2277 — automationRoi estimates savings from the automatable routines", () => {
+    const roi = automationRoi(log.variants);
+    expect(roi.cases).toBe(100);
+    expect(roi.currentHours).toBeGreaterThan(0);
+    expect(roi.savedHours).toBeGreaterThan(0);
+    expect(roi.savedPct).toBeGreaterThan(0);
+    expect(roi.savedPct).toBeLessThanOrEqual(1);
+    expect(roi.automatableCases).toBeGreaterThan(0);
+  });
+
+  it("T2278 — buildTaskProcedure emits an as-actually-done SOP with steps, apps and rework", () => {
+    const sop = buildTaskProcedure(log.variants, "Enter Invoice");
+    expect(sop).toContain("# Standard Operating Procedure — Enter Invoice");
+    expect(sop).toContain("## Applications used");
+    expect(sop).toMatch(/- Excel/);
+    expect(sop).toMatch(/- Chrome/);
+    expect(sop).toMatch(/1\.\s+/); // a numbered step
+    expect(sop).toContain("Exceptions / rework observed");
+    expect(sop).toContain("Automation note");
+  });
+
+  it("T2279 — the deterministic Explain is task-framed when isTask (automation callout)", () => {
+    const summary = summariseMiningResults({
+      runName: "Enter Invoice", stats: log.stats, variants: log.variants,
+      conformance: null, performance: null, hasBpmn: false, hasStateMachine: false, hasTwin: false,
+      isTask: true,
+    });
+    expect(summary).toContain("Task automation:");
+    expect(summary).toContain("Automation signal:");
+    expect(summary).toContain("ping-pong bounces:");
   });
 });

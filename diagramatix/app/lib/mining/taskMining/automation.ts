@@ -72,6 +72,45 @@ export function taskAutomationScore(variants: Variant[]): { score: number; verdi
   return { score, verdict: score >= 0.6 ? "high" : score >= 0.35 ? "medium" : "low" };
 }
 
+export interface AutomationRoi {
+  cases: number;                 // total cases mined
+  secondsPerStep: number;        // assumption used
+  currentHours: number;          // observed human handling time across the cases
+  automatedHours: number;        // residual human time after automating the candidates
+  savedHours: number;
+  savedPct: number;              // 0..1 share of handling time automatable
+  automatableCases: number;      // cases on high/medium routines
+}
+
+/** Estimate the ROI of automating this task: current human handling time vs the
+ *  residual after botting the high/medium routines (a `residual` of oversight is
+ *  kept so it never claims 100%). Uses a per-step time assumption when no mined
+ *  duration is supplied — transparent and volume-scalable. Pure. */
+export function automationRoi(variants: Variant[], opts?: { secondsPerStep?: number; residual?: number }): AutomationRoi {
+  const secPerStep = opts?.secondsPerStep ?? 6;
+  const residual = opts?.residual ?? 0.15; // human oversight kept on automated routines
+  const opps = automationOpportunities(variants);
+  let currentSec = 0, automatedSec = 0, automatableCases = 0;
+  for (const o of opps) {
+    const perCase = o.steps.length * secPerStep;
+    currentSec += perCase * o.cases;
+    const automatable = o.verdict === "high" || o.verdict === "medium";
+    automatedSec += perCase * o.cases * (automatable ? residual : 1);
+    if (automatable) automatableCases += o.cases;
+  }
+  const savedSec = Math.max(0, currentSec - automatedSec);
+  const cases = variants.reduce((n, v) => n + v.count, 0);
+  return {
+    cases,
+    secondsPerStep: secPerStep,
+    currentHours: currentSec / 3600,
+    automatedHours: automatedSec / 3600,
+    savedHours: savedSec / 3600,
+    savedPct: currentSec > 0 ? savedSec / currentSec : 0,
+    automatableCases,
+  };
+}
+
 /** A Markdown automation spec for the top opportunity — the RPA "recipe" +
  *  a rough saving estimate. `avgHandleSeconds` (from mined performance) refines
  *  the estimate; without it we fall back to a per-step assumption. */

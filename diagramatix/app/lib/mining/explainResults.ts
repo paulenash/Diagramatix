@@ -10,6 +10,8 @@ import { makeAiClient } from "@/app/lib/ai/anthropicClient";
 import type { Redactor } from "@/app/lib/ai/redaction";
 import type { Variant, MiningStats, Performance } from "./types";
 import type { ConformanceResult } from "./transitionConformance";
+import { taskAutomationScore } from "./taskMining/automation";
+import { pingPongFromVariants, detectReworkActivities } from "./taskMining/insights";
 
 export interface ExplainInput {
   apiKey: string;
@@ -23,10 +25,28 @@ export interface ExplainInput {
   hasStateMachine: boolean;
   hasTwin: boolean;
   referenceName?: string;
+  /** This run is a TASK log (UI-interaction steps inside one task) — frame the
+   *  explanation around automation potential rather than a business process. */
+  isTask?: boolean;
 }
 
 const SYSTEM =
   "You are a process-mining analyst briefing a business owner. Given the results of mining an event log, explain — in clear, plain business English — WHAT WAS DISCOVERED. Cover, only where the data supports it: the shape of the real process and its main paths; how well reality conforms to the reference lifecycle (the fitness %, and the notable deviations and what they most likely mean operationally); any timing or resource insight; and, if a digital twin was built, what it now enables. Be specific to the actual numbers, concise, and practical. Do NOT restate raw JSON or list every variant. Output plain text: short paragraphs and simple '- ' bullet lines only — no markdown headings, no bold/asterisks.";
+
+const TASK_SYSTEM =
+  "You are a task-mining analyst briefing an operations lead. The log captures the UI steps a person performs INSIDE a single task (e.g. copying fields from a spreadsheet into a web form). Explain — in clear, plain business English — HOW THE TASK IS ACTUALLY DONE and its AUTOMATION POTENTIAL. Cover, only where the data supports it: the common routine and where it varies; the app 'ping-pong' (bouncing between applications) and copy/paste effort; any rework (steps redone after a failed check); and a clear recommendation on whether this is a strong RPA/automation candidate and which steps to automate first. Be specific to the actual numbers, concise, and practical. Do NOT restate raw JSON or list every variant. Output plain text: short paragraphs and simple '- ' bullet lines only — no markdown headings, no bold/asterisks.";
+
+/** Task-mining facts appended to the prompt/summary when isTask. */
+function taskFacts(variants: Variant[]): string[] {
+  const score = taskAutomationScore(variants);
+  const bounces = pingPongFromVariants(variants);
+  const rework = detectReworkActivities(variants).slice(0, 4).map((r) => `${r.activity} (redone in ${r.cases})`);
+  return [
+    `Automation signal: ${(score.score * 100).toFixed(0)}% (${score.verdict}).`,
+    `Application ping-pong bounces: ${bounces}.`,
+    rework.length ? `Rework — repeated steps: ${rework.join(", ")}.` : `No rework observed.`,
+  ];
+}
 
 export function buildExplainPrompt(input: ExplainInput): string {
   const s = input.stats;
@@ -70,7 +90,12 @@ export function buildExplainPrompt(input: ExplainInput): string {
     );
   }
 
-  lines.push(``, `Explain what this reveals to the business owner.`);
+  if (input.isTask) {
+    lines.push(``, `This is a TASK log — UI-interaction steps inside one task, not an end-to-end process.`, ...taskFacts(input.variants));
+    lines.push(``, `Explain how the task is done and its automation potential.`);
+  } else {
+    lines.push(``, `Explain what this reveals to the business owner.`);
+  }
   return lines.filter((l) => l !== "").join("\n");
 }
 
@@ -113,6 +138,10 @@ export function summariseMiningResults(input: Omit<ExplainInput, "apiKey" | "mod
 
   const arte = [input.hasBpmn && "a BPMN process", input.hasStateMachine && "a state-machine lifecycle", input.hasTwin && "a simulation digital twin"].filter(Boolean);
   if (arte.length) out.push(`Produced: ${arte.join(", ")}.`);
+  if (input.isTask) {
+    out.push(``, `Task automation:`);
+    for (const f of taskFacts(input.variants)) out.push(`- ${f}`);
+  }
   out.push(``, `(Summary generated deterministically — enable AI for a narrated explanation.)`);
   return out.join("\n");
 }
@@ -125,7 +154,7 @@ export async function explainMiningResults(input: ExplainInput, redactor?: Redac
   const message = await client.messages.create({
     model: input.model,
     max_tokens: 1400,
-    system: SYSTEM,
+    system: input.isTask ? TASK_SYSTEM : SYSTEM,
     messages: [{ role: "user", content: redactor ? redactor.redact(prompt) : prompt }],
   });
   const block = message.content.find((b) => b.type === "text");

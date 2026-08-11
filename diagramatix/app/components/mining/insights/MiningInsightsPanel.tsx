@@ -16,8 +16,9 @@ import { applyHeat, heatColor, HEAT_METRICS, type HeatMetric } from "@/app/lib/m
 import { variantPathIds, variantDiff, variantPareto } from "@/app/lib/mining/variantView";
 import { buildRunners, pointAt } from "@/app/lib/mining/replayRunners";
 import { computeOutcomes, type KpiConfig } from "@/app/lib/mining/outcomes";
-import { automationOpportunities, taskAutomationScore, buildAutomationSpec } from "@/app/lib/mining/taskMining/automation";
+import { automationOpportunities, taskAutomationScore, buildAutomationSpec, automationRoi } from "@/app/lib/mining/taskMining/automation";
 import { isTaskRun, detectReworkActivities, pingPongFromVariants } from "@/app/lib/mining/taskMining/insights";
+import { buildTaskProcedure } from "@/app/lib/mining/taskMining/procedure";
 import { ReplayDiagramBackdrop } from "@/app/components/simulation/replay/ReplayDiagramBackdrop";
 import { ExpandedView } from "./ExpandedView";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
@@ -112,15 +113,17 @@ function TasksTab({ variants, loading }: { variants: Variant[]; loading: boolean
   const score = useMemo(() => taskAutomationScore(variants), [variants]);
   const rework = useMemo(() => detectReworkActivities(variants), [variants]);
   const bounces = useMemo(() => pingPongFromVariants(variants), [variants]);
+  const roi = useMemo(() => automationRoi(variants), [variants]);
   const spec = useMemo(() => buildAutomationSpec(variants, "this task"), [variants]);
+  const sop = useMemo(() => buildTaskProcedure(variants, "Enter Invoice"), [variants]);
 
   if (loading && variants.length === 0) return <p className="text-[11px] text-stone-500">Loading routine…</p>;
   if (variants.length === 0) return <p className="text-[11px] text-stone-400">No routine variants to analyse.</p>;
 
   const copySpec = () => { navigator.clipboard?.writeText(spec).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); };
-  const download = () => {
-    const url = URL.createObjectURL(new Blob([spec], { type: "text/markdown" }));
-    const a = document.createElement("a"); a.href = url; a.download = "automation-spec.md"; a.click(); URL.revokeObjectURL(url);
+  const downloadText = (text: string, name: string) => {
+    const url = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
+    const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
   };
 
   return (
@@ -135,9 +138,20 @@ function TasksTab({ variants, loading }: { variants: Variant[]; loading: boolean
             <div className="text-stone-400">{bounces} app ping-pong bounce{bounces === 1 ? "" : "s"} (Excel ↔ web form, etc.)</div>
           </div>
         </div>
-        <div className="flex items-center gap-2 mb-3">
+        {/* ROI estimate */}
+        <div className="rounded border border-stone-700 bg-stone-800/40 p-2 mb-3 text-[11px]">
+          <div className="flex items-center justify-between">
+            <span className="text-stone-400">Est. time automatable</span>
+            <span className="tabular-nums font-semibold text-emerald-300">{(roi.savedPct * 100).toFixed(0)}%</span>
+          </div>
+          <div className="text-[10px] text-stone-500 mt-0.5">
+            ~{roi.currentHours.toFixed(1)}h of handling across {roi.cases} case{roi.cases === 1 ? "" : "s"} → ~{roi.savedHours.toFixed(1)}h saved ({roi.automatableCases} automatable). Scales with volume; assumes ~{roi.secondsPerStep}s/step + oversight.
+          </div>
+        </div>
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
           <button onClick={copySpec} className="text-[11px] rounded px-2.5 py-1 bg-amber-700 hover:bg-amber-600 text-white">{copied ? "Copied ✓" : "Copy RPA spec"}</button>
-          <button onClick={download} className="text-[11px] rounded px-2.5 py-1 bg-stone-800 text-amber-200 hover:bg-stone-700">Download .md</button>
+          <button onClick={() => downloadText(spec, "automation-spec.md")} className="text-[11px] rounded px-2.5 py-1 bg-stone-800 text-amber-200 hover:bg-stone-700">RPA spec .md</button>
+          <button onClick={() => downloadText(sop, "task-sop.md")} className="text-[11px] rounded px-2.5 py-1 bg-stone-800 text-amber-200 hover:bg-stone-700">Download SOP .md</button>
         </div>
         <div className="text-xs font-semibold text-amber-200 mb-1">Rework — repeated work steps</div>
         {rework.length ? (
