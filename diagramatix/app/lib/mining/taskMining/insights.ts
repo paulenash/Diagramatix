@@ -14,6 +14,43 @@ import type { TaskInteraction } from "./schema";
 import { taskStepLabel } from "./schema";
 
 const isNav = (activity: string) => activity.startsWith("Switch to ") || activity.startsWith("Open ");
+const isCopyPaste = (activity: string) => /:\s*(Copy|Paste)\b/.test(activity);
+
+/** The application an activity happened in (from its label), or null. */
+function appOfActivity(activity: string): string | null {
+  if (activity.startsWith("Switch to ")) return activity.slice("Switch to ".length);
+  if (activity.startsWith("Open ")) return activity.slice("Open ".length);
+  const m = activity.match(/^([^:]+):/);
+  return m ? m[1] : null;
+}
+
+/** Does this run look like a TASK log (UI-step granularity) rather than a business
+ *  process? True when the activity vocabulary has BOTH app switches AND copy/paste
+ *  steps — a fingerprint a normal process (milestone) log won't match. Lets the
+ *  console show the Automation tab without any schema/`kind` flag. */
+export function isTaskRun(variants: Variant[]): boolean {
+  let hasNav = false, hasCopyPaste = false;
+  for (const v of variants) for (const a of v.events) {
+    if (!hasNav && isNav(a)) hasNav = true;
+    if (!hasCopyPaste && isCopyPaste(a)) hasCopyPaste = true;
+    if (hasNav && hasCopyPaste) return true;
+  }
+  return false;
+}
+
+/** Total A→B→A application bounces across all variants (weighted by frequency),
+ *  derived from the activity labels alone — the stored form of a run. */
+export function pingPongFromVariants(variants: Variant[]): number {
+  let total = 0;
+  for (const v of variants) {
+    const apps: string[] = [];
+    for (const a of v.events) { const app = appOfActivity(a); if (app && apps[apps.length - 1] !== app) apps.push(app); }
+    let bounces = 0;
+    for (let k = 2; k < apps.length; k++) if (apps[k] === apps[k - 2] && apps[k] !== apps[k - 1]) bounces++;
+    total += bounces * v.count;
+  }
+  return total;
+}
 
 /** Per-case A→B→A application bounces — the classic "ping-pong" between two apps
  *  (e.g. Excel ↔ web form). Returns the total and a per-case breakdown. */

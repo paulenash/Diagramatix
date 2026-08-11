@@ -10,7 +10,7 @@ import { discoverProcess, edgeKey } from "@/app/lib/mining/discoverProcess";
 import { computePerformance } from "@/app/lib/mining/performance";
 import { toEventLog, taskStepLabel, TASK_LOG_MAPPING } from "@/app/lib/mining/taskMining/schema";
 import { INVOICE_PROCESSING_TASK_LOG } from "@/app/lib/mining/taskMining/sampleInvoiceProcessing";
-import { detectPingPong, detectReworkActivities, automationSignal } from "@/app/lib/mining/taskMining/insights";
+import { detectPingPong, detectReworkActivities, automationSignal, isTaskRun, pingPongFromVariants } from "@/app/lib/mining/taskMining/insights";
 import { automationOpportunities, taskAutomationScore, buildAutomationSpec } from "@/app/lib/mining/taskMining/automation";
 import { buildTaskMiningExample } from "@/app/lib/mining/taskMining/example";
 import { validateMiningExamplePackage } from "@/app/lib/mining/examplePackage";
@@ -107,5 +107,16 @@ describe("Task Mining Phase 1 — Automation Opportunities + flagship example", 
     expect(ex.package.run.variants.length).toBe(2);
     expect(ex.package.sampleLog?.rows.length).toBe(INVOICE_PROCESSING_TASK_LOG.length);
     expect(ex.package.diagrams).toEqual([]); // task routine is discovered live on adopt
+  });
+
+  it("T2275 — isTaskRun detects the task log by its UI-step vocabulary (and rejects a process log)", () => {
+    expect(isTaskRun(log.variants)).toBe(true);
+    // A business-milestone process log has no app switches / copy-paste steps.
+    const processVariants = [{ states: [], events: ["Receive Invoice", "Approve Invoice", "Pay Invoice"], count: 5 }];
+    expect(isTaskRun(processVariants)).toBe(false);
+  });
+
+  it("T2276 — pingPongFromVariants matches the interaction-based ping-pong count", () => {
+    expect(pingPongFromVariants(log.variants)).toBe(detectPingPong(INVOICE_PROCESSING_TASK_LOG).total);
   });
 });

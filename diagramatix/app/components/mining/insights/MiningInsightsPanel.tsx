@@ -16,6 +16,8 @@ import { applyHeat, heatColor, HEAT_METRICS, type HeatMetric } from "@/app/lib/m
 import { variantPathIds, variantDiff, variantPareto } from "@/app/lib/mining/variantView";
 import { buildRunners, pointAt } from "@/app/lib/mining/replayRunners";
 import { computeOutcomes, type KpiConfig } from "@/app/lib/mining/outcomes";
+import { automationOpportunities, taskAutomationScore, buildAutomationSpec } from "@/app/lib/mining/taskMining/automation";
+import { isTaskRun, detectReworkActivities, pingPongFromVariants } from "@/app/lib/mining/taskMining/insights";
 import { ReplayDiagramBackdrop } from "@/app/components/simulation/replay/ReplayDiagramBackdrop";
 import { ExpandedView } from "./ExpandedView";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
@@ -24,7 +26,8 @@ const EXPAND_BTN = "ml-auto text-[11px] rounded px-2 py-0.5 bg-stone-800 text-am
 
 interface RunLite { id: string; discoveredBpmnId: string | null; discoveredSmId: string | null }
 
-type TabKey = "activities" | "heat" | "variants" | "cases" | "outcomes" | "export";
+type TabKey = "tasks" | "activities" | "heat" | "variants" | "cases" | "outcomes" | "export";
+const TASK_TAB: { key: TabKey; label: string } = { key: "tasks", label: "🤖 Automation" };
 const TABS: { key: TabKey; label: string }[] = [
   { key: "activities", label: "📋 Activities" },
   { key: "heat", label: "🔥 Insights" },
@@ -70,10 +73,17 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
 
   useEffect(() => { void load(); }, [load]);
 
+  // Task run? (UI-step vocabulary). If so, surface the Automation tab first and
+  // open into it once — a task run's headline is its automation potential.
+  const isTask = useMemo(() => isTaskRun(variants), [variants]);
+  const autoSwitched = useRef(false);
+  useEffect(() => { if (isTask && !autoSwitched.current) { autoSwitched.current = true; setTab("tasks"); } }, [isTask]);
+  const visibleTabs = isTask ? [TASK_TAB, ...TABS] : TABS;
+
   return (
     <div className="mt-4 pt-3 border-t border-stone-700">
-      <div className="flex items-center gap-2 mb-2">
-        {TABS.map((t) => (
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        {visibleTabs.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`text-xs rounded px-2.5 py-1 ${tab === t.key ? "bg-amber-700 text-white" : "bg-stone-800 text-stone-300 hover:bg-stone-700"}`}>
             {t.label}
@@ -81,12 +91,89 @@ export function MiningInsightsPanel({ projectId, run }: { projectId: string; run
         ))}
         {loading && <DiagramatixThrobber size={16} tone="amber" />}
       </div>
+      {tab === "tasks" && <TasksTab variants={variants} loading={loading} />}
       {tab === "activities" && <ActivitiesTab analytics={analytics} loading={loading} />}
       {tab === "heat" && <HeatTab analytics={analytics} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} loading={loading} />}
       {tab === "variants" && <VariantsTab variants={variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
       {tab === "cases" && <CasesTab analytics={analytics} variants={variants} bpmn={bpmn} hasBpmn={!!run.discoveredBpmnId} />}
       {tab === "outcomes" && <OutcomesTab analytics={analytics} variants={variants} kpiConfig={kpiConfig} onSave={saveKpi} />}
       {tab === "export" && <ExportTab projectId={projectId} runId={run.id} hasAnalytics={!!analytics && analytics.activities.length > 0} />}
+    </div>
+  );
+}
+
+// ── Automation tab (Task Mining: opportunities + rework + RPA spec) ──────────
+
+const verdictColor = (v: "high" | "medium" | "low") => (v === "high" ? "#86efac" : v === "medium" ? "#fcd34d" : "#94a3b8");
+
+function TasksTab({ variants, loading }: { variants: Variant[]; loading: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const opps = useMemo(() => automationOpportunities(variants), [variants]);
+  const score = useMemo(() => taskAutomationScore(variants), [variants]);
+  const rework = useMemo(() => detectReworkActivities(variants), [variants]);
+  const bounces = useMemo(() => pingPongFromVariants(variants), [variants]);
+  const spec = useMemo(() => buildAutomationSpec(variants, "this task"), [variants]);
+
+  if (loading && variants.length === 0) return <p className="text-[11px] text-stone-500">Loading routine…</p>;
+  if (variants.length === 0) return <p className="text-[11px] text-stone-400">No routine variants to analyse.</p>;
+
+  const copySpec = () => { navigator.clipboard?.writeText(spec).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); };
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([spec], { type: "text/markdown" }));
+    const a = document.createElement("a"); a.href = url; a.download = "automation-spec.md"; a.click(); URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {/* Headline score + rework */}
+      <div>
+        <div className="text-xs font-semibold text-amber-200 mb-1">Automation opportunity</div>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="text-3xl tabular-nums" style={{ color: verdictColor(score.verdict) }}>{(score.score * 100).toFixed(0)}%</div>
+          <div className="text-[11px]">
+            <div className="uppercase tracking-wide font-semibold" style={{ color: verdictColor(score.verdict) }}>{score.verdict} potential</div>
+            <div className="text-stone-400">{bounces} app ping-pong bounce{bounces === 1 ? "" : "s"} (Excel ↔ web form, etc.)</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 mb-3">
+          <button onClick={copySpec} className="text-[11px] rounded px-2.5 py-1 bg-amber-700 hover:bg-amber-600 text-white">{copied ? "Copied ✓" : "Copy RPA spec"}</button>
+          <button onClick={download} className="text-[11px] rounded px-2.5 py-1 bg-stone-800 text-amber-200 hover:bg-stone-700">Download .md</button>
+        </div>
+        <div className="text-xs font-semibold text-amber-200 mb-1">Rework — repeated work steps</div>
+        {rework.length ? (
+          <table className="w-full text-[11px]"><tbody>
+            {rework.map((r) => (
+              <tr key={r.activity} className="border-b border-stone-800">
+                <td className="py-1 pr-2 text-stone-200">{r.activity}</td>
+                <td className="py-1 text-right text-rose-300 tabular-nums whitespace-nowrap">redone in {r.cases} case{r.cases === 1 ? "" : "s"}</td>
+              </tr>
+            ))}
+          </tbody></table>
+        ) : <p className="text-[11px] text-stone-400">No repeated steps — no rework detected.</p>}
+      </div>
+
+      {/* Candidate routines (RPA recipe) */}
+      <div>
+        <div className="text-xs font-semibold text-amber-200 mb-1">Candidate routines</div>
+        <div className="max-h-[48vh] overflow-auto pr-1 space-y-2">
+          {opps.map((o, i) => (
+            <div key={o.variantIndex} className="rounded border border-stone-700 p-2">
+              <div className="flex items-center gap-2 text-[11px] mb-1">
+                <span className="text-stone-400">#{i + 1}</span>
+                <span className="tabular-nums font-semibold" style={{ color: verdictColor(o.verdict) }}>{(o.score * 100).toFixed(0)}% {o.verdict}</span>
+                <span className="text-stone-300 tabular-nums">{o.cases} case{o.cases === 1 ? "" : "s"} · {(o.share * 100).toFixed(0)}%</span>
+              </div>
+              <div className="text-[10px] text-stone-500 mb-1">{o.reason}</div>
+              {i === 0 && (
+                <ol className="text-[10px] text-stone-300 list-decimal ml-4 space-y-0.5">
+                  {o.steps.map((s, si) => <li key={si}>{s}</li>)}
+                </ol>
+              )}
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-stone-500 mt-1">The #1 routine is the strongest RPA candidate — its steps are the recipe. “Copy RPA spec” exports it.</p>
+      </div>
     </div>
   );
 }
