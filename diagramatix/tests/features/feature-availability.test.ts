@@ -18,7 +18,7 @@ describe("feature availability registry + seed", () => {
   it("T2264 — registry keys are unique and every feature has a label + category", () => {
     expect(new Set(FEATURE_KEYS).size).toBe(FEATURE_KEYS.length);
     for (const f of FEATURES) { expect(f.key).toBeTruthy(); expect(f.label).toBeTruthy(); expect(f.category).toBeTruthy(); }
-    expect(FEATURES.length).toBe(33);
+    expect(FEATURES.length).toBe(34);
   });
 
   it("T2265 — the seed covers every registry key × 5 levels (incl. enterprise) with valid states", () => {

@@ -2516,7 +2516,16 @@
                 "medianDurMs": 193500000,
                 "p90DurMs": 317327999.99999994,
                 "totalTimeMs": 27886320000,
-                "dominantResource": "Ben Okoro"
+                "dominantResource": "Ben Okoro",
+                "resources": [
+                  "Alice Chen",
+                  "Ben Okoro",
+                  "Carla Reyes",
+                  "David Singh"
+                ],
+                "states": [
+                  "Ready to Pay"
+                ]
               },
               {
                 "activity": "Begin Review",
@@ -2525,7 +2534,16 @@
                 "medianDurMs": 65250000,
                 "p90DurMs": 129030000,
                 "totalTimeMs": 13366440000,
-                "dominantResource": "Alice Chen"
+                "dominantResource": "Alice Chen",
+                "resources": [
+                  "Alice Chen",
+                  "Ben Okoro",
+                  "Carla Reyes",
+                  "David Singh"
+                ],
+                "states": [
+                  "In Progress"
+                ]
               },
               {
                 "activity": "Receive Invoice",
@@ -2534,7 +2552,16 @@
                 "medianDurMs": 61170000,
                 "p90DurMs": 104118000,
                 "totalTimeMs": 11960580000,
-                "dominantResource": "Alice Chen"
+                "dominantResource": "Alice Chen",
+                "resources": [
+                  "Alice Chen",
+                  "Ben Okoro",
+                  "Carla Reyes",
+                  "David Singh"
+                ],
+                "states": [
+                  "Received"
+                ]
               },
               {
                 "activity": "Place On Hold",
@@ -2543,7 +2570,16 @@
                 "medianDurMs": 132600000,
                 "p90DurMs": 211224000,
                 "totalTimeMs": 7495920000,
-                "dominantResource": "Alice Chen"
+                "dominantResource": "Alice Chen",
+                "resources": [
+                  "Alice Chen",
+                  "Ben Okoro",
+                  "Carla Reyes",
+                  "David Singh"
+                ],
+                "states": [
+                  "On Hold"
+                ]
               },
               {
                 "activity": "Approve Invoice",
@@ -2552,7 +2588,14 @@
                 "medianDurMs": 27780000,
                 "p90DurMs": 43362000.000000015,
                 "totalTimeMs": 4090800000,
-                "dominantResource": "Frank Muller"
+                "dominantResource": "Frank Muller",
+                "resources": [
+                  "Emma Watts",
+                  "Frank Muller"
+                ],
+                "states": [
+                  "Approved"
+                ]
               },
               {
                 "activity": "Resume Review",
@@ -2561,7 +2604,16 @@
                 "medianDurMs": 66120000,
                 "p90DurMs": 125052000.00000003,
                 "totalTimeMs": 2690640000,
-                "dominantResource": "Carla Reyes"
+                "dominantResource": "Carla Reyes",
+                "resources": [
+                  "Alice Chen",
+                  "Ben Okoro",
+                  "Carla Reyes",
+                  "David Singh"
+                ],
+                "states": [
+                  "In Progress"
+                ]
               },
               {
                 "activity": "Pay Invoice",
@@ -2570,7 +2622,13 @@
                 "medianDurMs": 0,
                 "p90DurMs": 0,
                 "totalTimeMs": 0,
-                "dominantResource": "Payment Run"
+                "dominantResource": "Payment Run",
+                "resources": [
+                  "Payment Run"
+                ],
+                "states": [
+                  "Paid"
+                ]
               },
               {
                 "activity": "Cancel Invoice",
@@ -2579,7 +2637,16 @@
                 "medianDurMs": 0,
                 "p90DurMs": 0,
                 "totalTimeMs": 0,
-                "dominantResource": "Alice Chen"
+                "dominantResource": "Alice Chen",
+                "resources": [
+                  "Alice Chen",
+                  "Ben Okoro",
+                  "Carla Reyes",
+                  "David Singh"
+                ],
+                "states": [
+                  "Cancelled"
+                ]
               }
             ],
             "edges": [
@@ -40701,7 +40768,13 @@
                 "medianDurMs": 436230000,
                 "p90DurMs": 793554000,
                 "totalTimeMs": 60069840000,
-                "dominantResource": "Billing System"
+                "dominantResource": "Billing System",
+                "resources": [
+                  "Billing System"
+                ],
+                "states": [
+                  "Invoiced"
+                ]
               },
               {
                 "activity": "Approve Order",
@@ -40710,7 +40783,13 @@
                 "medianDurMs": 93840000,
                 "p90DurMs": 152148000,
                 "totalTimeMs": 11585280000,
-                "dominantResource": "Order Desk"
+                "dominantResource": "Order Desk",
+                "resources": [
+                  "Order Desk"
+                ],
+                "states": [
+                  "Approved"
+                ]
               },
               {
                 "activity": "Fulfil Order",
@@ -40719,7 +40798,13 @@
                 "medianDurMs": 43440000,
                 "p90DurMs": 76200000,
                 "totalTimeMs": 6525840000,
-                "dominantResource": "Fulfilment Centre"
+                "dominantResource": "Fulfilment Centre",
+                "resources": [
+                  "Fulfilment Centre"
+                ],
+                "states": [
+                  "Fulfilled"
+                ]
               },
               {
                 "activity": "Run Credit Check",
@@ -40728,7 +40813,13 @@
                 "medianDurMs": 27600000,
                 "p90DurMs": 45276000,
                 "totalTimeMs": 5018520000,
-                "dominantResource": "Credit Desk"
+                "dominantResource": "Credit Desk",
+                "resources": [
+                  "Credit Desk"
+                ],
+                "states": [
+                  "Credit Check"
+                ]
               },
               {
                 "activity": "Receive Order",
@@ -40737,7 +40828,16 @@
                 "medianDurMs": 18480000,
                 "p90DurMs": 29472000,
                 "totalTimeMs": 3989760000,
-                "dominantResource": "Luis Ortega"
+                "dominantResource": "Luis Ortega",
+                "resources": [
+                  "Luis Ortega",
+                  "Nadia Rahman",
+                  "Priya Nair",
+                  "Tom Becker"
+                ],
+                "states": [
+                  "Received"
+                ]
               },
               {
                 "activity": "Place On Credit Hold",
@@ -40746,7 +40846,13 @@
                 "medianDurMs": 74460000,
                 "p90DurMs": 156912000,
                 "totalTimeMs": 3903660000,
-                "dominantResource": "Credit Desk"
+                "dominantResource": "Credit Desk",
+                "resources": [
+                  "Credit Desk"
+                ],
+                "states": [
+                  "On Credit Hold"
+                ]
               },
               {
                 "activity": "Release Credit Hold",
@@ -40755,7 +40861,13 @@
                 "medianDurMs": 73920000,
                 "p90DurMs": 153168000,
                 "totalTimeMs": 2348340000,
-                "dominantResource": "Credit Desk"
+                "dominantResource": "Credit Desk",
+                "resources": [
+                  "Credit Desk"
+                ],
+                "states": [
+                  "Approved"
+                ]
               },
               {
                 "activity": "Resolve Dispute",
@@ -40764,7 +40876,13 @@
                 "medianDurMs": 348150000,
                 "p90DurMs": 647292000,
                 "totalTimeMs": 1681320000,
-                "dominantResource": "Billing System"
+                "dominantResource": "Billing System",
+                "resources": [
+                  "Billing System"
+                ],
+                "states": [
+                  "Invoiced"
+                ]
               },
               {
                 "activity": "Raise Dispute",
@@ -40773,7 +40891,16 @@
                 "medianDurMs": 184140000,
                 "p90DurMs": 359928000,
                 "totalTimeMs": 1072380000,
-                "dominantResource": "Luis Ortega"
+                "dominantResource": "Luis Ortega",
+                "resources": [
+                  "Luis Ortega",
+                  "Nadia Rahman",
+                  "Priya Nair",
+                  "Tom Becker"
+                ],
+                "states": [
+                  "Disputed"
+                ]
               },
               {
                 "activity": "Ship Goods",
@@ -40782,7 +40909,13 @@
                 "medianDurMs": 65760000,
                 "p90DurMs": 87882000,
                 "totalTimeMs": 756300000,
-                "dominantResource": "Fulfilment Centre"
+                "dominantResource": "Fulfilment Centre",
+                "resources": [
+                  "Fulfilment Centre"
+                ],
+                "states": [
+                  "Fulfilled"
+                ]
               },
               {
                 "activity": "Receive Payment",
@@ -40791,7 +40924,13 @@
                 "medianDurMs": 0,
                 "p90DurMs": 0,
                 "totalTimeMs": 0,
-                "dominantResource": "Billing System"
+                "dominantResource": "Billing System",
+                "resources": [
+                  "Billing System"
+                ],
+                "states": [
+                  "Paid"
+                ]
               },
               {
                 "activity": "Cancel Order",
@@ -40800,7 +40939,16 @@
                 "medianDurMs": 0,
                 "p90DurMs": 0,
                 "totalTimeMs": 0,
-                "dominantResource": "Priya Nair"
+                "dominantResource": "Priya Nair",
+                "resources": [
+                  "Luis Ortega",
+                  "Nadia Rahman",
+                  "Priya Nair",
+                  "Tom Becker"
+                ],
+                "states": [
+                  "Cancelled"
+                ]
               }
             ],
             "edges": [
@@ -54657,7 +54805,17 @@
                 "medianDurMs": 40320000,
                 "p90DurMs": 75996000,
                 "totalTimeMs": 6926340000,
-                "dominantResource": "Ingrid Nilsen"
+                "dominantResource": "Ingrid Nilsen",
+                "resources": [
+                  "Grace Lee",
+                  "Ingrid Nilsen",
+                  "Mo Farah",
+                  "Ravi Patel",
+                  "Sam Cole"
+                ],
+                "states": [
+                  "Investigating"
+                ]
               },
               {
                 "activity": "Close",
@@ -54666,7 +54824,17 @@
                 "medianDurMs": 193200000,
                 "p90DurMs": 293424000,
                 "totalTimeMs": 3263880000,
-                "dominantResource": "Ingrid Nilsen"
+                "dominantResource": "Ingrid Nilsen",
+                "resources": [
+                  "Grace Lee",
+                  "Ingrid Nilsen",
+                  "Mo Farah",
+                  "Ravi Patel",
+                  "Sam Cole"
+                ],
+                "states": [
+                  "Closed"
+                ]
               },
               {
                 "activity": "Resolve",
@@ -54675,7 +54843,17 @@
                 "medianDurMs": 17100000,
                 "p90DurMs": 29820000,
                 "totalTimeMs": 3056760000,
-                "dominantResource": "Ingrid Nilsen"
+                "dominantResource": "Ingrid Nilsen",
+                "resources": [
+                  "Grace Lee",
+                  "Ingrid Nilsen",
+                  "Mo Farah",
+                  "Ravi Patel",
+                  "Sam Cole"
+                ],
+                "states": [
+                  "Resolved"
+                ]
               },
               {
                 "activity": "Escalate",
@@ -54684,7 +54862,17 @@
                 "medianDurMs": 69060000,
                 "p90DurMs": 159912000,
                 "totalTimeMs": 2719800000,
-                "dominantResource": "Ingrid Nilsen"
+                "dominantResource": "Ingrid Nilsen",
+                "resources": [
+                  "Grace Lee",
+                  "Ingrid Nilsen",
+                  "Mo Farah",
+                  "Ravi Patel",
+                  "Sam Cole"
+                ],
+                "states": [
+                  "Escalated"
+                ]
               },
               {
                 "activity": "Assign",
@@ -54693,7 +54881,17 @@
                 "medianDurMs": 18060000,
                 "p90DurMs": 28740000,
                 "totalTimeMs": 2623440000,
-                "dominantResource": "Ingrid Nilsen"
+                "dominantResource": "Ingrid Nilsen",
+                "resources": [
+                  "Grace Lee",
+                  "Ingrid Nilsen",
+                  "Mo Farah",
+                  "Ravi Patel",
+                  "Sam Cole"
+                ],
+                "states": [
+                  "Assigned"
+                ]
               },
               {
                 "activity": "Triage",
@@ -54702,7 +54900,17 @@
                 "medianDurMs": 8670000,
                 "p90DurMs": 17574000.000000004,
                 "totalTimeMs": 1716360000,
-                "dominantResource": "Ingrid Nilsen"
+                "dominantResource": "Ingrid Nilsen",
+                "resources": [
+                  "Grace Lee",
+                  "Ingrid Nilsen",
+                  "Mo Farah",
+                  "Ravi Patel",
+                  "Sam Cole"
+                ],
+                "states": [
+                  "Triaged"
+                ]
               },
               {
                 "activity": "Log Ticket",
@@ -54711,7 +54919,17 @@
                 "medianDurMs": 5190000,
                 "p90DurMs": 9876000.000000002,
                 "totalTimeMs": 923820000,
-                "dominantResource": "Ingrid Nilsen"
+                "dominantResource": "Ingrid Nilsen",
+                "resources": [
+                  "Grace Lee",
+                  "Ingrid Nilsen",
+                  "Mo Farah",
+                  "Ravi Patel",
+                  "Sam Cole"
+                ],
+                "states": [
+                  "Logged"
+                ]
               },
               {
                 "activity": "Reopen",
@@ -54720,7 +54938,17 @@
                 "medianDurMs": 19440000,
                 "p90DurMs": 31020000,
                 "totalTimeMs": 317640000,
-                "dominantResource": "Ingrid Nilsen"
+                "dominantResource": "Ingrid Nilsen",
+                "resources": [
+                  "Grace Lee",
+                  "Ingrid Nilsen",
+                  "Mo Farah",
+                  "Ravi Patel",
+                  "Sam Cole"
+                ],
+                "states": [
+                  "Investigating"
+                ]
               }
             ],
             "edges": [
@@ -90795,6 +91023,1744 @@
             "note": "Current — best adherence. Nearly every ticket follows Logged → Triaged → Assigned → Investigating → Resolved → Closed; fastest handling."
           }
         ]
+      }
+    },
+    {
+      "slug": "task-mining-enter-invoice",
+      "title": "Task Mining — Enter Invoice",
+      "concept": "Mine the UI steps inside one task to expose rework, app ping-pong and automation potential.",
+      "description": "**Task Mining** looks *inside* a single process task at the UI steps a person actually performs. This example is **Enter Invoice** — the clerk copies the Vendor and Amount from an Excel sheet into an Accounts-Payable web form, validates, and submits.  Import the log and you'll see the **task routine map**: the happy path, plus a **rework loop** where a failed validation sends the clerk back to Excel to re-copy the Amount (classic **ping-pong** between two apps). The heavy copy/paste + app-switching makes this a strong **RPA automation candidate** — exactly what Task Mining is for.",
+      "difficulty": "advanced",
+      "package": {
+        "version": 1,
+        "diagrams": [],
+        "run": {
+          "name": "Enter Invoice — task routine",
+          "mapping": {
+            "caseId": "taskCaseId",
+            "activity": "activity",
+            "timestamp": "timestamp",
+            "resource": "actor",
+            "entityType": "object"
+          },
+          "stats": {
+            "cases": 10,
+            "events": 115,
+            "activities": [
+              "Chrome: Paste Amount",
+              "Chrome: Paste Vendor",
+              "Chrome: Submit",
+              "Chrome: Validate",
+              "Excel: Copy Amount",
+              "Excel: Copy Vendor",
+              "Open Excel",
+              "Switch to Chrome",
+              "Switch to Excel"
+            ],
+            "states": [
+              "Chrome:ed Paste Amount",
+              "Chrome:ed Paste Vendor",
+              "Chrome:ed Submit",
+              "Chrome:ed Validate",
+              "Excel:ed Copy Amount",
+              "Excel:ed Copy Vendor",
+              "Opened Excel",
+              "Switched to Chrome",
+              "Switched to Excel"
+            ],
+            "variants": 2,
+            "from": 1772442000000,
+            "to": 1772448017000
+          },
+          "variants": [
+            {
+              "states": [
+                "Opened Excel",
+                "Excel:ed Copy Vendor",
+                "Switched to Chrome",
+                "Chrome:ed Paste Vendor",
+                "Switched to Excel",
+                "Excel:ed Copy Amount",
+                "Switched to Chrome",
+                "Chrome:ed Paste Amount",
+                "Chrome:ed Validate",
+                "Chrome:ed Submit"
+              ],
+              "events": [
+                "Open Excel",
+                "Excel: Copy Vendor",
+                "Switch to Chrome",
+                "Chrome: Paste Vendor",
+                "Switch to Excel",
+                "Excel: Copy Amount",
+                "Switch to Chrome",
+                "Chrome: Paste Amount",
+                "Chrome: Validate",
+                "Chrome: Submit"
+              ],
+              "count": 7
+            },
+            {
+              "states": [
+                "Opened Excel",
+                "Excel:ed Copy Vendor",
+                "Switched to Chrome",
+                "Chrome:ed Paste Vendor",
+                "Switched to Excel",
+                "Excel:ed Copy Amount",
+                "Switched to Chrome",
+                "Chrome:ed Paste Amount",
+                "Chrome:ed Validate",
+                "Switched to Excel",
+                "Excel:ed Copy Amount",
+                "Switched to Chrome",
+                "Chrome:ed Paste Amount",
+                "Chrome:ed Validate",
+                "Chrome:ed Submit"
+              ],
+              "events": [
+                "Open Excel",
+                "Excel: Copy Vendor",
+                "Switch to Chrome",
+                "Chrome: Paste Vendor",
+                "Switch to Excel",
+                "Excel: Copy Amount",
+                "Switch to Chrome",
+                "Chrome: Paste Amount",
+                "Chrome: Validate",
+                "Switch to Excel",
+                "Excel: Copy Amount",
+                "Switch to Chrome",
+                "Chrome: Paste Amount",
+                "Chrome: Validate",
+                "Chrome: Submit"
+              ],
+              "count": 3
+            }
+          ],
+          "performance": {
+            "clockUnit": "second",
+            "activityDurations": {
+              "Open Excel": [
+                8,
+                8,
+                8,
+                8,
+                8,
+                8,
+                8,
+                8,
+                8,
+                8
+              ],
+              "Excel: Copy Vendor": [
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4
+              ],
+              "Switch to Chrome": [
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                5,
+                4,
+                4,
+                5,
+                4,
+                4,
+                5
+              ],
+              "Chrome: Paste Vendor": [
+                6,
+                6,
+                6,
+                6,
+                6,
+                6,
+                6,
+                6,
+                6,
+                6
+              ],
+              "Switch to Excel": [
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                6,
+                5,
+                6,
+                5,
+                6
+              ],
+              "Excel: Copy Amount": [
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4
+              ],
+              "Chrome: Paste Amount": [
+                6,
+                6,
+                6,
+                6,
+                6,
+                6,
+                6,
+                6,
+                7,
+                6,
+                7,
+                6,
+                7
+              ],
+              "Chrome: Validate": [
+                6,
+                6,
+                6,
+                6,
+                6,
+                6,
+                6,
+                8,
+                6,
+                8,
+                6,
+                8,
+                6
+              ]
+            },
+            "interArrival": [
+              660,
+              660,
+              660,
+              660,
+              660,
+              660,
+              660,
+              660,
+              660
+            ],
+            "activityResource": {
+              "Open Excel": "Priya",
+              "Excel: Copy Vendor": "Priya",
+              "Switch to Chrome": "Priya",
+              "Chrome: Paste Vendor": "Priya",
+              "Switch to Excel": "Priya",
+              "Excel: Copy Amount": "Priya",
+              "Chrome: Paste Amount": "Priya",
+              "Chrome: Validate": "Priya",
+              "Chrome: Submit": "Priya"
+            },
+            "resourceConcurrency": {
+              "Priya": 1,
+              "Sam": 1,
+              "Lee": 1
+            },
+            "activeHours": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              60,
+              55,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "analytics": {
+            "clockUnit": "second",
+            "activities": [
+              {
+                "activity": "Switch to Chrome",
+                "caseFreq": 10,
+                "eventFreq": 23,
+                "medianDurMs": 4000,
+                "p90DurMs": 4800.000000000001,
+                "totalTimeMs": 95000,
+                "dominantResource": "Priya",
+                "resources": [
+                  "Lee",
+                  "Priya",
+                  "Sam"
+                ],
+                "states": [
+                  "Switched to Chrome"
+                ]
+              },
+              {
+                "activity": "Chrome: Validate",
+                "caseFreq": 10,
+                "eventFreq": 13,
+                "medianDurMs": 6000,
+                "p90DurMs": 8000,
+                "totalTimeMs": 84000,
+                "dominantResource": "Priya",
+                "resources": [
+                  "Lee",
+                  "Priya",
+                  "Sam"
+                ],
+                "states": [
+                  "Chrome:ed Validate"
+                ]
+              },
+              {
+                "activity": "Chrome: Paste Amount",
+                "caseFreq": 10,
+                "eventFreq": 13,
+                "medianDurMs": 6000,
+                "p90DurMs": 7000,
+                "totalTimeMs": 81000,
+                "dominantResource": "Priya",
+                "resources": [
+                  "Lee",
+                  "Priya",
+                  "Sam"
+                ],
+                "states": [
+                  "Chrome:ed Paste Amount"
+                ]
+              },
+              {
+                "activity": "Open Excel",
+                "caseFreq": 10,
+                "eventFreq": 10,
+                "medianDurMs": 8000,
+                "p90DurMs": 8000,
+                "totalTimeMs": 80000,
+                "dominantResource": "Priya",
+                "resources": [
+                  "Lee",
+                  "Priya",
+                  "Sam"
+                ],
+                "states": [
+                  "Opened Excel"
+                ]
+              },
+              {
+                "activity": "Switch to Excel",
+                "caseFreq": 10,
+                "eventFreq": 13,
+                "medianDurMs": 5000,
+                "p90DurMs": 6000,
+                "totalTimeMs": 68000,
+                "dominantResource": "Priya",
+                "resources": [
+                  "Lee",
+                  "Priya",
+                  "Sam"
+                ],
+                "states": [
+                  "Switched to Excel"
+                ]
+              },
+              {
+                "activity": "Chrome: Paste Vendor",
+                "caseFreq": 10,
+                "eventFreq": 10,
+                "medianDurMs": 6000,
+                "p90DurMs": 6000,
+                "totalTimeMs": 60000,
+                "dominantResource": "Priya",
+                "resources": [
+                  "Lee",
+                  "Priya",
+                  "Sam"
+                ],
+                "states": [
+                  "Chrome:ed Paste Vendor"
+                ]
+              },
+              {
+                "activity": "Excel: Copy Amount",
+                "caseFreq": 10,
+                "eventFreq": 13,
+                "medianDurMs": 4000,
+                "p90DurMs": 4000,
+                "totalTimeMs": 52000,
+                "dominantResource": "Priya",
+                "resources": [
+                  "Lee",
+                  "Priya",
+                  "Sam"
+                ],
+                "states": [
+                  "Excel:ed Copy Amount"
+                ]
+              },
+              {
+                "activity": "Excel: Copy Vendor",
+                "caseFreq": 10,
+                "eventFreq": 10,
+                "medianDurMs": 4000,
+                "p90DurMs": 4000,
+                "totalTimeMs": 40000,
+                "dominantResource": "Priya",
+                "resources": [
+                  "Lee",
+                  "Priya",
+                  "Sam"
+                ],
+                "states": [
+                  "Excel:ed Copy Vendor"
+                ]
+              },
+              {
+                "activity": "Chrome: Submit",
+                "caseFreq": 10,
+                "eventFreq": 10,
+                "medianDurMs": 0,
+                "p90DurMs": 0,
+                "totalTimeMs": 0,
+                "dominantResource": "Priya",
+                "resources": [
+                  "Lee",
+                  "Priya",
+                  "Sam"
+                ],
+                "states": [
+                  "Chrome:ed Submit"
+                ]
+              }
+            ],
+            "edges": [
+              {
+                "from": "Switch to Excel",
+                "to": "Excel: Copy Amount",
+                "freq": 13,
+                "medianMs": 5000
+              },
+              {
+                "from": "Excel: Copy Amount",
+                "to": "Switch to Chrome",
+                "freq": 13,
+                "medianMs": 4000
+              },
+              {
+                "from": "Switch to Chrome",
+                "to": "Chrome: Paste Amount",
+                "freq": 13,
+                "medianMs": 4000
+              },
+              {
+                "from": "Chrome: Paste Amount",
+                "to": "Chrome: Validate",
+                "freq": 13,
+                "medianMs": 6000
+              },
+              {
+                "from": "Open Excel",
+                "to": "Excel: Copy Vendor",
+                "freq": 10,
+                "medianMs": 8000
+              },
+              {
+                "from": "Excel: Copy Vendor",
+                "to": "Switch to Chrome",
+                "freq": 10,
+                "medianMs": 4000
+              },
+              {
+                "from": "Switch to Chrome",
+                "to": "Chrome: Paste Vendor",
+                "freq": 10,
+                "medianMs": 4000
+              },
+              {
+                "from": "Chrome: Paste Vendor",
+                "to": "Switch to Excel",
+                "freq": 10,
+                "medianMs": 6000
+              },
+              {
+                "from": "Chrome: Validate",
+                "to": "Chrome: Submit",
+                "freq": 10,
+                "medianMs": 6000
+              },
+              {
+                "from": "Chrome: Validate",
+                "to": "Switch to Excel",
+                "freq": 3,
+                "medianMs": 8000
+              }
+            ],
+            "throughput": [
+              {
+                "t": 1772442100283.3333,
+                "started": 1,
+                "completed": 1
+              },
+              {
+                "t": 1772442300850,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772442501416.6667,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772442701983.3333,
+                "started": 1,
+                "completed": 1
+              },
+              {
+                "t": 1772442902550,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772443103116.6667,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772443303683.3333,
+                "started": 1,
+                "completed": 1
+              },
+              {
+                "t": 1772443504250,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772443704816.6667,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772443905383.3333,
+                "started": 1,
+                "completed": 0
+              },
+              {
+                "t": 1772444105950,
+                "started": 0,
+                "completed": 1
+              },
+              {
+                "t": 1772444306516.6667,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772444507083.3333,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772444707650,
+                "started": 1,
+                "completed": 1
+              },
+              {
+                "t": 1772444908216.6667,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772445108783.3333,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772445309350,
+                "started": 1,
+                "completed": 1
+              },
+              {
+                "t": 1772445509916.6667,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772445710483.3333,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772445911050,
+                "started": 1,
+                "completed": 1
+              },
+              {
+                "t": 1772446111616.6667,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772446312183.3333,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772446512750,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772446713316.6667,
+                "started": 1,
+                "completed": 1
+              },
+              {
+                "t": 1772446913883.3333,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772447114450,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772447315016.6667,
+                "started": 1,
+                "completed": 1
+              },
+              {
+                "t": 1772447515583.3333,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772447716150,
+                "started": 0,
+                "completed": 0
+              },
+              {
+                "t": 1772447916716.6667,
+                "started": 1,
+                "completed": 1
+              }
+            ],
+            "cases": [
+              {
+                "idx": 0,
+                "caseId": "INV-1042",
+                "variantIdx": 0,
+                "startMs": 1772442000000,
+                "endMs": 1772442047000,
+                "cycleMs": 47000,
+                "events": 10
+              },
+              {
+                "idx": 1,
+                "caseId": "INV-1043",
+                "variantIdx": 0,
+                "startMs": 1772442660000,
+                "endMs": 1772442707000,
+                "cycleMs": 47000,
+                "events": 10
+              },
+              {
+                "idx": 2,
+                "caseId": "INV-1044",
+                "variantIdx": 0,
+                "startMs": 1772443320000,
+                "endMs": 1772443367000,
+                "cycleMs": 47000,
+                "events": 10
+              },
+              {
+                "idx": 3,
+                "caseId": "INV-1045",
+                "variantIdx": 0,
+                "startMs": 1772443980000,
+                "endMs": 1772444027000,
+                "cycleMs": 47000,
+                "events": 10
+              },
+              {
+                "idx": 4,
+                "caseId": "INV-1046",
+                "variantIdx": 0,
+                "startMs": 1772444640000,
+                "endMs": 1772444687000,
+                "cycleMs": 47000,
+                "events": 10
+              },
+              {
+                "idx": 5,
+                "caseId": "INV-1047",
+                "variantIdx": 0,
+                "startMs": 1772445300000,
+                "endMs": 1772445347000,
+                "cycleMs": 47000,
+                "events": 10
+              },
+              {
+                "idx": 6,
+                "caseId": "INV-1048",
+                "variantIdx": 0,
+                "startMs": 1772445960000,
+                "endMs": 1772446007000,
+                "cycleMs": 47000,
+                "events": 10
+              },
+              {
+                "idx": 7,
+                "caseId": "INV-1049",
+                "variantIdx": 1,
+                "startMs": 1772446620000,
+                "endMs": 1772446697000,
+                "cycleMs": 77000,
+                "events": 15
+              },
+              {
+                "idx": 8,
+                "caseId": "INV-1050",
+                "variantIdx": 1,
+                "startMs": 1772447280000,
+                "endMs": 1772447357000,
+                "cycleMs": 77000,
+                "events": 15
+              },
+              {
+                "idx": 9,
+                "caseId": "INV-1051",
+                "variantIdx": 1,
+                "startMs": 1772447940000,
+                "endMs": 1772448017000,
+                "cycleMs": 77000,
+                "events": 15
+              }
+            ],
+            "totalCases": 10,
+            "capped": false,
+            "cycle": {
+              "medianMs": 47000,
+              "p90Ms": 77000,
+              "minMs": 47000,
+              "maxMs": 77000
+            }
+          }
+        },
+        "sampleLog": {
+          "fileName": "enter-invoice-task-log.csv",
+          "runName": "Enter Invoice — task routine",
+          "headers": [
+            "taskCaseId",
+            "activity",
+            "timestamp",
+            "actor",
+            "object"
+          ],
+          "rows": [
+            [
+              "INV-1042",
+              "Open Excel",
+              "2026-03-02T09:00:00.000Z",
+              "Priya",
+              "INV-1042"
+            ],
+            [
+              "INV-1042",
+              "Excel: Copy Vendor",
+              "2026-03-02T09:00:08.000Z",
+              "Priya",
+              "INV-1042"
+            ],
+            [
+              "INV-1042",
+              "Switch to Chrome",
+              "2026-03-02T09:00:12.000Z",
+              "Priya",
+              "INV-1042"
+            ],
+            [
+              "INV-1042",
+              "Chrome: Paste Vendor",
+              "2026-03-02T09:00:16.000Z",
+              "Priya",
+              "INV-1042"
+            ],
+            [
+              "INV-1042",
+              "Switch to Excel",
+              "2026-03-02T09:00:22.000Z",
+              "Priya",
+              "INV-1042"
+            ],
+            [
+              "INV-1042",
+              "Excel: Copy Amount",
+              "2026-03-02T09:00:27.000Z",
+              "Priya",
+              "INV-1042"
+            ],
+            [
+              "INV-1042",
+              "Switch to Chrome",
+              "2026-03-02T09:00:31.000Z",
+              "Priya",
+              "INV-1042"
+            ],
+            [
+              "INV-1042",
+              "Chrome: Paste Amount",
+              "2026-03-02T09:00:35.000Z",
+              "Priya",
+              "INV-1042"
+            ],
+            [
+              "INV-1042",
+              "Chrome: Validate",
+              "2026-03-02T09:00:41.000Z",
+              "Priya",
+              "INV-1042"
+            ],
+            [
+              "INV-1042",
+              "Chrome: Submit",
+              "2026-03-02T09:00:47.000Z",
+              "Priya",
+              "INV-1042"
+            ],
+            [
+              "INV-1043",
+              "Open Excel",
+              "2026-03-02T09:11:00.000Z",
+              "Sam",
+              "INV-1043"
+            ],
+            [
+              "INV-1043",
+              "Excel: Copy Vendor",
+              "2026-03-02T09:11:08.000Z",
+              "Sam",
+              "INV-1043"
+            ],
+            [
+              "INV-1043",
+              "Switch to Chrome",
+              "2026-03-02T09:11:12.000Z",
+              "Sam",
+              "INV-1043"
+            ],
+            [
+              "INV-1043",
+              "Chrome: Paste Vendor",
+              "2026-03-02T09:11:16.000Z",
+              "Sam",
+              "INV-1043"
+            ],
+            [
+              "INV-1043",
+              "Switch to Excel",
+              "2026-03-02T09:11:22.000Z",
+              "Sam",
+              "INV-1043"
+            ],
+            [
+              "INV-1043",
+              "Excel: Copy Amount",
+              "2026-03-02T09:11:27.000Z",
+              "Sam",
+              "INV-1043"
+            ],
+            [
+              "INV-1043",
+              "Switch to Chrome",
+              "2026-03-02T09:11:31.000Z",
+              "Sam",
+              "INV-1043"
+            ],
+            [
+              "INV-1043",
+              "Chrome: Paste Amount",
+              "2026-03-02T09:11:35.000Z",
+              "Sam",
+              "INV-1043"
+            ],
+            [
+              "INV-1043",
+              "Chrome: Validate",
+              "2026-03-02T09:11:41.000Z",
+              "Sam",
+              "INV-1043"
+            ],
+            [
+              "INV-1043",
+              "Chrome: Submit",
+              "2026-03-02T09:11:47.000Z",
+              "Sam",
+              "INV-1043"
+            ],
+            [
+              "INV-1044",
+              "Open Excel",
+              "2026-03-02T09:22:00.000Z",
+              "Lee",
+              "INV-1044"
+            ],
+            [
+              "INV-1044",
+              "Excel: Copy Vendor",
+              "2026-03-02T09:22:08.000Z",
+              "Lee",
+              "INV-1044"
+            ],
+            [
+              "INV-1044",
+              "Switch to Chrome",
+              "2026-03-02T09:22:12.000Z",
+              "Lee",
+              "INV-1044"
+            ],
+            [
+              "INV-1044",
+              "Chrome: Paste Vendor",
+              "2026-03-02T09:22:16.000Z",
+              "Lee",
+              "INV-1044"
+            ],
+            [
+              "INV-1044",
+              "Switch to Excel",
+              "2026-03-02T09:22:22.000Z",
+              "Lee",
+              "INV-1044"
+            ],
+            [
+              "INV-1044",
+              "Excel: Copy Amount",
+              "2026-03-02T09:22:27.000Z",
+              "Lee",
+              "INV-1044"
+            ],
+            [
+              "INV-1044",
+              "Switch to Chrome",
+              "2026-03-02T09:22:31.000Z",
+              "Lee",
+              "INV-1044"
+            ],
+            [
+              "INV-1044",
+              "Chrome: Paste Amount",
+              "2026-03-02T09:22:35.000Z",
+              "Lee",
+              "INV-1044"
+            ],
+            [
+              "INV-1044",
+              "Chrome: Validate",
+              "2026-03-02T09:22:41.000Z",
+              "Lee",
+              "INV-1044"
+            ],
+            [
+              "INV-1044",
+              "Chrome: Submit",
+              "2026-03-02T09:22:47.000Z",
+              "Lee",
+              "INV-1044"
+            ],
+            [
+              "INV-1045",
+              "Open Excel",
+              "2026-03-02T09:33:00.000Z",
+              "Priya",
+              "INV-1045"
+            ],
+            [
+              "INV-1045",
+              "Excel: Copy Vendor",
+              "2026-03-02T09:33:08.000Z",
+              "Priya",
+              "INV-1045"
+            ],
+            [
+              "INV-1045",
+              "Switch to Chrome",
+              "2026-03-02T09:33:12.000Z",
+              "Priya",
+              "INV-1045"
+            ],
+            [
+              "INV-1045",
+              "Chrome: Paste Vendor",
+              "2026-03-02T09:33:16.000Z",
+              "Priya",
+              "INV-1045"
+            ],
+            [
+              "INV-1045",
+              "Switch to Excel",
+              "2026-03-02T09:33:22.000Z",
+              "Priya",
+              "INV-1045"
+            ],
+            [
+              "INV-1045",
+              "Excel: Copy Amount",
+              "2026-03-02T09:33:27.000Z",
+              "Priya",
+              "INV-1045"
+            ],
+            [
+              "INV-1045",
+              "Switch to Chrome",
+              "2026-03-02T09:33:31.000Z",
+              "Priya",
+              "INV-1045"
+            ],
+            [
+              "INV-1045",
+              "Chrome: Paste Amount",
+              "2026-03-02T09:33:35.000Z",
+              "Priya",
+              "INV-1045"
+            ],
+            [
+              "INV-1045",
+              "Chrome: Validate",
+              "2026-03-02T09:33:41.000Z",
+              "Priya",
+              "INV-1045"
+            ],
+            [
+              "INV-1045",
+              "Chrome: Submit",
+              "2026-03-02T09:33:47.000Z",
+              "Priya",
+              "INV-1045"
+            ],
+            [
+              "INV-1046",
+              "Open Excel",
+              "2026-03-02T09:44:00.000Z",
+              "Sam",
+              "INV-1046"
+            ],
+            [
+              "INV-1046",
+              "Excel: Copy Vendor",
+              "2026-03-02T09:44:08.000Z",
+              "Sam",
+              "INV-1046"
+            ],
+            [
+              "INV-1046",
+              "Switch to Chrome",
+              "2026-03-02T09:44:12.000Z",
+              "Sam",
+              "INV-1046"
+            ],
+            [
+              "INV-1046",
+              "Chrome: Paste Vendor",
+              "2026-03-02T09:44:16.000Z",
+              "Sam",
+              "INV-1046"
+            ],
+            [
+              "INV-1046",
+              "Switch to Excel",
+              "2026-03-02T09:44:22.000Z",
+              "Sam",
+              "INV-1046"
+            ],
+            [
+              "INV-1046",
+              "Excel: Copy Amount",
+              "2026-03-02T09:44:27.000Z",
+              "Sam",
+              "INV-1046"
+            ],
+            [
+              "INV-1046",
+              "Switch to Chrome",
+              "2026-03-02T09:44:31.000Z",
+              "Sam",
+              "INV-1046"
+            ],
+            [
+              "INV-1046",
+              "Chrome: Paste Amount",
+              "2026-03-02T09:44:35.000Z",
+              "Sam",
+              "INV-1046"
+            ],
+            [
+              "INV-1046",
+              "Chrome: Validate",
+              "2026-03-02T09:44:41.000Z",
+              "Sam",
+              "INV-1046"
+            ],
+            [
+              "INV-1046",
+              "Chrome: Submit",
+              "2026-03-02T09:44:47.000Z",
+              "Sam",
+              "INV-1046"
+            ],
+            [
+              "INV-1047",
+              "Open Excel",
+              "2026-03-02T09:55:00.000Z",
+              "Lee",
+              "INV-1047"
+            ],
+            [
+              "INV-1047",
+              "Excel: Copy Vendor",
+              "2026-03-02T09:55:08.000Z",
+              "Lee",
+              "INV-1047"
+            ],
+            [
+              "INV-1047",
+              "Switch to Chrome",
+              "2026-03-02T09:55:12.000Z",
+              "Lee",
+              "INV-1047"
+            ],
+            [
+              "INV-1047",
+              "Chrome: Paste Vendor",
+              "2026-03-02T09:55:16.000Z",
+              "Lee",
+              "INV-1047"
+            ],
+            [
+              "INV-1047",
+              "Switch to Excel",
+              "2026-03-02T09:55:22.000Z",
+              "Lee",
+              "INV-1047"
+            ],
+            [
+              "INV-1047",
+              "Excel: Copy Amount",
+              "2026-03-02T09:55:27.000Z",
+              "Lee",
+              "INV-1047"
+            ],
+            [
+              "INV-1047",
+              "Switch to Chrome",
+              "2026-03-02T09:55:31.000Z",
+              "Lee",
+              "INV-1047"
+            ],
+            [
+              "INV-1047",
+              "Chrome: Paste Amount",
+              "2026-03-02T09:55:35.000Z",
+              "Lee",
+              "INV-1047"
+            ],
+            [
+              "INV-1047",
+              "Chrome: Validate",
+              "2026-03-02T09:55:41.000Z",
+              "Lee",
+              "INV-1047"
+            ],
+            [
+              "INV-1047",
+              "Chrome: Submit",
+              "2026-03-02T09:55:47.000Z",
+              "Lee",
+              "INV-1047"
+            ],
+            [
+              "INV-1048",
+              "Open Excel",
+              "2026-03-02T10:06:00.000Z",
+              "Priya",
+              "INV-1048"
+            ],
+            [
+              "INV-1048",
+              "Excel: Copy Vendor",
+              "2026-03-02T10:06:08.000Z",
+              "Priya",
+              "INV-1048"
+            ],
+            [
+              "INV-1048",
+              "Switch to Chrome",
+              "2026-03-02T10:06:12.000Z",
+              "Priya",
+              "INV-1048"
+            ],
+            [
+              "INV-1048",
+              "Chrome: Paste Vendor",
+              "2026-03-02T10:06:16.000Z",
+              "Priya",
+              "INV-1048"
+            ],
+            [
+              "INV-1048",
+              "Switch to Excel",
+              "2026-03-02T10:06:22.000Z",
+              "Priya",
+              "INV-1048"
+            ],
+            [
+              "INV-1048",
+              "Excel: Copy Amount",
+              "2026-03-02T10:06:27.000Z",
+              "Priya",
+              "INV-1048"
+            ],
+            [
+              "INV-1048",
+              "Switch to Chrome",
+              "2026-03-02T10:06:31.000Z",
+              "Priya",
+              "INV-1048"
+            ],
+            [
+              "INV-1048",
+              "Chrome: Paste Amount",
+              "2026-03-02T10:06:35.000Z",
+              "Priya",
+              "INV-1048"
+            ],
+            [
+              "INV-1048",
+              "Chrome: Validate",
+              "2026-03-02T10:06:41.000Z",
+              "Priya",
+              "INV-1048"
+            ],
+            [
+              "INV-1048",
+              "Chrome: Submit",
+              "2026-03-02T10:06:47.000Z",
+              "Priya",
+              "INV-1048"
+            ],
+            [
+              "INV-1049",
+              "Open Excel",
+              "2026-03-02T10:17:00.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Excel: Copy Vendor",
+              "2026-03-02T10:17:08.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Switch to Chrome",
+              "2026-03-02T10:17:12.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Chrome: Paste Vendor",
+              "2026-03-02T10:17:16.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Switch to Excel",
+              "2026-03-02T10:17:22.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Excel: Copy Amount",
+              "2026-03-02T10:17:27.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Switch to Chrome",
+              "2026-03-02T10:17:31.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Chrome: Paste Amount",
+              "2026-03-02T10:17:35.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Chrome: Validate",
+              "2026-03-02T10:17:41.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Switch to Excel",
+              "2026-03-02T10:17:49.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Excel: Copy Amount",
+              "2026-03-02T10:17:55.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Switch to Chrome",
+              "2026-03-02T10:17:59.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Chrome: Paste Amount",
+              "2026-03-02T10:18:04.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Chrome: Validate",
+              "2026-03-02T10:18:11.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1049",
+              "Chrome: Submit",
+              "2026-03-02T10:18:17.000Z",
+              "Sam",
+              "INV-1049"
+            ],
+            [
+              "INV-1050",
+              "Open Excel",
+              "2026-03-02T10:28:00.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Excel: Copy Vendor",
+              "2026-03-02T10:28:08.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Switch to Chrome",
+              "2026-03-02T10:28:12.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Chrome: Paste Vendor",
+              "2026-03-02T10:28:16.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Switch to Excel",
+              "2026-03-02T10:28:22.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Excel: Copy Amount",
+              "2026-03-02T10:28:27.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Switch to Chrome",
+              "2026-03-02T10:28:31.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Chrome: Paste Amount",
+              "2026-03-02T10:28:35.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Chrome: Validate",
+              "2026-03-02T10:28:41.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Switch to Excel",
+              "2026-03-02T10:28:49.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Excel: Copy Amount",
+              "2026-03-02T10:28:55.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Switch to Chrome",
+              "2026-03-02T10:28:59.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Chrome: Paste Amount",
+              "2026-03-02T10:29:04.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Chrome: Validate",
+              "2026-03-02T10:29:11.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1050",
+              "Chrome: Submit",
+              "2026-03-02T10:29:17.000Z",
+              "Lee",
+              "INV-1050"
+            ],
+            [
+              "INV-1051",
+              "Open Excel",
+              "2026-03-02T10:39:00.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Excel: Copy Vendor",
+              "2026-03-02T10:39:08.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Switch to Chrome",
+              "2026-03-02T10:39:12.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Chrome: Paste Vendor",
+              "2026-03-02T10:39:16.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Switch to Excel",
+              "2026-03-02T10:39:22.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Excel: Copy Amount",
+              "2026-03-02T10:39:27.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Switch to Chrome",
+              "2026-03-02T10:39:31.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Chrome: Paste Amount",
+              "2026-03-02T10:39:35.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Chrome: Validate",
+              "2026-03-02T10:39:41.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Switch to Excel",
+              "2026-03-02T10:39:49.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Excel: Copy Amount",
+              "2026-03-02T10:39:55.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Switch to Chrome",
+              "2026-03-02T10:39:59.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Chrome: Paste Amount",
+              "2026-03-02T10:40:04.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Chrome: Validate",
+              "2026-03-02T10:40:11.000Z",
+              "Priya",
+              "INV-1051"
+            ],
+            [
+              "INV-1051",
+              "Chrome: Submit",
+              "2026-03-02T10:40:17.000Z",
+              "Priya",
+              "INV-1051"
+            ]
+          ],
+          "mapping": {
+            "caseId": "taskCaseId",
+            "activity": "activity",
+            "timestamp": "timestamp",
+            "resource": "actor",
+            "entityType": "object"
+          },
+          "scenario": "Enter Invoice",
+          "note": "UI-interaction (task) log: copy Vendor + Amount from Excel into the AP web form; 3 of 10 cases rework the Amount after a failed validation."
+        }
       }
     }
   ]

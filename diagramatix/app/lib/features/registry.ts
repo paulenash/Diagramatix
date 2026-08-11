@@ -52,6 +52,7 @@ export const FEATURES: FeatureDef[] = [
   { key: "processMining",          label: "Process Mining (XES)",        category: "Analytics & Mining" },
   { key: "process-mining-examples",label: "Process Mining Examples",     category: "Analytics & Mining" },
   { key: "process-mining-ocel",    label: "Process Mining OCEL Support", category: "Analytics & Mining" },
+  { key: "task-mining",            label: "Task Mining",                 category: "Analytics & Mining" },
   { key: "apqc",                   label: "APQC Process Framework",      category: "Analytics & Mining" },
   // Governance
   { key: "riskControl",            label: "Risk & Control",              category: "Governance" },

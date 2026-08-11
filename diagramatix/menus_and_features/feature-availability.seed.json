@@ -178,6 +178,16 @@
       }
     },
     {
+      "key": "task-mining",
+      "states": {
+        "free": "hidden",
+        "introductory": "hidden",
+        "professional": "hidden",
+        "expert": "available",
+        "enterprise": "available"
+      }
+    },
+    {
       "key": "riskControl",
       "states": {
         "free": "hidden",
