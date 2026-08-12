@@ -30,6 +30,7 @@ import type { DiagramData } from "../app/lib/diagram/types";
 import type { LogMapping } from "../app/lib/mining/types";
 import type { MiningExamplePackage, MiningExampleDiagram } from "../app/lib/mining/examplePackage";
 import { buildTaskMiningExample } from "../app/lib/mining/taskMining/example";
+import { buildLiveOrderProcessingExample } from "../app/lib/mining/liveDemoExample";
 
 // ── seeded PRNG (mulberry32) ────────────────────────────────────────────────
 function mulberry32(a: number) {
@@ -478,9 +479,11 @@ const serviceDeskExample = {
 
 // Task-Mining flagship example ("Enter Invoice") — built from the task sample log.
 const taskExample = buildTaskMiningExample();
+// Live-source flagship example ("Order Processing" real-time polling).
+const liveExample = buildLiveOrderProcessingExample();
 
 const outFile = join(__dirname, "..", "app", "lib", "mining", "miningExampleData.json");
-writeFileSync(outFile, JSON.stringify({ examples: [example, o2cExample, serviceDeskExample, taskExample] }, null, 2) + "\n", "utf8");
+writeFileSync(outFile, JSON.stringify({ examples: [example, o2cExample, serviceDeskExample, taskExample, liveExample] }, null, 2) + "\n", "utf8");
 console.log(`Wrote ${outFile}`);
 console.log(`  O2C: ${o2cLog.stats.cases} cases, ${o2cLog.stats.events} events, ${o2cLog.stats.variants} variants`);
 

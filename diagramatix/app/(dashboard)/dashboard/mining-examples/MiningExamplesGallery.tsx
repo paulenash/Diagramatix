@@ -61,6 +61,10 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
         try { sessionStorage.setItem(`mining-sample:${json.projectId}`, JSON.stringify(payload)); } catch { /* quota — fall back to an empty console */ }
         // The example's SLA — threaded into the re-import so Outcomes has a target.
         if (json.kpiConfig) { try { sessionStorage.setItem(`mining-kpi:${json.projectId}`, JSON.stringify(json.kpiConfig)); } catch { /* ignore */ } }
+      } else if (json.projectId && json.liveDemo) {
+        // Live-source demo — hand the poll batches to the console, which provisions
+        // a real webhook source and ingests them one poll at a time.
+        try { sessionStorage.setItem(`mining-livedemo:${json.projectId}`, JSON.stringify(json.liveDemo)); } catch { /* quota */ }
       } else if (json.projectId && json.runId) {
         // A ready-made run (no sample log to confirm) — tell the console to open
         // ON that run's details, not the empty Import panel (reuses mining-return).

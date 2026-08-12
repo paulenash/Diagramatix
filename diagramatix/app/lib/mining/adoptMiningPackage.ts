@@ -35,6 +35,9 @@ export interface AdoptMiningResult {
   /** The example's KPI/SLA config — threaded into the re-import so the Outcomes
    *  tab has a target out of the box (sample-log examples). */
   kpiConfig?: unknown;
+  /** Present for a live-source demo — the console shows a "Simulate poll" panel
+   *  that ingests these batches into a real webhook source, growing the run live. */
+  liveDemo?: MiningExamplePackage["liveDemo"];
 }
 
 export async function adoptMiningPackage(
@@ -139,6 +142,12 @@ export async function adoptMiningPackage(
 
     const referenceSmId = pkg.run.referenceSmKey ? keyToDiagramId.get(pkg.run.referenceSmKey) ?? null : null;
     const openDiagramId = referenceSmId ?? keyToDiagramId.values().next().value ?? null;
+
+    // Live-source demo: DON'T pre-create a run — the console provisions a real
+    // webhook source and ingests the poll batches to grow the run live.
+    if (pkg.liveDemo) {
+      return { projectId: project.id, projectName: project.name, openDiagramId, liveDemo: pkg.liveDemo };
+    }
 
     // With a sampleLog, DON'T pre-create the run — the user imports it in the
     // console (confirm-the-analysis flow). Otherwise recreate the run as usual.

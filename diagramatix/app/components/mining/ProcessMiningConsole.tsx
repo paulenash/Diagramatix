@@ -16,6 +16,7 @@ import { parseXes } from "@/app/lib/mining/formats/xes";
 import { parseOcel } from "@/app/lib/mining/formats/ocel";
 import { validateEventLogMapping } from "@/app/lib/mining/validateLog";
 import { MiningSourcesPanel } from "./MiningSourcesPanel";
+import { LiveDemoPanel } from "./LiveDemoPanel";
 import { MiningInsightsPanel } from "./insights/MiningInsightsPanel";
 import { MiningLogViewer } from "./MiningLogViewer";
 import type { LogMapping, MiningStats } from "@/app/lib/mining/types";
@@ -640,6 +641,10 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
           )}
           {err && <p className="text-rose-400 text-xs mt-2">{err}</p>}
         </section>
+
+        {/* Live-source polling DEMO — appears after adopting the "Order Processing —
+            live" example; ingests poll batches into a real webhook source. */}
+        <LiveDemoPanel projectId={projectId} onPolled={(runId) => { void load(); if (runId) setSelectedId(runId); }} />
 
         {/* Live sources — push (webhook) / pull (watched folder) auto-refresh */}
         <MiningSourcesPanel projectId={projectId} />

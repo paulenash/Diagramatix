@@ -90,8 +90,16 @@ export interface MiningExampleSampleLog {
   note?: string;
 }
 
+/** Live-source demo — a set of successive POLL batches. The example adopts as a
+ *  webhook MiningSource + empty run; the console ingests batch 1→N one at a time
+ *  (the real ingest endpoint) so the user watches the run grow in real time. */
+export interface MiningExampleLiveBatch { label: string; note: string; events: Record<string, string>[] }
+export interface MiningExampleLiveDemo { name: string; headers: string[]; mapping: LogMapping; batches: MiningExampleLiveBatch[] }
+
 export interface MiningExamplePackage {
   version: 1;
+  /** Present → this example demonstrates real-time live-source polling (see above). */
+  liveDemo?: MiningExampleLiveDemo;
   /** All carried diagrams by key: reference SMs, and (for an OCEL study) the
    *  Domain Diagram + each object type's discovered state machine. */
   diagrams: MiningExampleDiagram[];
