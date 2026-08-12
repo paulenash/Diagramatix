@@ -2806,9 +2806,18 @@ export function layoutBpmnDiagram(
     };
     for (const g of merges) {
       let maxRight = -Infinity;
+      const gc = colMap.get(g.id);
       for (const sid of incoming.get(g.id) ?? []) {
         const s = elById.get(sid);
-        if (s) maxRight = Math.max(maxRight, s.x + s.width);
+        if (!s) continue;
+        // Skip LOOP-BACK sources: a rework/iteration edge feeds the merge from a
+        // node at the merge's own column or beyond (a back-edge). It isn't an
+        // upstream branch, so pushing the merge to its right would shove the merge
+        // PAST its own loop — tearing a huge horizontal gap. Genuine upstream
+        // branches (incl. a wide wrapped EP) sit at a smaller column and still count.
+        const sc = colMap.get(sid);
+        if (sc !== undefined && gc !== undefined && sc >= gc) continue;
+        maxRight = Math.max(maxRight, s.x + s.width);
       }
       if (isFinite(maxRight)) {
         const delta = (maxRight + R625_GAP) - g.x;
