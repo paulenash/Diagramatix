@@ -52,6 +52,26 @@ function fmt(sec: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// Turn a getUserMedia failure into something actionable. The name is what matters:
+// NotReadableError = the OS/another app has the device; OverconstrainedError = the
+// device rejected the requested settings; NotAllowedError = permission blocked.
+function describeMediaError(e: DOMException): string {
+  switch (e.name) {
+    case "NotReadableError":
+    case "TrackStartError":
+      return "That microphone is in use or locked by another app (Zoom, Teams, OBS, Audacity, the AT2020’s own monitor mixer…) or by Windows exclusive mode. Close other apps using it — or unplug and replug the USB mic — then try again.";
+    case "OverconstrainedError":
+      return "That microphone rejected the requested audio settings. Try selecting it again, or pick a different mic.";
+    case "NotAllowedError":
+    case "SecurityError":
+      return "Microphone permission is blocked. Allow the mic for this site in the browser’s site settings, then reopen the studio.";
+    case "NotFoundError":
+      return "The selected microphone wasn’t found — it may have been unplugged. Pick another mic.";
+    default:
+      return `Camera/mic error: ${e.name || e.message}`;
+  }
+}
+
 const CORNERS: { id: InsetCorner; label: string; name: string }[] = [
   { id: "br", label: "↘", name: "Webcam in bottom-right" },
   { id: "bl", label: "↙", name: "Webcam in bottom-left" },
@@ -135,17 +155,42 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     setError(null);
     previewStreamRef.current?.getTracks().forEach((t) => t.stop());
     stopLevelMeter();
-    const constraints: MediaStreamConstraints = {
-      audio: micOn ? { deviceId: micId ? { exact: micId } : undefined } : false,
-      video: camOn ? { deviceId: camId ? { exact: camId } : undefined, width: 640, height: 360 } : false,
+    // Record the RAW mic: turn off Chrome's echo-cancel / noise-suppress / auto-gain
+    // pipeline. It's meant for two-way calls (headset mics like the JBL), but it chokes
+    // on studio/USB condenser mics (e.g. AT2020USB-XP) running at high sample rates and
+    // often yields a silent/dead track. Off = those mics work AND every mic sounds cleaner.
+    const audioConstraints: MediaTrackConstraints = {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
     };
+    if (micId) audioConstraints.deviceId = { exact: micId };
+    const video: MediaTrackConstraints | false = camOn
+      ? { deviceId: camId ? { exact: camId } : undefined, width: 640, height: 360 }
+      : false;
     if (!micOn && !camOn) { previewStreamRef.current = null; return; }
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      stream = await navigator.mediaDevices.getUserMedia({ audio: micOn ? audioConstraints : false, video });
     } catch (e) {
-      setError(`Camera/mic error: ${(e as Error).message}`);
-      return;
+      const err = e as DOMException;
+      // If the exact-device / no-processing combo was rejected (some devices/drivers
+      // reject exact deviceId or specific processing flags), retry once with a looser
+      // ask before giving up — keeps the raw-audio intent but lets the browser adapt.
+      if (micOn && (err.name === "OverconstrainedError" || err.name === "NotReadableError")) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: micId ? { deviceId: { ideal: micId } } : true,
+            video,
+          });
+        } catch (e2) {
+          setError(describeMediaError(e2 as DOMException));
+          return;
+        }
+      } else {
+        setError(describeMediaError(err));
+        return;
+      }
     }
     previewStreamRef.current = stream;
     await enumerate(); // labels now populated
