@@ -105,6 +105,21 @@ jobs:
           cache-from: type=registry,ref=${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_REPO }}:buildcache
           cache-to: type=registry,ref=${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_REPO }}:buildcache,mode=max
 
+      - name: Re-authenticate to Azure (post-build)
+        # The GitHub OIDC assertion azure/login trades in is valid only ~5 min.
+        # A cold Docker build can take much longer than that, after which the
+        # FIRST az call needing a fresh token (Key Vault below — a different
+        # audience than the ACR login) fails with AADSTS700024 "client assertion
+        # is not within its valid time range". Re-login here so every az step
+        # below runs on a fresh assertion regardless of how long the build took.
+        # (The build/push itself uses the docker credential minted by `az acr
+        # login`, which has a much longer TTL, so it's unaffected.)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Fetch DATABASE_URL from Key Vault
         id: db
         # Surface the secret as a step output. Subsequent steps refer to
