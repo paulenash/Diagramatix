@@ -86,6 +86,21 @@ const CORNERS: { id: InsetCorner; label: string; name: string }[] = [
   { id: "tl", label: "↖", name: "Webcam in top-left" },
 ];
 
+// Adjustable numeric webcam image controls, in the order we show them. `mode`, if set,
+// is the companion enum that must be switched to "manual" for the value to take effect
+// (exposure controls need exposureMode:manual; colour temp needs whiteBalanceMode:manual).
+// A camera only surfaces the ones it actually supports (via MediaStreamTrack capabilities).
+const VIDEO_CONTROLS: { key: string; label: string; mode?: string }[] = [
+  { key: "exposureTime", label: "Exposure", mode: "exposureMode" },
+  { key: "exposureCompensation", label: "Exposure ±", mode: "exposureMode" },
+  { key: "brightness", label: "Brightness" },
+  { key: "gain", label: "Gain" },
+  { key: "contrast", label: "Contrast" },
+  { key: "saturation", label: "Saturation" },
+  { key: "sharpness", label: "Sharpness" },
+  { key: "colorTemperature", label: "White bal.", mode: "whiteBalanceMode" },
+];
+
 export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [open, setOpen] = useState(false);
@@ -99,8 +114,8 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   const [scale, setScale] = useState(0.22);
   const [level, setLevel] = useState(0);
   const [gain, setGain] = useState(1); // mic recording volume (1 = 100%)
-  const [exposure, setExposure] = useState<number | null>(null); // webcam exposure/brightness value
-  const [expCap, setExpCap] = useState<{ kind: "exposure" | "brightness"; min: number; max: number; step: number } | null>(null);
+  const [camControls, setCamControls] = useState<{ key: string; label: string; min: number; max: number; step: number; mode?: string }[]>([]);
+  const [ctrlVals, setCtrlVals] = useState<Record<string, number>>({});
   const [testing, setTesting] = useState(false); // recording the 4s test clip
   const [testUrl, setTestUrl] = useState<string | null>(null); // replay of the test clip
   const [elapsed, setElapsed] = useState(0);
@@ -131,8 +146,8 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const camVideoRef = useRef<HTMLVideoElement | null>(null);
-  const camPreviewRef = useRef<HTMLVideoElement | null>(null); // visible setup preview of the webcam
-  const camTrackRef = useRef<MediaStreamTrack | null>(null);   // for exposure applyConstraints
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);   // visible live webcam preview (bound once → no flicker)
+  const camTrackRef = useRef<MediaStreamTrack | null>(null);       // for exposure applyConstraints
   const testRecRef = useRef<MediaRecorder | null>(null);       // 4s mic/inset test recorder
   const testChunksRef = useRef<BlobPart[]>([]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -219,27 +234,32 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     previewStreamRef.current = stream;
     await enumerate(); // labels now populated
     if (camVideoRef.current) { camVideoRef.current.srcObject = stream; void camVideoRef.current.play().catch(() => {}); }
-    if (camPreviewRef.current) { camPreviewRef.current.srcObject = stream; void camPreviewRef.current.play().catch(() => {}); }
-    // Webcam exposure control: read what this camera actually supports (manual
-    // exposure compensation first, else brightness) so we can offer a slider to
-    // tame an over-exposed image. Types aren't in the DOM lib yet → narrow casts.
+    // Bind the visible preview ONCE (guarded) — re-setting srcObject every render is
+    // what caused the flicker, so only touch it when it actually changed.
+    if (previewVideoRef.current && previewVideoRef.current.srcObject !== stream) {
+      previewVideoRef.current.srcObject = stream;
+      void previewVideoRef.current.play().catch(() => {});
+    }
+    // Webcam image controls: the way to tame an over-exposed image differs by camera,
+    // so enumerate EVERY numeric control this one exposes (exposure, brightness, gain…)
+    // and offer a live slider for each. Types aren't in the DOM lib yet → narrow casts.
     const vt = stream.getVideoTracks()[0] ?? null;
     camTrackRef.current = vt;
     if (vt && typeof vt.getCapabilities === "function") {
-      const caps = vt.getCapabilities() as MediaTrackCapabilities & {
-        exposureMode?: string[]; exposureCompensation?: { min: number; max: number; step: number }; brightness?: { min: number; max: number; step: number };
-      };
-      const set = vt.getSettings() as MediaTrackSettings & { exposureCompensation?: number; brightness?: number };
-      if (caps.exposureMode?.includes("manual") && caps.exposureCompensation) {
-        const c = caps.exposureCompensation;
-        setExpCap({ kind: "exposure", min: c.min, max: c.max, step: c.step || 0.1 });
-        setExposure(set.exposureCompensation ?? (c.min + c.max) / 2);
-      } else if (caps.brightness) {
-        const c = caps.brightness;
-        setExpCap({ kind: "brightness", min: c.min, max: c.max, step: c.step || 1 });
-        setExposure(set.brightness ?? (c.min + c.max) / 2);
-      } else { setExpCap(null); setExposure(null); }
-    } else { setExpCap(null); setExposure(null); }
+      const caps = vt.getCapabilities() as Record<string, unknown>;
+      const set = vt.getSettings() as Record<string, unknown>;
+      const found: { key: string; label: string; min: number; max: number; step: number; mode?: string }[] = [];
+      const vals: Record<string, number> = {};
+      for (const c of VIDEO_CONTROLS) {
+        const cap = caps[c.key] as { min?: number; max?: number; step?: number } | undefined;
+        if (cap && typeof cap.min === "number" && typeof cap.max === "number" && cap.max > cap.min) {
+          found.push({ key: c.key, label: c.label, min: cap.min, max: cap.max, step: cap.step || (cap.max - cap.min) / 100, mode: c.mode });
+          vals[c.key] = typeof set[c.key] === "number" ? (set[c.key] as number) : (cap.min + cap.max) / 2;
+        }
+      }
+      setCamControls(found);
+      setCtrlVals(vals);
+    } else { setCamControls([]); setCtrlVals({}); }
     // Route the mic through a gain node so the user can set the RECORDING volume, then
     // to (a) a destination whose track we record and (b) the level meter — so the meter
     // shows the adjusted level and what you see is what gets recorded. Falls back to the
@@ -276,18 +296,18 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     }
   }, [micOn, camOn, micId, camId, enumerate, stopLevelMeter]);
 
-  // Apply the exposure/brightness slider to the live webcam track.
-  const applyExposure = useCallback(async (value: number) => {
-    setExposure(value);
+  // Apply one webcam image control live. Controls with a companion `mode` (exposure,
+  // white balance) need that enum switched to "manual" or the value is ignored.
+  const applyControl = useCallback(async (key: string, value: number, mode?: string) => {
+    setCtrlVals((m) => ({ ...m, [key]: value }));
     const vt = camTrackRef.current;
-    if (!vt || !expCap) return;
+    if (!vt) return;
     try {
-      const adv = expCap.kind === "exposure"
-        ? { exposureMode: "manual", exposureCompensation: value }
-        : { brightness: value };
+      const adv: Record<string, unknown> = { [key]: value };
+      if (mode) adv[mode] = "manual";
       await vt.applyConstraints({ advanced: [adv] } as unknown as MediaTrackConstraints);
     } catch { /* camera rejected the constraint — ignore */ }
-  }, [expCap]);
+  }, []);
 
   // Record a short (4s) clip of the mic (+ webcam inset if on) and replay it, so you
   // can HEAR the level and SEE the inset exposure exactly as it will be recorded.
@@ -683,20 +703,21 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
                     </div>
                     <input type="range" min={0.12} max={0.4} step={0.02} value={scale} onChange={(e) => setScale(Number(e.target.value))} className="flex-1" title="Webcam inset size" aria-label="Webcam inset size" />
                   </div>
-                  {/* Live webcam preview — see the inset image and adjust its exposure */}
-                  <video
-                    ref={(el) => { camPreviewRef.current = el; if (el && previewStreamRef.current) { el.srcObject = previewStreamRef.current; void el.play().catch(() => {}); } }}
-                    muted playsInline className="w-full aspect-video rounded border border-gray-200 bg-black mb-1 object-cover"
-                  />
-                  {expCap ? (
-                    <div className="flex items-center gap-2 mb-2">
-                      <label className="text-[10px] uppercase tracking-wide text-gray-600 whitespace-nowrap">Exposure</label>
-                      <input type="range" min={expCap.min} max={expCap.max} step={expCap.step} value={exposure ?? expCap.min}
-                        onChange={(e) => void applyExposure(Number(e.target.value))} className="flex-1" title="Webcam exposure — lower it if the image is over-exposed" aria-label="Webcam exposure" />
-                      <span className="text-[10px] text-gray-600 tabular-nums w-9 text-right">{exposure != null ? Math.round(((exposure - expCap.min) / Math.max(1e-6, expCap.max - expCap.min)) * 100) : 0}%</span>
+                  {/* Live webcam preview (stable ref → bound once → no flicker) */}
+                  <video ref={previewVideoRef} muted playsInline autoPlay
+                    className="w-full aspect-video rounded border border-gray-200 bg-black mb-1 object-cover" />
+                  {camControls.length > 0 ? (
+                    <div className="mb-2 space-y-1">
+                      {camControls.map((c) => (
+                        <div key={c.key} className="flex items-center gap-2">
+                          <label className="text-[10px] uppercase tracking-wide text-gray-600 w-16 shrink-0 truncate" title={c.label}>{c.label}</label>
+                          <input type="range" min={c.min} max={c.max} step={c.step} value={ctrlVals[c.key] ?? c.min}
+                            onChange={(e) => void applyControl(c.key, Number(e.target.value), c.mode)} className="flex-1" aria-label={c.label} />
+                        </div>
+                      ))}
                     </div>
                   ) : (
-                    <p className="text-[10px] text-gray-500 mb-2">This camera doesn&rsquo;t expose an exposure control to the browser — adjust it in the Windows <em>Camera</em> app settings.</p>
+                    <p className="text-[10px] text-gray-500 mb-2">This camera exposes no adjustable image controls to the browser — adjust exposure in the Windows <em>Camera</em> app.</p>
                   )}
                 </>
               )}
