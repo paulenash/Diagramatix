@@ -21,15 +21,22 @@ import { beginSession, appendChunk, listPending, getSessionBlob, clearSession, t
 type Phase = "idle" | "setup" | "recording" | "paused" | "review";
 
 // Prefer recording mp4 DIRECTLY (Edge/Chrome 126+) — instant, no server transcode,
-// and mp4 is what social/Buffer needs. Fall back to webm on browsers that can't.
-function pickMime(): { mime: string; ext: "mp4" | "webm" } {
-  const cands: { mime: string; ext: "mp4" | "webm" }[] = [
+// and mp4 is what social/Buffer needs. BUT Chrome's mp4 MediaRecorder frequently
+// records the video and silently DROPS the mic audio track (green level bar during
+// capture, dead-silent file). webm/opus muxes audio reliably, so whenever we're
+// recording a microphone we record webm — the "Save .mp4" button then transcodes on
+// the server (which keeps the audio). Screen-only (no-mic) recordings still prefer mp4.
+function pickMime(hasAudio: boolean): { mime: string; ext: "mp4" | "webm" } {
+  const mp4: { mime: string; ext: "mp4" | "webm" }[] = [
     { mime: "video/mp4;codecs=avc1,mp4a", ext: "mp4" },
     { mime: "video/mp4", ext: "mp4" },
+  ];
+  const webm: { mime: string; ext: "mp4" | "webm" }[] = [
     { mime: "video/webm;codecs=vp9,opus", ext: "webm" },
     { mime: "video/webm;codecs=vp8,opus", ext: "webm" },
     { mime: "video/webm", ext: "webm" },
   ];
+  const cands = hasAudio ? [...webm, ...mp4] : [...mp4, ...webm];
   if (typeof MediaRecorder !== "undefined") {
     for (const c of cands) if (MediaRecorder.isTypeSupported(c.mime)) return c;
   }
@@ -351,7 +358,8 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     const mixed = new MediaStream(tracks);
 
     chunksRef.current = [];
-    const chosen = pickMime();
+    // Recording a mic → webm so the audio is actually muxed (see pickMime).
+    const chosen = pickMime(!!micTrack);
     setNativeExt(chosen.ext);
     sessionMimeRef.current = chosen.mime;
     // Open a fresh persisted session BEFORE recording, so every chunk is written
