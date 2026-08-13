@@ -6,3 +6,10 @@
 /node_modules/
 /package.json
 /package-lock.json
+
+# Local working artifacts — never belong in the repo. `scratchpad/` is Claude's
+# temp/working area (prod seed SQL, dumps, CSVs); `test/` holds ad-hoc sample
+# exports used while debugging. They were accidentally committed once (e859d8de)
+# and removed in the follow-up; keep them ignored so it can't recur.
+/scratchpad/
+/test/
