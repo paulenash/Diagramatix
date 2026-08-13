@@ -103,6 +103,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   const [transcoding, setTranscoding] = useState(false);
   const [convertElapsed, setConvertElapsed] = useState(0);
   const [pendingTo, setPendingTo] = useState<"mp4" | "webm" | null>(null);
+  const [recInfo, setRecInfo] = useState<string | null>(null); // what actually reached the recorder (audio diagnostic)
   const [nativeExt, setNativeExt] = useState<"mp4" | "webm">("webm");
   const [error, setError] = useState<string | null>(null);
   const convertAbortRef = useRef<AbortController | null>(null);
@@ -139,6 +140,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   const [recoverable, setRecoverable] = useState<RecMeta | null>(null);
   const rafRef = useRef<number>(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const recAudioCtxRef = useRef<AudioContext | null>(null); // rebuilds the recorded mic track
   const levelRafRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -217,7 +219,8 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
         analyser.getByteTimeDomainData(buf);
         let sum = 0;
         for (let i = 0; i < buf.length; i++) { const d = buf[i] - 128; sum += d * d; }
-        setLevel(Math.min(100, Math.round((Math.sqrt(sum / buf.length) / 64) * 100)));
+        // More sensitive meter (smaller divisor) so a quiet raw mic still reads clearly.
+        setLevel(Math.min(100, Math.round((Math.sqrt(sum / buf.length) / 30) * 100)));
         levelRafRef.current = requestAnimationFrame(tick);
       };
       levelRafRef.current = requestAnimationFrame(tick);
@@ -291,6 +294,8 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     cancelAnimationFrame(rafRef.current);
     displayStreamRef.current?.getTracks().forEach((t) => t.stop());
     displayStreamRef.current = null;
+    try { recAudioCtxRef.current?.close(); } catch { /* */ }
+    recAudioCtxRef.current = null;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }, []);
 
@@ -351,15 +356,37 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
       videoTrack = display.getVideoTracks()[0];
     }
 
-    // Mix mic audio into the recorded stream.
+    // Mix mic audio into the recorded stream. Route the mic through a Web Audio
+    // destination first: this rebuilds a fresh audio track at the AudioContext's own
+    // sample rate, which sidesteps odd USB-mic sample-rate / channel layouts that make
+    // MediaRecorder capture SILENCE even while the live level meter shows signal.
     const tracks: MediaStreamTrack[] = [videoTrack];
     const micTrack = previewStreamRef.current?.getAudioTracks()[0];
-    if (micTrack) tracks.push(micTrack);
+    if (micTrack) {
+      let routed = false;
+      try {
+        const AC: typeof AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const rc = new AC();
+        recAudioCtxRef.current = rc;
+        await rc.resume().catch(() => {}); // must be running or the dest track is silent
+        const srcNode = rc.createMediaStreamSource(new MediaStream([micTrack]));
+        const dest = rc.createMediaStreamDestination();
+        srcNode.connect(dest);
+        const outTrack = dest.stream.getAudioTracks()[0];
+        if (outTrack && rc.state === "running") { tracks.push(outTrack); routed = true; }
+      } catch { /* fall through to the raw track */ }
+      if (!routed) tracks.push(micTrack); // fallback: the raw device track
+    }
     const mixed = new MediaStream(tracks);
 
     chunksRef.current = [];
     // Recording a mic → webm so the audio is actually muxed (see pickMime).
     const chosen = pickMime(!!micTrack);
+    // Diagnostic surfaced on the review screen so a silent recording is self-explaining.
+    setRecInfo(
+      `${chosen.mime.split(";")[0]} · audioTracks:${mixed.getAudioTracks().length}` +
+      (micTrack ? ` · mic:"${(micTrack.label || "?").slice(0, 22)}" muted:${micTrack.muted} ${micTrack.readyState} · ctx:${recAudioCtxRef.current?.state ?? "raw"}` : " · NO MIC TRACK"),
+    );
     setNativeExt(chosen.ext);
     sessionMimeRef.current = chosen.mime;
     // Open a fresh persisted session BEFORE recording, so every chunk is written
@@ -377,6 +404,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     rec.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: rec.mimeType || "video/webm" });
       recordedBlobRef.current = blob;
+      setRecInfo((d) => (d ? `${d} · file:${(blob.size / 1024).toFixed(0)}KB` : d));
       setRecordedUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(blob); });
       setPhase("review");
       cleanupRecording();
@@ -593,6 +621,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
           {phase === "review" && recordedUrl && (
             <>
               <video src={recordedUrl} controls className="w-full rounded border border-gray-200 mb-2 bg-black" />
+              {recInfo && <p className="text-[9px] text-gray-400 mb-1 break-all font-mono" title="Recording diagnostic">🔎 {recInfo}</p>}
               <div className="grid grid-cols-2 gap-1.5">
                 <button onClick={() => { if (recordedBlobRef.current) { download(recordedBlobRef.current, nativeExt); if (sessionIdRef.current) { void clearSession(sessionIdRef.current); sessionIdRef.current = null; } } }} disabled={transcoding} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50 disabled:opacity-50" title="Save the recording as-is (instant, no conversion)">Save .{nativeExt}</button>
                 <button onClick={() => saveConverted(nativeExt === "mp4" ? "webm" : "mp4")} disabled={transcoding} className="py-1.5 border border-gray-300 text-gray-800 font-medium rounded hover:bg-gray-50 disabled:opacity-50" title="Convert on the server, then save">Save .{nativeExt === "mp4" ? "webm" : "mp4"}</button>
