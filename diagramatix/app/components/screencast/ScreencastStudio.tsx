@@ -99,6 +99,10 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   const [scale, setScale] = useState(0.22);
   const [level, setLevel] = useState(0);
   const [gain, setGain] = useState(1); // mic recording volume (1 = 100%)
+  const [exposure, setExposure] = useState<number | null>(null); // webcam exposure/brightness value
+  const [expCap, setExpCap] = useState<{ kind: "exposure" | "brightness"; min: number; max: number; step: number } | null>(null);
+  const [testing, setTesting] = useState(false); // recording the 4s test clip
+  const [testUrl, setTestUrl] = useState<string | null>(null); // replay of the test clip
   const [elapsed, setElapsed] = useState(0);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [transcoding, setTranscoding] = useState(false);
@@ -127,6 +131,10 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const camVideoRef = useRef<HTMLVideoElement | null>(null);
+  const camPreviewRef = useRef<HTMLVideoElement | null>(null); // visible setup preview of the webcam
+  const camTrackRef = useRef<MediaStreamTrack | null>(null);   // for exposure applyConstraints
+  const testRecRef = useRef<MediaRecorder | null>(null);       // 4s mic/inset test recorder
+  const testChunksRef = useRef<BlobPart[]>([]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewStreamRef = useRef<MediaStream | null>(null);   // cam + mic
   const displayStreamRef = useRef<MediaStream | null>(null);   // screen
@@ -211,6 +219,27 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     previewStreamRef.current = stream;
     await enumerate(); // labels now populated
     if (camVideoRef.current) { camVideoRef.current.srcObject = stream; void camVideoRef.current.play().catch(() => {}); }
+    if (camPreviewRef.current) { camPreviewRef.current.srcObject = stream; void camPreviewRef.current.play().catch(() => {}); }
+    // Webcam exposure control: read what this camera actually supports (manual
+    // exposure compensation first, else brightness) so we can offer a slider to
+    // tame an over-exposed image. Types aren't in the DOM lib yet → narrow casts.
+    const vt = stream.getVideoTracks()[0] ?? null;
+    camTrackRef.current = vt;
+    if (vt && typeof vt.getCapabilities === "function") {
+      const caps = vt.getCapabilities() as MediaTrackCapabilities & {
+        exposureMode?: string[]; exposureCompensation?: { min: number; max: number; step: number }; brightness?: { min: number; max: number; step: number };
+      };
+      const set = vt.getSettings() as MediaTrackSettings & { exposureCompensation?: number; brightness?: number };
+      if (caps.exposureMode?.includes("manual") && caps.exposureCompensation) {
+        const c = caps.exposureCompensation;
+        setExpCap({ kind: "exposure", min: c.min, max: c.max, step: c.step || 0.1 });
+        setExposure(set.exposureCompensation ?? (c.min + c.max) / 2);
+      } else if (caps.brightness) {
+        const c = caps.brightness;
+        setExpCap({ kind: "brightness", min: c.min, max: c.max, step: c.step || 1 });
+        setExposure(set.brightness ?? (c.min + c.max) / 2);
+      } else { setExpCap(null); setExposure(null); }
+    } else { setExpCap(null); setExposure(null); }
     // Route the mic through a gain node so the user can set the RECORDING volume, then
     // to (a) a destination whose track we record and (b) the level meter — so the meter
     // shows the adjusted level and what you see is what gets recorded. Falls back to the
@@ -246,6 +275,46 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
       } catch { processedTrackRef.current = null; /* record the raw track instead */ }
     }
   }, [micOn, camOn, micId, camId, enumerate, stopLevelMeter]);
+
+  // Apply the exposure/brightness slider to the live webcam track.
+  const applyExposure = useCallback(async (value: number) => {
+    setExposure(value);
+    const vt = camTrackRef.current;
+    if (!vt || !expCap) return;
+    try {
+      const adv = expCap.kind === "exposure"
+        ? { exposureMode: "manual", exposureCompensation: value }
+        : { brightness: value };
+      await vt.applyConstraints({ advanced: [adv] } as unknown as MediaTrackConstraints);
+    } catch { /* camera rejected the constraint — ignore */ }
+  }, [expCap]);
+
+  // Record a short (4s) clip of the mic (+ webcam inset if on) and replay it, so you
+  // can HEAR the level and SEE the inset exposure exactly as it will be recorded.
+  const runTest = useCallback(() => {
+    if (testing) return;
+    const micTrack = processedTrackRef.current ?? previewStreamRef.current?.getAudioTracks()[0];
+    const camTrack = camOn ? previewStreamRef.current?.getVideoTracks()[0] : undefined;
+    const tracks: MediaStreamTrack[] = [];
+    if (camTrack) tracks.push(camTrack);
+    if (micTrack) tracks.push(micTrack);
+    if (!tracks.length) return;
+    testChunksRef.current = [];
+    let rec: MediaRecorder;
+    try { rec = new MediaRecorder(new MediaStream(tracks), { mimeType: pickMime(!!micTrack).mime }); }
+    catch { rec = new MediaRecorder(new MediaStream(tracks)); }
+    testRecRef.current = rec;
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) testChunksRef.current.push(e.data); };
+    rec.onstop = () => {
+      const blob = new Blob(testChunksRef.current, { type: rec.mimeType || "video/webm" });
+      setTestUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(blob); });
+      setTesting(false);
+    };
+    setTestUrl((old) => { if (old) URL.revokeObjectURL(old); return null; });
+    setTesting(true);
+    rec.start();
+    window.setTimeout(() => { try { if (rec.state !== "inactive") rec.stop(); } catch { /* */ } }, 4000);
+  }, [testing, camOn]);
 
   const openStudio = useCallback(async () => {
     setOpen(true);
@@ -481,6 +550,9 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     if (convertTimerRef.current) { clearInterval(convertTimerRef.current); convertTimerRef.current = null; }
     stop();
     cleanupRecording();
+    try { if (testRecRef.current && testRecRef.current.state !== "inactive") testRecRef.current.stop(); } catch { /* */ }
+    setTestUrl((old) => { if (old) URL.revokeObjectURL(old); return null; });
+    setTesting(false);
     previewStreamRef.current?.getTracks().forEach((t) => t.stop());
     previewStreamRef.current = null;
     stopLevelMeter();
@@ -611,7 +683,34 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
                     </div>
                     <input type="range" min={0.12} max={0.4} step={0.02} value={scale} onChange={(e) => setScale(Number(e.target.value))} className="flex-1" title="Webcam inset size" aria-label="Webcam inset size" />
                   </div>
+                  {/* Live webcam preview — see the inset image and adjust its exposure */}
+                  <video
+                    ref={(el) => { camPreviewRef.current = el; if (el && previewStreamRef.current) { el.srcObject = previewStreamRef.current; void el.play().catch(() => {}); } }}
+                    muted playsInline className="w-full aspect-video rounded border border-gray-200 bg-black mb-1 object-cover"
+                  />
+                  {expCap ? (
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="text-[10px] uppercase tracking-wide text-gray-600 whitespace-nowrap">Exposure</label>
+                      <input type="range" min={expCap.min} max={expCap.max} step={expCap.step} value={exposure ?? expCap.min}
+                        onChange={(e) => void applyExposure(Number(e.target.value))} className="flex-1" title="Webcam exposure — lower it if the image is over-exposed" aria-label="Webcam exposure" />
+                      <span className="text-[10px] text-gray-600 tabular-nums w-9 text-right">{exposure != null ? Math.round(((exposure - expCap.min) / Math.max(1e-6, expCap.max - expCap.min)) * 100) : 0}%</span>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-gray-500 mb-2">This camera doesn&rsquo;t expose an exposure control to the browser — adjust it in the Windows <em>Camera</em> app settings.</p>
+                  )}
                 </>
+              )}
+
+              {/* Record a 4s sample and replay it — HEAR the mic level + SEE the inset exposure */}
+              {(micOn || camOn) && (
+                <div className="mb-2">
+                  <button onClick={runTest} disabled={testing}
+                    className="w-full py-1.5 border border-gray-300 text-gray-800 rounded hover:bg-gray-50 disabled:opacity-50 font-medium"
+                    title="Record a 4-second sample of your mic and webcam, then play it back">
+                    {testing ? "● Recording 4s test…" : "🎧 Test & replay (4s)"}
+                  </button>
+                  {testUrl && <video src={testUrl} controls autoPlay className="w-full rounded border border-gray-200 mt-1.5 bg-black" />}
+                </div>
               )}
 
               <button onClick={start}
