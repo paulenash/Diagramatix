@@ -98,6 +98,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   const [corner, setCorner] = useState<InsetCorner>("br");
   const [scale, setScale] = useState(0.22);
   const [level, setLevel] = useState(0);
+  const [gain, setGain] = useState(1); // mic recording volume (1 = 100%)
   const [elapsed, setElapsed] = useState(0);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [transcoding, setTranscoding] = useState(false);
@@ -139,6 +140,9 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
   const [recoverable, setRecoverable] = useState<RecMeta | null>(null);
   const rafRef = useRef<number>(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);            // live recording-volume control
+  const processedTrackRef = useRef<MediaStreamTrack | null>(null); // gain-adjusted mic track we record
+  const gainRef = useRef(gain); gainRef.current = gain;
   const levelRafRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -154,8 +158,13 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     cancelAnimationFrame(levelRafRef.current);
     try { audioCtxRef.current?.close(); } catch { /* */ }
     audioCtxRef.current = null;
+    gainNodeRef.current = null;
+    processedTrackRef.current = null;
     setLevel(0);
   }, []);
+
+  // Live-adjust the recording volume while the slider moves (no re-arm needed).
+  useEffect(() => { if (gainNodeRef.current) gainNodeRef.current.gain.value = gain; }, [gain]);
 
   // (Re)acquire cam+mic for preview/recording per the current device + toggles.
   const arm = useCallback(async () => {
@@ -202,26 +211,39 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
     previewStreamRef.current = stream;
     await enumerate(); // labels now populated
     if (camVideoRef.current) { camVideoRef.current.srcObject = stream; void camVideoRef.current.play().catch(() => {}); }
-    // Mic level meter on the selected mic.
+    // Route the mic through a gain node so the user can set the RECORDING volume, then
+    // to (a) a destination whose track we record and (b) the level meter — so the meter
+    // shows the adjusted level and what you see is what gets recorded. Falls back to the
+    // raw track if Web Audio is unavailable.
     const audioTrack = stream.getAudioTracks()[0];
     if (audioTrack) {
-      const AC: typeof AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AC();
-      audioCtxRef.current = ctx;
-      const src = ctx.createMediaStreamSource(new MediaStream([audioTrack]));
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      src.connect(analyser);
-      const buf = new Uint8Array(analyser.fftSize);
-      const tick = () => {
-        analyser.getByteTimeDomainData(buf);
-        let sum = 0;
-        for (let i = 0; i < buf.length; i++) { const d = buf[i] - 128; sum += d * d; }
-        // More sensitive meter (smaller divisor) so a quiet raw mic still reads clearly.
-        setLevel(Math.min(100, Math.round((Math.sqrt(sum / buf.length) / 30) * 100)));
+      try {
+        const AC: typeof AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const ctx = new AC();
+        audioCtxRef.current = ctx;
+        void ctx.resume().catch(() => {}); // must be running or the recorded track is silent
+        const src = ctx.createMediaStreamSource(new MediaStream([audioTrack]));
+        const gainNode = ctx.createGain();
+        gainNode.gain.value = gainRef.current;
+        gainNodeRef.current = gainNode;
+        const dest = ctx.createMediaStreamDestination();
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        src.connect(gainNode);
+        gainNode.connect(dest);      // this track is what we record (post-volume)
+        gainNode.connect(analyser);  // meter reflects the adjusted level
+        processedTrackRef.current = dest.stream.getAudioTracks()[0];
+        const buf = new Uint8Array(analyser.fftSize);
+        const tick = () => {
+          analyser.getByteTimeDomainData(buf);
+          let sum = 0;
+          for (let i = 0; i < buf.length; i++) { const d = buf[i] - 128; sum += d * d; }
+          // More sensitive meter (smaller divisor) so a quiet raw mic still reads clearly.
+          setLevel(Math.min(100, Math.round((Math.sqrt(sum / buf.length) / 30) * 100)));
+          levelRafRef.current = requestAnimationFrame(tick);
+        };
         levelRafRef.current = requestAnimationFrame(tick);
-      };
-      levelRafRef.current = requestAnimationFrame(tick);
+      } catch { processedTrackRef.current = null; /* record the raw track instead */ }
     }
   }, [micOn, camOn, micId, camId, enumerate, stopLevelMeter]);
 
@@ -352,9 +374,10 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
       videoTrack = display.getVideoTracks()[0];
     }
 
-    // Mix mic audio into the recorded stream.
+    // Mix mic audio into the recorded stream — the gain-adjusted track from arm() if
+    // present (so the recording volume matches the slider/meter), else the raw device track.
     const tracks: MediaStreamTrack[] = [videoTrack];
-    const micTrack = previewStreamRef.current?.getAudioTracks()[0];
+    const micTrack = processedTrackRef.current ?? previewStreamRef.current?.getAudioTracks()[0];
     if (micTrack) tracks.push(micTrack);
     const mixed = new MediaStream(tracks);
 
@@ -553,11 +576,19 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
                 </select>
                 <button onClick={() => setMicOn((v) => !v)} className={`px-1.5 py-1 rounded border ${micOn ? "border-green-300 text-green-700" : "border-gray-300 text-gray-600"}`} title="Toggle mic">{micOn ? "🎙" : "🔇"}</button>
               </div>
-              {/* Mic test level meter (the selected device) */}
+              {/* Mic test level meter (the selected device) — reflects the recording volume below */}
               {micOn && (
-                <div className="h-2 bg-gray-100 rounded overflow-hidden mb-2" title="Mic level — speak to test">
-                  <div className="h-full bg-green-500 transition-[width] duration-75" style={{ width: `${level}%` }} />
-                </div>
+                <>
+                  <div className="h-2 bg-gray-100 rounded overflow-hidden mb-1.5" title="Mic level — speak to test">
+                    <div className={`h-full transition-[width] duration-75 ${level > 92 ? "bg-red-500" : "bg-green-500"}`} style={{ width: `${level}%` }} />
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="text-[10px] uppercase tracking-wide text-gray-600 whitespace-nowrap">Rec volume</label>
+                    <input type="range" min={0} max={2} step={0.05} value={gain} onChange={(e) => setGain(Number(e.target.value))}
+                      className="flex-1" title="Recording volume — set so the meter peaks below red while you speak" aria-label="Recording volume" />
+                    <span className="text-[10px] text-gray-600 tabular-nums w-9 text-right">{Math.round(gain * 100)}%</span>
+                  </div>
+                </>
               )}
 
               <label className="block text-[10px] uppercase tracking-wide text-gray-600 mb-0.5">Camera (inset)</label>
