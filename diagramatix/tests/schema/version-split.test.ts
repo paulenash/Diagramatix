@@ -10,8 +10,8 @@ import { SCHEMA_VERSION, PRODUCT_VERSION, structuralSchemaVersion, checkSchemaCo
 
 describe("version-model split", () => {
   it("T2258 — the two version constants have their expected shapes", () => {
-    expect(SCHEMA_VERSION).toMatch(/^\d+$/);            // bare integer
-    expect(PRODUCT_VERSION).toMatch(/^\d+\.\d+\.\d+$/); // major.middle.patch
+    expect(SCHEMA_VERSION).toMatch(/^\d+$/);      // bare integer
+    expect(PRODUCT_VERSION).toMatch(/^\d+\.\d+$/); // two-tier major.minor (build is the display-only 3rd part)
   });
 
   it("T2259 — structuralSchemaVersion reads new integer AND legacy 1.NN forms", () => {

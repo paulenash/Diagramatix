@@ -5,13 +5,27 @@ the single place a feature-only release is recorded (the schema-scoped histories
 [`schema/SCHEMA_CHANGELOG.md`](schema/SCHEMA_CHANGELOG.md), the XSD, and `types.ts` only move on
 a `schemaVersion` bump). Newest first.
 
-- **Version shown** = `appVersion` = `schemaVersion` + `.` + git commit count (the build number).
+- **Version shown** = `PRODUCT_VERSION` (two-tier `major.minor`) + `.` + git commit count (the build
+  number) — e.g. `2.2.2185`. The build IS the third part (2026-08-13); there is no patch. The stamped
+  `appVersion` in exports is the bare two-tier `PRODUCT_VERSION`.
 - Maintained per [`schema/UPDATE_EVERYTHING.md`](schema/UPDATE_EVERYTHING.md) Step 5, on every
   release.
 - Earlier history (pre-`1.44` feature window, v1.0 → v1.43) lives in
   [`schema/SCHEMA_CHANGELOG.md`](schema/SCHEMA_CHANGELOG.md).
 
 ---
+
+## 2.2.2185 — 2026-08-13 — Version scheme: build count becomes the third part
+- **Version numbering tweak (Paul):** kept the two-tier `major.minor` line (`2.2`) and made the
+  **git commit count the third part** of the displayed version — the header badge now reads
+  `v2.2.<build>` (e.g. `v2.2.2185`) instead of `v2.2.0 (build 2185)`. The unused hand-maintained
+  patch is gone; the build advances automatically on every push. `PRODUCT_VERSION` is now `"2.2"`;
+  exports still stamp the bare two-tier line as `appVersion`. Docs (`UPDATE_EVERYTHING.md` Step 0) and
+  the `T2258` shape test updated. Schema integer unchanged (45); no DB change.
+- Also shipped this window: Screencast Studio mic/camera hardening — raw-mic capture, reliable webm
+  audio muxing, sensitive + clipping-aware level meter, recording-volume (gain) slider, webcam
+  exposure/image controls with a flicker-free live preview, and a 4-second test-and-replay. Deploy
+  pipeline hardened against slow builds (post-build Azure re-login).
 
 ## 2.2.0 (build 2165) — 2026-08-10 — Mobile viewer: subprocess/gateway/event/connector fidelity
 - **Expanded subprocesses** are now drawn as **containers** (behind their contents) with the name at the **top**,

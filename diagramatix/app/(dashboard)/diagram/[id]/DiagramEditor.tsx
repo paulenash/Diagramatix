@@ -4241,7 +4241,7 @@ export function DiagramEditor({
         <div className="flex items-center gap-1.5">
           <span className="font-semibold text-gray-900 text-xs">{diagramName}</span>
           <DiagramTypeBadge type={diagramType} showLabel showCode={false} />
-          <span className="text-[10px] text-gray-900" title="Diagramatix product version">v{PRODUCT_VERSION}{version ? ` (build ${version})` : ""}</span>
+          <span className="text-[10px] text-gray-900" title="Diagramatix product version — major.minor.build">v{PRODUCT_VERSION}.{version ?? 0}</span>
         </div>
 
         {/* New Diagram — mirrors the Project screen's blue primary button. Opens the

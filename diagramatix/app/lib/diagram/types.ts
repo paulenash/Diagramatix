@@ -1152,14 +1152,17 @@ export interface TemplateData {
 export const SCHEMA_VERSION = "45";
 
 /**
- * DIAGRAMATIX PRODUCT VERSION — `major.middle.patch`. The user-facing app version (header badge
- * shows `v{PRODUCT_VERSION} (build {commitCount})`) and the `appVersion` stamped in exports.
- *   • MIDDLE  → increment on ANY physical DB table/column/enum/relation change.
- *   • patch   → increment on fixes / releases within the same DB structure.
- *   • major   → manual, for a breaking / headline release.
- * When the middle bumps, reset patch to 0. See schema/UPDATE_EVERYTHING.md Step 0.
+ * DIAGRAMATIX PRODUCT VERSION — a two-tier `major.minor` product line (currently "2.2"). The
+ * user-facing app version in the header badge is `v{major.minor}.{build}`, where the THIRD part is
+ * the git commit count (automatic per deploy) — e.g. `v2.2.487`. There is no hand-maintained patch
+ * number any more; the build count IS the third part (2026-08-13, per Paul).
+ *   • minor  → increment on ANY physical DB table/column/enum/relation change, or a notable release.
+ *   • major  → manual, for a breaking / headline release.
+ *   • build  → automatic (git commit count, NEXT_PUBLIC_COMMIT_COUNT); never hand-edited.
+ * `appVersion` stamped in exports is the bare two-tier `PRODUCT_VERSION` (the build is display-only).
+ * See schema/UPDATE_EVERYTHING.md Step 0.
  */
-export const PRODUCT_VERSION = "2.2.0";
+export const PRODUCT_VERSION = "2.2";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the

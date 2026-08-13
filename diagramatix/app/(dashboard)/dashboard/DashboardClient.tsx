@@ -1468,7 +1468,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             onDoubleClick={toggleSuperAdminChrome}
             draggable={false}
           />
-          <span className="text-xs text-gray-900 ml-1" title="Diagramatix product version">v{PRODUCT_VERSION}{version ? ` (build ${version})` : ""}</span>
+          <span className="text-xs text-gray-900 ml-1" title="Diagramatix product version — major.minor.build">v{PRODUCT_VERSION}.{version ?? 0}</span>
           {usageSnapshot && (
             <button
               onClick={() => setShowUsagePopover(true)}

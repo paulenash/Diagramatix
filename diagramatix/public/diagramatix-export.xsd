@@ -9,9 +9,9 @@
       first-class element/attribute or typed-enum value). The original criterion.
       Legacy exports carry the old "major.minor" form (e.g. "1.45"); importers read
       either via structuralSchemaVersion() (the "1.NN" minor == the new integer).
-    appVersion (major.middle.patch, e.g. "2.1.1") — the Diagramatix PRODUCT version.
-      MIDDLE increments on any physical DB table/column change; patch on fixes; major
-      manually. The header badge appends "(build <git commit count>)" for display only.
+    appVersion (two-tier major.minor, e.g. "2.2") — the Diagramatix PRODUCT version.
+      MINOR increments on any physical DB table/column change; major manually. No patch;
+      the header badge shows the git commit count as a display-only third part (v2.2.<build>).
 
   The xs:schema version attribute carries the schemaVersion (integer).
   The appVersion (product version) is recorded as an annotation below and injected at
@@ -19,7 +19,7 @@
 
   WHEN TO BUMP schemaVersion (the integer): ONLY when THIS XSD / the Diagram JSON export
   SHAPE changes. Physical-DB or open-`properties` changes do NOT bump the schema integer —
-  they move appVersion's MIDDLE instead. See schema/UPDATE_EVERYTHING.md Step 0.
+  they move appVersion's MINOR instead. See schema/UPDATE_EVERYTHING.md Step 0.
 
   MAINTENANCE — these FOUR must always be kept in sync, and move together on a bump:
     1. app/lib/diagram/types.ts   — the SCHEMA_VERSION constant + its history comment
@@ -487,12 +487,14 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <!-- App = Diagramatix PRODUCT version: major.middle.patch  e.g. "2.1.1".
-       Middle increments on any physical DB change; the header badge adds a
-       "(build <commitCount>)" suffix that is display-only, not stamped here. -->
+  <!-- App = Diagramatix PRODUCT version. Two-tier major.minor (e.g. "2.2"); the
+       minor increments on any physical DB change. The header badge shows the git
+       commit count as a display-only third part (v2.2.<build>), which is NOT
+       stamped here. Pattern tolerates the optional third part so legacy files
+       (e.g. "2.1.1", "1.44.2153") still validate. -->
   <xs:simpleType name="AppVersionString">
     <xs:restriction base="xs:string">
-      <xs:pattern value="\d+\.\d+\.\d+"/>
+      <xs:pattern value="\d+\.\d+(\.\d+)?"/>
     </xs:restriction>
   </xs:simpleType>
 

@@ -16,15 +16,17 @@ Both are manual constants in [`../app/lib/diagram/types.ts`](../app/lib/diagram/
   Bumped ONLY on an XSD export-shape change (the original criterion). Stamped as `schemaVersion`
   in every export and carried on `<xs:schema version=…>`. Shown in the editor's `XSD (schema v45)`
   export leaf and inside the XSD.
-- **`PRODUCT_VERSION`** — the **Diagramatix product version** `major.middle.patch` (currently
-  `"2.1.1"`). **MIDDLE increments on ANY physical DB table/column change**; patch on fixes; major
-  manually (reset patch to 0 when the middle bumps). It is the header badge (shown as
-  `v{PRODUCT_VERSION} (build {commitCount})`) and the `appVersion` stamped in exports.
+- **`PRODUCT_VERSION`** — the **Diagramatix product version**, a two-tier `major.minor` line
+  (currently `"2.2"`; 2026-08-13, per Paul). **MINOR increments on ANY physical DB table/column
+  change** or a notable release; major is a manual headline/breaking call. There is **no patch** —
+  the header badge shows `v{major.minor}.{build}` where the git commit count IS the third part
+  (e.g. `v2.2.487`). Exports stamp the bare two-tier `PRODUCT_VERSION` as `appVersion`.
 
 Derived / automatic:
-- The header badge appends **`(build <git-commit-count>)`** — the count comes from
-  `GIT_COMMIT_COUNT` baked at deploy and advances every push by itself. It is display-only and is
-  **not** part of the stamped `appVersion` (which is the bare `PRODUCT_VERSION`).
+- The **third part of the header badge IS the git commit count** (`v{PRODUCT_VERSION}.{build}`, e.g.
+  `v2.2.487`) — the count comes from `GIT_COMMIT_COUNT` baked at deploy and advances every push by
+  itself. It is display-only and is **not** part of the stamped `appVersion` (the bare two-tier
+  `PRODUCT_VERSION`).
 - The XSD `version="{{SCHEMA_VERSION}}"` attribute and the `{{APP_VERSION}}` annotation are
   **placeholders** swapped at runtime in [`../app/api/schema/route.ts`](../app/api/schema/route.ts)
   (`{{SCHEMA_VERSION}}`→the integer, `{{APP_VERSION}}`→`PRODUCT_VERSION`) — never write a number there.
@@ -42,12 +44,13 @@ Derived / automatic:
 > **Policy (Paul, 2026-08-10 — TWO numbers).** The single `major.minor` version was split. Ask the
 > two questions below independently; either, both, or neither can move on a release.
 
-### Q1 — Did the **physical database** change? → bump **PRODUCT_VERSION.middle**
+### Q1 — Did the **physical database** change? → bump **PRODUCT_VERSION.minor**
 Any table, column, enum, or relation added / removed / renamed / retyped **anywhere** in
 `prisma/schema.prisma` — operational, auth, billing, telemetry, mining, connection tables all count
 (NOT just the curated `ddlGenerate.ts` DDL). Source of truth = the Prisma schema.
-- **Bump the MIDDLE** of `PRODUCT_VERSION` (`2.1.x → 2.2.0`; reset patch to 0). Major (`2 → 3`) is a
-  manual headline/breaking call; patch (`x`) is for fixes with no DB change.
+- **Bump the MINOR** of `PRODUCT_VERSION` (`2.2 → 2.3`). Major (`2 → 3`) is a manual headline/breaking
+  call. There is **no patch**: within a `major.minor`, the build count (the badge's third part)
+  advances by itself on every push.
 - New **rows** in existing tables are data, not structure → no bump.
 
 ### Q2 — Did the **XSD export shape** change? → bump **SCHEMA_VERSION** (the integer)
@@ -71,7 +74,7 @@ state; a TS-type field that is never persisted.
 ---
 
 ## Step 1 — `app/lib/diagram/types.ts`  *(on any bump)*
-- **Q1 (DB change):** bump `PRODUCT_VERSION` (middle; reset patch) and add a history-comment note.
+- **Q1 (DB change):** bump `PRODUCT_VERSION` (minor: `2.2 → 2.3`) and add a history-comment note.
 - **Q2 (XSD change):** increment the `SCHEMA_VERSION` integer and prepend a `schema N:` history entry.
 Both constants live side by side near the bottom of the file.
 

@@ -2489,7 +2489,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           {/* Export Owner display hidden 2026-06-06 — kept off the
               project header to match the sidebar. Value still lives on
               project.ownerName and round-trips through exports. */}
-          <span className="text-[10px] text-gray-900 shrink-0" title="Diagramatix product version">v{PRODUCT_VERSION}{version ? ` (build ${version})` : ""}</span>
+          <span className="text-[10px] text-gray-900 shrink-0" title="Diagramatix product version — major.minor.build">v{PRODUCT_VERSION}.{version ?? 0}</span>
           {/* Org Owner — the owning Org drives org-wide RCM code numbering + the
               compliance roll-up. Read-only chip; re-homing moved to the SuperAdmin
               "Project Org Maintenance" tile (it also renumbers both Orgs). */}
