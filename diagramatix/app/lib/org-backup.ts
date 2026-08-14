@@ -19,9 +19,9 @@ import JSZip from "jszip";
 import { prisma } from "./db";
 import { SCHEMA_VERSION } from "./diagram/types";
 import { getBackupSchema, reviveDates } from "./backupSchema";
-import { captureAllProjectPackages } from "./simulation/captureProject";
-import { replaySimulationPackages } from "./simulation/adoptPackage";
-import type { ExamplePackage } from "./simulation/examplePackage";
+import { captureAllProjectPackages, captureProjectLibrary, isEmptyLibrary } from "./simulation/captureProject";
+import { replaySimulationLibraries, replaySimulationPackages } from "./simulation/adoptPackage";
+import type { ExampleLibrary, ExamplePackage } from "./simulation/examplePackage";
 import {
   FULL_BACKUP_KIND,
   type FullBackupPayload,
@@ -147,9 +147,12 @@ export async function buildOrgBackup(
   // rather than raw Simulation* tables, so it's replayed (not row-inserted) on
   // restore — see replaySimulationPackages.
   const simulationPackages: Record<string, ExamplePackage[]> = {};
+  const simulationLibraries: Record<string, ExampleLibrary> = {};
   for (const p of projects) {
     const pkgs = await captureAllProjectPackages(String(p.id));
     if (pkgs.length) simulationPackages[String(p.id)] = pkgs;
+    const lib = await captureProjectLibrary(String(p.id));
+    if (!isEmptyLibrary(lib)) simulationLibraries[String(p.id)] = lib;
   }
   onProgress?.("Simulation", Object.keys(simulationPackages).length);
 
@@ -233,6 +236,7 @@ export async function buildOrgBackup(
       SopSection: serialise(sopSections as Record<string, unknown>[]),
     },
     ...(Object.keys(simulationPackages).length ? { simulationPackages } : {}),
+    ...(Object.keys(simulationLibraries).length ? { simulationLibraries } : {}),
   };
 
   onProgress?.("Compressing", 0);
@@ -557,7 +561,10 @@ export async function restoreOrgBackupAdditive(
         inserted.SopSection = (inserted.SopSection ?? 0) + sopSectionData.length;
       }
 
-      // Simulation configuration (portable packages) → replay per project.
+      // Simulation configuration → the standalone library first (a project can
+      // own teams/calendars before any study exists, and it makes the package
+      // replay below reuse those rows by name), then the portable packages.
+      await replaySimulationLibraries(tx, payload.simulationLibraries, projectIdMap);
       const simRestored = await replaySimulationPackages(
         tx, payload.simulationPackages, projectIdMap, diagramIdMap, null,
       );

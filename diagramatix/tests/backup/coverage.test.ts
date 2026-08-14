@@ -35,11 +35,28 @@ const SCOPED_COVERED = new Set<string>([
 // so a project backup round-trips a whole simulation is a deliberate follow-up.
 // Single-sourced here and PINNED by the "deliberately omits the Simulator
 // tables" test below, so the omission is an asserted decision, not a comment.
-const SIMULATOR_TABLES = [
+// Simulator CONFIGURATION is carried by the scoped backups — but as portable
+// ExamplePackage bundles + a standalone team/calendar library (see
+// app/lib/simulation/captureProject.ts), replayed rather than row-inserted, so
+// the ids remap onto the restored projects/diagrams. The raw tables are
+// therefore a deliberate omission from the ROW-level scoped backup, not from the
+// backup: tests/backup/simulation-roundtrip.test.ts pins the round-trip.
+const SIMULATOR_CONFIG_TABLES = [
   "SimulationTeam", "SimulationCalendar", "SimulationStudy", "SimulationStudyRoot",
-  "SimulationScenario", "SimulationRun", "SimulationExample",
-  "ProcessMiningRun", "MiningExample", "MiningSource",
+  "SimulationScenario",
 ] as const;
+
+// Run RESULTS + the global example catalog. Results are reproducible by
+// re-running a scenario (and carry a whole network snapshot), and the example
+// catalog is system content like DiagramTypeStyle — neither is per-user/org
+// data. SuperAdmin full backup only.
+const SIMULATOR_RESULT_TABLES = ["SimulationRun", "SimulationExample"] as const;
+
+// Process-mining runs (analysis history, like SimulationRun), the global mining
+// example catalog, and the live-source connector config. MiningSource carries
+// per-project connection settings — wiring it into the scoped backups is an open
+// follow-up, pinned here so the omission stays an asserted decision.
+const MINING_TABLES = ["ProcessMiningRun", "MiningExample", "MiningSource"] as const;
 
 // Risk & Control catalog (org master + project copy). Carried by the full
 // SuperAdmin backup (catalog-driven); wiring them into the SCOPED org/user
@@ -52,10 +69,14 @@ const RISK_CONTROL_TABLES = ["RiskControlLibrary", "RiskControlItem", "RiskContr
 // scoped org/user backup wiring is a deliberate follow-up, pinned here.
 const PCF_TABLES = ["PcfFramework", "PcfNode"] as const;
 
-// Tables the scoped backups deliberately DON'T carry — publish lineage,
-// review workflow, cross-tenant config, notifications, and (for now) the
-// Simulator. Only the SuperAdmin full backup carries these. A new table lands
-// here only as a conscious decision.
+// Tables the scoped backups deliberately DON'T carry AS ROWS — publish lineage,
+// review workflow, cross-tenant config, notifications, run results, and the
+// Simulator/Mining tables. Only the SuperAdmin full backup carries these rows. A
+// new table lands here only as a conscious decision.
+//
+// "Omitted" here means omitted from the ROW-level copy: simulator CONFIGURATION
+// does survive a scoped backup, replayed from portable packages + a standalone
+// library (see SIMULATOR_CONFIG_TABLES above).
 const SCOPED_OMITTED = new Set<string>([
   // Grant/membership tables (like ProjectShare + the bundle audiences, and now
   // admin-managed team membership) — carried by the full SuperAdmin backup only,
@@ -110,7 +131,9 @@ const SCOPED_OMITTED = new Set<string>([
   // Deliberately never backed up or restored — copying it elsewhere would be wrong
   // (and useless: it re-obtains itself when the user clicks "Connect SharePoint").
   "MicrosoftConnection",
-  ...SIMULATOR_TABLES,
+  ...SIMULATOR_CONFIG_TABLES,
+  ...SIMULATOR_RESULT_TABLES,
+  ...MINING_TABLES,
   ...RISK_CONTROL_TABLES,
   ...PCF_TABLES,
 ]);
@@ -147,22 +170,35 @@ describe("backup coverage", () => {
     ).toEqual([]);
   });
 
-  it("deliberately omits the Simulator tables from scoped backups (asserted, not just commented)", async () => {
+  it("deliberately omits the Simulator + Mining tables from ROW-level scoped backups (asserted, not just commented)", async () => {
     const schema = await getBackupSchema();
-    for (const t of SIMULATOR_TABLES) {
+    const pinned: Array<readonly string[]> = [SIMULATOR_CONFIG_TABLES, SIMULATOR_RESULT_TABLES, MINING_TABLES];
+    for (const t of pinned.flat()) {
       // Still a real catalog table — a rename / removal trips this so the pin
       // can't quietly reference a table that no longer exists.
-      expect(schema.tables, `${t} is no longer a catalog table — update SIMULATOR_TABLES`).toContain(t);
-      // Pinned as a CONSCIOUS scoped-backup omission.
+      expect(schema.tables, `${t} is no longer a catalog table — update its pinned list`).toContain(t);
+      // Pinned as a CONSCIOUS row-level scoped-backup omission.
       expect(SCOPED_OMITTED.has(t), `${t} must be a conscious scoped-backup omission`).toBe(true);
-      // The tripwire for the follow-up: the day the Simulator is wired into the
-      // scoped org/user backup, move the table to SCOPED_COVERED — and THIS
-      // fails, reminding you to drop it from the pin and add round-trip coverage.
+      // The tripwire for the follow-up: the day one of these is row-copied into
+      // the scoped org/user backup, move it to SCOPED_COVERED — and THIS fails,
+      // reminding you to drop it from the pin and add round-trip coverage.
       expect(
         SCOPED_COVERED.has(t),
-        `${t} is now scoped-covered — remove it from SIMULATOR_TABLES and add round-trip coverage`,
+        `${t} is now scoped-covered — remove it from its pinned list and add round-trip coverage`,
       ).toBe(false);
     }
+  });
+
+  // The config tables are omitted as ROWS but their content must still survive a
+  // scoped backup via the package/library replay. This asserts the mechanism is
+  // still wired in, so "omitted" can never quietly become "lost".
+  it("carries simulator configuration through the package + library replay", async () => {
+    const capture = await import("@/app/lib/simulation/captureProject");
+    const adopt = await import("@/app/lib/simulation/adoptPackage");
+    expect(typeof capture.captureAllProjectPackages).toBe("function");
+    expect(typeof capture.captureProjectLibrary).toBe("function");
+    expect(typeof adopt.replaySimulationPackages).toBe("function");
+    expect(typeof adopt.replaySimulationLibraries).toBe("function");
   });
 
   it("deliberately omits the Risk & Control tables from scoped backups (asserted, not just commented)", async () => {

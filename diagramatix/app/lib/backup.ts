@@ -32,9 +32,9 @@ import { prisma } from "./db";
 import { ARCHIVE_PROJECT_NAME } from "./archive";
 import { SCHEMA_VERSION } from "./diagram/types";
 import { type BackupProgressFn } from "./full-backup";
-import { captureAllProjectPackages } from "./simulation/captureProject";
-import { replaySimulationPackages } from "./simulation/adoptPackage";
-import type { ExamplePackage } from "./simulation/examplePackage";
+import { captureAllProjectPackages, captureProjectLibrary, isEmptyLibrary } from "./simulation/captureProject";
+import { replaySimulationLibraries, replaySimulationPackages } from "./simulation/adoptPackage";
+import type { ExampleLibrary, ExamplePackage } from "./simulation/examplePackage";
 
 const BACKUP_KIND = "diagramatix-user-backup";
 const BACKUP_ENTRY = "backup.json";
@@ -122,6 +122,10 @@ export interface BackupPayload {
   // calendar libraries; config only, no run results). Optional so older backups
   // still parse. Replayed on restore after diagrams are recreated.
   simulationPackages?: Record<string, ExamplePackage[]>;
+  // The project's team/calendar library on its own, per original project id.
+  // Carried alongside the packages because a project can own a library before
+  // its first study exists — that library is reachable from no package at all.
+  simulationLibraries?: Record<string, ExampleLibrary>;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -223,11 +227,16 @@ export async function buildUserBackup(
   onProgress?.("Prompts", userPromptsRaw.length);
 
   // Simulation configuration per project (studies + scenarios + team/calendar
-  // libraries; config only). Empty projects contribute nothing.
+  // libraries; config only). Empty projects contribute nothing. The library is
+  // captured separately as well as inside each package, so a project that has a
+  // team/calendar library but no study yet still round-trips.
   const simulationPackages: Record<string, ExamplePackage[]> = {};
+  const simulationLibraries: Record<string, ExampleLibrary> = {};
   for (const pid of projectIds) {
     const pkgs = await captureAllProjectPackages(pid);
     if (pkgs.length) simulationPackages[pid] = pkgs;
+    const lib = await captureProjectLibrary(pid);
+    if (!isEmptyLibrary(lib)) simulationLibraries[pid] = lib;
   }
   onProgress?.("Simulation", Object.keys(simulationPackages).length);
 
@@ -258,6 +267,7 @@ export async function buildUserBackup(
       createdAt: p.createdAt.toISOString(),
     })),
     ...(Object.keys(simulationPackages).length ? { simulationPackages } : {}),
+    ...(Object.keys(simulationLibraries).length ? { simulationLibraries } : {}),
   };
 
   onProgress?.("Compressing", 0);
@@ -539,7 +549,10 @@ export async function restoreUserBackup(
   }
 
   // 2c. Simulation configuration (studies + scenarios + team/calendar libraries)
-  // — replay each project's packages into the restored diagrams.
+  // — the library first (so a study-less project keeps its teams, and the
+  // packages below reuse these rows by name rather than duplicating them), then
+  // replay each project's packages into the restored diagrams.
+  await replaySimulationLibraries(tx, payload.simulationLibraries, oldToNewProjectId);
   const simRestored = await replaySimulationPackages(
     tx, payload.simulationPackages, oldToNewProjectId, oldToNewDiagramId, userId,
   );

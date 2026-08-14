@@ -27,6 +27,36 @@ async function seedSimulation(userId: string, orgId: string) {
   return { project, diagram, study };
 }
 
+/** A project whose simulation LIBRARY exists but which has no study yet — the
+ *  state a user is in after setting up teams/calendars but before building a
+ *  study. Nothing here is reachable from a SimulationStudy row. */
+async function seedLibraryOnly(userId: string, orgId: string) {
+  const project = await prisma.project.create({ data: { name: "Library Only", userId, orgId } });
+  const calendar = await prisma.simulationCalendar.create({ data: { name: "Night Shift", projectId: project.id } });
+  await prisma.simulationTeam.create({
+    data: { name: "Assessors", projectId: project.id, capacity: 4, costPerHour: 85, efficiency: 0.9, calendarId: calendar.id },
+  });
+  return { project };
+}
+
+/** A project with TWO studies over the same project-wide team/calendar library —
+ *  each captured package carries the whole library, so a naive replay inserts it
+ *  once per study. */
+async function seedTwoStudies(userId: string, orgId: string) {
+  const project = await prisma.project.create({ data: { name: "Two Studies", userId, orgId } });
+  const diagram = await prisma.diagram.create({
+    data: { name: "Shared Diagram", type: "bpmn", userId, orgId, projectId: project.id, data: { elements: [], connectors: [] } },
+  });
+  const calendar = await prisma.simulationCalendar.create({ data: { name: "Business Hours", projectId: project.id } });
+  await prisma.simulationTeam.create({ data: { name: "Processors", projectId: project.id, capacity: 3, calendarId: calendar.id } });
+  for (const name of ["Study A", "Study B"]) {
+    const study = await prisma.simulationStudy.create({ data: { name, projectId: project.id, createdById: userId } });
+    await prisma.simulationStudyRoot.create({ data: { studyId: study.id, diagramId: diagram.id } });
+    await prisma.simulationScenario.create({ data: { name: "Baseline", studyId: study.id, isBaseline: true } });
+  }
+  return { project };
+}
+
 describe("scoped backup round-trip — simulation configuration", () => {
   beforeEach(async () => { await truncateAll(); });
 
@@ -79,5 +109,52 @@ describe("scoped backup round-trip — simulation configuration", () => {
     });
     expect(studies).toHaveLength(1);
     expect(studies[0].scenarios).toHaveLength(2);
+  });
+
+  it("carries a team/calendar library that has no study yet", async () => {
+    const { user, org } = await createUserWithOrg();
+    await seedLibraryOnly(user.id, org.id);
+
+    const bytes = await buildUserBackup(user.id, "test");
+    await restoreUserBackup(bytes, user.id, org.id, "Owner");
+
+    const restoredProject = await prisma.project.findFirst({
+      where: { userId: user.id, name: { contains: "Library Only" }, id: { not: undefined } },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(restoredProject).toBeTruthy();
+    const teams = await prisma.simulationTeam.findMany({ where: { projectId: restoredProject!.id } });
+    expect(teams).toHaveLength(1);
+    expect(teams[0].name).toBe("Assessors");
+    expect(teams[0].capacity).toBe(4);
+    expect(teams[0].costPerHour).toBe(85);
+    // The calendar came back too, and the team is still linked to it.
+    const calendars = await prisma.simulationCalendar.findMany({ where: { projectId: restoredProject!.id } });
+    expect(calendars).toHaveLength(1);
+    expect(calendars[0].name).toBe("Night Shift");
+    expect(teams[0].calendarId).toBe(calendars[0].id);
+  });
+
+  it("does not duplicate the library when a project has two studies", async () => {
+    const { user, org } = await createUserWithOrg();
+    await seedTwoStudies(user.id, org.id);
+
+    const bytes = await buildUserBackup(user.id, "test");
+    await restoreUserBackup(bytes, user.id, org.id, "Owner");
+
+    const restoredProject = await prisma.project.findFirst({
+      where: { userId: user.id, name: { contains: "(restored)" } },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(restoredProject).toBeTruthy();
+    const studies = await prisma.simulationStudy.findMany({ where: { projectId: restoredProject!.id } });
+    expect(studies.map((s) => s.name).sort()).toEqual(["Study A", "Study B"]);
+    // The library is project-wide: two studies must NOT mean two copies of it.
+    const teams = await prisma.simulationTeam.findMany({ where: { projectId: restoredProject!.id } });
+    expect(teams).toHaveLength(1);
+    const calendars = await prisma.simulationCalendar.findMany({ where: { projectId: restoredProject!.id } });
+    expect(calendars).toHaveLength(1);
+    // Both studies' teams resolve to the one shared calendar row.
+    expect(teams[0].calendarId).toBe(calendars[0].id);
   });
 });

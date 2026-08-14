@@ -7,7 +7,7 @@
  * shared by the example "adopt" route AND the user-facing "Import simulation".
  */
 import { prisma } from "@/app/lib/db";
-import { validateExamplePackage, type ExamplePackage } from "./examplePackage";
+import { validateExamplePackage, type ExampleLibrary, type ExamplePackage } from "./examplePackage";
 
 export interface AdoptCtx {
   userId: string;
@@ -19,6 +19,79 @@ export interface AdoptCtx {
 
 /** Prisma interactive-transaction client type (inferred, no Prisma namespace import). */
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Recreate a simulation LIBRARY (calendars + teams) inside an EXISTING project,
+ * REUSING any row that already carries the same name in that project rather than
+ * inserting a second one.
+ *
+ * The library is project-wide but every package embeds a copy of it, so a project
+ * with N studies yields N packages that each carry the whole library. Blind
+ * inserts multiplied the team + calendar rows by N on restore. Name is the
+ * package-level identity for both (teams reference calendars by name, and
+ * overrides/interventions reference teams by name), so reuse-by-name is the
+ * correct merge key. Adopting into a fresh project is unaffected — nothing
+ * pre-exists, so every row is still created exactly once.
+ *
+ * Returns the calendar name → id map for the project.
+ */
+export async function adoptLibraryInto(
+  tx: Tx,
+  lib: ExampleLibrary,
+  projectId: string,
+): Promise<Map<string, string>> {
+  // Working-calendar library (first, so teams can reference by id).
+  const calendarNameToId = new Map<string, string>();
+  for (const c of lib.calendars ?? []) {
+    const existing = await tx.simulationCalendar.findFirst({
+      where: { projectId, name: c.name }, select: { id: true },
+    });
+    if (existing) { calendarNameToId.set(c.name, existing.id); continue; }
+    const cal = await tx.simulationCalendar.create({ data: { name: c.name, projectId } });
+    calendarNameToId.set(c.name, cal.id);
+    await tx.$executeRaw`UPDATE "SimulationCalendar" SET pattern = ${JSON.stringify(c.pattern ?? { intervals: [] })}::jsonb WHERE id = ${cal.id}`;
+  }
+
+  // Team library (link each team to its calendar by name → id).
+  for (const t of lib.teams) {
+    const existing = await tx.simulationTeam.findFirst({
+      where: { projectId, name: t.name }, select: { id: true },
+    });
+    if (existing) continue;
+    await tx.simulationTeam.create({
+      data: {
+        name: t.name, projectId,
+        capacity: Math.max(1, Math.round(t.capacity ?? 1)),
+        costPerHour: t.costPerHour ?? null,
+        efficiency: t.efficiency && t.efficiency > 0 ? t.efficiency : 1,
+        calendarId: t.calendarName ? calendarNameToId.get(t.calendarName) ?? null : null,
+      },
+    });
+  }
+  return calendarNameToId;
+}
+
+/**
+ * Replay a `{ originalProjectId → library }` map into already-restored projects.
+ * Runs BEFORE replaySimulationPackages so a project whose library exists without
+ * any study still gets its teams/calendars back; packages replayed afterwards
+ * then reuse those rows by name instead of duplicating them.
+ */
+export async function replaySimulationLibraries(
+  tx: Tx,
+  libraries: Record<string, ExampleLibrary> | undefined | null,
+  projectIdMap: Map<string, string>,
+): Promise<number> {
+  if (!libraries) return 0;
+  let n = 0;
+  for (const [origProjectId, lib] of Object.entries(libraries)) {
+    const newProjectId = projectIdMap.get(origProjectId);
+    if (!newProjectId || !lib || !Array.isArray(lib.teams)) continue;
+    await adoptLibraryInto(tx, lib, newProjectId);
+    n += lib.teams.length;
+  }
+  return n;
+}
 
 /**
  * Recreate a package's simulation LIBRARY (calendars + teams) and its STUDY +
@@ -35,26 +108,7 @@ export async function adoptPackageInto(
 ): Promise<void> {
   const { projectId, keyToDiagramId, userId } = ctx;
 
-  // Working-calendar library (create first so teams can reference by id).
-  const calendarNameToId = new Map<string, string>();
-  for (const c of pkg.calendars ?? []) {
-    const cal = await tx.simulationCalendar.create({ data: { name: c.name, projectId } });
-    calendarNameToId.set(c.name, cal.id);
-    await tx.$executeRaw`UPDATE "SimulationCalendar" SET pattern = ${JSON.stringify(c.pattern ?? { intervals: [] })}::jsonb WHERE id = ${cal.id}`;
-  }
-
-  // Team library (link each team to its calendar by name → new id).
-  for (const t of pkg.teams) {
-    await tx.simulationTeam.create({
-      data: {
-        name: t.name, projectId,
-        capacity: Math.max(1, Math.round(t.capacity ?? 1)),
-        costPerHour: t.costPerHour ?? null,
-        efficiency: t.efficiency && t.efficiency > 0 ? t.efficiency : 1,
-        calendarId: t.calendarName ? calendarNameToId.get(t.calendarName) ?? null : null,
-      },
-    });
-  }
+  await adoptLibraryInto(tx, pkg, projectId);
 
   // Study + roots (remap package keys → new diagram ids).
   const study = await tx.simulationStudy.create({ data: { name: pkg.study.name, projectId, createdById: userId } });

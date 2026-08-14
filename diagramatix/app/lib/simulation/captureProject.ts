@@ -11,6 +11,7 @@ import {
   validateExamplePackage,
   type ExamplePackage,
   type ExampleDiagram,
+  type ExampleLibrary,
   type ExampleScenario,
 } from "./examplePackage";
 import type { ScenarioRunConfig, WorkCalendar } from "./types";
@@ -20,6 +21,35 @@ const variantIdsOf = (id: unknown): string[] =>
   Array.isArray(id) ? (id as unknown[]).filter((x): x is string => typeof x === "string") : [];
 
 export interface CaptureResult { pkg: ExamplePackage; studyName: string }
+
+/** Capture a project's simulation LIBRARY (teams + their working calendars),
+ *  independent of any study. A package embeds this, but so does a backup/export
+ *  on its own — a project can own a fully-configured library before its first
+ *  study exists, and that library must survive a backup/restore round-trip. */
+export async function captureProjectLibrary(projectId: string): Promise<ExampleLibrary> {
+  const teamRows = await prisma.simulationTeam.findMany({
+    where: { projectId },
+    select: { name: true, capacity: true, costPerHour: true, efficiency: true, calendarId: true },
+  });
+  const calendarRows = await prisma.simulationCalendar.findMany({
+    where: { projectId },
+    select: { id: true, name: true, pattern: true },
+  });
+  const calendarIdToName = new Map(calendarRows.map((c) => [c.id, c.name]));
+  const calendars = calendarRows.map((c) => ({
+    name: c.name,
+    pattern: (c.pattern ?? { intervals: [] }) as unknown as WorkCalendar,
+  }));
+  const teams = teamRows.map((t) => ({
+    name: t.name, capacity: t.capacity, costPerHour: t.costPerHour, efficiency: t.efficiency,
+    ...(t.calendarId && calendarIdToName.has(t.calendarId) ? { calendarName: calendarIdToName.get(t.calendarId) } : {}),
+  }));
+  return { teams, ...(calendars.length ? { calendars } : {}) };
+}
+
+/** True when a project has nothing worth carrying in its library. */
+export const isEmptyLibrary = (lib: ExampleLibrary): boolean =>
+  lib.teams.length === 0 && (lib.calendars?.length ?? 0) === 0;
 
 /** Capture EVERY simulation study in a project as portable packages (config only:
  *  study + scenarios + team/calendar libraries; no run results). Used to embed a
@@ -54,14 +84,7 @@ export async function captureProjectPackage(projectId: string, studyId: string):
     key: d.id, name: d.name, type: d.type || "bpmn", data: (d.data ?? {}) as unknown as DiagramData,
   }));
 
-  const teamRows = await prisma.simulationTeam.findMany({ where: { projectId }, select: { name: true, capacity: true, costPerHour: true, efficiency: true, calendarId: true } });
-  const calendarRows = await prisma.simulationCalendar.findMany({ where: { projectId }, select: { id: true, name: true, pattern: true } });
-  const calendarIdToName = new Map(calendarRows.map((c) => [c.id, c.name]));
-  const calendars = calendarRows.map((c) => ({ name: c.name, pattern: (c.pattern ?? { intervals: [] }) as unknown as WorkCalendar }));
-  const teams = teamRows.map((t) => ({
-    name: t.name, capacity: t.capacity, costPerHour: t.costPerHour, efficiency: t.efficiency,
-    ...(t.calendarId && calendarIdToName.has(t.calendarId) ? { calendarName: calendarIdToName.get(t.calendarId) } : {}),
-  }));
+  const { teams, calendars } = await captureProjectLibrary(projectId);
 
   const scenarios: ExampleScenario[] = study.scenarios.map((s) => {
     const variantRootKeys = variantIdsOf(s.variantRootIds).filter((k) => capturedKeys.has(k));
@@ -77,7 +100,7 @@ export async function captureProjectPackage(projectId: string, studyId: string):
   const pkg: ExamplePackage = {
     version: 1,
     teams,
-    ...(calendars.length ? { calendars } : {}),
+    ...(calendars?.length ? { calendars } : {}),
     diagrams,
     study: { name: study.name, rootKeys: rootIds },
     scenarios,

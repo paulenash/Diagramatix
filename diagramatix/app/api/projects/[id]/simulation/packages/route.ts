@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
-import { captureAllProjectPackages } from "@/app/lib/simulation/captureProject";
+import { captureAllProjectPackages, captureProjectLibrary, isEmptyLibrary } from "@/app/lib/simulation/captureProject";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,5 +22,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     throw err;
   }
   const packages = await captureAllProjectPackages(id);
-  return NextResponse.json({ packages });
+  // The team/calendar library rides along separately as well as inside each
+  // package — a project can own one before its first study exists, and that
+  // library is reachable from no package at all.
+  const lib = await captureProjectLibrary(id);
+  return NextResponse.json({ packages, ...(isEmptyLibrary(lib) ? {} : { library: lib }) });
 }

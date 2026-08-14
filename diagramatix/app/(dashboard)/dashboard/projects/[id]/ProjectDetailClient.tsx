@@ -1198,12 +1198,17 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       // travels with a JSON export so it's recreated on import. Config only — no
       // run results. XML export doesn't carry it (kept diagram-structural).
       let simulationPackages: unknown[] = [];
+      let simulationLibrary: unknown = null;
       if (format !== "xml") {
         try {
           log("Exporting simulation configuration...");
           const simRes = await fetch(`/api/projects/${project.id}/simulation/packages`);
           if (simRes.ok) {
-            simulationPackages = (await simRes.json())?.packages ?? [];
+            const simJson = await simRes.json();
+            simulationPackages = simJson?.packages ?? [];
+            // Carried separately so a project with a team library but no study
+            // yet still exports (and re-imports) that library.
+            simulationLibrary = simJson?.library ?? null;
             log(`✔ ${simulationPackages.length} simulation study/studies exported`);
           }
         } catch { /* best-effort — simulation is optional */ }
@@ -1230,6 +1235,7 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
         })),
         folderTree,
         ...(simulationPackages.length ? { simulationPackages } : {}),
+        ...(simulationLibrary ? { simulationLibrary } : {}),
         // APQC licence: any export carrying PCF-derived content must include the notice.
         ...(anyDiagramHasPcf(diagramsWithData as { data?: unknown }[]) ? { pcfAttribution: APQC_ATTRIBUTION } : {}),
       };
@@ -1645,14 +1651,17 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     idMap: Map<string, string>,
     log: (m: string) => void,
   ) {
-    const packages = exportData.simulationPackages as unknown[] | undefined;
-    if (!Array.isArray(packages) || packages.length === 0) return;
+    const packages = (exportData.simulationPackages as unknown[] | undefined) ?? [];
+    const library = exportData.simulationLibrary ?? null;
+    // A project may carry only a team/calendar library (no study yet) \u2014 that's
+    // still simulation configuration worth replaying.
+    if (packages.length === 0 && !library) return;
     try {
       log(`Importing ${packages.length} simulation study/studies\u2026`);
       const res = await fetch(`/api/projects/${targetProjectId}/simulation/adopt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packages, keyMap: Object.fromEntries(idMap) }),
+        body: JSON.stringify({ packages, library, keyMap: Object.fromEntries(idMap) }),
       });
       if (res.ok) {
         const { adopted } = await res.json();

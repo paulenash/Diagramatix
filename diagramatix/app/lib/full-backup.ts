@@ -69,6 +69,9 @@ export interface FullBackupPayload {
    *  results), replayed on restore after diagrams are recreated. The full backup
    *  carries the real simulation TABLES instead, so this stays undefined there. */
   simulationPackages?: Record<string, import("./simulation/examplePackage").ExamplePackage[]>;
+  /** Per-project team/calendar library, carried separately from the packages so
+   *  a project with a library but no study still round-trips. */
+  simulationLibraries?: Record<string, import("./simulation/examplePackage").ExampleLibrary>;
 }
 
 /** Per-section progress callback for the streaming backup endpoints. Fired

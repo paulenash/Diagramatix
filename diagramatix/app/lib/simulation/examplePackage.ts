@@ -51,11 +51,17 @@ export interface ExampleScenario {
   variantRootKeys?: string[];
 }
 
-export interface ExamplePackage {
-  version: 1;
+/** A project's simulation LIBRARY on its own — the teams + calendars, with no
+ *  study attached. A package always embeds one of these, but a project can own
+ *  a library before any study exists, so backups/exports carry it separately
+ *  too (see captureProjectLibrary). */
+export interface ExampleLibrary {
   teams: ExampleTeam[];
-  /** Optional working-calendar library (team shift patterns / source hours). */
   calendars?: ExampleCalendar[];
+}
+
+export interface ExamplePackage extends ExampleLibrary {
+  version: 1;
   diagrams: ExampleDiagram[];
   study: { name: string; rootKeys: string[] };
   scenarios: ExampleScenario[];
