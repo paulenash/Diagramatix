@@ -156,7 +156,7 @@ export function connectorXml(c: any, ind: string): string {
   // XML export. Emit it as an optional boolean attribute.
   x += `${attr("labelAnchor", c.labelAnchor)}${attr("arrowAtSource", c.arrowAtSource || undefined)}${attr("bottleneck", c.bottleneck || undefined)}`;
   // v1.25: decision-gateway branch routing (Simulation). Optional + additive.
-  x += `${attr("branchProbability", c.branchProbability)}${attr("branchCondition", c.branchCondition)}${attr("isDefaultFlow", c.isDefaultFlow || undefined)}>\n`;
+  x += `${attr("branchProbability", c.branchProbability)}${attr("branchCondition", c.branchCondition)}${attr("isDefaultFlow", c.isDefaultFlow || undefined)}${attr("branchPercent", c.branchPercent)}>\n`;
 
   if (c.waypoints && c.waypoints.length > 0) {
     x += `${ind}  <dgx:waypoints>\n`;

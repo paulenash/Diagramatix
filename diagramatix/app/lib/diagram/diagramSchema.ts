@@ -122,6 +122,7 @@ export const connectorSchema = z.object({
   branchProbability: z.number().optional(),
   branchCondition: z.string().optional(),
   isDefaultFlow: z.boolean().optional(),
+  branchPercent: z.number().optional(),
 });
 
 const viewportSchema = z.object({ x: z.number(), y: z.number(), zoom: z.number() });

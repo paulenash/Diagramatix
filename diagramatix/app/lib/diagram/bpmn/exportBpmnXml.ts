@@ -120,7 +120,17 @@ export function buildBpmnXml(data: DiagramData, diagramName: string): string {
       }
       case "gateway": {
         const tag = GATEWAY_ELEMENT[el.gatewayType ?? "exclusive"] ?? "exclusiveGateway";
-        return `${indent}<bpmn:${tag}${attr("id", id)}${name}/>\n`;
+        // BPMN holds the default ("else") flow as a `default` attribute on the
+        // GATEWAY referencing one of its outgoing flows — not as a flag on the
+        // flow, which is how we store it. Parallel and event-based gateways
+        // evaluate no conditions and may not carry one, so it is emitted only
+        // for the gateway kinds the spec allows.
+        const canDefault = el.gatewayType !== "parallel" && el.gatewayType !== "event-based";
+        const def = canDefault
+          ? data.connectors.find((c) => c.sourceId === el.id && c.isDefaultFlow)
+          : undefined;
+        const defAttr = def ? attr("default", nid(def.id)) : "";
+        return `${indent}<bpmn:${tag}${attr("id", id)}${name}${defAttr}/>\n`;
       }
       case "start-event":
       case "end-event":

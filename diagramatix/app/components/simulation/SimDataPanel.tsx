@@ -14,6 +14,8 @@ import { useState } from "react";
 import type { DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/types";
 import { getSimParams, simPatch, DISTRIBUTION_KINDS, type SimDist, type ElementSimParams } from "@/app/lib/diagram/simParams";
 import { clearSimData } from "@/app/lib/simulation/clearSimData";
+import { useDiagramValues, hasDiagramValues } from "@/app/lib/simulation/useDiagramValues";
+import type { ClockUnit } from "@/app/lib/simulation/types";
 import { MatrixButton } from "./matrix/MatrixChrome";
 
 const SOURCE_TYPES = new Set(["start-event", "intermediate-event"]);
@@ -60,7 +62,7 @@ function MatrixDist({ value, onChange }: { value?: SimDist; onChange: (d: SimDis
 
 const num = (v: string) => (v === "" ? undefined : Math.max(0, Number(v) || 0));
 
-export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, calendars = [], teams = [] }: {
+export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, calendars = [], teams = [], clockUnit = "minute" }: {
   data: DiagramData;
   onApplyData: (next: DiagramData) => void;
   onFillMissing?: () => number;
@@ -71,6 +73,9 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
   calendars?: { id: string; name: string }[];
   /** Defined team names (from the Team library) for the per-task Team picker. */
   teams?: string[];
+  /** The run's base time unit, so diagram CT/WT authored in hours/days converts
+   *  correctly when taken into the simulation model. */
+  clockUnit?: ClockUnit;
 }) {
   const [confirmClear, setConfirmClear] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -103,13 +108,41 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
   for (const t of tasks) if (!getSimParams(t).cycleTime) missingItems.push(`${nameOf(t)} — cycle time`);
   for (const g of gateways) {
     const edges = branchSum(g);
+    if (edges.length < 2) continue;
     const hasCond = edges.some((e) => e.branchCondition);
     const sum = edges.reduce((a, e) => a + (e.branchProbability ?? 0), 0);
-    if (edges.length > 1 && !hasCond && Math.abs(sum - 100) > 0.5) missingItems.push(`${nameOf(g)} — branches total ${sum}% (need 100)`);
+    if (g.gatewayType === "inclusive") {
+      // Inclusive branches fire INDEPENDENTLY, so they legitimately total more
+      // than 100 (90 + 30 means 27% take both). Flagging that as an error is
+      // wrong. What an inclusive gateway does need is a default flow, for the
+      // cases where no branch fires at all.
+      if (!edges.some((e) => e.isDefaultFlow)) missingItems.push(`${nameOf(g)} — inclusive gateway has no default flow`);
+      continue;
+    }
+    if (g.gatewayType === "parallel") continue; // no conditions, no shares
+    if (!hasCond && Math.abs(sum - 100) > 0.5) missingItems.push(`${nameOf(g)} — branches total ${sum}% (need 100)`);
   }
   const missing = missingItems.length;
 
   function doFill() { const n = onFillMissing?.() ?? 0; setMsg(`Filled ${n} value(s).`); }
+
+  // Take the CT/WT + branch shares the DIAGRAM already documents. Only offered
+  // when there is something to take, so the control is never a no-op.
+  const canUseDiagram = hasDiagramValues(data);
+  function doUseDiagram() {
+    const r = useDiagramValues(data, clockUnit);
+    onApplyData(r.data);
+    const bits = [
+      r.cycleTimes ? `${r.cycleTimes} cycle time(s)` : "",
+      r.waitTimes ? `${r.waitTimes} wait time(s)` : "",
+      r.branches ? `${r.branches} branch %` : "",
+    ].filter(Boolean);
+    setMsg(
+      (bits.length ? `Took ${bits.join(", ")} from the diagram.` : "Nothing new to take — the simulation already has values.") +
+      (r.skipped ? ` ${r.skipped} left as-is (already set here).` : "") +
+      (r.unconverted ? ` ${r.unconverted} had no time unit and were read as ${clockUnit}s.` : ""),
+    );
+  }
   function doClear() { const r = clearSimData(data); onApplyData(r.data); setConfirmClear(false); setMsg(`Cleared ${r.cleared} item(s).`); }
 
   const flag = (bad: boolean) => <span className={bad ? "text-red-400" : "text-green-500/40"}>●</span>;
@@ -118,6 +151,11 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
     <div className="flex flex-col gap-3 text-[10px] overflow-x-auto">
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
+        {canUseDiagram && (
+          <span title="Take the CT/WT and gateway branch %s already recorded on the diagram, instead of inventing values">
+            <MatrixButton onClick={doUseDiagram}>↧ Use diagram values</MatrixButton>
+          </span>
+        )}
         {onFillMissing && <MatrixButton onClick={doFill}>⚙ Fill missing</MatrixButton>}
         {!confirmClear
           ? <MatrixButton variant="danger" onClick={() => setConfirmClear(true)}>🗑 Clear all</MatrixButton>

@@ -395,6 +395,11 @@ interface BuildContext {
    *  without a shape are dropped from the visual but still recorded here so
    *  the corresponding `<sequenceFlow>` can be warned-and-dropped properly. */
   hasShape: Set<string>;
+  /** BPMN ids of sequence flows named by a gateway's `default` attribute. BPMN
+   *  holds the default ("else") flow on the GATEWAY, but we store it as a flag
+   *  on the flow, so the references are collected while walking gateways and
+   *  applied once the connectors exist. */
+  defaultFlowRefs: Set<string>;
   stats: BpmnImportResult["stats"];
 }
 
@@ -623,6 +628,11 @@ function walkProcessBody(
     if (!bpmnId) continue;
     const name = getAttr(g.openTag, "name") ?? "";
     const gatewayType = GATEWAY_LOCAL_NAMES[g.local];
+    // The spec allows `default` only on gateways that evaluate conditions.
+    const defaultRef = getAttr(g.openTag, "default");
+    if (defaultRef && gatewayType !== "parallel" && gatewayType !== "event-based") {
+      ctx.defaultFlowRefs.add(defaultRef);
+    }
     const { el, hadShape } = buildElement(ctx, bpmnId, "gateway", name, g.body, {
       gatewayType,
       parentId: parentDiagramId,
@@ -997,6 +1007,10 @@ function buildFlows(
       // type doesn't have a generic properties bag.
       (conn as Connector & { _condition?: string })._condition = "true";
     }
+    // The owning gateway named this flow as its default — carry the BPMN
+    // `default` attribute across as our per-flow flag, so it draws with the
+    // spec's slash and the simulator uses it as the else branch.
+    if (ctx.defaultFlowRefs.has(bpmnId)) conn.isDefaultFlow = true;
     ctx.connectors.push(conn);
     ctx.stats.connectorsCreated++;
   }
@@ -1045,6 +1059,7 @@ export async function importBpmnXml(
     elements: [],
     connectors: [],
     hasShape: new Set(),
+    defaultFlowRefs: new Set(),
     stats,
   };
 

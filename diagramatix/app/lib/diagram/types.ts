@@ -301,6 +301,15 @@ export interface Connector {
   branchProbability?: number;
   branchCondition?: string;
   isDefaultFlow?: boolean;
+  // DIAGRAM-level branch share (0..100) for an outgoing edge of a decision
+  // gateway — the documented routing split, drawn on the connector and authored
+  // in the editor alongside the task CT/WT. It sits apart from
+  // `branchProbability` (the SIMULATION input) exactly as `properties.cycleTime`
+  // sits apart from `properties.sim.cycleTime`: the diagram records what the
+  // process does, and "Use diagram values" copies it into the simulation model.
+  // Exclusive branches should total 100; INCLUSIVE branches are independent and
+  // may total more (90 + 30 means 27% take both).
+  branchPercent?: number;
 }
 
 export interface Viewport {

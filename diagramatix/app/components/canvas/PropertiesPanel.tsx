@@ -1555,6 +1555,91 @@ export function PropertiesPanel({
             </div>
           )}
         </div>
+        {/* ── Gateway routing (BPMN) ──────────────────────────────────────
+            The documented branch share + the default ("else") flow, authored
+            here on the diagram rather than only inside the Simulator. Offered
+            on outgoing edges of an exclusive/inclusive gateway; the spec allows
+            no default on a parallel or event-based gateway, which evaluate no
+            conditions, so it isn't shown for those. */}
+        {onUpdateConnectorFields && (() => {
+          const src = allElements?.find((e) => e.id === connector.sourceId);
+          if (!src || src.type !== "gateway") return null;
+          const gt = src.gatewayType ?? "exclusive";
+          if (gt === "parallel" || gt === "event-based") return null;
+          const siblings = (allConnectors ?? []).filter((c) => c.sourceId === src.id);
+          if (siblings.length < 2) return null;
+          const inclusive = gt === "inclusive";
+          const total = siblings.reduce((a, c) => a + (c.branchPercent ?? 0), 0);
+          // Exclusive branches partition the cases, so they must total 100.
+          // Inclusive branches are independent and legitimately total more.
+          const sumWrong = !inclusive && total > 0 && Math.abs(total - 100) > 0.01;
+          const isDefault = connector.isDefaultFlow === true;
+          const otherDefault = siblings.find((c) => c.id !== connector.id && c.isDefaultFlow);
+          const needsDefault = inclusive && !siblings.some((c) => c.isDefaultFlow);
+          return (
+            <div className="space-y-1 border-t border-gray-100 pt-1.5">
+              <p className="text-[10px] text-gray-500 font-medium">
+                {inclusive ? "Inclusive" : "Exclusive"} gateway branch
+              </p>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-medium text-gray-500 w-20 shrink-0">Share %:</span>
+                <input
+                  type="number" min={0} max={100} step="any"
+                  className="w-16 text-[10px] border border-gray-300 rounded px-1 py-0.5"
+                  value={connector.branchPercent ?? ""}
+                  placeholder="—"
+                  disabled={isDefault}
+                  title={isDefault
+                    ? "The default flow has no share of its own — it takes whatever the other branches didn't"
+                    : inclusive
+                      ? "How often this branch is taken. Inclusive branches are independent, so they may total more than 100%."
+                      : "How often this branch is taken. Exclusive branches must total 100%."}
+                  onChange={(e) => onUpdateConnectorFields(connector.id, {
+                    branchPercent: e.target.value === "" ? undefined : Math.max(0, Math.min(100, Number(e.target.value))),
+                  })}
+                />
+                <span className="text-[10px] text-gray-400">
+                  total {Math.round(total)}%
+                </span>
+              </div>
+              {sumWrong && (
+                <p className="text-[10px] text-amber-600">
+                  Exclusive branches should total 100% (currently {Math.round(total)}%).
+                </p>
+              )}
+              <label className="flex items-center gap-1 cursor-pointer" title="BPMN default flow — taken when no other branch applies. Drawn with a slash across the connector. Only one per gateway.">
+                <span className="text-[10px] font-medium text-gray-500 w-20 shrink-0">Default flow:</span>
+                <input
+                  type="checkbox" className="cursor-pointer"
+                  checked={isDefault}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    // BPMN allows exactly one default per gateway, so setting
+                    // this one clears whichever sibling held it.
+                    if (on && otherDefault) onUpdateConnectorFields(otherDefault.id, { isDefaultFlow: undefined });
+                    onUpdateConnectorFields(connector.id, {
+                      isDefaultFlow: on || undefined,
+                      // A default flow carries no share of its own.
+                      ...(on ? { branchPercent: undefined } : {}),
+                    });
+                  }}
+                />
+                {isDefault && <span className="text-[10px] text-gray-400">(slash shown on the line)</span>}
+                {!isDefault && otherDefault && (
+                  <span className="text-[10px] text-gray-400 truncate">
+                    currently: {otherDefault.label || "another branch"}
+                  </span>
+                )}
+              </label>
+              {needsDefault && (
+                <p className="text-[10px] text-amber-600">
+                  An inclusive gateway needs a default flow — its branches are independent, so a case
+                  where none of them applies would have nowhere to go.
+                </p>
+              )}
+            </div>
+          );
+        })()}
         {connector.type.startsWith("archi-") && onUpdateConnectorType && (() => {
           const meta = ARCHI_REL_META[connector.type];
           const group: ArchiRelGroup = meta?.group ?? "Other";

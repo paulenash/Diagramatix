@@ -1155,6 +1155,10 @@
     <xs:attribute name="branchProbability" type="xs:decimal" use="optional"/>
     <xs:attribute name="branchCondition"   type="xs:string"  use="optional"/>
     <xs:attribute name="isDefaultFlow"     type="xs:boolean" use="optional"/>
+    <!-- DIAGRAM-level branch share (0..100) authored in the editor, as opposed
+         to branchProbability (the simulation input). Exclusive branches should
+         total 100; inclusive branches are independent and may total more. -->
+    <xs:attribute name="branchPercent"     type="xs:decimal" use="optional"/>
   </xs:complexType>
 
   <!-- Waypoints -->

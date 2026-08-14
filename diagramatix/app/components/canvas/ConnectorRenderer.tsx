@@ -854,6 +854,29 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     const pts = `${mx + ux * r},${my + uy * r} ${mx + px * r},${my + py * r} ${mx - ux * r},${my - uy * r} ${mx - px * r},${my - py * r}`;
     return <polygon points={pts} fill="white" stroke="#374151" strokeWidth={1.2} />;
   })();
+
+  // Documented branch share on a gateway's outgoing edge — drawn just past the
+  // source-end marker so it reads as "this much of the flow goes this way".
+  // Offset perpendicular to the line so it never sits on top of the path.
+  const branchPercentLabel = (() => {
+    const pct = connector.branchPercent;
+    if (pct === undefined || connector.type !== "sequence" || visibleWaypoints.length < 2) return null;
+    const p0 = visibleWaypoints[0], p1 = visibleWaypoints[1];
+    const len = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1;
+    const ux = (p1.x - p0.x) / len, uy = (p1.y - p0.y) / len;
+    const px = -uy, py = ux;
+    const along = Math.min(26, len * 0.45);
+    const x = p0.x + ux * along + px * 8;
+    const y = p0.y + uy * along + py * 8;
+    return (
+      <text
+        x={x} y={y} textAnchor="middle" dominantBaseline="middle"
+        fontSize={9} fill="#6b7280" style={{ pointerEvents: "none", userSelect: "none" }}
+      >
+        {Number.isInteger(pct) ? pct : pct.toFixed(1)}%
+      </text>
+    );
+  })();
   // For curvilinear, use the actual curve for the hit area so clicks near the arc are detected.
   // For messageBPMN, use visible path only — invisible leaders extend into pool bodies and
   // would make clicks inside the pool incorrectly select the connector.
@@ -993,6 +1016,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   return (
     <g opacity={faded ? 0.2 : undefined}>
       {flowMarker}
+      {branchPercentLabel}
       {isMessageBPMN ? (
         <defs>
           <UnfilledTriangleMarker id={`msg-end-${connector.id}`}   color={strokeColor} />
