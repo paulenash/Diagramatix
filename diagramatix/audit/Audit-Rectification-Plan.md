@@ -1,0 +1,160 @@
+# Diagramatix — Audit Rectification Plan
+
+| | |
+|---|---|
+| **Created** | 2026-08-14 |
+| **Baseline audit** | [`Source-Code-Audit.md`](./Source-Code-Audit.md) — staged multi-agent review, 2026-06-13 → 2026-06-26, ~103 findings, 36 fixed |
+| **This document** | The **live worklist**. Every still-open finding from the baseline audit, re-verified against `HEAD` (`2501b3ed`), plus new findings from a fresh sweep of surface added since the baseline (simulator, mining connectors, screencast, SOP, SharePoint, feature-availability, gateway/diagram work). Fixed items are **not** repeated here — they live in the baseline doc. |
+| **How to use** | Work an item, set its **Status** to `In progress` → `Fixed` (with the commit), or `Won't fix` (with a reason). Keep the baseline doc as the historical record; keep this doc as the burn-down. |
+
+**Status values:** `Not fixed` · `In progress` · `Fixed (<commit>)` · `Needs confirmation` (finding plausible but not yet reproduced) · `Won't fix (<reason>)`.
+
+**Severity:** Critical = exploitable hole / data loss · High = a bug users hit, or a security weakness needing circumstance · Medium = latent bug / race / robustness gap · Low = quality / performance / minor hardening.
+
+---
+
+## Re-verification summary (2026-08-14)
+
+- **All baseline "Open" findings were re-checked against current code.** None of the open items have been silently fixed since 26 June; a few moved file/line but the defect stands. They are carried forward below with their original IDs.
+- **Two findings are newly raised** from the post-baseline surface: **SIM-01** (unbounded, view-gated simulation run) and **MINE-01** (SSRF via operator-supplied poll URL). The large body of simulator/gateway work added this session was written test-first and is not a source of new correctness findings; the two items here are a resource-exhaustion gap and an egress gap, not logic bugs.
+- **Scope note:** the baseline explicitly excluded the **test suite** and `app/generated/`. That exclusion still stands — a test-suite review remains a separate, unstarted piece of work (tracked as **TEST-01** below so it isn't lost).
+- **Counts carried forward:** 12 Security · 12 Data-integrity · 15 Engine · 8 Canvas · 1 UI · 9 Import/Export · 10 Config + 2 new + 1 meta = **69 open items.**
+
+---
+
+## Priority waves
+
+The order below is the recommended execution sequence. It supersedes the baseline's original wave numbering (which was written before the completed fixes).
+
+- **Wave A — Security you can fix in a day each:** SEC-01, SEC-03, SEC-13, SEC-14, SEC-20, SEC-21, SIM-01.
+- **Wave B — Config & platform hardening (broad blast radius, low code):** CFG-02, CFG-03, CFG-04, CFG-05, CFG-06, CFG-07, MINE-01.
+- **Wave C — Data-integrity / data-loss:** DATA-09, DATA-14, DATA-15, DATA-18, DATA-19, DATA-20, DATA-21, DATA-29, UI-03.
+- **Wave D — Correctness & robustness:** SEC-08, SEC-09, DATA-08, DATA-10, DATA-30, ENG-05…08, ENG-14, IO-02…10.
+- **Wave E — Performance (large-diagram pan/zoom):** CANVAS-02…06, ENG-12, ENG-17, ENG-18, ENG-19, IO-04.
+- **Wave F — Low / cleanup:** everything remaining (SEC-16, SEC-17, SEC-18, DATA-24, ENG-09…13, ENG-15, ENG-16, CANVAS-07…09, CFG-01, CFG-08, CFG-09, CFG-10), plus TEST-01.
+
+---
+
+## Security & access control
+
+| Code | Sev | Nature of the issue | Risk if not fixed | Recommended fix | Status |
+|---|---|---|---|---|---|
+| SEC-01 | High | A user holding only a **VIEW** share of a project can delete it: the delete route's OrgAdmin probe (`requireRole` in [`app/api/projects/[id]/route.ts`](../app/api/projects/[id]/route.ts)) resolves against the caller's *current* org, not the *project's* org, so a shared-in user who is Owner/Admin of their **own** org passes the `isOrgAdmin` gate for someone else's project. | A collaborator (or anyone in a cross-org share) can destroy a project they were only meant to view. Data loss + trust breach. | Compute `isOrgAdmin` against the **project's** `orgId` (from `requireProjectAccess`), not the caller's current org. Pass that org into the role probe. | Not fixed |
+| SEC-03 | High | The OrgAdmin scoped backup serialises full `User` rows (`prisma.user.findMany` in [`org-backup.ts`](../app/lib/org-backup.ts)) — password hash, reset token, reset expiry, Stripe customer/subscription ids — into a file any OrgAdmin can download. | An OrgAdmin exfiltrates every member's credential hash + password-reset token (offline cracking, account takeover). Privilege escalation within a tenant. | Select only the columns a restore needs; drop `password`, `resetToken`, `resetTokenExpiry`, Stripe ids from the exported user projection. Restore already re-parents by email, so hashes aren't needed. | Not fixed |
+| SEC-08 | Medium | User search ([`app/api/users/search/route.ts`](../app/api/users/search/route.ts)) matches `name`/`email` across **all** tenants with no org scoping, returning email addresses. | Cross-tenant directory harvesting: any authenticated user enumerates every user's email. Privacy / GDPR exposure. | Scope the query to users who share an org (or an existing collaboration surface) with the caller; or return only within-org matches. | Not fixed |
+| SEC-09 | Medium | Raw Postgres / internal error text is returned to clients in several catch-alls. | Leaks schema, table names, and stack internals — reconnaissance that eases further attacks. | Return a generic message + a correlation id to the client; log the detail server-side only. Centralise via a small error responder. | Not fixed |
+| SEC-13 | Medium | Archived-diagram **delete/restore** routes never call `isReadOnlyImpersonation`. | A SuperAdmin impersonating a user in **read-only** mode can still destroy/restore that user's archived diagrams — the read-only promise is violated. | Add the `isReadOnlyImpersonation` guard (403) to both routes, matching every other mutating route. | Not fixed |
+| SEC-14 | Medium | `scan-links` **POST** mutates diagram JSON with no read-only-impersonation guard ([`app/api/projects/[id]/scan-links/route.ts`](../app/api/projects/[id]/scan-links/route.ts) — gated at `edit` but not impersonation). | Same as SEC-13: a read-only impersonating admin can rewrite a user's diagram. | Add `isReadOnlyImpersonation` → 403 to the POST handler. | Not fixed |
+| SEC-20 | High | The **archive** (soft-delete) route [`app/api/diagrams/[id]/archive/route.ts`](../app/api/diagrams/[id]/archive/route.ts) checks `requireDiagramAccess(owner)` but **not** `isReadOnlyImpersonation`. | A read-only impersonating SuperAdmin can soft-delete the viewed user's diagram — the most-used "reach in and look" path can still mutate. | Add the `isReadOnlyImpersonation` → 403 guard at the top of the handler. | Not fixed |
+| SEC-21 | Low | Prompt routes scope the **org** to the impersonated user but perform key writes against the **superuser's own** id. | Impersonated prompt edits land on the wrong user; subtle data mis-attribution during support sessions. | Resolve the effective user id (`getEffectiveUserId`) consistently for both the org scope and the write target. | Not fixed |
+| SEC-16 | Low | Password-reset token stored in plaintext at rest (`User.resetToken`, [`schema.prisma`](../prisma/schema.prisma)). | A read-only DB leak (or backup — see SEC-03) hands out live reset tokens → account takeover without cracking. | Store a SHA-256 hash of the token; compare hashes on redemption. One-line change either side + a short expiry (already present). | Not fixed |
+| SEC-17 | Low | Impersonation identity/mode cookies are `httpOnly` + `secure` but **unsigned** — their value is the target `userId` in the clear. | The cookies can't be read by JS, but they aren't integrity-protected; combined with any set-cookie surface, tampering is cheaper than it should be. Defence-in-depth gap. | Sign the cookie value (HMAC with `AUTH_SECRET`) or store a server-side session token instead of the raw id. | Not fixed |
+| SEC-18 | Low | OrgAdmin "impersonation" is a server-side no-op — the UI implies a capability the backend doesn't honour. | Misleading: an OrgAdmin believes they are acting as a user but writes land as themselves. Confusion, mis-attributed changes. | Either implement OrgAdmin impersonation properly (scoped, audited) or remove the UI affordance. | Not fixed |
+| SEC-19b | — | *(SEC-19 Deepgram key leak is **Fixed (Wave 1)** in the baseline — listed here only so the id isn't reused.)* | — | — | Fixed (Wave 1) |
+
+## Simulation & connectors (new surface)
+
+| Code | Sev | Nature of the issue | Risk if not fixed | Recommended fix | Status |
+|---|---|---|---|---|---|
+| SIM-01 | High | The scenario **run** route [`…/scenarios/[scenarioId]/run/route.ts`](../app/api/projects/[id]/simulation/studies/[studyId]/scenarios/[scenarioId]/run/route.ts) is gated at **`view`** and spreads the persisted `runConfig` (horizon, replications) into the engine **unclamped**. A viewer can POST a run whose `horizon × replications` is arbitrarily large; `runMonteCarlo` loops synchronously in the request. | Denial of service: a single request pins a server core for minutes and blocks the event loop; a viewer (not just an editor) can trigger it. No upper bound on compute. | Gate the run at **`edit`** (running writes a `SimulationRun`), and clamp `horizon`, `replications`, and their product to sane maxima before constructing the engine (mirror the BPSim-import clamps in [`bpsimProject.ts`](../app/lib/simulation/bpsim/bpsimProject.ts)). Consider moving long runs off the request path. | Not fixed |
+| MINE-01 | Medium | Live-source polling ([`app/lib/mining/pull.ts`](../app/lib/mining/pull.ts)) `fetch()`es a URL stored on the `MiningSource` with no host allow-list or private-range block. The URL is set by a project editor via the sources API. | SSRF: an editor can point a source at `http://169.254.169.254/…` or an internal service and have the server fetch it, exfiltrating cloud metadata / internal responses into the mining buffer. | Validate the configured URL at save time and re-validate at fetch time: require `https`, resolve the host and reject private/link-local/loopback ranges, and (ideally) restrict to an allow-list of connector hosts. | Not fixed |
+
+## Data integrity & server libraries
+
+| Code | Sev | Nature of the issue | Risk if not fixed | Recommended fix | Status |
+|---|---|---|---|---|---|
+| DATA-08 | High | Subprocess-link remap on restore only walks `properties.linkedDiagramId`; other embedded diagram references (variant roots, etc.) aren't remapped. | A restored project's cross-diagram links point at old ids → broken drill-down / roll-up, silent in the UI. | Extend the remap to every field that can hold a diagram id (variant roots, any `*DiagramId`); drive it from one shared id-map pass. | Needs confirmation |
+| DATA-09 | High | Bundle-invite promotion wraps its work in a catch-all that **deletes the pending row on any error** ([`bundleInvites.ts`](../app/lib/bundleInvites.ts)). | A transient failure (e.g. mail send) permanently discards a pending invite — the recipient silently never gets access. | Only delete the pending row on a *successful* promotion; on error, leave it for retry and surface the failure. | Not fixed |
+| DATA-10 | High | Invite-email Subject is built from unescaped inviter/bundle names → header-injection surface. | A crafted org/bundle name could inject mail headers (spoofed recipients, CC). | Strip CR/LF from any user-controlled value interpolated into a mail header; prefer a mail library that encodes headers. | Needs confirmation |
+| DATA-14 | High | Org backup pulls DiagramRules with `where: { userId: { in: memberUserIds } }` ([`org-backup.ts:92`](../app/lib/org-backup.ts)), so **org/admin-default** rules (`userId` null) are never captured. *(Confirmed 2026-08-14.)* | An org restore silently loses the org's default rule set → AI generation reverts to platform defaults. | Include rules where `orgId` matches (and `userId` null) in the org backup projection. | Not fixed |
+| DATA-15 | High | `checkLimit` / `recordUsage` are a read-then-write TOCTOU ([`subscription-route.ts`](../app/lib/subscription-route.ts)); concurrent requests both pass the check before either records. | Users exceed hard subscription caps under concurrency (free AI actions, imports) — revenue leak + resource abuse. | Atomic reserve-then-act-then-refund: a single conditional UPDATE that increments only if under cap, refunded on failure. Deferred in the baseline as a dedicated tested pass. | Not fixed |
+| DATA-18 | Medium | `restoreDiagram` trusts the archived `userId` and never re-validates current org membership. | A user removed from an org can have a diagram restored under their id back into that org → stale cross-tenant data. | Re-validate that the target user is still a member of the diagram's org before restoring; else re-home or refuse. | Not fixed |
+| DATA-19 | Medium | Per-user backup captures cross-org prompts, but restore dedups them into a single org → prompts from other orgs are lost. | Silent data loss on restore for any user who is a member of multiple orgs. | Key the restore dedup by (org, name) not name alone; recreate per-org copies. | Not fixed |
+| DATA-20 | Medium | `sendMail` failures are unhandled on the `PendingBundleAudience` path → the DB can record a notification/invite as delivered when it wasn't. | Recipients believe they were never invited; owners believe they were. Silent divergence. | Await the send, and only mark delivered on success; record failures for retry. | Needs confirmation |
+| DATA-21 | Medium | `shortCuid()` (`Math.random()` + `Date.now()`, in [`full-backup.ts`](../app/lib/full-backup.ts) and [`org-backup.ts`](../app/lib/org-backup.ts)) can collide mid-restore. | A PK collision aborts a restore, or worse mis-parents a row onto an existing id. Rare but catastrophic during disaster recovery. | Use `crypto.randomUUID()` (already used elsewhere) or the cuid library; never Math.random for identity. | Not fixed |
+| DATA-24 | Low | Two independent connection pools (Prisma adapter + raw `pgPool` in [`db.ts`](../app/lib/db.ts)) can't share a transaction, so raw JSON writes fall outside a surrounding Prisma `$transaction`. | JSON-field writes (unavoidable under Prisma 7) aren't atomic with their model writes → partial state on failure. | Where atomicity matters, run the raw write via the Prisma tx client (`tx.$executeRawUnsafe`) rather than the standalone pool. Several paths already do this; audit the rest. | Not fixed |
+| DATA-29 | Medium | Wipe-restore's data-loss COUNT guard runs **outside** the TRUNCATE transaction (TOCTOU). | A concurrent write between the count and the truncate defeats the guard → the very data-loss it's meant to prevent. | Move the guard COUNTs inside the same transaction as the TRUNCATE, or take an advisory lock for the restore. | Not fixed |
+| DATA-30 | Low | Per-table restore's `inserted` count excludes updates, and a malformed payload throws an unguarded `TypeError` → 500. | Confusing restore reports; an ugly 500 instead of a clear validation error on a bad file. | Count updates; validate payload shape up front and return a 400 with the problem. | Not fixed |
+
+## Diagram engine (reducer / routing / geometry)
+
+| Code | Sev | Nature of the issue | Risk if not fixed | Recommended fix | Status |
+|---|---|---|---|---|---|
+| ENG-05 | Medium | `REMOVE_SPACE` leaves corner elements un-shifted in cross (both-axis) removal zones. | Elements drift out of alignment after a space-removal in a corner region → visibly broken layout, silent. | Handle the both-axis case in the shift math (shift on the union of the two axis conditions). | Not fixed |
+| ENG-06 | Medium | An interleaved second drag overwrites the pre-drag snapshot → the first action is lost from history. | Undo skips a change the user made — surprising, and it can lose work. | Snapshot on drag *start* (once), guard against re-snapshotting mid-gesture. | Not fixed |
+| ENG-07 | Medium | `offsetAlongFromPoint` / `getOffsetAlong` divide by element `width`/`height` with no zero-guard ([`routing.ts`](../app/lib/diagram/routing.ts)); a 0–1 clamp was added but the **divisor** is still unguarded → `NaN` survives when w/h is 0. | A zero-size element yields `NaN` offsets → connectors render to `NaN` coordinates (invisible / broken). | Guard the divisor: `w > 0 ? (pt.x-el.x)/w : 0.5`. Two call sites. | Not fixed |
+| ENG-08 | Medium | Containment clamp can invert detour lines so the route crosses through the obstacle it was avoiding. | Connectors visibly cut through shapes on certain containment geometries. | Re-derive the detour after clamping and re-check obstacle intersection; fall back to the outer route. | Needs confirmation |
+| ENG-09 | Low | `SWAP_LANES_VERTICAL` reorders the connectors array → silent draw-order (z-order) change. | Connectors change stacking after a lane swap — cosmetic but surprising. | Preserve connector order; swap only the lane geometry. | Not fixed |
+| ENG-10 | Low | `swapLane` bypasses the 100-entry history cap. | Unbounded history growth via repeated swaps → memory creep in long sessions. | Route the swap through the same capped `pushHistory` as other mutations. | Not fixed |
+| ENG-11 | Low | `INSERT_SPACE` pushes a history snapshot on **every mouse-move frame** of a shift-drag. | History floods with intermediate frames → undo becomes useless (one step per frame) + memory. | Snapshot once at gesture start; coalesce the drag into a single history entry. | Not fixed |
+| ENG-12 | Low | `ancestorsOf` does a linear `find()` per hop → O(n²) obstacle setup per recompute. | Slow routing recompute on large diagrams (compounds CANVAS perf items). | Build an id→element Map once per recompute and walk parents through it. | Not fixed |
+| ENG-13 | Low | `consolidateWaypoints` returns its **input array by reference** for short paths → aliasing trap. | A later in-place edit mutates shared state → spooky-action bugs. | Always return a fresh array. | Not fixed |
+| ENG-14 | Medium | `updateLabelLive` mutates persisted label+geometry after an undo without invalidating the redo branch. | Redo after a live-label edit replays stale state → inconsistent document. | Invalidate the redo stack on the first live-label mutation, like other setters (ENG-03 pattern). | Needs confirmation |
+| ENG-15 | Low | `correctAllConnectors` rewrites persisted waypoints without `pushHistory` / `invalidateRedo`. | A correction pass silently makes an un-undoable change to saved geometry. | Wrap in the standard history push + redo-invalidate. | Not fixed |
+| ENG-16 | Low | Rectilinear waypoint-preservation uses a different obstacle set than the main pass → data-object flip-flop. | Connectors to/from data objects jitter between two routes on successive recomputes. | Use one obstacle set for both passes. | Not fixed |
+| ENG-17 | Low | `recomputeAllConnectors([conn])` rebuilds the full element Map per connector, per drag frame. | Redundant O(n) work per connector per frame → drag lag on big diagrams. | Build the Map once and pass it in. | Not fixed |
+| ENG-18 | Low | `ensureContainersEncloseChildren` recomputes ancestor depth inside the sort comparator → O(n² log n). | Slow container-enclose pass on deep hierarchies. | Precompute depth once into a map; sort on the memoised value. | Not fixed |
+| ENG-19 | Low | `getAllDescendantIds` is O(subtree×n) per column inside the vertical-swimlane drag frame. | Drag lag on wide swimlane diagrams. | Precompute a parent→children index once per gesture. | Not fixed |
+
+## Canvas & renderers (performance / leaks)
+
+| Code | Sev | Nature of the issue | Risk if not fixed | Recommended fix | Status |
+|---|---|---|---|---|---|
+| CANVAS-02 | High | O(n²) connector-hump computation rebuilt every render (`indexOf` + slice/map per connector). | Pan/zoom stutters badly on large diagrams; render cost grows quadratically. | Memoise the hump map; compute crossings once per data change, not per render. | Not fixed |
+| CANVAS-03 | High | `nonContainers` sort is O(n² log n): the comparator calls `elements.find()` in a parent-walk. | Same — every render pays a quadratic sort. | Precompute depth/parent into a map before sorting. | Not fixed |
+| CANVAS-04 | High | Domain-diagram obstacle check is O(connectors×elements×waypoints), unmemoised, every render. | Severe lag on domain diagrams with many connectors. | Memoise per (elements, connectors) identity; short-circuit unchanged frames. | Not fixed |
+| CANVAS-05 | High | `SymbolRenderer` / `ConnectorRenderer` are unmemoised and take fresh inline closures → full re-render every pan/zoom frame. | The single biggest pan/zoom cost: every shape re-renders on every frame. | `React.memo` the row renderers; hoist/`useCallback` the handlers so props are stable. | Not fixed |
+| CANVAS-06 | Medium | Connector-drop highlight is O(n²) via `getElementPoolId` linear find per element. | Lag while dragging a connector end over a big diagram. | Precompute element→pool once per drag. | Not fixed |
+| CANVAS-07 | Low | Pre-drag gesture listeners are never cleaned up on unmount. | Listener leak → memory growth and possible double-handling after navigation. | Return a cleanup from the effect that removes the listeners. | Not fixed |
+| CANVAS-08 | Low | Connector-label focus-clear listener leaks if the component unmounts before the next mousedown. | Same class of leak. | Clean up on unmount. | Not fixed |
+| CANVAS-09 | Low | Group-drag auto-scroll `setInterval` is cleared only on mouseup, not on unmount. | A drag interrupted by navigation leaves a running interval. | Clear the interval in an unmount cleanup as well. | Not fixed |
+
+## UI / client data-loss
+
+| Code | Sev | Nature of the issue | Risk if not fixed | Recommended fix | Status |
+|---|---|---|---|---|---|
+| UI-03 | Medium | Folder-tree changes are saved via a module-level 500 ms debounce with **no flush on navigation** ([`ProjectDetailClient.tsx`](../app/(dashboard)/dashboard/projects/[id]/ProjectDetailClient.tsx)). | A folder rename/move made and immediately navigated away from is lost. | Flush the pending debounce on route change / `beforeunload` (a `flushFolderTree()` helper already exists — call it on unmount). | Not fixed |
+
+## Import / export & interop
+
+| Code | Sev | Nature of the issue | Risk if not fixed | Recommended fix | Status |
+|---|---|---|---|---|---|
+| IO-02 | High | DDL importer drops FK relationships when table-name casing differs between definition and reference. | Imported physical models silently lose relationships → wrong diagram. | Normalise case for table-name matching in FK resolution. | Not fixed |
+| IO-03 | Medium | Unbounded recursion on nested sub-processes / lane sets (no depth guard) in an importer. | A crafted (or pathological) file blows the stack → 500 / crash. | Add a depth cap that degrades gracefully (like the sim splice cap). | Needs confirmation |
+| IO-04 | Medium | O(n²) element lookups via `ctx.elements.find` during BPMN flow/lane wiring. | Slow import of large BPMN files. | Build an id→element Map once. | Not fixed |
+| IO-05 | Medium | BPMN importer discards sequence-flow **condition expressions**, writing a literal `"true"` ([`importBpmnXml.ts`](../app/lib/diagram/bpmn/importBpmnXml.ts)). | Conditional routing is lost on import → simulation/semantics wrong for imported diagrams. (Adjacent to the new gateway work, which now round-trips `default` but not conditions.) | Preserve the condition into `branchCondition` instead of the placeholder. | Not fixed |
+| IO-06 | Medium | BPMN importer leaves a dangling `boundaryHostId` when the host has no `BPMNShape`. | A boundary event references a dropped host → render/logic gaps. | Null the `boundaryHostId` (or drop the event) when the host isn't materialised. | Needs confirmation |
+| IO-07 | Medium | Unsanitised diagram name interpolated into the `Content-Disposition` export header (Visio v2/v3/test-vsdx, e.g. [`visio-v2/route.ts`](../app/api/export/visio-v2/route.ts)). | Header injection / malformed downloads via a crafted diagram name (CR/LF, quotes). | Sanitise the filename (strip CR/LF + quotes) and use RFC 5987 `filename*=` encoding. | Not fixed |
+| IO-08 | Low | DDL parser writes attacker-controlled table names into a plain-object map key (proto-pollution surface). | A `__proto__`/`constructor` table name could pollute the prototype → unexpected behaviour. | Use a `Map`, or `Object.create(null)`, for the name→def index. | Needs confirmation |
+| IO-09 | Low | BPMN importer id minting uses `Math.random()` with no cross-mint collision guard. | Rare id collision within a single import → merged/broken elements. | Use `crypto.randomUUID()` (as the sim adopt path does) or track minted ids. | Not fixed |
+| IO-10 | Low | DDL enum detection is case-sensitive on the PK column `code` → enum tables imported as plain classes. | Enum tables mis-classified on differently-cased schemas. | Case-insensitive compare for the `code` heuristic. | Not fixed |
+
+## Config & platform
+
+| Code | Sev | Nature of the issue | Risk if not fixed | Recommended fix | Status |
+|---|---|---|---|---|---|
+| CFG-02 | High | `AUTH_SECRET` is the literal placeholder in local `.env`, and there is **no code-side weak-secret guard**. | If the placeholder ever reaches prod, all sessions are forgeable (catastrophic). No tripwire catches it. | Fail startup if `AUTH_SECRET` is missing/short/equals the known placeholder. Confirm prod uses a real 32-byte value. | Not fixed |
+| CFG-03 | High | No security headers anywhere — no CSP, `X-Frame-Options`, HSTS, or `X-Content-Type-Options` ([`next.config.ts`](../next.config.ts) has no `headers()`). | Clickjacking, no XSS mitigation-in-depth, no transport pinning. Compounds the stored-XSS class (CANVAS-01 was one instance). | Add a `headers()` block: a baseline CSP, `X-Frame-Options: DENY` (or `frame-ancestors`), `X-Content-Type-Options: nosniff`, HSTS. Start report-only for CSP. | Not fixed |
+| CFG-04 | Medium | No env-var validation; security-critical secrets read via non-null assertion (`!`) only. | A missing secret surfaces as a confusing runtime crash deep in a request, not a clear boot failure. | Validate required env at boot (a small schema); fail fast with a clear message. | Not fixed |
+| CFG-05 | Medium | The `proxy` matcher covers `/dashboard`, `/diagram`, `/portal`, `/m` but **not** the `(dashboard)` route-group's own URLs; auth relies on each page calling `auth()`. | A new page under the group that forgets its own `auth()` is silently public. Fragile by construction. | Broaden the matcher to cover the group, or add a layout-level guard so auth isn't per-page opt-in. | Not fixed |
+| CFG-06 | Medium | `/matrix` is publicly reachable despite a comment asserting route-group auth. | An unauthenticated visitor reaches the Matrix/Simulator shell surface. | Add `/matrix` to the matcher (or gate it), and reconcile the misleading comment. | Not fixed |
+| CFG-07 | Low | `X-Powered-By: Next.js` not disabled. | Minor fingerprinting aid. | `poweredByHeader: false` in `next.config.ts`. | Not fixed |
+| CFG-01 | Low | Live secrets in local `.env` (gitignored/never committed). | Low while it stays local; a shared/backed-up copy would expose them. **Rotate** and keep off shared locations. | Rotate the values; confirm `.env` is never in a backup/share path. | Not fixed |
+| CFG-08 | Low | Unused PGlite packages remain in production `dependencies` (`@electric-sql/pglite*` in [`package.json`](../package.json)). | Larger image, larger dependency attack surface for code that's dead. | Remove both packages; PGlite was retired 2026-04-12. | Not fixed |
+| CFG-09 | Low | Production auth depends on a pre-release beta of `next-auth` (`^5.0.0-beta.30`). | Beta churn / unpatched security fixes; upgrade risk deferred indefinitely. | Track the v5 stable release and plan a pinned upgrade. | Not fixed |
+| CFG-10 | Low | Microsoft token refresh computes `NaN` expiry when `expires_in` is absent → refresh silently disabled. | SharePoint connections silently stop refreshing → intermittent auth failures. | Default a sane expiry when `expires_in` is missing; never store `NaN`. | Not fixed |
+
+## Meta
+
+| Code | Sev | Nature of the issue | Risk if not fixed | Recommended fix | Status |
+|---|---|---|---|---|---|
+| TEST-01 | Medium | The **test suite itself** was explicitly excluded from the baseline audit and has never been reviewed (the memory note flags ~31 `orgContext` mocks as "odd" and not to be trusted as a safety net). | Green tests may be giving false assurance — mocked auth/tenancy could hide the very access-control bugs above. | A dedicated pass over `tests/`: audit the shared mocks (especially `orgContext`), confirm the auth/tenancy tests actually exercise the guard, and remove or fix misleading fixtures. | Not fixed |
+
+---
+
+## Notes for whoever works this
+
+- **Verify-in-prod-mode items** from the baseline are done but unconfirmed: the Stripe fixes (DATA-04/17/31) still want a Stripe **test-mode** run, and the per-table restore (DATA-27/28) wants a sandbox re-test. They're marked Fixed in the baseline doc; re-confirm before relying on them.
+- **`Needs confirmation`** here means the finding is plausible from reading the code but wasn't reproduced this pass — reproduce before fixing so the fix is targeted.
+- Keep audit evidence **redacted**: a prior finder quoted a real Azure secret into its output and GitHub push-protection blocked the commit. Don't paste credential-like strings into this file.
+- When an item is fixed, set Status to `Fixed (<short-sha>)` and, if it's a security item, add a one-line note in the baseline `Source-Code-Audit.md` summary table so the two stay reconciled.
