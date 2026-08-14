@@ -37,6 +37,11 @@ interface Pending { tokenId: string; nodeId: string; units: number; requestedAt:
 interface Frame { sub: string; scopeInst: string; remaining: number; loopBack?: number; parallel?: boolean; handler?: boolean; continueFrom?: string }
 interface Token {
   id: string; enteredAt: number; props: Record<string, Value>; callStack: Frame[]; internal?: boolean;
+  /** Open AND/OR branch groups this token is inside, innermost last. A split
+   *  gateway pushes one group id per clone; the matching converging gateway pops
+   *  it and only lets the LAST sibling through, so the branches merge back into
+   *  one case instead of each finishing separately. */
+  joinStack?: string[];
   /** BPMN compensation: handler node ids armed by executed host activities, in
    *  completion order (fired reverse-completion / LIFO on a throwing event). */
   armed?: string[];
@@ -68,6 +73,10 @@ export interface SimState {
   pools: Record<string, PoolState<Pending>>;
   tokens: Record<string, Token>;
   joinCount: Record<string, number>;
+  /** AND/OR branch group → outstanding branches. Optional so a snapshot taken
+   *  before branch joins existed still resumes. */
+  branchJoin?: Record<string, number>;
+  nextJoinId?: number;
   activeScopes: string[];
   cancelledTokens: string[];
   inService: Record<string, { teamId: string; units: number }>;
@@ -87,6 +96,9 @@ export class Engine {
   private nextTokenId = 0;
   private nextScopeId = 0;
   private joinCount = new Map<string, number>(); // parallel-MI scope instance → outstanding instances
+  private branchJoin = new Map<string, number>(); // AND/OR branch group → outstanding branches
+  private nextJoinId = 1;
+  private inCount = new Map<string, number>();   // node id → incoming edge count (converging test)
   private activeScopes = new Set<string>();      // scope instances currently running (for event-sub triggers)
   private cancelledTokens = new Set<string>();   // tokens whose pending events must be ignored (interrupt)
   private inService = new Map<string, { teamId: string; units: number }>(); // resources a token currently holds
@@ -134,6 +146,7 @@ export class Engine {
       const arr = this.outEdges.get(e.source) ?? [];
       arr.push(e);
       this.outEdges.set(e.source, arr);
+      this.inCount.set(e.target, (this.inCount.get(e.target) ?? 0) + 1);
       if (e.condition) this.condCache.set(e.id, compileExpr(e.condition.expr));
     }
     for (const n of network.nodes) {
@@ -542,18 +555,87 @@ export class Engine {
     this.enterNode(token, out[0].target, out[0].id);
   }
 
+  /** Does this outgoing edge of an INCLUSIVE gateway fire? Each branch is
+   *  evaluated INDEPENDENTLY (BPMN OR semantics), so any combination can fire
+   *  and the stated probabilities need not sum to 100. A default edge never
+   *  fires on its own — it is only the fallback when nothing else did. */
+  private inclusiveFires(token: Token, e: SimEdge): boolean {
+    if (e.isDefault) return false;
+    const c = this.condCache.get(e.id);
+    if (c) return c.evalBool({ props: token.props });
+    const p = this.probOf(e);
+    if (p === undefined) return false;
+    return this.rng.next() < p;
+  }
+
+  /** Fan `token` out down `edges`, opening a join group so the matching
+   *  converging gateway can merge them back into one case. A single edge needs
+   *  no group — it is still one token on one path. */
+  private fanOut(token: Token, edges: SimEdge[]): void {
+    if (edges.length === 1) return this.enterNode(token, edges[0].target, edges[0].id);
+    const groupId = `j${this.nextJoinId++}`;
+    this.branchJoin.set(groupId, edges.length);
+    for (const e of edges) {
+      const clone: Token = {
+        id: `t${this.nextTokenId++}`, enteredAt: token.enteredAt, props: { ...token.props },
+        callStack: cloneStack(token.callStack), internal: token.internal,
+        armed: token.armed ? [...token.armed] : undefined,
+        joinStack: [...(token.joinStack ?? []), groupId],
+      };
+      this.tokens.set(clone.id, clone);
+      this.enterNode(clone, e.target, e.id);
+    }
+    this.tokens.delete(token.id);
+  }
+
+  /**
+   * Converging AND / OR gateway. Consumes the token unless it is the LAST of its
+   * branch group still outstanding, in which case it carries on with the group
+   * popped. Returns true when the token was absorbed.
+   *
+   * A token arriving with no open group (a loop-back, or a diagram whose split
+   * sits outside this network) passes straight through — the old behaviour, and
+   * the safe one: better a case continues than one silently disappears.
+   */
+  private tryJoin(token: Token): boolean {
+    const stack = token.joinStack;
+    if (!stack || stack.length === 0) return false;
+    const groupId = stack[stack.length - 1];
+    const left = (this.branchJoin.get(groupId) ?? 1) - 1;
+    if (left > 0) {
+      // Not the last sibling — this branch is done; the others are still running.
+      this.branchJoin.set(groupId, left);
+      this.tokens.delete(token.id);
+      return true;
+    }
+    this.branchJoin.delete(groupId);
+    token.joinStack = stack.slice(0, -1);
+    return false;
+  }
+
   private routeGateway(token: Token, node: SimNode): void {
     const out = this.outEdges.get(node.id) ?? [];
+    // Converging AND/OR gateway: merge the branches back before routing onward.
+    // (A gateway may both converge and diverge; join first, then split.)
+    if ((node.gateway === "parallel" || node.gateway === "inclusive") && (this.inCount.get(node.id) ?? 0) > 1) {
+      if (this.tryJoin(token)) return;
+    }
     if (out.length === 0) return this.completeToken(token);
+
     if (node.gateway === "parallel" && out.length > 1) {
-      // Parallel split: a clone per branch (join sync is a later phase).
-      for (const e of out) {
-        const clone: Token = { id: `t${this.nextTokenId++}`, enteredAt: token.enteredAt, props: { ...token.props }, callStack: cloneStack(token.callStack), internal: token.internal, armed: token.armed ? [...token.armed] : undefined };
-        this.tokens.set(clone.id, clone);
-        this.enterNode(clone, e.target, e.id);
-      }
-      this.tokens.delete(token.id);
-      return;
+      return this.fanOut(token, out); // AND split: every branch
+    }
+    if (node.gateway === "inclusive" && out.length > 1) {
+      // OR split: every branch that fires, independently. Nothing fired → the
+      // default flow, which is exactly what BPMN reserves it for.
+      const fired = out.filter((e) => this.inclusiveFires(token, e));
+      if (fired.length > 0) return this.fanOut(token, fired);
+      const fallback = out.find((e) => e.isDefault) ?? out.find((e) => !this.condCache.has(e.id) && this.probOf(e) === undefined);
+      // No default either: the case would vanish, so keep it alive on the first
+      // edge rather than silently dropping it (the validation rule flags the
+      // missing default in the editor).
+      const e = fallback ?? out[0];
+      return this.enterNode(token, e.target, e.id);
     }
     // Decision (or pass-through merge): choose exactly one edge.
     const chosen = this.chooseEdge(token, out);
@@ -583,6 +665,14 @@ export class Engine {
   }
 
   private completeToken(token: Token): void {
+    // A branch that ends at its own end event still closes its slot in the join
+    // group, otherwise the siblings would wait for an arrival that can never
+    // come and the case would be absorbed and lost.
+    for (const groupId of token.joinStack ?? []) {
+      const left = (this.branchJoin.get(groupId) ?? 1) - 1;
+      if (left > 0) this.branchJoin.set(groupId, left);
+      else this.branchJoin.delete(groupId);
+    }
     this.emit("exit", token.id);
     if (this.warmedUp && !token.internal) { const flow = this.clock - token.enteredAt; this.completed++; this.flowSum += flow; this.flowCount++; this.flowSamples.push(flow); }
     this.tokens.delete(token.id);
@@ -648,6 +738,8 @@ export class Engine {
       pools,
       tokens,
       joinCount: Object.fromEntries(this.joinCount),
+      branchJoin: Object.fromEntries(this.branchJoin),
+      nextJoinId: this.nextJoinId,
       activeScopes: [...this.activeScopes],
       cancelledTokens: [...this.cancelledTokens],
       inService: Object.fromEntries(this.inService),
@@ -669,6 +761,8 @@ export class Engine {
     e.pools = new Map(Object.entries(snap.pools).map(([id, s]) => [id, ResourcePool.fromJSON<Pending>(s)]));
     e.tokens = new Map(Object.entries(snap.tokens).map(([id, t]) => [id, { ...t, props: { ...t.props }, callStack: cloneStack(t.callStack), internal: t.internal }]));
     e.joinCount = new Map(Object.entries(snap.joinCount ?? {}));
+    e.branchJoin = new Map(Object.entries(snap.branchJoin ?? {}));
+    e.nextJoinId = snap.nextJoinId ?? 1;
     e.activeScopes = new Set(snap.activeScopes ?? []);
     e.cancelledTokens = new Set(snap.cancelledTokens ?? []);
     e.inService = new Map(Object.entries(snap.inService ?? {}));

@@ -180,7 +180,12 @@ export function assembleFromDiagram(
       node.delay = sim.delay ?? { kind: "fixed", value: 0 };
       if (isInlineCompThrow(el)) node.compensationThrow = true; // fires armed handlers on entry
     } else if (kind === "gateway") {
-      node.gateway = el.gatewayType === "parallel" ? "parallel" : "decision";
+      // Event-based stays a decision (the race has exactly one winner) and so
+      // does complex (we don't model its expression) — both are exclusive
+      // approximations. Inclusive is genuinely different and gets its own kind.
+      node.gateway = el.gatewayType === "parallel" ? "parallel"
+        : el.gatewayType === "inclusive" ? "inclusive"
+        : "decision";
     } else if (kind === "subprocess") {
       // Body start = a start-event whose owning subprocess IS this one. Search the
       // whole subtree (not just direct children): a linked diagram spliced in

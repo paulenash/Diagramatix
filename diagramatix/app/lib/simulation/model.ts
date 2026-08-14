@@ -64,7 +64,16 @@ export interface SimNode {
   // delay
   delay?: SimDist;
   // gateway
-  gateway?: "decision" | "parallel";
+  //  decision  — XOR: exactly one outgoing edge is taken (BPMN exclusive; also
+  //              the approximation used for event-based, where the race has one
+  //              winner, and the pass-through behaviour of a converging XOR).
+  //  parallel  — AND: every outgoing edge is taken; a converging one waits for
+  //              ALL the branches its matching split opened.
+  //  inclusive — OR: each outgoing edge is taken independently at its own
+  //              probability, so any combination (including none, which falls to
+  //              the default flow) can fire; a converging one waits for exactly
+  //              the branches that were actually opened.
+  gateway?: "decision" | "parallel" | "inclusive";
   // compensation (BPMN): a host activity carries the node ids of its
   // compensation handler activities — armed when the host executes, fired when
   // a throwing compensation event is later reached.
