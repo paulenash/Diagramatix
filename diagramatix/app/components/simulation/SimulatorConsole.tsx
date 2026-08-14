@@ -208,7 +208,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
           </main>
         ) : (
           <main className="flex-1 overflow-hidden p-4">
-            <SimulationHeatmap data={activeData} teamCapacities={teamCapacities} teamCalendars={teamCalendars} calendarsById={calendarsById} onClose={() => setMode("home")} />
+            <SimulationHeatmap data={activeData} teamCapacities={teamCapacities} teamCalendars={teamCalendars} calendarsById={calendarsById} diagramId={activeId ?? diagramId} diagramsById={diagramsById} onClose={() => setMode("home")} />
           </main>
         )}
       </div>

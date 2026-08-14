@@ -17,6 +17,7 @@ import { buildReplay, forkReplay, teamIdsInDiagram, type ReplayData } from "@/ap
 import { closedReason, simClockLabel } from "@/app/lib/simulation/calendar";
 import { getSimParams } from "@/app/lib/diagram/simParams";
 import { buildStatTimeline } from "@/app/lib/simulation/runningStats";
+import { drillPrefix, visibleNodeId } from "@/app/lib/simulation/drillIds";
 import { LiveStatsTable } from "./LiveStatsTable";
 import { ReplayDiagramBackdrop } from "./ReplayDiagramBackdrop";
 import { MatrixButton } from "../matrix/MatrixChrome";
@@ -43,10 +44,6 @@ function pointAlongPolyline(pts: { x: number; y: number }[], f: number): { x: nu
   return pts[pts.length - 1];
 }
 
-/** Where to DISPLAY a token: nodes inside a spliced linked/expanded subprocess
- *  have ids "<subId>~<childId>" (recursive) — show the token at the top-level
- *  subprocess box in the parent diagram (drill-down comes in Phase 2). */
-function displayNodeId(id: string): string { const i = id.indexOf("~"); return i === -1 ? id : id.slice(0, i); }
 
 export function ReplayView({ data, config, teamCapacities, teamCalendars, calendarsById, diagramId, diagramsById, onClose }: { data: DiagramData; config: SimRunConfig; teamCapacities?: Record<string, number>; teamCalendars?: Record<string, WorkCalendar>; calendarsById?: Record<string, WorkCalendar>; diagramId?: string; diagramsById?: Map<string, DiagramData>; onClose?: () => void }) {
   // Flatten linked (collapsed) subprocesses into the run, exactly as ▶ Run does,
@@ -77,7 +74,7 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
     if (!drillStack.length) return data;
     return diagramsById?.get(drillStack[drillStack.length - 1].diagramId) ?? data;
   }, [drillStack, data, diagramsById]);
-  const prefix = drillStack.length ? drillStack.map((d) => d.subId).join("~") + "~" : "";
+  const prefix = drillPrefix(drillStack.map((d) => d.subId));
 
   // ── Geometry (of the current view) ──
   const nodes = useMemo<NodePos[]>(
@@ -259,15 +256,18 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
     let i = k.frames.length - 1;
     while (i > 0 && k.frames[i].t > simT) i--;
     const a = k.frames[i], b = k.frames[i + 1];
-    if (prefix && !a.nodeId.startsWith(prefix)) return null; // token isn't inside the drilled subprocess right now
+    // Which box in the diagram on screen is this token at? null = it's inside a
+    // different branch of the splice tree, so it isn't drawn at this level.
+    const aNode = visibleNodeId(a.nodeId, prefix);
+    if (aNode === null) return null;
     const loc = (id?: string) => (id && prefix && id.startsWith(prefix) ? id.slice(prefix.length) : id);
-    const aNode = displayNodeId(loc(a.nodeId) ?? a.nodeId);
     if (!b || b.t <= a.t) return { kind: "dwell", nodeId: aNode, entryEdgeId: loc(a.edgeId), tEnter: a.t };
     const dur = b.t - a.t;
     const transitDur = dur * 0.25; // dwell for the first 75%, hop across in the last 25%
     if (simT < b.t - transitDur) return { kind: "dwell", nodeId: aNode, entryEdgeId: loc(a.edgeId), tEnter: a.t };
     const f = transitDur > 0 ? Math.min(1, Math.max(0, (simT - (b.t - transitDur)) / transitDur)) : 1;
-    return { kind: "transit", edgeId: loc(b.edgeId), nodeA: aNode, nodeB: displayNodeId(loc(b.nodeId) ?? b.nodeId), f };
+    const bNode = visibleNodeId(b.nodeId, prefix) ?? aNode;
+    return { kind: "transit", edgeId: loc(b.edgeId), nodeA: aNode, nodeB: bNode, f };
   }
   function transitPos(ph: Extract<Phase, { kind: "transit" }>): { x: number; y: number } | null {
     const wp = ph.edgeId ? connWaypoints.get(ph.edgeId) : undefined;
