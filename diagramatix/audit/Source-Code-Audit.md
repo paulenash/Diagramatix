@@ -64,19 +64,19 @@
 | DATA-06 | High | Transactions | `restoreUserBackup` runs dozens of writes with no transaction → partial restore | ✅ Fixed (re-audit: now one `$transaction`) |
 | DATA-07 | High | Transactions | Backup phase-2 JSON writes outside the row creates → crash leaves dangling links | ✅ Fixed (re-audit: folded into the transaction) |
 | DATA-08 | High | Restore | Subprocess link remap only walks `properties.linkedDiagramId` → misses other refs | Changed (re-audit: remap moved to `backup.ts:497`; variant remains) |
-| DATA-09 | High | Transactions | Bundle-invite promotion catch-all deletes the pending row on *any* error | Open |
+| DATA-09 | High | Transactions | Bundle-invite promotion catch-all deletes the pending row on *any* error | ✅ Fixed 2026-08-15 (rectification batch 4) |
 | DATA-10 | High | Email | Invite email Subject built from unescaped inviter/bundle name → header injection | Needs manual confirmation |
 | DATA-11 | High | Restore | Additive full-restore matches users by bare email → re-parents data onto wrong live user | ✅ Fixed (Wave 2 — audit log) |
 | DATA-12 | High | Restore | Additive restore mints a project id without inserting the project → dangling FK abort | ✅ Fixed (Wave 2) |
 | DATA-13 | High | Restore | Org restore silently adds matched live users to the target org as Viewer (cross-tenant) | ✅ Fixed (Wave 2) |
-| DATA-14 | High | Backup | Org backup pulls rules by member `userId` → drops org/admin-default rules (`userId` null) | Needs manual confirmation |
+| DATA-14 | High | Backup | Org backup pulls rules by member `userId` → drops org/admin-default rules (`userId` null) | ✅ Fixed 2026-08-15 (rectification batch 4) |
 | DATA-15 | High | Races | `checkLimit`/`recordUsage` TOCTOU lets concurrent requests exceed hard caps | Open |
 | DATA-16 | High | Schema/FK | Project delete `SetNull`s `projectId` but leaves PUBLISHED diagrams as invisible orphans | ✅ Fixed (Wave 2) |
 | DATA-17 | Medium | Races | Monthly counter reset on renewal races concurrent usage / nukes unrelated counters | ✅ Fixed (Wave 2 — verify in Stripe test mode) |
 | DATA-18 | Medium | Multi-tenant | `restoreDiagram` trusts archived `userId`, never re-validates org membership | Open |
-| DATA-19 | Medium | Backup | Per-user backup captures cross-org prompts but restore dedups them into one org → loss | Open |
+| DATA-19 | Medium | Backup | Per-user backup captures cross-org prompts but restore dedups them into one org → loss | ✅ Fixed 2026-08-15 (rectification batch 4) |
 | DATA-20 | Medium | Email | `sendMail` failures unhandled → DB may record an invite/notification as delivered | Changed (re-audit: partially remediated; `PendingBundleAudience` variant persists) |
-| DATA-21 | Medium | Restore | `shortCuid()` (Math.random + Date.now) can collide mid-restore → duplicate-PK abort/mis-parent | Open |
+| DATA-21 | Medium | Restore | `shortCuid()` (Math.random + Date.now) can collide mid-restore → duplicate-PK abort/mis-parent | ✅ Fixed 2026-08-15 (rectification batch 4) |
 | DATA-22 | Medium | Transactions | `restoreRulesPrefsBundle` upserts in a bare loop, no transaction → partial merge | ✅ Fixed (re-audit: both loops now one `$transaction`) |
 | DATA-23 | Medium | Restore | Rules upsert keyed only by `id` violates `@@unique([category,userId,orgId])` → abort | ✅ Fixed (re-audit: now `findUnique(id) ?? findFirst(natural key)`) |
 | DATA-24 | Low | Architecture | Two independent connection pools (Prisma adapter + raw `pgPool`) can't share a transaction | Open |

@@ -685,8 +685,15 @@ export interface AdditiveSelection {
   templateIds?: string[];
 }
 
+// DATA-21: a restore mints hundreds of these ids in a tight loop. The old
+// `Date.now() + Math.random().slice(2,10)` had only ~40 bits of entropy and a
+// shared millisecond timestamp, so two ids minted in the same tick could
+// collide → a duplicate-PK abort, or worse a row mis-parented onto an existing
+// id. Back it with a UUID (122 bits) so a collision is not a practical concern;
+// keep the leading `c` + no-dashes shape so the ids still look like the cuids
+// they sit alongside.
 function shortCuid(): string {
-  return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  return "c" + crypto.randomUUID().replace(/-/g, "");
 }
 
 /** Selectively restore a subset of the backup, additively. Each selected

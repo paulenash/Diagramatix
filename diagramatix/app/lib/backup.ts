@@ -99,6 +99,12 @@ interface BackupPrompt {
   name: string;
   text: string;
   diagramType: string;
+  // DATA-19: the org this prompt belonged to. A user in several orgs can own
+  // same-named prompts in each; carrying the source org lets restore recreate
+  // the per-org copies instead of collapsing them all into one org and silently
+  // dropping the duplicates. Optional so a pre-fix backup still parses (it then
+  // falls back to the current-org behaviour on restore).
+  orgId?: string;
   // Most-recently-saved 2-phase AI Plan for this prompt, if any. The
   // editor stashes this so the user can resume an in-progress plan.
   planJson: unknown;
@@ -218,8 +224,8 @@ export async function buildUserBackup(
 
   // Prompts: scoped per (userId, orgId). We back up every prompt this
   // user owns, across every org they're a member of, so the data is
-  // preserved even if they later switch orgs. Restore re-attaches them
-  // to the user's CURRENT org (mirrors how project restore works).
+  // preserved even if they later switch orgs. Restore re-attaches each to its
+  // SOURCE org when the user is still a member (DATA-19), else the current org.
   const userPromptsRaw = await prisma.prompt.findMany({
     where: { userId },
     orderBy: { createdAt: "asc" },
@@ -262,6 +268,7 @@ export async function buildUserBackup(
       name: p.name,
       text: p.text,
       diagramType: p.diagramType,
+      orgId: p.orgId, // DATA-19: preserve the source org for a per-org restore
       planJson: p.planJson,
       planUpdatedAt: p.planUpdatedAt ? p.planUpdatedAt.toISOString() : null,
       createdAt: p.createdAt.toISOString(),
@@ -476,30 +483,39 @@ export async function restoreUserBackup(
   }
 
   // ── AI Prompts ─────────────────────────────────────────────────────────
-  // Restored into the user's CURRENT org. Dedup by (name + diagramType) in
-  // that org so re-running a restore doesn't pile up "Foo (1)", "Foo (2)".
+  // DATA-19: restore each prompt to the org it CAME FROM when the user is still
+  // a member of it, so a user in several orgs doesn't lose same-named prompts by
+  // collapsing them all into the current org. A prompt whose source org the user
+  // has since left (or a pre-fix backup with no source org) falls back to the
+  // current org — the previous behaviour. Dedup is keyed per (org, name, type)
+  // so re-running a restore doesn't pile up copies, and two same-named prompts
+  // in different orgs both survive.
   if (Array.isArray(payload.userPrompts) && payload.userPrompts.length > 0) {
+    const memberOrgIds = new Set(
+      (await tx.orgMember.findMany({ where: { userId }, select: { orgId: true } })).map((m) => m.orgId),
+    );
     const existing = await tx.prompt.findMany({
-      where: { userId, orgId },
-      select: { name: true, diagramType: true },
+      where: { userId },
+      select: { orgId: true, name: true, diagramType: true },
     });
-    const existingKeys = new Set(existing.map((p) => `${p.name}|${p.diagramType}`));
+    const seen = new Set(existing.map((p) => `${p.orgId}|${p.name}|${p.diagramType}`));
     for (const pr of payload.userPrompts) {
-      const key = `${pr.name}|${pr.diagramType ?? "bpmn"}`;
-      if (existingKeys.has(key)) { promptsSkipped++; continue; }
+      const targetOrg = pr.orgId && memberOrgIds.has(pr.orgId) ? pr.orgId : orgId;
+      const key = `${targetOrg}|${pr.name}|${pr.diagramType ?? "bpmn"}`;
+      if (seen.has(key)) { promptsSkipped++; continue; }
       await tx.prompt.create({
         data: {
           name: pr.name,
           text: pr.text,
           diagramType: pr.diagramType ?? "bpmn",
           userId,
-          orgId,
+          orgId: targetOrg,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           planJson: (pr.planJson ?? undefined) as any,
           planUpdatedAt: pr.planUpdatedAt ? new Date(pr.planUpdatedAt) : null,
         },
       });
-      existingKeys.add(key);
+      seen.add(key);
       promptsRestored++;
     }
   }

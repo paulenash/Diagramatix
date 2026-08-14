@@ -55,6 +55,8 @@ export async function promotePendingAudienceMemberships(
       continue;
     }
     try {
+      // Grant + pending-row delete are atomic: either the user becomes an
+      // audience member AND the pending row goes, or neither happens.
       await prisma.$transaction(async (tx) => {
         await tx.publicationBundleAudience.create({
           data: {
@@ -65,20 +67,33 @@ export async function promotePendingAudienceMemberships(
         });
         await tx.pendingBundleAudience.delete({ where: { id: row.id } });
       });
-      await createNotification(userId, "bundle-published", {
-        bundleId: row.bundleId,
-        bundleName: row.bundle.name,
-        fromUserId: row.invitedById ?? undefined,
-      });
       promoted++;
       if (!firstBundleId) firstBundleId = row.bundleId;
+      // The notification is best-effort and OUTSIDE the transaction — a failure
+      // here must not roll back the grant nor be mistaken for a promotion
+      // failure (which below would keep the pending row for retry).
+      try {
+        await createNotification(userId, "bundle-published", {
+          bundleId: row.bundleId,
+          bundleName: row.bundle.name,
+          fromUserId: row.invitedById ?? undefined,
+        });
+      } catch (notifyErr) {
+        console.warn("[bundle-invites] promoted but notification failed", row.id, notifyErr instanceof Error ? notifyErr.message : notifyErr);
+      }
     } catch (err) {
-      // Unique-constraint collision (already a member of this bundle)
-      // is fine — just drop the pending row so it doesn't keep showing
-      // up. Any other error gets logged and we move on so one bad row
-      // doesn't block the rest.
-      console.warn("[bundle-invites] promote skipped", row.id, err instanceof Error ? err.message : err);
-      await prisma.pendingBundleAudience.delete({ where: { id: row.id } }).catch(() => {});
+      // DATA-09: only DROP the pending row when it is genuinely redundant —
+      // i.e. the user is ALREADY an audience member (a unique-constraint
+      // collision, Prisma P2002). For ANY OTHER error (deadlock, DB blip, a
+      // transient failure) the invite must be KEPT so a later acceptance can
+      // retry it; deleting it here silently and permanently discards access the
+      // invitee was promised.
+      const alreadyMember = typeof err === "object" && err !== null && (err as { code?: string }).code === "P2002";
+      if (alreadyMember) {
+        await prisma.pendingBundleAudience.delete({ where: { id: row.id } }).catch(() => {});
+      } else {
+        console.warn("[bundle-invites] promote failed — invite kept for retry", row.id, err instanceof Error ? err.message : err);
+      }
     }
   }
 

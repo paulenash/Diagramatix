@@ -39,8 +39,11 @@ function convertDates(model: string, row: Record<string, unknown>): Record<strin
   return reviveDates(model, row, _timestampColumns);
 }
 
+// DATA-21: UUID-backed so ids minted in the same millisecond of a restore loop
+// can't collide (the old Date.now()+Math.random() form could). Same `c`+no-dash
+// shape as the cuids it sits beside. See full-backup.ts for the full rationale.
 function shortCuid(): string {
-  return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  return "c" + crypto.randomUUID().replace(/-/g, "");
 }
 
 /** Build an Org-scoped backup zip for one Org. The payload shape matches
@@ -89,7 +92,15 @@ export async function buildOrgBackup(
   onProgress?.("DiagramTemplate", templates.length);
   const prompts = await prisma.prompt.findMany({ where: { orgId, userId: { in: memberUserIds } } });
   onProgress?.("Prompt", prompts.length);
-  const rules = await prisma.diagramRules.findMany({ where: { userId: { in: memberUserIds } } });
+  // DATA-14: capture the org's OWN rule set too, not only members' rules. Org
+  // default rules have `userId = null, orgId = <this org>`, so a member-userId
+  // filter alone silently dropped them → an org restore reverted AI generation
+  // to platform defaults. `OR orgId` picks up the org defaults (and any
+  // org-scoped member overrides); platform defaults (orgId null, userId null)
+  // are correctly NOT captured.
+  const rules = await prisma.diagramRules.findMany({
+    where: { OR: [{ userId: { in: memberUserIds } }, { orgId }] },
+  });
   onProgress?.("DiagramRules", rules.length);
   // Entity Lists: this org's masters (orgId) + the per-project copies for the
   // org's projects (projectId), plus their nodes.
@@ -315,7 +326,12 @@ export function scopePayloadToOrg(payload: FullBackupPayload, orgId: string): Fu
       DiagramFeedback: [],
       DiagramTemplate: (payload.tables.DiagramTemplate as AnyRow[]).filter(t => memberUserIds.has(String(t.userId))),
       Prompt: (payload.tables.Prompt as AnyRow[]).filter(p => String(p.orgId) === orgId),
-      DiagramRules: (payload.tables.DiagramRules as AnyRow[]).filter(r => memberUserIds.has(String(r.userId))),
+      // DATA-14: keep the org's OWN rules (userId null, orgId = this org) as
+      // well as members' rules, so scoping an uploaded backup down to one org
+      // doesn't drop the org default rule set.
+      DiagramRules: (payload.tables.DiagramRules as AnyRow[]).filter(
+        r => memberUserIds.has(String(r.userId)) || String(r.orgId ?? "") === orgId,
+      ),
       Feature: [],
       BubbleHelp: [],
       DiagramTypeStyle: [],
@@ -490,6 +506,34 @@ export async function restoreOrgBackupAdditive(
           data: { ...convertDates("DiagramTemplate", t), id: shortCuid(), userId: userIdMap.get(ownerId)! } as any,
         });
         inserted.DiagramTemplate = (inserted.DiagramTemplate ?? 0) + 1;
+      }
+
+      // DATA-14: recreate the org's rule set. The additive restore previously
+      // captured rules into the payload but never re-inserted them, so an org
+      // restore silently lost the org's default AI rules. Remap the owner to the
+      // live user (null owner = an org DEFAULT rule, kept null) and re-home any
+      // org-scoped rule onto the target org; a personal rule (orgId null) stays
+      // personal. Natural-key upsert respects @@unique([category,userId,orgId])
+      // (the DATA-23 pattern) so a target row with the same tuple is updated,
+      // not duplicated into a constraint abort.
+      for (const r of (payload.tables.DiagramRules as AnyRow[] | undefined) ?? []) {
+        const backupUserId = r.userId != null ? String(r.userId) : null;
+        if (backupUserId && !userIdMap.has(backupUserId)) continue; // owner not in scope
+        const newUserId = backupUserId ? userIdMap.get(backupUserId)! : null;
+        const newOrgId = r.orgId != null ? targetOrgId : null;
+        const category = String(r.category);
+        const existing = await tx.diagramRules.findFirst({ where: { category, userId: newUserId, orgId: newOrgId } });
+        if (existing) {
+          await tx.diagramRules.update({
+            where: { id: existing.id },
+            data: { rules: String(r.rules ?? ""), isDefault: !!r.isDefault },
+          });
+        } else {
+          await tx.diagramRules.create({
+            data: { id: shortCuid(), category, rules: String(r.rules ?? ""), isDefault: !!r.isDefault, userId: newUserId, orgId: newOrgId },
+          });
+          inserted.DiagramRules = (inserted.DiagramRules ?? 0) + 1;
+        }
       }
       // Project-scoped Entity Lists for restored projects (the per-project
       // copies that drive pool/lane naming). Org masters are NOT recreated —
