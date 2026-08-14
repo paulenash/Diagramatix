@@ -13,6 +13,7 @@ import { MatrixButton } from "./matrix/MatrixChrome";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { PromptDialog } from "@/app/components/PromptDialog";
 import type { WorkCalendar, CalendarInterval } from "@/app/lib/simulation/types";
+import { crossesMidnight } from "@/app/lib/simulation/calendar";
 
 export interface CalendarRow { id: string; name: string; pattern: WorkCalendar }
 
@@ -197,6 +198,11 @@ export function CalendarLibraryManager({
                       className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]" />
                     <span className="text-green-400/40">–</span>
                     <EndTime value={iv.end} onChange={(v) => setField(idx, { end: v })} />
+                    {/* A night shift is a legitimate window, not a typo — say so
+                        rather than leaving it looking like the times are backwards. */}
+                    {crossesMidnight(iv) && (
+                      <span className="text-green-400/60 shrink-0" title="This window runs past midnight into the next day">+1d</span>
+                    )}
                     <label className="flex items-center gap-1 text-green-400/50 ml-1" title="Arrival-rate multiplier for a source using this calendar (1 = normal)">
                       ×<input type="number" min={0.1} step={0.1} value={iv.rate ?? 1}
                         onChange={(e) => setField(idx, { rate: Math.max(0.1, Number(e.target.value) || 1) })}

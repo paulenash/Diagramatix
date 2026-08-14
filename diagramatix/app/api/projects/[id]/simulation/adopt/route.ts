@@ -12,7 +12,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
-import { adoptLibraryInto, adoptPackageInto } from "@/app/lib/simulation/adoptPackage";
+import { adoptLibraryInto, adoptPackageInto, repointProjectCalendars } from "@/app/lib/simulation/adoptPackage";
 import { validateExamplePackage, type ExampleLibrary, type ExamplePackage } from "@/app/lib/simulation/examplePackage";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -43,11 +43,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   await prisma.$transaction(async (tx) => {
     // Library first: it survives a study-less project, and adopting it up front
     // means the packages below reuse these rows by name instead of duplicating.
-    if (library) await adoptLibraryInto(tx, library, id);
+    let resolve = library ? (await adoptLibraryInto(tx, library, id)).resolve : undefined;
     for (const pkg of valid) {
-      await adoptPackageInto(tx, pkg, { projectId: id, keyToDiagramId, userId });
+      ({ resolve } = await adoptPackageInto(tx, pkg, { projectId: id, keyToDiagramId, userId }));
       adopted++;
     }
+    // The diagrams were created by the importer before this call, so their
+    // sources still reference calendars from the project they came FROM.
+    if (resolve) await repointProjectCalendars(tx, id, resolve);
   });
   return NextResponse.json({ adopted, skipped: packages.length - adopted });
 }

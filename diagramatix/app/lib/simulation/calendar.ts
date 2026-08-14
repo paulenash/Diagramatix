@@ -76,21 +76,51 @@ export function weekLengthClock(clockUnit: ClockUnit): number {
   return (7 * 86400) / SECONDS_PER_UNIT[clockUnit];
 }
 
-/** Resolve a calendar's intervals into clock-unit windows within one week,
- *  sorted by start. Malformed windows (end ≤ start, day out of range) are
- *  dropped — they're flagged separately by readiness validation. */
+/**
+ * Resolve a calendar's intervals into clock-unit windows within one week,
+ * sorted by start.
+ *
+ * A window whose end is EARLIER than its start crosses midnight — a night shift
+ * like 22:00–06:00 — and is split into two windows: the tail of its own day and
+ * the head of the next. The week is cyclic, so Sunday's overflow lands back at
+ * Monday 00:00. This used to be dropped outright, which silently left that team
+ * unstaffed for the whole day with no warning anywhere.
+ *
+ * Genuinely malformed windows (zero length, day out of range) are still dropped;
+ * readiness validation flags those separately.
+ */
 export function intervalsToClock(cal: WorkCalendar, clockUnit: ClockUnit): WeekWindow[] {
   const spu = SECONDS_PER_UNIT[clockUnit];
+  const WEEK_SEC = 7 * 86400;
   const out: WeekWindow[] = [];
+  const push = (startSec: number, endSec: number, rate: number) => {
+    out.push({ s: startSec / spu, e: endSec / spu, rate });
+  };
   for (const iv of cal.intervals ?? []) {
     if (!Number.isInteger(iv.day) || iv.day < 0 || iv.day > 6) continue;
-    const startSec = iv.day * 86400 + hhmmToSeconds(iv.start);
-    const endSec = iv.day * 86400 + hhmmToSeconds(iv.end);
-    if (endSec <= startSec) continue;
+    const dayStart = iv.day * 86400;
+    const startOfDay = hhmmToSeconds(iv.start);
+    const endOfDay = hhmmToSeconds(iv.end);
+    if (endOfDay === startOfDay) continue; // zero-length — nothing to open
     const rate = typeof iv.rate === "number" && iv.rate > 0 ? iv.rate : 1;
-    out.push({ s: startSec / spu, e: endSec / spu, rate });
+    if (endOfDay > startOfDay) {
+      push(dayStart + startOfDay, dayStart + endOfDay, rate);
+      continue;
+    }
+    // Crosses midnight: this day's tail, then the next day's head.
+    push(dayStart + startOfDay, dayStart + 86400, rate);
+    const nextDayStart = (dayStart + 86400) % WEEK_SEC;
+    push(nextDayStart, nextDayStart + endOfDay, rate);
   }
   return out.sort((a, b) => a.s - b.s);
+}
+
+/** Does this window cross midnight into the following day? Used by the calendar
+ *  editor to show that a night shift is understood, not a typo. */
+export function crossesMidnight(iv: { start: string; end: string }): boolean {
+  const s = hhmmToSeconds(iv.start);
+  const e = hhmmToSeconds(iv.end);
+  return e < s;
 }
 
 /** The offset of `t` within its week, always in [0, weekLength). */

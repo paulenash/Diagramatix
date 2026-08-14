@@ -16,6 +16,7 @@ import {
 } from "./examplePackage";
 import type { ScenarioRunConfig, WorkCalendar } from "./types";
 import type { OverrideSet } from "./overrides";
+import { calendarRefsToNames } from "./calendarRefs";
 
 const variantIdsOf = (id: unknown): string[] =>
   Array.isArray(id) ? (id as unknown[]).filter((x): x is string => typeof x === "string") : [];
@@ -39,6 +40,7 @@ export async function captureProjectLibrary(projectId: string): Promise<ExampleL
   const calendars = calendarRows.map((c) => ({
     name: c.name,
     pattern: (c.pattern ?? { intervals: [] }) as unknown as WorkCalendar,
+    id: c.id,
   }));
   const teams = teamRows.map((t) => ({
     name: t.name, capacity: t.capacity, costPerHour: t.costPerHour, efficiency: t.efficiency,
@@ -80,11 +82,18 @@ export async function captureProjectPackage(projectId: string, studyId: string):
   const captureIds = Array.from(new Set([...rootIds, ...variantIds]));
   const diagramRows = await prisma.diagram.findMany({ where: { id: { in: captureIds } }, select: { id: true, name: true, type: true, data: true } });
   const capturedKeys = new Set(diagramRows.map((d) => d.id));
-  const diagrams: ExampleDiagram[] = diagramRows.map((d) => ({
-    key: d.id, name: d.name, type: d.type || "bpmn", data: (d.data ?? {}) as unknown as DiagramData,
-  }));
 
   const { teams, calendars } = await captureProjectLibrary(projectId);
+
+  // A source's operating-hours calendar is stored as a bare project-scoped id,
+  // which means nothing once this package lands somewhere else. Rewrite those
+  // references to the calendar NAME — the same identity teams already use — so
+  // the package is self-describing and adopt can re-point them.
+  const idToName = new Map((calendars ?? []).filter((c) => c.id).map((c) => [c.id as string, c.name]));
+  const diagrams: ExampleDiagram[] = diagramRows.map((d) => ({
+    key: d.id, name: d.name, type: d.type || "bpmn",
+    data: calendarRefsToNames((d.data ?? { elements: [], connectors: [] }) as unknown as DiagramData, idToName),
+  }));
 
   const scenarios: ExampleScenario[] = study.scenarios.map((s) => {
     const variantRootKeys = variantIdsOf(s.variantRootIds).filter((k) => capturedKeys.has(k));

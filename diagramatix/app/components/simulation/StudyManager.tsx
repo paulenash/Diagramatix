@@ -15,6 +15,7 @@ import { ResultsReport } from "./results/ResultsReport";
 import { ScenarioCompare } from "./results/ScenarioCompare";
 import { RunHistory } from "./results/RunHistory";
 import { PromptDialog } from "@/app/components/PromptDialog";
+import { summarizePackage, validateExamplePackage, type ExamplePackage } from "@/app/lib/simulation/examplePackage";
 import {
   DEFAULT_RUN_CONFIG,
   type ScenarioRunConfig,
@@ -47,21 +48,41 @@ export function StudyManager({ projectId, isAdmin, onRan }: { projectId: string 
   const [err, setErr] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
+  /** A parsed, validated bundle waiting for the user to confirm the import. */
+  const [pending, setPending] = useState<{ name: string; body: unknown; pkg: ExamplePackage } | null>(null);
 
-  // Import a Diagramatix simulation bundle → a brand-new project, then jump into it.
-  async function importBundle(e: React.ChangeEvent<HTMLInputElement>) {
+  // ── Import: STAGE first, then confirm ───────────────────────────────────
+  // Importing builds a whole new project and navigates away from this one, so
+  // it shouldn't happen on a file-picker click alone. Parse the bundle, show
+  // what's actually in it, and let the user back out.
+  async function stageBundle(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    e.target.value = "";
+    e.target.value = ""; // allow re-picking the same file
     if (!file) return;
-    setImporting(true); setErr(null);
+    setErr(null);
     try {
       const body = JSON.parse(await file.text());
-      const res = await fetch("/api/simulation/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const pkg = (body?.package ?? body) as ExamplePackage;
+      const problems = validateExamplePackage(pkg);
+      if (problems.length) {
+        setErr(`That bundle can't be imported: ${problems.slice(0, 3).join("; ")}`);
+        return;
+      }
+      setPending({ name: file.name, body, pkg });
+    } catch { setErr("That file isn't a valid simulation bundle (JSON)."); }
+  }
+
+  async function confirmImport() {
+    if (!pending) return;
+    setImporting(true); setErr(null);
+    try {
+      const res = await fetch("/api/simulation/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pending.body) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(json.error ?? "Import failed"); return; }
+      setPending(null);
       if (json.openDiagramId) window.location.href = `/diagram/${json.openDiagramId}`;
       else window.location.reload();
-    } catch { setErr("That file isn't a valid simulation bundle (JSON)."); }
+    } catch { setErr("Import failed."); }
     finally { setImporting(false); }
   }
 
@@ -142,10 +163,45 @@ export function StudyManager({ projectId, isAdmin, onRan }: { projectId: string 
         />
         <MatrixButton onClick={createStudy}>+ Study</MatrixButton>
         <MatrixButton onClick={() => importRef.current?.click()}>{importing ? "…" : "⭱ Import"}</MatrixButton>
-        <input ref={importRef} type="file" accept=".json,.dgxsim,application/json" onChange={importBundle} className="hidden" />
+        <input ref={importRef} type="file" accept=".json,.dgxsim,application/json" onChange={stageBundle} className="hidden" />
       </div>
       <p className="text-green-400/40 text-[10px]">⭳ on a study exports the whole simulation (diagrams + teams + calendars + scenarios) as a portable bundle; ⭱ Import recreates one in a new project.</p>
       {err && <p className="text-red-400">{err}</p>}
+
+      {/* What's in the bundle, before it becomes a project you can't un-create. */}
+      {pending && (() => {
+        const s = summarizePackage(pending.pkg);
+        const cals = pending.pkg.calendars?.length ?? 0;
+        const baseline = pending.pkg.scenarios?.find((x) => x.isBaseline)?.name;
+        return (
+          <div className="flex flex-col gap-2 border border-green-500/40 rounded p-2 bg-green-500/5">
+            <p className="text-green-300">
+              ⭱ <span className="text-green-400/60">{pending.name}</span> — import into a NEW project?
+            </p>
+            <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[10px]">
+              <span className="text-green-400/50">Study</span>
+              <span className="text-green-200 truncate">{pending.pkg.study?.name || "—"}</span>
+              <span className="text-green-400/50">Diagrams</span>
+              <span className="text-green-200">{s.diagrams} ({s.roots} as study root{s.roots === 1 ? "" : "s"})</span>
+              <span className="text-green-400/50">Teams</span>
+              <span className="text-green-200">
+                {s.teams}{cals ? ` · ${cals} calendar${cals === 1 ? "" : "s"}` : ""}
+              </span>
+              <span className="text-green-400/50">Scenarios</span>
+              <span className="text-green-200">
+                {s.scenarios}{baseline ? ` (baseline: ${baseline})` : ""}
+              </span>
+            </div>
+            <p className="text-green-400/40 text-[10px]">
+              Creates a new project and opens it. Run results aren&rsquo;t part of a bundle — you re-run there.
+            </p>
+            <div className="flex items-center gap-2">
+              <MatrixButton onClick={confirmImport}>{importing ? "…" : "Import"}</MatrixButton>
+              <button onClick={() => setPending(null)} className="text-green-400/60 hover:text-green-300">cancel</button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Selected study detail */}
       {detail && (

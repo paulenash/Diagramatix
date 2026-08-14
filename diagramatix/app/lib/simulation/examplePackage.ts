@@ -37,6 +37,11 @@ export interface ExampleTeam {
 export interface ExampleCalendar {
   name: string;
   pattern: WorkCalendar;
+  /** The calendar's id in the project it was captured from. Carried so a SCOPED
+   *  BACKUP restore — whose diagrams are rebuilt from raw rows still holding
+   *  that id — can re-point a source's `sim.calendarId` at the new row. Package
+   *  diagram data references calendars by NAME, so this is only the fallback. */
+  id?: string;
 }
 
 export interface ExampleScenario {

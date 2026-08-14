@@ -7,7 +7,9 @@
  * shared by the example "adopt" route AND the user-facing "Import simulation".
  */
 import { prisma } from "@/app/lib/db";
+import type { DiagramData } from "@/app/lib/diagram/types";
 import { validateExamplePackage, type ExampleLibrary, type ExamplePackage } from "./examplePackage";
+import { calendarResolver, remapCalendarRefs, type CalendarResolver } from "./calendarRefs";
 
 export interface AdoptCtx {
   userId: string;
@@ -33,23 +35,27 @@ type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
  * correct merge key. Adopting into a fresh project is unaffected — nothing
  * pre-exists, so every row is still created exactly once.
  *
- * Returns the calendar name → id map for the project.
+ * Returns a resolver for re-pointing a source's `sim.calendarId` at the new
+ * calendar rows (by name, falling back to the captured original id).
  */
 export async function adoptLibraryInto(
   tx: Tx,
   lib: ExampleLibrary,
   projectId: string,
-): Promise<Map<string, string>> {
+): Promise<{ nameToId: Map<string, string>; resolve: CalendarResolver }> {
   // Working-calendar library (first, so teams can reference by id).
   const calendarNameToId = new Map<string, string>();
+  const oldIdToNewId = new Map<string, string>();
   for (const c of lib.calendars ?? []) {
     const existing = await tx.simulationCalendar.findFirst({
       where: { projectId, name: c.name }, select: { id: true },
     });
-    if (existing) { calendarNameToId.set(c.name, existing.id); continue; }
-    const cal = await tx.simulationCalendar.create({ data: { name: c.name, projectId } });
-    calendarNameToId.set(c.name, cal.id);
-    await tx.$executeRaw`UPDATE "SimulationCalendar" SET pattern = ${JSON.stringify(c.pattern ?? { intervals: [] })}::jsonb WHERE id = ${cal.id}`;
+    const newId = existing?.id ?? (await tx.simulationCalendar.create({ data: { name: c.name, projectId } })).id;
+    calendarNameToId.set(c.name, newId);
+    if (c.id) oldIdToNewId.set(c.id, newId);
+    if (!existing) {
+      await tx.$executeRaw`UPDATE "SimulationCalendar" SET pattern = ${JSON.stringify(c.pattern ?? { intervals: [] })}::jsonb WHERE id = ${newId}`;
+    }
   }
 
   // Team library (link each team to its calendar by name → id).
@@ -68,7 +74,34 @@ export async function adoptLibraryInto(
       },
     });
   }
-  return calendarNameToId;
+  return { nameToId: calendarNameToId, resolve: calendarResolver(calendarNameToId, oldIdToNewId) };
+}
+
+/**
+ * Re-point the SOURCE operating-hours calendars on every diagram in a project
+ * that has just had its calendar library adopted. Without this a source's
+ * `sim.calendarId` still names a calendar from the project it was copied FROM;
+ * it resolves to nothing, and an unresolved calendar counts as always-open, so
+ * arrivals silently run 24/7. JSON is written with raw SQL (Prisma 7 omits JSON
+ * fields from model update inputs).
+ */
+export async function repointProjectCalendars(tx: Tx, projectId: string, resolve: CalendarResolver): Promise<number> {
+  const rows = await tx.diagram.findMany({ where: { projectId }, select: { id: true, data: true } });
+  let repointed = 0;
+  for (const row of rows) {
+    const { data, changed } = remapCalendarRefs(
+      (row.data ?? { elements: [], connectors: [] }) as unknown as DiagramData,
+      resolve,
+    );
+    if (!changed) continue;
+    repointed += changed;
+    await tx.$executeRawUnsafe(
+      'UPDATE "Diagram" SET "data" = $1::jsonb WHERE id = $2',
+      JSON.stringify(data),
+      row.id,
+    );
+  }
+  return repointed;
 }
 
 /**
@@ -87,7 +120,10 @@ export async function replaySimulationLibraries(
   for (const [origProjectId, lib] of Object.entries(libraries)) {
     const newProjectId = projectIdMap.get(origProjectId);
     if (!newProjectId || !lib || !Array.isArray(lib.teams)) continue;
-    await adoptLibraryInto(tx, lib, newProjectId);
+    const { resolve } = await adoptLibraryInto(tx, lib, newProjectId);
+    // The restored diagrams came from raw backup rows, so their sources still
+    // reference the ORIGINAL calendar ids — re-point them at the new rows.
+    await repointProjectCalendars(tx, newProjectId, resolve);
     n += lib.teams.length;
   }
   return n;
@@ -105,10 +141,10 @@ export async function adoptPackageInto(
   tx: Tx,
   pkg: ExamplePackage,
   ctx: { projectId: string; keyToDiagramId: Map<string, string>; userId: string | null },
-): Promise<void> {
+): Promise<{ resolve: CalendarResolver }> {
   const { projectId, keyToDiagramId, userId } = ctx;
 
-  await adoptLibraryInto(tx, pkg, projectId);
+  const { resolve } = await adoptLibraryInto(tx, pkg, projectId);
 
   // Study + roots (remap package keys → new diagram ids).
   const study = await tx.simulationStudy.create({ data: { name: pkg.study.name, projectId, createdById: userId } });
@@ -132,6 +168,7 @@ export async function adoptPackageInto(
       },
     });
   }
+  return { resolve };
 }
 
 /**
@@ -155,7 +192,8 @@ export async function replaySimulationPackages(
     if (!newProjectId) continue;
     for (const pkg of pkgs ?? []) {
       if (validateExamplePackage(pkg).length) continue;
-      await adoptPackageInto(tx, pkg, { projectId: newProjectId, keyToDiagramId: diagramIdMap, userId });
+      const { resolve } = await adoptPackageInto(tx, pkg, { projectId: newProjectId, keyToDiagramId: diagramIdMap, userId });
+      await repointProjectCalendars(tx, newProjectId, resolve);
       n++;
     }
   }
@@ -169,13 +207,17 @@ export async function adoptPackage(pkg: ExamplePackage, ctx: AdoptCtx): Promise<
       data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName, exampleType: "simulation", sourceExampleId: ctx.sourceExampleId ?? null },
     });
 
+    // Calendars first, so a source's `sim.calendarId` can be re-pointed at the
+    // new rows as each diagram is written rather than needing a second pass.
+    const { resolve } = await adoptLibraryInto(tx, pkg, project.id);
+
     // Diagrams — preserve `data`; pre-assign ids so a subprocess's
     // linkedDiagramId (a package KEY) rewrites to the new id before create.
     const keyToDiagramId = new Map<string, string>();
     for (const d of pkg.diagrams) keyToDiagramId.set(d.key, crypto.randomUUID());
     for (const d of pkg.diagrams) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data = JSON.parse(JSON.stringify(d.data)) as any;
+      const data = JSON.parse(JSON.stringify(remapCalendarRefs(d.data, resolve).data)) as any;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const el of (data.elements ?? []) as any[]) {
         const linked = el.properties?.linkedDiagramId as string | undefined;
