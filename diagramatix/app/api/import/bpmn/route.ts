@@ -5,6 +5,10 @@ import { prisma, pgPool } from "@/app/lib/db";
 import { uploadSizeError } from "@/app/lib/uploadLimit";
 import { importBpmnXml } from "@/app/lib/diagram/bpmn/importBpmnXml";
 import { validateDiagramData } from "@/app/lib/diagram/validateDiagram";
+import { parseBpsimScenarios } from "@/app/lib/simulation/bpsim/importBpsim";
+import { applyBpsimToDiagram } from "@/app/lib/simulation/bpsim/applyBpsimToDiagram";
+import { richestScenario } from "@/app/lib/simulation/bpsim/bpsimProject";
+import { createBpsimStudy } from "@/app/lib/simulation/bpsim/createBpsimStudy";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import {
@@ -32,6 +36,15 @@ import {
  *    Default "Imported BPMN Diagrams". Folder created on demand.
  *  - overwriteDiagramId (optional): UPDATE that diagram's `data`
  *    instead of creating a new one. Name/project/type preserved.
+ *  - bpsimStudy (optional): "0" to skip creating the team library +
+ *    study when the file carries BPSim data. Default: create them.
+ *
+ * BPSim: a BPSim file is a .bpmn carrying <bpsim:BPSimData>, so it
+ * arrives here. Its parameters are folded into the diagram's simulation
+ * annotations, and (when a projectId is given) the team/calendar library
+ * plus a study with the file's ScenarioParameters as the baseline are
+ * created, so the import lands ready to Run. The response carries a
+ * `bpsim` summary; a file without BPSim data reports `applied: false`.
  *
  * Name-conflict handling: if the resolved name collides with an
  * existing diagram in the same project, suffix with a `dd-mm-yy hh:mm`
@@ -165,6 +178,28 @@ export async function POST(request: Request) {
   const elementBlock = await gateElementCount(session.user.id, "bpmn", parsed.data);
   if (elementBlock) return elementBlock;
 
+  // ── BPSim ──
+  // A BPSim file IS a .bpmn file with <bpsim:BPSimData> extensions, so it
+  // arrives through this route. Parse it here and fold the parameters into the
+  // diagram's simulation annotations — dropping them would silently discard
+  // data the user's own file carries. Never fatal: a malformed or absent BPSim
+  // block leaves a perfectly good BPMN import.
+  let bpsimScenario = null as ReturnType<typeof richestScenario>;
+  let bpsimData = parsed.data;
+  try {
+    bpsimScenario = richestScenario(parseBpsimScenarios(xmlText, "minute"));
+    if (bpsimScenario) bpsimData = applyBpsimToDiagram(parsed.data, parsed.idMap, bpsimScenario);
+  } catch {
+    bpsimScenario = null;
+  }
+  const bpsimSummary = bpsimScenario
+    ? {
+        applied: true,
+        scenario: bpsimScenario.name ?? bpsimScenario.id ?? null,
+        elements: Object.keys(bpsimScenario.elements ?? {}).length,
+      }
+    : { applied: false as const };
+
   // ── Overwrite path ──
   if (overwriteDiagramId) {
     const existing = await prisma.diagram.findFirst({
@@ -179,10 +214,10 @@ export async function POST(request: Request) {
     const updated = await prisma.diagram.update({
       where: { id: overwriteDiagramId },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: { data: parsed.data as any },
+      data: { data: bpsimData as any },
     });
     return NextResponse.json(
-      { diagram: updated, warnings: parsed.warnings, stats: parsed.stats, overwrote: true },
+      { diagram: updated, warnings: parsed.warnings, stats: parsed.stats, overwrote: true, bpsim: bpsimSummary },
       { status: 200 },
     );
   }
@@ -200,18 +235,39 @@ export async function POST(request: Request) {
   });
   if (conflict) finalName = `${rawName} ${timestampSuffix()}`;
 
-  void validateDiagramData(parsed.data, { route: "import/bpmn", mode: "log" });
+  void validateDiagramData(bpsimData, { route: "import/bpmn", mode: "log" });
   const diagram = await prisma.diagram.create({
     data: {
       name: finalName,
       type: "bpmn",
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: parsed.data as any,
+      data: bpsimData as any,
       userId: session.user.id,
       orgId,
       ...(projectId ? { projectId } : {}),
     },
   });
+
+  // A BPSim import lands READY TO RUN: recreate the team/calendar library the
+  // file describes and a study over the new diagram with the file's own
+  // ScenarioParameters as the baseline. Only when the diagram has a project to
+  // hang them off (teams + studies are project-scoped). Best-effort — a failure
+  // here must not lose the imported diagram, which is already committed.
+  let bpsimStudy: { study: string; teams: number } | null = null;
+  if (projectId && bpsimScenario && (form.get("bpsimStudy") as string | null) !== "0") {
+    try {
+      bpsimStudy = await createBpsimStudy({
+        projectId,
+        diagramId: diagram.id,
+        name: finalName,
+        data: bpsimData,
+        scenario: bpsimScenario,
+        createdById: session.user.id,
+      });
+    } catch {
+      bpsimStudy = null;
+    }
+  }
 
   // Folder placement — upsert the chosen folder into the project's
   // folderTree and add the new diagram to it. No-op when no projectId
@@ -239,7 +295,7 @@ export async function POST(request: Request) {
   // Record AFTER the diagram is committed so a failed parse doesn't burn quota.
   await recordUsage(session.user.id, "individualImports");
   return NextResponse.json(
-    { diagram, warnings: parsed.warnings, stats: parsed.stats },
+    { diagram, warnings: parsed.warnings, stats: parsed.stats, bpsim: { ...bpsimSummary, ...(bpsimStudy ? { study: bpsimStudy } : {}) } },
     { status: 201 },
   );
 }

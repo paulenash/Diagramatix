@@ -1352,6 +1352,13 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
           shapesDropped: number;
           flowsDropped: number;
         };
+        // Present when the .bpmn carried BPSim simulation parameters.
+        bpsim?: {
+          applied: boolean;
+          scenario?: string | null;
+          elements?: number;
+          study?: { study: string; teams: number };
+        };
       };
       // Splice into the local diagram list.
       setDiagrams((prev) => [
@@ -1383,6 +1390,20 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
         diagram: result.diagram,
         warnings: [
           `Imported BPMN file (processes: ${result.stats.processCount}, participants: ${result.stats.participantCount}).`,
+          // BPSim files carry simulation parameters alongside the BPMN; say so,
+          // because the user gets an annotated + runnable diagram, not just a
+          // drawing, and that isn't obvious from the canvas.
+          ...(result.bpsim?.applied
+            ? [
+                `◈ BPSim simulation data applied to ${result.bpsim.elements ?? 0} element(s)` +
+                  (result.bpsim.scenario ? ` from scenario "${result.bpsim.scenario}"` : "") + ".",
+                ...(result.bpsim.study
+                  ? [result.bpsim.study.teams > 0
+                      ? `◈ Study "${result.bpsim.study.study}" created with ${result.bpsim.study.teams} team(s) — open the Simulator to Run it.`
+                      : `◈ Study "${result.bpsim.study.study}" created. The file names no resources, so it has no teams yet — use ⚙ Fill missing simulation data in the Simulator.`]
+                  : []),
+              ]
+            : []),
           ...result.warnings,
         ],
         stats: {

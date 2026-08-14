@@ -3684,6 +3684,8 @@ export function DiagramEditor({
           flowsDropped: number;
         };
         overwrote?: boolean;
+        // Present when the .bpmn carried BPSim simulation parameters.
+        bpsim?: { applied: boolean; scenario?: string | null; elements?: number; study?: { study: string; teams: number } };
       };
       if (result.overwrote && result.diagram?.data) {
         setData(result.diagram.data);
@@ -3694,6 +3696,19 @@ export function DiagramEditor({
         diagram: result.diagram,
         warnings: [
           `Imported BPMN file (processes: ${result.stats.processCount}, participants: ${result.stats.participantCount}).`,
+          // A BPSim file arrives as .bpmn; report the simulation half of the
+          // import so the annotations aren't a silent side effect.
+          ...(result.bpsim?.applied
+            ? [
+                `◈ BPSim simulation data applied to ${result.bpsim.elements ?? 0} element(s)` +
+                  (result.bpsim.scenario ? ` from scenario "${result.bpsim.scenario}"` : "") + ".",
+                ...(result.bpsim.study
+                  ? [result.bpsim.study.teams > 0
+                      ? `◈ Study "${result.bpsim.study.study}" created with ${result.bpsim.study.teams} team(s) — open the Simulator to Run it.`
+                      : `◈ Study "${result.bpsim.study.study}" created. The file names no resources, so it has no teams yet — use ⚙ Fill missing simulation data in the Simulator.`]
+                  : []),
+              ]
+            : []),
           ...result.warnings,
         ],
         stats: {
