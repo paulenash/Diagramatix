@@ -41,6 +41,11 @@ const SCOPED_COVERED = new Set<string>([
 // the ids remap onto the restored projects/diagrams. The raw tables are
 // therefore a deliberate omission from the ROW-level scoped backup, not from the
 // backup: tests/backup/simulation-roundtrip.test.ts pins the round-trip.
+//
+// GAP: the capture is per-PROJECT, so org-MASTER SimulationTeams (orgId set,
+// adopted into projects as copies) ride only in the SuperAdmin full backup.
+// Wiring them into the scoped org backup — like EntityList org masters, which
+// are carried but not recreated on restore — is an open follow-up.
 const SIMULATOR_CONFIG_TABLES = [
   "SimulationTeam", "SimulationCalendar", "SimulationStudy", "SimulationStudyRoot",
   "SimulationScenario",

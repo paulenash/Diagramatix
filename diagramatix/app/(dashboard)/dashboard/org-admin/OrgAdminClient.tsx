@@ -64,6 +64,12 @@ const CARDS: MenuCard[] = [
       "Every saved Diff Processes comparison in your Org, grouped by user. View the full results + AI summary, or remove runs.",
   },
   {
+    href: "/dashboard/org-admin/simulation-teams?from=/dashboard/org-admin",
+    title: "Simulation Teams",
+    description:
+      "Your organisation's standing resource pools (capacity, cost/hour, efficiency). Projects adopt them into their own Simulator team library as independent copies.",
+  },
+  {
     href: "/dashboard/org-admin/sop-templates?from=/dashboard/org-admin",
     title: "SOP Templates",
     description:

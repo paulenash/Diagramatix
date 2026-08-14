@@ -13,6 +13,12 @@ import type { CalendarRow } from "./CalendarLibraryManager";
 
 interface Team { id: string; name: string; capacity: number; costPerHour: number | null; efficiency: number; calendarId: string | null }
 
+/** An org-master team this project can adopt as its own copy. */
+interface OrgTeam {
+  id: string; name: string; capacity: number; costPerHour: number | null; efficiency: number;
+  alreadyInProject: boolean;
+}
+
 export function TeamLibraryManager({
   projectId,
   onCapacities,
@@ -33,6 +39,15 @@ export function TeamLibraryManager({
   const [err, setErr] = useState<string | null>(null);
   const [matching, setMatching] = useState(false);
   const [matchMsg, setMatchMsg] = useState<string | null>(null);
+  // Org-master adopt: the standing pools an OrgAdmin maintains, cloned into this
+  // project as independent copies.
+  const [orgTeams, setOrgTeams] = useState<OrgTeam[]>([]);
+  const [orgName, setOrgName] = useState("");
+  const [showAdopt, setShowAdopt] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [overwrite, setOverwrite] = useState(false);
+  const [adoptBusy, setAdoptBusy] = useState(false);
+  const [adoptMsg, setAdoptMsg] = useState<string | null>(null);
 
   const publish = useCallback((list: Team[]) => {
     // Keyed by NAME: tasks reference a team by the name typed in sim.teamId.
@@ -51,7 +66,44 @@ export function TeamLibraryManager({
     } catch { /* ignore */ }
   }, [projectId, publish]);
 
+  // Which org masters are available (and which this project already has by
+  // name). Cheap enough to load with the library so the button can hide itself
+  // when the org maintains none.
+  const loadOrgTeams = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const res = await fetch(`/api/projects/${projectId}/adopt-teams`);
+      if (!res.ok) return;
+      const json = await res.json();
+      setOrgTeams(json.teams ?? []);
+      setOrgName(json.orgName ?? "");
+    } catch { /* ignore — adopting is optional */ }
+  }, [projectId]);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadOrgTeams(); }, [loadOrgTeams]);
+
+  async function adopt() {
+    if (!projectId || picked.size === 0) return;
+    setAdoptBusy(true); setAdoptMsg(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/adopt-teams`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamIds: [...picked], overwriteExisting: overwrite }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setAdoptMsg(json.error || "Failed"); return; }
+      const bits = [json.created ? `${json.created} added` : "", json.updated ? `${json.updated} updated` : ""].filter(Boolean);
+      const skipped = picked.size - (json.created ?? 0) - (json.updated ?? 0);
+      setAdoptMsg(
+        (bits.join(", ") || "Nothing changed") +
+        (skipped > 0 ? ` · ${skipped} already in this project (tick Overwrite to replace)` : ""),
+      );
+      setPicked(new Set());
+      await load();
+      await loadOrgTeams();
+    } finally { setAdoptBusy(false); }
+  }
 
   async function addTeam() {
     if (!projectId || !newName.trim()) return;
@@ -164,6 +216,60 @@ export function TeamLibraryManager({
         </button>
       )}
       {matchMsg && <p className="text-green-300 text-[10px]">{matchMsg}</p>}
+
+      {/* Org-master adopt — only offered when the org actually maintains
+          standing pools, so a solo project never sees a dead control. */}
+      {orgTeams.length > 0 && (
+        <div className="flex flex-col gap-1 pt-1 border-t border-green-500/20">
+          <button
+            onClick={() => setShowAdopt((v) => !v)}
+            className="self-start text-[10px] text-green-400/60 hover:text-green-300"
+            title={`Copy standing resource pools maintained by ${orgName || "your organisation"} into this project`}
+          >
+            {showAdopt ? "▾" : "▸"} ⬇ Adopt from {orgName || "organisation"} ({orgTeams.length})
+          </button>
+          {showAdopt && (
+            <div className="flex flex-col gap-1 pl-2 border-l border-green-500/20">
+              {orgTeams.map((t) => (
+                <label key={t.id} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={picked.has(t.id)}
+                    onChange={(e) => setPicked((s) => {
+                      const next = new Set(s);
+                      if (e.target.checked) next.add(t.id); else next.delete(t.id);
+                      return next;
+                    })}
+                    className="accent-green-500"
+                  />
+                  <span className="w-44 shrink-0 text-green-300 truncate" title={t.name}>{t.name}</span>
+                  <span className="w-16 shrink-0 text-green-400/50">cap {t.capacity}</span>
+                  <span className="w-20 shrink-0 text-green-400/50">
+                    {t.costPerHour != null ? `$${t.costPerHour}/h` : "—"}
+                  </span>
+                  {t.alreadyInProject && (
+                    <span className="text-amber-400/70 text-[10px]" title="This project already has a team with this name">
+                      already here
+                    </span>
+                  )}
+                </label>
+              ))}
+              <div className="flex items-center gap-2 pt-0.5">
+                <MatrixButton onClick={adopt}>{adoptBusy ? "…" : `Adopt ${picked.size || ""}`}</MatrixButton>
+                <label className="flex items-center gap-1 text-green-400/60 cursor-pointer" title="Replace the settings of same-named teams already in this project">
+                  <input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} className="accent-green-500" />
+                  Overwrite existing
+                </label>
+              </div>
+              {adoptMsg && <p className="text-green-300 text-[10px]">{adoptMsg}</p>}
+              <p className="text-green-400/40 text-[10px]">
+                Adopted teams become this project&rsquo;s own copies — editing them never changes the organisation&rsquo;s masters.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       <p className="text-green-400/40 text-[10px]">Tasks reference a team by name in Properties → ◈ Simulation (or inherit their lane&rsquo;s team).</p>
     </div>
   );
