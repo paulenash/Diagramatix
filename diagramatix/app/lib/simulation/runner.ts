@@ -16,6 +16,59 @@ import { aggregate, type AggregatedStats, type RepStats } from "./statistics";
 import type { SimNetwork } from "./model";
 import type { SimRunConfig, PlannedIntervention } from "./types";
 
+/** Upper bounds on a run's cost. A Monte-Carlo's work scales with the number of
+ *  simulated events, for which `horizon × replications` is a sound proxy; each
+ *  replication also runs the engine synchronously in the request. These caps
+ *  keep an editor (or a malformed import) from wedging a server core with an
+ *  absurd stored config. Generous enough that any real study fits under them. */
+export const RUN_LIMITS = {
+  maxHorizon: 100_000,
+  maxReplications: 100,
+  /** horizon × replications — the dominant cost term. */
+  maxWork: 5_000_000,
+} as const;
+
+export interface ClampRunConfigResult {
+  cfg: SimRunConfig;
+  /** True when any field was reduced — the caller can surface a notice. */
+  clamped: boolean;
+}
+
+/**
+ * Clamp a run configuration to {@link RUN_LIMITS} before it reaches the engine.
+ * Applied at the API boundary, where `runConfig` is untrusted stored data.
+ *
+ * Order matters: bound horizon and replications individually first, then, if
+ * their product still exceeds `maxWork`, shrink replications (never horizon —
+ * a too-short horizon silently changes the model's meaning, whereas fewer
+ * replications only widens the confidence interval). warm-up is kept below the
+ * horizon so it can't discard the entire run.
+ */
+export function clampRunConfig(cfg: SimRunConfig): ClampRunConfigResult {
+  let clamped = false;
+  const clampNum = (v: unknown, min: number, max: number, fallback: number): number => {
+    const n = typeof v === "number" && Number.isFinite(v) ? v : fallback;
+    const c = Math.min(max, Math.max(min, Math.floor(n)));
+    if (c !== n) clamped = true;
+    return c;
+  };
+
+  const horizon = clampNum(cfg.horizon, 1, RUN_LIMITS.maxHorizon, 480);
+  let replications = clampNum(cfg.replications, 1, RUN_LIMITS.maxReplications, 1);
+
+  if (horizon * replications > RUN_LIMITS.maxWork) {
+    replications = Math.max(1, Math.floor(RUN_LIMITS.maxWork / horizon));
+    clamped = true;
+  }
+
+  // warm-up can't swallow the whole run; a negative/NaN warm-up becomes 0.
+  const rawWarm = typeof cfg.warmUp === "number" && Number.isFinite(cfg.warmUp) ? cfg.warmUp : 0;
+  const warmUp = Math.min(Math.max(0, Math.floor(rawWarm)), horizon - 1);
+  if (warmUp !== rawWarm) clamped = true;
+
+  return { cfg: { ...cfg, horizon, replications, warmUp }, clamped };
+}
+
 export interface MonteCarloResult {
   /** mean/p5/p50/p95 across replications. */
   stats: AggregatedStats;

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { archiveDiagram } from "@/app/lib/archive";
+import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
@@ -13,6 +14,17 @@ export async function POST(_req: Request, { params }: Params) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // SEC-20: archiving mutates (soft-deletes) the viewed user's data, so a
+  // SuperAdmin impersonating a user in READ-ONLY mode must not be able to do it.
+  // Every other mutating route carries this guard; the archive route was
+  // missing it. cookies() can throw in some contexts — treat that as "not
+  // impersonating" rather than failing the request.
+  try {
+    if (isReadOnlyImpersonation(session, await cookies())) {
+      return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+    }
+  } catch { /* not impersonating */ }
 
   const { id } = await params;
   // Owner-only — archive is a destructive (recoverable, but still removes

@@ -38,7 +38,7 @@
 
 | ID | Severity | Area | Title | Status |
 |---|---|---|---|---|
-| SEC-01 | High | Access control | VIEW-share recipient can delete an entire project (wrong-org OrgAdmin check) | Open |
+| SEC-01 | High | Access control | VIEW-share recipient can delete an entire project (wrong-org OrgAdmin check) | ✅ Fixed 2026-08-14 (rectification batch 1) |
 | SEC-02 | High | Access control | Empty `ADMIN_PASSWORD` lets any user edit/delete global built-in templates | ✅ Fixed (urgent batch) |
 | SEC-03 | High | Secrets | OrgAdmin backup leaks every member's password hash, reset token, Stripe IDs | Open (re-audit: code restructured, leak intact) |
 | SEC-04 | High | Auth flow | No email verification on register → account pre-hijacking via Entra auto-link | ✅ Fixed (urgent batch — SSO-link disables pw) |
@@ -94,7 +94,7 @@
 | ENG-12 | Low | Performance | `ancestorsOf` does a linear `find()` per hop → O(n²) obstacle setup per recompute | Open |
 | ENG-13 | Low | Mutation | `consolidateWaypoints` returns its input array by reference for short paths (aliasing trap) | Open |
 | SEC-19 | High | Secrets | Deepgram master API key returned to any authenticated client in the dictation-token fallback | ✅ Fixed (Wave 1) |
-| SEC-20 | High | Impersonation | Archive (soft-delete) route ignores the read-only impersonation guard | Open |
+| SEC-20 | High | Impersonation | Archive (soft-delete) route ignores the read-only impersonation guard | ✅ Fixed 2026-08-14 (rectification batch 1) |
 | SEC-21 | Low | Impersonation | Prompt routes scope org to the impersonated user but key writes on the superuser's own id | Open |
 | DATA-25 | High | Restore | Per-table restore NULLs live published diagrams' `currentPublishedVersionId` (deferred-FK nulled on UPDATE, best-effort relink) | ✅ Fixed (Wave 1) |
 | DATA-26 | High | Transactions | New per-table restore runs all upserts + FK re-links with NO transaction → half-merged DB | ✅ Fixed (Wave 1) |

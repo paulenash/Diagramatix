@@ -16,7 +16,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { truncateAll } from "../_setup/db";
 import { createUser, createUserWithOrg, addOrgMember } from "../_setup/factories";
-import { requireRole, OrgContextError } from "@/app/lib/auth/orgContext";
+import { requireRole, requireOrgAdminFor, OrgContextError } from "@/app/lib/auth/orgContext";
 import { authorizeProjectDelete, type ProjectDeleteMode } from "@/app/lib/projects/deleteProject";
 
 const cookies = { get: () => undefined };
@@ -63,6 +63,34 @@ describe("requireRole — org-role gate", () => {
     await addOrgMember(admin.id, org.id, "Admin");
     const res = await requireRole(sessionFor(admin), cookies, ["Owner", "Admin"]);
     expect(res.role).toBe("Admin");
+  });
+});
+
+describe("SEC-01 — OrgAdmin gate must scope to the PROJECT's org", () => {
+  beforeEach(async () => { await truncateAll(); });
+
+  // The delete route computes `isOrgAdmin` for the tier verdict. The bug was
+  // that it used the caller's CURRENT org (requireRole → getCurrentOrgId), so a
+  // user who is Owner of their OWN org passed the OrgAdmin gate for someone
+  // else's project that they only hold a view-share of. The fix routes the
+  // check through requireOrgAdminFor(projectOrgId); these pin its scoping.
+  it("an Owner of org A is NOT an OrgAdmin for org B", async () => {
+    const { user: ownerA } = await createUserWithOrg();          // Owner of org A
+    const { org: orgB } = await createUserWithOrg({ email: "b-owner@test.dev" });
+    await expectDenied(requireOrgAdminFor(sessionFor(ownerA), cookies, orgB.id), 403);
+  });
+
+  it("an Owner IS an OrgAdmin for their own org", async () => {
+    const { user, org } = await createUserWithOrg();
+    const res = await requireOrgAdminFor(sessionFor(user), cookies, org.id);
+    expect(res.isSuperAdmin).toBe(false);
+  });
+
+  it("a Viewer of the project's org is NOT an OrgAdmin", async () => {
+    const viewer = await createUser();
+    const { org } = await createUserWithOrg();
+    await addOrgMember(viewer.id, org.id, "Viewer");
+    await expectDenied(requireOrgAdminFor(sessionFor(viewer), cookies, org.id), 403);
   });
 });
 

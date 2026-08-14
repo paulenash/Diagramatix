@@ -8,7 +8,7 @@ import type { DiagramData } from "@/app/lib/diagram/types";
 import { assemblePortfolio, portfolioClosure } from "@/app/lib/simulation/network";
 import { spliceLinkedSubprocesses } from "@/app/lib/simulation/spliceLinks";
 import { applyOverrides, type OverrideSet } from "@/app/lib/simulation/overrides";
-import { runMonteCarlo } from "@/app/lib/simulation/runner";
+import { runMonteCarlo, clampRunConfig } from "@/app/lib/simulation/runner";
 import { checkSimReadiness } from "@/app/lib/simulation/readiness";
 import { runIdsToPrune } from "@/app/lib/simulation/runHistory";
 import { DEFAULT_RUN_CONFIG, type ScenarioRunConfig, type WorkCalendar } from "@/app/lib/simulation/types";
@@ -110,7 +110,13 @@ export async function POST(req: Request, { params }: Params) {
     if (t.calendarId && calendarsById[t.calendarId]) teamCalendars[t.name] = calendarsById[t.calendarId];
   }
 
-  const cfg: ScenarioRunConfig = { ...DEFAULT_RUN_CONFIG, ...((scenario.runConfig ?? {}) as unknown as ScenarioRunConfig) };
+  // SIM-01: the scenario's stored runConfig is untrusted input (set by an
+  // editor, or carried in from an import), and runMonteCarlo loops synchronously
+  // in the request — an absurd horizon × replications would pin a server core.
+  // Clamp to sane maxima before the engine ever sees it.
+  const rawCfg: ScenarioRunConfig = { ...DEFAULT_RUN_CONFIG, ...((scenario.runConfig ?? {}) as unknown as ScenarioRunConfig) };
+  const { cfg: clampedCfg } = clampRunConfig(rawCfg);
+  const cfg: ScenarioRunConfig = { ...rawCfg, ...clampedCfg };
   const overrides = (scenario.overrides ?? {}) as unknown as OverrideSet;
 
   // ── Pre-run readiness check ────────────────────────────────────────────

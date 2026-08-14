@@ -5,7 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isReadOnlyImpersonation, isSuperuser } from "@/app/lib/superuser";
 import { deleteProjectCascade, authorizeProjectDelete, type ProjectDeleteMode } from "@/app/lib/projects/deleteProject";
 import {
-  requireRole,
+  requireOrgAdminFor,
   requireProjectAccess,
   OrgContextError,
 } from "@/app/lib/auth/orgContext";
@@ -200,10 +200,16 @@ export async function DELETE(req: Request, { params }: Params) {
 
   // Three-tier authorization (extracted to authorizeProjectDelete so the rules
   // are unit-tested directly). Compute "is this caller an OrgAdmin in the
-  // project's Org?" via a requireRole probe, then ask the lib for the verdict.
+  // project's Org?" — SEC-01: this MUST resolve against the PROJECT's org
+  // (`projectOrgId`), not the caller's currently-selected org. `requireRole`
+  // used `getCurrentOrgId`, so a user who is Owner/Admin of their OWN org but
+  // holds only a view-share of someone else's project passed the OrgAdmin gate
+  // for that project and could archive/delete it. `requireOrgAdminFor` takes
+  // the target org explicitly and closes that hole. (It also grants for a
+  // SuperAdmin, which is the intended behaviour for the OrgAdmin tier.)
   let isOrgAdmin = false;
   try {
-    await requireRole(session, await cookies(), ["Owner", "Admin"]);
+    await requireOrgAdminFor(session, await cookies(), projectOrgId);
     isOrgAdmin = true;
   } catch (e) {
     if (e instanceof OrgContextError) isOrgAdmin = false;
