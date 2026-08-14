@@ -132,12 +132,12 @@
 | IO-09 | Low | Data integrity | BPMN importer id minting uses `Math.random()` with no cross-mint collision guard | Open |
 | IO-10 | Low | Data integrity | DDL enum detection case-sensitive on PK column `code` → enum tables imported as plain classes | Open |
 | CFG-01 | Low | Secrets | Live secrets in local `.env` — gitignored/never committed; **rotate** + keep off shared/backup locations (downgraded from Critical) | Open |
-| CFG-02 | High | Secrets | `AUTH_SECRET` is the literal placeholder in local `.env`; no code-side weak-secret guard | Open |
-| CFG-03 | High | Hardening | No CSP / X-Frame-Options / HSTS / X-Content-Type-Options anywhere (no `headers()` block) | Open |
-| CFG-04 | Medium | Config | No env-var validation; security-critical secrets read via non-null assertion only | Open |
-| CFG-05 | Medium | Config | `proxy` matcher misses `(dashboard)` route-group URLs; auth depends on per-page `auth()` | Open |
-| CFG-06 | Medium | Config | `/matrix` is publicly reachable despite a comment asserting route-group auth | Open |
-| CFG-07 | Low | Hardening | `X-Powered-By: Next.js` header not disabled | Open |
+| CFG-02 | High | Secrets | `AUTH_SECRET` is the literal placeholder in local `.env`; no code-side weak-secret guard | ✅ Fixed 2026-08-14 (rectification batch 3) |
+| CFG-03 | High | Hardening | No CSP / X-Frame-Options / HSTS / X-Content-Type-Options anywhere (no `headers()` block) | ✅ Fixed 2026-08-14 (rectification batch 3) |
+| CFG-04 | Medium | Config | No env-var validation; security-critical secrets read via non-null assertion only | ✅ Fixed 2026-08-14 (rectification batch 3) |
+| CFG-05 | Medium | Config | `proxy` matcher misses `(dashboard)` route-group URLs; auth depends on per-page `auth()` | ✅ Fixed 2026-08-14 (rectification batch 3) |
+| CFG-06 | Medium | Config | `/matrix` is publicly reachable despite a comment asserting route-group auth | ✅ Fixed 2026-08-14 (rectification batch 3) |
+| CFG-07 | Low | Hardening | `X-Powered-By: Next.js` header not disabled | ✅ Fixed 2026-08-14 (rectification batch 3) |
 | CFG-08 | Low | Dependencies | Unused PGlite packages remain in production `dependencies` | Open |
 | CFG-09 | Low | Dependencies | Production auth depends on a pre-release (beta) of `next-auth` | Open |
 | CFG-10 | Low | Robustness | Microsoft token refresh computes `NaN` expiry when `expires_in` is absent → refresh silently disabled | Open |

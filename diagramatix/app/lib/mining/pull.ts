@@ -6,6 +6,7 @@
  */
 import { prisma, pgPool } from "@/app/lib/db";
 import { parseAnyLog } from "./parseAnyLog";
+import { assertSafeBlobUrl } from "./blobUrl";
 import { getMsAccessToken } from "@/app/lib/sharepoint-token";
 import { listFolder, downloadFileContent } from "@/app/lib/sharepoint";
 
@@ -41,6 +42,11 @@ function splitSas(url: string): { base: string; sas: string } {
 export async function pollBlobSource(source: SourceRow): Promise<number> {
   const cfg = (source.config ?? {}) as { blobListUrl?: string };
   if (!cfg.blobListUrl) throw new Error("No blob SAS URL configured");
+  // MINE-01: the URL is editor-supplied — refuse anything that isn't an Azure
+  // Blob endpoint before the server ever fetches it, closing the SSRF vector.
+  // Re-checked here (not only at save time) so a directly-mutated DB row or an
+  // older row saved before validation existed can't slip through.
+  assertSafeBlobUrl(cfg.blobListUrl);
   const { base, sas } = splitSas(cfg.blobListUrl);
   const listUrl = `${base}?${sas ? sas + "&" : ""}restype=container&comp=list`;
   const res = await fetch(listUrl);

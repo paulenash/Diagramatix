@@ -10,6 +10,7 @@ import { prisma, pgPool } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { mintIngestKey } from "@/app/lib/mining/sourceAuth";
+import { validateBlobUrl } from "@/app/lib/mining/blobUrl";
 import { sourceHeaderFields, safeSource } from "@/app/lib/mining/sourceShape";
 import type { LogMapping } from "@/app/lib/mining/types";
 
@@ -44,6 +45,12 @@ export async function PATCH(req: Request, { params }: Params) {
     await pgPool.query('UPDATE "MiningSource" SET mapping = $1::jsonb, "headerFields" = $2::jsonb, "updatedAt" = NOW() WHERE id = $3', [JSON.stringify(mapping), JSON.stringify(sourceHeaderFields(mapping)), sourceId]);
   }
   if (body.config && typeof body.config === "object") {
+    // MINE-01: an azure-blob source's URL is fetched server-side, so validate it
+    // on reconfigure too — not only on create.
+    if (source.kind === "azure-blob") {
+      const blobErr = validateBlobUrl((body.config as Record<string, unknown>).blobListUrl);
+      if (blobErr) return NextResponse.json({ error: blobErr }, { status: 400 });
+    }
     await pgPool.query('UPDATE "MiningSource" SET config = $1::jsonb, "updatedAt" = NOW() WHERE id = $2', [JSON.stringify(body.config), sourceId]);
   }
 

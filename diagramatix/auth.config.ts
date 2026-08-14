@@ -16,6 +16,36 @@ const MOBILE_UA = /Android.+Mobile|iPhone|iPod|Windows Phone|BlackBerry|Opera Mi
 const SESSION_MAX_AGE = parseInt(process.env.AUTH_SESSION_MAX_AGE ?? "", 10) || 60 * 60 * 24 * 7;
 const SESSION_UPDATE_AGE = parseInt(process.env.AUTH_SESSION_UPDATE_AGE ?? "", 10) || 60 * 60 * 24;
 
+/**
+ * Every top-level URL prefix that requires a signed-in user (CFG-05, CFG-06).
+ *
+ * These are the routes the `(dashboard)` layout group exposes, plus the mobile
+ * `/m` tree. Route GROUPS (`(dashboard)`) do NOT gate anything — only this list,
+ * consumed by both the `authorized` callback below and the `proxy.ts` matcher,
+ * decides what's protected. Auth was previously per-page opt-in (a page calling
+ * `auth()` itself), so `/matrix` — which does not — was silently public, and any
+ * new page under the group that forgot its own check would be too.
+ *
+ * The single source of truth: `proxy.ts` must list a matcher entry for each of
+ * these, and `tests/config/route-protection.test.ts` fails if the two drift.
+ */
+export const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/diagram",
+  "/help",
+  "/matrix",
+  "/notifications",
+  "/portal",
+  "/processes",
+  "/tech-notes",
+  "/m",
+] as const;
+
+/** Does `path` fall under a protected prefix (the prefix itself, or a sub-path)? */
+export function isProtectedPath(path: string): boolean {
+  return PROTECTED_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+}
+
 export const authConfig = {
   pages: { signIn: "/login" },
   session: { strategy: "jwt" as const, maxAge: SESSION_MAX_AGE, updateAge: SESSION_UPDATE_AGE },
@@ -24,12 +54,7 @@ export const authConfig = {
       const { nextUrl } = request;
       const path = nextUrl.pathname;
       const isLoggedIn = !!auth?.user;
-      const isProtected =
-        path.startsWith("/dashboard") ||
-        path.startsWith("/diagram") ||
-        path.startsWith("/portal") ||
-        path.startsWith("/m");
-      if (isProtected && !isLoggedIn) return false; // → signIn page (keeps callbackUrl)
+      if (isProtectedPath(path) && !isLoggedIn) return false; // → signIn page (keeps callbackUrl)
 
       // Phone auto-redirect: a logged-in mobile user landing on the desktop
       // dashboard is sent to the mobile UI, unless they've opted for desktop

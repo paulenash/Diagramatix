@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * The Matrix — pure-canvas katakana rain. Self-contained, auth-gated by
- * being inside the (dashboard) route group. Visit /matrix to use.
+ * The Matrix — pure-canvas katakana rain. Visit /matrix to use.
+ *
+ * Auth-gated by the proxy middleware, which runs on `/matrix` via the matcher in
+ * proxy.ts (the route GROUP `(dashboard)` does not gate anything on its own —
+ * that was the CFG-06 bug this comment used to assert away).
  */
 export default function MatrixPage() {
   const [running, setRunning] = useState(false);

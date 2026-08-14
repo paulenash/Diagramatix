@@ -12,6 +12,7 @@ import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateFeature } from "@/app/lib/subscription-route";
 import { mintIngestKey } from "@/app/lib/mining/sourceAuth";
+import { validateBlobUrl } from "@/app/lib/mining/blobUrl";
 import { sourceHeaderFields, safeSource } from "@/app/lib/mining/sourceShape";
 import type { LogMapping } from "@/app/lib/mining/types";
 
@@ -55,8 +56,12 @@ export async function POST(req: Request, { params }: Params) {
   if (!mapping.caseId || !mapping.activity || !mapping.timestamp) {
     return NextResponse.json({ error: "Map the case id, activity and timestamp fields." }, { status: 400 });
   }
-  if (kind === "azure-blob" && !(typeof config.blobListUrl === "string" && config.blobListUrl.startsWith("http"))) {
-    return NextResponse.json({ error: "Provide a container SAS URL for the Azure Blob source." }, { status: 400 });
+  if (kind === "azure-blob") {
+    // MINE-01: reject a non-Azure / non-https URL at save time (the poller
+    // re-checks, but failing here gives the user a clear error and never stores
+    // an SSRF-capable value).
+    const blobErr = validateBlobUrl(config.blobListUrl);
+    if (blobErr) return NextResponse.json({ error: blobErr }, { status: 400 });
   }
 
   // The empty live run this source maintains.
