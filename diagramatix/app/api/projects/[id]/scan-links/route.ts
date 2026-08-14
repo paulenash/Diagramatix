@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
+import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { extractCode, stripCodeTail, normalize } from "@/app/lib/numbering/codes";
 import { LINK_BEARING_ELEMENT_TYPES } from "@/app/lib/diagram/linkClosure";
@@ -287,6 +288,14 @@ interface ApplyBody { adds?: AddOp[]; removes?: RemoveOp[] }
 export async function POST(req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // SEC-14: this POST rewrites the project's diagram JSON — a read-only
+  // impersonating SuperAdmin must not mutate the viewed user's data.
+  try {
+    if (isReadOnlyImpersonation(session, await cookies())) {
+      return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+    }
+  } catch { /* not impersonating */ }
 
   const { id: projectId } = await params;
   let orgId: string;

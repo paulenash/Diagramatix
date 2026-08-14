@@ -142,6 +142,24 @@ export async function buildOrgBackup(
   };
   const serialise = (rows: Record<string, unknown>[]) => rows.map(toIso);
 
+  // SEC-03: the OrgAdmin scoped backup is downloadable by any Owner/Admin of the
+  // org, so it must NOT carry members' secrets. Redact the credential + billing
+  // columns from every exported User row. The additive restore re-parents by
+  // email and never needs a hash (a created user gets password "" via the schema
+  // default → login is effectively disabled until they reset), so nothing here
+  // is load-bearing for restore. This differs deliberately from the SuperAdmin
+  // FULL backup, which keeps hashes because a disaster-recovery restore must let
+  // users log in again — and SuperAdmin is already inside that trust boundary.
+  const REDACTED_USER_COLUMNS = [
+    "password", "resetToken", "resetTokenExpiry", "stripeCustomerId", "stripeSubscriptionId",
+  ] as const;
+  const redactUser = (row: Record<string, unknown>): Record<string, unknown> => {
+    const out = { ...row };
+    for (const col of REDACTED_USER_COLUMNS) if (col in out) out[col] = null;
+    return out;
+  };
+  const serialiseUsers = (rows: Record<string, unknown>[]) => rows.map((r) => toIso(redactUser(r)));
+
   // Simulation configuration per project (studies + scenarios + team/calendar
   // libraries; config only). The scoped backup carries this as portable packages
   // rather than raw Simulation* tables, so it's replayed (not row-inserted) on
@@ -204,7 +222,7 @@ export async function buildOrgBackup(
     tables: {
       Org: serialise([org] as Record<string, unknown>[]),
       SubscriptionLevel: serialise(subscriptionLevels as Record<string, unknown>[]),
-      User: serialise(users as Record<string, unknown>[]),
+      User: serialiseUsers(users as Record<string, unknown>[]),
       UsageCounter: serialise(usageCounters as Record<string, unknown>[]),
       OrgMember: serialise(orgMembers as Record<string, unknown>[]),
       Project: serialise(projects as Record<string, unknown>[]),
@@ -394,9 +412,15 @@ export async function restoreOrgBackupAdditive(
         const newId = shortCuid();
         userIdMap.set(String(u.id), newId);
         createdUserIds.add(newId);
+        // SEC-03: never write a member's secrets on restore either — a pre-fix
+        // backup file may still carry them, and a stale unique stripe id would
+        // collide with a live row. A created user gets password "" (schema
+        // default) → login disabled until reset, which is the safe outcome.
+        const { password, resetToken, resetTokenExpiry, stripeCustomerId, stripeSubscriptionId, ...safeUser } = convertDates("User", u);
+        void password; void resetToken; void resetTokenExpiry; void stripeCustomerId; void stripeSubscriptionId;
         await tx.user.create({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          data: { ...convertDates("User", u), id: newId } as any,
+          data: { ...safeUser, id: newId } as any,
         });
         inserted.User = (inserted.User ?? 0) + 1;
       }

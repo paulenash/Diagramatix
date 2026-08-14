@@ -40,7 +40,7 @@
 |---|---|---|---|---|
 | SEC-01 | High | Access control | VIEW-share recipient can delete an entire project (wrong-org OrgAdmin check) | ✅ Fixed 2026-08-14 (rectification batch 1) |
 | SEC-02 | High | Access control | Empty `ADMIN_PASSWORD` lets any user edit/delete global built-in templates | ✅ Fixed (urgent batch) |
-| SEC-03 | High | Secrets | OrgAdmin backup leaks every member's password hash, reset token, Stripe IDs | Open (re-audit: code restructured, leak intact) |
+| SEC-03 | High | Secrets | OrgAdmin backup leaks every member's password hash, reset token, Stripe IDs | ✅ Fixed 2026-08-14 (rectification batch 2) |
 | SEC-04 | High | Auth flow | No email verification on register → account pre-hijacking via Entra auto-link | ✅ Fixed (urgent batch — SSO-link disables pw) |
 | SEC-05 | High | Secrets | Microsoft Graph access token leaked to the client via the session object | ✅ Fixed (Wave 1) |
 | SEC-06 | High | Auth flow | No rate limiting / lockout on login, register, or password reset | ✅ Fixed (urgent batch) |
@@ -50,8 +50,8 @@
 | SEC-10 | Medium | DoS | No size/zip-bomb limit on backup-restore upload | Open |
 | SEC-11 | Medium | Auth flow | No password strength/length check on registration | ✅ Fixed (urgent batch) |
 | SEC-12 | Medium | Auth flow | Login `authorize()` skips bcrypt when user missing (timing enumeration) | ✅ Fixed (urgent batch) |
-| SEC-13 | Medium | Impersonation | Archived-diagram delete/restore skip the read-only impersonation guard | Open |
-| SEC-14 | Medium | Impersonation | `scan-links` POST mutates diagram JSON without the read-only guard | Open |
+| SEC-13 | Medium | Impersonation | Archived-diagram delete/restore skip the read-only impersonation guard | ✅ Fixed 2026-08-14 (rectification batch 2) |
+| SEC-14 | Medium | Impersonation | `scan-links` POST mutates diagram JSON without the read-only guard | ✅ Fixed 2026-08-14 (rectification batch 2) |
 | SEC-15 | Low | Open redirect | `?from=` `startsWith('/')` accepts protocol-relative URLs | ✅ Fixed (Wave 1) |
 | SEC-16 | Low | Secrets | Password reset token stored in plaintext at rest | Open |
 | SEC-17 | Low | Impersonation | Impersonation identity/mode in unsigned, non-httpOnly cookies | Open |
@@ -95,7 +95,7 @@
 | ENG-13 | Low | Mutation | `consolidateWaypoints` returns its input array by reference for short paths (aliasing trap) | Open |
 | SEC-19 | High | Secrets | Deepgram master API key returned to any authenticated client in the dictation-token fallback | ✅ Fixed (Wave 1) |
 | SEC-20 | High | Impersonation | Archive (soft-delete) route ignores the read-only impersonation guard | ✅ Fixed 2026-08-14 (rectification batch 1) |
-| SEC-21 | Low | Impersonation | Prompt routes scope org to the impersonated user but key writes on the superuser's own id | Open |
+| SEC-21 | Low | Impersonation | Prompt routes scope org to the impersonated user but key writes on the superuser's own id | ✅ Fixed 2026-08-14 (rectification batch 2) |
 | DATA-25 | High | Restore | Per-table restore NULLs live published diagrams' `currentPublishedVersionId` (deferred-FK nulled on UPDATE, best-effort relink) | ✅ Fixed (Wave 1) |
 | DATA-26 | High | Transactions | New per-table restore runs all upserts + FK re-links with NO transaction → half-merged DB | ✅ Fixed (Wave 1) |
 | DATA-27 | Medium | Restore | Per-table restore silently skips rows colliding on a non-PK unique key (regresses the DATA-23 fix) | ✅ Fixed (Wave 2) |

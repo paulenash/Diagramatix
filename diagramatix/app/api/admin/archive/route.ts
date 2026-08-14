@@ -1,8 +1,23 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { isSuperuser } from "@/app/lib/superuser";
+import { isSuperuser, isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { ARCHIVE_PROJECT_NAME, restoreDiagram } from "@/app/lib/archive";
+
+/** SEC-13: the system archive holds EVERY user's archived diagrams, so restoring
+ *  or purging it mutates other users' data. A SuperAdmin who has entered
+ *  read-only impersonation must not be able to do it. `isSuperuser` checks the
+ *  real identity (still true under impersonation), so it alone does not catch
+ *  this — the read-only guard must be explicit. cookies() can throw in some
+ *  contexts; treat that as "not impersonating". */
+async function blockedByReadOnly(session: Parameters<typeof isReadOnlyImpersonation>[0]): Promise<boolean> {
+  try {
+    return isReadOnlyImpersonation(session, await cookies());
+  } catch {
+    return false;
+  }
+}
 
 /** GET — list all archived diagrams (superuser only).
  *
@@ -64,6 +79,9 @@ export async function POST(req: Request) {
   if (!session?.user?.id || !isSuperuser(session)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  if (await blockedByReadOnly(session)) {
+    return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+  }
 
   const { diagramId } = (await req.json()) as { diagramId?: string };
   if (!diagramId) {
@@ -92,6 +110,9 @@ export async function DELETE(req: Request) {
   const session = await auth();
   if (!session?.user?.id || !isSuperuser(session)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (await blockedByReadOnly(session)) {
+    return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
   const archive = await prisma.project.findFirst({

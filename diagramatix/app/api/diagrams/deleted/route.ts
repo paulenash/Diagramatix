@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { getEffectiveUserId } from "@/app/lib/superuser";
+import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { ARCHIVE_PROJECT_NAME, restoreDiagram } from "@/app/lib/archive";
 
 /** GET /api/diagrams/deleted — list diagrams the current user has deleted (archived) */
@@ -58,6 +58,14 @@ export async function DELETE(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // SEC-13: permanently deletes the (impersonated) user's archived diagrams —
+  // a read-only impersonating SuperAdmin must not.
+  try {
+    if (isReadOnlyImpersonation(session, await cookies())) {
+      return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+    }
+  } catch { /* not impersonating */ }
+
   let userId = session.user.id;
   try { userId = getEffectiveUserId(session, await cookies()); } catch { /* ignore */ }
 
@@ -85,6 +93,13 @@ export async function DELETE(req: Request) {
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // SEC-13: restoring mutates the (impersonated) user's data — block in read-only.
+  try {
+    if (isReadOnlyImpersonation(session, await cookies())) {
+      return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+    }
+  } catch { /* not impersonating */ }
 
   let userId = session.user.id;
   try { userId = getEffectiveUserId(session, await cookies()); } catch { /* ignore */ }
