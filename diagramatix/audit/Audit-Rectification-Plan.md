@@ -5,7 +5,7 @@
 | **Created** | 2026-08-14 |
 | **Baseline audit** | [`Source-Code-Audit.md`](./Source-Code-Audit.md) — staged multi-agent review, 2026-06-13 → 2026-06-26, ~103 findings, 36 fixed |
 | **This document** | The **live worklist**. Every still-open finding from the baseline audit, re-verified against `HEAD`, plus new findings from a fresh sweep of surface added since the baseline (simulator, mining connectors, screencast, SOP, SharePoint, feature-availability, gateway/diagram work). Fixed items are **not** repeated here — they live in the baseline doc. |
-| **Progress log** | **2026-08-14** — batch 1 (`64036360`): **SEC-01**, **SEC-20**, **SIM-01** (SIM-01 re-scoped on implementation — see its row). **batch 2 (`<pending-sha>`): the rest of Wave A — SEC-03, SEC-13, SEC-14, SEC-21.** Wave A complete. |
+| **Progress log** | **2026-08-14** — batch 1 (`64036360`): **SEC-01**, **SEC-20**, **SIM-01** (SIM-01 re-scoped on implementation — see its row). **batch 2 (`31a03d67`): the rest of Wave A — SEC-03, SEC-13, SEC-14, SEC-21.** Wave A complete. |
 | **How to use** | Work an item, set its **Status** to `In progress` → `Fixed` (with the commit), or `Won't fix` (with a reason). Keep the baseline doc as the historical record; keep this doc as the burn-down. |
 
 **Status values:** `Not fixed` · `In progress` · `Fixed (<commit>)` · `Needs confirmation` (finding plausible but not yet reproduced) · `Won't fix (<reason>)`.
