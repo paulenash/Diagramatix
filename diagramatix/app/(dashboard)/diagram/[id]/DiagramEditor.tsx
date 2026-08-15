@@ -64,6 +64,7 @@ import { NUMBERABLE_TYPES } from "@/app/lib/numbering/renumber";
 import { useOrgPolicy, useSharePointAvailable } from "@/app/lib/auth/useOrgPolicy";
 import { setNoObstacleAvoidance } from "@/app/lib/diagram/routing";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { formatNameList } from "@/app/lib/formatNames";
 import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { InfoDialog } from "@/app/components/InfoDialog";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
@@ -666,7 +667,7 @@ export function DiagramEditor({
   userEmail,
   createdAt,
   updatedAt,
-  readOnly,
+  readOnly: readOnlyProp,
   canGiveFeedback,
   viewingAsName,
   viewingAsEmail,
@@ -1214,6 +1215,13 @@ export function DiagramEditor({
     originalData: DiagramData;
   } | null>(null);
 
+  // "Open view-only" from the co-authoring join prompt: a session-local override
+  // that makes the editor behave read-only (no saves, no soft-locks) without the
+  // page having been opened read-only. Derive `readOnly` from the prop OR this,
+  // so every existing `readOnly` check downstream honours the choice unchanged.
+  const [sessionViewOnly, setSessionViewOnly] = useState(false);
+  const readOnly = readOnlyProp || sessionViewOnly;
+
   // UI-02: gates the autosave timer while previewing a history snapshot;
   // prePreviewDataRef holds the real diagram so a discard reverts the canvas.
   const [historyPreviewActive, setHistoryPreviewActive] = useState(false);
@@ -1331,11 +1339,31 @@ export function DiagramEditor({
     enabled: collabEnabled,
     userName: currentUserName,
     selection: presenceSelection,
-    editingElementIds: presenceSelection,
+    // A view-only session broadcasts presence (so others see you're here) but
+    // holds no soft-locks — you're not editing anything.
+    editingElementIds: readOnly ? [] : presenceSelection,
   });
   // Others present → MANUAL Sync mode (autosave off, push+pull on the button).
   const othersPresent = presenceRoster.some((m) => !m.isSelf);
   manualSyncRef.current = collabEnabled && othersPresent;
+
+  // ── "Someone's already editing" prompt ──
+  // On arrival, if others are ALREADY editing, ask whether to join the live
+  // session or open view-only. Decided exactly once, on the first presence poll
+  // that includes us (later arrivals are handled by the PresenceBar, not a
+  // modal). Skipped when the page was opened read-only anyway.
+  const [showJoinPrompt, setShowJoinPrompt] = useState(false);
+  const joinPromptDecidedRef = useRef(false);
+  useEffect(() => {
+    if (joinPromptDecidedRef.current || !collabEnabled || readOnlyProp) return;
+    if (!presenceRoster.some((m) => m.isSelf)) return; // wait for the first poll to land
+    joinPromptDecidedRef.current = true;
+    if (presenceRoster.some((m) => !m.isSelf)) setShowJoinPrompt(true);
+  }, [collabEnabled, readOnlyProp, presenceRoster]);
+  const otherEditorNames = useMemo(
+    () => presenceRoster.filter((m) => !m.isSelf).map((m) => m.userName || "Someone"),
+    [presenceRoster],
+  );
 
   // Reload-fresh on entry: once co-authoring is live, re-fetch the committed
   // diagram so a session never starts from stale / un-synced local state.
@@ -5948,6 +5976,23 @@ export function DiagramEditor({
             message={bundleMsg}
             tone="error"
             onClose={() => setBundleMsg(null)}
+          />
+        )}
+
+        {/* Co-authoring: someone is already editing this diagram on open. */}
+        {showJoinPrompt && (
+          <ConfirmDialog
+            title="Someone's already editing"
+            message={
+              `${formatNameList(otherEditorNames)} ${otherEditorNames.length > 1 ? "are" : "is"} editing ` +
+              `this diagram right now.\n\nJoin the session to edit together — your changes merge live — ` +
+              `or open it view-only to look without making any changes.`
+            }
+            confirmLabel="Join & co-edit"
+            cancelLabel="Open view-only"
+            destructive={false}
+            onConfirm={() => setShowJoinPrompt(false)}
+            onCancel={() => { setSessionViewOnly(true); setShowJoinPrompt(false); }}
           />
         )}
 
