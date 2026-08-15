@@ -1175,7 +1175,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           if (linked && idMap.has(linked)) { el.properties.linkedDiagramId = idMap.get(linked); changed = true; }
         }
         if (changed) {
-          await fetch(`/api/diagrams/${newId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data }) });
+          await fetch(`/api/diagrams/${newId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data, unconditional: true }) }); // initial write after create (DATA-32)
           relinked++;
         }
       }

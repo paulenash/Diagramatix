@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
+import { classifyDiagramWrite } from "@/app/lib/diagram/saveConcurrency";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { isAssignedReviewer } from "@/app/lib/reviewProjects";
@@ -187,14 +188,28 @@ export async function PUT(req: Request, { params }: Params) {
       };
 
       // ── Co-authoring optimistic-concurrency guard ──
-      // A DATA-changing save from a version-aware client is a compare-and-swap
-      // on `version`; if the diagram moved on under us we 409 with the current
-      // state so the client can reload+replay its local edits, instead of
-      // silently clobbering a concurrent editor.
+      // A DATA-changing save is a compare-and-swap on `version`; if the diagram
+      // moved on under us we 409 with the current state so the client can
+      // reload+replay its local edits, instead of silently clobbering a
+      // concurrent editor. A data write with NO version is rejected unless the
+      // caller explicitly opts into an authoritative overwrite — closing the
+      // old last-write-wins gap where a version-less write was accepted
+      // silently. See app/lib/diagram/saveConcurrency.ts.
       const clientVersion = typeof body.version === "number" ? body.version : null;
-      if (hasData && clientVersion !== null) {
+      const unconditional = body.unconditional === true;
+      const mode = classifyDiagramWrite({ hasData, clientVersion, unconditional });
+
+      if (mode === "reject") {
+        return NextResponse.json({
+          error: "version-required",
+          message: "A data save must include the current diagram version (optimistic concurrency), " +
+            "or set unconditional:true for an authoritative overwrite.",
+        }, { status: 400 });
+      }
+
+      if (mode === "cas") {
         const cas = await prisma.diagram.updateMany({
-          where: { id, version: clientVersion },
+          where: { id, version: clientVersion! },
           data: { ...writeFields, version: { increment: 1 } },
         });
         if (cas.count === 0) {
@@ -223,8 +238,9 @@ export async function PUT(req: Request, { params }: Params) {
           }, { status: 409 });
         }
       } else {
-        // Legacy client (no version) or metadata-only save: unconditional write.
-        // A data save still bumps `version` so version-aware clients converge.
+        // "unconditional": a metadata-only save, or a tool that explicitly
+        // declared an authoritative overwrite. A data write still bumps
+        // `version` so version-aware clients converge on the next poll.
         await prisma.diagram.update({
           where: { id },
           data: { ...writeFields, ...(hasData && { version: { increment: 1 } }) },

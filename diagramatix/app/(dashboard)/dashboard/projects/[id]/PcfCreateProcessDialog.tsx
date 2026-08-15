@@ -249,7 +249,7 @@ export function PcfCreateProcessDialog({ projectId, defaultQuery, defaultFramewo
         if (existingId && action === "replace") {
           // Replace: overwrite the existing diagram's content AND name in place
           // (keeps its id/folder, so links pointing at it stay valid).
-          const up = await fetch(`/api/diagrams/${existingId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data, name: folder.name }) });
+          const up = await fetch(`/api/diagrams/${existingId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data, name: folder.name, unconditional: true }) /* DATA-32 */ });
           if (!up.ok) { setErr("Failed to replace a diagram"); break; }
           createdByFolder[folder.id] = existingId;
         } else {

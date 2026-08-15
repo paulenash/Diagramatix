@@ -100,7 +100,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
   const applyActive = useCallback((next: DiagramData) => {
     if (isOpen) { onApplyData?.(next); return; }
     setVariantData(next);
-    fetch(`/api/diagrams/${activeId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: next }) }).catch(() => {});
+    fetch(`/api/diagrams/${activeId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: next, unconditional: true }) }).catch(() => {}); // authoritative sim write-back (DATA-32)
   }, [isOpen, activeId, onApplyData]);
   const fillActive = useCallback(() => {
     const { data: filled, filled: n } = autofillSimulation(activeData);
