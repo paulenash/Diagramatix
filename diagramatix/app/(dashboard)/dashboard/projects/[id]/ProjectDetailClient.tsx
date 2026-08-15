@@ -327,6 +327,25 @@ async function flushFolderTreeSave(): Promise<void> {
   if (p) await putFolderTree(p.projectId, p.tree);
 }
 
+/** UI-03: flush the pending write during page UNLOAD (tab close / hard nav),
+ *  where an ordinary fetch would be cancelled. `keepalive` lets the request
+ *  outlive the page; sendBeacon can't be used because it only issues POST and
+ *  the folder-tree endpoint is a PUT with a JSON body. Synchronous + fire-and-
+ *  forget, as required in a pagehide/beforeunload handler. */
+function flushFolderTreeOnUnload(): void {
+  if (_folderTreeSaveTimer) { clearTimeout(_folderTreeSaveTimer); _folderTreeSaveTimer = null; }
+  const p = _folderTreePending; _folderTreePending = null;
+  if (!p) return;
+  try {
+    void fetch(`/api/projects/${p.projectId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folderTree: p.tree }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch { /* unload path — nothing more we can do */ }
+}
+
 interface DiagramSummary {
   id: string;
   name: string;
@@ -1064,6 +1083,20 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
       return next;
     });
   }, [project.id]);
+
+  // UI-03: never lose a pending folder-tree change to navigation. The write is
+  // debounced 500ms; without this, moving/renaming a folder and immediately
+  // navigating away (SPA route change or tab close) dropped the pending save.
+  // On unmount (SPA nav) flush normally; on page unload use the keepalive path.
+  useEffect(() => {
+    window.addEventListener("pagehide", flushFolderTreeOnUnload);
+    window.addEventListener("beforeunload", flushFolderTreeOnUnload);
+    return () => {
+      window.removeEventListener("pagehide", flushFolderTreeOnUnload);
+      window.removeEventListener("beforeunload", flushFolderTreeOnUnload);
+      void flushFolderTreeSave();
+    };
+  }, []);
 
 
   // Fetch fresh colorConfig from API on mount

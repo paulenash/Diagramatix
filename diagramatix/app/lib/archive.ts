@@ -162,6 +162,19 @@ export async function restoreDiagram(diagramId: string): Promise<{ success: bool
   });
   if (!user) return { success: false, error: "Original user no longer exists" };
 
+  // DATA-18: the restore re-homes the diagram under its ORIGINAL owner + org
+  // (the UPDATE below keeps the archived `orgId`). If that owner has since been
+  // removed from the org, restoring would plant a diagram owned by a
+  // non-member inside the org — stale cross-tenant data. Re-validate membership
+  // and refuse rather than silently trust the archived userId.
+  const membership = await prisma.orgMember.findFirst({
+    where: { userId: originalUserId, orgId: diagram.orgId },
+    select: { id: true },
+  });
+  if (!membership) {
+    return { success: false, error: "Original owner is no longer a member of this diagram's organisation" };
+  }
+
   // Verify original project still exists (if it had one)
   let targetProjectId: string | null = null;
   if (originalProjectId) {

@@ -225,36 +225,48 @@ export async function restoreFullBackupWipe(
   const schema = await getBackupSchema();
   _timestampColumns = schema.timestampColumns;
 
-  // ── Guard (audit DATA-02) ────────────────────────────────────────────
-  // A wipe restore TRUNCATEs the ENTIRE schema (CASCADE). If this backup
-  // predates a table that now exists AND that live table holds rows, the
-  // cascade would delete those rows with nothing in the payload to
-  // re-insert — silent data loss. Refuse rather than destroy.
+  // Tables the current schema has but this backup's payload omits (pure set
+  // math — no DB access). The data-loss guard over these runs INSIDE the
+  // transaction below (DATA-29).
   const payloadTables = new Set(Object.keys(payload.tables ?? {}));
   const missingTables = schema.tables.filter((t) => !payloadTables.has(t));
-  if (missingTables.length > 0) {
-    const liveNonEmpty: string[] = [];
-    for (const t of missingTables) {
-      // Table names come from the catalog, never user input — safe to interpolate.
-      const rows = await prisma.$queryRawUnsafe<{ c: bigint }[]>(
-        `SELECT COUNT(*)::bigint AS c FROM "${t}"`,
-      );
-      if (Number(rows[0]?.c ?? 0) > 0) liveNonEmpty.push(t);
-    }
-    if (liveNonEmpty.length > 0) {
-      throw new Error(
-        `Refusing wipe restore: this backup predates ${liveNonEmpty.length} ` +
-        `table(s) that currently hold live data (${liveNonEmpty.join(", ")}). ` +
-        `A wipe restore would permanently delete those rows with nothing to ` +
-        `re-insert. Export a fresh full backup (schema ${SCHEMA_VERSION}) and ` +
-        `restore that, or use additive-selective restore instead.`,
-      );
-    }
-    log.push(`Note: backup omits ${missingTables.length} newer table(s); all empty live — safe to proceed.`);
-  }
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   await prisma.$transaction(async (tx) => {
+    // ── Guard (audit DATA-02, hardened DATA-29) ────────────────────────────
+    // A wipe restore TRUNCATEs the ENTIRE schema (CASCADE). If this backup
+    // predates a table that now exists AND that live table holds rows, the
+    // cascade would delete those rows with nothing in the payload to re-insert
+    // — silent data loss. Refuse rather than destroy.
+    //
+    // DATA-29: this guard MUST run inside the same transaction as the TRUNCATE,
+    // and hold a lock, or a concurrent write landing rows between the COUNT and
+    // the TRUNCATE would defeat it (a TOCTOU the old out-of-transaction guard
+    // had). Lock the checked tables ACCESS EXCLUSIVE first so no writer can slip
+    // in; throwing here rolls the transaction back with nothing truncated.
+    if (missingTables.length > 0) {
+      // Table names come from the catalog, never user input — safe to interpolate.
+      const quotedMissing = missingTables.map((t) => `"${t}"`).join(", ");
+      await tx.$executeRawUnsafe(`LOCK TABLE ${quotedMissing} IN ACCESS EXCLUSIVE MODE`);
+      const liveNonEmpty: string[] = [];
+      for (const t of missingTables) {
+        const rows = await tx.$queryRawUnsafe<{ c: bigint }[]>(
+          `SELECT COUNT(*)::bigint AS c FROM "${t}"`,
+        );
+        if (Number(rows[0]?.c ?? 0) > 0) liveNonEmpty.push(t);
+      }
+      if (liveNonEmpty.length > 0) {
+        throw new Error(
+          `Refusing wipe restore: this backup predates ${liveNonEmpty.length} ` +
+          `table(s) that currently hold live data (${liveNonEmpty.join(", ")}). ` +
+          `A wipe restore would permanently delete those rows with nothing to ` +
+          `re-insert. Export a fresh full backup (schema ${SCHEMA_VERSION}) and ` +
+          `restore that, or use additive-selective restore instead.`,
+        );
+      }
+      log.push(`Note: backup omits ${missingTables.length} newer table(s); all empty live — safe to proceed.`);
+    }
+
     // TRUNCATE every table. CASCADE + RESTART IDENTITY; all PKs are cuids so
     // identity restart is harmless. CASCADE handles FK order, so a simple
     // catalog-derived list (any order) is safe.

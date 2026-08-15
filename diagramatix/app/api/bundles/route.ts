@@ -261,24 +261,36 @@ export async function POST(req: Request) {
     // (cron + email infrastructure) — for now, in-app only.
     const singleRoot = rootDiagramIds.length === 1 ? rootDiagramIds[0] : undefined;
     if (finalAudienceUserIds.length > 0) {
-      await createNotifications(
-        finalAudienceUserIds.map(userId => ({
-          userId,
-          type: "bundle-published" as const,
-          payload: {
-            bundleId: bundle.id,
-            bundleName: name,
-            rootDiagramId: singleRoot,
-            fromUserId: callerId,
-          },
-        })),
-      );
+      // DATA-20: the bundle + pending rows are already committed above, so an
+      // in-app notification failure must NOT 500 an otherwise-successful publish.
+      // Best-effort, matching the invite-email path below.
+      try {
+        await createNotifications(
+          finalAudienceUserIds.map(userId => ({
+            userId,
+            type: "bundle-published" as const,
+            payload: {
+              bundleId: bundle.id,
+              bundleName: name,
+              rootDiagramId: singleRoot,
+              fromUserId: callerId,
+            },
+          })),
+        );
+      } catch (err) {
+        console.error("[POST /api/bundles] audience notifications failed", err instanceof Error ? err.message : err);
+      }
     }
 
     // Send invitation emails to anyone who didn't have an account yet.
-    // Best-effort — failures don't roll back the bundle creation.
+    // Best-effort — failures don't roll back the bundle creation. DATA-20: track
+    // which sends failed and report them, so the owner isn't told an invite went
+    // out when the email bounced. The PendingBundleAudience row still exists, so
+    // the invite works once the person registers — this is honest feedback, not
+    // a rollback.
     const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
     const registerUrl = `${baseUrl}/register`;
+    const failedInviteEmails: string[] = [];
     for (const email of inviteEmailsToSend) {
       try {
         await sendBundleInvitationEmail({
@@ -290,6 +302,7 @@ export async function POST(req: Request) {
         });
       } catch (err) {
         console.error("[POST /api/bundles] invite email failed for", email, err instanceof Error ? err.message : err);
+        failedInviteEmails.push(email);
       }
     }
 
@@ -298,6 +311,10 @@ export async function POST(req: Request) {
       memberCount: allIds.size,
       audienceCount: finalAudienceUserIds.length,
       inviteCount: inviteEmailsToSend.length,
+      // Emails that could not be delivered (the invite still stands — the
+      // recipient just wasn't notified). Empty when all sends succeeded.
+      emailsFailed: failedInviteEmails.length,
+      failedInvites: failedInviteEmails,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

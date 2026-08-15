@@ -73,9 +73,9 @@
 | DATA-15 | High | Races | `checkLimit`/`recordUsage` TOCTOU lets concurrent requests exceed hard caps | Open |
 | DATA-16 | High | Schema/FK | Project delete `SetNull`s `projectId` but leaves PUBLISHED diagrams as invisible orphans | ✅ Fixed (Wave 2) |
 | DATA-17 | Medium | Races | Monthly counter reset on renewal races concurrent usage / nukes unrelated counters | ✅ Fixed (Wave 2 — verify in Stripe test mode) |
-| DATA-18 | Medium | Multi-tenant | `restoreDiagram` trusts archived `userId`, never re-validates org membership | Open |
+| DATA-18 | Medium | Multi-tenant | `restoreDiagram` trusts archived `userId`, never re-validates org membership | ✅ Fixed 2026-08-15 (rectification batch 5) |
 | DATA-19 | Medium | Backup | Per-user backup captures cross-org prompts but restore dedups them into one org → loss | ✅ Fixed 2026-08-15 (rectification batch 4) |
-| DATA-20 | Medium | Email | `sendMail` failures unhandled → DB may record an invite/notification as delivered | Changed (re-audit: partially remediated; `PendingBundleAudience` variant persists) |
+| DATA-20 | Medium | Email | `sendMail` failures unhandled → DB may record an invite/notification as delivered | ✅ Fixed 2026-08-15 (rectification batch 5) |
 | DATA-21 | Medium | Restore | `shortCuid()` (Math.random + Date.now) can collide mid-restore → duplicate-PK abort/mis-parent | ✅ Fixed 2026-08-15 (rectification batch 4) |
 | DATA-22 | Medium | Transactions | `restoreRulesPrefsBundle` upserts in a bare loop, no transaction → partial merge | ✅ Fixed (re-audit: both loops now one `$transaction`) |
 | DATA-23 | Medium | Restore | Rules upsert keyed only by `id` violates `@@unique([category,userId,orgId])` → abort | ✅ Fixed (re-audit: now `findUnique(id) ?? findFirst(natural key)`) |
@@ -100,7 +100,7 @@
 | DATA-26 | High | Transactions | New per-table restore runs all upserts + FK re-links with NO transaction → half-merged DB | ✅ Fixed (Wave 1) |
 | DATA-27 | Medium | Restore | Per-table restore silently skips rows colliding on a non-PK unique key (regresses the DATA-23 fix) | ✅ Fixed (Wave 2) |
 | DATA-28 | Medium | Restore | Per-table restore drops a Diagram row when nullable `diagramOwnerId` points to a non-restored user (should null it) | ✅ Fixed (Wave 2) |
-| DATA-29 | Medium | Races | Wipe-restore data-loss guard runs its COUNT checks outside the TRUNCATE transaction (TOCTOU) | Open |
+| DATA-29 | Medium | Races | Wipe-restore data-loss guard runs its COUNT checks outside the TRUNCATE transaction (TOCTOU) | ✅ Fixed 2026-08-15 (rectification batch 5) |
 | DATA-30 | Low | Robustness | Per-table `inserted` count excludes updates; malformed payload → unguarded TypeError 500 | Open |
 | DATA-31 | Low | Transactions | `getOrCreateStripeCustomer` creates a Stripe customer then persists its id separately → dangling/duplicate customers | ✅ Fixed (Wave 2 — verify in Stripe test mode) |
 | ENG-14 | Medium | Undo/redo | `updateLabelLive` mutates persisted label+geometry after an undo without invalidating the redo branch | Needs manual confirmation |
@@ -120,7 +120,7 @@
 | CANVAS-09 | Low | Robustness | Group-drag auto-scroll `setInterval` cleared only on mouseup, not unmount | Open |
 | UI-01 | High | Data loss | Ctrl+S calls a stale `saveNow()` closure → silently overwrites edits with `initialData` | ✅ Fixed (Wave 2) |
 | UI-02 | High | Data loss | Previewing a history snapshot auto-saves it over the live diagram | ✅ Fixed (Wave 2) |
-| UI-03 | Medium | Data loss | Folder-tree changes lost on navigation (module-level 500 ms debounce, no flush) | Open |
+| UI-03 | Medium | Data loss | Folder-tree changes lost on navigation (module-level 500 ms debounce, no flush) | ✅ Fixed 2026-08-15 (rectification batch 5) |
 | IO-01 | High | DoS | No upload size limit before `.vsdx` is fully decompressed in memory (zip-bomb / OOM) | ✅ Fixed (urgent batch) |
 | IO-02 | High | Data integrity | DDL importer drops FK relationships when table-name casing differs between definition and reference | Open |
 | IO-03 | Medium | DoS | Unbounded recursion on nested sub-processes / lane sets (no depth guard) | Needs manual confirmation |

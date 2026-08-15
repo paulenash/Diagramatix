@@ -15,8 +15,9 @@ import { truncateAll } from "../_setup/db";
 import { createUser, createUserWithOrg, addOrgMember, createProject } from "../_setup/factories";
 import { buildOrgBackup, restoreOrgBackupAdditive } from "@/app/lib/org-backup";
 import { buildUserBackup, restoreUserBackup } from "@/app/lib/backup";
-import { parseFullBackup, type AdditiveSelection } from "@/app/lib/full-backup";
+import { buildFullBackup, parseFullBackup, restoreFullBackupWipe, type AdditiveSelection } from "@/app/lib/full-backup";
 import { promotePendingAudienceMemberships } from "@/app/lib/bundleInvites";
+import { restoreDiagram } from "@/app/lib/archive";
 
 // ── DATA-14 ─────────────────────────────────────────────────────────────────
 describe("DATA-14 — org backup carries + restores the org's default rules", () => {
@@ -98,6 +99,75 @@ describe("DATA-19 — multi-org prompts survive a restore in their own orgs", ()
 
     const bar = await prisma.prompt.findFirst({ where: { userId: user.id, name: "Bar" } });
     expect(bar?.orgId, "an orphaned prompt lands in the current org").toBe(orgA.id);
+  });
+});
+
+// ── DATA-18 ─────────────────────────────────────────────────────────────────
+describe("DATA-18 — restoreDiagram re-validates org membership", () => {
+  beforeEach(async () => { await truncateAll(); });
+
+  /** Seed a diagram already in the archived state (metadata in data._archive),
+   *  without the archive-project infra — restoreDiagram reads exactly this. */
+  async function seedArchived(userId: string, orgId: string, projectId: string) {
+    return prisma.diagram.create({
+      data: {
+        name: "Archived", type: "bpmn", userId, orgId, projectId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: { elements: [], connectors: [], _archive: { _archivedFromUserId: userId, _archivedFromProjectId: projectId } } as any,
+      },
+    });
+  }
+
+  it("refuses to restore when the original owner has left the org", async () => {
+    const { user, org } = await createUserWithOrg();
+    const project = await createProject({ userId: user.id, orgId: org.id });
+    const diagram = await seedArchived(user.id, org.id, project.id);
+
+    // Owner removed from the org after archiving.
+    await prisma.orgMember.deleteMany({ where: { userId: user.id, orgId: org.id } });
+
+    const res = await restoreDiagram(diagram.id);
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/no longer a member/i);
+    // The diagram is untouched — still archived.
+    const after = await prisma.diagram.findUnique({ where: { id: diagram.id } });
+    expect((after!.data as Record<string, unknown>)._archive).toBeTruthy();
+  });
+
+  it("restores when the original owner is still a member", async () => {
+    const { user, org } = await createUserWithOrg();
+    const project = await createProject({ userId: user.id, orgId: org.id });
+    const diagram = await seedArchived(user.id, org.id, project.id);
+
+    const res = await restoreDiagram(diagram.id);
+    expect(res.success).toBe(true);
+    const after = await prisma.diagram.findUnique({ where: { id: diagram.id } });
+    expect((after!.data as Record<string, unknown>)._archive).toBeUndefined(); // un-archived
+    expect(after!.userId).toBe(user.id);
+  });
+});
+
+// ── DATA-29 ─────────────────────────────────────────────────────────────────
+describe("DATA-29 — wipe-restore data-loss guard (now inside the transaction)", () => {
+  beforeEach(async () => { await truncateAll(); });
+
+  it("refuses a wipe restore whose payload omits a table that holds live rows", async () => {
+    const { user } = await createUserWithOrg();
+    const project = await createProject({ userId: user.id, orgId: (await createUserWithOrg({ email: "z@test.dev" })).org.id });
+    void project;
+
+    const bytes = await buildFullBackup("test@diagramatix.test", "test", undefined);
+    const payload = await parseFullBackup(bytes);
+
+    // Simulate a backup that predates a now-existing table: drop a table that
+    // still holds live rows from the payload. `User` always has rows here.
+    expect((payload.tables.User as unknown[]).length).toBeGreaterThan(0);
+    delete (payload.tables as Record<string, unknown>).User;
+
+    // The guard must refuse rather than truncate User with nothing to re-insert.
+    await expect(restoreFullBackupWipe(payload)).rejects.toThrow(/Refusing wipe restore/);
+    // And nothing was destroyed — the live users are still there.
+    expect(await prisma.user.count()).toBeGreaterThan(0);
   });
 });
 
