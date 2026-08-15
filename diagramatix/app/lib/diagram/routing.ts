@@ -271,11 +271,14 @@ function sideFromPoint(el: DiagramElement, pt: Point): Side {
   return "bottom";
 }
 
-/** Fractional offset (0..1) of a boundary point along a given side. */
+/** Fractional offset (0..1) of a boundary point along a given side.
+ *  ENG-07: guard the divisor — a zero-width/height element yields 0/0 = NaN,
+ *  which SURVIVES the clamp (Math.min/max propagate NaN) and lands as a NaN
+ *  connector coordinate. Fall back to the side's midpoint (0.5). */
 function offsetAlongFromPoint(el: DiagramElement, side: Side, pt: Point): number {
-  const raw = (side === "top" || side === "bottom")
-    ? (pt.x - el.x) / el.width
-    : (pt.y - el.y) / el.height;
+  const horizontal = side === "top" || side === "bottom";
+  const span = horizontal ? el.width : el.height;
+  const raw = span > 0 ? ((horizontal ? pt.x - el.x : pt.y - el.y) / span) : 0.5;
   return Math.max(0, Math.min(1, raw));
 }
 
@@ -415,8 +418,11 @@ function getClosestSideOfElement(px: number, py: number, el: DiagramElement): Si
 // Project a point onto an element's side to get the fractional offset along that side
 function getOffsetAlong(el: DiagramElement, side: Side, pt: Point): number {
   const clamp = (v: number) => Math.max(0.1, Math.min(0.9, v));
-  if (side === "top" || side === "bottom") return clamp((pt.x - el.x) / el.width);
-  return clamp((pt.y - el.y) / el.height);
+  // ENG-07: guard the divisor so a zero-size element can't produce NaN.
+  const horizontal = side === "top" || side === "bottom";
+  const span = horizontal ? el.width : el.height;
+  if (span <= 0) return 0.5;
+  return clamp((horizontal ? pt.x - el.x : pt.y - el.y) / span);
 }
 
 /**

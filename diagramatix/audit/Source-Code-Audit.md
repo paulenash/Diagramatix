@@ -84,9 +84,9 @@
 | ENG-02 | High | Reducer | `DELETE_ELEMENT` leaves dangling connectors on the deleted host's boundary events | ✅ Fixed v1.20 |
 | ENG-03 | High | Undo/redo | Title/font/database setters mutate persisted state but don't invalidate the redo stack | ✅ Fixed v1.20 |
 | ENG-04 | Medium | Reducer | `collectCascadeLanes` recurses with no visited guard → stack overflow on cyclic lane chain | ✅ Fixed (Wave 1) |
-| ENG-05 | Medium | Space tools | `REMOVE_SPACE` leaves corner elements un-shifted in cross (both-axis) zones | Open |
+| ENG-05 | Medium | Space tools | `REMOVE_SPACE` leaves corner elements un-shifted in cross (both-axis) zones | ✅ Fixed 2026-08-15 (rectification batch 9) |
 | ENG-06 | Medium | Undo/redo | Interleaved second drag overwrites the pre-drag snapshot → first action lost from history | Open |
-| ENG-07 | Medium | Geometry | `offsetAlongFromPoint`/`getOffsetAlong` divide by element w/h with no zero-guard → NaN offset | Open (re-audit: 0–1 clamp added but divisor still unguarded → NaN survives) |
+| ENG-07 | Medium | Geometry | `offsetAlongFromPoint`/`getOffsetAlong` divide by element w/h with no zero-guard → NaN offset | ✅ Fixed 2026-08-15 (rectification batch 9) |
 | ENG-08 | Medium | Routing | Containment clamp can invert detour lines → route crosses through obstacle | Needs manual confirmation |
 | ENG-09 | Low | Mutation | `SWAP_LANES_VERTICAL` reorders the connectors array → silent draw-order change | Open |
 | ENG-10 | Low | Undo/redo | `swapLane` bypasses the 100-entry history cap | Open |
@@ -103,7 +103,7 @@
 | DATA-29 | Medium | Races | Wipe-restore data-loss guard runs its COUNT checks outside the TRUNCATE transaction (TOCTOU) | ✅ Fixed 2026-08-15 (rectification batch 5) |
 | DATA-30 | Low | Robustness | Per-table `inserted` count excludes updates; malformed payload → unguarded TypeError 500 | ✅ Fixed 2026-08-15 (rectification batch 8) |
 | DATA-31 | Low | Transactions | `getOrCreateStripeCustomer` creates a Stripe customer then persists its id separately → dangling/duplicate customers | ✅ Fixed (Wave 2 — verify in Stripe test mode) |
-| ENG-14 | Medium | Undo/redo | `updateLabelLive` mutates persisted label+geometry after an undo without invalidating the redo branch | Needs manual confirmation |
+| ENG-14 | Medium | Undo/redo | `updateLabelLive` mutates persisted label+geometry after an undo without invalidating the redo branch | ✅ Fixed 2026-08-15 (rectification batch 9) |
 | ENG-15 | Low | Undo/redo | `correctAllConnectors` rewrites persisted waypoints without `pushHistory`/`invalidateRedo` | Open |
 | ENG-16 | Low | Routing | Rectilinear waypoint-preservation uses a different obstacle set than the main pass (data-object flip-flop) | Open |
 | ENG-17 | Low | Performance | `recomputeAllConnectors([conn])` rebuilds the full element Map per connector, per drag frame | Open |

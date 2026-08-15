@@ -8039,10 +8039,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             }
             return { ...e, x: nx, y: ny, width: nw, height: nh };
           }
-          // Non-structural, non-EP elements: partial overlap → leave
-          // alone; otherwise shift on each axis according to the
-          // direction choice.
-          if (partialOverlap(e)) return e;
+          // Non-structural, non-EP elements: shift on each axis INDEPENDENTLY.
+          // ENG-05: a blanket `if (partialOverlap(e)) return e` bailed out a
+          // CORNER element in a cross zone — one that overlaps a single strip but
+          // sits cleanly outside the other — so it never shifted on the axis
+          // where it should, drifting out of alignment. The per-axis conditions
+          // below already fire ONLY when the element is cleanly outside the strip
+          // on that axis (a strip-straddling element matches neither branch), so
+          // handling each axis on its own is both correct and sufficient.
           let nx = e.x, ny = e.y;
           if (e.x >= zR && rightMoves) nx -= zone.width;
           else if (e.x + e.width <= zone.x && leftMoves) nx += zone.width;
@@ -9739,6 +9743,12 @@ export function useDiagram(initialData: DiagramData) {
   }, []);
 
   const updateLabelLive = useCallback((id: string, label: string) => {
+    // ENG-14: this mutates persisted label + geometry. If the user had just
+    // pressed undo, a diverged redo future is now stale — typing over it and
+    // then pressing redo would replay old geometry on top of the new label.
+    // Invalidate the redo branch on the live edit (idempotent; no-op when there
+    // is no future to clear), matching the ENG-03 setter pattern.
+    invalidateRedo();
     // Per-keystroke path; no history push. The reducer applies the
     // autosize + label change but skips connector recompute and lane
     // reflow (deferred to UPDATE_LABEL on commit).
