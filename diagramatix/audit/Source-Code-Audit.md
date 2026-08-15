@@ -88,11 +88,11 @@
 | ENG-06 | Medium | Undo/redo | Interleaved second drag overwrites the pre-drag snapshot → first action lost from history | Open |
 | ENG-07 | Medium | Geometry | `offsetAlongFromPoint`/`getOffsetAlong` divide by element w/h with no zero-guard → NaN offset | ✅ Fixed 2026-08-15 (rectification batch 9) |
 | ENG-08 | Medium | Routing | Containment clamp can invert detour lines → route crosses through obstacle | Needs manual confirmation |
-| ENG-09 | Low | Mutation | `SWAP_LANES_VERTICAL` reorders the connectors array → silent draw-order change | Open |
-| ENG-10 | Low | Undo/redo | `swapLane` bypasses the 100-entry history cap | Open |
-| ENG-11 | Low | Space tools | `INSERT_SPACE` pushes a history snapshot every mouse-move frame of a shift-drag | Open |
+| ENG-09 | Low | Mutation | `SWAP_LANES_VERTICAL` reorders the connectors array → silent draw-order change | ✅ Fixed 2026-08-16 |
+| ENG-10 | Low | Undo/redo | `swapLane` bypasses the 100-entry history cap | ✅ Fixed 2026-08-16 |
+| ENG-11 | Low | Space tools | `INSERT_SPACE` pushes a history snapshot every mouse-move frame of a shift-drag | ⏸ Deferred (interactive) 2026-08-16 |
 | ENG-12 | Low | Performance | `ancestorsOf` does a linear `find()` per hop → O(n²) obstacle setup per recompute | ✅ Fixed 2026-08-15 |
-| ENG-13 | Low | Mutation | `consolidateWaypoints` returns its input array by reference for short paths (aliasing trap) | Open |
+| ENG-13 | Low | Mutation | `consolidateWaypoints` returns its input array by reference for short paths (aliasing trap) | ✅ Fixed 2026-08-16 |
 | SEC-19 | High | Secrets | Deepgram master API key returned to any authenticated client in the dictation-token fallback | ✅ Fixed (Wave 1) |
 | SEC-20 | High | Impersonation | Archive (soft-delete) route ignores the read-only impersonation guard | ✅ Fixed 2026-08-14 (rectification batch 1) |
 | SEC-21 | Low | Impersonation | Prompt routes scope org to the impersonated user but key writes on the superuser's own id | ✅ Fixed 2026-08-14 (rectification batch 2) |
@@ -104,20 +104,20 @@
 | DATA-30 | Low | Robustness | Per-table `inserted` count excludes updates; malformed payload → unguarded TypeError 500 | ✅ Fixed 2026-08-15 (rectification batch 8) |
 | DATA-31 | Low | Transactions | `getOrCreateStripeCustomer` creates a Stripe customer then persists its id separately → dangling/duplicate customers | ✅ Fixed (Wave 2 — verify in Stripe test mode) |
 | ENG-14 | Medium | Undo/redo | `updateLabelLive` mutates persisted label+geometry after an undo without invalidating the redo branch | ✅ Fixed 2026-08-15 (rectification batch 9) |
-| ENG-15 | Low | Undo/redo | `correctAllConnectors` rewrites persisted waypoints without `pushHistory`/`invalidateRedo` | Open |
-| ENG-16 | Low | Routing | Rectilinear waypoint-preservation uses a different obstacle set than the main pass (data-object flip-flop) | Open |
-| ENG-17 | Low | Performance | `recomputeAllConnectors([conn])` rebuilds the full element Map per connector, per drag frame | Open |
+| ENG-15 | Low | Undo/redo | `correctAllConnectors` rewrites persisted waypoints without `pushHistory`/`invalidateRedo` | ✅ Fixed 2026-08-16 |
+| ENG-16 | Low | Routing | Rectilinear waypoint-preservation uses a different obstacle set than the main pass (data-object flip-flop) | ⏸ Deferred (visual) 2026-08-16 |
+| ENG-17 | Low | Performance | `recomputeAllConnectors([conn])` rebuilds the full element Map per connector, per drag frame | ✅ Fixed 2026-08-16 |
 | ENG-18 | Low | Performance | `ensureContainersEncloseChildren` recomputes ancestor depth inside the sort comparator (O(n²log n)) | ✅ Fixed 2026-08-15 |
-| ENG-19 | Low | Performance | `getAllDescendantIds` O(subtree×n) per column inside the vswimlane drag frame | Open |
+| ENG-19 | Low | Performance | `getAllDescendantIds` O(subtree×n) per column inside the vswimlane drag frame | ✅ Fixed 2026-08-16 |
 | CANVAS-01 | High | XSS | `RichTextEditor` assigns stored `description` to `innerHTML` on init without `sanitizeRichText` (stored XSS) | ✅ Fixed (Wave 1) |
 | CANVAS-02 | High | Performance | O(n²) connector-hump computation rebuilt every render (`indexOf` + slice/map per connector) | Open |
 | CANVAS-03 | High | Performance | `nonContainers` sort O(n²log n): comparator calls `elements.find()` in a parent-walk | Open |
 | CANVAS-04 | High | Performance | Domain-diagram obstacle check O(connectors×elements×waypoints), unmemoised, every render | Open |
 | CANVAS-05 | High | Performance | `SymbolRenderer`/`ConnectorRenderer` unmemoised + fresh inline closures → full re-render every pan/zoom frame | Open |
 | CANVAS-06 | Medium | Performance | Connector-drop highlight O(n²) via `getElementPoolId` linear find per element | Open |
-| CANVAS-07 | Low | Listener leak | Pre-drag gesture listeners never cleaned up on unmount | Open |
-| CANVAS-08 | Low | Listener leak | Connector-label focus-clear listener leaks if unmounted before next mousedown | Open |
-| CANVAS-09 | Low | Robustness | Group-drag auto-scroll `setInterval` cleared only on mouseup, not unmount | Open |
+| CANVAS-07 | Low | Listener leak | Pre-drag gesture listeners never cleaned up on unmount | ⏸ Deferred (React lifecycle, desk) 2026-08-16 |
+| CANVAS-08 | Low | Listener leak | Connector-label focus-clear listener leaks if unmounted before next mousedown | ⏸ Deferred (React lifecycle, desk) 2026-08-16 |
+| CANVAS-09 | Low | Robustness | Group-drag auto-scroll `setInterval` cleared only on mouseup, not unmount | ⏸ Deferred (React lifecycle, desk) 2026-08-16 |
 | UI-01 | High | Data loss | Ctrl+S calls a stale `saveNow()` closure → silently overwrites edits with `initialData` | ✅ Fixed (Wave 2) |
 | UI-02 | High | Data loss | Previewing a history snapshot auto-saves it over the live diagram | ✅ Fixed (Wave 2) |
 | UI-03 | Medium | Data loss | Folder-tree changes lost on navigation (module-level 500 ms debounce, no flush) | ✅ Fixed 2026-08-15 (rectification batch 5) |
@@ -138,9 +138,9 @@
 | CFG-05 | Medium | Config | `proxy` matcher misses `(dashboard)` route-group URLs; auth depends on per-page `auth()` | ✅ Fixed 2026-08-14 (rectification batch 3) |
 | CFG-06 | Medium | Config | `/matrix` is publicly reachable despite a comment asserting route-group auth | ✅ Fixed 2026-08-14 (rectification batch 3) |
 | CFG-07 | Low | Hardening | `X-Powered-By: Next.js` header not disabled | ✅ Fixed 2026-08-14 (rectification batch 3) |
-| CFG-08 | Low | Dependencies | Unused PGlite packages remain in production `dependencies` | Open |
+| CFG-08 | Low | Dependencies | Unused PGlite packages remain in production `dependencies` | ✅ Fixed 2026-08-16 |
 | CFG-09 | Low | Dependencies | Production auth depends on a pre-release (beta) of `next-auth` | Open |
-| CFG-10 | Low | Robustness | Microsoft token refresh computes `NaN` expiry when `expires_in` is absent → refresh silently disabled | Open |
+| CFG-10 | Low | Robustness | Microsoft token refresh computes `NaN` expiry when `expires_in` is absent → refresh silently disabled | ✅ Already mitigated (?? 3600 fallback) 2026-08-16 |
 
 ---
 

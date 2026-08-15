@@ -4097,10 +4097,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // the drag itself doesn't churn parentId every frame.
       if (DATA_ELEMENT_TYPES.has(el.type)) {
         const elements = state.elements.map((e) => e.id === id ? { ...e, x, y } : e);
-        const connectors = state.connectors.map((conn) => {
-          if (conn.sourceId !== id && conn.targetId !== id) return conn;
-          return recomputeAllConnectors([conn], elements, state.relaxedLayout)[0] ?? conn;
-        });
+        // ENG-17: recompute every connector touching this element in ONE call so
+        // `recomputeAllConnectors` builds the element Map a single time, not once
+        // per connector on every drag frame.
+        const affected = state.connectors.filter(c => c.sourceId === id || c.targetId === id);
+        const recById = new Map(
+          recomputeAllConnectors(affected, elements, state.relaxedLayout).map(c => [c.id, c]),
+        );
+        const connectors = state.connectors.map(c => recById.get(c.id) ?? c);
         return { ...state, elements, connectors };
       }
 
@@ -4110,11 +4114,29 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (el.type === "flowchart-vswimlane") {
         const dx = x - el.x, dy = y - el.y;
         if (dx === 0 && dy === 0) return state;
+        // ENG-19: index child edges (parentId + boundaryHostId) once, then do a
+        // single multi-root BFS from every column — instead of an O(n) full scan
+        // per column (getAllDescendantIds) which was O(columns × n) per frame.
+        const childIndex = new Map<string, DiagramElement[]>();
+        for (const e of state.elements) {
+          for (const key of [e.parentId, e.boundaryHostId]) {
+            if (!key) continue;
+            const list = childIndex.get(key) ?? [];
+            list.push(e);
+            childIndex.set(key, list);
+          }
+        }
         const moveIds = new Set<string>();
+        const queue: string[] = [];
         for (const col of state.elements) {
           if (col.type !== "flowchart-vswimlane") continue;
-          moveIds.add(col.id);
-          for (const d of getAllDescendantIds(state.elements, col.id)) moveIds.add(d);
+          if (!moveIds.has(col.id)) { moveIds.add(col.id); queue.push(col.id); }
+        }
+        while (queue.length) {
+          const cur = queue.shift()!;
+          for (const child of childIndex.get(cur) ?? []) {
+            if (!moveIds.has(child.id)) { moveIds.add(child.id); queue.push(child.id); }
+          }
         }
         const elements = state.elements.map((e) =>
           moveIds.has(e.id) ? { ...e, x: e.x + dx, y: e.y + dy } : e,
@@ -4990,12 +5012,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // pattern. Internal-only connectors that were merely translated
       // are skipped: their relative geometry to their endpoints is
       // unchanged, so they can't have newly crossed an obstacle.
+      // ENG-09: validate the rerouted subset, then splice the results back in
+      // their ORIGINAL positions. The old code concatenated rerouted-first,
+      // silently changing the connector draw order (z-order) after a lane swap.
       const toValidate = connectors.filter(c => reroutedIds.has(c.id));
-      const unchanged  = connectors.filter(c => !reroutedIds.has(c.id));
-      const finalConnectors = [
-        ...validateConnectorsAgainstObstacles(toValidate, elements),
-        ...unchanged,
-      ];
+      const validatedById = new Map(
+        validateConnectorsAgainstObstacles(toValidate, elements).map(c => [c.id, c]),
+      );
+      const finalConnectors = connectors.map(c => validatedById.get(c.id) ?? c);
 
       return { ...state, elements, connectors: finalConnectors };
     }
@@ -9683,10 +9707,10 @@ export function useDiagram(initialData: DiagramData) {
     // One-shot action — push the pre-swap snapshot to the undo stack
     // so the user can revert the entire swap (positions + descendant
     // shifts + connector reroutes) in one step.
-    pastRef.current.push(snapshotData());
-    futureRef.current = [];
-    setCanUndo(true);
-    setCanRedo(false);
+    // ENG-10: go through pushHistory so the 100-entry cap is enforced; the
+    // manual `pastRef.current.push` bypassed it and grew history unbounded
+    // across repeated swaps.
+    pushHistory(snapshotData());
     dispatch({ type: "SWAP_LANES_VERTICAL", payload: { laneId, direction } });
   }, []);
 
@@ -10056,6 +10080,12 @@ export function useDiagram(initialData: DiagramData) {
   }, []);
 
   const correctAllConnectors = useCallback(() => {
+    // ENG-15: this rewrites persisted waypoints, so an invocation after an undo
+    // must kill the now-stale redo branch (same reasoning as ENG-03/ENG-14) —
+    // otherwise a later redo replays geometry the user has diverged from. It
+    // does not push its own snapshot: when auto-called at the end of a drag the
+    // preceding gesture already pushed one, and this pass is part of that step.
+    invalidateRedo();
     dispatch({ type: "CORRECT_ALL_CONNECTORS" });
   }, []);
 

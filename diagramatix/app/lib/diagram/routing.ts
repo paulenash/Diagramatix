@@ -1609,7 +1609,10 @@ export function rectifyWaypoints(waypoints: Point[], sourceSide: Side): Point[] 
 // Always preserves the 4 boundary points (srcCenter, srcEdge, tgtEdge, tgtCenter).
 export function consolidateWaypoints(wps: Point[]): Point[] {
   const THRESHOLD = 8;
-  if (wps.length <= 4) return wps;
+  // ENG-13: return a fresh array, never the caller's input by reference — a
+  // short path used to alias its argument, so a later in-place waypoint edit
+  // would mutate shared state.
+  if (wps.length <= 4) return wps.slice();
   const result = [wps[0], wps[1]];
   for (let i = 2; i < wps.length - 2; i++) {
     const prev = result[result.length - 1];
