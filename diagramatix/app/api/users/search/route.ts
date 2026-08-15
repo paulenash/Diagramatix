@@ -16,6 +16,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
+import { searchUsers } from "@/app/lib/userSearch";
 
 const MAX_RESULTS = 20;
 
@@ -36,7 +37,7 @@ export async function GET(req: Request) {
   const callerId = session.user.id;
 
   // Collect already-in-group user ids if asked.
-  let excludedUserIds: Set<string> = new Set([callerId]);
+  const excludedUserIds: Set<string> = new Set();
   if (excludeGroupId) {
     const inGroup = await prisma.collaborationGroupMember.findMany({
       where: {
@@ -48,22 +49,9 @@ export async function GET(req: Request) {
     for (const m of inGroup) excludedUserIds.add(m.userId);
   }
 
-  const users = await prisma.user.findMany({
-    where: {
-      AND: [
-        { id: { notIn: [...excludedUserIds] } },
-        {
-          OR: [
-            { email: { contains: q, mode: "insensitive" } },
-            { name: { contains: q, mode: "insensitive" } },
-          ],
-        },
-      ],
-    },
-    select: { id: true, name: true, email: true },
-    orderBy: [{ name: "asc" }, { email: "asc" }],
-    take: MAX_RESULTS,
-  });
+  // SEC-08: the scoping (colleagues by partial match; everyone else by exact
+  // email only) lives in searchUsers so it's unit-tested directly.
+  const users = await searchUsers({ callerId, q, excludeUserIds: excludedUserIds, max: MAX_RESULTS });
 
   return NextResponse.json({ users });
 }

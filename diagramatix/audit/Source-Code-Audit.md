@@ -45,8 +45,8 @@
 | SEC-05 | High | Secrets | Microsoft Graph access token leaked to the client via the session object | ✅ Fixed (Wave 1) |
 | SEC-06 | High | Auth flow | No rate limiting / lockout on login, register, or password reset | ✅ Fixed (urgent batch) |
 | SEC-07 | High | IDOR | Visio export endpoints authorise by Org membership, not project access | ✅ Fixed (Wave 1) |
-| SEC-08 | Medium | Privacy | User search leaks every user's name + email across all tenants | Open |
-| SEC-09 | Medium | Info leak | Raw Postgres/internal error text returned to clients | Open |
+| SEC-08 | Medium | Privacy | User search leaks every user's name + email across all tenants | ✅ Fixed 2026-08-15 (rectification batch 7) |
+| SEC-09 | Medium | Info leak | Raw Postgres/internal error text returned to clients | ✅ Fixed 2026-08-15 (rectification batch 7) |
 | SEC-10 | Medium | DoS | No size/zip-bomb limit on backup-restore upload | Open |
 | SEC-11 | Medium | Auth flow | No password strength/length check on registration | ✅ Fixed (urgent batch) |
 | SEC-12 | Medium | Auth flow | Login `authorize()` skips bcrypt when user missing (timing enumeration) | ✅ Fixed (urgent batch) |

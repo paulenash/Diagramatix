@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { serverError } from "@/app/lib/apiError";
 import { auth } from "@/auth";
 import { pgPool } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
@@ -41,7 +42,7 @@ export async function GET() {
     return NextResponse.json({ schema, counts });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err);
   }
 }
 

@@ -7,6 +7,7 @@
  *        Body: { rows: { label, keywords: string[], targetCategory?, targetTemplateName?, sortOrder? }[] }
  */
 import { NextResponse } from "next/server";
+import { serverError } from "@/app/lib/apiError";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
@@ -84,7 +85,7 @@ export async function PUT(req: Request) {
     ]);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err);
   }
 
   const rows = await prisma.intentKeywordMap.findMany({ orderBy: [{ sortOrder: "asc" }, { label: "asc" }] });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { serverError } from "@/app/lib/apiError";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -58,6 +59,6 @@ export async function POST(_req: Request, { params }: Params) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[POST /api/diagrams/archive] error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err);
   }
 }

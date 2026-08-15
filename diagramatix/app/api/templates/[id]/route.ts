@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { serverError } from "@/app/lib/apiError";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { pgPool, prisma } from "@/app/lib/db";
@@ -36,7 +37,7 @@ export async function GET(_req: Request, { params }: Params) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[GET /api/templates/:id] error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err);
   }
 }
 
@@ -132,7 +133,7 @@ export async function PUT(req: Request, { params }: Params) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[PUT /api/templates/:id] error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err);
   }
 }
 
@@ -188,6 +189,6 @@ export async function DELETE(req: Request, { params }: Params) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[DELETE /api/templates/:id] error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err);
   }
 }

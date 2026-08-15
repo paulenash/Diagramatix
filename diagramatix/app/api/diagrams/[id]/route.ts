@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { serverError } from "@/app/lib/apiError";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { classifyDiagramWrite } from "@/app/lib/diagram/saveConcurrency";
@@ -281,7 +282,7 @@ export async function PUT(req: Request, { params }: Params) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[PUT /api/diagrams] error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err);
   }
 }
 

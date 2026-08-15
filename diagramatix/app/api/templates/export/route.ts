@@ -9,6 +9,7 @@
  * password gate is needed because the user is already authenticated.
  */
 import { NextResponse } from "next/server";
+import { serverError } from "@/app/lib/apiError";
 import { auth } from "@/auth";
 import { pgPool } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
@@ -88,6 +89,6 @@ export async function GET(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[GET /api/templates/export] error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err);
   }
 }

@@ -15,6 +15,7 @@
  *     Returns the restore result (counts per table, log).
  */
 import { NextResponse } from "next/server";
+import { serverError } from "@/app/lib/apiError";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
@@ -102,7 +103,7 @@ export async function GET(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[admin/full-backup] GET error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(err);
   }
 }
 
@@ -160,7 +161,7 @@ export async function POST(req: Request) {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[admin/full-backup] POST inspect error:", message);
-      return NextResponse.json({ error: message }, { status: 500 });
+      return serverError(err);
     }
   }
 
@@ -182,7 +183,7 @@ export async function POST(req: Request) {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[admin/full-backup] POST wipe error:", message);
-      return NextResponse.json({ error: message }, { status: 500 });
+      return serverError(err);
     }
   }
 
@@ -220,7 +221,7 @@ export async function POST(req: Request) {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[admin/full-backup] POST additive error:", message);
-      return NextResponse.json({ error: message }, { status: 500 });
+      return serverError(err);
     }
   }
 
@@ -252,7 +253,7 @@ export async function POST(req: Request) {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[admin/full-backup] POST tables error:", message);
-      return NextResponse.json({ error: message }, { status: 500 });
+      return serverError(err);
     }
   }
 

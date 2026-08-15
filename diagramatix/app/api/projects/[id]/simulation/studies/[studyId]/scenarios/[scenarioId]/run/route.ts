@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { serverError } from "@/app/lib/apiError";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -174,6 +175,6 @@ export async function POST(req: Request, { params }: Params) {
     const message = e instanceof Error ? e.message : "Simulation failed";
     await prisma.simulationRun.update({ where: { id: run.id }, data: { error: message, finishedAt: new Date() } });
     await prisma.simulationScenario.update({ where: { id: scenarioId }, data: { status: "FAILED" } });
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(e);
   }
 }
