@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeExportName } from "@/app/lib/exportFilename";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -125,8 +126,8 @@ export async function GET(request: Request) {
       profile.name === "diagramatix-v1.6" ? "v1.6"
       : profile.name === "diagramatix-v1.5" ? "v1.5"
       : "V3";
-    // Strip filename-invalid chars (Windows + macOS): \ / : * ? " < > |
-    const safeName = project.name.replace(/[\\/:*?"<>|]/g, "_").trim() || "Project";
+    // Strip control chars (header injection) + filename-invalid chars.
+    const safeName = safeExportName(project.name, "Project");
     // Record AFTER the file is built. Failed exports don't burn the quota.
     await recordUsage(session.user.id, "bulkExports");
     return new NextResponse(result as unknown as BodyInit, {

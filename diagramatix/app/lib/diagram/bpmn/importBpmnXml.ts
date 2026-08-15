@@ -189,8 +189,10 @@ function readInnerText(body: string): string {
 
 /** Map of generation-time helpers shared across passes. */
 function nanoid(): string {
-  // Short URL-safe id; matches the convention used elsewhere in the codebase.
-  return Math.random().toString(36).slice(2, 11);
+  // IO-09: `Math.random().toString(36)` yields only ~9 low-entropy chars, so a
+  // large import can mint two identical ids (birthday collision) and silently
+  // merge unrelated elements. Derive from a v4 UUID's random bytes instead.
+  return "n" + crypto.randomUUID().replace(/-/g, "").slice(0, 12);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -984,7 +986,14 @@ function buildFlows(
       }
     }
 
-    // Condition / default flag on the connector's properties.
+    // Condition on the sequence flow. IO-05: the real expression was discarded
+    // and a literal "true" written instead — losing the routing semantics of
+    // every imported conditional flow. Extract the expression text (unwrapping
+    // CDATA + decoding entities) and keep it.
+    const condMatch = /<(?:[a-zA-Z0-9_-]+:)?conditionExpression\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9_-]+:)?conditionExpression>/.exec(f.body);
+    const conditionExpr = condMatch
+      ? decodeXmlEntities(condMatch[1].replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, "").trim())
+      : "";
     const hasCondition = /<(?:[a-zA-Z0-9_-]+:)?conditionExpression\b/.test(f.body);
 
     const conn: Connector = {
@@ -1002,10 +1011,10 @@ function buildFlows(
       label: name ? decodeXmlEntities(name) : undefined,
     };
     if (hasCondition) {
-      // condition expressions are preserved opaquely for future v2
-      // rendering — stored as a stringified body since the connector
-      // type doesn't have a generic properties bag.
-      (conn as Connector & { _condition?: string })._condition = "true";
+      // Preserve the actual condition text on the real connector field so the
+      // routing semantics survive a round-trip. Fall back to a non-empty marker
+      // only when the expression body couldn't be extracted.
+      conn.branchCondition = conditionExpr || "condition";
     }
     // The owning gateway named this flow as its default — carry the BPMN
     // `default` attribute across as our per-flow flag, so it draws with the
@@ -1216,6 +1225,19 @@ export async function importBpmnXml(
           `Median element width is ${median.toFixed(1)} px — coordinates may be in mm rather than pixels. Check the source file.`,
         );
       }
+    }
+  }
+
+  // IO-06: `mintId` allocates an id for a boundary event's attachedToRef even
+  // when that host activity was never emitted (missing <BPMNShape>, malformed
+  // ref, forward reference to a dropped element). A boundaryHostId pointing at a
+  // non-existent element leaves the boundary event visually detached and breaks
+  // any downstream code that dereferences the host. Drop dangling references.
+  const elementIds = new Set(ctx.elements.map((e) => e.id));
+  for (const el of ctx.elements) {
+    if (el.boundaryHostId && !elementIds.has(el.boundaryHostId)) {
+      delete el.boundaryHostId;
+      ctx.warnings.push(`Boundary event "${el.label || el.id}" references a missing host element — detached.`);
     }
   }
 

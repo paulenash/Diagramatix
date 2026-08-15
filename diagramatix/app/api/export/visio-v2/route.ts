@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeExportName } from "@/app/lib/exportFilename";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -67,7 +68,7 @@ export async function GET(request: Request) {
     return new NextResponse(result as any, {
       headers: {
         "Content-Type": "application/vnd.ms-visio.drawing",
-        "Content-Disposition": `attachment; filename="${diagram.name} (V2).vsdx"`,
+        "Content-Disposition": `attachment; filename="${safeExportName(diagram.name)} (V2).vsdx"`,
       },
     });
   } catch (err: any) {

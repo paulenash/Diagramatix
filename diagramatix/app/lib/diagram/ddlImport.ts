@@ -150,14 +150,16 @@ export function parseDDL(sql: string): ParsedTable[] {
   //   ALTER TABLE <t> ADD [CONSTRAINT <name>] FOREIGN KEY (<col>) REFERENCES <r>(<rcol>)
   // SQL Server emits the element self-FKs and a few cross-table FKs this way
   // (with bracket-quoted ids). Postgres/MySQL never do, so this is additive.
+  // IO-02: key case-insensitively — an ALTER TABLE may reference a table whose
+  // casing differs from the CREATE (SQL identifiers are case-insensitive).
   const byName = new Map<string, ParsedTable>();
-  for (const t of tables) byName.set(t.name, t);
+  for (const t of tables) byName.set(t.name.toLowerCase(), t);
   const alterFkRe = new RegExp(
     `ALTER\\s+TABLE\\s+(${ID})\\s+ADD\\s+(?:CONSTRAINT\\s+\\S+\\s+)?FOREIGN\\s+KEY\\s*\\((${ID})\\)\\s*REFERENCES\\s+(${ID})\\s*\\((${ID})\\)`,
     "gi"
   );
   while ((m = alterFkRe.exec(text)) !== null) {
-    const tbl = byName.get(unquoteId(m[1]));
+    const tbl = byName.get(unquoteId(m[1]).toLowerCase());
     if (!tbl) continue;
     const colName = unquoteId(m[2]);
     const col = tbl.columns.find((c) => c.name === colName);
@@ -187,13 +189,15 @@ export function parseDDL(sql: string): ParsedTable[] {
       const nValRe = /\(\s*N'([^']*)'\s*\)/g;
       while ((vm = nValRe.exec(valBlock)) !== null) vals.push(vm[1]);
     }
-    if (vals.length > 0) inserts.set(tbl, vals);
+    if (vals.length > 0) inserts.set(tbl.toLowerCase(), vals);
   }
 
   for (const t of tables) {
-    if (t.columns.length === 1 && t.columns[0].name === "code" && inserts.has(t.name)) {
+    // IO-10: match the enum-key column and the INSERT table name
+    // case-insensitively so a `Code` PK or `INSERT INTO Status` still resolves.
+    if (t.columns.length === 1 && t.columns[0].name.toLowerCase() === "code" && inserts.has(t.name.toLowerCase())) {
       t.isEnum = true;
-      t.enumValues = inserts.get(t.name)!;
+      t.enumValues = inserts.get(t.name.toLowerCase())!;
     }
   }
 
@@ -267,7 +271,13 @@ export function generateDiagramFromDDL(
 
   const elements: DiagramElement[] = [];
   const connectors: Connector[] = [];
-  const elementMap: Record<string, string> = {};
+  // IO-08: a plain object keyed by attacker-controlled table names is
+  // prototype-pollutable (a table named `__proto__`/`constructor` corrupts the
+  // map, and its lookup returns a truthy inherited value → a bogus edge). A Map
+  // has no such keys. IO-02: DDL identifiers are case-insensitive, so key on a
+  // lowercased name to match FK references whose casing differs from the CREATE.
+  const elementMap = new Map<string, string>();
+  const emKey = (n: string) => n.toLowerCase();
 
   const entityTables = parsedTables.filter(t => !t.isEnum);
   const enumTables = parsedTables.filter(t => t.isEnum);
@@ -307,7 +317,7 @@ export function generateDiagramFromDDL(
     const h = classHeight(t);
     if (col >= 4) { col = 0; curX = 100; curY += rowH + 40; rowH = 0; }
     const id = mkId();
-    elementMap[t.name] = id;
+    elementMap.set(emKey(t.name), id);
     elements.push({
       id, type: "uml-class",
       x: curX, y: curY, width: w, height: h,
@@ -337,7 +347,7 @@ export function generateDiagramFromDDL(
     const h = enumHeight(t);
     if (enumCol >= 5) { enumCol = 0; enumX = 2200; enumY += enumRowH + 40; enumRowH = 0; }
     const id = mkId();
-    elementMap[t.name] = id;
+    elementMap.set(emKey(t.name), id);
     elements.push({
       id, type: "uml-enumeration",
       x: enumX, y: enumY, width: w, height: h,
@@ -351,11 +361,11 @@ export function generateDiagramFromDDL(
 
   // Create FK connectors
   for (const t of entityTables) {
-    const srcId = elementMap[t.name];
+    const srcId = elementMap.get(emKey(t.name));
     if (!srcId) continue;
     for (const c of t.columns) {
       if (!c.foreignKey || !c.fkTable) continue;
-      const tgtId = elementMap[c.fkTable];
+      const tgtId = elementMap.get(emKey(c.fkTable));
       if (!tgtId || srcId === tgtId) continue;
       connectors.push({
         id: mkConnId(),

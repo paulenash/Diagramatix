@@ -122,15 +122,15 @@
 | UI-02 | High | Data loss | Previewing a history snapshot auto-saves it over the live diagram | ✅ Fixed (Wave 2) |
 | UI-03 | Medium | Data loss | Folder-tree changes lost on navigation (module-level 500 ms debounce, no flush) | ✅ Fixed 2026-08-15 (rectification batch 5) |
 | IO-01 | High | DoS | No upload size limit before `.vsdx` is fully decompressed in memory (zip-bomb / OOM) | ✅ Fixed (urgent batch) |
-| IO-02 | High | Data integrity | DDL importer drops FK relationships when table-name casing differs between definition and reference | Open |
-| IO-03 | Medium | DoS | Unbounded recursion on nested sub-processes / lane sets (no depth guard) | Needs manual confirmation |
+| IO-02 | High | Data integrity | DDL importer drops FK relationships when table-name casing differs between definition and reference | ✅ Fixed 2026-08-15 |
+| IO-03 | Medium | DoS | Unbounded recursion on nested sub-processes / lane sets (no depth guard) | ✅ N/A — iterative walker, no recursion |
 | IO-04 | Medium | Performance | O(n²) element lookups via `ctx.elements.find` during BPMN flow/lane wiring | Open |
-| IO-05 | Medium | Data integrity | BPMN importer discards sequence-flow condition expressions (writes literal `"true"`) | Open |
-| IO-06 | Medium | Data integrity | BPMN importer leaves dangling `boundaryHostId` when the host has no `BPMNShape` | Needs manual confirmation |
-| IO-07 | Medium | Header injection | Unsanitized diagram name interpolated into the `Content-Disposition` export header (v2/v3/test-vsdx) | Open |
-| IO-08 | Low | Proto pollution | DDL parser writes attacker-controlled table names into a plain-object map key | Needs manual confirmation |
-| IO-09 | Low | Data integrity | BPMN importer id minting uses `Math.random()` with no cross-mint collision guard | Open |
-| IO-10 | Low | Data integrity | DDL enum detection case-sensitive on PK column `code` → enum tables imported as plain classes | Open |
+| IO-05 | Medium | Data integrity | BPMN importer discards sequence-flow condition expressions (writes literal `"true"`) | ✅ Fixed 2026-08-15 |
+| IO-06 | Medium | Data integrity | BPMN importer leaves dangling `boundaryHostId` when the host has no `BPMNShape` | ✅ Fixed 2026-08-15 |
+| IO-07 | Medium | Header injection | Unsanitized diagram name interpolated into the `Content-Disposition` export header (v2/v3/test-vsdx) | ✅ Fixed 2026-08-15 |
+| IO-08 | Low | Proto pollution | DDL parser writes attacker-controlled table names into a plain-object map key | ✅ Fixed 2026-08-15 |
+| IO-09 | Low | Data integrity | BPMN importer id minting uses `Math.random()` with no cross-mint collision guard | ✅ Fixed 2026-08-15 |
+| IO-10 | Low | Data integrity | DDL enum detection case-sensitive on PK column `code` → enum tables imported as plain classes | ✅ Fixed 2026-08-15 |
 | CFG-01 | Low | Secrets | Live secrets in local `.env` — gitignored/never committed; **rotate** + keep off shared/backup locations (downgraded from Critical) | Open |
 | CFG-02 | High | Secrets | `AUTH_SECRET` is the literal placeholder in local `.env`; no code-side weak-secret guard | ✅ Fixed 2026-08-14 (rectification batch 3) |
 | CFG-03 | High | Hardening | No CSP / X-Frame-Options / HSTS / X-Content-Type-Options anywhere (no `headers()` block) | ✅ Fixed 2026-08-14 (rectification batch 3) |
