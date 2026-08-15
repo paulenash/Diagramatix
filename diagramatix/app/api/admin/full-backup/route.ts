@@ -26,6 +26,7 @@ import {
   restoreFullBackupWipe,
   restoreFullBackupAdditive,
   restoreFullBackupTables,
+  BackupValidationError,
   inspectFullBackup,
   type AdditiveSelection,
 } from "@/app/lib/full-backup";
@@ -251,8 +252,11 @@ export async function POST(req: Request) {
       const result = await restoreFullBackupTables(payload, tables);
       return NextResponse.json({ ok: true, result });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error("[admin/full-backup] POST tables error:", message);
+      // DATA-30: a structurally-malformed backup is the caller's problem → 400,
+      // not a generic 500.
+      if (err instanceof BackupValidationError) {
+        return NextResponse.json({ error: err.message }, { status: 400 });
+      }
       return serverError(err);
     }
   }

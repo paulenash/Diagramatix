@@ -38,6 +38,12 @@ import { getBackupSchema, reviveDates, delegateName } from "./backupSchema";
 export const FULL_BACKUP_KIND = "diagramatix-full-backup";
 const FULL_BACKUP_ENTRY = "full-backup.json";
 
+/** DATA-30: thrown when a restore payload is structurally malformed. The route
+ *  maps it to a 400 (client error) instead of a generic 500. */
+export class BackupValidationError extends Error {
+  constructor(message: string) { super(message); this.name = "BackupValidationError"; }
+}
+
 // The model list, insert/truncate order, the Date-column map and the cyclic
 // Diagram↔PublishedVersion deferral are ALL derived from the live Postgres
 // catalog (see backupSchema.ts) — so a new table is backed up + restored
@@ -362,6 +368,13 @@ export async function restoreFullBackupTables(
   payload: FullBackupPayload,
   selectedTables: string[],
 ): Promise<FullRestoreResult> {
+  // DATA-30: validate the payload shape up front so a malformed file is a clear
+  // 400 (BackupValidationError → the route returns 400) rather than an unguarded
+  // TypeError deep in the loop surfacing as a generic 500.
+  if (!payload || typeof payload !== "object" || typeof (payload as { tables?: unknown }).tables !== "object" || payload.tables === null) {
+    throw new BackupValidationError("Not a valid backup file: missing a `tables` object.");
+  }
+
   const schema = await getBackupSchema();
   _timestampColumns = schema.timestampColumns;
   const valid = new Set(schema.tables);
@@ -394,7 +407,16 @@ export async function restoreFullBackupTables(
     // Forward dependency order so a selected parent lands before a selected child.
     for (const table of schema.insertOrder) {
       if (!wanted.has(table)) continue;
-      const rows = (payload.tables[table] ?? []) as Record<string, unknown>[];
+      // DATA-30: a table whose payload value isn't an array (or rows that aren't
+      // objects) must not crash the batch — coerce/skip with a warning.
+      const rawTable = payload.tables[table];
+      if (rawTable != null && !Array.isArray(rawTable)) {
+        log.push(`  ${table}: payload value is not an array — skipped`);
+        continue;
+      }
+      const rows = ((rawTable ?? []) as unknown[]).filter(
+        (r): r is Record<string, unknown> => typeof r === "object" && r !== null,
+      );
       const delegate = (tx as any)[delegateName(table)];
       if (!delegate?.upsert) { log.push(`  ${table}: no client delegate — skipped`); continue; }
       const pkCols = schema.primaryKey[table] ?? ["id"];
@@ -490,7 +512,10 @@ export async function restoreFullBackupTables(
           }
         }
       }
-      inserted[table] = ins;
+      // DATA-30: the summary counts rows RESTORED (created + updated), not just
+      // inserts — an update is a successful restore too, and reporting only
+      // inserts read as "0 restored" on a re-run over existing rows.
+      inserted[table] = ins + upd;
       log.push(`  ${table}: ${ins} inserted, ${upd} updated${skp ? `, ${skp} skipped` : ""}`);
     }
 

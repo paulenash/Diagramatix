@@ -63,9 +63,9 @@
 | DATA-05 | High | Races | `archiveDiagram` read-modify-writes `data` across two pools → lost update clobbers saves | ✅ Fixed (Wave 2) |
 | DATA-06 | High | Transactions | `restoreUserBackup` runs dozens of writes with no transaction → partial restore | ✅ Fixed (re-audit: now one `$transaction`) |
 | DATA-07 | High | Transactions | Backup phase-2 JSON writes outside the row creates → crash leaves dangling links | ✅ Fixed (re-audit: folded into the transaction) |
-| DATA-08 | High | Restore | Subprocess link remap only walks `properties.linkedDiagramId` → misses other refs | Changed (re-audit: remap moved to `backup.ts:497`; variant remains) |
+| DATA-08 | High | Restore | Subprocess link remap only walks `properties.linkedDiagramId` → misses other refs | ✅ Fixed 2026-08-15 (rectification batch 8) |
 | DATA-09 | High | Transactions | Bundle-invite promotion catch-all deletes the pending row on *any* error | ✅ Fixed 2026-08-15 (rectification batch 4) |
-| DATA-10 | High | Email | Invite email Subject built from unescaped inviter/bundle name → header injection | Needs manual confirmation |
+| DATA-10 | High | Email | Invite email Subject built from unescaped inviter/bundle name → header injection | ✅ Fixed 2026-08-15 (rectification batch 8) |
 | DATA-11 | High | Restore | Additive full-restore matches users by bare email → re-parents data onto wrong live user | ✅ Fixed (Wave 2 — audit log) |
 | DATA-12 | High | Restore | Additive restore mints a project id without inserting the project → dangling FK abort | ✅ Fixed (Wave 2) |
 | DATA-13 | High | Restore | Org restore silently adds matched live users to the target org as Viewer (cross-tenant) | ✅ Fixed (Wave 2) |
@@ -101,7 +101,7 @@
 | DATA-27 | Medium | Restore | Per-table restore silently skips rows colliding on a non-PK unique key (regresses the DATA-23 fix) | ✅ Fixed (Wave 2) |
 | DATA-28 | Medium | Restore | Per-table restore drops a Diagram row when nullable `diagramOwnerId` points to a non-restored user (should null it) | ✅ Fixed (Wave 2) |
 | DATA-29 | Medium | Races | Wipe-restore data-loss guard runs its COUNT checks outside the TRUNCATE transaction (TOCTOU) | ✅ Fixed 2026-08-15 (rectification batch 5) |
-| DATA-30 | Low | Robustness | Per-table `inserted` count excludes updates; malformed payload → unguarded TypeError 500 | Open |
+| DATA-30 | Low | Robustness | Per-table `inserted` count excludes updates; malformed payload → unguarded TypeError 500 | ✅ Fixed 2026-08-15 (rectification batch 8) |
 | DATA-31 | Low | Transactions | `getOrCreateStripeCustomer` creates a Stripe customer then persists its id separately → dangling/duplicate customers | ✅ Fixed (Wave 2 — verify in Stripe test mode) |
 | ENG-14 | Medium | Undo/redo | `updateLabelLive` mutates persisted label+geometry after an undo without invalidating the redo branch | Needs manual confirmation |
 | ENG-15 | Low | Undo/redo | `correctAllConnectors` rewrites persisted waypoints without `pushHistory`/`invalidateRedo` | Open |

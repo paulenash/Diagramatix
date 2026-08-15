@@ -1,5 +1,22 @@
 import nodemailer from "nodemailer";
 
+/**
+ * DATA-10: strip CR/LF (and other control chars) from any user-controlled value
+ * interpolated into an email HEADER (Subject, etc.). A newline in an inviter or
+ * bundle/diagram name would otherwise let an attacker inject extra headers
+ * (spoofed Bcc/Cc). Body HTML is separately escaped via escapeHtml; this is the
+ * header-line equivalent. Collapses internal whitespace and caps length.
+ */
+export function mailHeader(s: string | null | undefined): string {
+  // \s collapses CR / LF / tab (the header-injection vectors) and any run of
+  // whitespace into a single space — so a newline in the value can't split the
+  // header into an injected extra line.
+  return (s ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 200);
+}
+
 // Shared transport factory — keeps every send-* helper consistent on
 // host / port / auth so a config tweak in .env only changes one place.
 // Returns null when SMTP_HOST is unset (dev mode), and the caller falls
@@ -103,7 +120,7 @@ export async function sendSupportDiagramEmail(input: SupportEmailInput): Promise
       from: defaultFrom(),
       to: supportAddress,
       replyTo: input.fromUserEmail,
-      subject: input.subject || `Help with: ${input.diagramName}`,
+      subject: mailHeader(input.subject) || `Help with: ${mailHeader(input.diagramName)}`,
       html,
       attachments,
     });
@@ -158,7 +175,7 @@ export async function sendBundleInvitationEmail(input: BundleInviteEmailInput): 
       from: defaultFrom(),
       to: input.toEmail,
       replyTo: input.inviterEmail,
-      subject: `${input.inviterName ?? input.inviterEmail} invited you to view "${input.bundleName}"`,
+      subject: `${mailHeader(input.inviterName ?? input.inviterEmail)} invited you to view "${mailHeader(input.bundleName)}"`,
       html,
     });
   } else {

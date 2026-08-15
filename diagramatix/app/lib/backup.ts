@@ -544,14 +544,27 @@ export async function restoreUserBackup(
     const sourceDiag = findBackupDiagram(payload, oldDiagId);
     if (!sourceDiag) continue;
     const data = sourceDiag.data as
-      | { elements?: Array<{ properties?: Record<string, unknown> }> }
+      | { elements?: Array<{ properties?: Record<string, unknown> }>; parentDiagramIds?: unknown }
       | undefined;
-    if (!data?.elements) continue;
+    if (!data) continue;
     let dirty = false;
-    for (const el of data.elements) {
+    for (const el of data.elements ?? []) {
       const linked = el.properties?.linkedDiagramId;
       if (typeof linked === "string" && oldToNewDiagramId.has(linked)) {
         el.properties!.linkedDiagramId = oldToNewDiagramId.get(linked)!;
+        dirty = true;
+      }
+    }
+    // DATA-08: the subprocess forward-link (linkedDiagramId) is only ONE
+    // cross-diagram reference. `data.parentDiagramIds` (the back-references that
+    // track which diagrams link TO this one) also holds diagram ids and must be
+    // remapped, or a restored diagram's parent list points at stale ids.
+    if (Array.isArray(data.parentDiagramIds)) {
+      const remapped = (data.parentDiagramIds as unknown[]).map((pid) =>
+        typeof pid === "string" && oldToNewDiagramId.has(pid) ? oldToNewDiagramId.get(pid)! : pid,
+      );
+      if (remapped.some((v, i) => v !== (data.parentDiagramIds as unknown[])[i])) {
+        data.parentDiagramIds = remapped;
         dirty = true;
       }
     }
