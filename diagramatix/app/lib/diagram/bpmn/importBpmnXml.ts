@@ -392,6 +392,10 @@ interface BuildContext {
    *  ids to avoid collisions with any existing diagram's ids on import.) */
   idMap: Map<string, string>;
   elements: DiagramElement[];
+  /** IO-04: id → element index kept in sync with `elements` via `addElement`,
+   *  so the flow/lane wiring passes resolve endpoints in O(1) instead of a
+   *  linear `elements.find()` (which was O(n²) over a large import). */
+  byId: Map<string, DiagramElement>;
   connectors: Connector[];
   /** Set of node ids that the diagram contains a `<BPMNShape>` for. Nodes
    *  without a shape are dropped from the visual but still recorded here so
@@ -403,6 +407,12 @@ interface BuildContext {
    *  applied once the connectors exist. */
   defaultFlowRefs: Set<string>;
   stats: BpmnImportResult["stats"];
+}
+
+/** Append an element and keep the `byId` index in sync (IO-04). */
+function addElement(ctx: BuildContext, el: DiagramElement): void {
+  ctx.elements.push(el);
+  ctx.byId.set(el.id, el);
 }
 
 /** Allocate a new Diagramatix id for a source BPMN id, or return the
@@ -556,7 +566,7 @@ function walkProcessBody(
       ctx.stats.shapesDropped++;
       continue;
     }
-    ctx.elements.push(el);
+    addElement(ctx, el);
     ctx.stats.elementsCreated++;
     produced.add(bpmnId);
   }
@@ -575,7 +585,7 @@ function walkProcessBody(
       ctx.stats.shapesDropped++;
       continue;
     }
-    ctx.elements.push(el);
+    addElement(ctx, el);
     ctx.stats.elementsCreated++;
     produced.add(bpmnId);
   }
@@ -605,7 +615,7 @@ function walkProcessBody(
       ctx.stats.shapesDropped++;
       continue;
     }
-    ctx.elements.push(el);
+    addElement(ctx, el);
     ctx.stats.elementsCreated++;
     produced.add(bpmnId);
     if (collapsed) {
@@ -644,7 +654,7 @@ function walkProcessBody(
       ctx.stats.shapesDropped++;
       continue;
     }
-    ctx.elements.push(el);
+    addElement(ctx, el);
     ctx.stats.elementsCreated++;
     produced.add(bpmnId);
   }
@@ -674,7 +684,7 @@ function walkProcessBody(
       ctx.stats.shapesDropped++;
       continue;
     }
-    ctx.elements.push(el);
+    addElement(ctx, el);
     ctx.stats.elementsCreated++;
     produced.add(bpmnId);
   }
@@ -704,7 +714,7 @@ function walkProcessBody(
       ctx.stats.shapesDropped++;
       continue;
     }
-    ctx.elements.push(el);
+    addElement(ctx, el);
     ctx.stats.elementsCreated++;
     produced.add(bpmnId);
   }
@@ -720,7 +730,7 @@ function walkProcessBody(
       parentId: parentDiagramId,
     });
     if (!hadShape) { ctx.stats.shapesDropped++; continue; }
-    ctx.elements.push(el);
+    addElement(ctx, el);
     ctx.stats.elementsCreated++;
     produced.add(bpmnId);
   }
@@ -734,7 +744,7 @@ function walkProcessBody(
       parentId: parentDiagramId,
     });
     if (!hadShape) { ctx.stats.shapesDropped++; continue; }
-    ctx.elements.push(el);
+    addElement(ctx, el);
     ctx.stats.elementsCreated++;
     produced.add(bpmnId);
   }
@@ -774,7 +784,7 @@ function applyLaneParenting(
     const only = lanes[0];
     const laneBpmnId = getAttr(only.openTag, "id") ?? "";
     const laneName = (getAttr(only.openTag, "name") ?? "").trim();
-    const poolEl = ctx.elements.find((e) => e.id === poolDiagramId);
+    const poolEl = ctx.byId.get(poolDiagramId);
     const poolName = (poolEl?.label ?? "").trim();
     const normalise = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
     const sameAsPool = !!laneName && !!poolName && normalise(laneName) === normalise(poolName);
@@ -785,7 +795,7 @@ function applyLaneParenting(
         if (!refText) continue;
         const childDiagramId = ctx.idMap.get(refText);
         if (!childDiagramId) continue;
-        const child = ctx.elements.find((e) => e.id === childDiagramId);
+        const child = ctx.byId.get(childDiagramId);
         if (child) child.parentId = poolDiagramId;
       }
       // Sub-lanes: when the absorbed lane wraps a nested <childLaneSet>,
@@ -821,7 +831,7 @@ function applyLaneParenting(
       ctx.stats.shapesDropped++;
       continue;
     }
-    ctx.elements.push(el);
+    addElement(ctx, el);
     ctx.stats.elementsCreated++;
     // Re-parent the lane's child nodes.
     for (const ref of findChildren(lane.body, ["flowNodeRef"])) {
@@ -829,7 +839,7 @@ function applyLaneParenting(
       if (!refText) continue;
       const childDiagramId = ctx.idMap.get(refText);
       if (!childDiagramId) continue;
-      const child = ctx.elements.find((e) => e.id === childDiagramId);
+      const child = ctx.byId.get(childDiagramId);
       if (child) child.parentId = el.id;
     }
     // Nested laneSet (sub-lanes).
@@ -882,8 +892,8 @@ function buildDataAssociations(ctx: BuildContext, body: string): void {
       const targetId = isInput ? activityDiagramId : dataDiagramId;
       let waypoints = ctx.di.edgeWaypoints.get(assocBpmnId);
       if (!waypoints) {
-        const s = ctx.elements.find((e) => e.id === sourceId);
-        const t = ctx.elements.find((e) => e.id === targetId);
+        const s = ctx.byId.get(sourceId);
+        const t = ctx.byId.get(targetId);
         if (s && t) {
           waypoints = [
             { x: s.x + s.width / 2, y: s.y + s.height / 2 },
@@ -974,8 +984,8 @@ function buildFlows(
     // shape centres.
     let waypoints = ctx.di.edgeWaypoints.get(bpmnId);
     if (!waypoints) {
-      const s = ctx.elements.find((e) => e.id === sId);
-      const t = ctx.elements.find((e) => e.id === tId);
+      const s = ctx.byId.get(sId);
+      const t = ctx.byId.get(tId);
       if (s && t) {
         waypoints = [
           { x: s.x + s.width / 2, y: s.y + s.height / 2 },
@@ -1066,6 +1076,7 @@ export async function importBpmnXml(
     warnings,
     idMap: new Map(),
     elements: [],
+    byId: new Map(),
     connectors: [],
     hasShape: new Set(),
     defaultFlowRefs: new Set(),
@@ -1138,7 +1149,7 @@ export async function importBpmnXml(
           (el.properties as Record<string, unknown>).poolHeaderWidth = Math.max(36, lineCount * 30 + 16);
         }
       }
-      ctx.elements.push(el);
+      addElement(ctx, el);
       stats.elementsCreated++;
       if (processRef) {
         poolProcessRefs.set(el.id, processRef);

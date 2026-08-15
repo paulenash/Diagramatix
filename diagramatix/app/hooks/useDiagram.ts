@@ -2201,14 +2201,25 @@ function ensureContainersEncloseChildren(
     childrenByParent.set(e.parentId, list);
   }
   // Topological depth: leaves first → roots last.
+  // ENG-18: the depth walk previously did `elements.find()` per hop *inside the
+  // sort comparator* → O(n² log n). Index parents once and memoise each depth so
+  // the sort is O(n log n).
+  const parentOf = new Map<string, string | undefined>();
+  for (const e of elements) parentOf.set(e.id, e.parentId);
+  const depthMemo = new Map<string, number>();
   const depthOf = (id: string): number => {
+    const cached = depthMemo.get(id);
+    if (cached !== undefined) return cached;
     let d = 0;
-    let cur: DiagramElement | undefined = elements.find((e) => e.id === id);
-    while (cur?.parentId) {
+    let curId: string | undefined = id;
+    while (curId) {
+      const p = parentOf.get(curId);
+      if (!p) break;
       d++;
-      cur = elements.find((e) => e.id === cur!.parentId);
+      curId = p;
       if (d > 12) break;     // pathological cycle guard
     }
+    depthMemo.set(id, d);
     return d;
   };
   const sorted = [...elements].sort((a, b) => depthOf(b.id) - depthOf(a.id));

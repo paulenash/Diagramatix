@@ -91,7 +91,7 @@
 | ENG-09 | Low | Mutation | `SWAP_LANES_VERTICAL` reorders the connectors array → silent draw-order change | Open |
 | ENG-10 | Low | Undo/redo | `swapLane` bypasses the 100-entry history cap | Open |
 | ENG-11 | Low | Space tools | `INSERT_SPACE` pushes a history snapshot every mouse-move frame of a shift-drag | Open |
-| ENG-12 | Low | Performance | `ancestorsOf` does a linear `find()` per hop → O(n²) obstacle setup per recompute | Open |
+| ENG-12 | Low | Performance | `ancestorsOf` does a linear `find()` per hop → O(n²) obstacle setup per recompute | ✅ Fixed 2026-08-15 |
 | ENG-13 | Low | Mutation | `consolidateWaypoints` returns its input array by reference for short paths (aliasing trap) | Open |
 | SEC-19 | High | Secrets | Deepgram master API key returned to any authenticated client in the dictation-token fallback | ✅ Fixed (Wave 1) |
 | SEC-20 | High | Impersonation | Archive (soft-delete) route ignores the read-only impersonation guard | ✅ Fixed 2026-08-14 (rectification batch 1) |
@@ -107,7 +107,7 @@
 | ENG-15 | Low | Undo/redo | `correctAllConnectors` rewrites persisted waypoints without `pushHistory`/`invalidateRedo` | Open |
 | ENG-16 | Low | Routing | Rectilinear waypoint-preservation uses a different obstacle set than the main pass (data-object flip-flop) | Open |
 | ENG-17 | Low | Performance | `recomputeAllConnectors([conn])` rebuilds the full element Map per connector, per drag frame | Open |
-| ENG-18 | Low | Performance | `ensureContainersEncloseChildren` recomputes ancestor depth inside the sort comparator (O(n²log n)) | Open |
+| ENG-18 | Low | Performance | `ensureContainersEncloseChildren` recomputes ancestor depth inside the sort comparator (O(n²log n)) | ✅ Fixed 2026-08-15 |
 | ENG-19 | Low | Performance | `getAllDescendantIds` O(subtree×n) per column inside the vswimlane drag frame | Open |
 | CANVAS-01 | High | XSS | `RichTextEditor` assigns stored `description` to `innerHTML` on init without `sanitizeRichText` (stored XSS) | ✅ Fixed (Wave 1) |
 | CANVAS-02 | High | Performance | O(n²) connector-hump computation rebuilt every render (`indexOf` + slice/map per connector) | Open |
@@ -124,7 +124,7 @@
 | IO-01 | High | DoS | No upload size limit before `.vsdx` is fully decompressed in memory (zip-bomb / OOM) | ✅ Fixed (urgent batch) |
 | IO-02 | High | Data integrity | DDL importer drops FK relationships when table-name casing differs between definition and reference | ✅ Fixed 2026-08-15 |
 | IO-03 | Medium | DoS | Unbounded recursion on nested sub-processes / lane sets (no depth guard) | ✅ N/A — iterative walker, no recursion |
-| IO-04 | Medium | Performance | O(n²) element lookups via `ctx.elements.find` during BPMN flow/lane wiring | Open |
+| IO-04 | Medium | Performance | O(n²) element lookups via `ctx.elements.find` during BPMN flow/lane wiring | ✅ Fixed 2026-08-15 |
 | IO-05 | Medium | Data integrity | BPMN importer discards sequence-flow condition expressions (writes literal `"true"`) | ✅ Fixed 2026-08-15 |
 | IO-06 | Medium | Data integrity | BPMN importer leaves dangling `boundaryHostId` when the host has no `BPMNShape` | ✅ Fixed 2026-08-15 |
 | IO-07 | Medium | Header injection | Unsanitized diagram name interpolated into the `Content-Disposition` export header (v2/v3/test-vsdx) | ✅ Fixed 2026-08-15 |

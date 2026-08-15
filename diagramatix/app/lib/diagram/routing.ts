@@ -1163,12 +1163,15 @@ export function computeWaypoints(
   // ANY depth (not only as a direct parent) is excluded from obstacles.
   // User rule: an EP is an obstacle for a sequence connector unless the
   // connector terminates on one of its descendants.
+  // ENG-12: index once so the ancestor walk is O(depth), not O(depth × n).
+  const elByIdForAncestors = new Map<string, DiagramElement>();
+  for (const e of allElements) elByIdForAncestors.set(e.id, e);
   function ancestorsOf(elementId: string): Set<string> {
     const result = new Set<string>();
-    let cur = allElements.find((e) => e.id === elementId);
+    let cur = elByIdForAncestors.get(elementId);
     while (cur?.parentId) {
       result.add(cur.parentId);
-      cur = allElements.find((e) => e.id === cur!.parentId);
+      cur = elByIdForAncestors.get(cur.parentId);
     }
     return result;
   }
