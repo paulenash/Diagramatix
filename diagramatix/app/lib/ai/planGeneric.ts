@@ -10,7 +10,7 @@
  * the model resolved (getAiGenerateModel()); this helper is deliberately dumb.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import { makeAiClient } from "@/app/lib/ai/anthropicClient";
+import { makeAiClient, cappedMaxTokens } from "@/app/lib/ai/anthropicClient";
 import { buildGenericSystemPrompt } from "./generateDiagramPrompt";
 import { extractBalancedJson, repairJsonCommas, closeTruncatedJson } from "./planBpmn";
 
@@ -44,7 +44,7 @@ export async function planGeneric(input: GenericPlanInput): Promise<GenericPlan>
 
   const message = await client.messages.create({
     model: input.model,
-    max_tokens: input.maxTokens ?? 8192,
+    max_tokens: cappedMaxTokens(input.model, input.maxTokens ?? 8192),
     system: systemPrompt,
     messages: [{ role: "user", content: userContent }],
   });

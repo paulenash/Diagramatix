@@ -6,10 +6,14 @@
  * on the way out; a LiteLLM gateway that mirrors the prefixed names leaves it off.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { backendModelName } from "@/app/lib/ai/anthropicClient";
+import { backendModelName, cappedMaxTokens } from "@/app/lib/ai/anthropicClient";
 
 const saved = process.env.OLLAMA_STRIP_MODEL_PREFIX;
-afterEach(() => { process.env.OLLAMA_STRIP_MODEL_PREFIX = saved; });
+const savedMax = process.env.OLLAMA_MAX_TOKENS;
+afterEach(() => {
+  process.env.OLLAMA_STRIP_MODEL_PREFIX = saved;
+  process.env.OLLAMA_MAX_TOKENS = savedMax;
+});
 
 describe("backendModelName", () => {
   it("strips the ollama/ prefix for the ollama provider when the flag is on", () => {
@@ -43,5 +47,33 @@ describe("backendModelName", () => {
   it("is a no-op for an ollama id that lacks the prefix", () => {
     process.env.OLLAMA_STRIP_MODEL_PREFIX = "true";
     expect(backendModelName("ollama", "google/gemma-4-e4b")).toBe("google/gemma-4-e4b");
+  });
+});
+
+describe("cappedMaxTokens", () => {
+  it("caps a local (ollama) model to OLLAMA_MAX_TOKENS", () => {
+    process.env.OLLAMA_MAX_TOKENS = "4096";
+    expect(cappedMaxTokens("ollama/google/gemma-4-e4b", 16000)).toBe(4096);
+  });
+
+  it("defaults the local cap to 4096 when the env is unset/invalid", () => {
+    delete process.env.OLLAMA_MAX_TOKENS;
+    expect(cappedMaxTokens("ollama/google/gemma-4-e4b", 32000)).toBe(4096);
+    process.env.OLLAMA_MAX_TOKENS = "not-a-number";
+    expect(cappedMaxTokens("ollama/gemma2:2b", 16000)).toBe(4096);
+    process.env.OLLAMA_MAX_TOKENS = "0";
+    expect(cappedMaxTokens("ollama/gemma2:2b", 16000)).toBe(4096);
+  });
+
+  it("leaves cloud models at their full budget", () => {
+    process.env.OLLAMA_MAX_TOKENS = "4096";
+    // Unknown/untagged ids resolve to the anthropic provider → not capped.
+    expect(cappedMaxTokens("claude-opus-4-8", 32000)).toBe(32000);
+    expect(cappedMaxTokens("kimi-k3", 16000)).toBe(16000);
+  });
+
+  it("honours a raised local cap when the box has headroom", () => {
+    process.env.OLLAMA_MAX_TOKENS = "8192";
+    expect(cappedMaxTokens("ollama/gemma2:9b", 16000)).toBe(8192);
   });
 });

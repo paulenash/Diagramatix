@@ -6,7 +6,7 @@
  * `layoutFlowchartDiagram` — no layout happens here.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import { makeAiClient } from "@/app/lib/ai/anthropicClient";
+import { makeAiClient, cappedMaxTokens } from "@/app/lib/ai/anthropicClient";
 import type { Attachment } from "./planBpmn";
 import type { AiFcElement, AiFcConnection } from "@/app/lib/diagram/layoutFlowchart";
 
@@ -106,8 +106,8 @@ export async function planFlowchart(opts: PlanFlowchartOptions): Promise<PlanFlo
   const message = await client.messages.create({
     model,
     // See planBpmn: 8192 truncated larger plans mid-JSON on verbose models. 16000
-    // is the largest every offered model accepts.
-    max_tokens: 16000,
+    // is the largest every offered model accepts. Capped for local (ollama) boxes.
+    max_tokens: cappedMaxTokens(model, 16000),
     system: systemPrompt,
     messages: [{ role: "user", content: userContent }],
   });

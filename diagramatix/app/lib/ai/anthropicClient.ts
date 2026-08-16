@@ -21,6 +21,27 @@ export function backendModelName(provider: string, model: string): string {
 }
 
 /**
+ * Cap `max_tokens` for local (ollama) backends. The cloud planners request a
+ * 16000–32000-token output budget, but a small local box can't set up that big
+ * a generation context: LM Studio stalls and a tunnel in front of it returns
+ * `ERR_NGROK_3004` (invalid/incomplete upstream response). `OLLAMA_MAX_TOKENS`
+ * (default 4096) bounds the ask to what the box's loaded context can serve — it
+ * MUST be ≤ the model's context length in LM Studio minus the prompt. Cloud
+ * providers keep their full budget.
+ */
+export function cappedMaxTokens(model: string, cloudDefault: number): number {
+  // Detect local models by the registry provider OR the `ollama/` id prefix
+  // (the same convention aiRates uses) — the prefix works even when the model
+  // registry isn't populated (e.g. tests, or before env is read).
+  const isLocal = providerForModel(model) === "ollama" || /^ollama[/:]/i.test(model ?? "");
+  if (isLocal) {
+    const n = Number(process.env.OLLAMA_MAX_TOKENS);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 4096;
+  }
+  return cloudDefault;
+}
+
+/**
  * Anthropic client construction, honouring the optional `ANTHROPIC_BASE_URL` env
  * var so a deployment can route ALL Claude traffic through an enterprise proxy /
  * private gateway / self-hosted or region-pinned endpoint (data-residency + egress

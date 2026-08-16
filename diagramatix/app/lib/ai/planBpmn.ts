@@ -10,7 +10,7 @@
  * plan to `layoutBpmnDiagram` when they are ready to render.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import { makeAiClient } from "@/app/lib/ai/anthropicClient";
+import { makeAiClient, cappedMaxTokens } from "@/app/lib/ai/anthropicClient";
 import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { renderFlowchartMappingForPrompt } from "@/app/lib/diagram/translate/flowchartBpmnMap";
 import { hardWrapProcessName } from "@/app/lib/diagram/textMetrics";
@@ -490,7 +490,7 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
   // was truncating verbose models (Opus) mid-JSON → "Unexpected end of JSON input".
   // Give the big-output Claude models (Opus / Sonnet) more room; keep 16000 for the
   // rest (the largest Kimi K3 + Haiku accept). Salvage below covers any residual cut.
-  const maxTokens = /(?:opus|sonnet)/i.test(model) ? 32000 : 16000;
+  const maxTokens = cappedMaxTokens(model, /(?:opus|sonnet)/i.test(model) ? 32000 : 16000);
   // NOTE: max_tokens above ~21333 would trip the SDK's "Streaming is required for
   // operations that may take longer than 10 minutes" guard — but makeAiClient sets
   // an explicit client `timeout`, which skips that guard entirely (see messages.js:
