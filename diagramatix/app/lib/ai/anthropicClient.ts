@@ -3,6 +3,24 @@ import { providerForModel, resolvedEnvSecret } from "./models";
 import { recordAiInvocation } from "./aiTelemetry";
 
 /**
+ * The model name to send to the backend for a given registry id.
+ *
+ * Local (ollama) model ids carry an `ollama/` prefix so pricing/telemetry tag
+ * them as free (aiRates.ts) and modelAccess offers them to every user. A LiteLLM
+ * gateway mirrors those prefixed names, so it receives them verbatim. But a
+ * DIRECT backend (LM Studio / raw Ollama serving the Anthropic Messages API)
+ * expects its own bare model names (e.g. `google/gemma-4-e4b`, not
+ * `ollama/google/gemma-4-e4b`). Setting `OLLAMA_STRIP_MODEL_PREFIX` strips the
+ * `ollama/` prefix on the way out, while the prefixed id is kept for
+ * pricing/telemetry. Leave the flag UNSET for the gateway pattern.
+ */
+export function backendModelName(provider: string, model: string): string {
+  const strip = /^(1|true|yes|on)$/i.test((process.env.OLLAMA_STRIP_MODEL_PREFIX ?? "").trim());
+  if (provider === "ollama" && strip) return model.replace(/^ollama\//i, "");
+  return model;
+}
+
+/**
  * Anthropic client construction, honouring the optional `ANTHROPIC_BASE_URL` env
  * var so a deployment can route ALL Claude traffic through an enterprise proxy /
  * private gateway / self-hosted or region-pinned endpoint (data-residency + egress
@@ -150,6 +168,12 @@ function instrumentClient(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   messages.create = (async (body: any, options?: any) => {
+    // Rewrite the outbound model name for direct local backends (see
+    // backendModelName). Telemetry below still records the original `model`
+    // (the prefixed registry id), so pricing/free-tagging is unaffected.
+    if (provider === "ollama" && typeof body?.model === "string") {
+      body = { ...body, model: backendModelName(provider, body.model) };
+    }
     const t0 = Date.now();
     const before = getAttempts();
     try {
