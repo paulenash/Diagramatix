@@ -47,22 +47,22 @@ describe("aiClientConfig / aiApiKey — provider routing", () => {
   it("T2824 — a DeepSeek model uses DEEPSEEK_API_KEY + the Anthropic-compatible endpoint by default", () => {
     process.env.DEEPSEEK_API_KEY = "sk-deep";
     delete process.env.DEEPSEEK_BASE_URL; // default endpoint
-    expect(aiApiKey("deepseek-chat")).toBe("sk-deep");
-    expect(aiClientConfig("deepseek-chat")).toEqual({ apiKey: "sk-deep", baseURL: "https://api.deepseek.com/anthropic" });
+    expect(aiApiKey("deepseek-v4-flash")).toBe("sk-deep");
+    expect(aiClientConfig("deepseek-v4-flash")).toEqual({ apiKey: "sk-deep", baseURL: "https://api.deepseek.com/anthropic" });
     // Provider key wins over a caller-supplied Anthropic fallback.
-    expect(aiClientConfig("deepseek-chat", "sk-ant").apiKey).toBe("sk-deep");
+    expect(aiClientConfig("deepseek-v4-flash", "sk-ant").apiKey).toBe("sk-deep");
   });
 
   it("T2825 — DEEPSEEK_BASE_URL overrides the endpoint", () => {
     process.env.DEEPSEEK_API_KEY = "sk-deep";
     process.env.DEEPSEEK_BASE_URL = "https://proxy.internal/deepseek";
-    expect(aiClientConfig("deepseek-chat").baseURL).toBe("https://proxy.internal/deepseek");
+    expect(aiClientConfig("deepseek-v4-flash").baseURL).toBe("https://proxy.internal/deepseek");
   });
 
   it("T2826 — without DEEPSEEK_API_KEY the id isn't registered, so it doesn't route to DeepSeek", () => {
     delete process.env.DEEPSEEK_API_KEY;
     // Unregistered → treated as anthropic, NOT the DeepSeek endpoint.
-    expect(aiClientConfig("deepseek-chat").baseURL).not.toBe("https://api.deepseek.com/anthropic");
+    expect(aiClientConfig("deepseek-v4-flash").baseURL).not.toBe("https://api.deepseek.com/anthropic");
   });
 
   it("T0956 — aiApiKey is undefined when the selected provider's key is missing", () => {

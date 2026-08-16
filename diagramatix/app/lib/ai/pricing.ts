@@ -52,10 +52,14 @@ export const PRICING: Record<string, ModelPrice> = {
   "gpt-4o": { in: 2.5, out: 10 },
   "gpt-4o-mini": { in: 0.15, out: 0.6 },
   "phi-4": { in: 0.125, out: 0.5 },
-  // DeepSeek — api-docs.deepseek.com/quick_start/pricing (standard tier, USD).
+  // DeepSeek — the account's live models (GET /models): v4-flash + v4-pro.
   // Estimates; verify against your account tier + adjust in the rate catalog.
-  "deepseek-chat": { in: 0.28, out: 0.42, note: "cache-miss input; cache hits far cheaper" },
-  "deepseek-reasoner": { in: 0.55, out: 2.19 },
+  "deepseek-v4-flash": { in: 0.28, out: 0.42, note: "cache-miss input; cache hits far cheaper" },
+  "deepseek-v4-pro": { in: 0.55, out: 2.19 },
+  // Generic aliases (both currently resolve to v4-flash) — priced so a direct use
+  // isn't "varies".
+  "deepseek-chat": { in: 0.28, out: 0.42 },
+  "deepseek-reasoner": { in: 0.28, out: 0.42 },
 };
 
 /** The reference price for a model id, or undefined when unknown / floating. */

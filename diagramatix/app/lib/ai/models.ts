@@ -114,14 +114,16 @@ export function moonshotModels(): AiModel[] {
 /**
  * DeepSeek models, offered ONLY when `DEEPSEEK_API_KEY` is set. Reached via
  * DeepSeek's Anthropic-compatible endpoint (https://api.deepseek.com/anthropic),
- * so the same SDK + Messages shape works — see anthropicClient.ts. `deepseek-chat`
- * floats to their current general model; `deepseek-reasoner` is the R-series
- * reasoning model. No vision on this endpoint. Override the whole list with
- * `DEEPSEEK_MODELS` (`id|Label`, comma-separated) using exact console ids.
+ * so the same SDK + Messages shape works — see anthropicClient.ts. The account's
+ * live model ids are `deepseek-v4-flash` (fast/cheap) and `deepseek-v4-pro` (more
+ * capable) — confirmed via GET /models. (The generic `deepseek-chat` /
+ * `deepseek-reasoner` aliases both currently resolve to v4-flash, so they're NOT
+ * used here — we register the two distinct models directly.) No vision on this
+ * endpoint. Override with `DEEPSEEK_MODELS` (`id|Label`, comma-separated).
  */
 const DEFAULT_DEEPSEEK_MODELS: AiModel[] = [
-  { id: "deepseek-chat", label: "DeepSeek Chat", provider: "deepseek", vision: false },
-  { id: "deepseek-reasoner", label: "DeepSeek Reasoner", provider: "deepseek", vision: false },
+  { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash", provider: "deepseek", vision: false },
+  { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", provider: "deepseek", vision: false },
 ];
 
 export function deepseekModels(): AiModel[] {
