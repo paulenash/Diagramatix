@@ -19,10 +19,25 @@ describe("suggestNextSteps", () => {
     expect(out.map((c) => c.symbolType)).toEqual(["task"]);
   });
 
-  it("task → Task, Decision, End element candidates (in that order)", () => {
+  it("task → Task, Gateway, Event, End element candidates (in that order)", () => {
     const s = el("t", "task");
     const out = suggestNextSteps(s, data([s]), "bpmn");
-    expect(out.filter((c) => c.kind === "element").map((c) => c.label)).toEqual(["Task", "Decision", "End"]);
+    expect(out.filter((c) => c.kind === "element").map((c) => c.label)).toEqual(["Task", "Gateway", "Event", "End"]);
+  });
+
+  it("the Event candidate defaults to a Receive (catching message) intermediate event", () => {
+    const s = el("t", "task");
+    const ev = suggestNextSteps(s, data([s]), "bpmn").find((c) => c.label === "Event");
+    expect(ev).toBeTruthy();
+    expect(ev!.symbolType).toBe("intermediate-event");
+    expect(ev!.eventType).toBe("message");
+    expect(ev!.flowType).toBe("catching");
+  });
+
+  it("the Gateway candidate defaults to the 'none' marker", () => {
+    const s = el("t", "task");
+    const gw = suggestNextSteps(s, data([s]), "bpmn").find((c) => c.label === "Gateway");
+    expect(gw?.gatewayType).toBe("none");
   });
 
   it("task (a boundary host) also offers a Boundary event when there's room", () => {

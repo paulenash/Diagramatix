@@ -6,7 +6,7 @@
  * through `canConnect` against a synthetic fresh target, so a suggestion is
  * always legal to place. The AI layer (assist.ts) later NAMES a chosen candidate.
  */
-import type { DiagramData, DiagramElement, SymbolType, ConnectorType, EventType, GatewayType } from "./types";
+import type { DiagramData, DiagramElement, SymbolType, ConnectorType, EventType, GatewayType, FlowType } from "./types";
 import { canConnect } from "./canConnect";
 import { placeBoundaryEvent } from "./assistPlacement";
 
@@ -25,6 +25,7 @@ export interface NextStepCandidate {
   connectorType: ConnectorType;
   eventType?: EventType;
   gatewayType?: GatewayType;
+  flowType?: FlowType;
   /** Short label for the ghost + palette ("Task", "Gateway", "End"). */
   label: string;
   /** Why it's suggested (tooltip). */
@@ -42,13 +43,16 @@ const BOUNDARY_HOST_TYPES = new Set<string>(["task", "subprocess", "subprocess-e
 /** Ordered candidate menu per source type (BPMN), most-likely first. */
 function menuFor(sourceType: string): NextStepCandidate[] {
   const task: NextStepCandidate = { kind: "element", symbolType: "task", connectorType: "sequence", label: "Task", reason: "next activity" };
-  const gateway: NextStepCandidate = { kind: "element", symbolType: "gateway", connectorType: "sequence", gatewayType: "exclusive", label: "Gateway", reason: "branch the flow" };
+  const gateway: NextStepCandidate = { kind: "element", symbolType: "gateway", connectorType: "sequence", gatewayType: "none", label: "Gateway", reason: "branch the flow" };
+  // "Event" adds an inline intermediate event; default trigger is Receive
+  // (a catching message event: eventType "message" + flowType "catching").
+  const event: NextStepCandidate = { kind: "element", symbolType: "intermediate-event", connectorType: "sequence", eventType: "message", flowType: "catching", label: "Event", reason: "wait for / receive an event" };
   const end: NextStepCandidate = { kind: "element", symbolType: "end-event", connectorType: "sequence", label: "End", reason: "end the process" };
   switch (sourceType) {
     case "start-event": return [task];
     case "task":
     case "subprocess":
-    case "subprocess-expanded": return [task, gateway, end];
+    case "subprocess-expanded": return [task, gateway, event, end];
     case "gateway": return [task];
     case "intermediate-event": return [task];
     default: return [];
@@ -74,6 +78,7 @@ function synthTarget(c: NextStepCandidate, parentId?: string): DiagramElement {
     properties: {},
     ...(c.eventType ? { eventType: c.eventType } : {}),
     ...(c.gatewayType ? { gatewayType: c.gatewayType } : {}),
+    ...(c.flowType ? { flowType: c.flowType } : {}),
     ...(parentId ? { parentId } : {}),
   } as DiagramElement;
 }

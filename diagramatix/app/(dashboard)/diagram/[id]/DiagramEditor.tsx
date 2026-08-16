@@ -2491,6 +2491,7 @@ export function DiagramEditor({
     }
     addElementGated(c.symbolType, center, undefined, c.eventType, newId, parentId ? { parentId } : undefined);
     if (c.gatewayType) updateProperties(newId, { gatewayType: c.gatewayType });
+    if (c.flowType) updateProperties(newId, { flowType: c.flowType });
     if (srcSide) addConnector(src.id, newId, c.connectorType, "directed", "rectilinear", srcSide, "left");
     else addConnector(src.id, newId, c.connectorType);
     // Auto-extend all pools to the same width if the new element overflows.
