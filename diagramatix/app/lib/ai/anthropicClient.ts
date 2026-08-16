@@ -59,12 +59,16 @@ export function makeAnthropic(apiKey: string): Anthropic {
  *  `MOONSHOT_BASE_URL` (e.g. https://api.moonshot.cn/anthropic for mainland China). */
 const MOONSHOT_DEFAULT_BASE_URL = "https://api.moonshot.ai/anthropic";
 
+/** DeepSeek's Anthropic-compatible endpoint. Override with `DEEPSEEK_BASE_URL`. */
+const DEEPSEEK_DEFAULT_BASE_URL = "https://api.deepseek.com/anthropic";
+
 /** The key env var that serves a given model's provider. */
 export function aiApiKey(model: string | null | undefined): string | undefined {
   switch (providerForModel(model)) {
     case "moonshot":  return resolvedEnvSecret(process.env.MOONSHOT_API_KEY);
     case "google":    return resolvedEnvSecret(process.env.GOOGLE_API_KEY);
     case "microsoft": return resolvedEnvSecret(process.env.MICROSOFT_API_KEY);
+    case "deepseek":  return resolvedEnvSecret(process.env.DEEPSEEK_API_KEY);
     default:          return resolvedEnvSecret(process.env.ANTHROPIC_API_KEY);
   }
 }
@@ -101,6 +105,13 @@ export function aiClientConfig(
     return {
       apiKey: resolvedEnvSecret(process.env.MICROSOFT_API_KEY) ?? "",
       baseURL: process.env.MICROSOFT_BASE_URL?.trim() || undefined,
+    };
+  }
+  if (provider === "deepseek") {
+    // DeepSeek via its Anthropic-compatible endpoint (public default), Bearer-auth.
+    return {
+      apiKey: resolvedEnvSecret(process.env.DEEPSEEK_API_KEY) ?? "",
+      baseURL: process.env.DEEPSEEK_BASE_URL?.trim() || DEEPSEEK_DEFAULT_BASE_URL,
     };
   }
   if (provider === "ollama") {
@@ -145,7 +156,7 @@ export function makeAiClient(model: string | null | undefined, fallbackApiKey?: 
   const telemetry = { fetch: countingFetch, maxRetries: 2, timeout: 15 * 60 * 1000 };
 
   let client: Anthropic;
-  if (provider === "moonshot" || provider === "google" || provider === "microsoft" || provider === "ollama") {
+  if (provider === "moonshot" || provider === "google" || provider === "microsoft" || provider === "ollama" || provider === "deepseek") {
     // All reached via an Anthropic-compatible endpoint that authenticates with
     // `Authorization: Bearer <key>` (Moonshot's endpoint; a LiteLLM-style gateway
     // for Gemini / Azure OpenAI / Phi) — NOT Anthropic's native `x-api-key` header.

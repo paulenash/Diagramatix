@@ -23,6 +23,7 @@ export interface EffectiveRate {
 export function providerOf(model: string): string {
   if (/^ollama[/:]/i.test(model)) return "ollama"; // local Ollama (free) — check first
   if (/^(kimi|moonshot)/i.test(model)) return "moonshot";
+  if (/^deepseek/i.test(model)) return "deepseek";
   if (/^gemini/i.test(model)) return "google";
   // Azure OpenAI (gpt-*, o1/o3/o4-*) + Microsoft's own Phi/MAI models.
   if (/^(gpt|o[0-9]|phi|mai)/i.test(model)) return "microsoft";

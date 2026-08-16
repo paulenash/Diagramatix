@@ -9,7 +9,7 @@
  *  default, and how every built-in Claude model is treated). Moonshot/Kimi is
  *  reached via its Anthropic-compatible endpoint, so it reuses the same SDK +
  *  Messages-API shape — only the base URL + key differ (see anthropicClient.ts). */
-export type AiProvider = "anthropic" | "moonshot" | "google" | "microsoft" | "ollama";
+export type AiProvider = "anthropic" | "moonshot" | "google" | "microsoft" | "ollama" | "deepseek";
 
 export interface AiModel {
   id: string;
@@ -107,6 +107,34 @@ export function moonshotModels(): AiModel[] {
       // ids are left undefined (allowed in the vision picker, not flagged).
       const vision = /vision/i.test(id) || /^kimi-latest/i.test(id) ? true : undefined;
       return { id, label: rest.join("|").trim() || id, provider: "moonshot", vision };
+    })
+    .filter((m): m is AiModel => m !== null);
+}
+
+/**
+ * DeepSeek models, offered ONLY when `DEEPSEEK_API_KEY` is set. Reached via
+ * DeepSeek's Anthropic-compatible endpoint (https://api.deepseek.com/anthropic),
+ * so the same SDK + Messages shape works — see anthropicClient.ts. `deepseek-chat`
+ * floats to their current general model; `deepseek-reasoner` is the R-series
+ * reasoning model. No vision on this endpoint. Override the whole list with
+ * `DEEPSEEK_MODELS` (`id|Label`, comma-separated) using exact console ids.
+ */
+const DEFAULT_DEEPSEEK_MODELS: AiModel[] = [
+  { id: "deepseek-chat", label: "DeepSeek Chat", provider: "deepseek", vision: false },
+  { id: "deepseek-reasoner", label: "DeepSeek Reasoner", provider: "deepseek", vision: false },
+];
+
+export function deepseekModels(): AiModel[] {
+  if (!resolvedEnvSecret(process.env.DEEPSEEK_API_KEY)) return [];
+  const raw = process.env.DEEPSEEK_MODELS?.trim();
+  if (!raw) return DEFAULT_DEEPSEEK_MODELS;
+  return raw
+    .split(",")
+    .map((entry): AiModel | null => {
+      const [rawId, ...rest] = entry.split("|");
+      const id = rawId.trim();
+      if (!id) return null;
+      return { id, label: rest.join("|").trim() || id, provider: "deepseek", vision: false };
     })
     .filter((m): m is AiModel => m !== null);
 }
@@ -217,7 +245,7 @@ export function ollamaModels(): AiModel[] {
 /** Claude models, plus Moonshot/Kimi, Google/Gemini, Microsoft/Azure and local
  *  Ollama (each when configured), plus any local/custom models. */
 export const allModels = (): AiModel[] => [
-  ...AI_MODELS, ...moonshotModels(), ...googleModels(), ...microsoftModels(), ...ollamaModels(), ...customModels(),
+  ...AI_MODELS, ...moonshotModels(), ...googleModels(), ...microsoftModels(), ...deepseekModels(), ...ollamaModels(), ...customModels(),
 ];
 
 export const isKnownAiModel = (id: string | null | undefined): boolean =>
