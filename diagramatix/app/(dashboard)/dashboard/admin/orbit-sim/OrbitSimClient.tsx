@@ -96,14 +96,15 @@ function ConfigTile({ cfg, set, setCfg, onRun }: {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-gray-900">Orbit Simulator</h1>
-          <p className="text-xs text-gray-500">N-body point-mass gravity · Velocity-Verlet · softened Newtonian force. Press <kbd className="px-1 border rounded">Esc</kbd> in the sim to return here.</p>
-        </div>
+        <a href="/dashboard/admin" className="text-sm font-medium text-red-600 hover:text-red-700">← SuperAdmin</a>
         <button onClick={onRun}
           className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700">
           ▶ Test / Run
         </button>
+      </div>
+      <div>
+        <h1 className="text-lg font-semibold text-gray-900">Orbit Simulator</h1>
+        <p className="text-xs text-gray-500">N-body point-mass gravity · Velocity-Verlet · softened Newtonian force. Press <kbd className="px-1 border rounded">Esc</kbd> in the sim to return here.</p>
       </div>
 
       <Section title="Cluster">
@@ -320,11 +321,13 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
 
     // ── loop ──
     let raf = 0; let hudTick = 0;
-    let escapedCount = 0, escSpeedSum = 0; // running escaper stats
-    let eRef = e0;                         // energy baseline (re-based when a body leaves)
-    let colorsDirty = false;
-    const rebuildColors = () => {
-      for (let i = 0; i < bodies.length; i++) { cores.setColorAt(i, cols[i]); if (glows) glows.setColorAt(i, cols[i]); }
+    // Escapers STAY in the physics (so total energy is conserved) but are hidden.
+    const escaped: boolean[] = new Array(N).fill(false);
+    let escapedCount = 0, escSpeedSum = 0;
+    let visibleIdx: number[] = bodies.map((_, i) => i);
+    let visibleDirty = true;
+    const packColours = () => {
+      visibleIdx.forEach((v, s) => { cores.setColorAt(s, cols[v]); if (glows) glows.setColorAt(s, cols[v]); });
       if (cores.instanceColor) cores.instanceColor.needsUpdate = true;
       if (glows && glows.instanceColor) glows.instanceColor.needsUpdate = true;
     };
@@ -332,48 +335,47 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
     const loop = () => {
       raf = requestAnimationFrame(loop);
       if (!pausedRef.current) {
-        // Adaptive sub-stepping keeps total energy bounded through close passes.
+        // FULL N-body physics — escapers included, so total energy is conserved.
         const simTime = cfg.dt * cfg.substeps;
         advance(bodies, simTime, { dtMax: cfg.dt, G: cfg.G, softening: cfg.softening });
         simClock += simTime;
       }
 
-      // ── escape detection → removal → HUD (throttled) ──
-      if (++hudTick % 10 === 0 && bodies.length > 0) {
-        const a = analyse(bodies, cfg.G, cfg.softening, { detectBinaries: bodies.length <= 400 });
-        // Remove escapers high→low so splices stay valid; record their escape speed.
-        let removed = false;
-        for (let i = bodies.length - 1; i >= 0; i--) {
-          if (a.escaping[i]) {
-            escSpeedSum += a.speeds[i]; escapedCount++;
-            bodies.splice(i, 1); cols.splice(i, 1); radii.splice(i, 1);
-            const tr = trails.splice(i, 1)[0];
-            if (tr) { scene.remove(tr.line); tr.line.geometry.dispose(); (tr.line.material as THREE.Material).dispose(); }
-            removed = true;
+      // ── escape detection (throttled) — evaluated on the VISIBLE cluster only ──
+      if (++hudTick % 10 === 0) {
+        const vis = visibleIdx.map((i) => bodies[i]);
+        const a = analyse(vis, cfg.G, cfg.softening, { detectBinaries: vis.length <= 400 });
+        let changed = false;
+        for (let li = 0; li < visibleIdx.length; li++) {
+          if (a.escaping[li]) {
+            const bi = visibleIdx[li];
+            escaped[bi] = true; escSpeedSum += a.speeds[li]; escapedCount++;
+            const tr = trails[bi]; if (tr) tr.line.visible = false; // hide its trail
+            changed = true;
           }
         }
-        // Removing a body changes the remaining system's energy — re-baseline so
-        // ΔE keeps measuring the integrator's conservation of what's left.
-        if (removed) { colorsDirty = true; eRef = bodies.length ? energy(bodies, cfg.G, cfg.softening).total : 0; }
+        if (changed) { visibleIdx = bodies.map((_, i) => i).filter((i) => !escaped[i]); visibleDirty = true; }
 
-        const en = bodies.length ? energy(bodies, cfg.G, cfg.softening) : { ke: 0, pe: 0, total: 0 };
+        // Energy over the FULL system → ΔE stays ~0 (nothing is removed).
+        const en = energy(bodies, cfg.G, cfg.softening);
         setHud({
-          t: simClock, q: en.pe < 0 ? en.ke / -en.pe : 0, n: bodies.length,
-          dE: eRef !== 0 ? (en.total - eRef) / Math.abs(eRef) : 0,
+          t: simClock, q: en.pe < 0 ? en.ke / -en.pe : 0, n: visibleIdx.length,
+          dE: e0 !== 0 ? (en.total - e0) / Math.abs(e0) : 0,
           escaped: escapedCount, avgEscV: escapedCount ? escSpeedSum / escapedCount : 0,
           binaries: a.binaries.length, avgEcc: a.avgEccentricity, note: perfNote,
         });
       }
 
-      // ── update instances + trails ──
-      if (colorsDirty) { rebuildColors(); colorsDirty = false; }
-      cores.count = bodies.length; if (glows) glows.count = bodies.length;
+      // ── render: pack only the VISIBLE bodies into instances ──
+      if (visibleDirty) { packColours(); visibleDirty = false; }
+      cores.count = visibleIdx.length; if (glows) glows.count = visibleIdx.length;
       let msq = 0;
-      bodies.forEach((b, i) => {
-        setInst(cores, i, b.pos, radii[i]);
-        if (glows) setInst(glows, i, b.pos, radii[i] * 2.6);
+      visibleIdx.forEach((v, s) => {
+        const b = bodies[v];
+        setInst(cores, s, b.pos, radii[v]);
+        if (glows) setInst(glows, s, b.pos, radii[v] * 2.6);
         msq += b.pos[0] ** 2 + b.pos[1] ** 2 + b.pos[2] ** 2;
-        const tr = trails[i];
+        const tr = trails[v];
         if (tr && !pausedRef.current) {
           tr.pts.push([b.pos[0], b.pos[1], b.pos[2]]);
           if (tr.pts.length > cfg.trail) tr.pts.shift();
@@ -388,9 +390,9 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
       });
       cores.instanceMatrix.needsUpdate = true;
       if (glows) glows.instanceMatrix.needsUpdate = true;
-      const rms = bodies.length ? Math.sqrt(msq / bodies.length) : cfg.cubeSize;
+      const rms = visibleIdx.length ? Math.sqrt(msq / visibleIdx.length) : cfg.cubeSize;
 
-      // auto-zoom: frame the cluster (COM stays at origin — momentum is zeroed)
+      // auto-zoom: frame the visible cluster (the bound core stays ≈ origin)
       if (cfg.autoRotate && !dragging) az += 0.0016 * cfg.substeps;
       const fit = Math.max(cfg.cubeSize * 0.6, rms * 2.6) / Math.tan(fovR / 2);
       dist += (fit * zoom - dist) * 0.06;
