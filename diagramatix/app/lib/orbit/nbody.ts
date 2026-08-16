@@ -280,6 +280,19 @@ export function analyse(
   return { speeds, escapeSpeeds, escaping, binaries, avgEccentricity };
 }
 
+/** Total angular momentum L = Σ mᵢ (rᵢ × vᵢ) about the origin (= about the COM,
+ *  since the COM is held at the origin). Conserved to machine precision by
+ *  Velocity-Verlet because the (softened) forces are central. */
+export function angularMomentum(bodies: Body[]): Vec3 {
+  const L: Vec3 = [0, 0, 0];
+  for (const b of bodies) {
+    L[0] += b.mass * (b.pos[1] * b.vel[2] - b.pos[2] * b.vel[1]);
+    L[1] += b.mass * (b.pos[2] * b.vel[0] - b.pos[0] * b.vel[2]);
+    L[2] += b.mass * (b.pos[0] * b.vel[1] - b.pos[1] * b.vel[0]);
+  }
+  return L;
+}
+
 /** Mass-weighted centre-of-mass position + velocity. */
 export function centreOfMass(bodies: Body[]): { pos: Vec3; vel: Vec3 } {
   let M = 0; const p: Vec3 = [0, 0, 0]; const v: Vec3 = [0, 0, 0];

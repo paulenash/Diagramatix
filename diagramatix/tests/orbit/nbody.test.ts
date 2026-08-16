@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  initBodies, verletStep, advance, energy, centreOfMass, bodyColour, makeRng,
+  initBodies, verletStep, advance, energy, angularMomentum, centreOfMass, bodyColour, makeRng,
   analyse, twoBodyOrbit,
   type InitConfig, type Vec3, type Body,
 } from "@/app/lib/orbit/nbody";
@@ -58,6 +58,16 @@ describe("nbody — integration", () => {
     let acc: Vec3[] | undefined;
     for (let s = 0; s < 200; s++) acc = verletStep(b, 0.005, 1, 0.25, acc);
     expect(mag(centreOfMass(b).vel)).toBeLessThan(1e-9);
+  });
+
+  it("conserves total angular momentum to ~machine precision (central forces)", () => {
+    const b = initBodies(cfg({ n: 5, masses: [2, 1, 1, 1, 1], seed: 11 }));
+    const L0 = angularMomentum(b);
+    let acc: Vec3[] | undefined;
+    for (let s = 0; s < 400; s++) acc = verletStep(b, 0.004, 1, 0.25, acc);
+    const L1 = angularMomentum(b);
+    const drift = mag([L1[0] - L0[0], L1[1] - L0[1], L1[2] - L0[2]]) / mag(L0);
+    expect(drift).toBeLessThan(1e-9); // far tighter than the energy bound
   });
 });
 

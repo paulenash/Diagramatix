@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, type Dispatch, type SetStateAction, type ReactNode } from "react";
 import * as THREE from "three";
 import {
-  initBodies, advance, energy, analyse, bodyColour,
+  initBodies, advance, energy, angularMomentum, analyse, bodyColour,
   type Body, type VelocityMode,
 } from "@/app/lib/orbit/nbody";
 
@@ -215,9 +215,10 @@ const NumIn = ({ v, on, step, min }: { v: number; on: (v: number) => void; step:
 function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
+  const resetViewRef = useRef(false);
   const [paused, setPaused] = useState(false);
   const [hud, setHud] = useState({
-    t: 0, q: 0, n: cfg.n, dE: 0,
+    t: 0, q: 0, n: cfg.n, dE: 0, dL: 0,
     escaped: 0, avgEscV: 0, binaries: 0, avgEcc: 0, note: "",
   });
 
@@ -234,6 +235,7 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
       speedBound: cfg.speedBound, G: cfg.G, softening: cfg.softening, seed: cfg.seed,
     });
     const e0 = energy(bodies, cfg.G, cfg.softening).total; // reference for drift
+    const l0v = angularMomentum(bodies); const L0 = Math.hypot(l0v[0], l0v[1], l0v[2]);
     let simClock = 0;
     const meanMass = masses.reduce((a, b) => a + b, 0) / masses.length;
     const baseR = cfg.cubeSize * 0.02; // render radius scale
@@ -356,11 +358,13 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
         }
         if (changed) { visibleIdx = bodies.map((_, i) => i).filter((i) => !escaped[i]); visibleDirty = true; }
 
-        // Energy over the FULL system → ΔE stays ~0 (nothing is removed).
+        // Energy + angular momentum over the FULL system → both conserved.
         const en = energy(bodies, cfg.G, cfg.softening);
+        const lv = angularMomentum(bodies); const Lm = Math.hypot(lv[0], lv[1], lv[2]);
         setHud({
           t: simClock, q: en.pe < 0 ? en.ke / -en.pe : 0, n: visibleIdx.length,
           dE: e0 !== 0 ? (en.total - e0) / Math.abs(e0) : 0,
+          dL: L0 > 1e-6 ? (Lm - L0) / L0 : 0,
           escaped: escapedCount, avgEscV: escapedCount ? escSpeedSum / escapedCount : 0,
           binaries: a.binaries.length, avgEcc: a.avgEccentricity, note: perfNote,
         });
@@ -393,6 +397,7 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
       const rms = visibleIdx.length ? Math.sqrt(msq / visibleIdx.length) : cfg.cubeSize;
 
       // auto-zoom: frame the visible cluster (the bound core stays ≈ origin)
+      if (resetViewRef.current) { az = 0.6; el = 0.4; zoom = 1; resetViewRef.current = false; }
       if (cfg.autoRotate && !dragging) az += 0.0016 * cfg.substeps;
       const fit = Math.max(cfg.cubeSize * 0.6, rms * 2.6) / Math.tan(fovR / 2);
       dist += (fit * zoom - dist) * 0.06;
@@ -434,6 +439,7 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
       <div className="absolute top-3 left-3 flex items-center gap-2 text-xs">
         <button onClick={onBack} className="px-3 py-1.5 bg-white/90 rounded shadow hover:bg-white font-medium">← Config (Esc)</button>
         <button onClick={togglePause} className="px-3 py-1.5 bg-white/90 rounded shadow hover:bg-white font-medium">{paused ? "▶ Play" : "⏸ Pause"} (Space)</button>
+        <button onClick={() => { resetViewRef.current = true; }} className="px-3 py-1.5 bg-white/90 rounded shadow hover:bg-white font-medium">⟲ Reset view</button>
       </div>
       <div className="absolute top-3 right-3 text-[11px] text-white/80 bg-black/40 rounded px-2 py-1.5 tabular-nums space-y-0.5 text-right min-w-[9rem]">
         <div>t = {hud.t.toFixed(1)}</div>
@@ -441,6 +447,9 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
         <div>virial Q = {hud.q.toFixed(2)}</div>
         <div className={Math.abs(hud.dE) < 0.01 ? "text-green-300" : Math.abs(hud.dE) < 0.05 ? "text-yellow-300" : "text-red-300"}>
           ΔE = {(hud.dE * 100 >= 0 ? "+" : "") + (hud.dE * 100).toFixed(2)}%
+        </div>
+        <div className={Math.abs(hud.dL) < 0.001 ? "text-green-300" : Math.abs(hud.dL) < 0.01 ? "text-yellow-300" : "text-red-300"}>
+          ΔL = {(hud.dL * 100 >= 0 ? "+" : "") + (hud.dL * 100).toFixed(3)}%
         </div>
         <div className="border-t border-white/15 mt-1 pt-1">
           <div className={hud.escaped ? "text-orange-300" : "text-white/50"}>⇱ escaped: {hud.escaped}</div>
