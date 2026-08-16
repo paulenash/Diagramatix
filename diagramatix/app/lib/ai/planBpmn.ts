@@ -430,13 +430,22 @@ export function closeTruncatedJson(s: string): string | null {
   return trimmed;
 }
 
+/** The exact Anthropic `messages.create` request for a BPMN plan. */
+export interface BpmnRequest {
+  model: string;
+  max_tokens: number;
+  system: string;
+  messages: { role: "user"; content: Anthropic.Messages.ContentBlockParam[] }[];
+}
+
 /**
- * Call Sonnet with the given prompt + attachment + rules, parse + normalise
- * the JSON response, and return the plan. Does not run the layout engine.
+ * Assemble the EXACT request body sent to the model for a BPMN plan — the single
+ * source of truth shared by `planBpmn` (which sends it) and the SuperAdmin
+ * "Export Full AI Prompt" endpoint (which serialises it), so the export can never
+ * drift from what is really sent.
  */
-export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
-  const { apiKey, prompt, attachment, rules, model = DEFAULT_MODEL, captureGeometry = false } = opts;
-  const client = makeAiClient(model, apiKey);
+export function buildBpmnRequest(opts: PlanBpmnOptions): BpmnRequest {
+  const { prompt, attachment, rules, model = DEFAULT_MODEL, captureGeometry = false } = opts;
   // Geometry capture only makes sense with an image to measure.
   const wantGeometry = captureGeometry && attachment?.type === "image";
   const systemPrompt = buildSystemPrompt(rules, wantGeometry);
@@ -491,17 +500,22 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
   // Give the big-output Claude models (Opus / Sonnet) more room; keep 16000 for the
   // rest (the largest Kimi K3 + Haiku accept). Salvage below covers any residual cut.
   const maxTokens = cappedMaxTokens(model, /(?:opus|sonnet)/i.test(model) ? 32000 : 16000);
+  return { model, max_tokens: maxTokens, system: systemPrompt, messages: [{ role: "user", content: userContent }] };
+}
+
+/**
+ * Call Sonnet with the given prompt + attachment + rules, parse + normalise
+ * the JSON response, and return the plan. Does not run the layout engine.
+ */
+export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
+  const { apiKey, model = DEFAULT_MODEL } = opts;
+  const client = makeAiClient(model, apiKey);
   // NOTE: max_tokens above ~21333 would trip the SDK's "Streaming is required for
   // operations that may take longer than 10 minutes" guard — but makeAiClient sets
   // an explicit client `timeout`, which skips that guard entirely (see messages.js:
   // the check only runs when the client timeout is unset). So this stays a plain
   // non-streaming create (keeping the telemetry wrapper intact).
-  const message = await client.messages.create({
-    model,
-    max_tokens: maxTokens,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userContent }],
-  });
+  const message = await client.messages.create(buildBpmnRequest(opts));
 
   const textBlock = message.content.find(b => b.type === "text");
   if (!textBlock || textBlock.type !== "text") {
