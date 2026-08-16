@@ -795,33 +795,32 @@ export function AiPanel({
         )}
 
         {isSuperuser && !superAdminHidden && diagramType === "bpmn" && (
-          <button onClick={() => handleCompare()}
-            disabled={generating || comparing || !prompt.trim() || !diagramId}
-            className="w-full px-3 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
-            title="SuperAdmin: generate with every available model, fill this diagram with the best result, and save one diagram per model">
-            {comparing && (
-              <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
-                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-            )}
-            {comparing ? "Comparing models…" : "Compare all models (SuperAdmin)"}
-          </button>
-        )}
-
-        {isSuperuser && !superAdminHidden && diagramType === "bpmn" && (
-          <button onClick={() => handleExportPrompt()}
-            disabled={generating || exporting || !prompt.trim()}
-            className="w-full px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
-            title="SuperAdmin: download a ZIP of the exact prompt, rules, image and model params sent to the AI — without running a generation. For local-LLM testing.">
-            {exporting && (
-              <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
-                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-            )}
-            {exporting ? "Building export…" : "Export Full AI Prompt (SuperAdmin)"}
-          </button>
+          <div className="flex gap-1">
+            <button onClick={() => handleCompare()}
+              disabled={generating || comparing || !prompt.trim() || !diagramId}
+              className="flex-1 px-3 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+              title="SuperAdmin: generate with every available model, fill this diagram with the best result, and save one diagram per model">
+              {comparing && (
+                <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              )}
+              {comparing ? "Comparing…" : "Compare Models"}
+            </button>
+            <button onClick={() => handleExportPrompt()}
+              disabled={generating || exporting || !prompt.trim()}
+              className="flex-1 px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+              title="SuperAdmin: download a ZIP of the exact prompt, rules, image and model params sent to the AI — without running a generation. For local-LLM testing.">
+              {exporting && (
+                <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              )}
+              {exporting ? "Building…" : "Export AI Package"}
+            </button>
+          </div>
         )}
 
         {showSave && (
