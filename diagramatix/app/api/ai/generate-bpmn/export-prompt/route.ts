@@ -38,8 +38,9 @@ export async function POST(req: Request) {
 
   const { prompt, attachment, pcfNodeId, model: requestedModel, captureGeometry } =
     await req.json();
-  if (!prompt?.trim()) {
-    return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
+  // A prompt OR an attachment is required (image ingestion can be attachment-only).
+  if (!prompt?.trim() && !attachment) {
+    return NextResponse.json({ error: "A prompt or an attachment is required" }, { status: 400 });
   }
 
   // Same model resolution as the generation route (image → vision model).
@@ -60,10 +61,12 @@ export async function POST(req: Request) {
   const { aiRules } = splitRulesByEnforcement(rulesRaw);
   const grounded = await groundRulesWithPcf(prisma, aiRules, pcfNodeId);
 
+  const promptText = (typeof prompt === "string" ? prompt : "").trim();
+
   // The EXACT request that would be sent (no AI call).
   const request = buildBpmnRequest({
     apiKey: "", // unused by buildBpmnRequest — the export never calls the model
-    prompt,
+    prompt: promptText,
     attachment: attachment ?? undefined,
     rules: grounded,
     model,
@@ -83,7 +86,7 @@ export async function POST(req: Request) {
   zip.file("system-prompt.txt", request.system);
   zip.file("framework.txt", buildSystemPrompt("", wantGeometry)); // (b) the scaffold, rules omitted
   zip.file("green-rules.md", grounded || "(no green rules configured)"); // (c) rules as injected
-  zip.file("user-prompt.txt", prompt.trim()); // (a) the user's text
+  zip.file("user-prompt.txt", promptText || "(no text prompt — attachment only)"); // (a) the user's text
 
   if (isImage && attachment?.data && attachment?.mediaType) {
     const ext = IMAGE_EXT[attachment.mediaType] ?? "bin";
@@ -102,7 +105,7 @@ export async function POST(req: Request) {
       : null,
     counts: {
       systemChars: request.system.length,
-      userPromptChars: prompt.trim().length,
+      userPromptChars: promptText.length,
       greenRulesChars: grounded.length,
       contentBlocks: request.messages[0].content.length,
     },

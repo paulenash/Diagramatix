@@ -90,7 +90,6 @@ export function AiPanel({
   // the SuperAdmin-only AI options. No-op for non-SuperAdmins.
   const { hidden: superAdminHidden } = useSuperAdminChrome(isSuperuser || !!isAdmin);
   const [comparing, setComparing] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [clarifyOpen, setClarifyOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   // Chosen generate model (defaults to the current global default once known).
@@ -382,50 +381,6 @@ export function AiPanel({
   /** SuperAdmin: generate this prompt across Fable 5 / Opus 4.8 / Sonnet 5 / Haiku 4.5,
    *  fill the current diagram with the best output, and save a diagram per
    *  model. Four live calls — slow. */
-  /** SuperAdmin: download a ZIP of the EXACT payload that would be sent to the
-   *  model (system prompt = framework + green rules, user prompt, the image, and
-   *  model/max_tokens) WITHOUT calling the AI — for replaying against a local LLM.
-   *  Sends the same inputs as handleGenerate; whether an image is attached gives
-   *  the "image ingestion" vs "text prompt" scenario. */
-  async function handleExportPrompt() {
-    const effPrompt = prompt.trim();
-    if (!effPrompt) return;
-    setExporting(true);
-    setError(null);
-    setStatus("Building the full AI prompt export…");
-    try {
-      const res = await fetch("/api/ai/generate-bpmn/export-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: effPrompt,
-          attachment: attachment ?? undefined,
-          pcfNodeId: pcf?.nodeId,
-          model: model || undefined,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Export failed" }));
-        setError(err.error ?? "Export failed");
-        setStatus(null);
-        return;
-      }
-      const blob = await res.blob();
-      const cd = res.headers.get("Content-Disposition") || "";
-      const name = /filename="([^"]+)"/.exec(cd)?.[1] || "ai-prompt.zip";
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = name; a.click();
-      URL.revokeObjectURL(url);
-      setStatus(`Exported ${name}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Export failed");
-      setStatus(null);
-    } finally {
-      setExporting(false);
-    }
-  }
-
   async function handleCompare() {
     const effPrompt = prompt.trim();
     if (!effPrompt || !diagramId) return;
@@ -795,32 +750,18 @@ export function AiPanel({
         )}
 
         {isSuperuser && !superAdminHidden && diagramType === "bpmn" && (
-          <div className="flex gap-1">
-            <button onClick={() => handleCompare()}
-              disabled={generating || comparing || !prompt.trim() || !diagramId}
-              className="flex-1 px-3 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
-              title="SuperAdmin: generate with every available model, fill this diagram with the best result, and save one diagram per model">
-              {comparing && (
-                <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
-                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                </svg>
-              )}
-              {comparing ? "Comparing…" : "Compare Models"}
-            </button>
-            <button onClick={() => handleExportPrompt()}
-              disabled={generating || exporting || !prompt.trim()}
-              className="flex-1 px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
-              title="SuperAdmin: download a ZIP of the exact prompt, rules, image and model params sent to the AI — without running a generation. For local-LLM testing.">
-              {exporting && (
-                <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
-                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                </svg>
-              )}
-              {exporting ? "Building…" : "Export AI Package"}
-            </button>
-          </div>
+          <button onClick={() => handleCompare()}
+            disabled={generating || comparing || !prompt.trim() || !diagramId}
+            className="w-full px-3 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+            title="SuperAdmin: generate with every available model, fill this diagram with the best result, and save one diagram per model">
+            {comparing && (
+              <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+            )}
+            {comparing ? "Comparing models…" : "Compare all models (SuperAdmin)"}
+          </button>
         )}
 
         {showSave && (
