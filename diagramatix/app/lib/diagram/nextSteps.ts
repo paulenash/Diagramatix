@@ -25,7 +25,7 @@ export interface NextStepCandidate {
   connectorType: ConnectorType;
   eventType?: EventType;
   gatewayType?: GatewayType;
-  /** Short label for the ghost + palette ("Task", "Decision", "End"). */
+  /** Short label for the ghost + palette ("Task", "Gateway", "End"). */
   label: string;
   /** Why it's suggested (tooltip). */
   reason: string;
@@ -42,13 +42,13 @@ const BOUNDARY_HOST_TYPES = new Set<string>(["task", "subprocess", "subprocess-e
 /** Ordered candidate menu per source type (BPMN), most-likely first. */
 function menuFor(sourceType: string): NextStepCandidate[] {
   const task: NextStepCandidate = { kind: "element", symbolType: "task", connectorType: "sequence", label: "Task", reason: "next activity" };
-  const decision: NextStepCandidate = { kind: "element", symbolType: "gateway", connectorType: "sequence", gatewayType: "exclusive", label: "Decision", reason: "branch the flow" };
+  const gateway: NextStepCandidate = { kind: "element", symbolType: "gateway", connectorType: "sequence", gatewayType: "exclusive", label: "Gateway", reason: "branch the flow" };
   const end: NextStepCandidate = { kind: "element", symbolType: "end-event", connectorType: "sequence", label: "End", reason: "end the process" };
   switch (sourceType) {
     case "start-event": return [task];
     case "task":
     case "subprocess":
-    case "subprocess-expanded": return [task, decision, end];
+    case "subprocess-expanded": return [task, gateway, end];
     case "gateway": return [task];
     case "intermediate-event": return [task];
     default: return [];
