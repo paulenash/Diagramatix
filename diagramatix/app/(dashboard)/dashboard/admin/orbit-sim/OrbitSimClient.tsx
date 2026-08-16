@@ -3,12 +3,14 @@
 import { useState, useRef, useEffect, useCallback, type Dispatch, type SetStateAction, type ReactNode } from "react";
 import * as THREE from "three";
 import {
-  initBodies, verletStep, energy, bodyColour,
-  type Body, type Vec3, type VelocityMode,
+  initBodies, advance, energy, analyse, bodyColour,
+  type Body, type VelocityMode,
 } from "@/app/lib/orbit/nbody";
 
 const MAX_CONFIG = 10; // per-body colour + mass are configurable up to here
-const MAX_BODIES = 50;
+const MAX_BODIES = 1000;
+const TRAIL_MAX_N = 80;  // trails get too heavy above this
+const GLOW_MAX_N = 300;  // additive glow overdraw above this
 
 interface OrbitConfig {
   n: number;
@@ -108,9 +110,12 @@ function ConfigTile({ cfg, set, setCfg, onRun }: {
         <Field label={`Bodies (2–${MAX_BODIES})`}>
           <input type="range" min={2} max={MAX_BODIES} value={cfg.n}
             onChange={(e) => set("n", +e.target.value)} className="w-48" />
-          <span className="ml-2 tabular-nums text-sm">{cfg.n}</span>
+          <input type="number" min={2} max={MAX_BODIES} value={cfg.n}
+            onChange={(e) => set("n", Math.max(2, Math.min(MAX_BODIES, Math.floor(+e.target.value || 2))))}
+            className="ml-2 w-16 text-xs border border-gray-200 rounded px-1 py-0.5" />
         </Field>
         <p className="text-[11px] text-gray-500">Colour + mass are configurable for the first {MAX_CONFIG}; beyond that, colours spread across the spectrum and masses are random within the bounds below.</p>
+        {cfg.n > 200 && <p className="text-[11px] text-amber-600">Large N: forces are O(N²) and one close pair slows the whole step — expect lower frame-rate. Trails off above {TRAIL_MAX_N}, glow off above {GLOW_MAX_N}. Raise softening ε to keep it smooth.</p>}
       </Section>
 
       <Section title={`Bodies 1–${nConfigurable}`}>
@@ -210,7 +215,11 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
   const [paused, setPaused] = useState(false);
-  const [hud, setHud] = useState({ t: 0, q: 0, n: cfg.n });
+  const [hud, setHud] = useState({
+    t: 0, q: 0, n: cfg.n, dE: 0,
+    escapers: [] as { c: string; v: number }[], escaperCount: 0,
+    binary: null as null | { e: number; sep: number }, note: "",
+  });
 
   const togglePause = useCallback(() => { pausedRef.current = !pausedRef.current; setPaused(pausedRef.current); }, []);
 
@@ -224,7 +233,8 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
       n: cfg.n, cubeSize: cfg.cubeSize, masses, velocityMode: cfg.velocityMode,
       speedBound: cfg.speedBound, G: cfg.G, softening: cfg.softening, seed: cfg.seed,
     });
-    let acc: Vec3[] | undefined;
+    const e0 = energy(bodies, cfg.G, cfg.softening).total; // reference for drift
+    let simClock = 0;
     const meanMass = masses.reduce((a, b) => a + b, 0) / masses.length;
     const baseR = cfg.cubeSize * 0.02; // render radius scale
 
@@ -239,32 +249,55 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
     renderer.setSize(w, h);
     mount.appendChild(renderer.domElement);
 
-    const sphere = new THREE.SphereGeometry(1, 20, 14);
-    const cores: THREE.Mesh[] = [];
-    const glows: THREE.Mesh[] = [];
-    const trails: { line: THREE.Line; pts: number[][]; posAttr: THREE.BufferAttribute; colAttr: THREE.BufferAttribute }[] = [];
+    const N = bodies.length;
+    const paletteN = cfg.colours.slice(0, Math.min(cfg.n, MAX_CONFIG));
+    const cols = bodies.map((_, i) => new THREE.Color(bodyColour(i, cfg.n, paletteN)));
+    const radii = bodies.map((b) => baseR * Math.cbrt(b.mass / meanMass));
+    const dummy = new THREE.Object3D();
+    const setInst = (im: THREE.InstancedMesh, idx: number, p: [number, number, number], s: number) => {
+      dummy.position.set(p[0], p[1], p[2]); dummy.scale.setScalar(s); dummy.updateMatrix();
+      im.setMatrixAt(idx, dummy.matrix);
+    };
 
-    bodies.forEach((b, i) => {
-      const hex = bodyColour(i, cfg.n, cfg.colours.slice(0, Math.min(cfg.n, MAX_CONFIG)));
-      const col = new THREE.Color(hex);
-      const r = baseR * Math.cbrt(b.mass / meanMass);
-      const core = new THREE.Mesh(sphere, new THREE.MeshBasicMaterial({ color: col }));
-      core.scale.setScalar(r); scene.add(core); cores.push(core);
-      const glow = new THREE.Mesh(sphere, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
-      glow.scale.setScalar(r * 2.6); scene.add(glow); glows.push(glow);
+    // Cores + glow as instanced meshes (one draw call each) → scales to 1000.
+    const sphere = new THREE.SphereGeometry(1, N > 200 ? 12 : 20, N > 200 ? 8 : 14);
+    const cores = new THREE.InstancedMesh(sphere, new THREE.MeshBasicMaterial(), N);
+    cores.frustumCulled = false;
+    bodies.forEach((b, i) => { setInst(cores, i, b.pos, radii[i]); cores.setColorAt(i, cols[i]); });
 
-      if (cfg.trail > 0) {
-        const geo = new THREE.BufferGeometry();
-        const posAttr = new THREE.BufferAttribute(new Float32Array(cfg.trail * 3), 3);
-        const colAttr = new THREE.BufferAttribute(new Float32Array(cfg.trail * 3), 3);
-        geo.setAttribute("position", posAttr);
-        geo.setAttribute("color", colAttr);
-        geo.setDrawRange(0, 0);
-        const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 }));
-        scene.add(line);
-        trails.push({ line, pts: [], posAttr, colAttr });
-      }
+    const glowOn = N <= GLOW_MAX_N;
+    let glows: THREE.InstancedMesh | null = null;
+    if (glowOn) {
+      glows = new THREE.InstancedMesh(sphere, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }), N);
+      glows.frustumCulled = false;
+      bodies.forEach((b, i) => { setInst(glows!, i, b.pos, radii[i] * 2.6); glows!.setColorAt(i, cols[i]); });
+      scene.add(glows);
+    }
+    scene.add(cores);
+
+    // Escape highlight: a white wireframe halo around each unbound body (instanced,
+    // count set from the analysis each tick).
+    const ringGeo = new THREE.SphereGeometry(1, 12, 8);
+    const ringMesh = new THREE.InstancedMesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.85 }), N);
+    ringMesh.frustumCulled = false; ringMesh.count = 0;
+    scene.add(ringMesh);
+
+    // Trails (only for modest N — too heavy otherwise).
+    const trailsOn = cfg.trail > 0 && N <= TRAIL_MAX_N;
+    const trails: { line: THREE.Line; pts: number[][]; posAttr: THREE.BufferAttribute; colAttr: THREE.BufferAttribute; col: THREE.Color }[] = [];
+    if (trailsOn) bodies.forEach((_, i) => {
+      const geo = new THREE.BufferGeometry();
+      const posAttr = new THREE.BufferAttribute(new Float32Array(cfg.trail * 3), 3);
+      const colAttr = new THREE.BufferAttribute(new Float32Array(cfg.trail * 3), 3);
+      geo.setAttribute("position", posAttr); geo.setAttribute("color", colAttr); geo.setDrawRange(0, 0);
+      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 }));
+      scene.add(line);
+      trails.push({ line, pts: [], posAttr, colAttr, col: cols[i] });
     });
+    const perfNote = [
+      cfg.trail > 0 && !trailsOn ? `trails off (N>${TRAIL_MAX_N})` : "",
+      !glowOn ? `glow off (N>${GLOW_MAX_N})` : "",
+    ].filter(Boolean).join(" · ");
 
     // ── camera orbit state ──
     let az = 0.6, el = 0.4, zoom = 1, dist = cfg.cubeSize * 2;
@@ -290,33 +323,37 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
     window.addEventListener("resize", onResize);
 
     // ── loop ──
-    let raf = 0; let steps = 0; let hudTick = 0;
+    let raf = 0; let hudTick = 0;
     const loop = () => {
       raf = requestAnimationFrame(loop);
       if (!pausedRef.current) {
-        for (let s = 0; s < cfg.substeps; s++) { acc = verletStep(bodies, cfg.dt, cfg.G, cfg.softening, acc); steps++; }
+        // Adaptive sub-stepping keeps total energy bounded through close passes.
+        const simTime = cfg.dt * cfg.substeps;
+        advance(bodies, simTime, { dtMax: cfg.dt, G: cfg.G, softening: cfg.softening });
+        simClock += simTime;
       }
 
-      // update meshes + trails; measure spread (RMS radius, robust to a single escaper)
+      // update instances + trails; measure spread (RMS radius, robust to a lone escaper)
       let msq = 0;
       bodies.forEach((b, i) => {
-        cores[i].position.set(b.pos[0], b.pos[1], b.pos[2]);
-        glows[i].position.copy(cores[i].position);
+        setInst(cores, i, b.pos, radii[i]);
+        if (glows) setInst(glows, i, b.pos, radii[i] * 2.6);
         msq += b.pos[0] ** 2 + b.pos[1] ** 2 + b.pos[2] ** 2;
         const tr = trails[i];
         if (tr && !pausedRef.current) {
           tr.pts.push([b.pos[0], b.pos[1], b.pos[2]]);
           if (tr.pts.length > cfg.trail) tr.pts.shift();
-          const base = new THREE.Color(bodyColour(i, cfg.n, cfg.colours.slice(0, Math.min(cfg.n, MAX_CONFIG))));
           for (let k = 0; k < tr.pts.length; k++) {
             tr.posAttr.setXYZ(k, tr.pts[k][0], tr.pts[k][1], tr.pts[k][2]);
             const f = (k + 1) / tr.pts.length; // fade tail → head
-            tr.colAttr.setXYZ(k, base.r * f, base.g * f, base.b * f);
+            tr.colAttr.setXYZ(k, tr.col.r * f, tr.col.g * f, tr.col.b * f);
           }
           tr.posAttr.needsUpdate = true; tr.colAttr.needsUpdate = true;
           tr.line.geometry.setDrawRange(0, tr.pts.length);
         }
       });
+      cores.instanceMatrix.needsUpdate = true;
+      if (glows) glows.instanceMatrix.needsUpdate = true;
       const rms = Math.sqrt(msq / bodies.length);
 
       // auto-zoom: frame the cluster (COM stays at origin — momentum is zeroed)
@@ -327,9 +364,24 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
       camera.lookAt(0, 0, 0);
       renderer.render(scene, camera);
 
-      if (++hudTick % 12 === 0) {
-        const { ke, pe } = energy(bodies, cfg.G, cfg.softening);
-        setHud({ t: steps * cfg.dt, q: pe < 0 ? ke / -pe : 0, n: bodies.length });
+      // Escape + binary analysis (throttled): highlight unbound bodies + report.
+      if (++hudTick % 10 === 0) {
+        const a = analyse(bodies, cfg.G, cfg.softening);
+        let k = 0;
+        for (let i = 0; i < bodies.length; i++) if (a.escaping[i]) { setInst(ringMesh, k, bodies[i].pos, radii[i] * 3); k++; }
+        ringMesh.count = k; ringMesh.instanceMatrix.needsUpdate = true;
+
+        const { ke, pe, total } = energy(bodies, cfg.G, cfg.softening);
+        const dE = e0 !== 0 ? (total - e0) / Math.abs(e0) : 0;
+        const escapers: { c: string; v: number }[] = [];
+        for (let i = 0; i < bodies.length && escapers.length < 8; i++) {
+          if (a.escaping[i]) escapers.push({ c: "#" + cols[i].getHexString(), v: a.speeds[i] });
+        }
+        setHud({
+          t: simClock, q: pe < 0 ? ke / -pe : 0, n: bodies.length, dE,
+          escapers, escaperCount: a.escaperCount,
+          binary: a.binary ? { e: a.binary.e, sep: a.binary.sep } : null, note: perfNote,
+        });
       }
     };
     loop();
@@ -341,8 +393,9 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
       window.removeEventListener("pointermove", onMove);
       dom.removeEventListener("wheel", onWheel);
       window.removeEventListener("resize", onResize);
-      cores.forEach((m) => (m.material as THREE.Material).dispose());
-      glows.forEach((m) => (m.material as THREE.Material).dispose());
+      cores.dispose(); (cores.material as THREE.Material).dispose();
+      if (glows) { glows.dispose(); (glows.material as THREE.Material).dispose(); }
+      ringMesh.dispose(); (ringMesh.material as THREE.Material).dispose(); ringGeo.dispose();
       trails.forEach((t) => { t.line.geometry.dispose(); (t.line.material as THREE.Material).dispose(); });
       sphere.dispose();
       renderer.dispose();
@@ -367,12 +420,35 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
         <button onClick={onBack} className="px-3 py-1.5 bg-white/90 rounded shadow hover:bg-white font-medium">← Config (Esc)</button>
         <button onClick={togglePause} className="px-3 py-1.5 bg-white/90 rounded shadow hover:bg-white font-medium">{paused ? "▶ Play" : "⏸ Pause"} (Space)</button>
       </div>
-      <div className="absolute top-3 right-3 text-[11px] text-white/80 bg-black/40 rounded px-2 py-1 tabular-nums space-y-0.5 text-right">
+      <div className="absolute top-3 right-3 text-[11px] text-white/80 bg-black/40 rounded px-2 py-1.5 tabular-nums space-y-0.5 text-right min-w-[9rem]">
         <div>t = {hud.t.toFixed(1)}</div>
         <div>bodies: {hud.n}</div>
         <div>virial Q = {hud.q.toFixed(2)}</div>
+        <div className={Math.abs(hud.dE) < 0.01 ? "text-green-300" : Math.abs(hud.dE) < 0.05 ? "text-yellow-300" : "text-red-300"}>
+          ΔE = {(hud.dE * 100 >= 0 ? "+" : "") + (hud.dE * 100).toFixed(2)}%
+        </div>
+        <div className="border-t border-white/15 mt-1 pt-1">
+          <div className={hud.escaperCount ? "text-orange-300" : "text-white/50"}>
+            ⇱ escaping: {hud.escaperCount}
+          </div>
+          {hud.escapers.map((e, i) => (
+            <div key={i} className="flex items-center justify-end gap-1 text-[10px]">
+              <span>v = {e.v.toFixed(2)}</span>
+              <span className="inline-block w-2 h-2 rounded-full" style={{ background: e.c }} />
+            </div>
+          ))}
+          {hud.escaperCount > hud.escapers.length && <div className="text-[10px] text-white/40">+{hud.escaperCount - hud.escapers.length} more</div>}
+        </div>
+        <div className="border-t border-white/15 mt-1 pt-1">
+          {hud.binary
+            ? <div>binary e = <span className="text-cyan-300">{hud.binary.e.toFixed(3)}</span></div>
+            : <div className="text-white/40">no bound binary</div>}
+          {hud.binary && <div className="text-[10px] text-white/50">sep = {hud.binary.sep.toFixed(2)}</div>}
+        </div>
       </div>
-      <div className="absolute bottom-3 left-3 text-[10px] text-white/40">drag to rotate · scroll to zoom</div>
+      <div className="absolute bottom-3 left-3 text-[10px] text-white/40">
+        drag to rotate · scroll to zoom{hud.note ? ` · ${hud.note}` : ""}
+      </div>
     </div>
   );
 }

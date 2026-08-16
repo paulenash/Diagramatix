@@ -95,6 +95,60 @@ export function verletStep(
   return a2;
 }
 
+/**
+ * Advance the system by `simTime` using ADAPTIVE Velocity-Verlet sub-steps.
+ *
+ * A fixed step conserves energy well for smooth orbits, but a close encounter /
+ * slingshot spikes the force faster than a coarse `dtMax` can resolve, injecting
+ * energy. Here the step shrinks with the peak acceleration (Δt ∝ √(ε/|a|max)), so
+ * close passes are resolved and total energy stays bounded — while distant, slow
+ * configurations still run at the full `dtMax`. Returns the final accelerations to
+ * seed the next call. `guard` caps the worst-case sub-step count so a pathological
+ * frame can't hang the loop.
+ */
+export function advance(
+  bodies: Body[],
+  simTime: number,
+  opts: { dtMax: number; G: number; softening: number; eta?: number },
+): Vec3[] {
+  const { dtMax, G, softening, eta = 0.03 } = opts;
+  const n = bodies.length;
+  const s2 = softening * softening;
+  // Generous floor purely to guarantee termination — `guard` is the real bound.
+  const dtFloor = dtMax / 65536;
+  let acc = accelerations(bodies, G, softening);
+  let remaining = simTime;
+  let guard = 0;
+  while (remaining > 1e-12 && guard++ < 1_000_000) {
+    // Smallest pairwise timescale — crossing time r/v and free-fall time
+    // √(r³/G·M). Basing the step on these (not just the start-of-step force)
+    // resolves fast fly-throughs, so total energy stays bounded.
+    let tmin = dtMax / eta;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const dx = bodies[j].pos[0] - bodies[i].pos[0];
+        const dy = bodies[j].pos[1] - bodies[i].pos[1];
+        const dz = bodies[j].pos[2] - bodies[i].pos[2];
+        const r2 = dx * dx + dy * dy + dz * dz + s2;
+        const r = Math.sqrt(r2);
+        const dvx = bodies[j].vel[0] - bodies[i].vel[0];
+        const dvy = bodies[j].vel[1] - bodies[i].vel[1];
+        const dvz = bodies[j].vel[2] - bodies[i].vel[2];
+        const v = Math.sqrt(dvx * dvx + dvy * dvy + dvz * dvz);
+        const tCross = v > 1e-9 ? r / v : Infinity;
+        const tFree = Math.sqrt(r2 * r / (G * (bodies[i].mass + bodies[j].mass)));
+        if (tCross < tmin) tmin = tCross;
+        if (tFree < tmin) tmin = tFree;
+      }
+    }
+    let step = Math.min(dtMax, eta * tmin, remaining);
+    step = Math.max(step, Math.min(dtFloor, remaining));
+    acc = verletStep(bodies, step, G, softening, acc);
+    remaining -= step;
+  }
+  return acc;
+}
+
 /** Kinetic, (softened) potential, and total energy — for diagnostics + tests. */
 export function energy(bodies: Body[], G: number, softening: number): { ke: number; pe: number; total: number } {
   let ke = 0;
@@ -110,6 +164,88 @@ export function energy(bodies: Body[], G: number, softening: number): { ke: numb
     }
   }
   return { ke, pe, total: ke + pe };
+}
+
+/** Two-body Keplerian orbital elements from a relative state (unsoftened — a good
+ *  approximation for a real binary whose separation ≫ ε). */
+export function twoBodyOrbit(bi: Body, bj: Body, G: number): {
+  bound: boolean; e: number; a: number; sep: number; period: number; energy: number;
+} {
+  const rx = bj.pos[0] - bi.pos[0], ry = bj.pos[1] - bi.pos[1], rz = bj.pos[2] - bi.pos[2];
+  const vx = bj.vel[0] - bi.vel[0], vy = bj.vel[1] - bi.vel[1], vz = bj.vel[2] - bi.vel[2];
+  const r = Math.sqrt(rx * rx + ry * ry + rz * rz);
+  const v2 = vx * vx + vy * vy + vz * vz;
+  const mu = G * (bi.mass + bj.mass);
+  const energy = 0.5 * v2 - mu / r;              // specific orbital energy
+  // Specific angular momentum h = r × v.
+  const hx = ry * vz - rz * vy, hy = rz * vx - rx * vz, hz = rx * vy - ry * vx;
+  const h2 = hx * hx + hy * hy + hz * hz;
+  const e = Math.sqrt(Math.max(0, 1 + (2 * energy * h2) / (mu * mu)));
+  const bound = energy < 0;
+  const a = bound ? -mu / (2 * energy) : Infinity; // semi-major axis
+  const period = bound ? 2 * Math.PI * Math.sqrt((a * a * a) / mu) : Infinity;
+  return { bound, e, a, sep: r, period, energy };
+}
+
+export interface OrbitAnalysis {
+  /** speed of each body relative to the cluster COM */
+  speeds: number[];
+  /** local escape speed √(2|Φ|) at each body */
+  escapeSpeeds: number[];
+  /** whether each body is instantaneously unbound (speed ≥ escape speed) */
+  escaping: boolean[];
+  escaperCount: number;
+  /** the most-bound pair among the NON-escaping bodies (the remaining binary), or
+   *  null when fewer than two bound bodies remain. Escapers contribute nothing —
+   *  the binary's state is computed from the two bound bodies alone. */
+  binary: { i: number; j: number; e: number; a: number; sep: number; period: number } | null;
+}
+
+/**
+ * Per-body escape analysis + the eccentricity of the remaining bound binary.
+ * Escape: a body is unbound when its speed (relative to the cluster COM) meets or
+ * exceeds the local escape speed √(2|Φ|), Φ being the softened potential from all
+ * other bodies. Binary: among the still-bound bodies, the most tightly-bound pair.
+ */
+export function analyse(bodies: Body[], G: number, softening: number): OrbitAnalysis {
+  const n = bodies.length;
+  const s2 = softening * softening;
+  const comV = centreOfMass(bodies).vel;
+  const speeds: number[] = [];
+  const escapeSpeeds: number[] = [];
+  const escaping: boolean[] = [];
+  for (let i = 0; i < n; i++) {
+    const vx = bodies[i].vel[0] - comV[0], vy = bodies[i].vel[1] - comV[1], vz = bodies[i].vel[2] - comV[2];
+    const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+    let phi = 0;
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue;
+      const dx = bodies[j].pos[0] - bodies[i].pos[0];
+      const dy = bodies[j].pos[1] - bodies[i].pos[1];
+      const dz = bodies[j].pos[2] - bodies[i].pos[2];
+      phi += -G * bodies[j].mass / Math.sqrt(dx * dx + dy * dy + dz * dz + s2);
+    }
+    const vesc = Math.sqrt(Math.max(0, -2 * phi));
+    speeds.push(speed);
+    escapeSpeeds.push(vesc);
+    escaping.push(vesc > 0 && speed >= vesc);
+  }
+
+  // Most-bound pair among the bound bodies → the remaining binary.
+  let best: { i: number; j: number; e: number; a: number; sep: number; period: number; energy: number } | null = null;
+  const bound = [];
+  for (let i = 0; i < n; i++) if (!escaping[i]) bound.push(i);
+  for (let a = 0; a < bound.length; a++) {
+    for (let b = a + 1; b < bound.length; b++) {
+      const i = bound[a], j = bound[b];
+      const o = twoBodyOrbit(bodies[i], bodies[j], G);
+      if (!o.bound) continue;
+      if (!best || o.energy < best.energy) best = { i, j, e: o.e, a: o.a, sep: o.sep, period: o.period, energy: o.energy };
+    }
+  }
+  const binary = best ? { i: best.i, j: best.j, e: best.e, a: best.a, sep: best.sep, period: best.period } : null;
+
+  return { speeds, escapeSpeeds, escaping, escaperCount: escaping.filter(Boolean).length, binary };
 }
 
 /** Mass-weighted centre-of-mass position + velocity. */

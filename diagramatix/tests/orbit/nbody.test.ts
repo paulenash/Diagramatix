@@ -6,8 +6,9 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  initBodies, verletStep, energy, centreOfMass, bodyColour, makeRng,
-  type InitConfig, type Vec3,
+  initBodies, verletStep, advance, energy, centreOfMass, bodyColour, makeRng,
+  analyse, twoBodyOrbit,
+  type InitConfig, type Vec3, type Body,
 } from "@/app/lib/orbit/nbody";
 
 const cfg = (over: Partial<InitConfig> = {}): InitConfig => ({
@@ -57,6 +58,93 @@ describe("nbody — integration", () => {
     let acc: Vec3[] | undefined;
     for (let s = 0; s < 200; s++) acc = verletStep(b, 0.005, 1, 0.25, acc);
     expect(mag(centreOfMass(b).vel)).toBeLessThan(1e-9);
+  });
+});
+
+describe("nbody — adaptive advance conserves energy through close encounters", () => {
+  // A near-head-on slingshot: a light body whips past a heavy one with a tiny
+  // impact parameter — the case a fixed coarse step mishandles.
+  const scenario = (): Body[] => [
+    { mass: 10, pos: [-1, 0, 0], vel: [0.5, 0, 0] },
+    { mass: 1, pos: [1, 0.05, 0], vel: [-1.5, 0, 0] },
+  ];
+  const G = 1, soft = 0.05, dtMax = 0.05, frames = 90;
+
+  it("total energy drifts <1% across the encounter", () => {
+    const b = scenario();
+    const e0 = energy(b, G, soft).total;
+    for (let f = 0; f < frames; f++) advance(b, dtMax, { dtMax, G, softening: soft });
+    expect(Math.abs((energy(b, G, soft).total - e0) / e0)).toBeLessThan(0.01);
+  });
+
+  it("resolves the close pass far better than an equal fixed coarse step", () => {
+    const a = scenario(); const e0 = energy(a, G, soft).total;
+    for (let f = 0; f < frames; f++) advance(a, dtMax, { dtMax, G, softening: soft });
+    const driftAdaptive = Math.abs((energy(a, G, soft).total - e0) / e0);
+
+    const c = scenario();
+    let acc: Vec3[] | undefined;
+    for (let s = 0; s < frames; s++) acc = verletStep(c, dtMax, G, soft, acc); // same total time, one coarse step/frame
+    const driftFixed = Math.abs((energy(c, G, soft).total - e0) / e0);
+
+    expect(driftAdaptive).toBeLessThan(driftFixed);
+  });
+
+  it("is deterministic", () => {
+    const a = scenario(), b = scenario();
+    for (let f = 0; f < 20; f++) { advance(a, dtMax, { dtMax, G, softening: soft }); advance(b, dtMax, { dtMax, G, softening: soft }); }
+    expect(a).toEqual(b);
+  });
+});
+
+describe("nbody — two-body orbit", () => {
+  const G = 1;
+  it("a circular orbit has eccentricity ≈ 0", () => {
+    const v = Math.SQRT2 / 2; // each body's speed for a circular relative orbit (mu=2, d=1)
+    const o = twoBodyOrbit(
+      { mass: 1, pos: [-0.5, 0, 0], vel: [0, -v, 0] },
+      { mass: 1, pos: [0.5, 0, 0], vel: [0, v, 0] }, G);
+    expect(o.bound).toBe(true);
+    expect(o.e).toBeLessThan(0.02);
+    expect(o.a).toBeCloseTo(1, 3);
+  });
+  it("a radial (head-on) orbit has eccentricity ≈ 1", () => {
+    const o = twoBodyOrbit(
+      { mass: 1, pos: [-0.5, 0, 0], vel: [0.1, 0, 0] },
+      { mass: 1, pos: [0.5, 0, 0], vel: [-0.1, 0, 0] }, G);
+    expect(o.bound).toBe(true);
+    expect(o.e).toBeGreaterThan(0.99);
+  });
+  it("a fast pair is unbound (e > 1)", () => {
+    const o = twoBodyOrbit(
+      { mass: 1, pos: [-0.5, 0, 0], vel: [0, -3, 0] },
+      { mass: 1, pos: [0.5, 0, 0], vel: [0, 3, 0] }, G);
+    expect(o.bound).toBe(false);
+    expect(o.e).toBeGreaterThan(1);
+  });
+});
+
+describe("nbody — escape + binary analysis", () => {
+  const G = 1, soft = 0.05;
+  // Heavy centre, one slow bound satellite, one fast escaper.
+  const system = (): Body[] => [
+    { mass: 20, pos: [0, 0, 0], vel: [0, 0, 0] },
+    { mass: 1, pos: [0.5, 0, 0], vel: [0, 1, 0] },
+    { mass: 1, pos: [5, 0, 0], vel: [0, 6, 0] },
+  ];
+  it("flags exactly the body moving above local escape speed", () => {
+    const a = analyse(system(), G, soft);
+    expect(a.escaping).toEqual([false, false, true]);
+    expect(a.escaperCount).toBe(1);
+    expect(a.speeds[2]).toBeGreaterThan(a.escapeSpeeds[2]); // the escaper
+    expect(a.speeds[1]).toBeLessThan(a.escapeSpeeds[1]);    // the bound satellite
+  });
+  it("reports the remaining bound pair as the binary (escaper excluded)", () => {
+    const a = analyse(system(), G, soft);
+    expect(a.binary).not.toBeNull();
+    expect(new Set([a.binary!.i, a.binary!.j])).toEqual(new Set([0, 1]));
+    expect(a.binary!.e).toBeGreaterThan(0); // a bound ellipse (0 < e < 1)
+    expect(a.binary!.e).toBeLessThan(1);
   });
 });
 
