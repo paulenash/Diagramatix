@@ -126,25 +126,41 @@ describe("nbody — two-body orbit", () => {
 
 describe("nbody — escape + binary analysis", () => {
   const G = 1, soft = 0.05;
-  // Heavy centre, one slow bound satellite, one fast escaper.
+  // Heavy centre, one slow bound satellite, one fast escaper receding radially.
   const system = (): Body[] => [
     { mass: 20, pos: [0, 0, 0], vel: [0, 0, 0] },
     { mass: 1, pos: [0.5, 0, 0], vel: [0, 1, 0] },
-    { mass: 1, pos: [5, 0, 0], vel: [0, 6, 0] },
+    { mass: 1, pos: [5, 0, 0], vel: [6, 0, 0] },
   ];
-  it("flags exactly the body moving above local escape speed", () => {
+  it("flags only a genuine escaper (unbound + far + receding)", () => {
     const a = analyse(system(), G, soft);
     expect(a.escaping).toEqual([false, false, true]);
-    expect(a.escaperCount).toBe(1);
-    expect(a.speeds[2]).toBeGreaterThan(a.escapeSpeeds[2]); // the escaper
-    expect(a.speeds[1]).toBeLessThan(a.escapeSpeeds[1]);    // the bound satellite
+    expect(a.speeds[2]).toBeGreaterThan(a.escapeSpeeds[2]); // escaper is unbound
+    expect(a.speeds[1]).toBeLessThan(a.escapeSpeeds[1]);    // satellite is bound
   });
-  it("reports the remaining bound pair as the binary (escaper excluded)", () => {
+  it("does NOT flag an unbound-but-inbound body (not receding)", () => {
+    const s = system();
+    s[2].vel = [-6, 0, 0]; // fast, far, but heading back toward the cluster
+    expect(analyse(s, G, soft).escaping[2]).toBe(false);
+  });
+  it("reports the bound pair as a binary with eccentricity 0 < e < 1", () => {
     const a = analyse(system(), G, soft);
-    expect(a.binary).not.toBeNull();
-    expect(new Set([a.binary!.i, a.binary!.j])).toEqual(new Set([0, 1]));
-    expect(a.binary!.e).toBeGreaterThan(0); // a bound ellipse (0 < e < 1)
-    expect(a.binary!.e).toBeLessThan(1);
+    expect(a.binaries).toHaveLength(1);
+    expect(new Set([a.binaries[0].i, a.binaries[0].j])).toEqual(new Set([0, 1]));
+    expect(a.binaries[0].e).toBeGreaterThan(0);
+    expect(a.binaries[0].e).toBeLessThan(1);
+    expect(a.avgEccentricity).toBeCloseTo(a.binaries[0].e, 10);
+  });
+  it("counts multiple binaries and averages their eccentricity", () => {
+    // Two well-separated circular pairs → two binaries, each e ≈ 0.
+    const v = Math.SQRT2 / 2; // circular relative speed for m=1,d=1 (mu=2)
+    const pair = (x: number): Body[] => [
+      { mass: 1, pos: [x - 0.5, 0, 0], vel: [0, -v, 0] },
+      { mass: 1, pos: [x + 0.5, 0, 0], vel: [0, v, 0] },
+    ];
+    const a = analyse([...pair(-8), ...pair(8)], G, soft);
+    expect(a.binaries).toHaveLength(2);
+    expect(a.avgEccentricity).toBeLessThan(0.05);
   });
 });
 

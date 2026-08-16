@@ -217,8 +217,7 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
   const [paused, setPaused] = useState(false);
   const [hud, setHud] = useState({
     t: 0, q: 0, n: cfg.n, dE: 0,
-    escapers: [] as { c: string; v: number }[], escaperCount: 0,
-    binary: null as null | { e: number; sep: number }, note: "",
+    escaped: 0, avgEscV: 0, binaries: 0, avgEcc: 0, note: "",
   });
 
   const togglePause = useCallback(() => { pausedRef.current = !pausedRef.current; setPaused(pausedRef.current); }, []);
@@ -275,12 +274,9 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
     }
     scene.add(cores);
 
-    // Escape highlight: a white wireframe halo around each unbound body (instanced,
-    // count set from the analysis each tick).
-    const ringGeo = new THREE.SphereGeometry(1, 12, 8);
-    const ringMesh = new THREE.InstancedMesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.85 }), N);
-    ringMesh.frustumCulled = false; ringMesh.count = 0;
-    scene.add(ringMesh);
+    // Escapers are REMOVED from the sim (below), so no persistent highlight is
+    // needed — they simply leave, and the HUD tracks the running count + average
+    // escape speed.
 
     // Trails (only for modest N — too heavy otherwise).
     const trailsOn = cfg.trail > 0 && N <= TRAIL_MAX_N;
@@ -324,6 +320,15 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
 
     // ── loop ──
     let raf = 0; let hudTick = 0;
+    let escapedCount = 0, escSpeedSum = 0; // running escaper stats
+    let eRef = e0;                         // energy baseline (re-based when a body leaves)
+    let colorsDirty = false;
+    const rebuildColors = () => {
+      for (let i = 0; i < bodies.length; i++) { cores.setColorAt(i, cols[i]); if (glows) glows.setColorAt(i, cols[i]); }
+      if (cores.instanceColor) cores.instanceColor.needsUpdate = true;
+      if (glows && glows.instanceColor) glows.instanceColor.needsUpdate = true;
+    };
+
     const loop = () => {
       raf = requestAnimationFrame(loop);
       if (!pausedRef.current) {
@@ -333,7 +338,36 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
         simClock += simTime;
       }
 
-      // update instances + trails; measure spread (RMS radius, robust to a lone escaper)
+      // ── escape detection → removal → HUD (throttled) ──
+      if (++hudTick % 10 === 0 && bodies.length > 0) {
+        const a = analyse(bodies, cfg.G, cfg.softening, { detectBinaries: bodies.length <= 400 });
+        // Remove escapers high→low so splices stay valid; record their escape speed.
+        let removed = false;
+        for (let i = bodies.length - 1; i >= 0; i--) {
+          if (a.escaping[i]) {
+            escSpeedSum += a.speeds[i]; escapedCount++;
+            bodies.splice(i, 1); cols.splice(i, 1); radii.splice(i, 1);
+            const tr = trails.splice(i, 1)[0];
+            if (tr) { scene.remove(tr.line); tr.line.geometry.dispose(); (tr.line.material as THREE.Material).dispose(); }
+            removed = true;
+          }
+        }
+        // Removing a body changes the remaining system's energy — re-baseline so
+        // ΔE keeps measuring the integrator's conservation of what's left.
+        if (removed) { colorsDirty = true; eRef = bodies.length ? energy(bodies, cfg.G, cfg.softening).total : 0; }
+
+        const en = bodies.length ? energy(bodies, cfg.G, cfg.softening) : { ke: 0, pe: 0, total: 0 };
+        setHud({
+          t: simClock, q: en.pe < 0 ? en.ke / -en.pe : 0, n: bodies.length,
+          dE: eRef !== 0 ? (en.total - eRef) / Math.abs(eRef) : 0,
+          escaped: escapedCount, avgEscV: escapedCount ? escSpeedSum / escapedCount : 0,
+          binaries: a.binaries.length, avgEcc: a.avgEccentricity, note: perfNote,
+        });
+      }
+
+      // ── update instances + trails ──
+      if (colorsDirty) { rebuildColors(); colorsDirty = false; }
+      cores.count = bodies.length; if (glows) glows.count = bodies.length;
       let msq = 0;
       bodies.forEach((b, i) => {
         setInst(cores, i, b.pos, radii[i]);
@@ -354,7 +388,7 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
       });
       cores.instanceMatrix.needsUpdate = true;
       if (glows) glows.instanceMatrix.needsUpdate = true;
-      const rms = Math.sqrt(msq / bodies.length);
+      const rms = bodies.length ? Math.sqrt(msq / bodies.length) : cfg.cubeSize;
 
       // auto-zoom: frame the cluster (COM stays at origin — momentum is zeroed)
       if (cfg.autoRotate && !dragging) az += 0.0016 * cfg.substeps;
@@ -363,26 +397,6 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
       camera.position.set(dist * Math.cos(el) * Math.sin(az), dist * Math.sin(el), dist * Math.cos(el) * Math.cos(az));
       camera.lookAt(0, 0, 0);
       renderer.render(scene, camera);
-
-      // Escape + binary analysis (throttled): highlight unbound bodies + report.
-      if (++hudTick % 10 === 0) {
-        const a = analyse(bodies, cfg.G, cfg.softening);
-        let k = 0;
-        for (let i = 0; i < bodies.length; i++) if (a.escaping[i]) { setInst(ringMesh, k, bodies[i].pos, radii[i] * 3); k++; }
-        ringMesh.count = k; ringMesh.instanceMatrix.needsUpdate = true;
-
-        const { ke, pe, total } = energy(bodies, cfg.G, cfg.softening);
-        const dE = e0 !== 0 ? (total - e0) / Math.abs(e0) : 0;
-        const escapers: { c: string; v: number }[] = [];
-        for (let i = 0; i < bodies.length && escapers.length < 8; i++) {
-          if (a.escaping[i]) escapers.push({ c: "#" + cols[i].getHexString(), v: a.speeds[i] });
-        }
-        setHud({
-          t: simClock, q: pe < 0 ? ke / -pe : 0, n: bodies.length, dE,
-          escapers, escaperCount: a.escaperCount,
-          binary: a.binary ? { e: a.binary.e, sep: a.binary.sep } : null, note: perfNote,
-        });
-      }
     };
     loop();
 
@@ -395,7 +409,6 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
       window.removeEventListener("resize", onResize);
       cores.dispose(); (cores.material as THREE.Material).dispose();
       if (glows) { glows.dispose(); (glows.material as THREE.Material).dispose(); }
-      ringMesh.dispose(); (ringMesh.material as THREE.Material).dispose(); ringGeo.dispose();
       trails.forEach((t) => { t.line.geometry.dispose(); (t.line.material as THREE.Material).dispose(); });
       sphere.dispose();
       renderer.dispose();
@@ -422,28 +435,18 @@ function SimView({ cfg, onBack }: { cfg: OrbitConfig; onBack: () => void }) {
       </div>
       <div className="absolute top-3 right-3 text-[11px] text-white/80 bg-black/40 rounded px-2 py-1.5 tabular-nums space-y-0.5 text-right min-w-[9rem]">
         <div>t = {hud.t.toFixed(1)}</div>
-        <div>bodies: {hud.n}</div>
+        <div>remaining: {hud.n}</div>
         <div>virial Q = {hud.q.toFixed(2)}</div>
         <div className={Math.abs(hud.dE) < 0.01 ? "text-green-300" : Math.abs(hud.dE) < 0.05 ? "text-yellow-300" : "text-red-300"}>
           ΔE = {(hud.dE * 100 >= 0 ? "+" : "") + (hud.dE * 100).toFixed(2)}%
         </div>
         <div className="border-t border-white/15 mt-1 pt-1">
-          <div className={hud.escaperCount ? "text-orange-300" : "text-white/50"}>
-            ⇱ escaping: {hud.escaperCount}
-          </div>
-          {hud.escapers.map((e, i) => (
-            <div key={i} className="flex items-center justify-end gap-1 text-[10px]">
-              <span>v = {e.v.toFixed(2)}</span>
-              <span className="inline-block w-2 h-2 rounded-full" style={{ background: e.c }} />
-            </div>
-          ))}
-          {hud.escaperCount > hud.escapers.length && <div className="text-[10px] text-white/40">+{hud.escaperCount - hud.escapers.length} more</div>}
+          <div className={hud.escaped ? "text-orange-300" : "text-white/50"}>⇱ escaped: {hud.escaped}</div>
+          {hud.escaped > 0 && <div className="text-[10px] text-white/70">avg escape v = {hud.avgEscV.toFixed(2)}</div>}
         </div>
         <div className="border-t border-white/15 mt-1 pt-1">
-          {hud.binary
-            ? <div>binary e = <span className="text-cyan-300">{hud.binary.e.toFixed(3)}</span></div>
-            : <div className="text-white/40">no bound binary</div>}
-          {hud.binary && <div className="text-[10px] text-white/50">sep = {hud.binary.sep.toFixed(2)}</div>}
+          <div>binaries: <span className="text-cyan-300">{hud.binaries}</span></div>
+          {hud.binaries > 0 && <div className="text-[10px] text-white/70">avg e = {hud.avgEcc.toFixed(3)}</div>}
         </div>
       </div>
       <div className="absolute bottom-3 left-3 text-[10px] text-white/40">

@@ -192,30 +192,51 @@ export interface OrbitAnalysis {
   speeds: number[];
   /** local escape speed √(2|Φ|) at each body */
   escapeSpeeds: number[];
-  /** whether each body is instantaneously unbound (speed ≥ escape speed) */
+  /** GENUINE escapers: unbound (speed ≥ escape speed) AND out beyond the cluster
+   *  (r > escapeRadiusMult × RMS radius) AND receding. All three are required so a
+   *  momentarily-fast core body isn't flagged (and, when the caller removes
+   *  escapers, isn't wrongly deleted). */
   escaping: boolean[];
-  escaperCount: number;
-  /** the most-bound pair among the NON-escaping bodies (the remaining binary), or
-   *  null when fewer than two bound bodies remain. Escapers contribute nothing —
-   *  the binary's state is computed from the two bound bodies alone. */
-  binary: { i: number; j: number; e: number; a: number; sep: number; period: number } | null;
+  /** every binary: a pair of bodies that are MUTUALLY each other's most-bound
+   *  partner (and bound to each other). Disjoint by construction. */
+  binaries: { i: number; j: number; e: number; sep: number; period: number }[];
+  /** mean eccentricity across `binaries` (0 when there are none). */
+  avgEccentricity: number;
 }
 
 /**
- * Per-body escape analysis + the eccentricity of the remaining bound binary.
- * Escape: a body is unbound when its speed (relative to the cluster COM) meets or
- * exceeds the local escape speed √(2|Φ|), Φ being the softened potential from all
- * other bodies. Binary: among the still-bound bodies, the most tightly-bound pair.
+ * Escape analysis + binary detection.
+ * Escape speed at body i is √(2|Φ_i|) with Φ_i = −Σ_{j≠i} G·m_j/√(r²+ε²) — the
+ * softened potential from every OTHER body. A body genuinely escapes when it is
+ * unbound, out past `escapeRadiusMult`× the RMS cluster radius, and receding.
+ * A binary is a mutually-most-bound bound pair; the average eccentricity is over
+ * all such pairs.
  */
-export function analyse(bodies: Body[], G: number, softening: number): OrbitAnalysis {
+export function analyse(
+  bodies: Body[], G: number, softening: number,
+  opts?: { escapeRadiusMult?: number; detectBinaries?: boolean },
+): OrbitAnalysis {
   const n = bodies.length;
   const s2 = softening * softening;
-  const comV = centreOfMass(bodies).vel;
+  const escapeRadiusMult = opts?.escapeRadiusMult ?? 3;
+  const detectBinaries = opts?.detectBinaries ?? true;
+  const com = centreOfMass(bodies);
+
+  // Radii from the COM + the MEDIAN radius as the cluster scale (robust — a lone
+  // far escaper doesn't inflate it the way an RMS radius would).
+  const rad = new Array<number>(n);
+  for (let i = 0; i < n; i++) {
+    const dx = bodies[i].pos[0] - com.pos[0], dy = bodies[i].pos[1] - com.pos[1], dz = bodies[i].pos[2] - com.pos[2];
+    rad[i] = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+  const sortedRad = [...rad].sort((a, b) => a - b);
+  const median = n > 0 ? sortedRad[Math.floor(n / 2)] : 0;
+
   const speeds: number[] = [];
   const escapeSpeeds: number[] = [];
   const escaping: boolean[] = [];
   for (let i = 0; i < n; i++) {
-    const vx = bodies[i].vel[0] - comV[0], vy = bodies[i].vel[1] - comV[1], vz = bodies[i].vel[2] - comV[2];
+    const vx = bodies[i].vel[0] - com.vel[0], vy = bodies[i].vel[1] - com.vel[1], vz = bodies[i].vel[2] - com.vel[2];
     const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
     let phi = 0;
     for (let j = 0; j < n; j++) {
@@ -226,26 +247,37 @@ export function analyse(bodies: Body[], G: number, softening: number): OrbitAnal
       phi += -G * bodies[j].mass / Math.sqrt(dx * dx + dy * dy + dz * dz + s2);
     }
     const vesc = Math.sqrt(Math.max(0, -2 * phi));
+    const px = bodies[i].pos[0] - com.pos[0], py = bodies[i].pos[1] - com.pos[1], pz = bodies[i].pos[2] - com.pos[2];
+    const receding = vx * px + vy * py + vz * pz > 0;
     speeds.push(speed);
     escapeSpeeds.push(vesc);
-    escaping.push(vesc > 0 && speed >= vesc);
+    escaping.push(vesc > 0 && speed >= vesc && rad[i] > escapeRadiusMult * median && receding);
   }
 
-  // Most-bound pair among the bound bodies → the remaining binary.
-  let best: { i: number; j: number; e: number; a: number; sep: number; period: number; energy: number } | null = null;
-  const bound = [];
-  for (let i = 0; i < n; i++) if (!escaping[i]) bound.push(i);
-  for (let a = 0; a < bound.length; a++) {
-    for (let b = a + 1; b < bound.length; b++) {
-      const i = bound[a], j = bound[b];
-      const o = twoBodyOrbit(bodies[i], bodies[j], G);
-      if (!o.bound) continue;
-      if (!best || o.energy < best.energy) best = { i, j, e: o.e, a: o.a, sep: o.sep, period: o.period, energy: o.energy };
+  // Binaries: each body's most-bound partner, kept when the choice is mutual.
+  const binaries: { i: number; j: number; e: number; sep: number; period: number }[] = [];
+  if (detectBinaries && n >= 2) {
+    const best = new Array<number>(n).fill(-1);
+    for (let i = 0; i < n; i++) {
+      let bi = -1, be = 0;
+      for (let j = 0; j < n; j++) {
+        if (j === i) continue;
+        const o = twoBodyOrbit(bodies[i], bodies[j], G);
+        if (o.bound && o.energy < be) { be = o.energy; bi = j; }
+      }
+      best[i] = bi;
+    }
+    for (let i = 0; i < n; i++) {
+      const j = best[i];
+      if (j > i && best[j] === i) {
+        const o = twoBodyOrbit(bodies[i], bodies[j], G);
+        binaries.push({ i, j, e: o.e, sep: o.sep, period: o.period });
+      }
     }
   }
-  const binary = best ? { i: best.i, j: best.j, e: best.e, a: best.a, sep: best.sep, period: best.period } : null;
+  const avgEccentricity = binaries.length ? binaries.reduce((s, b) => s + b.e, 0) / binaries.length : 0;
 
-  return { speeds, escapeSpeeds, escaping, escaperCount: escaping.filter(Boolean).length, binary };
+  return { speeds, escapeSpeeds, escaping, binaries, avgEccentricity };
 }
 
 /** Mass-weighted centre-of-mass position + velocity. */
