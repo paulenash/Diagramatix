@@ -20,6 +20,7 @@ import { createUser } from "../_setup/factories";
 import {
   createPasswordResetToken,
   resetPasswordWithToken,
+  hashResetToken,
 } from "@/app/lib/auth/passwordReset";
 
 /** Seed a user with a known (hashed) password so we can detect changes. */
@@ -44,7 +45,9 @@ describe("createPasswordResetToken — mint", () => {
     expect(res!.resetUrl).toContain(`/reset-password?token=${res!.resetToken}`);
 
     const stored = await prisma.user.findUnique({ where: { id: u.id } });
-    expect(stored?.resetToken).toBe(res!.resetToken);
+    // SEC-16: the token is HASHED at rest — the raw token never touches the DB.
+    expect(stored?.resetToken).not.toBe(res!.resetToken);
+    expect(stored?.resetToken).toBe(hashResetToken(res!.resetToken));
     expect(stored?.resetTokenExpiry).not.toBeNull();
     // Expiry is ~1h in the future (allow a little slack for execution time).
     const expiryMs = stored!.resetTokenExpiry!.getTime();

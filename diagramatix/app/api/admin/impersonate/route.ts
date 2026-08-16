@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser, IMPERSONATE_COOKIE, IMPERSONATE_MODE_COOKIE } from "@/app/lib/superuser";
+import { signValue, verifySignedValue } from "@/app/lib/crypto/signedValue";
 import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
 
@@ -67,10 +68,11 @@ export async function POST(req: Request) {
   const secure = process.env.NODE_ENV === "production";
   // Edit mode is time-boxed tighter (1h) than read-only view (8h).
   const maxAge = resolvedMode === "edit" ? 60 * 60 : 60 * 60 * 8;
-  cookieStore.set(IMPERSONATE_COOKIE, userId, {
+  // SEC-17: HMAC-sign both values so tampering is detectable server-side.
+  cookieStore.set(IMPERSONATE_COOKIE, signValue(userId), {
     path: "/", sameSite: "lax", httpOnly: true, secure, maxAge,
   });
-  cookieStore.set(IMPERSONATE_MODE_COOKIE, resolvedMode, {
+  cookieStore.set(IMPERSONATE_MODE_COOKIE, signValue(resolvedMode), {
     path: "/", sameSite: "lax", httpOnly: true, secure, maxAge,
   });
 
@@ -96,8 +98,8 @@ export async function DELETE(req: Request) {
   }
 
   const cookieStore = await cookies();
-  const prevTarget = cookieStore.get(IMPERSONATE_COOKIE)?.value ?? null;
-  const prevMode = cookieStore.get(IMPERSONATE_MODE_COOKIE)?.value ?? null;
+  const prevTarget = verifySignedValue(cookieStore.get(IMPERSONATE_COOKIE)?.value);
+  const prevMode = verifySignedValue(cookieStore.get(IMPERSONATE_MODE_COOKIE)?.value);
   cookieStore.delete(IMPERSONATE_COOKIE);
   cookieStore.delete(IMPERSONATE_MODE_COOKIE);
 

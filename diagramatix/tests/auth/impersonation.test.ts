@@ -25,15 +25,25 @@ import {
   IMPERSONATE_MODE_COOKIE,
   SUPERUSER_EMAILS,
 } from "@/app/lib/superuser";
+import { signValue } from "@/app/lib/crypto/signedValue";
+
+// SEC-17: the impersonation cookies are HMAC-signed at rest. The resolvers
+// verify the signature, so the mock store must sign the values it injects
+// (production writes them via `signValue`). A known secret makes it deterministic.
+process.env.AUTH_SECRET = process.env.AUTH_SECRET || "test-secret-at-least-thirty-two-chars-000";
 
 // A real superuser email + a normal one.
 const SUPER_EMAIL = [...SUPERUSER_EMAILS][0];
 const NORMAL_EMAIL = "normal-user@diagramatix.test";
 
-// Fake cookie store: map of cookie-name → value.
-const cookies = (m: Record<string, string>) => ({
-  get: (n: string) => (n in m ? { value: m[n] } : undefined),
-});
+// Fake cookie store: map of cookie-name → value. The two impersonation cookies
+// are signed exactly as the impersonate route signs them.
+const SIGNED_KEYS = new Set([IMPERSONATE_COOKIE, IMPERSONATE_MODE_COOKIE]);
+const cookies = (m: Record<string, string>) => {
+  const store: Record<string, string> = {};
+  for (const [k, v] of Object.entries(m)) store[k] = SIGNED_KEYS.has(k) ? signValue(v) : v;
+  return { get: (n: string) => (n in store ? { value: store[n] } : undefined) };
+};
 
 const superSession = { user: { id: "super-id", email: SUPER_EMAIL } };
 const normalSession = { user: { id: "normal-id", email: NORMAL_EMAIL } };
@@ -70,6 +80,12 @@ describe("getViewAsUserId", () => {
   });
   it("superuser + no cookie → null", () => {
     expect(getViewAsUserId(superSession, cookies({}))).toBeNull();
+  });
+  it("SEC-17: superuser + an UNSIGNED (raw) cookie → null (tamper/legacy rejected)", () => {
+    // Bypass the signing helper and inject a raw value, as a tampered or
+    // pre-SEC-17 cookie would carry.
+    const raw = { get: (n: string) => (n === IMPERSONATE_COOKIE ? { value: TARGET } : undefined) };
+    expect(getViewAsUserId(superSession, raw)).toBeNull();
   });
 });
 

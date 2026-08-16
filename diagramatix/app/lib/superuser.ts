@@ -1,3 +1,5 @@
+import { verifySignedValue } from "@/app/lib/crypto/signedValue";
+
 /** Emails permitted to access admin functions */
 export const SUPERUSER_EMAILS = new Set([
   "paul@nashcc.com.au",
@@ -37,7 +39,8 @@ export function getViewAsUserId(
   cookieStore: CookieStore,
 ): string | null {
   if (!isSuperuser(session)) return null;
-  const val = cookieStore.get(IMPERSONATE_COOKIE)?.value;
+  // SEC-17: the cookie is HMAC-signed — reject a tampered/unsigned value.
+  const val = verifySignedValue(cookieStore.get(IMPERSONATE_COOKIE)?.value);
   if (!val) return null;
   // Don't impersonate yourself
   if (val === session?.user?.id) return null;
@@ -60,9 +63,11 @@ export function isImpersonating(
   return getViewAsUserId(session, cookieStore) !== null;
 }
 
-/** Read the impersonation mode cookie ("view" by default). */
+/** Read the impersonation mode cookie ("view" by default). SEC-17: the value is
+ *  HMAC-signed, so a tampered "edit" (which would unlock writes) fails
+ *  verification and safely falls back to read-only "view". */
 export function getImpersonationMode(cookieStore: CookieStore): ImpersonationMode {
-  return cookieStore.get(IMPERSONATE_MODE_COOKIE)?.value === "edit" ? "edit" : "view";
+  return verifySignedValue(cookieStore.get(IMPERSONATE_MODE_COOKIE)?.value) === "edit" ? "edit" : "view";
 }
 
 /**

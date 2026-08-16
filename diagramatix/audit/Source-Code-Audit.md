@@ -53,8 +53,8 @@
 | SEC-13 | Medium | Impersonation | Archived-diagram delete/restore skip the read-only impersonation guard | ✅ Fixed 2026-08-14 (rectification batch 2) |
 | SEC-14 | Medium | Impersonation | `scan-links` POST mutates diagram JSON without the read-only guard | ✅ Fixed 2026-08-14 (rectification batch 2) |
 | SEC-15 | Low | Open redirect | `?from=` `startsWith('/')` accepts protocol-relative URLs | ✅ Fixed (Wave 1) |
-| SEC-16 | Low | Secrets | Password reset token stored in plaintext at rest | Open |
-| SEC-17 | Low | Impersonation | Impersonation identity/mode in unsigned, non-httpOnly cookies | Open |
+| SEC-16 | Low | Secrets | Password reset token stored in plaintext at rest | ✅ Fixed 2026-08-16 |
+| SEC-17 | Low | Impersonation | Impersonation identity/mode in unsigned, non-httpOnly cookies | ✅ Fixed 2026-08-16 |
 | SEC-18 | Low | Correctness | OrgAdmin impersonation is a server-side no-op (misleading UI) | Open |
 | DATA-01 | Critical | Schema/FK | User delete throws (Restrict FK) for anyone who ever published — undeletable | ✅ Fixed v1.19 |
 | DATA-02 | Critical | Backup | Full-backup wipe-restore TRUNCATEs ~15 tables it never re-inserts → permanent loss | ✅ Fixed v1.19 |

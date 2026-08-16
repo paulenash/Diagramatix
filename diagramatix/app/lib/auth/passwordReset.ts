@@ -18,6 +18,17 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/app/lib/db";
 
 /**
+ * SEC-16: reset tokens are stored HASHED at rest. A read-only DB leak (or an
+ * org backup — see SEC-03) then exposes only useless digests, never live
+ * tokens. The token is 256 bits of CSPRNG output, so a plain SHA-256 (no salt)
+ * is sufficient — it's unguessable, and a deterministic hash is required so we
+ * can still look the user up by the emailed token.
+ */
+export function hashResetToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/**
  * Mint a password-reset token for `email`. Returns the token + reset url, or
  * null (writing nothing) when no user has that email — the caller ALWAYS
  * returns a generic message so existence is never leaked.
@@ -35,7 +46,8 @@ export async function createPasswordResetToken(
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { resetToken, resetTokenExpiry },
+    // Store the HASH; the raw token only ever lives in the emailed link.
+    data: { resetToken: hashResetToken(resetToken), resetTokenExpiry },
   });
 
   const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
@@ -66,7 +78,8 @@ export async function resetPasswordWithToken(
   }
 
   const user = await prisma.user.findUnique({
-    where: { resetToken: token as string },
+    // Look up by the HASH of the presented token (SEC-16).
+    where: { resetToken: hashResetToken(token as string) },
   });
 
   if (!user || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
