@@ -479,20 +479,31 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
                       <span className="text-xs text-gray-400">You</span>
                     ) : (
                       <div className="inline-flex gap-1">
-                        <button
-                          onClick={() => handleViewAs(u.id, "view", diagramHref)}
-                          className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50 hover:bg-orange-50"
-                          title={workingOn ? `View "${workingOn.name}" (read-only)` : "View this user's dashboard (read-only)"}
-                        >
-                          View
-                        </button>
-                        <button
-                          onClick={() => setEditConfirm({ userId: u.id, email: u.email, target: diagramHref })}
-                          className="text-xs text-red-600 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-                          title={workingOn ? `Edit "${workingOn.name}" as ${u.email}` : `Edit ${u.email}'s data for support purposes`}
-                        >
-                          Edit
-                        </button>
+                        {/* SEC-18: impersonation (View / Edit-as) is SuperAdmin
+                            ONLY. The OrgAdmin path was a silent no-op —
+                            getViewAsUserId gates on isSuperuser, so an
+                            OrgAdmin's "View as" set a cookie that every data
+                            query ignored (their writes still landed as
+                            themselves). Paul's decision (2026-08-16): OrgAdmins
+                            must not have impersonation at all. */}
+                        {isSuperAdmin && (
+                          <>
+                            <button
+                              onClick={() => handleViewAs(u.id, "view", diagramHref)}
+                              className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50 hover:bg-orange-50"
+                              title={workingOn ? `View "${workingOn.name}" (read-only)` : "View this user's dashboard (read-only)"}
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={() => setEditConfirm({ userId: u.id, email: u.email, target: diagramHref })}
+                              className="text-xs text-red-600 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+                              title={workingOn ? `Edit "${workingOn.name}" as ${u.email}` : `Edit ${u.email}'s data for support purposes`}
+                            >
+                              Edit
+                            </button>
+                          </>
+                        )}
                         {isSuperAdmin && (
                           <button
                             onClick={() => setFeatureOverrideFor({ userId: u.id, name: u.email })}
@@ -502,9 +513,8 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
                             Features
                           </button>
                         )}
-                        {/* Delete is SuperAdmin only. OrgAdmin gets View
-                            + Edit but cannot purge users — that's a
-                            platform-level action. */}
+                        {/* Delete is SuperAdmin only (a platform-level action);
+                            OrgAdmins have no per-user actions here now. */}
                         {isSuperAdmin && !u.isAdmin && (
                           <button
                             onClick={() => setDeleteStage1({

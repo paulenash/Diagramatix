@@ -4,7 +4,6 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser, IMPERSONATE_COOKIE, IMPERSONATE_MODE_COOKIE } from "@/app/lib/superuser";
 import { signValue, verifySignedValue } from "@/app/lib/crypto/signedValue";
-import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { recordAudit, AUDIT, ipFromRequest } from "@/app/lib/audit";
 
 /** POST — start impersonating a user */
@@ -36,28 +35,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  // Non-SuperAdmin path (Paul's 2026-06-08 item 8): an OrgAdmin
-  // (Owner/Admin in their active Org) can impersonate, but ONLY
-  // users who are members of that same Org. SuperAdmin bypasses
-  // the org check entirely.
+  // SEC-18: impersonation is a SuperAdmin-only capability. An earlier OrgAdmin
+  // path (2026-06-08 item 8) set the impersonation cookie for an Org Owner/Admin,
+  // but `getViewAsUserId` gates on `isSuperuser`, so the cookie was inert — the
+  // OrgAdmin's writes still landed as themselves. That made it a misleading
+  // no-op. Paul's decision (2026-08-16): OrgAdmins must not have impersonation
+  // at all. Reject every non-SuperAdmin here (the UI hides the controls too).
   if (!su) {
-    const cookieStore = await cookies();
-    const activeOrgId = await getCurrentOrgId(session, cookieStore);
-    const callerMembership = await prisma.orgMember.findFirst({
-      where: { userId: session.user.id, orgId: activeOrgId },
-      select: { role: true },
-    });
-    const isOrgAdmin = callerMembership?.role === "Owner" || callerMembership?.role === "Admin";
-    if (!isOrgAdmin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    const targetIsInOrg = await prisma.orgMember.findFirst({
-      where: { userId, orgId: activeOrgId },
-      select: { id: true },
-    });
-    if (!targetIsInOrg) {
-      return NextResponse.json({ error: "Target user is not in your Org" }, { status: 403 });
-    }
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const cookieStore = await cookies();

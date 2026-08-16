@@ -55,7 +55,7 @@
 | SEC-15 | Low | Open redirect | `?from=` `startsWith('/')` accepts protocol-relative URLs | ✅ Fixed (Wave 1) |
 | SEC-16 | Low | Secrets | Password reset token stored in plaintext at rest | ✅ Fixed 2026-08-16 |
 | SEC-17 | Low | Impersonation | Impersonation identity/mode in unsigned, non-httpOnly cookies | ✅ Fixed 2026-08-16 |
-| SEC-18 | Low | Correctness | OrgAdmin impersonation is a server-side no-op (misleading UI) | Open |
+| SEC-18 | Low | Correctness | OrgAdmin impersonation is a server-side no-op (misleading UI) | ✅ Fixed 2026-08-16 — OrgAdmin impersonation removed (SuperAdmin-only) |
 | DATA-01 | Critical | Schema/FK | User delete throws (Restrict FK) for anyone who ever published — undeletable | ✅ Fixed v1.19 |
 | DATA-02 | Critical | Backup | Full-backup wipe-restore TRUNCATEs ~15 tables it never re-inserts → permanent loss | ✅ Fixed v1.19 |
 | DATA-03 | Critical | Backup | Wipe-restore re-inserts `Diagram.currentPublishedVersionId` but never backs up `PublishedVersion` → FK abort | ✅ Fixed v1.19 |
