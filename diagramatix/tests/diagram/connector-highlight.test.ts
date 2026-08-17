@@ -17,12 +17,14 @@ const el = (id: string, type: string, extra: Partial<DiagramElement> = {}): Diag
   ({ id, type: type as DiagramElement["type"], label: id, x: 0, y: 0, width: 40, height: 40, properties: {}, ...extra });
 
 // ── a rich BPMN world ──────────────────────────────────────────────────────
-// White-box pools A & B (message across them), black-box pool C.
-const poolA = el("poolA", "pool", { x: 0, y: 0, width: 400, height: 200, properties: { poolType: "white-box" } });
-const poolB = el("poolB", "pool", { x: 0, y: 300, width: 400, height: 200, properties: { poolType: "white-box" } });
-const poolC = el("poolC", "pool", { x: 0, y: 600, width: 400, height: 200, properties: { poolType: "black-box" } });
-const taskA1 = el("taskA1", "task", { parentId: "poolA" });
-const taskB1 = el("taskB1", "task", { parentId: "poolB" });
+// White-box pools A & B (message across them), black-box pool C. Positioned far
+// from the (0,0) default so unpositioned top-level elements never fall inside a
+// pool via the position fallback. Pool membership below is set via parentId.
+const poolA = el("poolA", "pool", { x: 2000, y: 0, width: 400, height: 200, properties: { poolType: "white-box" } });
+const poolB = el("poolB", "pool", { x: 2000, y: 300, width: 400, height: 200, properties: { poolType: "white-box" } });
+const poolC = el("poolC", "pool", { x: 2000, y: 600, width: 400, height: 200, properties: { poolType: "black-box" } });
+const taskA1 = el("taskA1", "task", { parentId: "poolA", x: 2050, y: 50 });
+const taskB1 = el("taskB1", "task", { parentId: "poolB", x: 2050, y: 350 });
 
 // Top-level (pool-less) nested EPs: EP1 ⊃ EP2 ⊃ children; EP3; event-EP.
 const ep1 = el("ep1", "subprocess-expanded", { x: 600, y: 0, width: 300, height: 200 });
@@ -129,6 +131,44 @@ describe("classifyDragTarget — GREEN (sequence)", () => {
     expect(classify(topTask, edgeEndOnEp1).sequence).toBe(false);
     // As source: an end event never has outgoing flow.
     expect(classify(edgeEndOnEp1, topTask).sequence).toBe(false);
+  });
+});
+
+describe("pool boundary — a sequence flow may never cross pools (Bug 1a)", () => {
+  // Task 3 in white-box Pool 1, dragging to Activities in white-box Pool 2.
+  const pool1 = el("pool1", "pool", { x: 0, y: -300, width: 800, height: 130, properties: { poolType: "white-box" } });
+  const pool2 = el("pool2", "pool", { x: 0, y: 0, width: 800, height: 600, properties: { poolType: "white-box" } });
+  const task3 = el("task3", "task", { parentId: "pool1" });
+  const epInPool2 = el("epInPool2", "subprocess-expanded", { parentId: "pool2", x: 100, y: 100, width: 300, height: 200 });
+  const taskInPool2 = el("taskInPool2", "task", { parentId: "pool2", x: 500, y: 100 });
+  const w = [pool1, pool2, task3, epInPool2, taskInPool2];
+  const cls = (s: DiagramElement, t: DiagramElement) =>
+    classifyDragTarget(s, t, computeDragContext(s, w, CONNS as never, s.id), w, CONNS as never, "bpmn");
+
+  it("an EP in another pool is NOT a green sequence target", () => {
+    expect(cls(task3, epInPool2).sequence).toBe(false); // was wrongly green
+  });
+  it("a task in another white-box pool is blue (message), not green", () => {
+    expect(cls(task3, taskInPool2).sequence).toBe(false);
+    expect(cls(task3, taskInPool2).message).toBe(true);
+  });
+  it("within the SAME pool a sequence is still legal", () => {
+    const task3b = el("task3b", "task", { parentId: "pool1" });
+    const w2 = [...w, task3b];
+    expect(classifyDragTarget(task3, task3b, computeDragContext(task3, w2, CONNS as never, task3.id), w2, CONNS as never, "bpmn").sequence).toBe(true);
+  });
+
+  it("nested EPs INSIDE one pool still flow (Bug 2 topology): outer-EP start → inner EP", () => {
+    // outerEp (in pool2) ⊃ innerEp; a start event lives in outerEp.
+    const outerEp = el("outerEp", "subprocess-expanded", { parentId: "pool2", x: 100, y: 100, width: 400, height: 300 });
+    const innerEp = el("innerEp", "subprocess-expanded", { parentId: "outerEp", x: 150, y: 150, width: 200, height: 150 });
+    const seInOuter = el("seInOuter", "start-event", { parentId: "outerEp", x: 110, y: 120 });
+    const taskInInner = el("taskInInner", "task", { parentId: "innerEp", x: 160, y: 180 });
+    const w3 = [pool2, outerEp, innerEp, seInOuter, taskInInner];
+    const cls3 = (s: DiagramElement, t: DiagramElement) =>
+      classifyDragTarget(s, t, computeDragContext(s, w3, CONNS as never, s.id), w3, CONNS as never, "bpmn");
+    expect(cls3(seInOuter, innerEp).sequence).toBe(true);        // same pool + same EP-scope → legal (green)
+    expect(cls3(seInOuter, taskInInner).sequence).toBe(false);   // child of inner EP = different scope
   });
 });
 

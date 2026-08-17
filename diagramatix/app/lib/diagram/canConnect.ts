@@ -13,6 +13,7 @@
  * self-loops (source === target), and the compensation → association coercion.
  */
 import type { DiagramElement, ConnectorType } from "./types";
+import { getElementPoolId } from "./poolUtil";
 
 const DATA_ELEMENT_TYPES = new Set<string>(["data-object", "data-store", "text-annotation"]);
 const MARKER_TYPES = new Set<string>(["uml-pain-point", "uml-issue"]);
@@ -77,6 +78,11 @@ export function canConnect(
   if (connectorType === "sequence") {
     // Compensation activity = association-only, never sequence.
     if (source.properties?.isForCompensation === true || target.properties?.isForCompensation === true) return false;
+
+    // A sequence flow may never cross a POOL boundary — participants in
+    // different pools communicate only via message flows. (Two pool-less
+    // top-level elements both resolve to null → same "pool" → allowed.)
+    if (getElementPoolId(source, elements) !== getElementPoolId(target, elements)) return false;
 
     const byId = (id?: string) => (id ? elements.find((e) => e.id === id) : undefined);
     // The innermost Expanded-Subprocess (EP) ancestor's id — the element's flow

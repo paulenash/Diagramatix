@@ -25,6 +25,7 @@ import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectify
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
+import { getElementPoolId } from "@/app/lib/diagram/poolUtil";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
 import { autoSizeForType, getDefaultSize, wrapText, type AutosizeType } from "@/app/lib/diagram/textMetrics";
 import { archiFitSize } from "@/app/lib/diagram/genericLayout";
@@ -6775,6 +6776,9 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // A Compensation Activity is triggered by its compensation association,
         // never a sequence flow — reject any sequence connector in or out of it.
         if (source.properties?.isForCompensation === true || target.properties?.isForCompensation === true) return state;
+
+        // A sequence flow may never cross a POOL boundary (mirrors canConnect).
+        if (getElementPoolId(source, state.elements) !== getElementPoolId(target, state.elements)) return state;
 
         // Scope model (single source of truth — mirrors app/lib/diagram/canConnect.ts).
         // A sequence flow may not cross an Expanded-Subprocess (EP) boundary. Each

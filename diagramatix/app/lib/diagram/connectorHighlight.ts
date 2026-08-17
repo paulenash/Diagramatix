@@ -17,32 +17,12 @@
  */
 import type { DiagramElement, Connector, DiagramType } from "./types";
 import { canConnect } from "./canConnect";
+import { getElementPoolId } from "./poolUtil";
+
+export { getElementPoolId };
 
 const DATA_ELEMENT_TYPES = new Set<string>(["data-object", "data-store", "text-annotation"]);
 const CHILD_EVENT_TYPES_HIGHLIGHT = new Set<string>(["start-event", "intermediate-event", "end-event"]);
-
-/** The pool an element belongs to (id), or null at the top level. Pure. */
-export function getElementPoolId(el: DiagramElement, elements: DiagramElement[]): string | null {
-  if (el.type === "pool") return el.id;
-  // Try parentId chain first (fast path)
-  if (el.parentId) {
-    const parent = elements.find((e) => e.id === el.parentId);
-    if (parent?.type === "pool") return parent.id;
-    if (parent?.type === "lane") {
-      const gp = elements.find((e) => e.id === parent.parentId);
-      if (gp?.type === "pool") return gp.id;
-    }
-  }
-  // Fallback: position check — is this element's centre inside any pool?
-  const cx = el.x + el.width / 2;
-  const cy = el.y + el.height / 2;
-  const pool = elements.find(
-    (p) => p.type === "pool" &&
-      cx >= p.x && cx <= p.x + p.width &&
-      cy >= p.y && cy <= p.y + p.height
-  );
-  return pool?.id ?? null;
-}
 
 /**
  * The SOURCE end of a connector drag, classified into the flags the highlight

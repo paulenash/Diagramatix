@@ -29,6 +29,7 @@ import { GhostSuggestion } from "./GhostSuggestion";
 import type { NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
+import { canConnect } from "@/app/lib/diagram/canConnect";
 import { getElementPoolId, computeDragContext, classifyDragTarget } from "@/app/lib/diagram/connectorHighlight";
 import { parseUmlAttribute, parseUmlOperation } from "@/app/lib/diagram/umlParse";
 
@@ -1466,7 +1467,26 @@ export function Canvas({
       const ctxFilter = ctxSrcEl
         ? (cand: DiagramElement) => isValidContextFlowPair(ctxSrcEl.type, cand.type)
         : undefined;
-      const targetEl = findDropTarget(pos, elementId, ctxFilter);
+      let targetEl = findDropTarget(pos, elementId, ctxFilter);
+      // Expanded Subprocesses are usually packed with children, so a drop aimed
+      // at the EP often lands on a child. When that child is NOT a legal
+      // sequence target but an ancestor EP IS (it was the green-highlighted
+      // target), retarget to the EP so the drop matches what the highlight
+      // promised. Only for BPMN, non-data, when the direct target is illegal.
+      if (targetEl && diagramType === "bpmn") {
+        const src0 = data.elements.find((e) => e.id === elementId);
+        if (src0 && !DATA_ELEMENT_TYPES.has(src0.type) && !DATA_ELEMENT_TYPES.has(targetEl.type)
+            && !canConnect(src0, targetEl, "sequence", data.elements)) {
+          let anc = targetEl.parentId ? data.elements.find((e) => e.id === targetEl!.parentId) : undefined;
+          for (let i = 0; i < 20 && anc; i++) {
+            if (anc.type === "subprocess-expanded" && canConnect(src0, anc, "sequence", data.elements)) {
+              targetEl = anc;
+              break;
+            }
+            anc = anc.parentId ? data.elements.find((e) => e.id === anc!.parentId) : undefined;
+          }
+        }
+      }
       if (targetEl) {
         const sourceEl = data.elements.find((e) => e.id === elementId);
         const actorLike = ["actor", "team", "system", "hourglass"];
