@@ -50,6 +50,66 @@ describe("split a sequence connector with an intermediate event (T0705)", () => 
 });
 
 /**
+ * A palette drop (SPLIT_CONNECTOR) centres the NEW element on the original
+ * connector's path (T0733/T0734): a straight sequence connector yields parallel
+ * halves with the element dead-centre on the line; a curvilinear transition
+ * drops the element onto the curve.
+ */
+describe("palette drop centres the inserted element on the connector path", () => {
+  it("T0733 — off-line sequence drop snaps the new element onto the line, halves parallel", () => {
+    const d0 = {
+      elements: [
+        { id: "a", type: "task", x: 100, y: 200, width: 100, height: 60, label: "A", properties: {} },
+        { id: "b", type: "task", x: 500, y: 200, width: 100, height: 60, label: "B", properties: {} },
+      ],
+      connectors: [{
+        id: "ab", type: "sequence", sourceId: "a", targetId: "b", sourceSide: "right", targetSide: "left",
+        directionType: "directed", routingType: "rectilinear",
+        waypoints: [{ x: 150, y: 230 }, { x: 200, y: 230 }, { x: 500, y: 230 }, { x: 550, y: 230 }],
+      }],
+    } as unknown as DiagramData;
+
+    // Drop a NEW task BELOW the line (y 270) — must be pulled back onto y 230.
+    const out = reducer(d0, {
+      type: "SPLIT_CONNECTOR",
+      payload: { symbolType: "task", position: { x: 350, y: 270 }, connectorId: "ab" },
+    });
+    const nu = out.elements.find((e) => e.type === "task" && e.id !== "a" && e.id !== "b")!;
+    expect(nu.y + nu.height / 2).toBeCloseTo(230, 5);           // centred on the line
+    const inHalf = out.connectors.find((c) => c.targetId === nu.id)!;
+    const outHalf = out.connectors.find((c) => c.sourceId === nu.id)!;
+    expect(inHalf.targetSide).toBe("left");                     // parallel halves:
+    expect(outHalf.sourceSide).toBe("right");                   // left in / right out
+  });
+
+  it("T0734 — curvilinear transition drop snaps the element onto the curve", () => {
+    const d0 = {
+      elements: [
+        { id: "s1", type: "state", x: 100, y: 200, width: 100, height: 60, label: "S1", properties: {} },
+        { id: "s2", type: "state", x: 500, y: 200, width: 100, height: 60, label: "S2", properties: {} },
+      ],
+      connectors: [{
+        id: "t", type: "transition", sourceId: "s1", targetId: "s2", sourceSide: "right", targetSide: "left",
+        directionType: "directed", routingType: "curvilinear",
+        // Bows DOWN to y 300 across the middle.
+        waypoints: [{ x: 200, y: 230 }, { x: 300, y: 300 }, { x: 400, y: 300 }, { x: 500, y: 230 }],
+      }],
+    } as unknown as DiagramData;
+
+    // Drop ABOVE the curve (y 250) near x 350 — must snap DOWN onto the curve (~y 300).
+    const out = reducer(d0, {
+      type: "SPLIT_CONNECTOR",
+      payload: { symbolType: "state", position: { x: 350, y: 250 }, connectorId: "t" },
+    });
+    const nu = out.elements.find((e) => e.type === "state" && e.id !== "s1" && e.id !== "s2")!;
+    expect(nu.y + nu.height / 2).toBeGreaterThan(280);          // pulled onto the curve, not left at 250
+    expect(nu.x + nu.width / 2).toBeCloseTo(350, 0);
+    expect(out.connectors.some((c) => c.sourceId === "s1" && c.targetId === nu.id)).toBe(true);
+    expect(out.connectors.some((c) => c.sourceId === nu.id && c.targetId === "s2")).toBe(true);
+  });
+});
+
+/**
  * Intermediate events are NOT sequence-flow routing obstacles (T0706). Like a
  * gateway, an event sits ON the flow (e.g. after splitting a connector), so a
  * sequence flow must pass straight through / attach to it, never detour around.

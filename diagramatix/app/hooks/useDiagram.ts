@@ -8489,6 +8489,23 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const orig = state.connectors.find(c => c.id === connectorId);
       if (!orig) return state;
 
+      // Centre the inserted element on the ORIGINAL connector's path: project the
+      // drop point onto the connector's polyline and use that as the element's
+      // centre. For a straight/orthogonal SEQUENCE connector this makes the two
+      // resulting halves collinear (parallel) and dead-centred on the line; for a
+      // curvilinear TRANSITION it snaps the element onto the curve itself.
+      const dropCenter: Point = (() => {
+        const path = orig.waypoints;
+        if (!path || path.length < 2) return position;
+        let best = position, bestD2 = Infinity;
+        for (let i = 0; i < path.length - 1; i++) {
+          const q = nearestOnSeg(position, path[i], path[i + 1]);
+          const d2 = (position.x - q.x) ** 2 + (position.y - q.y) ** 2;
+          if (d2 < bestD2) { bestD2 = d2; best = q; }
+        }
+        return best;
+      })();
+
       // Build new element (same labelling logic as ADD_ELEMENT)
       const def = getSymbolDefinition(symbolType);
       let label = def.label;
@@ -8519,8 +8536,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const newEl: DiagramElement = {
         id: nanoid(),
         type: symbolType,
-        x: position.x - def.defaultWidth / 2,
-        y: position.y - def.defaultHeight / 2,
+        x: dropCenter.x - def.defaultWidth / 2,
+        y: dropCenter.y - def.defaultHeight / 2,
         width: def.defaultWidth,
         height: def.defaultHeight,
         label,
