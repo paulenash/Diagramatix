@@ -2481,6 +2481,15 @@ export function PropertiesPanel({
     element.type === "intermediate-event" ||
     element.type === "end-event";
 
+  // An edge-mounted (boundary) intermediate event — "EMIE" — always CATCHES a
+  // trigger; a throwing boundary event is not valid BPMN. So the Flow Type
+  // selector hides "Throwing" for an EMIE and any legacy throwing value reads as
+  // Catching.
+  const isEmie = element.type === "intermediate-event" && !!element.boundaryHostId;
+  const flowTypeOptions = isEmie
+    ? FLOW_TYPE_OPTIONS.filter((o) => o.value !== "throwing")
+    : FLOW_TYPE_OPTIONS;
+
   // A Compensation START trigger is legal ONLY as the start event of an embedded
   // Compensation Event Sub-Process (an event `subprocess-expanded`) nested inside
   // an EP. Rare, but legal — gate the trigger option to that exact placement.
@@ -3620,8 +3629,11 @@ export function PropertiesPanel({
           {hasMessageBpmnConnection && (
             <p className="text-xs text-gray-400 mb-1">Cannot change while messageBPMN connections exist</p>
           )}
+          {isEmie && (
+            <p className="text-xs text-gray-400 mb-1">Edge-mounted events are catch-only</p>
+          )}
           <select
-            value={element.flowType ?? "none"}
+            value={isEmie && element.flowType === "throwing" ? "catching" : (element.flowType ?? "none")}
             disabled={hasMessageBpmnConnection}
             onChange={(e) => { if (!hasMessageBpmnConnection) onUpdateProperties(element.id, { flowType: e.target.value }); }}
             className={`w-full text-xs border rounded px-2 py-1 outline-none ${
@@ -3630,7 +3642,7 @@ export function PropertiesPanel({
                 : "border-gray-300 focus:border-blue-400"
             }`}
           >
-            {FLOW_TYPE_OPTIONS.map(({ value, label }) => (
+            {flowTypeOptions.map(({ value, label }) => (
               <option key={value} value={value}>{label}</option>
             ))}
           </select>

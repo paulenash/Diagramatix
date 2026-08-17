@@ -23,6 +23,7 @@
 import type { DiagramElement, Connector } from "../types";
 import { wrapText } from "../textMetrics";
 import { getRiskControl } from "../riskControl";
+import { canConnect } from "../canConnect";
 
 export interface DiagramLike {
   elements: DiagramElement[];
@@ -1745,6 +1746,48 @@ export function checkDataObjectRole(d: DiagramLike): Violation[] {
   return out;
 }
 
+/**
+ * Every connector must satisfy the SAME legality predicate the editor enforces
+ * on creation (`canConnect`) — pools, EP scope, the invisible pool, event/data
+ * rules, the EMIE message-trigger rule, etc. An INGESTED diagram from another
+ * tool can carry connectors that violate these; this surfaces each one so the
+ * scan flags exactly what the editor would have refused to draw. Semantic —
+ * runs even under relaxedLayout.
+ */
+export function checkConnectorLegality(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  const byId = new Map(d.elements.map((e) => [e.id, e] as const));
+  for (const c of d.connectors) {
+    const s = byId.get(c.sourceId);
+    const t = byId.get(c.targetId);
+    if (!s || !t || s.id === t.id) continue; // dangling → ref-integrity; self-loops elsewhere
+    if (canConnect(s, t, c.type, d.elements)) continue;
+    out.push({
+      rule: "connector-legality",
+      severity: "error",
+      ids: [c.id, s.id, t.id],
+      message: `illegal ${c.type} connector from "${labelOrType(s)}" to "${labelOrType(t)}" — violates a BPMN connection rule`,
+    });
+  }
+  return out;
+}
+
+/**
+ * An edge-mounted (boundary) intermediate event — EMIE — always CATCHES a
+ * trigger; a throwing boundary event is not valid BPMN. Flag any EMIE whose
+ * flowType is "throwing" (e.g. from an ingested diagram or a legacy edit).
+ */
+export function checkEmieCatchOnly(d: DiagramLike): Violation[] {
+  return d.elements
+    .filter((e) => e.type === "intermediate-event" && !!e.boundaryHostId && e.flowType === "throwing")
+    .map((e) => ({
+      rule: "emie-catch-only",
+      severity: "error" as const,
+      ids: [e.id],
+      message: `edge-mounted intermediate event "${labelOrType(e)}" is set to Throwing — boundary events must catch`,
+    }));
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const RULES: Rule[] = [
@@ -2092,6 +2135,24 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkEdgeMountIntermediateOutgoing,
+  },
+  {
+    code: "B42",
+    id: "connector-legality",
+    title: "Illegal connector (violates a BPMN connection rule)",
+    description: "A connector's source/target/type combination is one the editor would refuse to draw — it crosses a pool or Expanded Sub-Process boundary illegally, targets a non-boundary Start or a non-Message boundary event with a message, wires a data element without an association, etc. Checked with the same canConnect predicate used on creation, so it catches connectors carried in from an ingested diagram.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkConnectorLegality,
+  },
+  {
+    code: "B43",
+    id: "emie-catch-only",
+    title: "Edge-mounted intermediate event set to Throwing",
+    description: "An edge-mounted (boundary) intermediate event always catches its trigger; a throwing boundary event is not valid BPMN. Its Flow Type must be Catching.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkEmieCatchOnly,
   },
 ];
 

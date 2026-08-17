@@ -262,9 +262,12 @@ function classifyPoolTarget(target: DiagramElement, ctx: DragContext, isBpmnSour
 
 function classifyEpTarget(target: DiagramElement, ctx: DragContext): TargetHighlight {
   const isEventSub = (target.properties.subprocessType as string | undefined) === "event";
+  // Edge-mounted start / intermediate sources are NOT excluded here — an EP can
+  // be their valid target when it lives in the right scope (a host child for an
+  // edge-start, an outer sibling for an EMIE). canConnect (the sequence gate)
+  // makes the exact scope decision; this only withholds the cases it can't judge.
   const sequence = !ctx.sourceIsData && !isEventSub && !ctx.fromEventSubprocess && !ctx.fromInsideEventSubprocess
-    && !ctx.fromEdgeMountedCompensationEvent && target.id !== ctx.sourceParentId
-    && !ctx.fromEdgeMountedStartEvent && !ctx.fromEdgeMountedIntermediateReceiveEvent;
+    && !ctx.fromEdgeMountedCompensationEvent && target.id !== ctx.sourceParentId;
   const association = ctx.sourceIsData;
   const compensation = ctx.compTargetsAvailable && !isEventSub && target.id !== ctx.sourceBoundaryHostId;
   return { sequence, message: false, association, compensation };
@@ -279,15 +282,20 @@ function classifyBoundaryTarget(
     && connectors.some((c) => c.type === "messageBPMN" && c.sourceId === target.id);
   const poolOf = getElementPoolId(target, elements);
   const host = elements.find((e) => e.id === target.boundaryHostId);
+  // An edge-mounted (boundary) intermediate event catches an internal trigger,
+  // not an incoming message flow — it is a messageBPMN target ONLY when its
+  // trigger is Message (canConnect enforces the same on commit).
+  const targetCanReceiveMsg = target.type === "intermediate-event"
+    && (target.eventType as string | undefined) === "message";
 
   if (ctx.fromPool) {
-    if (poolOf && poolOf !== ctx.sourcePoolId && target.type === "intermediate-event" && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+    if (poolOf && poolOf !== ctx.sourcePoolId && targetCanReceiveMsg && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
   } else if ((ctx.fromChildEvent || ctx.fromBoundaryOnChild) && target.boundaryHostId && ctx.sourceAncestorIds.has(target.boundaryHostId)) {
     association = true; // purple — associationBPMN to a boundary event on an ancestor
   } else if (ctx.sourceIsData) {
     association = true;
   } else if (ctx.fromFreeEndEvent) {
-    if (poolOf && target.type === "intermediate-event" && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+    if (poolOf && targetCanReceiveMsg && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
   } else if (ctx.fromEdgeMountedEndEvent) {
     if (poolOf === ctx.sourcePoolId && host?.parentId !== ctx.sourceBoundaryHostId) sequence = true;
   } else if (ctx.fromEdgeMountedStartEvent) {
@@ -295,7 +303,7 @@ function classifyBoundaryTarget(
   } else if (ctx.fromEdgeMountedIntermediateSendEvent) {
     if (target.boundaryHostId !== ctx.sourceBoundaryHostId && (!host || host.parentId !== ctx.sourceBoundaryHostId)) {
       if (poolOf === ctx.sourcePoolId) sequence = true;
-      else if (poolOf && poolOf !== ctx.sourcePoolId && target.type === "intermediate-event" && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+      else if (poolOf && poolOf !== ctx.sourcePoolId && targetCanReceiveMsg && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
     }
   } else if (ctx.fromEdgeMountedIntermediateReceiveEvent) {
     /* not a valid target for receive events */
@@ -303,7 +311,7 @@ function classifyBoundaryTarget(
     sequence = true;
   } else {
     if (poolOf === ctx.sourcePoolId) sequence = true;
-    else if (poolOf && poolOf !== ctx.sourcePoolId && target.type === "intermediate-event" && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+    else if (poolOf && poolOf !== ctx.sourcePoolId && targetCanReceiveMsg && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
   }
   return { sequence, message, association, compensation: false };
 }
@@ -341,14 +349,16 @@ function classifyPlainTarget(
     if ((poolOf === ctx.sourcePoolId || !poolOf) && target.parentId !== ctx.sourceBoundaryHostId) sequence = true;
   } else if (ctx.fromEdgeMountedStartEvent) {
     if (target.parentId === ctx.sourceBoundaryHostId) sequence = true;
-  } else if (ctx.fromEdgeMountedIntermediateSendEvent) {
+  } else if (ctx.fromEdgeMountedIntermediateSendEvent || ctx.fromEdgeMountedIntermediateReceiveEvent) {
+    // An EMIE is catch-only; its outgoing sequence continues in the OUTER scope
+    // (the exception/continuation path beside the host), NOT into the host's
+    // interior — so it targets anything EXCEPT its host activity's own children.
+    // canConnect narrows this to the exact outer-scope match.
     if (target.parentId !== ctx.sourceBoundaryHostId) {
       if (poolOf === ctx.sourcePoolId) sequence = true;
       else if (poolOf && poolOf !== ctx.sourcePoolId && !elIsData && !elIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
       else if (!poolOf) sequence = true;
     }
-  } else if (ctx.fromEdgeMountedIntermediateReceiveEvent) {
-    if (target.parentId === ctx.sourceBoundaryHostId) sequence = true;
   } else if (isBpmnSource && !ctx.sourcePoolId) {
     // Floating BPMN source = the invisible white-box participant. Crossing to a
     // NAMED pool's visible contents is a message; staying within the invisible

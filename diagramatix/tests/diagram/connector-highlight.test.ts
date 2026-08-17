@@ -240,12 +240,39 @@ describe("classifyDragTarget — edge send / receive intermediates", () => {
     expect(classify(edgeSend, outsideSendHost).sequence).toBe(true);
     expect(classify(edgeSend, childInSendHost).sequence).toBe(false); // host's child
   });
-  it("receive targets ONLY its host's children", () => {
-    expect(classify(edgeRecv, childInSendHost).sequence).toBe(false); // not recvHost's child
-    const childInRecvHost = el("childInRecvHost", "task", { parentId: "recvHost" });
-    const w = [...WORLD, childInRecvHost];
-    const c = computeDragContext(edgeRecv, w, CONNS as never, edgeRecv.id);
-    expect(classifyDragTarget(edgeRecv, childInRecvHost, c, w, CONNS as never, "bpmn").sequence).toBe(true);
+  it("receive (like send) continues in the OUTER scope, never into its host", () => {
+    // EMIEs are catch-only; the outgoing flow is the exception/continuation path
+    // beside the host, so it targets outer siblings — not the host's interior.
+    const emHost = el("emHost", "subprocess-expanded", { x: 0, y: 0, width: 200, height: 150 });
+    const insideEmHost = el("insideEmHost", "task", { parentId: "emHost" });
+    const outerSib = el("outerSib", "task"); // top-level = emHost's outer scope
+    const emRecv = el("emRecv", "intermediate-event", { boundaryHostId: "emHost", flowType: "catching" });
+    const w = [emHost, insideEmHost, outerSib, emRecv];
+    const run = (t: DiagramElement) =>
+      classifyDragTarget(emRecv, t, computeDragContext(emRecv, w, CONNS as never, emRecv.id), w, CONNS as never, "bpmn").sequence;
+    expect(run(outerSib)).toBe(true);       // outer scope (host's level)
+    expect(run(insideEmHost)).toBe(false);  // inside the host EP → not a target
+  });
+});
+
+describe("EMIE message-trigger — only a Message boundary event can receive a message", () => {
+  // A source in one white-box pool messaging a boundary intermediate event in
+  // another white-box pool: blue only when the boundary event's trigger is Message.
+  const poolWB = el("poolWB", "pool", { x: 3000, y: 0, width: 400, height: 200, properties: { poolType: "white-box" } });
+  const otherWB = el("otherWB", "pool", { x: 3000, y: 400, width: 400, height: 200, properties: { poolType: "white-box" } });
+  const srcTask = el("srcTask", "task", { parentId: "poolWB" });
+  const host = el("emieHost", "task", { parentId: "otherWB" });
+  const msgEmie = el("msgEmie", "intermediate-event", { parentId: "otherWB", boundaryHostId: "emieHost", eventType: "message" });
+  const errEmie = el("errEmie", "intermediate-event", { parentId: "otherWB", boundaryHostId: "emieHost", eventType: "error" });
+  const w = [poolWB, otherWB, srcTask, host, msgEmie, errEmie];
+  const msg = (t: DiagramElement) =>
+    classifyDragTarget(srcTask, t, computeDragContext(srcTask, w, CONNS as never, srcTask.id), w, CONNS as never, "bpmn").message;
+
+  it("lights a Message boundary event blue", () => {
+    expect(msg(msgEmie)).toBe(true);
+  });
+  it("but never an Error boundary event", () => {
+    expect(msg(errEmie)).toBe(false);
   });
 });
 

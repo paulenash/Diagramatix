@@ -72,6 +72,14 @@ export function canConnect(
     const srcWB = source.type === "pool" && ((source.properties.poolType as string | undefined) ?? "black-box") === "white-box";
     const tgtWB = target.type === "pool" && ((target.properties.poolType as string | undefined) ?? "black-box") === "white-box";
     if (srcWB || tgtWB) return false;
+    // An edge-mounted (boundary) intermediate event — an "EMIE" — catches an
+    // internal trigger, not an incoming message flow, UNLESS its trigger is
+    // Message. So a messageBPMN may only target a boundary intermediate event
+    // when eventType === "message"; and a boundary event never SENDS a message.
+    const isBoundaryIntermediate = (el: DiagramElement) =>
+      el.type === "intermediate-event" && !!el.boundaryHostId;
+    if (isBoundaryIntermediate(source)) return false;
+    if (isBoundaryIntermediate(target) && (target.eventType as string | undefined) !== "message") return false;
   }
 
   // ── BPMN sequence rules ──

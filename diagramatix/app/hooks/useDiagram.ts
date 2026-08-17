@@ -6768,6 +6768,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const tgtIsWhiteBoxPool = target.type === "pool"
           && ((target.properties.poolType as string | undefined) ?? "black-box") === "white-box";
         if (srcIsWhiteBoxPool || tgtIsWhiteBoxPool) return state;
+        // EMIE rule (mirrors canConnect): a boundary intermediate event catches
+        // an internal trigger, not an incoming message flow — a messageBPMN may
+        // target one only when eventType === "message", and never originate from one.
+        const isBoundaryIntermediate = (el: DiagramElement) =>
+          el.type === "intermediate-event" && !!el.boundaryHostId;
+        if (isBoundaryIntermediate(source)) return state;
+        if (isBoundaryIntermediate(target) && (target.eventType as string | undefined) !== "message") return state;
       }
 
       // ── BPMN sequence connector rules ──

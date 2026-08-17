@@ -12,7 +12,7 @@ start             seq  seq  seq   .   seq   .   seq  seq   .   asc  asc   .
 eStart             .    .    .    .    .    .    .    .   seq  asc  asc   . 
 inter             seq  seq  seq   .   seq   .   seq  seq   .   asc  asc   . 
 eSend             seq  seq  seq   .   seq   .   seq  seq   .   asc  asc   . 
-eRecv              .    .    .    .    .    .    .    .    .   asc  asc   . 
+eRecv             seq  seq  seq   .   seq   .   seq  seq   .   asc  asc   . 
 eComp             cmp  cmp   .    .    .    .    .    .   cmp   .    .   cmp
 end                .    .    .    .    .    .    .    .    .   asc  asc   . 
 eEnd               .    .    .    .    .    .    .    .    .   asc  asc   . 

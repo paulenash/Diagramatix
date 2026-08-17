@@ -33,6 +33,11 @@ const CASES: Array<{ name: string; s: DiagramElement; t: DiagramElement; ct: Con
   { name: "uml-package → uml-package (uml-containment) allowed", s: el("a", "uml-package"), t: el("b", "uml-package"), ct: "uml-containment", expect: true },
   { name: "sequence into a compensation activity rejected", s: el("a", "task"), t: el("b", "task", { properties: { isForCompensation: true } }), ct: "sequence", expect: false },
   { name: "intermediate → intermediate (associationBPMN) allowed (event-to-event)", s: el("a", "intermediate-event"), t: el("b", "intermediate-event"), ct: "associationBPMN", expect: true },
+  // EMIE message-trigger rule: a boundary intermediate event receives a message
+  // only when its trigger is Message, and never sends one.
+  { name: "messageBPMN → boundary Message event allowed", s: el("a", "task"), t: el("b", "intermediate-event", { boundaryHostId: "h", eventType: "message" }), ct: "messageBPMN", expect: true },
+  { name: "messageBPMN → boundary Error event rejected", s: el("a", "task"), t: el("b", "intermediate-event", { boundaryHostId: "h", eventType: "error" }), ct: "messageBPMN", expect: false },
+  { name: "messageBPMN FROM a boundary event rejected", s: el("a", "intermediate-event", { boundaryHostId: "h", eventType: "message" }), t: el("b", "task"), ct: "messageBPMN", expect: false },
 ];
 
 describe("canConnect ≡ ADD_CONNECTOR non-force parity (T2225)", () => {
