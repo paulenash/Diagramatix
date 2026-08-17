@@ -6855,7 +6855,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         ? state.connectors.filter((c) => c.type === "messageBPMN").length
         : 0;
       const isTransition = connectorType === "transition";
-      const isFromInitialState = isTransition && source.type === "initial-state";
+      // A transition leaving an initial OR history / deep-history state is
+      // unlabelled on creation (these are pseudo-initial states).
+      const isFromInitialState = isTransition &&
+        (source.type === "initial-state" || source.type === "history-state" || source.type === "deep-history-state");
       const transitionCount = isTransition
         ? state.connectors.filter((c) => c.type === "transition").length
         : 0;

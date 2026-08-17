@@ -1008,14 +1008,18 @@ function HistoryStateShape({ el, deep }: { el: DiagramElement; deep?: boolean })
     <g>
       <circle cx={cx} cy={cy} r={r} fill="white" stroke="#374151" strokeWidth={2} />
       {deep ? (
-        // Deep history: "H*" centred as a unit — a large asterisk right beside
-        // the H (the * glyph rides high, so nudge it down to visually centre).
-        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
-          fontWeight={700} fill="#374151"
-          style={{ fontFamily: "sans-serif", userSelect: "none" }}>
-          <tspan fontSize={r}>H</tspan>
-          <tspan fontSize={r * 1.6} dy={r * 0.42}>*</tspan>
-        </text>
+        // Deep history "H*": H nudged left so the pair centres; the large
+        // asterisk sits upper-right with its CENTRE level with the top of the H.
+        // (The * glyph rides high in its em box, so its baseline anchor is a
+        // touch below the target — tuned by eye.)
+        <>
+          <text x={cx - r * 0.28} y={cy} textAnchor="middle" dominantBaseline="central"
+            fontSize={r} fontWeight={700} fill="#374151"
+            style={{ fontFamily: "sans-serif", userSelect: "none" }}>H</text>
+          <text x={cx + r * 0.48} y={cy + r * 0.13} textAnchor="middle" dominantBaseline="central"
+            fontSize={r * 1.6} fontWeight={700} fill="#374151"
+            style={{ fontFamily: "sans-serif", userSelect: "none" }}>*</text>
+        </>
       ) : (
         <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
           fontSize={r} fontWeight={700} fill="#374151"

@@ -7,7 +7,8 @@ import { describe, it, expect } from "vitest";
 import {
   checkHistoryStatePlacement, checkHistoryStateUmlLimit, checkRegionEntryExit,
 } from "@/app/lib/diagram/checks/diagramChecks";
-import type { Connector, DiagramElement } from "@/app/lib/diagram/types";
+import { reducer } from "@/app/hooks/useDiagram";
+import type { Connector, DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 
 const el = (id: string, type: string, extra: Partial<DiagramElement> = {}): DiagramElement =>
   ({ id, type: type as DiagramElement["type"], label: id, x: 0, y: 0, width: 40, height: 40, properties: {}, ...extra });
@@ -59,6 +60,22 @@ describe("B45 — UML history limit (one H + one H* per region)", () => {
       connectors: [],
     };
     expect(checkHistoryStateUmlLimit(data)).toHaveLength(0); // different regions
+  });
+});
+
+describe("a transition leaving a history state is unlabelled on creation", () => {
+  const add = (srcType: string): DiagramData => reducer(
+    { elements: [el("src", srcType), el("s", "state")], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } } as DiagramData,
+    { type: "ADD_CONNECTOR", payload: { sourceId: "src", targetId: "s", connectorType: "transition", directionType: "directed", routingType: "curvilinear", sourceSide: "right", targetSide: "left" } } as never,
+  );
+  it("history → state: blank label", () => {
+    expect(add("history-state").connectors[0].label).toBe("");
+  });
+  it("deep-history → state: blank label", () => {
+    expect(add("deep-history-state").connectors[0].label).toBe("");
+  });
+  it("a plain state → state transition still gets a default label", () => {
+    expect(add("state").connectors[0].label).not.toBe("");
   });
 });
 
