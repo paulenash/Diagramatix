@@ -852,6 +852,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "archimate-relationships", title: "ArchiMate Relationship Explorer", description: "Pick a Source and Target element — see their box shapes side by side and the full list of relationships ArchiMate 3.2 permits between them, either direction.", href: "/dashboard/admin/archimate-relationships" },
   { id: "prompts", title: "AI Prompt Maintenance", description: "Maintain your own saved AI generation prompts.", href: "/dashboard/prompts?from=/dashboard/admin", feature: "ai" },
   { id: "notifications", title: "Notifications & Feedback", description: "Inspect any user's notification feed — filter by Org & User.", href: "/notifications?from=/dashboard/admin" },
+  { id: "templates", title: "Template Management", description: "Every diagram template — built-in + all users'. Preview each thumbnail, edit name / group / description, delete, and regenerate previews (single template or bulk) after a renderer change.", href: "/dashboard/admin/templates" },
   { id: "orbit-sim", title: "Orbit Simulator", description: "N-body point-mass gravity playground — configure 2–50 “stars” (colours + relative masses), Newtonian softened force, virial-bound 3D initial conditions, then Test to watch it run. Esc returns to config.", href: "/dashboard/admin/orbit-sim" },
 ];
 

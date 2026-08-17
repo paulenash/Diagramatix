@@ -3,7 +3,7 @@ import { serverError } from "@/app/lib/apiError";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { pgPool, prisma } from "@/app/lib/db";
-import { getEffectiveUserId, isReadOnlyImpersonation, SUPERUSER_EMAILS } from "@/app/lib/superuser";
+import { getEffectiveUserId, isReadOnlyImpersonation, isSuperuser, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { isAdminPasswordValid } from "@/app/lib/adminPassword";
 import { renderTemplateThumbnailSvg } from "@/app/lib/diagram/templateThumbnail";
 
@@ -113,8 +113,10 @@ export async function PUT(req: Request, { params }: Params) {
     values.push(new Date());
     values.push(id);
 
+    // A SuperAdmin (Template Management) may edit any template; a normal user is
+    // scoped to their own. Built-ins already required SuperAdmin/admin-password above.
     let whereClause: string;
-    if (isBuiltin) {
+    if (isBuiltin || isSuperuser(session)) {
       whereClause = `WHERE id = $${idx++}`;
     } else {
       values.push(session.user.id);
@@ -176,11 +178,14 @@ export async function DELETE(req: Request, { params }: Params) {
       }
     }
 
+    // SuperAdmin (Template Management) may delete any template; a normal user only
+    // their own. Built-ins already required SuperAdmin/admin-password above.
+    const unscoped = isBuiltin || isSuperuser(session);
     const result = await pgPool.query(
-      isBuiltin
+      unscoped
         ? `DELETE FROM "DiagramTemplate" WHERE id = $1`
         : `DELETE FROM "DiagramTemplate" WHERE id = $1 AND "userId" = $2`,
-      isBuiltin ? [id] : [id, session.user.id]
+      unscoped ? [id] : [id, session.user.id]
     );
     if (result.rowCount === 0) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -22,12 +22,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { scope } = (await req.json().catch(() => ({}))) as { scope?: string };
+  const { scope, templateId } = (await req.json().catch(() => ({}))) as { scope?: string; templateId?: string };
   const onlyBuiltin = scope === "builtin";
 
   try {
+    // Single template (from Template Management) or a bulk pass (all / built-ins).
+    const where = templateId ? `WHERE id = $1` : (onlyBuiltin ? `WHERE "templateType" = 'builtin'` : "");
     const rows = (await pgPool.query(
-      `SELECT id, data FROM "DiagramTemplate" ${onlyBuiltin ? `WHERE "templateType" = 'builtin'` : ""}`
+      `SELECT id, data FROM "DiagramTemplate" ${where}`,
+      templateId ? [templateId] : []
     )).rows as { id: string; data: TemplateData }[];
 
     let updated = 0, skipped = 0;
