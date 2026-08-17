@@ -1,0 +1,32 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`connector highlight — FLAT type matrix (single invisible pool) > grid 1`] = `
+"
+src \\ tgt        task subP   EP evEP   gwstartinter  endhostCh dataannotcompAct
+task              seq  seq  seq   .   seq   .   seq  seq   .   asc  asc   . 
+subP              seq  seq  seq   .   seq   .   seq  seq   .   asc  asc   . 
+EP                seq  seq  seq   .   seq   .   seq  seq   .   asc  asc   . 
+evEP               .    .    .    .    .    .    .    .    .   asc  asc   . 
+gw                seq  seq  seq   .   seq   .   seq  seq   .   asc  asc   . 
+start             seq  seq  seq   .   seq   .   seq  seq   .   asc  asc   . 
+eStart             .    .    .    .    .    .    .    .   seq  asc  asc   . 
+inter             seq  seq  seq   .   seq   .   seq  seq   .   asc  asc   . 
+eSend             seq  seq  seq   .   seq   .   seq  seq   .   asc  asc   . 
+eRecv              .    .    .    .    .    .    .    .    .   asc  asc   . 
+eComp             cmp  cmp   .    .    .    .    .    .   cmp   .    .   cmp
+end                .    .    .    .    .    .    .    .    .   asc  asc   . 
+eEnd               .    .    .    .    .    .    .    .    .   asc  asc   . 
+data              asc  asc  asc  asc  asc  asc  asc  asc  asc   .    .   asc
+annot             asc  asc  asc  asc  asc  asc  asc  asc  asc   .    .   asc
+compAct            .    .    .    .    .    .    .    .    .   asc  asc   . 
+"
+`;
+
+exports[`connector highlight — invisible pool, Config Y (named pool coexists) > grid 1`] = `
+"
+src \\ tgt       floatTaskfloatEPpooledTaskpooledEPwbPoolShapebbPoolShapebbContent
+floatTask         seq  seq  msg  msg   .   msg   . 
+floatEP           seq   ·   msg  msg   .   msg   . 
+pooledTask        msg  msg   ·   seq   .   msg   . 
+"
+`;

@@ -190,6 +190,15 @@ const isWhiteBoxPool = (poolId: string | null, elements: DiagramElement[]): bool
   return ((p?.properties.poolType as string | undefined) ?? "black-box") === "white-box";
 };
 
+// A pool-less element behaves as if wrapped in one shared implicit pool: the
+// "invisible unnamed pool" (poolId === null). It is a real WHITE-BOX participant
+// — its contents are visible and message-targetable, distinct from any named
+// pool. So a message may target a named white-box pool's contents OR any
+// pool-less (invisible-pool) element; a named BLACK-box pool's contents stay
+// hidden (message its pool shape instead).
+const isVisibleParticipant = (poolId: string | null, elements: DiagramElement[]): boolean =>
+  poolId === null || isWhiteBoxPool(poolId, elements);
+
 /**
  * Classify one candidate `target` for a NEW connector drag from `source`.
  * `ctx` must be `computeDragContext(source, …)`. Returns which highlight (if
@@ -313,7 +322,7 @@ function classifyPlainTarget(
   if (ctx.fromEdgeMountedCompensationEvent) {
     if (ctx.compTargetsAvailable && COMP_ACTIVITY_TYPES.has(target.type) && target.id !== ctx.sourceBoundaryHostId) compensation = true;
   } else if (ctx.fromPool) {
-    if (!elIsData && !elIsSendLocked && poolOf && poolOf !== ctx.sourcePoolId && isWhiteBoxPool(poolOf, elements)) message = true;
+    if (!elIsData && !elIsSendLocked && poolOf !== ctx.sourcePoolId && isVisibleParticipant(poolOf, elements)) message = true;
   } else if (ctx.sourceIsData && !elIsData) {
     association = true;
   } else if (ctx.sourceIsData && elIsData) {
@@ -340,13 +349,22 @@ function classifyPlainTarget(
     }
   } else if (ctx.fromEdgeMountedIntermediateReceiveEvent) {
     if (target.parentId === ctx.sourceBoundaryHostId) sequence = true;
+  } else if (isBpmnSource && !ctx.sourcePoolId) {
+    // Floating BPMN source = the invisible white-box participant. Crossing to a
+    // NAMED pool's visible contents is a message; staying within the invisible
+    // pool is a sequence (canConnect-gated).
+    if (poolOf !== null) {
+      if (!elIsData && !elIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+    } else {
+      sequence = true;
+    }
   } else if (!isBpmnSource || !ctx.sourcePoolId) {
     sequence = (diagramType === "context" || diagramType === "basic")
       ? isValidContextFlowPair(source.type, target.type)
       : true;
   } else {
     if (poolOf === ctx.sourcePoolId) sequence = true;
-    else if (poolOf && poolOf !== ctx.sourcePoolId && !elIsData && !elIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+    else if (!elIsData && !elIsSendLocked && isVisibleParticipant(poolOf, elements)) message = true;
   }
   return { sequence, message, association, compensation };
 }
