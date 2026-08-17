@@ -4537,13 +4537,21 @@ export function Canvas({
       }
       return depth;
     }
+    // Data artifacts (Data Objects, Data Stores) and Text Annotations always
+    // render AFTER the flow elements so they sit above tasks / events / etc.,
+    // and the one currently being moved or placed renders ABSOLUTELY LAST so it
+    // floats above every other element — including other data artifacts
+    // (requested UX). Rank: 0 = flow element, 1 = data artifact, 2 = the one
+    // being dragged.
+    const DATA_ARTIFACT_TYPES = new Set<string>(["data-object", "data-store", "text-annotation"]);
+    const stackRank = (el: DiagramElement): number => {
+      if (!DATA_ARTIFACT_TYPES.has(el.type)) return 0;
+      return el.id === draggingElementId ? 2 : 1;
+    };
     return items.sort((a, b) => {
-      // Dragging text-annotation renders LAST so it sits above all other
-      // non-container elements while the user moves it (requested UX).
-      const aDragAnno = a.id === draggingElementId && a.type === "text-annotation";
-      const bDragAnno = b.id === draggingElementId && b.type === "text-annotation";
-      if (aDragAnno && !bDragAnno) return 1;
-      if (bDragAnno && !aDragAnno) return -1;
+      const ra = stackRank(a);
+      const rb = stackRank(b);
+      if (ra !== rb) return ra - rb;
       return getParentDepth(a) - getParentDepth(b);
     });
   })();
