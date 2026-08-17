@@ -1541,16 +1541,13 @@ export function Canvas({
             if (targetEl.parentId !== sourceEl.boundaryHostId) return;
           }
 
-          // Rules 3 & 5: Edge-mounted intermediate event
+          // Edge-mounted intermediate event (EMIE): catch-only, and its outgoing
+          // sequence continues in the OUTER scope — never into its host's own
+          // children (matches canConnect + the highlight; the throwing/receive
+          // split is gone now that boundary events are catch-only).
           if (sourceEl?.type === "intermediate-event" && sourceEl.boundaryHostId) {
-            // Rule 5: cannot connect to boundary events of the same parent subprocess
-            if (targetEl.boundaryHostId === sourceEl.boundaryHostId) return;
-
-            if (sourceEl.taskType === "send" || sourceEl.flowType === "throwing") {
-              if (targetEl.parentId === sourceEl.boundaryHostId) return;
-            } else if (sourceEl.taskType === "receive" || sourceEl.flowType === "catching") {
-              if (targetEl.parentId !== sourceEl.boundaryHostId) return;
-            }
+            if (targetEl.boundaryHostId === sourceEl.boundaryHostId) return; // sibling boundary event
+            if (targetEl.parentId === sourceEl.boundaryHostId) return;        // host's own child
           }
         }
 
@@ -1600,6 +1597,14 @@ export function Canvas({
           const msgSrcOffset = sourceEl && sourceEl.width > 0
             ? Math.max(0, Math.min(1, (chosenX - sourceEl.x) / sourceEl.width))
             : 0.5;
+          // canConnect is the legality authority for the message drop too (e.g. a
+          // messageBPMN may only target a Message-trigger boundary event).
+          if (diagramType === "bpmn" && sourceEl && !canConnect(sourceEl, targetEl, "messageBPMN", data.elements)) {
+            setDraggingConnector(null);
+            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mouseup", onMouseUp);
+            return;
+          }
           onAddConnector(
             elementId, targetEl.id,
             "messageBPMN", "directed", "direct",
@@ -1754,6 +1759,15 @@ export function Canvas({
             return;
           } else {
             connType = "sequence"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+          }
+          // Single legality authority for BPMN drops: canConnect (the same
+          // predicate the highlight and the reducer use). Keeps creation-on-drop
+          // from diverging from what lit up green/blue.
+          if (diagramType === "bpmn" && sourceEl && !canConnect(sourceEl, targetEl, connType, data.elements)) {
+            setDraggingConnector(null);
+            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mouseup", onMouseUp);
+            return;
           }
           onAddConnector(elementId, targetEl.id, connType, connDirection, connRouting, seqSourceSide, seqTargetSide, seqSourceOffsetAlong, seqTargetOffsetAlong);
         }
