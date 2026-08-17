@@ -1788,6 +1788,83 @@ export function checkEmieCatchOnly(d: DiagramLike): Violation[] {
     }));
 }
 
+// ── State-machine: history states + composite regions ────────────────────────
+
+const HISTORY_TYPES = new Set<string>(["history-state", "deep-history-state"]);
+const SM_HEADER_H = 28; // composite-state header height (mirrors SymbolRenderer)
+
+/** Which region (0-based) a child sits in, within its composite parent. */
+function regionOf(child: DiagramElement, comp: DiagramElement): number {
+  const count = Math.max(1, Math.min(5, Math.round(Number(comp.properties?.regionCount) || 1)));
+  if (count <= 1) return 0;
+  const vertical = (comp.properties?.regionOrientation as string) === "vertical";
+  const stored = comp.properties?.regionDividers;
+  const fracs = Array.isArray(stored) && stored.length === count - 1
+    ? (stored as number[]) : Array.from({ length: count - 1 }, (_, i) => (i + 1) / count);
+  const cx = child.x + child.width / 2, cy = child.y + child.height / 2;
+  const pos = vertical
+    ? (cx - comp.x) / (comp.width || 1)
+    : (cy - (comp.y + SM_HEADER_H)) / ((comp.height - SM_HEADER_H) || 1);
+  let idx = 0;
+  for (const f of fracs) { if (pos > f) idx++; else break; }
+  return idx;
+}
+
+/** A history state (H / H*) must live inside a composite state and, being a
+ *  pseudo-initial state, may have OUTGOING transitions only. */
+export function checkHistoryStatePlacement(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  const byId = new Map(d.elements.map((e) => [e.id, e] as const));
+  for (const e of d.elements) {
+    if (!HISTORY_TYPES.has(e.type)) continue;
+    const parent = e.parentId ? byId.get(e.parentId) : undefined;
+    if (!parent || parent.type !== "composite-state") {
+      out.push({ rule: "history-in-composite", severity: "error", ids: [e.id], message: `history state "${labelOrType(e)}" must be placed inside a composite state` });
+    }
+    if (d.connectors.some((c) => c.targetId === e.id)) {
+      out.push({ rule: "history-no-incoming", severity: "error", ids: [e.id], message: `history state "${labelOrType(e)}" has an incoming transition — history states allow outgoing transitions only` });
+    }
+  }
+  return out;
+}
+
+/** UML allows at most one shallow (H) and one deep (H*) history per region. */
+export function checkHistoryStateUmlLimit(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  const seen = new Map<string, string>();
+  for (const e of d.elements) {
+    if (!HISTORY_TYPES.has(e.type)) continue;
+    const comp = e.parentId ? d.elements.find((x) => x.id === e.parentId) : undefined;
+    if (!comp || comp.type !== "composite-state") continue;
+    const key = `${comp.id}#${regionOf(e, comp)}#${e.type}`;
+    if (seen.has(key)) {
+      out.push({ rule: "history-uml-limit", severity: "error", ids: [e.id, seen.get(key)!], message: `a region of composite state "${labelOrType(comp)}" has more than one ${e.type === "deep-history-state" ? "deep " : ""}history state — UML allows at most one` });
+    } else {
+      seen.set(key, e.id);
+    }
+  }
+  return out;
+}
+
+/** Every region of a composite state should have an entry (an initial OR history
+ *  state) and an exit (a final state). Validate-only (warning). */
+export function checkRegionEntryExit(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  for (const comp of d.elements.filter((e) => e.type === "composite-state")) {
+    const count = Math.max(1, Math.min(5, Math.round(Number(comp.properties?.regionCount) || 1)));
+    const children = d.elements.filter((e) => e.parentId === comp.id);
+    for (let r = 0; r < count; r++) {
+      const inR = children.filter((c) => regionOf(c, comp) === r);
+      const hasEntry = inR.some((c) => c.type === "initial-state" || HISTORY_TYPES.has(c.type));
+      const hasExit = inR.some((c) => c.type === "final-state");
+      if (hasEntry && hasExit) continue;
+      const missing = [!hasEntry && "an initial or history state", !hasExit && "a final state"].filter(Boolean).join(" and ");
+      out.push({ rule: "region-entry-exit", severity: "warning", ids: [comp.id], message: `${count > 1 ? `region ${r + 1} of ` : ""}composite state "${labelOrType(comp)}" is missing ${missing}` });
+    }
+  }
+  return out;
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const RULES: Rule[] = [
@@ -2153,6 +2230,33 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkEmieCatchOnly,
+  },
+  {
+    code: "B44",
+    id: "history-state-placement",
+    title: "History state outside a composite / with an incoming transition",
+    description: "A shallow (H) or deep (H*) history state is a pseudo-initial state: it must be placed INSIDE a composite state and may have OUTGOING transitions only — never an incoming one.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkHistoryStatePlacement,
+  },
+  {
+    code: "B45",
+    id: "history-state-uml-limit",
+    title: "More than one history state of a kind in a region",
+    description: "UML allows at most one shallow (H) and one deep (H*) history state per region of a composite state.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkHistoryStateUmlLimit,
+  },
+  {
+    code: "B46",
+    id: "region-entry-exit",
+    title: "Composite-state region missing an entry or exit",
+    description: "Every region of a composite state should have an entry — an initial or history state — and an exit — a final state.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkRegionEntryExit,
   },
 ];
 

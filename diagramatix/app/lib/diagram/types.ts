@@ -11,6 +11,8 @@ export type SymbolType =
   | "team"
   | "state"
   | "initial-state"
+  | "history-state"
+  | "deep-history-state"
   | "final-state"
   | "pool"
   | "lane"

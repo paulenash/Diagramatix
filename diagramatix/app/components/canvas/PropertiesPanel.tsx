@@ -3529,6 +3529,35 @@ export function PropertiesPanel({
         </>
       )}
 
+      {element.type === "composite-state" && (
+        <>
+          <div className="flex items-center gap-1">
+            <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Regions</label>
+            <input
+              type="number" min={1} max={5}
+              value={Math.max(1, Math.min(5, Math.round(Number(element.properties.regionCount) || 1)))}
+              onChange={(e) => {
+                const n = Math.max(1, Math.min(5, Math.round(Number(e.target.value) || 1)));
+                // Clear stored divider positions so they reset to even spacing.
+                onUpdateProperties(element.id, { regionCount: n, regionDividers: null });
+              }}
+              className="flex-1 text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Orient.</label>
+            <select
+              value={(element.properties.regionOrientation as string) === "vertical" ? "vertical" : "horizontal"}
+              onChange={(e) => onUpdateProperties(element.id, { regionOrientation: e.target.value })}
+              className="flex-1 text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
+            >
+              <option value="horizontal">Horizontal</option>
+              <option value="vertical">Vertical</option>
+            </select>
+          </div>
+        </>
+      )}
+
       {element.type === "gateway" && diagramType !== "state-machine" && (
         <div className="flex items-center gap-1">
           <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Gateway Type</label>

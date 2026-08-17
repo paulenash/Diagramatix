@@ -41,6 +41,10 @@ const CASES: Array<{ name: string; s: DiagramElement; t: DiagramElement; ct: Con
   // An EMIE is triggered by its boundary — it has no INCOMING sequence flow.
   { name: "sequence INTO a boundary intermediate event (EMIE) rejected", s: el("a", "task"), t: el("b", "intermediate-event", { boundaryHostId: "h" }), ct: "sequence", expect: false },
   { name: "sequence OUT of a boundary intermediate event (EMIE) allowed", s: el("a", "intermediate-event", { boundaryHostId: "h" }), t: el("b", "task"), ct: "sequence", expect: true },
+  // History states (H / H*) are pseudo-initial — no incoming transitions.
+  { name: "transition INTO a shallow history state rejected", s: el("a", "state"), t: el("b", "history-state"), ct: "transition", expect: false },
+  { name: "transition INTO a deep history state rejected", s: el("a", "state"), t: el("b", "deep-history-state"), ct: "transition", expect: false },
+  { name: "transition OUT of a history state allowed", s: el("a", "history-state"), t: el("b", "state"), ct: "transition", expect: true },
 ];
 
 describe("canConnect ≡ ADD_CONNECTOR non-force parity (T2225)", () => {

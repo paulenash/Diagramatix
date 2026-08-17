@@ -547,7 +547,7 @@ function renumberMarkers(elements: DiagramElement[], type: SymbolType): DiagramE
 
 function containerAccepts(containerType: SymbolType, childType: SymbolType): boolean {
   if (containerType === "system-boundary") return childType === "use-case" || childType === "hourglass";
-  if (containerType === "composite-state") return childType === "state" || childType === "initial-state" || childType === "final-state" || childType === "gateway" || childType === "fork-join" || childType === "submachine";
+  if (containerType === "composite-state") return childType === "state" || childType === "initial-state" || childType === "history-state" || childType === "deep-history-state" || childType === "final-state" || childType === "gateway" || childType === "fork-join" || childType === "submachine";
   if (containerType === "pool") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "lane") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "subprocess-expanded") return BPMN_CONTENT_TYPES.has(childType);
@@ -6723,9 +6723,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // Force mode: skip all validation (used by Shift+Ctrl+Click override)
       if (!force) {
 
-      // State-machine rules: never connect FROM a final-state or TO an initial-state
+      // State-machine rules: never connect FROM a final-state or TO an initial /
+      // history state (a history state is a pseudo-initial — outgoing only).
       if (source.type === "final-state") return state;
-      if (target.type === "initial-state") return state;
+      if (target.type === "initial-state" || target.type === "history-state" || target.type === "deep-history-state") return state;
 
       if (isDataConn && connectorType !== "associationBPMN") return state;
 

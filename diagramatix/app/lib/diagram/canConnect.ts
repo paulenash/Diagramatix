@@ -37,9 +37,11 @@ export function canConnect(
     !!source.boundaryHostId &&
     COMPENSATION_TARGET_TYPES.has(target.type);
 
-  // State-machine: never FROM a final-state or TO an initial-state.
+  // State-machine: never FROM a final-state or TO an initial / history state.
+  // A history state (shallow H / deep H*) is a pseudo-initial state — it may
+  // only have OUTGOING transitions (UML).
   if (source.type === "final-state") return false;
-  if (target.type === "initial-state") return false;
+  if (target.type === "initial-state" || target.type === "history-state" || target.type === "deep-history-state") return false;
 
   // Data elements may only use associationBPMN.
   if (isDataConn && connectorType !== "associationBPMN") return false;

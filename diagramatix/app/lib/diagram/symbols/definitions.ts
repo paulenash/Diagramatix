@@ -73,6 +73,20 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     description: "Starting state",
   },
   {
+    type: "history-state",
+    label: "History",
+    defaultWidth: 40,
+    defaultHeight: 40,
+    description: "Shallow history — resumes the composite state at its last active substate. Only inside a composite state; no incoming transitions.",
+  },
+  {
+    type: "deep-history-state",
+    label: "Deep History",
+    defaultWidth: 40,
+    defaultHeight: 40,
+    description: "Deep history — resumes the composite state at its last active substate at every nesting level. Only inside a composite state; no incoming transitions.",
+  },
+  {
     type: "final-state",
     label: "Final",
     defaultWidth: 30,
@@ -330,7 +344,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   context: ["external-entity", "process-system", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],
   basic: ["external-entity", "process-system", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],  // legacy alias
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],
-  "state-machine": ["state", "submachine", "initial-state", "final-state", "composite-state", "gateway", "fork-join", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],
+  "state-machine": ["state", "submachine", "initial-state", "history-state", "deep-history-state", "final-state", "composite-state", "gateway", "fork-join", ...PROBLEM_MARKERS, ...REVIEW_MARKERS],
   bpmn: [
     "start-event",
     "intermediate-event",
@@ -369,7 +383,7 @@ export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = 
   context: ["external-entity", "process-system"],
   basic: ["external-entity", "process-system"],  // legacy alias
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary", "system-boundary-body"],
-  "state-machine": ["state", "submachine", "initial-state", "final-state", "composite-state", "composite-state-body", "gateway", "fork-join"],
+  "state-machine": ["state", "submachine", "initial-state", "history-state", "deep-history-state", "final-state", "composite-state", "composite-state-body", "gateway", "fork-join"],
   bpmn: [
     "start-event",
     "intermediate-event",

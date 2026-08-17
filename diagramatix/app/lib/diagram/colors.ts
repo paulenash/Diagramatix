@@ -31,6 +31,8 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   // State Machine
   "state":               "#dbeafe",
   "initial-state":       "#374151",   // disc colour
+  "history-state":       "#374151",   // H glyph / border colour
+  "deep-history-state":  "#374151",
   "final-state":         "#374151",   // inner disc colour
   "composite-state":     "#ede9fe",   // header colour
   "composite-state-body": "#ede9fe",  // body fill colour (rendered with opacity)
@@ -94,6 +96,8 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   // State Machine
   "state":               "#ffffff",
   "initial-state":       "#000000",
+  "history-state":       "#000000",
+  "deep-history-state":  "#000000",
   "final-state":         "#000000",
   "composite-state":     "#ffffff",
   "composite-state-body": "#ffffff",

@@ -21,7 +21,7 @@ import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
 import { BubbleHelp } from "./BubbleHelp";
 import { EntityNameInput } from "./EntityNameInput";
 import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
-import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, ShowReviewCommentsCtx, ReviewCommentColorsCtx, reviewCommentAuthorKey, REVIEW_COMMENT_PALETTE, formatUmlAttribute, formatUmlOperation, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, UmlPackageDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, ShowPainPointsCtx, ShowPainPointDescCtx, ShowIssuesCtx, ShowIssueDescCtx, ShowReviewCommentsCtx, ReviewCommentColorsCtx, reviewCommentAuthorKey, REVIEW_COMMENT_PALETTE, formatUmlAttribute, formatUmlOperation, compositeRegions, type ResizeHandle } from "./SymbolRenderer";
 import { CollabCursors } from "./CollabCursors";
 import { CollabLiveEdits } from "./CollabLiveEdits";
 import { CollabGhosts } from "./CollabGhosts";
@@ -2069,6 +2069,33 @@ export function Canvas({
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
       onLaneBoundaryMoveEnd?.();
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }
+
+  // Drag a composite-state's region divider. Writes the whole fractional-position
+  // array back via onUpdateProperties (in-memory; auto-save persists it), keeping
+  // the dividers ordered and non-crossing.
+  function handleRegionDividerDrag(e: React.MouseEvent, comp: DiagramElement, index: number) {
+    e.stopPropagation();
+    const { orientation, fracs } = compositeRegions(comp);
+    const bodyTop = comp.y + HEADER_H;
+    const bodyH = comp.height - HEADER_H;
+    function onMouseMove(ev: MouseEvent) {
+      const w = clientToWorld(ev.clientX, ev.clientY);
+      let f = orientation === "horizontal" ? (w.y - bodyTop) / bodyH : (w.x - comp.x) / comp.width;
+      const lo = index > 0 ? fracs[index - 1] + 0.05 : 0.05;
+      const hi = index < fracs.length - 1 ? fracs[index + 1] - 0.05 : 0.95;
+      f = Math.max(lo, Math.min(hi, f));
+      const next = [...fracs];
+      next[index] = f;
+      onUpdateProperties?.(comp.id, { regionDividers: next });
+    }
+    function onMouseUp() {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      onElementMoveEnd?.(comp.id);
     }
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
@@ -5607,6 +5634,28 @@ export function Canvas({
             );
             return <>{handles}</>;
           })()}
+
+          {/* Region-divider drag handles for a SELECTED composite state — a
+              transparent hit-zone over each dashed divider. */}
+          {data.elements.filter(el => el.type === "composite-state" && selectedElementIds.has(el.id)).map((el) => {
+            const { count, orientation, fracs } = compositeRegions(el);
+            if (count <= 1) return null;
+            const bodyTop = el.y + HEADER_H;
+            const bodyH = el.height - HEADER_H;
+            return (
+              <g key={`rgnh-${el.id}`}>
+                {fracs.map((f, i) => orientation === "horizontal" ? (
+                  <rect key={i} x={el.x} y={bodyTop + f * bodyH - 4} width={el.width} height={8}
+                    fill="transparent" style={{ cursor: "ns-resize" }}
+                    onMouseDown={(e) => handleRegionDividerDrag(e, el, i)} />
+                ) : (
+                  <rect key={i} x={el.x + f * el.width - 4} y={bodyTop} width={8} height={bodyH}
+                    fill="transparent" style={{ cursor: "ew-resize" }}
+                    onMouseDown={(e) => handleRegionDividerDrag(e, el, i)} />
+                ))}
+              </g>
+            );
+          })}
 
           {/* Expanded Subprocesses — rendered AFTER lanes / sublanes so EPs
               sit above the lane background (issue 5). Depth-sorted so a

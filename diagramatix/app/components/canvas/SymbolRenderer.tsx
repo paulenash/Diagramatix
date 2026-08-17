@@ -145,7 +145,7 @@ function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): s
 
 const CONNECTION_POINT_SIDES: Side[] = ["top", "right", "bottom", "left"];
 
-const HEADER_H = 28;
+export const HEADER_H = 28;
 // Horizontal padding subtracted from an ArchiMate box's width when wrapping its
 // name, so the text sits clear of the outline (and the top-right corner glyph).
 const ARCHI_LABEL_PAD = 16;
@@ -764,10 +764,27 @@ function SystemBoundaryShape({ el }: { el: DiagramElement }) {
   );
 }
 
+/** Region dividers of a composite state: the fractional (0–1) positions along
+ *  the split axis of each of the (regionCount − 1) dashed boundaries. Even
+ *  spacing when none are stored. Exported so the canvas drag handles + the
+ *  region-membership checks share one definition. */
+export function compositeRegions(el: DiagramElement): { count: number; orientation: "horizontal" | "vertical"; fracs: number[] } {
+  const count = Math.max(1, Math.min(5, Math.round(Number(el.properties?.regionCount) || 1)));
+  const orientation = (el.properties?.regionOrientation as string) === "vertical" ? "vertical" : "horizontal";
+  const stored = el.properties?.regionDividers;
+  const fracs = Array.isArray(stored) && stored.length === count - 1
+    ? (stored as number[]).map((f) => Math.max(0.05, Math.min(0.95, Number(f))))
+    : Array.from({ length: count - 1 }, (_, i) => (i + 1) / count);
+  return { count, orientation, fracs };
+}
+
 function CompositeStateShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const headerColor = resolveColor("composite-state", colors);
   const bodyColor = resolveColor("composite-state-body", colors);
+  const { orientation, fracs } = compositeRegions(el);
+  const bodyTop = el.y + HEADER_H;
+  const bodyH = el.height - HEADER_H;
   return (
     <g>
       {/* Outer rounded rect with body fill */}
@@ -781,6 +798,15 @@ function CompositeStateShape({ el }: { el: DiagramElement }) {
       {/* Header bottom border */}
       <line x1={el.x} y1={el.y + HEADER_H} x2={el.x + el.width} y2={el.y + HEADER_H}
         stroke="#374151" strokeWidth={1} />
+      {/* Orthogonal region dividers — dashed. Horizontal orientation stacks
+          regions top→bottom (horizontal lines); vertical places them side-by-side. */}
+      {fracs.map((f, i) => orientation === "horizontal" ? (
+        <line key={`rgn-${i}`} x1={el.x} y1={bodyTop + f * bodyH} x2={el.x + el.width} y2={bodyTop + f * bodyH}
+          stroke="#374151" strokeWidth={1} strokeDasharray="6 4" />
+      ) : (
+        <line key={`rgn-${i}`} x1={el.x + f * el.width} y1={bodyTop} x2={el.x + f * el.width} y2={el.y + el.height}
+          stroke="#374151" strokeWidth={1} strokeDasharray="6 4" />
+      ))}
     </g>
   );
 }
@@ -971,6 +997,26 @@ function InitialStateShape({ el }: { el: DiagramElement }) {
   return (
     <circle cx={el.x + el.width / 2} cy={el.y + el.height / 2} r={el.width / 2}
       fill={resolveColor("initial-state", colors)} />
+  );
+}
+
+function HistoryStateShape({ el, deep }: { el: DiagramElement; deep?: boolean }) {
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const r = el.width / 2;
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill="white" stroke="#374151" strokeWidth={2} />
+      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
+        fontSize={r} fontWeight={700} fill="#374151"
+        style={{ fontFamily: "sans-serif", userSelect: "none" }}>H</text>
+      {/* Deep history carries a superscript asterisk (H*). */}
+      {deep && (
+        <text x={cx + r * 0.58} y={cy - r * 0.4} textAnchor="middle" dominantBaseline="central"
+          fontSize={r * 0.8} fontWeight={700} fill="#374151"
+          style={{ fontFamily: "sans-serif", userSelect: "none" }}>*</text>
+      )}
+    </g>
   );
 }
 
@@ -2087,6 +2133,8 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "team":          return <TeamShape el={el} />;
       case "state":         return <StateShape el={el} />;
       case "initial-state": return <InitialStateShape el={el} />;
+      case "history-state": return <HistoryStateShape el={el} />;
+      case "deep-history-state": return <HistoryStateShape el={el} deep />;
       case "final-state":   return <FinalStateShape el={el} />;
       case "submachine":      return <SubmachineShape el={el} />;
       case "chevron":             return <ChevronShape el={el} />;
@@ -2696,7 +2744,7 @@ export function SymbolRenderer({
   const canResize = element.type !== "lane" && element.type !== "flowchart-vswimlane" && !isArchiJunction; // lanes + vertical swimlanes use custom boundary handles
   const isBoundaryStartOrEnd = !!element.boundaryHostId &&
     (element.type === "start-event" || element.type === "end-event");
-  const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && element.type !== "flowchart-parallel" && element.type !== "flowchart-decision" && element.type !== "flowchart-vswimlane" && !isBoundaryStartOrEnd;
+  const showLabel = element.type !== "initial-state" && element.type !== "history-state" && element.type !== "deep-history-state" && element.type !== "final-state" && element.type !== "fork-join" && element.type !== "flowchart-parallel" && element.type !== "flowchart-decision" && element.type !== "flowchart-vswimlane" && !isBoundaryStartOrEnd;
   // Review stickies hide (shape AND label) under the diagram-level toggle.
   const showReviewMarkers = useContext(ShowReviewCommentsCtx);
   const reviewCommentColorMap = useContext(ReviewCommentColorsCtx);

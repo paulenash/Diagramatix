@@ -5429,13 +5429,13 @@ export function DiagramEditor({
                     Process description
                   </button>
                 )}
-                {diagramType === "bpmn" && (
+                {(diagramType === "bpmn" || diagramType === "state-machine") && (
                   <>
                     <div className="border-t border-gray-100" />
                     <button
                       onClick={() => { setClearMenuOpen(false); setReviewIssues(null); setDiagramScan(checkDiagram(data)); }}
                       className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                      title="Check this diagram against the BPMN structural rules (the same rules the project-level scan uses)."
+                      title="Check this diagram against the structural rules (the same rules the project-level scan uses)."
                     >
                       Scan Diagram for Issues
                     </button>
