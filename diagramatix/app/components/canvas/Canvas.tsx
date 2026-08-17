@@ -29,7 +29,7 @@ import { GhostSuggestion } from "./GhostSuggestion";
 import type { NextStepCandidate } from "@/app/lib/diagram/nextSteps";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
-import { canConnect } from "@/app/lib/diagram/canConnect";
+import { getElementPoolId, computeDragContext, classifyDragTarget } from "@/app/lib/diagram/connectorHighlight";
 import { parseUmlAttribute, parseUmlOperation } from "@/app/lib/diagram/umlParse";
 
 // ── UML inline-editor assist popups (issue #10) ──
@@ -95,28 +95,6 @@ function isValidContextFlowPair(sourceType: string, targetType: string): boolean
   if (sourceType === "external-entity") return targetType === "process-system";
   if (sourceType === "process-system") return targetType === "external-entity";
   return false;
-}
-
-function getElementPoolId(el: DiagramElement, elements: DiagramElement[]): string | null {
-  if (el.type === "pool") return el.id;
-  // Try parentId chain first (fast path)
-  if (el.parentId) {
-    const parent = elements.find((e) => e.id === el.parentId);
-    if (parent?.type === "pool") return parent.id;
-    if (parent?.type === "lane") {
-      const gp = elements.find((e) => e.id === parent.parentId);
-      if (gp?.type === "pool") return gp.id;
-    }
-  }
-  // Fallback: position check — is this element's centre inside any pool?
-  const cx = el.x + el.width / 2;
-  const cy = el.y + el.height / 2;
-  const pool = elements.find(
-    (p) => p.type === "pool" &&
-      cx >= p.x && cx <= p.x + p.width &&
-      cy >= p.y && cy <= p.y + p.height
-  );
-  return pool?.id ?? null;
 }
 
 function getContainingPool(el: DiagramElement, elements: DiagramElement[]): DiagramElement | null {
@@ -4576,97 +4554,33 @@ export function Canvas({
       ? el : null;
   })();
 
-  // Precompute messageBPMN highlight context
-  const BPMN_TRIGGER_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded", "intermediate-event", "end-event", "pool"]);
+  // Precompute connector-highlight context
   const draggingSourceEl = draggingConnector
     ? (data.elements.find((e) => e.id === draggingConnector.fromId) ?? null)
     : null;
-  const isBpmnSource = draggingSourceEl ? BPMN_TRIGGER_TYPES.has(draggingSourceEl.type) : false;
-  // Single authority for the BPMN sequence-flow highlight: an element is a valid
-  // green sequence TARGET only when canConnect (the same predicate ADD_CONNECTOR
-  // enforces) accepts it. Applied at EVERY render pass that can carry a sequence
-  // highlight — EPs, boundary events, and plain elements each render in their own
-  // pass, so the gate must be uniform or the passes drift (the EP-boundary bug).
-  // A no-op for non-BPMN diagrams (transition/flow/flowline use their own rules).
-  const seqTargetOk = (el: DiagramElement): boolean =>
-    diagramType !== "bpmn" || !draggingSourceEl ||
-    canConnect(draggingSourceEl, el, "sequence", data.elements);
-  const draggingSourcePoolId = draggingSourceEl
-    ? getElementPoolId(draggingSourceEl, data.elements)
-    : null;
-  const draggingSourceIsData = draggingSourceEl ? DATA_ELEMENT_TYPES.has(draggingSourceEl.type) : false;
-  const draggingFromPool = draggingSourceEl?.type === "pool";
-  const draggingFromFreeEndEvent =
-    draggingSourceEl?.type === "end-event" && !draggingSourceEl.boundaryHostId;
-  const draggingFromEdgeMountedEndEvent =
-    draggingSourceEl?.type === "end-event" && !!draggingSourceEl.boundaryHostId;
-  const draggingFromEdgeMountedStartEvent =
-    draggingSourceEl?.type === "start-event" && !!draggingSourceEl.boundaryHostId;
-  const draggingFromEdgeMountedIntermediateSendEvent =
-    draggingSourceEl?.type === "intermediate-event" &&
-    !!draggingSourceEl.boundaryHostId &&
-    (draggingSourceEl.flowType === "throwing" || (draggingSourceEl.flowType == null && draggingSourceEl.taskType === "send"));
-  const draggingFromEdgeMountedIntermediateReceiveEvent =
-    draggingSourceEl?.type === "intermediate-event" &&
-    !!draggingSourceEl.boundaryHostId &&
-    draggingSourceEl.flowType === "catching";
-  const draggingFromEdgeMountedIntermediateEvent =
-    draggingFromEdgeMountedIntermediateSendEvent || draggingFromEdgeMountedIntermediateReceiveEvent;
-  // Edge-mounted (boundary) compensation event: a connector from it is a
-  // compensation Association whose ONLY valid targets are Activities — those
-  // are highlighted in a dedicated dark-yellow colour used only here.
-  const draggingFromEdgeMountedCompensationEvent =
-    draggingSourceEl?.type === "intermediate-event" &&
-    !!draggingSourceEl.boundaryHostId &&
-    draggingSourceEl.eventType === "compensation";
-  // A4: an edge-mounted compensation event may have only ONE outgoing
-  // compensation association. If it already has one, offer no targets.
-  const compEventAlreadyLinked =
-    draggingFromEdgeMountedCompensationEvent && !!draggingConnector &&
-    data.connectors.some((c) => c.type === "associationBPMN" && c.sourceId === draggingConnector!.fromId);
-  const compTargetsAvailable = draggingFromEdgeMountedCompensationEvent && !compEventAlreadyLinked;
-  const draggingSourceBoundaryHostId = draggingSourceEl?.boundaryHostId ?? null;
-  // State-machine: no connections FROM final-state or TO initial-state
-  const draggingFromFinalState = draggingSourceEl?.type === "final-state";
-  // BPMN: no sequence from Event Expanded Subprocess
-  const draggingFromEventSubprocess = draggingSourceEl?.type === "subprocess-expanded" &&
-    (draggingSourceEl.properties.subprocessType as string | undefined) === "event";
-  // BPMN: no sequence from inside an Event Expanded Subprocess to outside
-  const draggingFromInsideEventSubprocess = (() => {
-    if (!draggingSourceEl?.parentId) return false;
-    const p = data.elements.find(e => e.id === draggingSourceEl!.parentId);
-    return p?.type === "subprocess-expanded" && (p.properties.subprocessType as string | undefined) === "event";
-  })();
-  const CHILD_EVENT_TYPES_HIGHLIGHT = new Set(["start-event", "intermediate-event", "end-event"]);
-  // Compute ancestor IDs for dragging source (treating boundaryHostId as parent)
-  const draggingSourceAncestorIds = (() => {
-    if (!draggingSourceEl) return new Set<string>();
-    const ids = new Set<string>();
-    let cur: DiagramElement | undefined = draggingSourceEl;
-    const visited = new Set<string>();
-    while (cur && !visited.has(cur.id)) {
-      visited.add(cur.id);
-      const nextId: string | undefined = cur.boundaryHostId ?? cur.parentId;
-      if (nextId) { ids.add(nextId); cur = data.elements.find(e => e.id === nextId); }
-      else break;
-    }
-    return ids;
-  })();
-  const draggingFromChildEvent =
-    draggingSourceEl != null &&
-    CHILD_EVENT_TYPES_HIGHLIGHT.has(draggingSourceEl.type) &&
-    !draggingSourceEl.boundaryHostId &&
-    !!draggingSourceEl.parentId;
-  const draggingSourceParentId = draggingSourceEl?.parentId ?? null;
-  // Edge-mounted event on a child element inside an expanded subprocess
-  const draggingFromBoundaryOnChild =
-    draggingSourceEl != null &&
-    CHILD_EVENT_TYPES_HIGHLIGHT.has(draggingSourceEl.type) &&
-    !!draggingSourceEl.boundaryHostId &&
-    data.elements.some(e => e.id === draggingSourceEl.boundaryHostId && !!e.parentId);
-  const draggingSourceHostParentId = draggingFromBoundaryOnChild
-    ? data.elements.find(e => e.id === draggingSourceEl!.boundaryHostId)?.parentId ?? null
-    : null;
+  // All drag-SOURCE classification now lives in the pure, tested module
+  // (app/lib/diagram/connectorHighlight.ts) so the render passes and the test
+  // suite share ONE definition of every `draggingFrom*` rule.
+  const _dctx = computeDragContext(draggingSourceEl, data.elements, data.connectors, draggingConnector?.fromId);
+  const draggingSourcePoolId = _dctx.sourcePoolId;
+  const draggingSourceIsData = _dctx.sourceIsData;
+  const draggingFromPool = _dctx.fromPool;
+  const draggingFromFreeEndEvent = _dctx.fromFreeEndEvent;
+  const draggingFromEdgeMountedEndEvent = _dctx.fromEdgeMountedEndEvent;
+  const draggingFromEdgeMountedStartEvent = _dctx.fromEdgeMountedStartEvent;
+  const draggingFromEdgeMountedIntermediateSendEvent = _dctx.fromEdgeMountedIntermediateSendEvent;
+  const draggingFromEdgeMountedIntermediateReceiveEvent = _dctx.fromEdgeMountedIntermediateReceiveEvent;
+  const draggingFromEdgeMountedCompensationEvent = _dctx.fromEdgeMountedCompensationEvent;
+  const compTargetsAvailable = _dctx.compTargetsAvailable;
+  const draggingSourceBoundaryHostId = _dctx.sourceBoundaryHostId;
+  const draggingFromFinalState = _dctx.fromFinalState;
+  const draggingFromEventSubprocess = _dctx.fromEventSubprocess;
+  const draggingFromInsideEventSubprocess = _dctx.fromInsideEventSubprocess;
+  const draggingSourceAncestorIds = _dctx.sourceAncestorIds;
+  const draggingFromChildEvent = _dctx.fromChildEvent;
+  const draggingSourceParentId = _dctx.sourceParentId;
+  const draggingFromBoundaryOnChild = _dctx.fromBoundaryOnChild;
+  const draggingSourceHostParentId = _dctx.sourceHostParentId;
 
   // Compute misaligned messageBPMN connectors: (a) no x-overlap between source
   // and target, or (b) attached to a white-box pool (messages can only touch
@@ -5357,13 +5271,16 @@ export function Canvas({
               overlay block at the END of this group, so the whole
               moving template stays above the existing diagram. */}
           {[...pools, ...vswimlanes, ...otherContainers].filter(el => !inActiveGroup(el.id)).map((el) => {
+            // Highlight rules: app/lib/diagram/connectorHighlight.ts (tested).
+            // This pass renders pools / swimlanes / composite-states (no EPs), so
+            // only pool (message) and composite-state (sequence) can highlight —
+            // classify is consulted for exactly those to avoid misclassifying a
+            // swimlane as a plain target.
+            const h = (el.type === "pool" || el.type === "composite-state")
+              ? classifyDragTarget(draggingSourceEl, el, _dctx, data.elements, data.connectors, diagramType)
+              : null;
             const isMsgTarget =
-              (isDraggingConnector && isBpmnSource &&
-                el.type === "pool" && el.id !== draggingSourcePoolId &&
-                ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box" &&
-                !draggingFromEdgeMountedEndEvent &&
-                !draggingFromEdgeMountedStartEvent &&
-                !draggingFromEdgeMountedIntermediateReceiveEvent) // receive can only target subprocess children
+              (h?.message ?? false)
               ||
               (isMessageBpmnEndpointDrag &&
                 el.type === "pool" &&
@@ -5373,35 +5290,10 @@ export function Canvas({
                 ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box");
             const isWhiteBoxPool = el.type === "pool" &&
               ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-            const isEventSubprocess = el.type === "subprocess-expanded" &&
-              (el.properties.subprocessType as string | undefined) === "event";
-            const isSubExpDropTarget = isDraggingConnector && !draggingSourceIsData &&
-              el.type === "subprocess-expanded" &&
-              !isEventSubprocess && // never highlight Event Expanded Subprocesses as sequence targets
-              !draggingFromEventSubprocess && // Event Expanded Subprocesses cannot create sequence connectors
-              !draggingFromInsideEventSubprocess && // elements inside Event subprocesses cannot connect out
-              !draggingFromEdgeMountedCompensationEvent && // compensation uses its own dark-yellow target, never green
-              el.id !== draggingConnector!.fromId &&
-              el.id !== (draggingSourceEl?.parentId ?? "") && // rule 4: child cannot target its own parent subprocess
-              !draggingFromEdgeMountedStartEvent &&
-              !draggingFromEdgeMountedIntermediateReceiveEvent && // receive can only target subprocess children
-              seqTargetOk(el); // canConnect authority (this pass renders composite-state, not EPs; kept uniform)
-            const isSubExpAssocTarget = isDraggingConnector && draggingSourceIsData &&
-              el.type === "subprocess-expanded" &&
-              el.id !== draggingConnector!.fromId;
-            // Compensation association: an Expanded Sub-Process (not an event sub,
-            // not the event's own host) is a valid dark-yellow handler target.
-            const isSubExpCompTarget = isDraggingConnector && compTargetsAvailable &&
-              el.type === "subprocess-expanded" &&
-              !isEventSubprocess &&
-              el.id !== draggingConnector!.fromId &&
-              el.id !== draggingSourceBoundaryHostId;
-            const isCompositeDropTarget =
-              isDraggingConnector &&
-              !draggingSourceIsData &&
-              el.type === "composite-state" &&
-              el.id !== draggingConnector!.fromId &&
-              draggingSourceEl?.parentId !== el.id; // source must be outside this composite-state
+            const isSubExpDropTarget = false; // no EPs render in this pass
+            const isSubExpAssocTarget = false;
+            const isSubExpCompTarget = false;
+            const isCompositeDropTarget = h?.sequence ?? false;
             // Orange border when element is being dragged into this subprocess-expanded
             const draggingEl = draggingElementId ? data.elements.find(e => e.id === draggingElementId) : null;
             const isElementDragTarget = el.type === "subprocess-expanded" &&
@@ -5678,26 +5570,11 @@ export function Canvas({
               sit above the lane background (issue 5). Depth-sorted so a
               nested EP paints over its parent EP. */}
           {expandedSubprocesses.filter(el => !inActiveGroup(el.id)).map((el) => {
-            const isEventSubprocess = el.type === "subprocess-expanded" &&
-              (el.properties.subprocessType as string | undefined) === "event";
-            const isSubExpDropTarget = isDraggingConnector && !draggingSourceIsData &&
-              !isEventSubprocess &&
-              !draggingFromEventSubprocess &&
-              !draggingFromInsideEventSubprocess &&
-              !draggingFromEdgeMountedCompensationEvent && // compensation uses its own dark-yellow target, never green
-              el.id !== draggingConnector!.fromId &&
-              el.id !== (draggingSourceEl?.parentId ?? "") &&
-              !draggingFromEdgeMountedStartEvent &&
-              !draggingFromEdgeMountedIntermediateReceiveEvent &&
-              seqTargetOk(el); // canConnect is the final authority (EP-scope rule)
-            const isSubExpAssocTarget = isDraggingConnector && draggingSourceIsData &&
-              el.id !== draggingConnector!.fromId;
-            // Compensation association: an Expanded Sub-Process (not an event sub,
-            // not the event's own host) is a valid dark-yellow handler target.
-            const isSubExpCompTarget = isDraggingConnector && compTargetsAvailable &&
-              !isEventSubprocess &&
-              el.id !== draggingConnector!.fromId &&
-              el.id !== draggingSourceBoundaryHostId;
+            // Highlight rules: app/lib/diagram/connectorHighlight.ts (tested).
+            const h = classifyDragTarget(draggingSourceEl, el, _dctx, data.elements, data.connectors, diagramType);
+            const isSubExpDropTarget = h.sequence;
+            const isSubExpAssocTarget = h.association;
+            const isSubExpCompTarget = h.compensation;
             const draggingEl = draggingElementId ? data.elements.find(e => e.id === draggingElementId) : null;
             const isElementDragTarget = draggingEl != null &&
               (draggingEl.x + draggingEl.width / 2) >= el.x &&
@@ -5834,110 +5711,14 @@ export function Canvas({
                el.boundaryHostId === draggingSourceEl.id);
             if (isDraggingConnector && el.id !== draggingConnector!.fromId && !skipBecauseExpandedSelfContent
                 && !draggingFromFinalState && el.type !== "initial-state") {
-              const elIsData = DATA_ELEMENT_TYPES.has(el.type);
-              // End events are always senders — never valid messageBPMN targets.
-              // Send tasks / throwing events are excluded only if they already have an
-              // outgoing messageBPMN connector; otherwise they can be targets (auto-flipped
-              // to receive/catching on connection).
-              const elIsSendLocked = el.type === "end-event"
-                || ((el.taskType === "send" || el.flowType === "throwing")
-                    && data.connectors.some(c => c.type === "messageBPMN" && c.sourceId === el.id));
-              if (draggingFromEdgeMountedCompensationEvent) {
-                // Compensation association: ONLY Activities are valid targets,
-                // highlighted in the dedicated dark-yellow colour used only here.
-                // A2: never the event's own host. A4: none once already linked.
-                if (compTargetsAvailable
-                    && (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded")
-                    && el.id !== draggingSourceBoundaryHostId) {
-                  elIsCompTarget = true;
-                }
-              } else if (draggingFromPool) {
-                // Pools can only create messageBPMN — target elements in other white-box pools
-                if (!elIsData && !elIsSendLocked) {
-                  const elPoolId = getElementPoolId(el, data.elements);
-                  if (elPoolId && elPoolId !== draggingSourcePoolId) {
-                    const elPool = data.elements.find((p) => p.id === elPoolId);
-                    if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
-                      elIsMsgTarget = true;
-                    }
-                  }
-                }
-              } else if (draggingSourceIsData && !elIsData) {
-                elIsAssocTarget = true;
-              } else if (draggingSourceIsData && elIsData) {
-                // Data → data is not a legal connector. Leave all flags false
-                // so the target receives no highlight at all.
-              } else if (!draggingSourceIsData && elIsData) {
-                elIsAssocTarget = true;
-              } else if (draggingFromBoundaryOnChild) {
-                // Edge-mounted event on a child element inside expanded subprocess
-                // Child events in same subprocess → dual highlight (sequence + association)
-                // Other valid targets → sequence only
-                if (CHILD_EVENT_TYPES_HIGHLIGHT.has(el.type) && !el.boundaryHostId && el.parentId === draggingSourceHostParentId) {
-                  elIsDropTarget = true;
-                  elIsAssocTarget = true;
-                } else {
-                  const elPoolId = getElementPoolId(el, data.elements);
-                  if (elPoolId === draggingSourcePoolId || !elPoolId) {
-                    elIsDropTarget = true;
-                  }
-                }
-              } else if (draggingFromFreeEndEvent) {
-                // Free-standing end-event: messageBPMN targets only in white-box pools
-                if (!elIsData && !elIsSendLocked) {
-                  const elPoolId = getElementPoolId(el, data.elements);
-                  if (elPoolId) {
-                    const elPool = data.elements.find((p) => p.id === elPoolId);
-                    if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
-                      elIsMsgTarget = true;
-                    }
-                  }
-                }
-              } else if (draggingFromEdgeMountedEndEvent) {
-                // Edge-mounted end-event: sequence targets outside the parent subprocess (same/no pool, not children)
-                const elPoolId = getElementPoolId(el, data.elements);
-                if ((elPoolId === draggingSourcePoolId || !elPoolId) && el.parentId !== draggingSourceBoundaryHostId) {
-                  elIsDropTarget = true;
-                }
-              } else if (draggingFromEdgeMountedStartEvent) {
-                // Rule 2: edge-mounted start event — only children of its parent subprocess
-                if (el.parentId === draggingSourceBoundaryHostId) elIsDropTarget = true;
-              } else if (draggingFromEdgeMountedIntermediateSendEvent) {
-                // Rule 3 (send): any element except children of its parent subprocess
-                if (el.parentId !== draggingSourceBoundaryHostId) {
-                  const elPoolId = getElementPoolId(el, data.elements);
-                  if (elPoolId === draggingSourcePoolId) {
-                    elIsDropTarget = true;
-                  } else if (elPoolId && elPoolId !== draggingSourcePoolId && !elIsData && !elIsSendLocked) {
-                    const elPool = data.elements.find((p) => p.id === elPoolId);
-                    if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") elIsMsgTarget = true;
-                  } else if (!elPoolId) {
-                    elIsDropTarget = true;
-                  }
-                }
-              } else if (draggingFromEdgeMountedIntermediateReceiveEvent) {
-                // Rule 3 (receive): only children of its parent subprocess
-                if (el.parentId === draggingSourceBoundaryHostId) elIsDropTarget = true;
-              } else if (!isBpmnSource || !draggingSourcePoolId) {
-                // Context-Diagram rule: only the complementary type
-                // (entity ↔ process) is a valid flow target. Other diagram
-                // types remain unrestricted.
-                if ((diagramType === "context" || diagramType === "basic") && draggingSourceEl) {
-                  elIsDropTarget = isValidContextFlowPair(draggingSourceEl.type, el.type);
-                } else {
-                  elIsDropTarget = true;
-                }
-              } else {
-                const elPoolId = getElementPoolId(el, data.elements);
-                if (elPoolId === draggingSourcePoolId) {
-                  elIsDropTarget = true;
-                } else if (elPoolId && elPoolId !== draggingSourcePoolId && !elIsData && !elIsSendLocked) {
-                  const elPool = data.elements.find((p) => p.id === elPoolId);
-                  const elPoolIsWhiteBox =
-                    ((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-                  if (elPoolIsWhiteBox) elIsMsgTarget = true;
-                }
-              }
+              // New-connector drag highlight rules live in the tested module
+              // app/lib/diagram/connectorHighlight.ts (classifyDragTarget). The
+              // green (sequence) flag it returns is already gated by canConnect.
+              const h = classifyDragTarget(draggingSourceEl, el, _dctx, data.elements, data.connectors, diagramType);
+              elIsDropTarget = h.sequence;
+              elIsMsgTarget = h.message;
+              elIsAssocTarget = h.association;
+              elIsCompTarget = h.compensation;
             } else if (isMessageBpmnEndpointDrag) {
               // Any message endpoint (on a pool, task or event) may re-attach to
               // a task/subprocess inside any white-box pool. No restriction on
@@ -5992,32 +5773,9 @@ export function Canvas({
                 }
               }
             }
-            // Sequence target validation — sync with ADD_CONNECTOR rules
-            // Non-boundary start events cannot be sequence targets (boundary ones CAN from outside)
-            if (el.type === "start-event" && !el.boundaryHostId) elIsDropTarget = false;
-            // Event Expanded Subprocess as source: no sequence to anything
-            if (elIsDropTarget && draggingFromEventSubprocess) elIsDropTarget = false;
-            // Source inside an Event Expanded Subprocess: no sequence to outside
-            if (elIsDropTarget && draggingFromInsideEventSubprocess) {
-              const srcParent = data.elements.find(p => p.id === draggingSourceEl!.parentId);
-              if (srcParent && el.parentId !== srcParent.id) elIsDropTarget = false;
-            }
-            // Target inside an Event Expanded Subprocess: no sequence from outside
-            if (elIsDropTarget && el.parentId) {
-              const _elP = data.elements.find(p => p.id === el.parentId);
-              if (_elP?.type === "subprocess-expanded" && (_elP.properties.subprocessType as string | undefined) === "event") {
-                if (draggingConnector && draggingSourceEl?.parentId !== _elP.id) elIsDropTarget = false;
-              }
-            }
-            // A Compensation Activity participates only via its compensation
-            // association — never a sequence flow. It is not a valid sequence
-            // TARGET, and no sequence may start FROM it (so no green highlight
-            // when dragging from it). Messages / data associations still apply.
-            if (elIsDropTarget && el.properties?.isForCompensation === true) elIsDropTarget = false;
-            if (elIsDropTarget && draggingSourceEl?.properties?.isForCompensation === true) elIsDropTarget = false;
-            // Final authority: canConnect (see seqTargetOk) — the EP-scope rules
-            // live there, not duplicated here.
-            if (elIsDropTarget && !seqTargetOk(el)) elIsDropTarget = false;
+            // (Sequence gates — non-boundary start, event-subprocess scope,
+            // compensation-activity, EP-scope — are applied inside
+            // classifyDragTarget via canConnect; no duplication needed here.)
             return (
             <SymbolRenderer
               key={el.id}
@@ -6159,98 +5917,18 @@ export function Canvas({
                (diagramType === "domain" && DOMAIN_SELF_TARGET_TYPES.has(el.type)));
             if (isDraggingConnector && (el.id !== draggingConnector!.fromId || isSelfStateTarget) && !skipBecauseOwnBoundary
                 && !draggingFromFinalState && el.type !== "initial-state") {
-              // Throwing/send boundary events excluded only if they already have an outgoing messageBPMN
-              const bEvtIsSendLocked = (el.flowType === "throwing" || el.taskType === "send")
-                && data.connectors.some(c => c.type === "messageBPMN" && c.sourceId === el.id);
-              if (draggingFromPool) {
-                // Pools can only create messageBPMN — boundary catching intermediate-events in other white-box pools
-                const elPoolId = getElementPoolId(el, data.elements);
-                if (elPoolId && elPoolId !== draggingSourcePoolId && el.type === "intermediate-event" && !bEvtIsSendLocked) {
-                  const elPool = data.elements.find((p) => p.id === elPoolId);
-                  if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
-                    elIsMsgTarget = true;
-                  }
-                }
-              } else if ((draggingFromChildEvent || draggingFromBoundaryOnChild) &&
-                  el.boundaryHostId && draggingSourceAncestorIds.has(el.boundaryHostId)) {
-                elIsAssocTarget = true; // purple — associationBPMN to boundary event on ancestor
-              } else if (draggingSourceIsData) {
-                elIsAssocTarget = true;
-              } else if (draggingFromFreeEndEvent) {
-                // Free-standing end-event: boundary catching intermediate-events in other white-box pools are messageBPMN targets
-                const elPoolId = getElementPoolId(el, data.elements);
-                if (elPoolId && el.type === "intermediate-event" && !bEvtIsSendLocked) {
-                  const elPool = data.elements.find((p) => p.id === elPoolId);
-                  if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
-                    elIsMsgTarget = true;
-                  }
-                }
-              } else if (draggingFromEdgeMountedEndEvent) {
-                // Edge-mounted end-event: boundary events in same pool, but not on elements inside the subprocess
-                const elPoolId = getElementPoolId(el, data.elements);
-                const hostEl = data.elements.find((e) => e.id === el.boundaryHostId);
-                if (elPoolId === draggingSourcePoolId && hostEl?.parentId !== draggingSourceBoundaryHostId) {
-                  elIsDropTarget = true;
-                }
-              } else if (draggingFromEdgeMountedStartEvent) {
-                // Rule 2: edge-mounted start event — boundary events are not inside the subprocess, so not targets
-                // (no action — elIsDropTarget stays false)
-              } else if (draggingFromEdgeMountedIntermediateSendEvent) {
-                // Rule 5: exclude boundary events on the same parent subprocess
-                // Rule 3 (send): also exclude those whose host is a child of the parent subprocess
-                if (el.boundaryHostId !== draggingSourceBoundaryHostId) {
-                  const hostEl = data.elements.find((e) => e.id === el.boundaryHostId);
-                  if (!hostEl || hostEl.parentId !== draggingSourceBoundaryHostId) {
-                    const elPoolId = getElementPoolId(el, data.elements);
-                    if (elPoolId === draggingSourcePoolId) elIsDropTarget = true;
-                    else if (elPoolId && elPoolId !== draggingSourcePoolId && el.type === "intermediate-event" && !bEvtIsSendLocked) {
-                      const elPool = data.elements.find((p) => p.id === elPoolId);
-                      if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") elIsMsgTarget = true;
-                    }
-                  }
-                }
-              } else if (draggingFromEdgeMountedIntermediateReceiveEvent) {
-                // Rule 3 (receive): boundary events are not subprocess children, not valid targets
-                // Rule 5: also not targets for receive events
-                // (no action — elIsDropTarget stays false)
-              } else if (!isBpmnSource || !draggingSourcePoolId) {
-                elIsDropTarget = true;
-              } else {
-                const elPoolId = getElementPoolId(el, data.elements);
-                if (elPoolId === draggingSourcePoolId) {
-                  elIsDropTarget = true;
-                } else if (elPoolId && elPoolId !== draggingSourcePoolId && el.type === "intermediate-event" && !bEvtIsSendLocked) {
-                  const elPool = data.elements.find((p) => p.id === elPoolId);
-                  const elPoolIsWhiteBox =
-                    ((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-                  if (elPoolIsWhiteBox) elIsMsgTarget = true;
-                }
-              }
+              // New-connector drag highlight rules: the tested module
+              // (classifyDragTarget) — its boundary-event branch. Green is
+              // already gated by canConnect.
+              const h = classifyDragTarget(draggingSourceEl, el, _dctx, data.elements, data.connectors, diagramType);
+              elIsDropTarget = h.sequence;
+              elIsMsgTarget = h.message;
+              elIsAssocTarget = h.association;
             } else if (isAssocBpmnEndpointDrag && el.id !== epDragMovingId) {
               const elIsData = DATA_ELEMENT_TYPES.has(el.type);
               if (epDragFixedIsData && !elIsData) elIsAssocTarget = true;
               else if (!epDragFixedIsData && elIsData) elIsAssocTarget = true;
             }
-            // Sequence target validation — sync with ADD_CONNECTOR rules
-            // Non-boundary start events cannot be sequence targets (boundary ones CAN from outside)
-            if (el.type === "start-event" && !el.boundaryHostId) elIsDropTarget = false;
-            // Event Expanded Subprocess as source: no sequence to anything
-            if (elIsDropTarget && draggingFromEventSubprocess) elIsDropTarget = false;
-            // Source inside an Event Expanded Subprocess: no sequence to outside
-            if (elIsDropTarget && draggingFromInsideEventSubprocess) {
-              const srcParent = data.elements.find(p => p.id === draggingSourceEl!.parentId);
-              if (srcParent && el.parentId !== srcParent.id) elIsDropTarget = false;
-            }
-            // Target inside an Event Expanded Subprocess: no sequence from outside
-            if (elIsDropTarget && el.parentId) {
-              const _elP = data.elements.find(p => p.id === el.parentId);
-              if (_elP?.type === "subprocess-expanded" && (_elP.properties.subprocessType as string | undefined) === "event") {
-                if (draggingConnector && draggingSourceEl?.parentId !== _elP.id) elIsDropTarget = false;
-              }
-            }
-            // Final authority: canConnect (see seqTargetOk) — boundary events
-            // (edge-mounted start/end) as source or target obey the EP-scope rules.
-            if (elIsDropTarget && !seqTargetOk(el)) elIsDropTarget = false;
             return (
               <SymbolRenderer
                 key={el.id}

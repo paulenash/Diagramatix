@@ -1,0 +1,367 @@
+/**
+ * Pure, testable business rules for the connector drop-target HIGHLIGHT — the
+ * green / blue / purple / dark-yellow rings the canvas draws on candidate
+ * elements while a connector is being dragged from a source.
+ *
+ * Canvas.tsx renders drop targets in several independent passes (plain
+ * elements, expanded subprocesses, boundary events, …). To stop those passes
+ * drifting apart (the EP-boundary regression), the rules live here and every
+ * pass consumes them:
+ *   • `computeDragContext(source)` classifies the SOURCE once (is it an
+ *     edge-mounted start? a compensation event? inside an Event subprocess? …).
+ *   • `isSequenceHighlightTarget(source, target)` is the single authority for
+ *     the green SEQUENCE highlight — a faithful delegate to `canConnect`, the
+ *     same predicate `ADD_CONNECTOR` enforces on commit.
+ *
+ * These are covered by tests/diagram/connector-highlight.test.ts.
+ */
+import type { DiagramElement, Connector, DiagramType } from "./types";
+import { canConnect } from "./canConnect";
+
+const DATA_ELEMENT_TYPES = new Set<string>(["data-object", "data-store", "text-annotation"]);
+const CHILD_EVENT_TYPES_HIGHLIGHT = new Set<string>(["start-event", "intermediate-event", "end-event"]);
+
+/** The pool an element belongs to (id), or null at the top level. Pure. */
+export function getElementPoolId(el: DiagramElement, elements: DiagramElement[]): string | null {
+  if (el.type === "pool") return el.id;
+  // Try parentId chain first (fast path)
+  if (el.parentId) {
+    const parent = elements.find((e) => e.id === el.parentId);
+    if (parent?.type === "pool") return parent.id;
+    if (parent?.type === "lane") {
+      const gp = elements.find((e) => e.id === parent.parentId);
+      if (gp?.type === "pool") return gp.id;
+    }
+  }
+  // Fallback: position check — is this element's centre inside any pool?
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const pool = elements.find(
+    (p) => p.type === "pool" &&
+      cx >= p.x && cx <= p.x + p.width &&
+      cy >= p.y && cy <= p.y + p.height
+  );
+  return pool?.id ?? null;
+}
+
+/**
+ * The SOURCE end of a connector drag, classified into the flags the highlight
+ * passes branch on. A verbatim extraction of the `draggingFrom*` consts that
+ * used to live inline in Canvas.tsx.
+ */
+export interface DragContext {
+  sourcePoolId: string | null;
+  sourceIsData: boolean;
+  sourceBoundaryHostId: string | null;
+  sourceParentId: string | null;
+  sourceAncestorIds: Set<string>;
+  sourceHostParentId: string | null;
+  fromPool: boolean;
+  fromFreeEndEvent: boolean;
+  fromEdgeMountedEndEvent: boolean;
+  fromEdgeMountedStartEvent: boolean;
+  fromEdgeMountedIntermediateSendEvent: boolean;
+  fromEdgeMountedIntermediateReceiveEvent: boolean;
+  fromEdgeMountedIntermediateEvent: boolean;
+  fromEdgeMountedCompensationEvent: boolean;
+  compEventAlreadyLinked: boolean;
+  compTargetsAvailable: boolean;
+  fromFinalState: boolean;
+  fromEventSubprocess: boolean;
+  fromInsideEventSubprocess: boolean;
+  fromChildEvent: boolean;
+  fromBoundaryOnChild: boolean;
+}
+
+/**
+ * Classify a drag SOURCE. `sourceId` is the id being dragged from (used to
+ * detect a compensation event that is already linked). Pure — no React, no
+ * canvas geometry.
+ */
+export function computeDragContext(
+  source: DiagramElement | null,
+  elements: DiagramElement[],
+  connectors: Connector[],
+  sourceId?: string,
+): DragContext {
+  const empty: DragContext = {
+    sourcePoolId: null, sourceIsData: false, sourceBoundaryHostId: null, sourceParentId: null,
+    sourceAncestorIds: new Set(), sourceHostParentId: null,
+    fromPool: false, fromFreeEndEvent: false, fromEdgeMountedEndEvent: false,
+    fromEdgeMountedStartEvent: false, fromEdgeMountedIntermediateSendEvent: false,
+    fromEdgeMountedIntermediateReceiveEvent: false, fromEdgeMountedIntermediateEvent: false,
+    fromEdgeMountedCompensationEvent: false, compEventAlreadyLinked: false, compTargetsAvailable: false,
+    fromFinalState: false, fromEventSubprocess: false, fromInsideEventSubprocess: false,
+    fromChildEvent: false, fromBoundaryOnChild: false,
+  };
+  if (!source) return empty;
+
+  const sourcePoolId = getElementPoolId(source, elements);
+  const sourceIsData = DATA_ELEMENT_TYPES.has(source.type);
+  const fromPool = source.type === "pool";
+  const fromFreeEndEvent = source.type === "end-event" && !source.boundaryHostId;
+  const fromEdgeMountedEndEvent = source.type === "end-event" && !!source.boundaryHostId;
+  const fromEdgeMountedStartEvent = source.type === "start-event" && !!source.boundaryHostId;
+  const fromEdgeMountedIntermediateSendEvent =
+    source.type === "intermediate-event" && !!source.boundaryHostId &&
+    (source.flowType === "throwing" || (source.flowType == null && source.taskType === "send"));
+  const fromEdgeMountedIntermediateReceiveEvent =
+    source.type === "intermediate-event" && !!source.boundaryHostId && source.flowType === "catching";
+  const fromEdgeMountedIntermediateEvent =
+    fromEdgeMountedIntermediateSendEvent || fromEdgeMountedIntermediateReceiveEvent;
+  const fromEdgeMountedCompensationEvent =
+    source.type === "intermediate-event" && !!source.boundaryHostId && source.eventType === "compensation";
+  const compEventAlreadyLinked =
+    fromEdgeMountedCompensationEvent && !!sourceId &&
+    connectors.some((c) => c.type === "associationBPMN" && c.sourceId === sourceId);
+  const compTargetsAvailable = fromEdgeMountedCompensationEvent && !compEventAlreadyLinked;
+  const fromFinalState = source.type === "final-state";
+  const fromEventSubprocess = source.type === "subprocess-expanded" &&
+    (source.properties.subprocessType as string | undefined) === "event";
+  const fromInsideEventSubprocess = (() => {
+    if (!source.parentId) return false;
+    const p = elements.find((e) => e.id === source.parentId);
+    return p?.type === "subprocess-expanded" && (p.properties.subprocessType as string | undefined) === "event";
+  })();
+  const sourceAncestorIds = (() => {
+    const ids = new Set<string>();
+    let cur: DiagramElement | undefined = source;
+    const visited = new Set<string>();
+    while (cur && !visited.has(cur.id)) {
+      visited.add(cur.id);
+      const nextId: string | undefined = cur.boundaryHostId ?? cur.parentId;
+      if (nextId) { ids.add(nextId); cur = elements.find((e) => e.id === nextId); }
+      else break;
+    }
+    return ids;
+  })();
+  const fromChildEvent =
+    CHILD_EVENT_TYPES_HIGHLIGHT.has(source.type) && !source.boundaryHostId && !!source.parentId;
+  const fromBoundaryOnChild =
+    CHILD_EVENT_TYPES_HIGHLIGHT.has(source.type) && !!source.boundaryHostId &&
+    elements.some((e) => e.id === source.boundaryHostId && !!e.parentId);
+  const sourceHostParentId = fromBoundaryOnChild
+    ? elements.find((e) => e.id === source.boundaryHostId)?.parentId ?? null
+    : null;
+
+  return {
+    sourcePoolId, sourceIsData, sourceBoundaryHostId: source.boundaryHostId ?? null,
+    sourceParentId: source.parentId ?? null, sourceAncestorIds, sourceHostParentId,
+    fromPool, fromFreeEndEvent, fromEdgeMountedEndEvent, fromEdgeMountedStartEvent,
+    fromEdgeMountedIntermediateSendEvent, fromEdgeMountedIntermediateReceiveEvent,
+    fromEdgeMountedIntermediateEvent, fromEdgeMountedCompensationEvent, compEventAlreadyLinked,
+    compTargetsAvailable, fromFinalState, fromEventSubprocess, fromInsideEventSubprocess,
+    fromChildEvent, fromBoundaryOnChild,
+  };
+}
+
+/**
+ * The SINGLE authority for the green SEQUENCE-flow highlight. An element is a
+ * valid green target only when `canConnect` (the predicate `ADD_CONNECTOR`
+ * enforces on commit) accepts a sequence flow to it. Every canvas render pass
+ * calls this, so the highlight can never diverge from what a drop will accept.
+ *
+ * A no-op (always true) for non-BPMN diagrams — transition / flow / flowline
+ * connectors carry their own, separate rules elsewhere.
+ */
+export function isSequenceHighlightTarget(
+  source: DiagramElement,
+  target: DiagramElement,
+  elements: DiagramElement[],
+  diagramType: DiagramType,
+): boolean {
+  if (diagramType !== "bpmn") return true;
+  return canConnect(source, target, "sequence", elements);
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Full drop-target classification for a NEW connector drag.
+// A verbatim port of the per-branch logic that used to live inline in the
+// canvas render passes (non-containers, boundary events, expanded subprocesses,
+// and pool/composite container targets). Endpoint-RECONNECTION drags (moving an
+// existing message/association end) are a SEPARATE mode, still handled inline in
+// Canvas.tsx and NOT covered here.
+// ───────────────────────────────────────────────────────────────────────────
+
+const BPMN_TRIGGER_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded", "intermediate-event", "end-event", "pool"]);
+const COMP_ACTIVITY_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded"]);
+// Container element types that are never a new-connector drop target.
+const NON_TARGET_TYPES = new Set<string>(["lane", "group", "system-boundary", "process-group", "uml-package", "review-comment"]);
+
+/** The four connector-highlight colours a candidate target can receive. */
+export interface TargetHighlight {
+  sequence: boolean;     // green  — sequence / flow / flowline / transition
+  message: boolean;      // blue   — messageBPMN
+  association: boolean;  // purple — associationBPMN
+  compensation: boolean; // dark-yellow — compensation association (Activity)
+}
+
+const NO_HIGHLIGHT: TargetHighlight = { sequence: false, message: false, association: false, compensation: false };
+
+function isValidContextFlowPair(sourceType: string, targetType: string): boolean {
+  if (sourceType === "external-entity") return targetType === "process-system";
+  if (sourceType === "process-system") return targetType === "external-entity";
+  return false;
+}
+
+const isWhiteBoxPool = (poolId: string | null, elements: DiagramElement[]): boolean => {
+  if (!poolId) return false;
+  const p = elements.find((e) => e.id === poolId);
+  return ((p?.properties.poolType as string | undefined) ?? "black-box") === "white-box";
+};
+
+/**
+ * Classify one candidate `target` for a NEW connector drag from `source`.
+ * `ctx` must be `computeDragContext(source, …)`. Returns which highlight (if
+ * any) the element should receive. Pure.
+ */
+export function classifyDragTarget(
+  source: DiagramElement | null,
+  target: DiagramElement,
+  ctx: DragContext,
+  elements: DiagramElement[],
+  connectors: Connector[],
+  diagramType: DiagramType,
+  opts?: { isSelfLoopTarget?: boolean },
+): TargetHighlight {
+  if (!source) return NO_HIGHLIGHT;
+  // Universal gates (shared by every pass).
+  if (target.id === source.id && !opts?.isSelfLoopTarget) return NO_HIGHLIGHT;
+  if (ctx.fromFinalState) return NO_HIGHLIGHT;
+  if (target.type === "initial-state") return NO_HIGHLIGHT;
+  // Dragging from an EP never highlights its OWN contents / boundary events.
+  if (source.type === "subprocess-expanded" &&
+      (target.parentId === source.id || target.boundaryHostId === source.id)) return NO_HIGHLIGHT;
+
+  const isBpmnSource = BPMN_TRIGGER_TYPES.has(source.type);
+  let out: TargetHighlight;
+
+  if (target.type === "pool") {
+    out = classifyPoolTarget(target, ctx, isBpmnSource);
+  } else if (target.type === "composite-state") {
+    out = { ...NO_HIGHLIGHT, sequence: !ctx.sourceIsData && source.parentId !== target.id };
+  } else if (NON_TARGET_TYPES.has(target.type)) {
+    out = NO_HIGHLIGHT;
+  } else if (target.type === "subprocess-expanded") {
+    out = classifyEpTarget(target, ctx);
+  } else if (target.boundaryHostId) {
+    out = classifyBoundaryTarget(source, target, ctx, elements, connectors, isBpmnSource);
+  } else {
+    out = classifyPlainTarget(source, target, ctx, elements, connectors, diagramType, isBpmnSource);
+  }
+
+  // Single authority for the green highlight: canConnect (BPMN) — see
+  // isSequenceHighlightTarget. Subsumes the old event-subprocess / non-boundary
+  // -start / compensation-activity gates, so they need not be duplicated here.
+  if (out.sequence && !isSequenceHighlightTarget(source, target, elements, diagramType)) {
+    out = { ...out, sequence: false };
+  }
+  return out;
+}
+
+function classifyPoolTarget(target: DiagramElement, ctx: DragContext, isBpmnSource: boolean): TargetHighlight {
+  const poolType = (target.properties.poolType as string | undefined) ?? "black-box";
+  const message = isBpmnSource && target.id !== ctx.sourcePoolId && poolType === "black-box"
+    && !ctx.fromEdgeMountedEndEvent && !ctx.fromEdgeMountedStartEvent && !ctx.fromEdgeMountedIntermediateReceiveEvent;
+  return { ...NO_HIGHLIGHT, message };
+}
+
+function classifyEpTarget(target: DiagramElement, ctx: DragContext): TargetHighlight {
+  const isEventSub = (target.properties.subprocessType as string | undefined) === "event";
+  const sequence = !ctx.sourceIsData && !isEventSub && !ctx.fromEventSubprocess && !ctx.fromInsideEventSubprocess
+    && !ctx.fromEdgeMountedCompensationEvent && target.id !== ctx.sourceParentId
+    && !ctx.fromEdgeMountedStartEvent && !ctx.fromEdgeMountedIntermediateReceiveEvent;
+  const association = ctx.sourceIsData;
+  const compensation = ctx.compTargetsAvailable && !isEventSub && target.id !== ctx.sourceBoundaryHostId;
+  return { sequence, message: false, association, compensation };
+}
+
+function classifyBoundaryTarget(
+  source: DiagramElement, target: DiagramElement, ctx: DragContext,
+  elements: DiagramElement[], connectors: Connector[], isBpmnSource: boolean,
+): TargetHighlight {
+  let sequence = false, message = false, association = false;
+  const bEvtIsSendLocked = (target.flowType === "throwing" || target.taskType === "send")
+    && connectors.some((c) => c.type === "messageBPMN" && c.sourceId === target.id);
+  const poolOf = getElementPoolId(target, elements);
+  const host = elements.find((e) => e.id === target.boundaryHostId);
+
+  if (ctx.fromPool) {
+    if (poolOf && poolOf !== ctx.sourcePoolId && target.type === "intermediate-event" && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+  } else if ((ctx.fromChildEvent || ctx.fromBoundaryOnChild) && target.boundaryHostId && ctx.sourceAncestorIds.has(target.boundaryHostId)) {
+    association = true; // purple — associationBPMN to a boundary event on an ancestor
+  } else if (ctx.sourceIsData) {
+    association = true;
+  } else if (ctx.fromFreeEndEvent) {
+    if (poolOf && target.type === "intermediate-event" && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+  } else if (ctx.fromEdgeMountedEndEvent) {
+    if (poolOf === ctx.sourcePoolId && host?.parentId !== ctx.sourceBoundaryHostId) sequence = true;
+  } else if (ctx.fromEdgeMountedStartEvent) {
+    /* boundary events are not inside the subprocess → not targets */
+  } else if (ctx.fromEdgeMountedIntermediateSendEvent) {
+    if (target.boundaryHostId !== ctx.sourceBoundaryHostId && (!host || host.parentId !== ctx.sourceBoundaryHostId)) {
+      if (poolOf === ctx.sourcePoolId) sequence = true;
+      else if (poolOf && poolOf !== ctx.sourcePoolId && target.type === "intermediate-event" && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+    }
+  } else if (ctx.fromEdgeMountedIntermediateReceiveEvent) {
+    /* not a valid target for receive events */
+  } else if (!isBpmnSource || !ctx.sourcePoolId) {
+    sequence = true;
+  } else {
+    if (poolOf === ctx.sourcePoolId) sequence = true;
+    else if (poolOf && poolOf !== ctx.sourcePoolId && target.type === "intermediate-event" && !bEvtIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+  }
+  return { sequence, message, association, compensation: false };
+}
+
+function classifyPlainTarget(
+  source: DiagramElement, target: DiagramElement, ctx: DragContext,
+  elements: DiagramElement[], connectors: Connector[], diagramType: DiagramType, isBpmnSource: boolean,
+): TargetHighlight {
+  let sequence = false, message = false, association = false, compensation = false;
+  const elIsData = DATA_ELEMENT_TYPES.has(target.type);
+  const elIsSendLocked = target.type === "end-event"
+    || ((target.taskType === "send" || target.flowType === "throwing")
+        && connectors.some((c) => c.type === "messageBPMN" && c.sourceId === target.id));
+  const poolOf = getElementPoolId(target, elements);
+
+  if (ctx.fromEdgeMountedCompensationEvent) {
+    if (ctx.compTargetsAvailable && COMP_ACTIVITY_TYPES.has(target.type) && target.id !== ctx.sourceBoundaryHostId) compensation = true;
+  } else if (ctx.fromPool) {
+    if (!elIsData && !elIsSendLocked && poolOf && poolOf !== ctx.sourcePoolId && isWhiteBoxPool(poolOf, elements)) message = true;
+  } else if (ctx.sourceIsData && !elIsData) {
+    association = true;
+  } else if (ctx.sourceIsData && elIsData) {
+    /* data → data is not a legal connector — no highlight */
+  } else if (!ctx.sourceIsData && elIsData) {
+    association = true;
+  } else if (ctx.fromBoundaryOnChild) {
+    if (CHILD_EVENT_TYPES_HIGHLIGHT.has(target.type) && !target.boundaryHostId && target.parentId === ctx.sourceHostParentId) {
+      sequence = true; association = true; // dual highlight
+    } else if (poolOf === ctx.sourcePoolId || !poolOf) {
+      sequence = true;
+    }
+  } else if (ctx.fromFreeEndEvent) {
+    if (!elIsData && !elIsSendLocked && poolOf && isWhiteBoxPool(poolOf, elements)) message = true;
+  } else if (ctx.fromEdgeMountedEndEvent) {
+    if ((poolOf === ctx.sourcePoolId || !poolOf) && target.parentId !== ctx.sourceBoundaryHostId) sequence = true;
+  } else if (ctx.fromEdgeMountedStartEvent) {
+    if (target.parentId === ctx.sourceBoundaryHostId) sequence = true;
+  } else if (ctx.fromEdgeMountedIntermediateSendEvent) {
+    if (target.parentId !== ctx.sourceBoundaryHostId) {
+      if (poolOf === ctx.sourcePoolId) sequence = true;
+      else if (poolOf && poolOf !== ctx.sourcePoolId && !elIsData && !elIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+      else if (!poolOf) sequence = true;
+    }
+  } else if (ctx.fromEdgeMountedIntermediateReceiveEvent) {
+    if (target.parentId === ctx.sourceBoundaryHostId) sequence = true;
+  } else if (!isBpmnSource || !ctx.sourcePoolId) {
+    sequence = (diagramType === "context" || diagramType === "basic")
+      ? isValidContextFlowPair(source.type, target.type)
+      : true;
+  } else {
+    if (poolOf === ctx.sourcePoolId) sequence = true;
+    else if (poolOf && poolOf !== ctx.sourcePoolId && !elIsData && !elIsSendLocked && isWhiteBoxPool(poolOf, elements)) message = true;
+  }
+  return { sequence, message, association, compensation };
+}
