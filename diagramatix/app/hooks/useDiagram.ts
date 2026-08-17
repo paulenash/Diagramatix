@@ -6775,88 +6775,55 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // A Compensation Activity is triggered by its compensation association,
         // never a sequence flow — reject any sequence connector in or out of it.
         if (source.properties?.isForCompensation === true || target.properties?.isForCompensation === true) return state;
-        // Helper: find the expanded subprocess ancestor of an element
-        const findExpandedSubParent = (el: DiagramElement): DiagramElement | undefined => {
+
+        // Scope model (single source of truth — mirrors app/lib/diagram/canConnect.ts).
+        // A sequence flow may not cross an Expanded-Subprocess (EP) boundary. Each
+        // endpoint's "flow scope" is the EP it participates in — normally its
+        // container, but an edge-mounted event redefines it:
+        //   • edge Start on X — source: flows INTO X (scope = X); target: an external
+        //     trigger reached from OUTSIDE X (scope = the scope containing X).
+        //   • edge End on X — target: X's exit, reachable only from INSIDE X (scope =
+        //     X); source: illegal (an End has no outgoing flow).
+        //   • edge (boundary) Intermediate on X: its flow continues in X's own scope.
+        // Legal iff the two effective scopes are equal.
+        const byId = (id?: string) => (id ? state.elements.find(e => e.id === id) : undefined);
+        const containerScope = (el: DiagramElement | undefined): string | null => {
           let cur = el;
-          for (let i = 0; i < 10; i++) {
-            if (!cur.parentId) return undefined;
-            const parent = state.elements.find(e => e.id === cur.parentId);
-            if (!parent) return undefined;
-            if (parent.type === "subprocess-expanded") return parent;
+          for (let i = 0; i < 20 && cur; i++) {
+            if (!cur.parentId) return null;
+            const parent = byId(cur.parentId);
+            if (!parent) return null;
+            if (parent.type === "subprocess-expanded") return parent.id;
             cur = parent;
           }
-          return undefined;
+          return null;
         };
         const isEventExpandedSub = (el: DiagramElement) =>
           el.type === "subprocess-expanded" &&
           (el.properties.subprocessType as string | undefined) === "event";
 
-        // Rule: No sequence connector TO a non-boundary start event
-        // (boundary start events CAN receive sequence from outside their host subprocess)
+        // A non-boundary Start can never be a sequence target; a non-boundary End
+        // can never be a sequence source.
         if (target.type === "start-event" && !target.boundaryHostId) return state;
-
-        // Rule: No sequence connector FROM an end event (end events have no outgoing sequence)
-        // Exception: boundary-mounted end events can't connect inside either (handled below)
         if (source.type === "end-event" && !source.boundaryHostId) return state;
 
-        // Rule: No sequence connector TO or FROM an Event Expanded Subprocess
-        if (isEventExpandedSub(target)) return state;
-        if (isEventExpandedSub(source)) return state;
-        const targetParentExp = findExpandedSubParent(target);
-        if (targetParentExp && isEventExpandedSub(targetParentExp)) {
-          // Target is inside an event subprocess — only allow if source is also inside the same one
-          const sourceParentExp = findExpandedSubParent(source);
-          if (sourceParentExp?.id !== targetParentExp.id) return state;
-        }
+        // An Event Expanded Subprocess is triggered by an event, never sequence flow.
+        if (isEventExpandedSub(source) || isEventExpandedSub(target)) return state;
 
-        // Rule: Nothing inside an Event Expanded Subprocess can connect out
-        const sourceParentExp = findExpandedSubParent(source);
-        if (sourceParentExp && isEventExpandedSub(sourceParentExp)) {
-          const targetParentExp2 = findExpandedSubParent(target);
-          if (targetParentExp2?.id !== sourceParentExp.id) return state;
-        }
-
-        // Rule: Edge-mounted End/Intermediate events cannot connect inside their host subprocess
-        if (source.boundaryHostId && (source.type === "end-event" || source.type === "intermediate-event")) {
-          const hostSub = state.elements.find(e => e.id === source.boundaryHostId);
-          if (hostSub) {
-            // Check if target is inside the host subprocess
-            let cur: DiagramElement | undefined = target;
-            for (let i = 0; i < 10 && cur; i++) {
-              if (cur.id === hostSub.id || cur.parentId === hostSub.id) return state;
-              cur = cur.parentId ? state.elements.find(e => e.id === cur!.parentId) : undefined;
-            }
+        const flowScope = (el: DiagramElement, role: "source" | "target"): string | null | "illegal" => {
+          if (el.boundaryHostId) {
+            const host = byId(el.boundaryHostId);
+            const outer = host ? containerScope(host) : null;
+            if (el.type === "start-event") return role === "source" ? el.boundaryHostId : outer;
+            if (el.type === "end-event") return role === "source" ? "illegal" : el.boundaryHostId;
+            return outer; // boundary intermediate event
           }
-        }
-
-        // Rule: an edge-mounted End event can only be reached from INSIDE
-        // its host EP. Any source outside the host (or in a different EP)
-        // is rejected — the end event represents the EP completing, so
-        // outside elements have no business connecting to it.
-        if (target.boundaryHostId && target.type === "end-event") {
-          const hostId = target.boundaryHostId;
-          let cur: DiagramElement | undefined = source;
-          let inside = false;
-          for (let i = 0; i < 10 && cur; i++) {
-            if (cur.id === hostId || cur.parentId === hostId) { inside = true; break; }
-            cur = cur.parentId ? state.elements.find(e => e.id === cur!.parentId) : undefined;
-          }
-          if (!inside) return state;
-        }
-
-        // Rule (R3.08): an edge-mounted Start event represents an external
-        // trigger — it can only be reached from OUTSIDE its host EP. A
-        // source inside the same host (or a descendant of it) is rejected.
-        if (target.boundaryHostId && target.type === "start-event") {
-          const hostId = target.boundaryHostId;
-          let cur: DiagramElement | undefined = source;
-          let inside = false;
-          for (let i = 0; i < 10 && cur; i++) {
-            if (cur.id === hostId || cur.parentId === hostId) { inside = true; break; }
-            cur = cur.parentId ? state.elements.find(e => e.id === cur!.parentId) : undefined;
-          }
-          if (inside) return state;
-        }
+          return containerScope(el);
+        };
+        const sScope = flowScope(source, "source");
+        const tScope = flowScope(target, "target");
+        if (sScope === "illegal" || tScope === "illegal") return state;
+        if (sScope !== tScope) return state;
       }
 
       } // end if (!force)
