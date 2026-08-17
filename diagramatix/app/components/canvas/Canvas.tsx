@@ -5610,6 +5610,7 @@ export function Canvas({
                 isFaded={isAssocFadedEl(el)}
                 isDropTarget={isSubExpDropTarget}
                 isDisallowedTarget={false}
+                isMessageBpmnTarget={h.message}
                 isAssocBpmnTarget={isSubExpAssocTarget}
                 isCompensationTarget={isSubExpCompTarget}
                 isElementDragTarget={isElementDragTarget}
