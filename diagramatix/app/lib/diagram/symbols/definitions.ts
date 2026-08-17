@@ -75,15 +75,15 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   {
     type: "history-state",
     label: "History",
-    defaultWidth: 40,
-    defaultHeight: 40,
+    defaultWidth: 30,
+    defaultHeight: 30,
     description: "Shallow history — resumes the composite state at its last active substate. Only inside a composite state; no incoming transitions.",
   },
   {
     type: "deep-history-state",
     label: "Deep History",
-    defaultWidth: 40,
-    defaultHeight: 40,
+    defaultWidth: 30,
+    defaultHeight: 30,
     description: "Deep history — resumes the composite state at its last active substate at every nesting level. Only inside a composite state; no incoming transitions.",
   },
   {

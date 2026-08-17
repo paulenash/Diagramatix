@@ -159,6 +159,22 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
           <circle cx={12} cy={12} r={10} fill={resolveColor("initial-state", colorConfig)} />
         </svg>
       );
+    case "history-state":
+      return (
+        <svg width={18} height={18} viewBox="0 0 24 24">
+          <circle cx={12} cy={12} r={10} fill="white" stroke="#374151" strokeWidth={2} />
+          <text x={12} y={12} textAnchor="middle" dominantBaseline="central" fontSize={13} fontWeight={700} fill="#374151" fontFamily="sans-serif">H</text>
+        </svg>
+      );
+    case "deep-history-state":
+      return (
+        <svg width={18} height={18} viewBox="0 0 24 24">
+          <circle cx={12} cy={12} r={10} fill="white" stroke="#374151" strokeWidth={2} />
+          <text x={12} y={12} textAnchor="middle" dominantBaseline="central" fontWeight={700} fill="#374151" fontFamily="sans-serif">
+            <tspan fontSize={11}>H</tspan><tspan fontSize={18} dy={5}>*</tspan>
+          </text>
+        </svg>
+      );
     case "final-state": {
       const c = resolveColor("final-state", colorConfig);
       return (

@@ -1007,14 +1007,19 @@ function HistoryStateShape({ el, deep }: { el: DiagramElement; deep?: boolean })
   return (
     <g>
       <circle cx={cx} cy={cy} r={r} fill="white" stroke="#374151" strokeWidth={2} />
-      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
-        fontSize={r} fontWeight={700} fill="#374151"
-        style={{ fontFamily: "sans-serif", userSelect: "none" }}>H</text>
-      {/* Deep history carries a superscript asterisk (H*). */}
-      {deep && (
-        <text x={cx + r * 0.58} y={cy - r * 0.4} textAnchor="middle" dominantBaseline="central"
-          fontSize={r * 0.8} fontWeight={700} fill="#374151"
-          style={{ fontFamily: "sans-serif", userSelect: "none" }}>*</text>
+      {deep ? (
+        // Deep history: "H*" centred as a unit — a large asterisk right beside
+        // the H (the * glyph rides high, so nudge it down to visually centre).
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
+          fontWeight={700} fill="#374151"
+          style={{ fontFamily: "sans-serif", userSelect: "none" }}>
+          <tspan fontSize={r}>H</tspan>
+          <tspan fontSize={r * 1.6} dy={r * 0.42}>*</tspan>
+        </text>
+      ) : (
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
+          fontSize={r} fontWeight={700} fill="#374151"
+          style={{ fontFamily: "sans-serif", userSelect: "none" }}>H</text>
       )}
     </g>
   );
