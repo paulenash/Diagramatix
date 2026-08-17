@@ -4582,6 +4582,15 @@ export function Canvas({
     ? (data.elements.find((e) => e.id === draggingConnector.fromId) ?? null)
     : null;
   const isBpmnSource = draggingSourceEl ? BPMN_TRIGGER_TYPES.has(draggingSourceEl.type) : false;
+  // Single authority for the BPMN sequence-flow highlight: an element is a valid
+  // green sequence TARGET only when canConnect (the same predicate ADD_CONNECTOR
+  // enforces) accepts it. Applied at EVERY render pass that can carry a sequence
+  // highlight — EPs, boundary events, and plain elements each render in their own
+  // pass, so the gate must be uniform or the passes drift (the EP-boundary bug).
+  // A no-op for non-BPMN diagrams (transition/flow/flowline use their own rules).
+  const seqTargetOk = (el: DiagramElement): boolean =>
+    diagramType !== "bpmn" || !draggingSourceEl ||
+    canConnect(draggingSourceEl, el, "sequence", data.elements);
   const draggingSourcePoolId = draggingSourceEl
     ? getElementPoolId(draggingSourceEl, data.elements)
     : null;
@@ -5376,11 +5385,7 @@ export function Canvas({
               el.id !== (draggingSourceEl?.parentId ?? "") && // rule 4: child cannot target its own parent subprocess
               !draggingFromEdgeMountedStartEvent &&
               !draggingFromEdgeMountedIntermediateReceiveEvent && // receive can only target subprocess children
-              // Final authority: an EP is a valid sequence target only when
-              // canConnect agrees (same-scope rule — an EP inside another EP is
-              // reachable only from its own scope, never from a sibling EP's inside).
-              (diagramType !== "bpmn" || !draggingSourceEl ||
-               canConnect(draggingSourceEl, el, "sequence", data.elements));
+              seqTargetOk(el); // canConnect authority (this pass renders composite-state, not EPs; kept uniform)
             const isSubExpAssocTarget = isDraggingConnector && draggingSourceIsData &&
               el.type === "subprocess-expanded" &&
               el.id !== draggingConnector!.fromId;
@@ -5683,7 +5688,8 @@ export function Canvas({
               el.id !== draggingConnector!.fromId &&
               el.id !== (draggingSourceEl?.parentId ?? "") &&
               !draggingFromEdgeMountedStartEvent &&
-              !draggingFromEdgeMountedIntermediateReceiveEvent;
+              !draggingFromEdgeMountedIntermediateReceiveEvent &&
+              seqTargetOk(el); // canConnect is the final authority (EP-scope rule)
             const isSubExpAssocTarget = isDraggingConnector && draggingSourceIsData &&
               el.id !== draggingConnector!.fromId;
             // Compensation association: an Expanded Sub-Process (not an event sub,
@@ -6009,15 +6015,9 @@ export function Canvas({
             // when dragging from it). Messages / data associations still apply.
             if (elIsDropTarget && el.properties?.isForCompensation === true) elIsDropTarget = false;
             if (elIsDropTarget && draggingSourceEl?.properties?.isForCompensation === true) elIsDropTarget = false;
-            // Final authority for the BPMN sequence-flow highlight: defer to
-            // canConnect (the same predicate ADD_CONNECTOR enforces) so the green
-            // highlight can never drift from what a drop will actually accept.
-            // The EP-scope rules (no crossing an Expanded Subprocess boundary,
-            // edge-mounted-event exceptions) live there, not duplicated here.
-            if (elIsDropTarget && diagramType === "bpmn" && draggingSourceEl
-                && !canConnect(draggingSourceEl, el, "sequence", data.elements)) {
-              elIsDropTarget = false;
-            }
+            // Final authority: canConnect (see seqTargetOk) — the EP-scope rules
+            // live there, not duplicated here.
+            if (elIsDropTarget && !seqTargetOk(el)) elIsDropTarget = false;
             return (
             <SymbolRenderer
               key={el.id}
@@ -6248,6 +6248,9 @@ export function Canvas({
                 if (draggingConnector && draggingSourceEl?.parentId !== _elP.id) elIsDropTarget = false;
               }
             }
+            // Final authority: canConnect (see seqTargetOk) — boundary events
+            // (edge-mounted start/end) as source or target obey the EP-scope rules.
+            if (elIsDropTarget && !seqTargetOk(el)) elIsDropTarget = false;
             return (
               <SymbolRenderer
                 key={el.id}

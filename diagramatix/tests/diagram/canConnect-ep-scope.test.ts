@@ -70,6 +70,28 @@ describe("issue #3 — start event inside an EP", () => {
   });
 });
 
+describe("nested EPs — a Start Event in the OUTER EP (the reported case)", () => {
+  // A child living inside the INNER EP (EP2 ⊂ EP1); startInEp1 lives in EP1.
+  const childInInnerEp = el("childInInnerEp", "task", { parentId: "ep2" });
+  const nestedWorld = [...WORLD, childInInnerEp];
+  const nseq = (s: DiagramElement, t: DiagramElement) => canConnect(s, t, "sequence", nestedWorld);
+
+  it("connects to the inner EP itself — whether or not the inner EP has children", () => {
+    // ep2 already has children (taskInEp2 etc.) in WORLD; scope is still EP1 == EP1.
+    expect(nseq(startInEp1, ep2)).toBe(true);
+  });
+  it("does NOT connect to a CHILD of the inner EP (scope EP2 ≠ EP1)", () => {
+    expect(nseq(startInEp1, childInInnerEp)).toBe(false);
+    expect(nseq(startInEp1, taskInEp2)).toBe(false);
+    expect(nseq(startInEp1, startInEp2)).toBe(false);
+  });
+  it("does NOT highlight anything OUTSIDE its own EP", () => {
+    expect(nseq(startInEp1, topTask)).toBe(false);   // top level
+    expect(nseq(startInEp1, ep3)).toBe(false);       // sibling top-level EP
+    expect(nseq(startInEp1, taskInEp3)).toBe(false); // inside another EP
+  });
+});
+
 describe("issue #4 — an EP as source", () => {
   it("cannot target its OWN children", () => {
     expect(seq(ep2, taskInEp2)).toBe(false);
