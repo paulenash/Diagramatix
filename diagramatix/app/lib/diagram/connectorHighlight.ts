@@ -224,6 +224,11 @@ export function classifyDragTarget(
     out = NO_HIGHLIGHT;
   } else if (target.type === "subprocess-expanded") {
     out = classifyEpTarget(target, ctx);
+    // An EP (subprocess) is also a valid messageBPMN target across pools, exactly
+    // like a task — reuse the plain-target message logic (blue). Its sequence /
+    // association / compensation come from classifyEpTarget above.
+    const msg = classifyPlainTarget(source, target, ctx, elements, connectors, diagramType, isBpmnSource).message;
+    if (msg) out = { ...out, message: true };
   } else if (target.boundaryHostId) {
     out = classifyBoundaryTarget(source, target, ctx, elements, connectors, isBpmnSource);
   } else {

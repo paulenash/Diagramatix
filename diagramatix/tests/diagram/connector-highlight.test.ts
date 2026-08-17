@@ -152,6 +152,16 @@ describe("pool boundary — a sequence flow may never cross pools (Bug 1a)", () 
     expect(cls(task3, taskInPool2).sequence).toBe(false);
     expect(cls(task3, taskInPool2).message).toBe(true);
   });
+  it("an EP (subprocess) in another white-box pool is ALSO blue (message)", () => {
+    // A black-box pool source → an EP in a white-box pool: blue, not green/none.
+    const blackPool = el("blackPool", "pool", { x: 5000, y: 0, width: 400, height: 200, properties: { poolType: "black-box" } });
+    const w2 = [...w, blackPool];
+    const c = computeDragContext(blackPool, w2, CONNS as never, blackPool.id);
+    expect(classifyDragTarget(blackPool, epInPool2, c, w2, CONNS as never, "bpmn").message).toBe(true);
+    expect(classifyDragTarget(blackPool, epInPool2, c, w2, CONNS as never, "bpmn").sequence).toBe(false);
+    // And a task-in-pool source → EP in a different white-box pool is blue too.
+    expect(cls(task3, epInPool2).message).toBe(true);
+  });
   it("within the SAME pool a sequence is still legal", () => {
     const task3b = el("task3b", "task", { parentId: "pool1" });
     const w2 = [...w, task3b];
