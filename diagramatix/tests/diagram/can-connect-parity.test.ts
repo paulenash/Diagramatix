@@ -38,6 +38,9 @@ const CASES: Array<{ name: string; s: DiagramElement; t: DiagramElement; ct: Con
   { name: "messageBPMN → boundary Message event allowed", s: el("a", "task"), t: el("b", "intermediate-event", { boundaryHostId: "h", eventType: "message" }), ct: "messageBPMN", expect: true },
   { name: "messageBPMN → boundary Error event rejected", s: el("a", "task"), t: el("b", "intermediate-event", { boundaryHostId: "h", eventType: "error" }), ct: "messageBPMN", expect: false },
   { name: "messageBPMN FROM a boundary event rejected", s: el("a", "intermediate-event", { boundaryHostId: "h", eventType: "message" }), t: el("b", "task"), ct: "messageBPMN", expect: false },
+  // An EMIE is triggered by its boundary — it has no INCOMING sequence flow.
+  { name: "sequence INTO a boundary intermediate event (EMIE) rejected", s: el("a", "task"), t: el("b", "intermediate-event", { boundaryHostId: "h" }), ct: "sequence", expect: false },
+  { name: "sequence OUT of a boundary intermediate event (EMIE) allowed", s: el("a", "intermediate-event", { boundaryHostId: "h" }), t: el("b", "task"), ct: "sequence", expect: true },
 ];
 
 describe("canConnect ≡ ADD_CONNECTOR non-force parity (T2225)", () => {

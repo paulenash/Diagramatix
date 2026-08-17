@@ -124,7 +124,9 @@ export function canConnect(
     //     trigger reached from OUTSIDE X (scope = the scope containing X).
     //   • edge End on X — target: X's exit, reachable only from INSIDE X (scope =
     //     X); source: illegal (an End has no outgoing flow).
-    //   • edge (boundary) Intermediate on X: its flow continues in X's own scope.
+    //   • edge (boundary) Intermediate on X (an EMIE) — source: its outgoing flow
+    //     continues in X's OUTER scope; target: illegal (an EMIE is TRIGGERED by
+    //     its boundary, it has no incoming sequence flow).
     // A connection is legal iff the two effective scopes are equal.
     const flowScope = (el: DiagramElement, role: "source" | "target"): string | null | "illegal" => {
       if (el.boundaryHostId) {
@@ -132,7 +134,7 @@ export function canConnect(
         const outer = host ? containerScope(host) : null;
         if (el.type === "start-event") return role === "source" ? el.boundaryHostId : outer;
         if (el.type === "end-event") return role === "source" ? "illegal" : el.boundaryHostId;
-        return outer; // boundary intermediate event
+        return role === "target" ? "illegal" : outer; // boundary intermediate (EMIE): outgoing only
       }
       return containerScope(el);
     };

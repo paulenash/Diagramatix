@@ -77,6 +77,7 @@ const flatTargets: Array<[string, DiagramElement]> = [
   ["start", el("t_start", "start-event")],
   ["inter", el("t_inter", "intermediate-event")],
   ["end", el("t_end", "end-event")],
+  ["eEmie", el("t_emie", "intermediate-event", { boundaryHostId: "hostEP" })], // EMIE: no inward sequence
   ["hostCh", childOfHost],
   ["data", el("t_data", "data-object")],
   ["annot", el("t_annot", "text-annotation")],

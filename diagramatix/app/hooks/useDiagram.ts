@@ -6827,7 +6827,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             const outer = host ? containerScope(host) : null;
             if (el.type === "start-event") return role === "source" ? el.boundaryHostId : outer;
             if (el.type === "end-event") return role === "source" ? "illegal" : el.boundaryHostId;
-            return outer; // boundary intermediate event
+            return role === "target" ? "illegal" : outer; // boundary intermediate (EMIE): outgoing only, no incoming
           }
           return containerScope(el);
         };
