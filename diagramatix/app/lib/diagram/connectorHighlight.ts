@@ -211,9 +211,13 @@ export function classifyDragTarget(
   elements: DiagramElement[],
   connectors: Connector[],
   diagramType: DiagramType,
-  opts?: { isSelfLoopTarget?: boolean },
+  opts?: { isSelfLoopTarget?: boolean; poolIdOf?: (el: DiagramElement) => string | null },
 ): TargetHighlight {
   if (!source) return NO_HIGHLIGHT;
+  // Pool lookup: caller may pass a precomputed resolver so the per-element pool
+  // id is O(1) instead of getElementPoolId's O(n) walk on every drag frame
+  // (CANVAS-06). Falls back to the direct lookup.
+  const poolOf = opts?.poolIdOf ?? ((el: DiagramElement) => getElementPoolId(el, elements));
   // Universal gates (shared by every pass).
   if (target.id === source.id && !opts?.isSelfLoopTarget) return NO_HIGHLIGHT;
   if (ctx.fromFinalState) return NO_HIGHLIGHT;
@@ -236,12 +240,12 @@ export function classifyDragTarget(
     // An EP (subprocess) is also a valid messageBPMN target across pools, exactly
     // like a task — reuse the plain-target message logic (blue). Its sequence /
     // association / compensation come from classifyEpTarget above.
-    const msg = classifyPlainTarget(source, target, ctx, elements, connectors, diagramType, isBpmnSource).message;
+    const msg = classifyPlainTarget(source, target, ctx, elements, connectors, diagramType, isBpmnSource, poolOf).message;
     if (msg) out = { ...out, message: true };
   } else if (target.boundaryHostId) {
-    out = classifyBoundaryTarget(source, target, ctx, elements, connectors, isBpmnSource);
+    out = classifyBoundaryTarget(source, target, ctx, elements, connectors, isBpmnSource, poolOf);
   } else {
-    out = classifyPlainTarget(source, target, ctx, elements, connectors, diagramType, isBpmnSource);
+    out = classifyPlainTarget(source, target, ctx, elements, connectors, diagramType, isBpmnSource, poolOf);
   }
 
   // Single authority for the green highlight: canConnect (BPMN) — see
@@ -276,11 +280,12 @@ function classifyEpTarget(target: DiagramElement, ctx: DragContext): TargetHighl
 function classifyBoundaryTarget(
   source: DiagramElement, target: DiagramElement, ctx: DragContext,
   elements: DiagramElement[], connectors: Connector[], isBpmnSource: boolean,
+  poolIdOf: (el: DiagramElement) => string | null,
 ): TargetHighlight {
   let sequence = false, message = false, association = false;
   const bEvtIsSendLocked = (target.flowType === "throwing" || target.taskType === "send")
     && connectors.some((c) => c.type === "messageBPMN" && c.sourceId === target.id);
-  const poolOf = getElementPoolId(target, elements);
+  const poolOf = poolIdOf(target);
   const host = elements.find((e) => e.id === target.boundaryHostId);
   // An edge-mounted (boundary) intermediate event catches an internal trigger,
   // not an incoming message flow — it is a messageBPMN target ONLY when its
@@ -319,13 +324,14 @@ function classifyBoundaryTarget(
 function classifyPlainTarget(
   source: DiagramElement, target: DiagramElement, ctx: DragContext,
   elements: DiagramElement[], connectors: Connector[], diagramType: DiagramType, isBpmnSource: boolean,
+  poolIdOf: (el: DiagramElement) => string | null,
 ): TargetHighlight {
   let sequence = false, message = false, association = false, compensation = false;
   const elIsData = DATA_ELEMENT_TYPES.has(target.type);
   const elIsSendLocked = target.type === "end-event"
     || ((target.taskType === "send" || target.flowType === "throwing")
         && connectors.some((c) => c.type === "messageBPMN" && c.sourceId === target.id));
-  const poolOf = getElementPoolId(target, elements);
+  const poolOf = poolIdOf(target);
 
   if (ctx.fromEdgeMountedCompensationEvent) {
     if (ctx.compTargetsAvailable && COMP_ACTIVITY_TYPES.has(target.type) && target.id !== ctx.sourceBoundaryHostId) compensation = true;
