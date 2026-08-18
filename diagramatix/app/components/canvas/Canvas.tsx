@@ -1556,7 +1556,12 @@ export function Canvas({
         // Rule 4b: Child state cannot connect to its own parent composite-state
         if (sourceEl?.parentId && targetEl.id === sourceEl.parentId && targetEl.type === "composite-state") return;
 
-        if (isCrossPool || involvesPool) {
+        // A DATA connector (data object / store ↔ element) is always an
+        // associationBPMN, never a message — even across pools (a data store is
+        // shared). Excluding it here lets it fall through to the associationBPMN
+        // path below, matching the purple highlight (was: routed to messageBPMN
+        // and then rejected by canConnect, so nothing was created).
+        if ((isCrossPool || involvesPool) && !isDataConn) {
           // Never create messageBPMN between an element and its own containing pool
           if (targetEl.type === "pool" && targetPoolId === sourcePoolId) return;
           if (sourceEl?.type === "pool" && sourcePoolId === targetPoolId) return;
@@ -4947,6 +4952,13 @@ export function Canvas({
     ? (draggingEndpoint.endpoint === "target" ? MSG_RECEIVE_EVENT_TYPES : MSG_SEND_EVENT_TYPES)
     : null;
 
+  // The non-container element renderer is captured here (assigned inside its JSX
+  // pass) so Data Objects / Stores / Annotations can be re-rendered in a second
+  // pass AFTER the boundary-event pass — they must float ABOVE edge-mounted
+  // intermediate events, which the single-pass order can't do (#1).
+  let renderNonContainerEl: ((el: DiagramElement) => React.ReactNode) | null = null;
+  const isDataArtifactType = (t: string) => t === "data-object" || t === "data-store" || t === "text-annotation";
+
   return (
     <div
       className="relative flex-1 overflow-hidden bg-gray-50 select-none"
@@ -5820,7 +5832,7 @@ export function Canvas({
           {/* Non-container elements. Review comments are pulled OUT here and
               rendered in a dedicated final pass so they always float on top of
               everything else on the canvas (items 14/15 + D). */}
-          {nonContainers.filter(el => !inActiveGroup(el.id) && el.type !== "review-comment").map((el) => {
+          {(() => { renderNonContainerEl = (el: DiagramElement) => {
             let elIsDropTarget = false;
             let elIsMsgTarget = false;
             let elIsAssocTarget = false;
@@ -6022,7 +6034,13 @@ export function Canvas({
               showValueDisplay={showValueDisplay}
             />
             );
-          })}
+          };
+          // First pass: every non-container EXCEPT data artifacts (those render
+          // in a dedicated pass after the boundary events, below).
+          return nonContainers
+            .filter(el => !inActiveGroup(el.id) && el.type !== "review-comment" && !isDataArtifactType(el.type))
+            .map(renderNonContainerEl);
+          })()}
 
           {/* Boundary events — rendered on top of their hosts */}
           {boundaryEvents.filter(el => !inActiveGroup(el.id)).map((el) => {
@@ -6126,6 +6144,15 @@ export function Canvas({
               />
             );
           })}
+
+          {/* Data artifacts (Data Objects / Stores / Annotations) — rendered in a
+              dedicated pass AFTER the boundary events so they float ABOVE
+              edge-mounted intermediate events (#1). Uses the SAME non-container
+              renderer; order is preserved from the nonContainers sort (the
+              dragged artifact is last, so it stays on top of its peers). */}
+          {renderNonContainerEl && nonContainers
+            .filter(el => !inActiveGroup(el.id) && isDataArtifactType(el.type))
+            .map(renderNonContainerEl)}
 
           {/* Group elements — rendered on top of all other elements */}
           {groupElements.filter(el => !inActiveGroup(el.id)).map((el) => (
