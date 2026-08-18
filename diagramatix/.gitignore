@@ -48,7 +48,7 @@ next-env.d.ts
 # curated Process Repository doc, which the "Create Project Diagrams from .md"
 # tool consumes and which is verified secret-free.
 /new features/*
-!/new features/Process Repository.md
+!/new features/Process Repository Final.md
 
 # Playwright e2e artifacts
 /test-results/
