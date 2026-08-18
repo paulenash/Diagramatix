@@ -4565,17 +4565,26 @@ export function Canvas({
                 && el.type !== "uml-pain-point" && el.type !== "uml-issue" // markers render in the top-most pass
                 && !el.boundaryHostId
     );
+    // Parent depth per element, precomputed ONCE (id→element map + memoised
+    // walk) so the sort comparator is O(1) per call instead of an O(n)
+    // `data.elements.find` parent-walk — the whole sort drops from O(n² log n)
+    // to O(n log n). Behaviour-identical (CANVAS-03).
+    const byIdNC = new Map(data.elements.map((e) => [e.id, e] as const));
+    const depthCacheNC = new Map<string, number>();
     function getParentDepth(el: DiagramElement): number {
+      const hit = depthCacheNC.get(el.id);
+      if (hit !== undefined) return hit;
       let depth = 0;
-      let current = el;
+      let current: DiagramElement | undefined = el;
       const visited = new Set<string>();
-      while (current.parentId && !visited.has(current.id)) {
+      while (current?.parentId && !visited.has(current.id)) {
         visited.add(current.id);
-        const parent = data.elements.find(p => p.id === current.parentId);
+        const parent = byIdNC.get(current.parentId);
         if (!parent) break;
         depth++;
         current = parent;
       }
+      depthCacheNC.set(el.id, depth);
       return depth;
     }
     // Data artifacts (Data Objects, Data Stores) and Text Annotations always
@@ -4631,6 +4640,18 @@ export function Canvas({
   // (app/lib/diagram/connectorHighlight.ts) so the render passes and the test
   // suite share ONE definition of every `draggingFrom*` rule.
   const _dctx = computeDragContext(draggingSourceEl, data.elements, data.connectors, draggingConnector?.fromId);
+  // element id → containing pool id, precomputed ONCE (memoised on elements) so
+  // the drag-highlight passes resolve a pool in O(1) instead of getElementPoolId's
+  // O(n) walk per element on every drag frame (CANVAS-06).
+  const poolIdByElement = useMemo(
+    () => new Map(data.elements.map((e) => [e.id, getElementPoolId(e, data.elements)] as const)),
+    [data.elements],
+  );
+  const poolIdOf = useCallback(
+    (el: DiagramElement): string | null =>
+      poolIdByElement.has(el.id) ? (poolIdByElement.get(el.id) ?? null) : getElementPoolId(el, data.elements),
+    [poolIdByElement, data.elements],
+  );
   const draggingSourcePoolId = _dctx.sourcePoolId;
   const draggingSourceIsData = _dctx.sourceIsData;
   const draggingFromPool = _dctx.fromPool;
@@ -4682,9 +4703,6 @@ export function Canvas({
       }
     });
 
-  // Detect connectors whose path passes through elements (obstacle violations) — domain diagrams only
-  const obstacleViolationConnIds = new Set<string>();
-  const obstacleViolationElementIds = new Set<string>();
   // Gateway branch labels (labelAnchor "source") are SUPPRESSED — not
   // deleted — while their source gateway's marker is Parallel or
   // Event-based, since those markers carry no branch conditions. Computed
@@ -4787,47 +4805,54 @@ export function Canvas({
     }
     return false;
   }
-  const isDbDomain = diagramType === "domain" && data.database && data.database !== "none";
-  if (diagramType === "domain" && !isDbDomain) for (const conn of data.connectors) {
-    const wp = conn.waypoints;
-    if (wp.length < 3) continue;
-    const vs = conn.sourceInvisibleLeader ? 1 : 0;
-    const ve = conn.targetInvisibleLeader ? wp.length - 2 : wp.length - 1;
-    const visible = wp.slice(vs, ve + 1);
-    const interior = wp.slice(vs + 1, ve);
-    for (const el of data.elements) {
-      if (el.type === "pool" || el.type === "lane") continue;
-      const b = { x: el.x, y: el.y, w: el.width, h: el.height };
-      const isOwn = el.id === conn.sourceId || el.id === conn.targetId;
-      let violation = false;
-      if (isOwn) {
-        // Check if interior waypoints or segments pass through own source/target
-        for (const pt of interior) {
-          if (pt.x > b.x + 1 && pt.x < b.x + b.w - 1 && pt.y > b.y + 1 && pt.y < b.y + b.h - 1) { violation = true; break; }
-        }
-        if (!violation) {
-          for (let i = 0; i < interior.length - 1; i++) {
-            if (segCrossesRect(interior[i], interior[i + 1], b)) { violation = true; break; }
+  // Detect connectors whose path passes through elements (obstacle violations) —
+  // domain diagrams only. O(connectors × elements × waypoints), so memoise it by
+  // (diagramType, database, elements, connectors) identity — it recomputes only
+  // when the geometry actually changes, NOT on every pan/zoom frame (CANVAS-04).
+  const { obstacleViolationConnIds, obstacleViolationElementIds } = useMemo(() => {
+    const conns = new Set<string>();
+    const els = new Set<string>();
+    const isDbDomain = diagramType === "domain" && data.database && data.database !== "none";
+    if (diagramType === "domain" && !isDbDomain) for (const conn of data.connectors) {
+      const wp = conn.waypoints;
+      if (wp.length < 3) continue;
+      const vs = conn.sourceInvisibleLeader ? 1 : 0;
+      const ve = conn.targetInvisibleLeader ? wp.length - 2 : wp.length - 1;
+      const visible = wp.slice(vs, ve + 1);
+      const interior = wp.slice(vs + 1, ve);
+      for (const el of data.elements) {
+        if (el.type === "pool" || el.type === "lane") continue;
+        const b = { x: el.x, y: el.y, w: el.width, h: el.height };
+        const isOwn = el.id === conn.sourceId || el.id === conn.targetId;
+        let violation = false;
+        if (isOwn) {
+          for (const pt of interior) {
+            if (pt.x > b.x + 1 && pt.x < b.x + b.w - 1 && pt.y > b.y + 1 && pt.y < b.y + b.h - 1) { violation = true; break; }
+          }
+          if (!violation) {
+            for (let i = 0; i < interior.length - 1; i++) {
+              if (segCrossesRect(interior[i], interior[i + 1], b)) { violation = true; break; }
+            }
+          }
+        } else {
+          if (el.boundaryHostId === conn.sourceId || el.boundaryHostId === conn.targetId) continue;
+          for (const pt of visible) {
+            if (pt.x > b.x && pt.x < b.x + b.w && pt.y > b.y && pt.y < b.y + b.h) { violation = true; break; }
+          }
+          if (!violation) {
+            for (let i = 0; i < visible.length - 1; i++) {
+              if (segCrossesRect(visible[i], visible[i + 1], b)) { violation = true; break; }
+            }
           }
         }
-      } else {
-        if (el.boundaryHostId === conn.sourceId || el.boundaryHostId === conn.targetId) continue;
-        // Check waypoints inside OR segments crossing
-        for (const pt of visible) {
-          if (pt.x > b.x && pt.x < b.x + b.w && pt.y > b.y && pt.y < b.y + b.h) { violation = true; break; }
+        if (violation) {
+          conns.add(conn.id);
+          els.add(el.id);
         }
-        if (!violation) {
-          for (let i = 0; i < visible.length - 1; i++) {
-            if (segCrossesRect(visible[i], visible[i + 1], b)) { violation = true; break; }
-          }
-        }
-      }
-      if (violation) {
-        obstacleViolationConnIds.add(conn.id);
-        obstacleViolationElementIds.add(el.id);
       }
     }
-  }
+    return { obstacleViolationConnIds: conns, obstacleViolationElementIds: els };
+  }, [diagramType, data.database, data.elements, data.connectors]);
 
   // Endpoint handle positions for selected connector
   const selectedConnector: Connector | null =
@@ -5346,7 +5371,7 @@ export function Canvas({
             // classify is consulted for exactly those to avoid misclassifying a
             // swimlane as a plain target.
             const h = (el.type === "pool" || el.type === "composite-state")
-              ? classifyDragTarget(draggingSourceEl, el, _dctx, data.elements, data.connectors, diagramType)
+              ? classifyDragTarget(draggingSourceEl, el, _dctx, data.elements, data.connectors, diagramType, { poolIdOf })
               : null;
             const isMsgTarget =
               (h?.message ?? false)
@@ -5662,7 +5687,7 @@ export function Canvas({
               nested EP paints over its parent EP. */}
           {expandedSubprocesses.filter(el => !inActiveGroup(el.id)).map((el) => {
             // Highlight rules: app/lib/diagram/connectorHighlight.ts (tested).
-            const h = classifyDragTarget(draggingSourceEl, el, _dctx, data.elements, data.connectors, diagramType);
+            const h = classifyDragTarget(draggingSourceEl, el, _dctx, data.elements, data.connectors, diagramType, { poolIdOf });
             const isSubExpDropTarget = h.sequence;
             const isSubExpAssocTarget = h.association;
             const isSubExpCompTarget = h.compensation;
@@ -5743,6 +5768,17 @@ export function Canvas({
             // all here. Elsewhere only associationBPMN/messageBPMN are on top.
             const regularConns = data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN" && c.type !== "review-comment-link" && !(c.type.startsWith("archi-") || diagramType === "archimate"));
             const humpEligible = regularConns.filter(c => c.type === "sequence" || c.type === "association" || c.type === "uml-association");
+            // Precompute each hump-eligible connector's index + VISIBLE waypoints
+            // ONCE, so per-connector work drops from O(n) (indexOf + re-slice of
+            // every prior connector) to an O(1) map lookup + a shallow prefix
+            // slice (CANVAS-02). Behaviour-identical.
+            const humpIndexById = new Map<string, number>();
+            const humpVisibleWps = humpEligible.map((c, i) => {
+              humpIndexById.set(c.id, i);
+              const vs = c.sourceInvisibleLeader ? 1 : 0;
+              const ve = c.targetInvisibleLeader ? c.waypoints.length - 2 : c.waypoints.length - 1;
+              return c.waypoints.slice(vs, ve + 1);
+            });
             return regularConns.filter(c => c.id !== selectedConnectorId).map((conn) => (
               <ConnectorRenderer
                 key={conn.id}
@@ -5762,11 +5798,7 @@ export function Canvas({
                 onUpdateCurveHandles={onUpdateCurveHandles}
                 otherConnectorWaypoints={
                   (conn.type === "sequence" || conn.type === "association" || conn.type === "uml-association")
-                    ? humpEligible.slice(0, humpEligible.indexOf(conn)).map(c => {
-                        const vs = c.sourceInvisibleLeader ? 1 : 0;
-                        const ve = c.targetInvisibleLeader ? c.waypoints.length - 2 : c.waypoints.length - 1;
-                        return c.waypoints.slice(vs, ve + 1);
-                      })
+                    ? humpVisibleWps.slice(0, humpIndexById.get(conn.id) ?? 0)
                     : undefined
                 }
                 debugMode={debugMode}
@@ -5806,7 +5838,7 @@ export function Canvas({
               // New-connector drag highlight rules live in the tested module
               // app/lib/diagram/connectorHighlight.ts (classifyDragTarget). The
               // green (sequence) flag it returns is already gated by canConnect.
-              const h = classifyDragTarget(draggingSourceEl, el, _dctx, data.elements, data.connectors, diagramType);
+              const h = classifyDragTarget(draggingSourceEl, el, _dctx, data.elements, data.connectors, diagramType, { poolIdOf });
               elIsDropTarget = h.sequence;
               elIsMsgTarget = h.message;
               elIsAssocTarget = h.association;
@@ -5819,7 +5851,7 @@ export function Canvas({
               if (MSG_TASKSUB_TYPES.has(el.type)
                   && el.id !== epDragMovingEl?.id
                   && el.id !== epDragFixedEl?.id) {
-                const elPoolId = getElementPoolId(el, data.elements);
+                const elPoolId = poolIdOf(el);
                 if (elPoolId) {
                   const elPool = data.elements.find(p => p.id === elPoolId);
                   if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
@@ -5835,7 +5867,7 @@ export function Canvas({
                 && !el.boundaryHostId
                 && el.id !== epDragMovingEl?.id
                 && el.id !== epDragFixedEl?.id) {
-              const elPoolId = getElementPoolId(el, data.elements);
+              const elPoolId = poolIdOf(el);
               if (elPoolId) {
                 const elPool = data.elements.find(p => p.id === elPoolId);
                 if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
@@ -6012,7 +6044,7 @@ export function Canvas({
               // New-connector drag highlight rules: the tested module
               // (classifyDragTarget) — its boundary-event branch. Green is
               // already gated by canConnect.
-              const h = classifyDragTarget(draggingSourceEl, el, _dctx, data.elements, data.connectors, diagramType);
+              const h = classifyDragTarget(draggingSourceEl, el, _dctx, data.elements, data.connectors, diagramType, { poolIdOf });
               elIsDropTarget = h.sequence;
               elIsMsgTarget = h.message;
               elIsAssocTarget = h.association;
