@@ -1762,7 +1762,10 @@ export function DiagramEditor({
     if (localStorage.getItem(`debug-${projectId}`) === "true") setDebugMode(true);
     // Sync the routing module flag to THIS diagram's stored experiment value
     // (explicitly both ways, so a leftover from another diagram is cleared).
-    const noObs = localStorage.getItem(`noObstacles-${diagramId}`) === "true";
+    // Fall back to the diagram's persisted `noObstacles` flag (set when an
+    // ArchiMate diagram is generated) when there's no per-diagram localStorage.
+    const storedNoObs = localStorage.getItem(`noObstacles-${diagramId}`);
+    const noObs = storedNoObs != null ? storedNoObs === "true" : data.noObstacles === true;
     setNoObstacleAvoidanceState(noObs);
     setNoObstacleAvoidance(noObs);
     if (localStorage.getItem(`valueDisplay-${diagramId}`) === "false") setShowValueDisplay(false);

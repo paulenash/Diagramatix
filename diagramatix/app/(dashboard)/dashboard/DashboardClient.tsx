@@ -1696,6 +1696,16 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       Deleted Diagrams
                     </a>
+                    {isSu && (
+                      <a
+                        href="/dashboard/admin/md-diagrams"
+                        onClick={() => setFileMenuOpen(false)}
+                        className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50"
+                        title="SuperAdmin — create a whole project of diagrams from a Value-Chain .md file"
+                      >
+                        Create Project Diagrams from .md
+                      </a>
+                    )}
                     {/* Client-side <Link> (not <a>): a full-page navigation tears
                         down the root layout — and with it the GlobalOverlays
                         Screencast recorder — interrupting an in-progress recording

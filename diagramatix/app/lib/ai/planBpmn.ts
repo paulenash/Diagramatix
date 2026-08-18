@@ -356,6 +356,127 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
       t.taskType = "none";
     }
   }
+
+  // Code-enforced connector cleanup — runs last, on the fully-canonicalised plan.
+  pruneRedundantBpmnConnectors(parsed);
+}
+
+/** Iterative DFS (gray/black) back-edge detector over a sequence-flow subgraph.
+ *  Returns the set of `${sourceId}->${targetId}` edge keys that close a cycle. */
+function findBackEdges(edges: AiConnection[]): Set<string> {
+  const adj = new Map<string, string[]>();
+  const nodes = new Set<string>();
+  for (const e of edges) {
+    nodes.add(e.sourceId); nodes.add(e.targetId);
+    const arr = adj.get(e.sourceId);
+    if (arr) arr.push(e.targetId); else adj.set(e.sourceId, [e.targetId]);
+  }
+  const WHITE = 0, GRAY = 1, BLACK = 2;
+  const color = new Map<string, number>();
+  for (const n of nodes) color.set(n, WHITE);
+  const back = new Set<string>();
+  for (const start of nodes) {
+    if (color.get(start) !== WHITE) continue;
+    const stack: { node: string; i: number }[] = [{ node: start, i: 0 }];
+    color.set(start, GRAY);
+    while (stack.length) {
+      const top = stack[stack.length - 1];
+      const neighbours = adj.get(top.node) ?? [];
+      if (top.i < neighbours.length) {
+        const nxt = neighbours[top.i++];
+        const c = color.get(nxt);
+        if (c === GRAY) back.add(`${top.node}->${nxt}`);          // closes a cycle
+        else if (c === WHITE) { color.set(nxt, GRAY); stack.push({ node: nxt, i: 0 }); }
+      } else {
+        color.set(top.node, BLACK);
+        stack.pop();
+      }
+    }
+  }
+  return back;
+}
+
+/**
+ * Prune redundant sequence flows the model tends to over-draw. Code-enforced (runs
+ * on every AI BPMN plan via normaliseAiPlan), and idempotent — apply-layout re-runs
+ * normaliseAiPlan on an already-pruned plan and nothing re-fires:
+ *
+ *  (b) Inside a Standard-Loop expanded subprocess (repeatType === "loop"), a
+ *      back-edge sequence flow between two of its children is redundant: the loop
+ *      marker already means "repeat", so the drawn loop-back is noise (issue #3).
+ *  (a) A gateway with exactly ONE incoming and ONE outgoing sequence flow is a pure
+ *      pass-through — e.g. a "merge" left behind when the other branch ended at an
+ *      End Event, so nothing actually rejoins. Delete the gateway and reconnect its
+ *      single source straight to its single target (issue #4). A 1-in/1-out gateway
+ *      is never semantically meaningful in BPMN, so this is always safe.
+ *
+ * Run order matters: (b) first, so a loop gateway left with a single outgoing branch
+ * after its back-edge is stripped is then collapsed by (a)'s fixpoint.
+ */
+export function pruneRedundantBpmnConnectors(
+  parsed: { elements: AiElement[]; connections: AiConnection[] },
+): void {
+  const DATA_ARTIFACT_TYPES = new Set(["data-object", "data-store", "text-annotation"]);
+  const isSeqFlow = (c: AiConnection, types: Map<string, string>) =>
+    c.type !== "message"
+    && !DATA_ARTIFACT_TYPES.has(types.get(c.sourceId) ?? "")
+    && !DATA_ARTIFACT_TYPES.has(types.get(c.targetId) ?? "");
+
+  // (b) Redundant back-edges inside loop-marked expanded subprocesses.
+  const loopSubs = parsed.elements.filter(
+    (e) => (e.type === "subprocess-expanded" || e.type === "subprocess") && e.repeatType === "loop",
+  );
+  for (const sp of loopSubs) {
+    const childIds = new Set(
+      parsed.elements.filter((e) => e.parentSubprocess === sp.id).map((e) => e.id),
+    );
+    if (childIds.size === 0) continue;
+    const types = new Map(parsed.elements.map((e) => [e.id, e.type] as const));
+    const internal = parsed.connections.filter(
+      (c) => isSeqFlow(c, types) && childIds.has(c.sourceId) && childIds.has(c.targetId),
+    );
+    const back = findBackEdges(internal);
+    if (back.size) {
+      const drop = new Set(internal.filter((c) => back.has(`${c.sourceId}->${c.targetId}`)));
+      parsed.connections = parsed.connections.filter((c) => !drop.has(c));
+    }
+  }
+
+  // (a) Collapse pass-through gateways — fixpoint, since removing one can expose
+  //     the next (chained gateways).
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const types = new Map(parsed.elements.map((e) => [e.id, e.type] as const));
+    for (const g of parsed.elements) {
+      if (g.type !== "gateway") continue;
+      // A message flow touching the gateway means removing it would orphan a
+      // message — leave it alone.
+      if (parsed.connections.some((c) => c.type === "message" && (c.sourceId === g.id || c.targetId === g.id))) continue;
+      const ins = parsed.connections.filter((c) => isSeqFlow(c, types) && c.targetId === g.id);
+      const outs = parsed.connections.filter((c) => isSeqFlow(c, types) && c.sourceId === g.id);
+      if (ins.length !== 1 || outs.length !== 1) continue;
+      const inc = ins[0], out = outs[0];
+      // Skip degenerate self-references (would create a self-loop on reconnect).
+      if (inc.sourceId === g.id || out.targetId === g.id || inc.sourceId === out.targetId) continue;
+      parsed.elements = parsed.elements.filter((e) => e.id !== g.id);
+      parsed.connections = parsed.connections.filter((c) => c !== inc && c !== out);
+      // Reconnect source → target (don't duplicate an already-present flow).
+      const dup = parsed.connections.some(
+        (c) => c.type !== "message" && c.sourceId === inc.sourceId && c.targetId === out.targetId,
+      );
+      if (!dup) {
+        parsed.connections.push({
+          sourceId: inc.sourceId,
+          targetId: out.targetId,
+          type: "sequence",
+          ...(out.label ? { label: out.label } : inc.label ? { label: inc.label } : {}),
+        });
+      }
+      changed = true;
+      break; // maps are stale after a mutation — rebuild on the next pass
+    }
+  }
 }
 
 /**

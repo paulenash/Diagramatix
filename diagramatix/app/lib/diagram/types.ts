@@ -352,6 +352,12 @@ export interface DiagramData {
    *  when the AI reproduces an imported image's positions; also toggleable in
    *  Diagram Properties. Optional — absent/false means normal Diagramatix rules. */
   relaxedLayout?: boolean;
+  /** Obstacle-avoidance OFF for this diagram — connectors route straight without
+   *  detouring around intervening elements. Set automatically when generating an
+   *  ArchiMate diagram (whose layered/nested layout already spaces elements). The
+   *  editor honours this on load (falling back to the per-diagram localStorage
+   *  toggle). Absent/false = normal obstacle avoidance. */
+  noObstacles?: boolean;
   /** "Display Pain Points" master toggle — render Pain Point icons on the
    *  canvas. Absent/true = shown; explicit false = hidden. Toggleable in
    *  Diagram Properties (the description toggle nests under it). */

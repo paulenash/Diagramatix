@@ -6,7 +6,7 @@
 import type { DiagramData, DiagramElement, Connector, Point, Side } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { wrapText, AVG_CHAR_W_FACTOR } from "./textMetrics";
-import { computeWaypoints, spreadUmlEndpoints, deconflictUmlSegments, selfLoopWaypoints, SELF_LOOP_BULGE } from "./routing";
+import { computeWaypoints, spreadUmlEndpoints, deconflictUmlSegments, selfLoopWaypoints, SELF_LOOP_BULGE, setNoObstacleAvoidance, getNoObstacleAvoidance } from "./routing";
 import { sizeUmlNote } from "./umlAutoSize";
 import { parseConstraintText, parseEndRole } from "./umlConstraints";
 import { CHEVRON_THEMES } from "./chevronThemes";
@@ -65,7 +65,7 @@ function wrapLabel(label: string, maxWidth: number): { text: string; lines: numb
  * process name beneath it. Falls back to plain wrapping when there's no
  * leading process number.
  */
-const PROCESS_NUMBER_RE = /^([A-Za-z]{1,2}\d+(?:\.\d+)*)\s+(\S.*)$/;
+const PROCESS_NUMBER_RE = /^([A-Za-z]{1,2}\d+(?:\.\d+)*)\.?\s+(\S.*)$/;
 
 function wrapChevronLabel(label: string, maxWidth: number): { text: string; lines: number; fits: boolean } {
   const m = PROCESS_NUMBER_RE.exec(label.trim());
@@ -218,6 +218,16 @@ export function layoutGenericDiagram(
   const aiElements = parsed.elements ?? [];
   const aiConnections = parsed.connections ?? [];
 
+  // ArchiMate diagrams generate with obstacle-avoidance OFF — the layered/nested
+  // layout already spaces elements, and detour routing bends the clean orthogonal
+  // connectors (Paul). Run the archimate layout with the routing flag forced on,
+  // restore it after, and persist `noObstacles` so the editor keeps it off too.
+  const withNoObstacles = <T>(fn: () => T): T => {
+    const prev = getNoObstacleAvoidance();
+    setNoObstacleAvoidance(true);
+    try { return fn(); } finally { setNoObstacleAvoidance(prev); }
+  };
+
   // State machine reproduced FROM AN IMAGE: when the AI emitted per-element
   // `bounds`, honour the original placement, Composite-State nesting and
   // connector faces instead of re-flowing. Falls through to auto-layout when
@@ -245,10 +255,10 @@ export function layoutGenericDiagram(
   // to the nested / band auto-layout when bounds are missing/unusable.
   if (diagramType === "archimate"
       && aiElements.some((e) => e.bounds && typeof e.bounds === "object")) {
-    const preserved = layoutArchimatePreserved(
+    const preserved = withNoObstacles(() => layoutArchimatePreserved(
       aiElements as never, aiConnections as never, opts?.imageAspect,
-    );
-    if (preserved) return preserved;
+    ));
+    if (preserved) { preserved.noObstacles = true; return preserved; }
   }
 
   // Context diagrams: special circular layout
@@ -258,7 +268,9 @@ export function layoutGenericDiagram(
 
   // ArchiMate: nested (composition) or layered-band layout
   if (diagramType === "archimate") {
-    return layoutArchimateDiagram(aiElements, aiConnections);
+    const data = withNoObstacles(() => layoutArchimateDiagram(aiElements, aiConnections));
+    data.noObstacles = true;
+    return data;
   }
 
   // State machine: dedicated layered layout enforcing the S3.xx Layout rules.

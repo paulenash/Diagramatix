@@ -67,7 +67,8 @@ REPRODUCE THE ORIGINAL LAYOUT — capture geometry so the diagram matches the dr
 - CONNECTION POINTS: for each connection report which element FACE each end touches in the image — "sourceSide" and "targetSide", one of "top"|"right"|"bottom"|"left" — and optionally "sourceOffset"/"targetOffset" (0..1 ALONG that side; for top/bottom measured left→right, for left/right measured top→bottom) for where on the edge it attaches. This lets the tool mimic the drawn connection points.
 Example with geometry: { "id": "s1", "type": "business-service", "label": "Claim Registration", "notation": "icon", "bounds": { "x": 0.10, "y": 0.40, "w": 0.24, "h": 0.08 } }
 
-NON-IMAGE GENERATION — for a text prompt (no image), still PREFER nesting for composition: set the part's "parent" to the whole's id instead of a "composition" connector. Aggregation stays a connector. Omit "bounds" when there is no image — positions are applied by the tool.`,
+NON-IMAGE GENERATION — for a text prompt (no image), use "parent" ONLY for genuine whole–part composition where the part truly sits INSIDE the whole (e.g. an Application Component containing its sub-components, a Grouping or Location containing its members, an Actor containing an org sub-unit). Do NOT use "parent" for cross-layer or behavioural relationships — a Business Process realising a Business Service, an Application Component serving a Process, an Actor assigned to a Process, an Interface serving a Service are RELATIONSHIPS (connectors: realisation / serving / assignment / access), NEVER nesting.
+LAYERED / LANDSCAPE VIEWS — when the prompt describes a layered view (actors, then services/interfaces, then processes, then applications — "bands", "landscape", "service → process → application"), keep EVERY element FLAT (no "parent") and connect them with relationships. The tool then lays the layers out top-to-bottom automatically (Business Actors at the top, then Interfaces & Services, then Business Processes, then Applications at the bottom). Setting even one "parent" in such a view switches off that layered layout, so don't. Aggregation stays a connector. Omit "bounds" when there is no image — positions are applied by the tool.`,
 
   "state-machine": `You are a UML State Machine diagram expert. Output ONLY valid JSON with elements and connections.
 
@@ -113,14 +114,15 @@ Example transition with faces: { "sourceId": "s1", "targetId": "s2", "label": "s
 Element types: "chevron-collapsed" (process — always use this type), "process-group" (value chain container)
 No connectors in value chain diagrams — flow is implied by left-to-right arrangement.
 Always use "chevron-collapsed" for every process element. Never use "chevron".
+PRESERVE PROCESS CODES: when a process name in the prompt starts with a code/number (e.g. "V02.01 Identify Need", "A1 Inbound Logistics"), keep that code at the START of the label EXACTLY as written — never drop, renumber or reformat it (the tool renders the code on its own line above the name). Only include a code when the prompt's process names have one; do not invent codes.
 
-Output format:
+Output format (the coded example shows how to keep a leading code; omit the code when the prompt has none):
 {
   "elements": [
     { "id": "g1", "type": "process-group", "label": "Core Processes" },
-    { "id": "e1", "type": "chevron-collapsed", "label": "Inbound Logistics", "group": "g1", "description": "Receiving and storing raw materials" },
-    { "id": "e2", "type": "chevron-collapsed", "label": "Operations", "group": "g1", "description": "Manufacturing and assembly" },
-    { "id": "e3", "type": "chevron-collapsed", "label": "Outbound Logistics", "group": "g1", "description": "Distribution to customers" }
+    { "id": "e1", "type": "chevron-collapsed", "label": "V02.01 Identify Need", "group": "g1", "description": "Recognise and define the purchase need" },
+    { "id": "e2", "type": "chevron-collapsed", "label": "V02.02 Create Requisition", "group": "g1", "description": "Raise and review the requisition" },
+    { "id": "e3", "type": "chevron-collapsed", "label": "V02.03 Approve Purchase", "group": "g1", "description": "Budget and delegation approval" }
   ],
   "connections": []
 }`,
