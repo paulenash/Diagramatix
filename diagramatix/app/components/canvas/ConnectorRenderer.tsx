@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useContext } from "react";
+import { useState, useContext, memo } from "react";
+import { canvasMemoEqual } from "./memoEqual";
 
 import type { Connector, Point, Side } from "@/app/lib/diagram/types";
 import { isUmlConnType } from "@/app/lib/diagram/types";
@@ -730,7 +731,7 @@ function ConstraintBox({
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, reviewLinkColor, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, sourceType, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
+function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, reviewLinkColor, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, sourceType, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const showReviewMarkers = useContext(ShowReviewCommentsCtx);
@@ -1811,3 +1812,9 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     </g>
   );
 }
+
+// CANVAS-05: memoise so a connector does NOT re-render on every pan/zoom frame —
+// only when a real (non-function) prop changes (otherConnectorWaypoints is a
+// fresh slice each render but its entries are stable via the memoised hump data
+// in Canvas, so canvasMemoEqual's shallow array check treats it as equal).
+export const ConnectorRenderer = memo(ConnectorRendererInner, canvasMemoEqual);

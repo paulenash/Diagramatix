@@ -4534,7 +4534,7 @@ export function Canvas({
   // Sort non-containers by parent nesting depth so children of deeper subprocesses render on top
   // Assign each distinct review-comment AUTHOR a palette index, in creation
   // order (first author = pink), so different users' notes are distinct (item G).
-  const reviewCommentColors = (() => {
+  const reviewCommentColors = useMemo(() => {
     const map = new Map<string, number>();
     let next = 0;
     for (const el of data.elements) {
@@ -4543,7 +4543,7 @@ export function Canvas({
       if (!map.has(key)) map.set(key, next++);
     }
     return map;
-  })();
+  }, [data.elements]);
 
   // The stroke colour for a review-comment-link = its note's per-author colour,
   // so the tether always matches the note even after colours reassign when
@@ -4958,6 +4958,24 @@ export function Canvas({
   // intermediate events, which the single-pass order can't do (#1).
   let renderNonContainerEl: ((el: DiagramElement) => React.ReactNode) | null = null;
   const isDataArtifactType = (t: string) => t === "data-object" || t === "data-store" || t === "text-annotation";
+
+  // Hump geometry for the regular-connector pass, MEMOISED so each connector's
+  // otherConnectorWaypoints entries are STABLE refs across pan/zoom frames — the
+  // memoised ConnectorRenderer (CANVAS-05) then skips re-render. Recomputes only
+  // when the connectors (or diagram type) change. (CANVAS-02 built the per-render
+  // version; this hoists it so the refs are stable.)
+  const { regularConns, humpVisibleWps, humpIndexById } = useMemo(() => {
+    const rc = data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN" && c.type !== "review-comment-link" && !(c.type.startsWith("archi-") || diagramType === "archimate"));
+    const he = rc.filter(c => c.type === "sequence" || c.type === "association" || c.type === "uml-association");
+    const idx = new Map<string, number>();
+    const wps = he.map((c, i) => {
+      idx.set(c.id, i);
+      const vs = c.sourceInvisibleLeader ? 1 : 0;
+      const ve = c.targetInvisibleLeader ? c.waypoints.length - 2 : c.waypoints.length - 1;
+      return c.waypoints.slice(vs, ve + 1);
+    });
+    return { regularConns: rc, humpVisibleWps: wps, humpIndexById: idx };
+  }, [data.connectors, diagramType]);
 
   return (
     <div
@@ -5778,19 +5796,7 @@ export function Canvas({
             // In ArchiMate diagrams EVERY connector renders on top of all
             // elements (handled by the on-top pass below), so exclude them
             // all here. Elsewhere only associationBPMN/messageBPMN are on top.
-            const regularConns = data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN" && c.type !== "review-comment-link" && !(c.type.startsWith("archi-") || diagramType === "archimate"));
-            const humpEligible = regularConns.filter(c => c.type === "sequence" || c.type === "association" || c.type === "uml-association");
-            // Precompute each hump-eligible connector's index + VISIBLE waypoints
-            // ONCE, so per-connector work drops from O(n) (indexOf + re-slice of
-            // every prior connector) to an O(1) map lookup + a shallow prefix
-            // slice (CANVAS-02). Behaviour-identical.
-            const humpIndexById = new Map<string, number>();
-            const humpVisibleWps = humpEligible.map((c, i) => {
-              humpIndexById.set(c.id, i);
-              const vs = c.sourceInvisibleLeader ? 1 : 0;
-              const ve = c.targetInvisibleLeader ? c.waypoints.length - 2 : c.waypoints.length - 1;
-              return c.waypoints.slice(vs, ve + 1);
-            });
+            // regularConns / humpVisibleWps / humpIndexById are memoised above.
             return regularConns.filter(c => c.id !== selectedConnectorId).map((conn) => (
               <ConnectorRenderer
                 key={conn.id}

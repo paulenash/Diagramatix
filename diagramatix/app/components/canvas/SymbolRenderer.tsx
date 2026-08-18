@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, createContext, useContext, useRef, useLayoutEffect } from "react";
+import { useState, createContext, useContext, useRef, useLayoutEffect, memo } from "react";
+import { canvasMemoEqual } from "./memoEqual";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
 import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
@@ -2295,7 +2296,7 @@ function getHandlePos(handle: ResizeHandle, el: DiagramElement): { hx: number; h
   }
 }
 
-export function SymbolRenderer({
+function SymbolRendererInner({
   element,
   selected,
   isDropTarget,
@@ -4033,3 +4034,7 @@ export function SymbolRenderer({
     </SymbolColorCtx.Provider>
   );
 }
+
+// CANVAS-05: memoise so a shape does NOT re-render on every pan/zoom frame —
+// only when a real (non-function) prop changes. See canvasMemoEqual.
+export const SymbolRenderer = memo(SymbolRendererInner, canvasMemoEqual);
