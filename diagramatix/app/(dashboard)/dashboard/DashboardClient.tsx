@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { DiagramType } from "@/app/lib/diagram/types";
@@ -1695,8 +1696,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       Deleted Diagrams
                     </a>
+                    {/* Client-side <Link> (not <a>): a full-page navigation tears
+                        down the root layout — and with it the GlobalOverlays
+                        Screencast recorder — interrupting an in-progress recording
+                        (it then shows "Recover recording"). Client nav keeps the
+                        root layout, and the recorder, mounted. */}
                     {ent.simulator && (
-                    <a
+                    <Link
                       href="/dashboard/simulator-examples"
                       onClick={() => setFileMenuOpen(false)}
                       style={featureVars(featureScheme, "simulator")}
@@ -1704,10 +1710,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       title="Load a ready-made example simulation to explore or demo"
                     >
                       <span className="mr-2">◈</span>Simulator Examples
-                    </a>
+                    </Link>
                     )}
                     {ent.processMining && (
-                    <a
+                    <Link
                       href="/dashboard/mining-examples"
                       onClick={() => setFileMenuOpen(false)}
                       style={featureVars(featureScheme, "mining")}
@@ -1715,10 +1721,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       title="Load a ready-made process-mining example (event log + reference lifecycle) to explore or demo"
                     >
                       <span className="mr-2">⛏</span>Process Mining Examples
-                    </a>
+                    </Link>
                     )}
                     {ent.riskControl && (
-                    <a
+                    <Link
                       href="/dashboard/risk-control-examples"
                       onClick={() => setFileMenuOpen(false)}
                       style={featureVars(featureScheme, "riskControl")}
@@ -1726,7 +1732,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       title="Load a ready-made Risk & Control (GRC) example — process + risks/controls + mining effectiveness"
                     >
                       <span className="mr-2">⚖</span>Risk &amp; Control Examples
-                    </a>
+                    </Link>
                     )}
                     <div className="border-t border-gray-100" />
                     <button

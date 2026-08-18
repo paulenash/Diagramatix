@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 /**
  * Simulator Examples gallery — browse the published example simulations and
@@ -71,7 +72,7 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-2xl font-semibold text-green-300 tracking-wide">◈ Simulator Examples</h1>
-          <a href="/dashboard" className="text-sm text-green-400/60 hover:text-green-300">← Dashboard</a>
+          <Link href="/dashboard" className="text-sm text-green-400/60 hover:text-green-300">← Dashboard</Link>
         </div>
         <p className="text-sm text-green-400/70 mb-6">
           Ready-made simulations to explore or demo. <span className="text-green-300">Load</span> copies one into a
@@ -111,7 +112,7 @@ export function ExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
 
         {isAdmin && (
           <p className="mt-8 text-xs text-green-400/40">
-            Admin: manage the catalog at <a href="/dashboard/admin/simulator-examples" className="underline hover:text-green-300">Catalog manager</a>.
+            Admin: manage the catalog at <Link href="/dashboard/admin/simulator-examples" className="underline hover:text-green-300">Catalog manager</Link>.
           </p>
         )}
       </div>

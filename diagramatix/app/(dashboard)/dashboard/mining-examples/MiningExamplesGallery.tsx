@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 /**
  * DiagramatixMINER Examples gallery — browse the published process-mining
  * examples and one-click "Load & open" any into a fresh project. Adopt lands you
@@ -87,7 +89,7 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-2xl font-semibold text-amber-300 tracking-wide">⛏ DiagramatixMINER Examples</h1>
-          <a href="/dashboard" className="text-sm text-amber-200/60 hover:text-amber-200">← Dashboard</a>
+          <Link href="/dashboard" className="text-sm text-amber-200/60 hover:text-amber-200">← Dashboard</Link>
         </div>
         <p className="text-sm text-amber-200/70 mb-6">
           Ready-made process-mining studies to explore or demo. <span className="text-amber-300">Load &amp; open</span> copies one
@@ -132,7 +134,7 @@ export function MiningExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
 
         {isAdmin && (
           <p className="mt-8 text-xs text-amber-200/40">
-            Admin: manage the catalog at <a href="/dashboard/admin/mining-examples" className="underline hover:text-amber-200">Catalog manager</a>.
+            Admin: manage the catalog at <Link href="/dashboard/admin/mining-examples" className="underline hover:text-amber-200">Catalog manager</Link>.
           </p>
         )}
       </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 /**
  * Risk & Control (GRC) Examples gallery — browse the published GRC examples and
  * one-click "Load & open" any into a fresh project: the real process diagrams,
@@ -55,7 +57,7 @@ export function RiskControlExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-2xl font-semibold text-teal-800 tracking-tight">◆ Risk &amp; Control Examples</h1>
-          <a href="/dashboard" className="text-sm text-gray-500 hover:text-gray-800">← Dashboard</a>
+          <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-800">← Dashboard</Link>
         </div>
         <p className="text-sm text-gray-700 mb-6 max-w-2xl">
           Ready-made governance studies to explore or demo. <span className="text-teal-800 font-semibold">Load &amp; open</span> copies one
@@ -96,7 +98,7 @@ export function RiskControlExamplesGallery({ isAdmin }: { isAdmin: boolean }) {
 
         {isAdmin && (
           <p className="mt-8 text-xs text-gray-500">
-            Admin: manage the catalog at <a href="/dashboard/admin/risk-control-examples" className="text-teal-800 font-medium underline hover:text-teal-900">Catalog manager</a>.
+            Admin: manage the catalog at <Link href="/dashboard/admin/risk-control-examples" className="text-teal-800 font-medium underline hover:text-teal-900">Catalog manager</Link>.
           </p>
         )}
       </div>
