@@ -160,19 +160,21 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
         </svg>
       );
     case "history-state":
+      // A faithful scaled copy of the canvas element (circle r=10, H fontSize = r).
       return (
         <svg width={18} height={18} viewBox="0 0 24 24">
           <circle cx={12} cy={12} r={10} fill="white" stroke="#374151" strokeWidth={2} />
-          <text x={12} y={12} textAnchor="middle" dominantBaseline="central" fontSize={13} fontWeight={700} fill="#374151" fontFamily="sans-serif">H</text>
+          <text x={12} y={12} textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight={700} fill="#374151" fontFamily="sans-serif">H</text>
         </svg>
       );
     case "deep-history-state":
+      // Mirrors HistoryStateShape (deep) at r=10: H fontSize = r nudged left, the
+      // asterisk 1.6× upper-right with its centre level with the top of the H.
       return (
         <svg width={18} height={18} viewBox="0 0 24 24">
           <circle cx={12} cy={12} r={10} fill="white" stroke="#374151" strokeWidth={2} />
-          <text x={12} y={12} textAnchor="middle" dominantBaseline="central" fontWeight={700} fill="#374151" fontFamily="sans-serif">
-            <tspan fontSize={11}>H</tspan><tspan fontSize={18} dy={5}>*</tspan>
-          </text>
+          <text x={12 - 2.8} y={12} textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight={700} fill="#374151" fontFamily="sans-serif">H</text>
+          <text x={12 + 4.8} y={12 + 1.3} textAnchor="middle" dominantBaseline="central" fontSize={16} fontWeight={700} fill="#374151" fontFamily="sans-serif">*</text>
         </svg>
       );
     case "final-state": {
