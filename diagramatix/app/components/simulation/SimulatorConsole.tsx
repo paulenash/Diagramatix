@@ -140,7 +140,12 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
             ) : null}
             {mode !== "home" && <button onClick={() => setMode("home")} className="text-green-400/60 text-xs hover:text-green-300">‹ back</button>}
           </div>
-          <MatrixButton variant="danger" onClick={onClose}>✕ EXIT</MatrixButton>
+          <div className="flex items-center gap-2">
+            <a href="/help?c=simulation" target="_blank" rel="noopener noreferrer"
+              title="Open the Simulator section of the User Guide"
+              className="text-green-300/80 hover:text-green-200 text-xs border border-green-500/40 rounded px-3 py-1.5">📖 User Guide</a>
+            <MatrixButton variant="danger" onClick={onClose}>✕ EXIT</MatrixButton>
+          </div>
         </header>
 
         {mode === "home" ? (

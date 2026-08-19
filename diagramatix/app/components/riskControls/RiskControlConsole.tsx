@@ -97,6 +97,9 @@ export function RiskControlConsole({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <a href="/help?c=risk-controls" target="_blank" rel="noopener noreferrer"
+            title="Open the Risk &amp; Controls section of the User Guide"
+            className="text-xs bg-blue-700 hover:bg-blue-600 rounded px-3 py-1.5">📖 User Guide</a>
           {library && <a href={`${basePath}/export`} className="text-xs bg-blue-700 hover:bg-blue-600 rounded px-3 py-1.5">⭳ Export Risk-Control Matrix</a>}
           <button onClick={onClose} className="text-xs bg-blue-900/60 hover:bg-blue-900 rounded px-3 py-1.5">✕ Close</button>
         </div>

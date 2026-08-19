@@ -434,7 +434,12 @@ export function ProcessMiningConsole({ projectId, projectName, isAdmin, onClose,
           <span className="text-amber-300 tracking-[0.25em] text-sm">⛏ DiagramatixMINER</span>
           {projectName && <span className="text-stone-400 text-xs">{projectName}</span>}
         </div>
-        <button onClick={onClose} className="px-3 py-1.5 text-xs text-white bg-stone-700 hover:bg-stone-600 rounded">✕ Exit</button>
+        <div className="flex items-center gap-2">
+          <a href="/help?c=process-mining" target="_blank" rel="noopener noreferrer"
+            title="Open the Process Mining section of the User Guide"
+            className="px-3 py-1.5 text-xs text-amber-200 border border-amber-500/40 hover:bg-amber-500/10 rounded">📖 User Guide</a>
+          <button onClick={onClose} className="px-3 py-1.5 text-xs text-white bg-stone-700 hover:bg-stone-600 rounded">✕ Exit</button>
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto p-4 grid gap-4 md:grid-cols-3">
