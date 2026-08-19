@@ -857,8 +857,8 @@ export function healPoolHeaderWidths(d: DiagramData): DiagramData {
  *   - Y: place the label 50px FROM the Black-Box Pool boundary INTO the
  *     gap between the BBP and the other end's pool (whether the other
  *     pool is white-box or another black-box).
- *   - X: prefer the RIGHT of the connector with a small gap; fall back
- *     to the LEFT if a sibling label on the same BBP would overlap.
+ *   - X: prefer the LEFT of the connector with a small gap; fall back
+ *     to the RIGHT if a sibling label on the same BBP would overlap.
  *
  * If neither end is a BBP (e.g. white-box → white-box), falls back to
  * the legacy "gap centre" placement so existing behaviour is preserved.
@@ -889,7 +889,7 @@ function computeMsgBpmnLabelOffsets(
   const tgtPool = findPool(target);
   const goingDown = sourceSide === "bottom";
   if (waypoints.length < 4 || !srcPool || !tgtPool) {
-    return { offsetX: 20, offsetY: 0 };
+    return { offsetX: -45, offsetY: 0 };
   }
   const srcPoolEdgeY = goingDown ? srcPool.y + srcPool.height : srcPool.y;
   const tgtPoolEdgeY = goingDown ? tgtPool.y : tgtPool.y + tgtPool.height;
@@ -914,9 +914,9 @@ function computeMsgBpmnLabelOffsets(
     bbpPool = srcPool; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY;
   }
   if (!bbpPool) {
-    // Both white-box: legacy gap-centre placement
+    // Both white-box: gap-centre Y, label to the LEFT of the connector.
     const labelY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
-    return { offsetX: 20, offsetY: labelY - anchorY - 7 };
+    return { offsetX: -45, offsetY: labelY - anchorY - 7 };
   }
 
   // Direction: +1 if BBP edge is above the other (label drops 50 below
@@ -961,9 +961,11 @@ function computeMsgBpmnLabelOffsets(
 
   const rightCentreX = anchorX + RIGHT_OFFSET;
   const leftCentreX = anchorX + LEFT_OFFSET;
-  let offsetX = RIGHT_OFFSET;
-  if (rangeOverlaps(rightCentreX) && !rangeOverlaps(leftCentreX)) {
-    offsetX = LEFT_OFFSET;
+  // Default a message-flow label to the LEFT of the connector (Paul); only flip
+  // to the RIGHT if a sibling label on the same BBP would overlap on the left.
+  let offsetX = LEFT_OFFSET;
+  if (rangeOverlaps(leftCentreX) && !rangeOverlaps(rightCentreX)) {
+    offsetX = RIGHT_OFFSET;
   }
   return { offsetX, offsetY };
 }

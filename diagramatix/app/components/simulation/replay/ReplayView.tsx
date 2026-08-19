@@ -144,6 +144,31 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
       return undefined;
     };
     const lanes = viewData.elements.filter((e) => e.type === "lane" || e.type === "pool");
+    // No visible pool/lane (an invisible / unnamed pool): there is nothing to dim,
+    // so shade the WHOLE content area instead, using the calendar of whatever
+    // team(s) the tasks run on — a stalled queue still reads as "off-shift"
+    // (Paul: shade the invisible pool). Synthesise a single pool-sized region.
+    if (lanes.length === 0) {
+      const teamSet = new Set<string>();
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, any = false;
+      for (const el of viewData.elements) {
+        if (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded") {
+          const tid = getSimParams(el).teamId;
+          if (tid && cals[tid]) teamSet.add(tid);
+        }
+        if (typeof el.x === "number" && typeof el.width === "number") {
+          minX = Math.min(minX, el.x); minY = Math.min(minY, el.y);
+          maxX = Math.max(maxX, el.x + el.width); maxY = Math.max(maxY, el.y + el.height); any = true;
+        }
+      }
+      if (!any || teamSet.size === 0) return [];
+      const pad = 48;
+      const synth = {
+        id: "__invisible_pool__", type: "pool", label: "", properties: {},
+        x: minX - pad, y: minY - pad, width: (maxX - minX) + pad * 2, height: (maxY - minY) + pad * 2,
+      } as unknown as DiagramData["elements"][number];
+      return [{ el: synth, teams: [...teamSet] }];
+    }
     // Every team a lane is responsible for: its own sim.teamId, its label (teams
     // are named after lanes), AND the teams of the tasks inside it — so a lane
     // dims however its team is wired up.

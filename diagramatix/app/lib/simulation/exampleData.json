@@ -1,6 +1,881 @@
 {
   "examples": [
     {
+      "slug": "simple-process",
+      "title": "Simple Process",
+      "concept": "One straightforward process — vary the enquiry arrival rate and team sizes to find the staffing that keeps up with demand.",
+      "description": "A Sales enquiry is checked by the Front Office and, if genuine, answered by the\nSales Team. It is the simplest possible staffing study: two teams, one decision,\nno calendars — just arrivals versus capacity.\n\n**Demo:** Run the *Baseline* — the **Sales Team** sits well over 100% utilisation and\nenquiries pile up behind *Create Sales Enquiry Response*. Then *Add Sales staff*\nand **⇄ compare** to watch the queue and flow-time fall. Vary the arrival rate on\n*Sales Enquiry Arrives* and the team capacities to find the staffing that keeps up.",
+      "difficulty": "intro",
+      "package": {
+        "version": 1,
+        "teams": [
+          {
+            "name": "Front Office Team",
+            "capacity": 1,
+            "calendarName": "Business hours"
+          },
+          {
+            "name": "Sales Team",
+            "capacity": 1,
+            "calendarName": "Business hours"
+          }
+        ],
+        "calendars": [
+          {
+            "name": "Business hours",
+            "pattern": {
+              "intervals": [
+                {
+                  "day": 0,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 0,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 1,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 1,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 2,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 2,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 3,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 3,
+                  "start": "13:00",
+                  "end": "17:00"
+                },
+                {
+                  "day": 4,
+                  "start": "09:00",
+                  "end": "12:00"
+                },
+                {
+                  "day": 4,
+                  "start": "13:00",
+                  "end": "17:00"
+                }
+              ]
+            }
+          }
+        ],
+        "diagrams": [
+          {
+            "key": "simple",
+            "name": "Simple Process",
+            "type": "bpmn",
+            "data": {
+              "elements": [
+                {
+                  "id": "41orphby",
+                  "type": "pool",
+                  "x": 273.0056915283203,
+                  "y": 211.50568389892578,
+                  "width": 976.9040909919971,
+                  "height": 458,
+                  "label": "Sales-R-Us",
+                  "properties": {
+                    "poolType": "white-box",
+                    "poolHeaderWidth": 36
+                  }
+                },
+                {
+                  "id": "e9deria0",
+                  "type": "lane",
+                  "x": 309.0056915283203,
+                  "y": 211.50568389892578,
+                  "width": 940.9040909919971,
+                  "height": 224,
+                  "label": "Front Office Team",
+                  "properties": {},
+                  "parentId": "41orphby"
+                },
+                {
+                  "id": "icosdnkq",
+                  "type": "lane",
+                  "x": 309.0056915283203,
+                  "y": 435.5056838989258,
+                  "width": 940.9040909919971,
+                  "height": 234,
+                  "label": "Sales Team",
+                  "properties": {},
+                  "parentId": "41orphby"
+                },
+                {
+                  "id": "djv84s7w",
+                  "type": "pool",
+                  "x": 273.0056915283203,
+                  "y": 30.858162898186023,
+                  "width": 976.9040909919972,
+                  "height": 97,
+                  "label": "Customer",
+                  "properties": {
+                    "poolType": "black-box",
+                    "poolHeaderWidth": 36
+                  }
+                },
+                {
+                  "id": "ypibs5c5",
+                  "type": "start-event",
+                  "x": 404.0056915283203,
+                  "y": 321.0056838989258,
+                  "width": 36,
+                  "height": 36,
+                  "label": "Sales Enquiry\nArrives",
+                  "properties": {
+                    "sim": {
+                      "arrival": {
+                        "kind": "exponential",
+                        "mean": 12
+                      },
+                      "calendarId": "Business hours"
+                    }
+                  },
+                  "eventType": "message",
+                  "parentId": "e9deria0",
+                  "flowType": "catching"
+                },
+                {
+                  "id": "nw8AIsuL_7KXOyFg_48Jk",
+                  "type": "task",
+                  "x": 493.0056915283203,
+                  "y": 306.5056838989258,
+                  "width": 102,
+                  "height": 65,
+                  "label": "Check\nEnquiry\nDetails",
+                  "properties": {
+                    "sim": {
+                      "teamId": "Front Office Team",
+                      "resourceUnits": 1,
+                      "cycleTime": {
+                        "kind": "normal",
+                        "mean": 5,
+                        "sd": 1
+                      }
+                    }
+                  },
+                  "taskType": "user",
+                  "parentId": "e9deria0"
+                },
+                {
+                  "id": "IQEnGlHNRI5nk2N2HAUfy",
+                  "type": "gateway",
+                  "x": 657.9252255279168,
+                  "y": 319.0056838989258,
+                  "width": 40,
+                  "height": 40,
+                  "label": "Spurious?",
+                  "properties": {
+                    "labelOffsetX": -35,
+                    "labelOffsetY": -52,
+                    "gatewayRole": "decision"
+                  },
+                  "parentId": "e9deria0"
+                },
+                {
+                  "id": "HSQnW-iia-85F2ECqj4jm",
+                  "type": "task",
+                  "x": 816.8753745251595,
+                  "y": 306.5056838989258,
+                  "width": 102,
+                  "height": 65,
+                  "label": "Send\nSorry Can't \nHelp Reply",
+                  "properties": {
+                    "sim": {
+                      "teamId": "Front Office Team",
+                      "resourceUnits": 1,
+                      "cycleTime": {
+                        "kind": "fixed",
+                        "value": 3
+                      }
+                    }
+                  },
+                  "taskType": "send",
+                  "parentId": "e9deria0"
+                },
+                {
+                  "id": "ht3ct0m9",
+                  "type": "pool",
+                  "x": 273.0056915283203,
+                  "y": 733.5056838989258,
+                  "width": 976.9040909919972,
+                  "height": 50,
+                  "label": "CRM",
+                  "properties": {
+                    "poolType": "black-box",
+                    "poolHeaderWidth": 36,
+                    "isSystem": true
+                  }
+                },
+                {
+                  "id": "BRZghc6_Z9z8FBjl9hXyM",
+                  "type": "task",
+                  "x": 754.5689535311449,
+                  "y": 505.5056838989258,
+                  "width": 102,
+                  "height": 65,
+                  "label": "Create\nSales Enquiry\nResponse",
+                  "properties": {
+                    "sim": {
+                      "teamId": "Sales Team",
+                      "resourceUnits": 1,
+                      "cycleTime": {
+                        "kind": "normal",
+                        "mean": 15,
+                        "sd": 4
+                      }
+                    }
+                  },
+                  "taskType": "user",
+                  "parentId": "icosdnkq"
+                },
+                {
+                  "id": "E3j-Oll55XfBK5vab6iiY",
+                  "type": "end-event",
+                  "x": 1156.0707145211245,
+                  "y": 321.775935907803,
+                  "width": 36,
+                  "height": 36,
+                  "label": "End\nProcess",
+                  "properties": {},
+                  "eventType": "none",
+                  "parentId": "e9deria0",
+                  "flowType": "none"
+                },
+                {
+                  "id": "0rDsUJUqg4ybt-HS8ra4w",
+                  "type": "task",
+                  "x": 922.6416980277488,
+                  "y": 505.5056838989258,
+                  "width": 102,
+                  "height": 65,
+                  "label": "Send\nResponse to\nCustomer",
+                  "properties": {
+                    "sim": {
+                      "teamId": "Sales Team",
+                      "resourceUnits": 1,
+                      "cycleTime": {
+                        "kind": "normal",
+                        "mean": 5,
+                        "sd": 1
+                      }
+                    }
+                  },
+                  "taskType": "send",
+                  "parentId": "icosdnkq"
+                },
+                {
+                  "id": "G4hkDulQrxjdvuuI9E3pG",
+                  "type": "gateway",
+                  "x": 1064.3979440686333,
+                  "y": 319.0056838989258,
+                  "width": 40,
+                  "height": 40,
+                  "label": "",
+                  "properties": {
+                    "labelOffsetX": -30,
+                    "labelOffsetY": -54,
+                    "gatewayRole": "merge"
+                  },
+                  "parentId": "e9deria0"
+                }
+              ],
+              "viewport": {
+                "x": 0,
+                "y": 0,
+                "zoom": 1
+              },
+              "connectors": [
+                {
+                  "id": "92o8eovr",
+                  "sourceId": "IQEnGlHNRI5nk2N2HAUfy",
+                  "targetId": "HSQnW-iia-85F2ECqj4jm",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5,
+                  "type": "sequence",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 677.9252255279168,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 697.9252255279168,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 717.9252255279168,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 792.8753745251595,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 816.8753745251595,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 867.8753745251595,
+                      "y": 339.0056838989258
+                    }
+                  ],
+                  "label": "Yes",
+                  "labelOffsetX": 18,
+                  "labelOffsetY": -24,
+                  "labelWidth": 60,
+                  "labelAnchor": "source",
+                  "branchProbability": 20
+                },
+                {
+                  "id": "m13u9lik",
+                  "sourceId": "HSQnW-iia-85F2ECqj4jm",
+                  "targetId": "G4hkDulQrxjdvuuI9E3pG",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5,
+                  "type": "sequence",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 867.8753745251595,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 918.8753745251595,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 942.8753745251595,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 1044.3979440686333,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 1064.3979440686333,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 1084.3979440686333,
+                      "y": 339.0056838989258
+                    }
+                  ],
+                  "label": "",
+                  "labelOffsetX": 0,
+                  "labelOffsetY": -20,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "900gw35k",
+                  "sourceId": "HSQnW-iia-85F2ECqj4jm",
+                  "targetId": "djv84s7w",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "sourceOffsetAlong": 0.5392156862745098,
+                  "type": "messageBPMN",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 867.8753745251595,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 871.8753745251595,
+                      "y": 306.5056838989258
+                    },
+                    {
+                      "x": 871.8753745251595,
+                      "y": 127.85816289818602
+                    },
+                    {
+                      "x": 761.4577370243189,
+                      "y": 79.35816289818602
+                    }
+                  ],
+                  "label": "Can't\nHelp\nReply",
+                  "labelOffsetX": -33.02682200013453,
+                  "labelOffsetY": -64.7030614997646,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "tjt18kz7",
+                  "sourceId": "IQEnGlHNRI5nk2N2HAUfy",
+                  "targetId": "BRZghc6_Z9z8FBjl9hXyM",
+                  "sourceSide": "bottom",
+                  "targetSide": "left",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5,
+                  "type": "sequence",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 677.9252255279168,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 677.9252255279168,
+                      "y": 359.0056838989258
+                    },
+                    {
+                      "x": 677.9252255279168,
+                      "y": 538.0056838989258
+                    },
+                    {
+                      "x": 754.5689535311449,
+                      "y": 538.0056838989258
+                    },
+                    {
+                      "x": 805.5689535311449,
+                      "y": 538.0056838989258
+                    }
+                  ],
+                  "label": "No",
+                  "labelOffsetX": 27.727987001143333,
+                  "labelOffsetY": 3.2169060030936265,
+                  "labelWidth": 60,
+                  "labelAnchor": "source",
+                  "branchProbability": 80
+                },
+                {
+                  "id": "m8iheqf2",
+                  "sourceId": "nw8AIsuL_7KXOyFg_48Jk",
+                  "targetId": "IQEnGlHNRI5nk2N2HAUfy",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5,
+                  "type": "sequence",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 544.0056915283203,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 595.0056915283203,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 619.0056915283203,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 637.9252255279168,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 657.9252255279168,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 677.9252255279168,
+                      "y": 339.0056838989258
+                    }
+                  ],
+                  "label": "",
+                  "labelOffsetX": 0,
+                  "labelOffsetY": -20,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "4s3xhk8z",
+                  "type": "sequence",
+                  "sourceId": "BRZghc6_Z9z8FBjl9hXyM",
+                  "targetId": "0rDsUJUqg4ybt-HS8ra4w",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5,
+                  "waypoints": [
+                    {
+                      "x": 805.5689535311449,
+                      "y": 538.0056838989258
+                    },
+                    {
+                      "x": 856.5689535311449,
+                      "y": 538.0056838989258
+                    },
+                    {
+                      "x": 880.5689535311449,
+                      "y": 538.0056838989258
+                    },
+                    {
+                      "x": 898.6416980277488,
+                      "y": 538.0056838989258
+                    },
+                    {
+                      "x": 922.6416980277488,
+                      "y": 538.0056838989258
+                    },
+                    {
+                      "x": 973.6416980277488,
+                      "y": 538.0056838989258
+                    }
+                  ],
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "label": "",
+                  "labelOffsetX": 0,
+                  "labelOffsetY": -20,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "h3umbdra",
+                  "sourceId": "0rDsUJUqg4ybt-HS8ra4w",
+                  "targetId": "djv84s7w",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "sourceOffsetAlong": 0.4781910004509356,
+                  "type": "messageBPMN",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 973.6416980277488,
+                      "y": 538.0056838989258
+                    },
+                    {
+                      "x": 971.4171800737442,
+                      "y": 505.5056838989258
+                    },
+                    {
+                      "x": 971.4171800737442,
+                      "y": 127.85816289818602
+                    },
+                    {
+                      "x": 761.4577370243189,
+                      "y": 79.35816289818602
+                    }
+                  ],
+                  "label": "Response",
+                  "labelOffsetX": -45.681928995897806,
+                  "labelOffsetY": -148.79693850023537,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "lisodz2a",
+                  "sourceId": "BRZghc6_Z9z8FBjl9hXyM",
+                  "targetId": "ht3ct0m9",
+                  "sourceSide": "bottom",
+                  "targetSide": "top",
+                  "sourceOffsetAlong": 0.49391471568034107,
+                  "type": "messageBPMN",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 805.5689535311449,
+                      "y": 538.0056838989258
+                    },
+                    {
+                      "x": 804.9482545305397,
+                      "y": 570.5056838989258
+                    },
+                    {
+                      "x": 804.9482545305397,
+                      "y": 733.5056838989258
+                    },
+                    {
+                      "x": 761.4577370243189,
+                      "y": 758.5056838989258
+                    }
+                  ],
+                  "label": "Response\nDetails",
+                  "labelOffsetX": -49.97317799986547,
+                  "labelOffsetY": 35.55364400026906,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "0q76bcpt",
+                  "sourceId": "ypibs5c5",
+                  "targetId": "nw8AIsuL_7KXOyFg_48Jk",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5,
+                  "type": "sequence",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 422.0056915283203,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 440.0056915283203,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 458.0056915283203,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 469.0056915283203,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 493.0056915283203,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 544.0056915283203,
+                      "y": 339.0056838989258
+                    }
+                  ],
+                  "label": "",
+                  "labelOffsetX": 0,
+                  "labelOffsetY": -20,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "jfb168vr",
+                  "sourceId": "djv84s7w",
+                  "targetId": "ypibs5c5",
+                  "sourceSide": "bottom",
+                  "targetSide": "top",
+                  "sourceOffsetAlong": 0.15252264922823483,
+                  "type": "messageBPMN",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 761.4577370243189,
+                      "y": 79.35816289818602
+                    },
+                    {
+                      "x": 422.0056915283203,
+                      "y": 127.85816289818602
+                    },
+                    {
+                      "x": 422.0056915283203,
+                      "y": 321.0056838989258
+                    },
+                    {
+                      "x": 422.0056915283203,
+                      "y": 339.0056838989258
+                    }
+                  ],
+                  "label": "Sales\nEnquiry",
+                  "labelOffsetX": -42,
+                  "labelOffsetY": -62.49329449996637,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "5auid33b",
+                  "sourceId": "ht3ct0m9",
+                  "targetId": "nw8AIsuL_7KXOyFg_48Jk",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "sourceOffsetAlong": 0.2897293156624805,
+                  "type": "messageBPMN",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 761.4577370243189,
+                      "y": 758.5056838989258
+                    },
+                    {
+                      "x": 556.0434452793093,
+                      "y": 733.5056838989258
+                    },
+                    {
+                      "x": 556.0434452793093,
+                      "y": 371.5056838989258
+                    },
+                    {
+                      "x": 544.0056915283203,
+                      "y": 339.0056838989258
+                    }
+                  ],
+                  "label": "Email\nDetails",
+                  "labelOffsetX": -39,
+                  "labelOffsetY": 136,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "rxm1dxbk",
+                  "sourceId": "0rDsUJUqg4ybt-HS8ra4w",
+                  "targetId": "G4hkDulQrxjdvuuI9E3pG",
+                  "sourceSide": "right",
+                  "targetSide": "bottom",
+                  "sourceOffsetAlong": 0.27622398461532893,
+                  "targetOffsetAlong": 0.5,
+                  "type": "sequence",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 973.6416980277488,
+                      "y": 538.0056838989258
+                    },
+                    {
+                      "x": 1024.6416980277488,
+                      "y": 523.4602428989222
+                    },
+                    {
+                      "x": 1084.3979440686333,
+                      "y": 523.4602428989222
+                    },
+                    {
+                      "x": 1084.3979440686333,
+                      "y": 359.0056838989258
+                    },
+                    {
+                      "x": 1084.3979440686333,
+                      "y": 339.0056838989258
+                    }
+                  ],
+                  "label": "",
+                  "labelOffsetX": 0,
+                  "labelOffsetY": -20,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "6ewbvx7p",
+                  "sourceId": "G4hkDulQrxjdvuuI9E3pG",
+                  "targetId": "E3j-Oll55XfBK5vab6iiY",
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "sourceOffsetAlong": 0.5515969752016631,
+                  "targetOffsetAlong": 0.5470451944219255,
+                  "type": "sequence",
+                  "directionType": "directed",
+                  "routingType": "rectilinear",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1084.3979440686333,
+                      "y": 339.0056838989258
+                    },
+                    {
+                      "x": 1102.3340650605667,
+                      "y": 341.0695629069923
+                    },
+                    {
+                      "x": 1122.3340650605667,
+                      "y": 341.0695629069923
+                    },
+                    {
+                      "x": 1138.0707145211245,
+                      "y": 341.4695629069923
+                    },
+                    {
+                      "x": 1156.0707145211245,
+                      "y": 341.4695629069923
+                    },
+                    {
+                      "x": 1174.0707145211245,
+                      "y": 339.775935907803
+                    }
+                  ],
+                  "label": "",
+                  "labelOffsetX": 8,
+                  "labelOffsetY": 20,
+                  "labelWidth": 60,
+                  "labelAnchor": "source"
+                }
+              ]
+            }
+          }
+        ],
+        "study": {
+          "name": "Simple Process",
+          "rootKeys": [
+            "simple"
+          ]
+        },
+        "scenarios": [
+          {
+            "name": "Baseline",
+            "isBaseline": true,
+            "runConfig": {
+              "clockUnit": "minute",
+              "horizon": 2880,
+              "warmUp": 120,
+              "replications": 5,
+              "seed": 1,
+              "collectQueues": true
+            },
+            "overrides": {}
+          },
+          {
+            "name": "Add Sales staff",
+            "runConfig": {
+              "clockUnit": "minute",
+              "horizon": 2880,
+              "warmUp": 120,
+              "replications": 5,
+              "seed": 1,
+              "collectQueues": true
+            },
+            "overrides": {
+              "teams": {
+                "Sales Team": {
+                  "capacity": 2
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "slug": "loan-origination",
       "title": "Loan origination",
       "concept": "A multi-team loan process with real task timings — find the team that gates throughput.",
@@ -33,708 +908,1368 @@
             "data": {
               "elements": [
                 {
-                  "id": "vo2rctxmg",
-                  "type": "task",
                   "x": 830,
                   "y": 171,
+                  "id": "vo2rctxmg",
+                  "type": "task",
+                  "label": "Verify Employment",
                   "width": 105,
                   "height": 68,
-                  "label": "Verify Employment",
+                  "parentId": "lo26m50x",
+                  "taskType": "user",
                   "properties": {
                     "sim": {
-                      "cycleTime": {
-                        "kind": "normal",
-                        "mean": 30,
-                        "sd": 4
-                      },
                       "teamId": "loan-officer",
+                      "cycleTime": {
+                        "sd": 4,
+                        "kind": "normal",
+                        "mean": 30
+                      },
                       "resourceUnits": 1
                     }
-                  },
-                  "taskType": "user",
-                  "parentId": "98xvzew86"
+                  }
                 },
                 {
-                  "id": "vg2keo3gt",
-                  "type": "task",
                   "x": 1137,
                   "y": 296,
+                  "id": "vg2keo3gt",
+                  "type": "task",
+                  "label": "Review Loan Application",
                   "width": 105,
                   "height": 68,
-                  "label": "Review Loan Application",
+                  "parentId": "lo26m50x",
+                  "taskType": "user",
                   "properties": {
                     "sim": {
-                      "cycleTime": {
-                        "kind": "normal",
-                        "mean": 30,
-                        "sd": 4
-                      },
                       "teamId": "loan-officer",
+                      "cycleTime": {
+                        "sd": 4,
+                        "kind": "normal",
+                        "mean": 30
+                      },
                       "resourceUnits": 1
                     }
-                  },
-                  "taskType": "user",
-                  "parentId": "98xvzew86"
+                  }
                 },
                 {
+                  "x": 1459.2857142857144,
+                  "y": 389.42857142857144,
                   "id": "6ur1w7erg",
                   "type": "task",
-                  "x": 1405,
-                  "y": 388,
+                  "label": "Send Approval Letter",
                   "width": 105,
                   "height": 68,
-                  "label": "Send Approval Letter",
+                  "parentId": "lo26m50x",
+                  "taskType": "send",
                   "properties": {
                     "sim": {
+                      "teamId": "loan-officer",
                       "cycleTime": {
                         "kind": "fixed",
                         "value": 1
                       },
-                      "teamId": "loan-officer",
                       "resourceUnits": 1
                     }
-                  },
-                  "taskType": "send",
-                  "parentId": "98xvzew86"
+                  }
                 },
                 {
-                  "id": "40lydcgbk",
-                  "type": "task",
                   "x": 549,
                   "y": 296,
+                  "id": "40lydcgbk",
+                  "type": "task",
+                  "label": "Record Loan Application",
                   "width": 105,
                   "height": 68,
-                  "label": "Record Loan Application",
+                  "parentId": "lo26m50x",
+                  "taskType": "user",
                   "properties": {
                     "sim": {
-                      "cycleTime": {
-                        "kind": "normal",
-                        "mean": 20,
-                        "sd": 1
-                      },
                       "teamId": "loan-officer",
+                      "cycleTime": {
+                        "sd": 1,
+                        "kind": "normal",
+                        "mean": 20
+                      },
                       "resourceUnits": 1
                     }
-                  },
-                  "taskType": "user",
-                  "parentId": "98xvzew86"
+                  }
                 },
                 {
-                  "id": "jojn8dbqe",
-                  "type": "task",
                   "x": 1663,
                   "y": 171,
+                  "id": "jojn8dbqe",
+                  "type": "task",
+                  "label": "Close-Out Rejection",
                   "width": 105,
                   "height": 68,
-                  "label": "Close-Out Rejection",
+                  "parentId": "lo26m50x",
+                  "taskType": "user",
                   "properties": {
                     "sim": {
-                      "cycleTime": {
-                        "kind": "normal",
-                        "mean": 5,
-                        "sd": 0.25
-                      },
                       "teamId": "loan-officer",
+                      "cycleTime": {
+                        "sd": 0.25,
+                        "kind": "normal",
+                        "mean": 5
+                      },
                       "resourceUnits": 1
                     }
-                  },
-                  "taskType": "user",
-                  "parentId": "98xvzew86"
+                  }
                 },
                 {
+                  "x": 1388.2857142857142,
+                  "y": 171,
                   "id": "xjn4xve0i",
                   "type": "task",
-                  "x": 1404,
-                  "y": 171,
+                  "label": "Send Rejection Letter",
                   "width": 105,
                   "height": 68,
-                  "label": "Send Rejection Letter",
+                  "parentId": "lo26m50x",
+                  "taskType": "send",
                   "properties": {
                     "sim": {
+                      "teamId": "loan-officer",
                       "cycleTime": {
                         "kind": "fixed",
                         "value": 1
                       },
-                      "teamId": "loan-officer",
                       "resourceUnits": 1
                     }
-                  },
-                  "taskType": "send",
-                  "parentId": "98xvzew86"
+                  }
                 },
                 {
-                  "id": "48yha1myj",
-                  "type": "task",
                   "x": 1664,
                   "y": 393,
+                  "id": "48yha1myj",
+                  "type": "task",
+                  "label": "Close-out Approval",
                   "width": 105,
                   "height": 68,
-                  "label": "Close-out Approval",
+                  "parentId": "lo26m50x",
+                  "taskType": "user",
                   "properties": {
                     "sim": {
-                      "cycleTime": {
-                        "kind": "normal",
-                        "mean": 10,
-                        "sd": 0.25
-                      },
                       "teamId": "loan-officer",
+                      "cycleTime": {
+                        "sd": 0.25,
+                        "kind": "normal",
+                        "mean": 10
+                      },
                       "resourceUnits": 1
                     }
-                  },
-                  "taskType": "user",
-                  "parentId": "98xvzew86"
+                  }
                 },
                 {
-                  "id": "dfq8m7r3e",
-                  "type": "task",
                   "x": 780,
                   "y": 639,
+                  "id": "dfq8m7r3e",
+                  "type": "task",
+                  "label": "Perform Title Search",
                   "width": 105,
                   "height": 68,
-                  "label": "Perform Title Search",
+                  "parentId": "jtmmm6o3",
+                  "taskType": "manual",
                   "properties": {
                     "sim": {
-                      "cycleTime": {
-                        "kind": "normal",
-                        "mean": 60,
-                        "sd": 2
-                      },
                       "teamId": "title-researcher",
+                      "cycleTime": {
+                        "sd": 2,
+                        "kind": "normal",
+                        "mean": 60
+                      },
                       "resourceUnits": 1
                     }
-                  },
-                  "taskType": "manual",
-                  "parentId": "abwfks14w"
+                  }
                 },
                 {
-                  "id": "qm0o5rstp",
-                  "type": "task",
                   "x": 930,
                   "y": 639,
+                  "id": "qm0o5rstp",
+                  "type": "task",
+                  "label": "Review Title Report",
                   "width": 105,
                   "height": 68,
-                  "label": "Review Title Report",
+                  "parentId": "jtmmm6o3",
+                  "taskType": "user",
                   "properties": {
                     "sim": {
-                      "cycleTime": {
-                        "kind": "normal",
-                        "mean": 20,
-                        "sd": 2
-                      },
                       "teamId": "title-researcher",
+                      "cycleTime": {
+                        "sd": 2,
+                        "kind": "normal",
+                        "mean": 20
+                      },
                       "resourceUnits": 1
                     }
-                  },
-                  "taskType": "user",
-                  "parentId": "abwfks14w"
+                  }
                 },
                 {
+                  "x": 1571.4980829392046,
+                  "y": 931,
                   "id": "109isdj1c",
                   "type": "task",
-                  "x": 1563,
-                  "y": 931,
+                  "label": "Set with Default Terms",
                   "width": 105,
                   "height": 68,
-                  "label": "Set with Default Terms",
+                  "parentId": "qg78avrx",
+                  "taskType": "script",
                   "properties": {
                     "sim": {
+                      "teamId": "loan-underwriter",
                       "cycleTime": {
                         "kind": "fixed",
                         "value": 1
                       },
-                      "teamId": "loan-underwriter",
                       "resourceUnits": 1
                     }
-                  },
-                  "taskType": "script",
-                  "parentId": "ugxwzs9td"
+                  }
                 },
                 {
-                  "id": "br1myk84r",
-                  "type": "task",
                   "x": 1405,
                   "y": 825,
+                  "id": "br1myk84r",
+                  "type": "task",
+                  "label": "Underwrite Loan with Terms",
                   "width": 105,
                   "height": 68,
-                  "label": "Underwrite Loan with Terms",
+                  "parentId": "qg78avrx",
+                  "taskType": "user",
                   "properties": {
                     "sim": {
-                      "cycleTime": {
-                        "kind": "normal",
-                        "mean": 50,
-                        "sd": 10
-                      },
                       "teamId": "loan-underwriter",
+                      "cycleTime": {
+                        "sd": 10,
+                        "kind": "normal",
+                        "mean": 50
+                      },
                       "resourceUnits": 1
                     }
-                  },
-                  "taskType": "user",
-                  "parentId": "ugxwzs9td"
+                  }
                 },
                 {
-                  "id": "c0qs5lip2",
-                  "type": "gateway",
                   "x": 705,
                   "y": 309,
+                  "id": "c0qs5lip2",
+                  "type": "gateway",
+                  "label": "",
                   "width": 42,
                   "height": 42,
-                  "label": "",
+                  "parentId": "lo26m50x",
                   "properties": {},
-                  "gatewayType": "parallel",
-                  "parentId": "98xvzew86"
+                  "gatewayType": "parallel"
                 },
                 {
-                  "id": "ddcp2s1id",
-                  "type": "gateway",
                   "x": 1293,
                   "y": 309,
+                  "id": "ddcp2s1id",
+                  "type": "gateway",
+                  "label": "Approved?",
                   "width": 42,
                   "height": 42,
-                  "label": "Approved?",
-                  "properties": {},
-                  "gatewayType": "exclusive",
-                  "parentId": "98xvzew86"
+                  "parentId": "lo26m50x",
+                  "properties": {
+                    "labelOffsetX": -39.36781102201735,
+                    "labelOffsetY": -78.29692388103746
+                  },
+                  "gatewayType": "exclusive"
                 },
                 {
-                  "id": "35ha3k3v2",
-                  "type": "gateway",
                   "x": 1044,
                   "y": 309,
+                  "id": "35ha3k3v2",
+                  "type": "gateway",
+                  "label": "",
                   "width": 42,
                   "height": 42,
-                  "label": "",
+                  "parentId": "lo26m50x",
                   "properties": {},
-                  "gatewayType": "parallel",
-                  "parentId": "98xvzew86"
+                  "gatewayType": "parallel"
                 },
                 {
+                  "x": 1602.8735622044035,
+                  "y": 837.6877396325995,
                   "id": "i4cvizb32",
                   "type": "gateway",
-                  "x": 1595,
-                  "y": 839,
+                  "label": "",
                   "width": 42,
                   "height": 42,
-                  "label": "",
+                  "parentId": "qg78avrx",
                   "properties": {},
-                  "gatewayType": "exclusive",
-                  "parentId": "ugxwzs9td"
+                  "gatewayType": "exclusive"
                 },
                 {
+                  "x": 460,
+                  "y": 315,
                   "id": "an3lylu4z",
                   "type": "start-event",
-                  "x": 470,
-                  "y": 315,
+                  "label": "Receive  Loan  Application",
                   "width": 30,
                   "height": 30,
-                  "label": "Receive  Loan  Application",
+                  "flowType": "catching",
+                  "parentId": "lo26m50x",
+                  "eventType": "message",
                   "properties": {
                     "sim": {
                       "arrival": {
-                        "kind": "triangular",
-                        "min": 10,
-                        "mode": 16,
-                        "max": 30
-                      }
+                        "kind": "exponential",
+                        "mean": 150
+                      },
+                      "calendarId": "Business hours"
                     }
-                  },
-                  "eventType": "message",
-                  "flowType": "none",
-                  "parentId": "98xvzew86"
+                  }
                 },
                 {
-                  "id": "69gm57llv",
-                  "type": "intermediate-event",
                   "x": 818,
                   "y": 314,
+                  "id": "69gm57llv",
+                  "type": "intermediate-event",
+                  "label": "Request Credit Report",
                   "width": 32,
                   "height": 32,
-                  "label": "Request Credit Report",
+                  "flowType": "throwing",
+                  "parentId": "lo26m50x",
+                  "eventType": "message",
                   "properties": {
                     "sim": {
                       "delay": {
-                        "kind": "fixed",
-                        "value": 2
-                      }
-                    }
-                  },
-                  "eventType": "message",
-                  "flowType": "throwing",
-                  "parentId": "98xvzew86"
-                },
-                {
-                  "id": "clri4mlib",
-                  "type": "end-event",
-                  "x": 1818,
-                  "y": 189,
-                  "width": 32,
-                  "height": 32,
-                  "label": "Loan Request Rejected",
-                  "properties": {},
-                  "eventType": "none",
-                  "flowType": "none",
-                  "parentId": "98xvzew86"
-                },
-                {
-                  "id": "cowuioizt",
-                  "type": "intermediate-event",
-                  "x": 940,
-                  "y": 314,
-                  "width": 32,
-                  "height": 32,
-                  "label": "Receive  Credit  Report",
-                  "properties": {
-                    "sim": {
-                      "cycleTime": {
                         "kind": "triangular",
-                        "min": 4,
-                        "mode": 5,
-                        "max": 6
+                        "min": 12,
+                        "mode": 16,
+                        "max": 20
                       },
                       "arrival": {
                         "kind": "triangular",
-                        "min": 4,
-                        "mode": 5,
-                        "max": 6
-                      },
-                      "delay": {
-                        "kind": "fixed",
-                        "value": 2
+                        "min": 12,
+                        "mode": 16,
+                        "max": 20
                       }
                     }
                   },
-                  "eventType": "message",
-                  "flowType": "catching",
-                  "parentId": "98xvzew86"
+                  "taskType": "send"
                 },
                 {
-                  "id": "m5jz4rkkz",
-                  "type": "end-event",
                   "x": 1818,
-                  "y": 411,
+                  "y": 189,
+                  "id": "clri4mlib",
+                  "type": "end-event",
+                  "label": "Loan Request Rejected",
                   "width": 32,
                   "height": 32,
-                  "label": "Loan Request Approved",
-                  "properties": {},
-                  "eventType": "none",
                   "flowType": "none",
-                  "parentId": "98xvzew86"
+                  "parentId": "lo26m50x",
+                  "eventType": "none",
+                  "properties": {}
                 },
                 {
-                  "id": "m9p3bzxw3",
+                  "x": 940,
+                  "y": 314,
+                  "id": "cowuioizt",
                   "type": "intermediate-event",
-                  "x": 1416,
-                  "y": 877,
+                  "label": "Receive  Credit  Report",
                   "width": 32,
                   "height": 32,
-                  "label": "1 Hour Time Limit",
+                  "flowType": "catching",
+                  "parentId": "lo26m50x",
+                  "eventType": "message",
                   "properties": {
                     "sim": {
+                      "delay": {
+                        "kind": "fixed",
+                        "value": 2
+                      },
+                      "arrival": {
+                        "max": 6,
+                        "min": 4,
+                        "kind": "triangular",
+                        "mode": 5
+                      },
+                      "cycleTime": {
+                        "max": 6,
+                        "min": 4,
+                        "kind": "triangular",
+                        "mode": 5
+                      }
+                    }
+                  }
+                },
+                {
+                  "x": 1818,
+                  "y": 411,
+                  "id": "m5jz4rkkz",
+                  "type": "end-event",
+                  "label": "Loan Request Approved",
+                  "width": 32,
+                  "height": 32,
+                  "flowType": "none",
+                  "parentId": "lo26m50x",
+                  "eventType": "none",
+                  "properties": {}
+                },
+                {
+                  "x": 1468.4904146960237,
+                  "y": 877,
+                  "id": "m9p3bzxw3",
+                  "type": "intermediate-event",
+                  "label": "1 Hour Time Limit",
+                  "width": 32,
+                  "height": 32,
+                  "flowType": "catching",
+                  "parentId": "druuirlu",
+                  "eventType": "timer",
+                  "properties": {
+                    "sim": {
+                      "delay": {
+                        "kind": "fixed",
+                        "value": 2
+                      },
                       "arrival": {
                         "kind": "fixed",
                         "value": 60
-                      },
-                      "delay": {
-                        "kind": "fixed",
-                        "value": 2
                       }
-                    }
+                    },
+                    "labelOffsetX": -55.11493543082406,
+                    "labelOffsetY": -0.8735622044034699
                   },
-                  "boundaryHostId": "br1myk84r",
-                  "eventType": "timer",
-                  "flowType": "catching"
+                  "boundaryHostId": "br1myk84r"
                 },
                 {
+                  "x": 1747.1858225718047,
+                  "y": 492.9367811022018,
                   "id": "r7zdiuz8s",
                   "type": "data-object",
-                  "x": 1738,
-                  "y": 489,
+                  "label": "Loan Application",
                   "width": 30,
                   "height": 38,
-                  "label": "Loan Application",
-                  "properties": {}
+                  "parentId": "lo26m50x",
+                  "properties": {
+                    "role": "output",
+                    "state": "Approved"
+                  }
                 },
                 {
+                  "x": 509.0670530193891,
+                  "y": 184.37547926519886,
                   "id": "2owwtkdeh",
                   "type": "data-object",
-                  "x": 534,
-                  "y": 187,
+                  "label": "Loan Application",
                   "width": 30,
                   "height": 38,
-                  "label": "Loan Application",
-                  "properties": {}
+                  "parentId": "lo26m50x",
+                  "properties": {
+                    "role": "input",
+                    "state": "Initial"
+                  }
                 },
                 {
+                  "x": 1762.2857142857151,
+                  "y": 282.84701612271715,
                   "id": "rg05095np",
                   "type": "data-object",
-                  "x": 1738,
-                  "y": 262,
+                  "label": "Loan Application",
                   "width": 30,
                   "height": 38,
-                  "label": "Loan Application",
-                  "properties": {}
+                  "parentId": "lo26m50x",
+                  "properties": {
+                    "role": "output",
+                    "state": "Rejected"
+                  }
                 },
                 {
-                  "id": "98xvzew86",
-                  "type": "lane",
-                  "x": 384,
-                  "y": 120,
-                  "width": 1524,
-                  "height": 471,
-                  "label": "Loan officer",
-                  "properties": {}
+                  "x": 328.7813387336747,
+                  "y": 121.80405069377031,
+                  "id": "druuirlu",
+                  "type": "pool",
+                  "label": "Loan Company",
+                  "width": 1555.7142857142858,
+                  "height": 916.3593526873876,
+                  "properties": {
+                    "poolType": "white-box",
+                    "poolHeaderWidth": 36
+                  }
                 },
                 {
-                  "id": "abwfks14w",
+                  "x": 364.7813387336747,
+                  "y": 579.7350365051356,
+                  "id": "jtmmm6o3",
                   "type": "lane",
-                  "x": 384,
-                  "y": 591,
-                  "width": 1524,
-                  "height": 168,
                   "label": "Title Researcher",
+                  "width": 1519.7142857142858,
+                  "height": 190.7751343377394,
+                  "parentId": "druuirlu",
                   "properties": {}
                 },
                 {
-                  "id": "ugxwzs9td",
+                  "x": 364.7813387336747,
+                  "y": 770.5101708428756,
+                  "id": "qg78avrx",
                   "type": "lane",
-                  "x": 384,
-                  "y": 759,
-                  "width": 1524,
-                  "height": 282,
                   "label": "Loan Underwriter",
+                  "width": 1519.7142857142858,
+                  "height": 267.6532325382824,
+                  "parentId": "druuirlu",
                   "properties": {}
+                },
+                {
+                  "x": 364.7813387336747,
+                  "y": 121.80405069377031,
+                  "id": "lo26m50x",
+                  "type": "lane",
+                  "label": "Loan Officer",
+                  "width": 1519.7142857142858,
+                  "height": 457.9309858113663,
+                  "parentId": "druuirlu",
+                  "properties": {}
+                },
+                {
+                  "id": "pws1buv9",
+                  "type": "pool",
+                  "x": 328.7813387336747,
+                  "y": 1118.19801275175,
+                  "width": 1555.7142857142858,
+                  "height": 145,
+                  "label": "Credit Agency",
+                  "properties": {
+                    "poolType": "black-box",
+                    "poolHeaderWidth": 36
+                  }
+                },
+                {
+                  "id": "1hrsz43r",
+                  "type": "data-object",
+                  "x": 1112.9241958765317,
+                  "y": 418.1265841803211,
+                  "width": 36,
+                  "height": 46,
+                  "label": "Loan\nApplication",
+                  "properties": {
+                    "state": "To Be Approved",
+                    "role": "input"
+                  },
+                  "parentId": "lo26m50x"
+                },
+                {
+                  "id": "apidaf9c",
+                  "type": "data-object",
+                  "x": 1732.924195876532,
+                  "y": 835.2694413231784,
+                  "width": 36,
+                  "height": 46,
+                  "label": "Loan\nApplication",
+                  "properties": {
+                    "role": "output",
+                    "state": "Complete"
+                  },
+                  "parentId": "qg78avrx"
+                },
+                {
+                  "id": "7k3xril1",
+                  "type": "pool",
+                  "x": 328.7813387336747,
+                  "y": -62.087701533964555,
+                  "width": 1555.7142857142858,
+                  "height": 107,
+                  "label": "Applicant",
+                  "properties": {
+                    "poolType": "black-box",
+                    "poolHeaderWidth": 36
+                  }
                 }
               ],
+              "viewport": {
+                "x": 0,
+                "y": 0,
+                "zoom": 1
+              },
               "connectors": [
                 {
-                  "id": "wsjo4rx6w",
-                  "sourceId": "an3lylu4z",
-                  "targetId": "40lydcgbk",
-                  "sourceSide": "right",
-                  "targetSide": "left",
+                  "id": "vg7ctimww",
                   "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
+                  "label": "Yes",
+                  "sourceId": "ddcp2s1id",
+                  "targetId": "6ur1w7erg",
                   "waypoints": [
                     {
-                      "x": 500,
+                      "x": 1314,
                       "y": 330
                     },
                     {
-                      "x": 514,
+                      "x": 1314,
+                      "y": 351
+                    },
+                    {
+                      "x": 1314,
+                      "y": 423.42857142857144
+                    },
+                    {
+                      "x": 1459.2857142857144,
+                      "y": 423.42857142857144
+                    },
+                    {
+                      "x": 1511.7857142857144,
+                      "y": 423.42857142857144
+                    }
+                  ],
+                  "labelWidth": 80,
+                  "sourceSide": "bottom",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "labelOffsetX": -45.28188016412332,
+                  "labelOffsetY": -14.25287559119306,
+                  "directionType": "directed",
+                  "branchProbability": 27,
+                  "sourceOffsetAlong": 0.5,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
+                },
+                {
+                  "id": "kxsbfobp3",
+                  "type": "sequence",
+                  "sourceId": "6ur1w7erg",
+                  "targetId": "br1myk84r",
+                  "waypoints": [
+                    {
+                      "x": 1511.7857142857144,
+                      "y": 423.42857142857144
+                    },
+                    {
+                      "x": 1511.7857142857144,
+                      "y": 457.42857142857144
+                    },
+                    {
+                      "x": 1511.7857142857144,
+                      "y": 481.42857142857144
+                    },
+                    {
+                      "x": 1511.7857142857144,
+                      "y": 641.2142857142858
+                    },
+                    {
+                      "x": 1457.5,
+                      "y": 641.2142857142858
+                    },
+                    {
+                      "x": 1457.5,
+                      "y": 801
+                    },
+                    {
+                      "x": 1457.5,
+                      "y": 825
+                    },
+                    {
+                      "x": 1457.5,
+                      "y": 859
+                    }
+                  ],
+                  "sourceSide": "bottom",
+                  "targetSide": "top",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
+                },
+                {
+                  "id": "v6q115dqg",
+                  "type": "sequence",
+                  "label": "No",
+                  "sourceId": "ddcp2s1id",
+                  "targetId": "xjn4xve0i",
+                  "waypoints": [
+                    {
+                      "x": 1314,
+                      "y": 330
+                    },
+                    {
+                      "x": 1315.306018326648,
+                      "y": 310.306018326648
+                    },
+                    {
+                      "x": 1315.306018326648,
+                      "y": 205
+                    },
+                    {
+                      "x": 1388.2857142857142,
+                      "y": 205
+                    },
+                    {
+                      "x": 1440.7857142857142,
+                      "y": 205
+                    }
+                  ],
+                  "labelWidth": 80,
+                  "sourceSide": "top",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "labelOffsetX": -9.683905511008334,
+                  "labelOffsetY": -9.003834121590785,
+                  "directionType": "directed",
+                  "branchProbability": 73,
+                  "sourceOffsetAlong": 0.5310956744439993,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
+                },
+                {
+                  "id": "npblxanwp",
+                  "type": "sequence",
+                  "sourceId": "xjn4xve0i",
+                  "targetId": "jojn8dbqe",
+                  "waypoints": [
+                    {
+                      "x": 1440.7857142857142,
+                      "y": 205
+                    },
+                    {
+                      "x": 1493.2857142857142,
+                      "y": 205
+                    },
+                    {
+                      "x": 1517.2857142857142,
+                      "y": 205
+                    },
+                    {
+                      "x": 1639,
+                      "y": 205
+                    },
+                    {
+                      "x": 1663,
+                      "y": 205
+                    },
+                    {
+                      "x": 1715.5,
+                      "y": 205
+                    }
+                  ],
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
+                },
+                {
+                  "id": "txsw57vd",
+                  "sourceId": "xjn4xve0i",
+                  "targetId": "7k3xril1",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "sourceOffsetAlong": 0.4468971035860185,
+                  "type": "messageBPMN",
+                  "directionType": "directed",
+                  "routingType": "direct",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1440.7857142857142,
+                      "y": 205
+                    },
+                    {
+                      "x": 1435.2099101622462,
+                      "y": 171
+                    },
+                    {
+                      "x": 1435.2099101622462,
+                      "y": 44.912298466035445
+                    },
+                    {
+                      "x": 1106.6384815908177,
+                      "y": -8.587701533964555
+                    }
+                  ],
+                  "label": "Loan\nRejection\nLetter",
+                  "labelOffsetX": -39.28571428571445,
+                  "labelOffsetY": -40.04385076698226,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "wsjo4rx6w",
+                  "type": "sequence",
+                  "sourceId": "an3lylu4z",
+                  "targetId": "40lydcgbk",
+                  "waypoints": [
+                    {
+                      "x": 475,
+                      "y": 330
+                    },
+                    {
+                      "x": 490,
+                      "y": 330
+                    },
+                    {
+                      "x": 505,
+                      "y": 330
+                    },
+                    {
+                      "x": 525,
                       "y": 330
                     },
                     {
                       "x": 549,
                       "y": 330
+                    },
+                    {
+                      "x": 601.5,
+                      "y": 330
                     }
-                  ]
+                  ],
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
+                },
+                {
+                  "id": "ive9e5z0j",
+                  "type": "sequence",
+                  "sourceId": "109isdj1c",
+                  "targetId": "i4cvizb32",
+                  "waypoints": [
+                    {
+                      "x": 1623.9980829392046,
+                      "y": 965
+                    },
+                    {
+                      "x": 1623.9980829392046,
+                      "y": 931
+                    },
+                    {
+                      "x": 1623.9980829392046,
+                      "y": 908
+                    },
+                    {
+                      "x": 1623.8735622044035,
+                      "y": 900.6877396325995
+                    },
+                    {
+                      "x": 1623.8735622044035,
+                      "y": 879.6877396325995
+                    },
+                    {
+                      "x": 1623.8735622044035,
+                      "y": 858.6877396325995
+                    }
+                  ],
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceOffsetAlong": 0.5,
+                  "targetOffsetAlong": 0.5,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
+                },
+                {
+                  "id": "o3xrszm9f",
+                  "type": "sequence",
+                  "sourceId": "m9p3bzxw3",
+                  "targetId": "109isdj1c",
+                  "waypoints": [
+                    {
+                      "x": 1484.4904146960237,
+                      "y": 893
+                    },
+                    {
+                      "x": 1481.963084986521,
+                      "y": 909
+                    },
+                    {
+                      "x": 1481.963084986521,
+                      "y": 965
+                    },
+                    {
+                      "x": 1571.4980829392046,
+                      "y": 965
+                    },
+                    {
+                      "x": 1623.9980829392046,
+                      "y": 965
+                    }
+                  ],
+                  "sourceSide": "bottom",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceOffsetAlong": 0.42102094657803946,
+                  "targetOffsetAlong": 0.5,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
+                },
+                {
+                  "id": "o8n0cb83j",
+                  "type": "sequence",
+                  "sourceId": "br1myk84r",
+                  "targetId": "i4cvizb32",
+                  "waypoints": [
+                    {
+                      "x": 1457.5,
+                      "y": 859
+                    },
+                    {
+                      "x": 1510,
+                      "y": 859
+                    },
+                    {
+                      "x": 1534,
+                      "y": 859
+                    },
+                    {
+                      "x": 1581.8735622044035,
+                      "y": 858.6877396325995
+                    },
+                    {
+                      "x": 1602.8735622044035,
+                      "y": 858.6877396325995
+                    },
+                    {
+                      "x": 1623.8735622044035,
+                      "y": 858.6877396325995
+                    }
+                  ],
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
+                },
+                {
+                  "id": "jyfmhb9ut",
+                  "type": "sequence",
+                  "sourceId": "i4cvizb32",
+                  "targetId": "48yha1myj",
+                  "waypoints": [
+                    {
+                      "x": 1623.8735622044035,
+                      "y": 858.6877396325995
+                    },
+                    {
+                      "x": 1624.9994650331837,
+                      "y": 838.8136424613797
+                    },
+                    {
+                      "x": 1624.9994650331837,
+                      "y": 427
+                    },
+                    {
+                      "x": 1664,
+                      "y": 427
+                    },
+                    {
+                      "x": 1716.5,
+                      "y": 427
+                    }
+                  ],
+                  "sourceSide": "top",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceOffsetAlong": 0.526807210209053,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
+                },
+                {
+                  "id": "h7wvfog9r",
+                  "type": "associationBPMN",
+                  "sourceId": "2owwtkdeh",
+                  "targetId": "40lydcgbk",
+                  "waypoints": [
+                    {
+                      "x": 524.067053019389,
+                      "y": 203.37547926519886
+                    },
+                    {
+                      "x": 535.6858610045573,
+                      "y": 222.37547926519886
+                    },
+                    {
+                      "x": 580.7084488686463,
+                      "y": 296
+                    },
+                    {
+                      "x": 601.5,
+                      "y": 330
+                    }
+                  ],
+                  "sourceSide": "bottom",
+                  "targetSide": "top",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceOffsetAlong": 0.8872935995056063,
+                  "targetOffsetAlong": 0.3019852273204411,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
+                },
+                {
+                  "id": "m62q8xrod",
+                  "type": "associationBPMN",
+                  "sourceId": "jojn8dbqe",
+                  "targetId": "rg05095np",
+                  "waypoints": [
+                    {
+                      "x": 1715.5,
+                      "y": 205
+                    },
+                    {
+                      "x": 1737.1910584323264,
+                      "y": 239
+                    },
+                    {
+                      "x": 1765.1642404558856,
+                      "y": 282.84701612271715
+                    },
+                    {
+                      "x": 1777.2857142857151,
+                      "y": 301.84701612271715
+                    }
+                  ],
+                  "sourceSide": "bottom",
+                  "targetSide": "top",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceOffsetAlong": 0.7065815088792988,
+                  "targetOffsetAlong": 0.09595087233901722,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
+                },
+                {
+                  "id": "y1s1ru997",
+                  "type": "associationBPMN",
+                  "sourceId": "48yha1myj",
+                  "targetId": "r7zdiuz8s",
+                  "waypoints": [
+                    {
+                      "x": 1716.5,
+                      "y": 427
+                    },
+                    {
+                      "x": 1734.7879307089859,
+                      "y": 461
+                    },
+                    {
+                      "x": 1751.9660965873716,
+                      "y": 492.9367811022018
+                    },
+                    {
+                      "x": 1762.1858225718047,
+                      "y": 511.9367811022018
+                    }
+                  ],
+                  "sourceSide": "bottom",
+                  "targetSide": "top",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceOffsetAlong": 0.6741707686570083,
+                  "targetOffsetAlong": 0.15934246718556247,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "rnw4ikbys",
+                  "type": "sequence",
                   "sourceId": "40lydcgbk",
                   "targetId": "c0qs5lip2",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
+                    {
+                      "x": 601.5,
+                      "y": 330
+                    },
                     {
                       "x": 654,
                       "y": 330
                     },
                     {
-                      "x": 668,
+                      "x": 677,
+                      "y": 330
+                    },
+                    {
+                      "x": 684,
                       "y": 330
                     },
                     {
                       "x": 705,
                       "y": 330
+                    },
+                    {
+                      "x": 726,
+                      "y": 330
                     }
-                  ]
+                  ],
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "rnftfzn9o",
+                  "type": "sequence",
                   "sourceId": "c0qs5lip2",
                   "targetId": "vo2rctxmg",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
                     {
-                      "x": 730,
-                      "y": 313
+                      "x": 726,
+                      "y": 330
                     },
                     {
-                      "x": 730,
+                      "x": 724.7888529963888,
+                      "y": 310.21114700361125
+                    },
+                    {
+                      "x": 724.7888529963888,
                       "y": 205
                     },
                     {
                       "x": 830,
                       "y": 205
+                    },
+                    {
+                      "x": 882.5,
+                      "y": 205
                     }
-                  ]
+                  ],
+                  "sourceSide": "top",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceOffsetAlong": 0.47116316658068463,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "yopno6c1s",
+                  "type": "sequence",
                   "sourceId": "c0qs5lip2",
                   "targetId": "69gm57llv",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
+                    {
+                      "x": 726,
+                      "y": 330
+                    },
                     {
                       "x": 747,
                       "y": 330
                     },
                     {
+                      "x": 768,
+                      "y": 330
+                    },
+                    {
+                      "x": 802,
+                      "y": 330
+                    },
+                    {
                       "x": 818,
                       "y": 330
+                    },
+                    {
+                      "x": 834,
+                      "y": 330
                     }
-                  ]
+                  ],
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "xmf8ol1zm",
+                  "type": "sequence",
                   "sourceId": "69gm57llv",
                   "targetId": "cowuioizt",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
+                    {
+                      "x": 834,
+                      "y": 330
+                    },
                     {
                       "x": 850,
                       "y": 330
                     },
                     {
+                      "x": 866,
+                      "y": 330
+                    },
+                    {
+                      "x": 924,
+                      "y": 330
+                    },
+                    {
                       "x": 940,
                       "y": 330
+                    },
+                    {
+                      "x": 956,
+                      "y": 330
                     }
-                  ]
+                  ],
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "eiwz264j3",
+                  "type": "sequence",
                   "sourceId": "cowuioizt",
                   "targetId": "35ha3k3v2",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
                     {
-                      "x": 973,
+                      "x": 956,
+                      "y": 330
+                    },
+                    {
+                      "x": 972,
+                      "y": 330
+                    },
+                    {
+                      "x": 988,
+                      "y": 330
+                    },
+                    {
+                      "x": 1023,
                       "y": 330
                     },
                     {
                       "x": 1044,
                       "y": 330
+                    },
+                    {
+                      "x": 1065,
+                      "y": 330
                     }
-                  ]
+                  ],
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "j192nwpxy",
+                  "type": "sequence",
                   "sourceId": "vo2rctxmg",
                   "targetId": "35ha3k3v2",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
+                    {
+                      "x": 882.5,
+                      "y": 205
+                    },
                     {
                       "x": 935,
                       "y": 205
                     },
                     {
-                      "x": 1065,
+                      "x": 1064.664288153138,
                       "y": 205
                     },
                     {
+                      "x": 1064.664288153138,
+                      "y": 309.33571184686207
+                    },
+                    {
                       "x": 1065,
-                      "y": 309
+                      "y": 330
                     }
-                  ]
+                  ],
+                  "sourceSide": "right",
+                  "targetSide": "top",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "targetOffsetAlong": 0.49200686078899836,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "ea9at66xc",
+                  "type": "sequence",
                   "sourceId": "c0qs5lip2",
                   "targetId": "dfq8m7r3e",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
+                    {
+                      "x": 726,
+                      "y": 330
+                    },
                     {
                       "x": 726,
                       "y": 351
                     },
                     {
                       "x": 726,
-                      "y": 674
+                      "y": 673
                     },
                     {
                       "x": 780,
                       "y": 673
+                    },
+                    {
+                      "x": 832.5,
+                      "y": 673
                     }
-                  ]
+                  ],
+                  "sourceSide": "bottom",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceOffsetAlong": 0.5,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "j5chirplq",
+                  "type": "sequence",
                   "sourceId": "dfq8m7r3e",
                   "targetId": "qm0o5rstp",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
+                    {
+                      "x": 832.5,
+                      "y": 673
+                    },
                     {
                       "x": 885,
                       "y": 673
                     },
                     {
+                      "x": 905,
+                      "y": 673
+                    },
+                    {
+                      "x": 910,
+                      "y": 673
+                    },
+                    {
                       "x": 930,
                       "y": 673
+                    },
+                    {
+                      "x": 982.5,
+                      "y": 673
                     }
-                  ]
+                  ],
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "kmrptryor",
+                  "type": "sequence",
                   "sourceId": "qm0o5rstp",
                   "targetId": "35ha3k3v2",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
+                    {
+                      "x": 982.5,
+                      "y": 673
+                    },
                     {
                       "x": 1035,
                       "y": 673
@@ -746,401 +2281,377 @@
                     {
                       "x": 1065,
                       "y": 351
+                    },
+                    {
+                      "x": 1065,
+                      "y": 330
                     }
-                  ]
+                  ],
+                  "sourceSide": "right",
+                  "targetSide": "bottom",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "targetOffsetAlong": 0.5,
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "rbm2qt9g6",
+                  "type": "sequence",
                   "sourceId": "35ha3k3v2",
                   "targetId": "vg2keo3gt",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
+                    {
+                      "x": 1065,
+                      "y": 330
+                    },
                     {
                       "x": 1086,
                       "y": 330
                     },
                     {
-                      "x": 1100,
+                      "x": 1107,
+                      "y": 330
+                    },
+                    {
+                      "x": 1114,
                       "y": 330
                     },
                     {
                       "x": 1137,
                       "y": 330
+                    },
+                    {
+                      "x": 1189.5,
+                      "y": 330
                     }
-                  ]
+                  ],
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "jn6nvtg8j",
+                  "type": "sequence",
                   "sourceId": "vg2keo3gt",
                   "targetId": "ddcp2s1id",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
+                    {
+                      "x": 1189.5,
+                      "y": 330
+                    },
                     {
                       "x": 1242,
                       "y": 330
                     },
                     {
-                      "x": 1256,
+                      "x": 1265,
+                      "y": 330
+                    },
+                    {
+                      "x": 1272,
                       "y": 330
                     },
                     {
                       "x": 1293,
                       "y": 330
-                    }
-                  ]
-                },
-                {
-                  "id": "v6q115dqg",
-                  "sourceId": "ddcp2s1id",
-                  "targetId": "xjn4xve0i",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
-                  "waypoints": [
-                    {
-                      "x": 1314,
-                      "y": 309
                     },
                     {
                       "x": 1314,
-                      "y": 205
-                    },
-                    {
-                      "x": 1404,
-                      "y": 205
+                      "y": 330
                     }
                   ],
-                  "label": "No",
-                  "branchProbability": 73
-                },
-                {
-                  "id": "npblxanwp",
-                  "sourceId": "xjn4xve0i",
-                  "targetId": "jojn8dbqe",
                   "sourceSide": "right",
                   "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
                   "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
-                  "waypoints": [
-                    {
-                      "x": 1509,
-                      "y": 205
-                    },
-                    {
-                      "x": 1663,
-                      "y": 205
-                    }
-                  ]
+                  "directionType": "directed",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "az8cd8qvj",
+                  "type": "sequence",
                   "sourceId": "jojn8dbqe",
                   "targetId": "clri4mlib",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
+                    {
+                      "x": 1715.5,
+                      "y": 205
+                    },
                     {
                       "x": 1768,
                       "y": 205
                     },
                     {
-                      "x": 1782,
+                      "x": 1791,
+                      "y": 205
+                    },
+                    {
+                      "x": 1802,
                       "y": 205
                     },
                     {
                       "x": 1818,
                       "y": 205
-                    }
-                  ]
-                },
-                {
-                  "id": "vg7ctimww",
-                  "sourceId": "ddcp2s1id",
-                  "targetId": "6ur1w7erg",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
-                  "waypoints": [
-                    {
-                      "x": 1314,
-                      "y": 351
                     },
                     {
-                      "x": 1314,
-                      "y": 422
-                    },
-                    {
-                      "x": 1405,
-                      "y": 422
+                      "x": 1834,
+                      "y": 205
                     }
                   ],
-                  "label": "Yes",
-                  "branchProbability": 27
-                },
-                {
-                  "id": "kxsbfobp3",
-                  "sourceId": "6ur1w7erg",
-                  "targetId": "br1myk84r",
                   "sourceSide": "right",
                   "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
                   "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
-                  "waypoints": [
-                    {
-                      "x": 1457,
-                      "y": 456
-                    },
-                    {
-                      "x": 1457,
-                      "y": 825
-                    }
-                  ]
-                },
-                {
-                  "id": "o8n0cb83j",
-                  "sourceId": "br1myk84r",
-                  "targetId": "i4cvizb32",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
                   "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
-                  "waypoints": [
-                    {
-                      "x": 1510,
-                      "y": 859
-                    },
-                    {
-                      "x": 1524,
-                      "y": 859
-                    },
-                    {
-                      "x": 1595,
-                      "y": 859
-                    }
-                  ]
-                },
-                {
-                  "id": "o3xrszm9f",
-                  "sourceId": "m9p3bzxw3",
-                  "targetId": "109isdj1c",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
-                  "waypoints": [
-                    {
-                      "x": 1432,
-                      "y": 909
-                    },
-                    {
-                      "x": 1432,
-                      "y": 945
-                    },
-                    {
-                      "x": 1563,
-                      "y": 945
-                    }
-                  ]
-                },
-                {
-                  "id": "ive9e5z0j",
-                  "sourceId": "109isdj1c",
-                  "targetId": "i4cvizb32",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
-                  "waypoints": [
-                    {
-                      "x": 1616,
-                      "y": 931
-                    },
-                    {
-                      "x": 1616,
-                      "y": 917
-                    },
-                    {
-                      "x": 1616,
-                      "y": 880
-                    }
-                  ]
-                },
-                {
-                  "id": "jyfmhb9ut",
-                  "sourceId": "i4cvizb32",
-                  "targetId": "48yha1myj",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
-                  "waypoints": [
-                    {
-                      "x": 1616,
-                      "y": 839
-                    },
-                    {
-                      "x": 1616,
-                      "y": 427
-                    },
-                    {
-                      "x": 1664,
-                      "y": 427
-                    }
-                  ]
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
                 },
                 {
                   "id": "ij82lukqs",
+                  "type": "sequence",
                   "sourceId": "48yha1myj",
                   "targetId": "m5jz4rkkz",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "sequence",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
                   "waypoints": [
+                    {
+                      "x": 1716.5,
+                      "y": 427
+                    },
                     {
                       "x": 1769,
                       "y": 427
                     },
                     {
-                      "x": 1783,
+                      "x": 1791,
+                      "y": 427
+                    },
+                    {
+                      "x": 1802,
                       "y": 427
                     },
                     {
                       "x": 1818,
                       "y": 427
+                    },
+                    {
+                      "x": 1834,
+                      "y": 427
+                    }
+                  ],
+                  "sourceSide": "right",
+                  "targetSide": "left",
+                  "routingType": "rectilinear",
+                  "directionType": "directed",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true
+                },
+                {
+                  "id": "lo9coaje",
+                  "sourceId": "69gm57llv",
+                  "targetId": "pws1buv9",
+                  "sourceSide": "bottom",
+                  "targetSide": "top",
+                  "sourceOffsetAlong": 0.6270954068559043,
+                  "type": "messageBPMN",
+                  "directionType": "directed",
+                  "routingType": "direct",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 834,
+                      "y": 330
+                    },
+                    {
+                      "x": 834,
+                      "y": 346
+                    },
+                    {
+                      "x": 834,
+                      "y": 1118.19801275175
+                    },
+                    {
+                      "x": 1106.6384815908177,
+                      "y": 1190.69801275175
+                    }
+                  ],
+                  "label": "Credit\nRequest",
+                  "labelOffsetX": -66.42857142857144,
+                  "labelOffsetY": 340.5275778044463,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "vlfxqvwo",
+                  "sourceId": "pws1buv9",
+                  "targetId": "cowuioizt",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "sourceOffsetAlong": 0.4026629935720844,
+                  "type": "messageBPMN",
+                  "directionType": "directed",
+                  "routingType": "direct",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1106.6384815908177,
+                      "y": 1190.69801275175
+                    },
+                    {
+                      "x": 956,
+                      "y": 1118.19801275175
+                    },
+                    {
+                      "x": 956,
+                      "y": 346
+                    },
+                    {
+                      "x": 956,
+                      "y": 330
+                    }
+                  ],
+                  "label": "Credit\nResponse",
+                  "labelOffsetX": 45,
+                  "labelOffsetY": 347.67043494730365,
+                  "labelWidth": 80
+                },
+                {
+                  "id": "l142z0p0",
+                  "sourceId": "1hrsz43r",
+                  "targetId": "vg2keo3gt",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "sourceOffsetAlong": 0.8367639767590668,
+                  "targetOffsetAlong": 0.32931713972956717,
+                  "type": "associationBPMN",
+                  "directionType": "open-directed",
+                  "routingType": "direct",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
+                  "waypoints": [
+                    {
+                      "x": 1130.9241958765317,
+                      "y": 441.1265841803211
+                    },
+                    {
+                      "x": 1143.0476990398581,
+                      "y": 418.1265841803211
+                    },
+                    {
+                      "x": 1171.5782996716046,
+                      "y": 364
+                    },
+                    {
+                      "x": 1189.5,
+                      "y": 330
                     }
                   ]
                 },
                 {
-                  "id": "h7wvfog9r",
-                  "sourceId": "2owwtkdeh",
-                  "targetId": "40lydcgbk",
-                  "sourceSide": "right",
+                  "id": "fhf4i77r",
+                  "sourceId": "109isdj1c",
+                  "targetId": "apidaf9c",
+                  "sourceSide": "top",
                   "targetSide": "left",
+                  "sourceOffsetAlong": 0.5795684225323687,
+                  "targetOffsetAlong": 0.5931677018633527,
                   "type": "associationBPMN",
-                  "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
+                  "directionType": "open-directed",
+                  "routingType": "direct",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
                   "waypoints": [
                     {
-                      "x": 564,
-                      "y": 205
+                      "x": 1623.9980829392046,
+                      "y": 965
                     },
                     {
-                      "x": 601,
-                      "y": 205
+                      "x": 1632.3527673051033,
+                      "y": 931
                     },
                     {
-                      "x": 602,
-                      "y": 296
+                      "x": 1732.924195876532,
+                      "y": 862.5551556088926
+                    },
+                    {
+                      "x": 1750.924195876532,
+                      "y": 858.2694413231784
                     }
                   ]
                 },
                 {
-                  "id": "m62q8xrod",
-                  "sourceId": "jojn8dbqe",
-                  "targetId": "rg05095np",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "associationBPMN",
+                  "id": "7g8vnnzs",
+                  "sourceId": "7k3xril1",
+                  "targetId": "an3lylu4z",
+                  "sourceSide": "bottom",
+                  "targetSide": "top",
+                  "sourceOffsetAlong": 0.08953168044077131,
+                  "type": "messageBPMN",
                   "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
+                  "routingType": "direct",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
                   "waypoints": [
                     {
-                      "x": 1698,
-                      "y": 239
+                      "x": 1106.6384815908177,
+                      "y": -8.587701533964555
                     },
                     {
-                      "x": 1698,
-                      "y": 280
+                      "x": 475,
+                      "y": 44.912298466035445
                     },
                     {
-                      "x": 1738,
-                      "y": 281
+                      "x": 475,
+                      "y": 315
+                    },
+                    {
+                      "x": 475,
+                      "y": 330
                     }
-                  ]
+                  ],
+                  "label": "Loan\nApplication",
+                  "labelOffsetX": -45.00000000000006,
+                  "labelOffsetY": -106.32956505269657,
+                  "labelWidth": 80
                 },
                 {
-                  "id": "y1s1ru997",
-                  "sourceId": "48yha1myj",
-                  "targetId": "r7zdiuz8s",
-                  "sourceSide": "right",
-                  "targetSide": "left",
-                  "type": "associationBPMN",
+                  "id": "0r3wlet1",
+                  "sourceId": "6ur1w7erg",
+                  "targetId": "7k3xril1",
+                  "sourceSide": "top",
+                  "targetSide": "bottom",
+                  "sourceOffsetAlong": 0.5462168314771718,
+                  "type": "messageBPMN",
                   "directionType": "directed",
-                  "routingType": "rectilinear",
-                  "sourceInvisibleLeader": false,
-                  "targetInvisibleLeader": false,
+                  "routingType": "direct",
+                  "sourceInvisibleLeader": true,
+                  "targetInvisibleLeader": true,
                   "waypoints": [
                     {
-                      "x": 1716,
-                      "y": 461
+                      "x": 1511.7857142857144,
+                      "y": 423.42857142857144
                     },
                     {
-                      "x": 1716,
-                      "y": 508
+                      "x": 1516.6384815908175,
+                      "y": 389.42857142857144
                     },
                     {
-                      "x": 1738,
-                      "y": 507
+                      "x": 1516.6384815908175,
+                      "y": 44.912298466035445
+                    },
+                    {
+                      "x": 1106.6384815908177,
+                      "y": -8.587701533964555
                     }
-                  ]
+                  ],
+                  "label": "Loan\nApplication\nApproval Letter",
+                  "labelOffsetX": 63.57142857142844,
+                  "labelOffsetY": -152.11527933841086,
+                  "labelWidth": 80
                 }
-              ],
-              "viewport": {
-                "x": 0,
-                "y": 0,
-                "zoom": 1
-              }
+              ]
             }
           }
         ],
@@ -1708,6 +3219,10 @@
                   "properties": {
                     "sim": {
                       "eventTrigger": {
+                        "kind": "exponential",
+                        "mean": 1200
+                      },
+                      "arrival": {
                         "kind": "exponential",
                         "mean": 1200
                       }
@@ -2492,7 +4007,8 @@
                   "sourceOffsetAlong": 0.5,
                   "targetOffsetAlong": 0.5086527762523412,
                   "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true
+                  "targetInvisibleLeader": true,
+                  "branchProbability": 20
                 },
                 {
                   "id": "hz2yep3t",
@@ -2577,7 +4093,8 @@
                   "sourceOffsetAlong": 0.5,
                   "targetOffsetAlong": 0.5,
                   "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true
+                  "targetInvisibleLeader": true,
+                  "branchProbability": 80
                 },
                 {
                   "id": "ja8apgay",
@@ -2791,7 +4308,8 @@
                   "sourceOffsetAlong": 0.5592397770276042,
                   "targetOffsetAlong": 0.512488328940182,
                   "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true
+                  "targetInvisibleLeader": true,
+                  "branchProbability": 30
                 },
                 {
                   "id": "zp247v0n",
@@ -2836,7 +4354,8 @@
                   "sourceOffsetAlong": 0.5,
                   "targetOffsetAlong": 0.5,
                   "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true
+                  "targetInvisibleLeader": true,
+                  "branchProbability": 70
                 },
                 {
                   "id": "810ak1ov",
@@ -3171,7 +4690,8 @@
                   "sourceOffsetAlong": 0.5115592860391059,
                   "targetOffsetAlong": 0.4258858486406112,
                   "sourceInvisibleLeader": true,
-                  "targetInvisibleLeader": true
+                  "targetInvisibleLeader": true,
+                  "branchProbability": 34
                 },
                 {
                   "id": "poovn1vy",

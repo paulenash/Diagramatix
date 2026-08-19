@@ -97,6 +97,10 @@ export function checkSimReadiness(diagrams: DiagramData[], teams: TeamLite[]): R
     const describe = (e?: DiagramElement) => !e ? "?" : e.type === "end-event" ? "End" : e.type === "start-event" ? "Start" : nameOf(e);
     for (const el of d.elements) {
       if (el.type !== "gateway" || (el.properties?.gatewayRole as string | undefined) === "merge") continue;
+      // Parallel (AND) gateways fire EVERY outgoing branch — probabilities /
+      // conditions don't apply, so a parallel split is never an under-specified
+      // "decision". Only exclusive / inclusive splits route by probability.
+      if (el.gatewayType === "parallel") continue;
       const outs = d.connectors.filter((c) => c.type === "sequence" && c.sourceId === el.id);
       if (outs.length < 2) continue;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

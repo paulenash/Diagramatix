@@ -96,7 +96,12 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
   const sources = data.elements.filter((e) => SOURCE_TYPES.has(e.type) && !e.boundaryHostId);
   const tasks = data.elements.filter((e) => TASK_TYPES.has(e.type) && !isEventEP(e));
   const eventEPs = data.elements.filter(isEventEP);
-  const gateways = data.elements.filter((e) => e.type === "gateway" && e.gatewayType !== "parallel");
+  // Only real decisions belong here: exclusive / inclusive SPLITS (≥ 2 outgoing
+  // sequence flows). Parallel gateways route by no probability, and a merge/join
+  // (one outgoing flow) is not a decision — showing it as "sum 0%" is noise.
+  const gateways = data.elements.filter((e) =>
+    e.type === "gateway" && e.gatewayType !== "parallel"
+    && data.connectors.filter((c) => c.sourceId === e.id && c.type === "sequence").length >= 2);
   const labelOf = (id: string) => data.elements.find((e) => e.id === id)?.label || id;
   const nameOf = (e: DiagramElement) => e.label || e.id;
 
@@ -148,7 +153,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
   const flag = (bad: boolean) => <span className={bad ? "text-red-400" : "text-green-500/40"}>●</span>;
 
   return (
-    <div className="flex flex-col gap-3 text-[10px] overflow-x-auto">
+    <div className="flex flex-col gap-3 text-[10px] w-max min-w-full mx-auto">
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
         {canUseDiagram && (
@@ -312,10 +317,11 @@ function Section({ title, cols, children }: { title: string; cols: { label: stri
   return (
     <div>
       <p className="text-green-400/70 uppercase tracking-widest text-[10px] mb-1">{title}</p>
-      {/* Header + rows share one horizontal-scroll container at their natural
-          (min-w-max) width, so wide dist columns scroll together in step
-          rather than overflowing the panel or overlapping the next column. */}
-      <div className="overflow-x-auto">
+      {/* Header + rows share one container at their natural (min-w-max) width.
+          When a section is wider than the panel it WIDENS to fit and stays
+          centred (not a scroll box) — Paul. A scrollbar only appears if it
+          also exceeds the viewport (the outer console container). */}
+      <div className="flex justify-center">
         <div className="min-w-max">
           <div className="flex items-center gap-2 text-green-400/40 pb-0.5 border-b border-green-500/20">
             {cols.map((c, i) => <span key={i} className={`${c.w} text-left`}>{c.label}</span>)}

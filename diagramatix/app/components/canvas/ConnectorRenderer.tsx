@@ -399,11 +399,6 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
     const step = Math.min(60, len - 6); // don't overshoot a very short spine
     anchor = { x: poolEnd.x + (dx / len) * step, y: poolEnd.y + (dy / len) * step };
   }
-  // Default the flowline label to sit just beside the source endpoint
-  // (down-right of the exit), clear of the connector line; still draggable.
-  // A message-to-pool label sits just beside its 60px anchor (not 30px above).
-  const offsetX = connector.labelOffsetX ?? (connector.type === "flowline" ? 18 : msgToPool ? 20 : 0);
-  const offsetY = connector.labelOffsetY ?? (connector.type === "flowline" ? 16 : msgToPool ? -7 : -30);
   const lWidth  = connector.labelWidth ?? 80;
   const label   = connector.label ?? "";
   // Auto-size: measure text width from actual content
@@ -415,6 +410,18 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const lines   = rawLines;
   const lineH   = 14;
   const lHeight = Math.max(lineH, lines.length * lineH);
+  // Default label placement (all still draggable): a flowline sits beside the
+  // source exit; a MESSAGE flow's label sits to the LEFT of the line by default
+  // (its right edge just clear of the spine), per Paul — messageBPMN labels
+  // default left, not right; everything else centres on the spine. Since the
+  // label is centred at lCx, "left" = shift the centre by half the width + a gap.
+  const isMessage = connector.type === "messageBPMN";
+  const offsetX = connector.labelOffsetX ?? (
+    connector.type === "flowline" ? 18
+    : isMessage ? -(effectiveLWidth / 2 + 6)
+    : 0
+  );
+  const offsetY = connector.labelOffsetY ?? (connector.type === "flowline" ? 16 : msgToPool ? -7 : -30);
   const lCx     = anchor.x + offsetX;
   const lTy     = anchor.y + offsetY;
   const lMidY   = lTy + lHeight / 2;

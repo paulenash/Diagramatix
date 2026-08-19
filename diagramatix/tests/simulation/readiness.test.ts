@@ -33,6 +33,17 @@ describe("checkSimReadiness", () => {
     expect(issues.some((i) => /split evenly/.test(i.message))).toBe(true);
   });
 
+  it("does NOT flag a PARALLEL gateway split — every branch fires, so no probabilities apply", () => {
+    const issues = checkSimReadiness([D(
+      [mk("g", "gateway", { gatewayType: "parallel" }),
+       mk("a", "task", { properties: { sim: { teamId: "Real" } } }),
+       mk("b", "task", { properties: { sim: { teamId: "Real" } } }),
+       mk("c", "task", { properties: { sim: { teamId: "Real" } } })],
+      [seq("c1", "g", "a"), seq("c2", "g", "b"), seq("c3", "g", "c")],
+    )], [{ name: "Real", capacity: 2 }]);
+    expect(issues.some((i) => /split evenly/.test(i.message))).toBe(false);
+  });
+
   it("T0540 — flags a property read but never initialised (and not one that is)", () => {
     const declared = checkSimReadiness([D([
       mk("t", "task", { properties: { sim: { teamId: "Real", assign: [{ expr: "getProperty('x') + 1", property: "x" }] } } }),
