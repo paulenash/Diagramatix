@@ -585,6 +585,22 @@ function pathHitsObstacles(path: Point[], obstacles: Bounds[], margin = 4): bool
 // (segmentHitsObstacle's margin=4) without discarding otherwise-clean paths.
 const L_SHAPE_CLEARANCE = 12;
 
+// ENG-16: the ONE obstacle-type set shared by the main routing pass AND the
+// waypoint-preservation pass, so the two can never diverge. A prior mismatch let
+// the preservation pass keep routes the main pass would detour around, so a
+// connector flip-flopped between two candidates on successive recomputes.
+// Only BPMN flow-node types + ArchiMate shapes are obstacles. Edge-mounted
+// (boundary) events are excluded (connectors attach to them); intermediate
+// events sit ON the flow so are excluded; Data Objects / Data Stores are NOT
+// obstacles (Paul's 2026-06-10 rule) — a route may pass one without detouring.
+const SEQ_OBSTACLE_TYPES = new Set<string>([
+  "task", "subprocess", "subprocess-expanded",
+  "start-event", "end-event",
+  // ArchiMate elements are obstacles for archi-* relationship routing (rule
+  // A4.07). Only present in archimate diagrams, so never affects BPMN routing.
+  "archimate-shape",
+]);
+
 function buildOrthogonalPath(
   start: Point,
   end: Point,
@@ -1143,22 +1159,8 @@ export function computeWaypoints(
   const tgtEdgeRect = sidePoint(target, targetSide, targetOffsetAlong);
   const srcEdge = projectToShapeBoundary(srcEdgeRect, source) ?? srcEdgeRect;
   const tgtEdge = projectToShapeBoundary(tgtEdgeRect, target) ?? tgtEdgeRect;
-  // Sequence-flow obstacle set: only BPMN flow-node-like shapes act as
-  // obstacles. Edge-mounted (boundary) events are intentionally NOT obstacles
-  // so connectors can still attach to them. Data Objects and Data Stores
-  // are NOT obstacles (Paul's 2026-06-10 rule) — sequence flow ignores
-  // them; they may visually overlap a route without forcing a detour.
-  const SEQ_OBSTACLE_TYPES = new Set<string>([
-    "task", "subprocess", "subprocess-expanded",
-    // Intermediate events are NOT obstacles (like gateways) — they sit ON the
-    // flow (e.g. when a connector is split by dropping an event on it), so a
-    // sequence flow must pass through / attach to them, never detour around.
-    "start-event", "end-event",
-    // ArchiMate elements are obstacles for archi-* relationship routing so
-    // connectors route AROUND elements (rule A4.07). Only present in
-    // archimate diagrams, so this never affects BPMN sequence routing.
-    "archimate-shape",
-  ]);
+  // Sequence-flow obstacle set = the shared module-level SEQ_OBSTACLE_TYPES,
+  // the SAME set the waypoint-preservation pass uses (ENG-16).
   // Walk the ancestor chain so an EP that contains the source/target at
   // ANY depth (not only as a direct parent) is excluded from obstacles.
   // User rule: an EP is an obstacle for a sequence connector unless the
@@ -2031,19 +2033,10 @@ export function recomputeAllConnectors(
           const appDy = candidate[ve].y - candidate[ve - 1].y;
           if ((tgtNorm.dx !== 0 && appDx * (-tgtNorm.dx) <= 0) || (tgtNorm.dy !== 0 && appDy * (-tgtNorm.dy) <= 0)) outwardOk = false;
         }
-        // Check if preserved interior routing passes through any obstacle.
-        // MUST match the main routing pass (SEQ_OBSTACLE_TYPES): only BPMN
-        // flow-node types are obstacles for sequence flow; edge-mounted events
-        // are excluded, and EPs containing source or target at any depth are
-        // excluded. Data Objects and Data Stores are NOT obstacles (Paul's
-        // 2026-06-10 rule) — a route may pass a data artifact without detouring;
-        // including them here (a prior inconsistency) rejected valid routes and
-        // left a gap around data stores.
-        const SEQ_OBS = new Set<string>([
-          "task", "subprocess", "subprocess-expanded",
-          // Intermediate events excluded (like gateways) — they sit ON the flow.
-          "start-event", "end-event",
-        ]);
+        // Check if preserved interior routing passes through any obstacle, using
+        // the SAME shared SEQ_OBSTACLE_TYPES as the main pass (ENG-16) so the two
+        // passes can never disagree. EPs containing source or target at any depth
+        // are excluded below.
         function ancestorsOfPreserve(elementId: string): Set<string> {
           const result = new Set<string>();
           let cur = elements.find((e) => e.id === elementId);
@@ -2060,7 +2053,7 @@ export function recomputeAllConnectors(
             if (el.id === source.id || el.id === target.id) return false;
             if (el.type === "pool" || el.type === "lane") return false;
             if (el.boundaryHostId) return false;
-            if (!SEQ_OBS.has(el.type)) return false;
+            if (!SEQ_OBSTACLE_TYPES.has(el.type)) return false;
             if (el.type === "subprocess-expanded"
                 && (preserveSrcAncestors.has(el.id) || preserveTgtAncestors.has(el.id))) return false;
             return true;

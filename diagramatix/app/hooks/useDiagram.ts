@@ -9698,6 +9698,13 @@ export function useDiagram(initialData: DiagramData) {
 
   const moveElement = useCallback((id: string, x: number, y: number, unconstrained?: boolean) => {
     if (draggingRef.current !== id) {
+      // ENG-06: a previous element-drag whose end never fired (e.g. mouseup lost
+      // outside the window, then a different element is moved) still holds an
+      // uncommitted pre-drag snapshot. Push it FIRST so its change gets its own
+      // undo entry, instead of being silently overwritten — and lost from
+      // history — by this drag's snapshot (which already includes it). No-op in
+      // the normal case, where move-end has already nulled preMoveRef.
+      if (preMoveRef.current) pushHistory(preMoveRef.current);
       draggingRef.current = id;
       preMoveRef.current = snapshotData(); // snapshot before drag starts
     }
@@ -10091,7 +10098,16 @@ export function useDiagram(initialData: DiagramData) {
   }, []);
 
   const insertSpace = useCallback((markerX: number, markerY: number, dx: number, dy: number) => {
-    pushHistory(snapshotData());
+    // ENG-11: the shift-drag fires insertSpace every mouse-move frame. Coalesce
+    // into ONE undo entry — push the pre-drag snapshot on the first tick of the
+    // gesture and skip the rest (same pattern as updateProperties). Otherwise
+    // history floods with one entry per frame and undo becomes useless (one step
+    // per frame). Geometry is unaffected — only the history push is gated.
+    if (pointerDownRef.current) {
+      if (!gesturePushedRef.current) { pushHistory(snapshotData()); gesturePushedRef.current = true; }
+    } else {
+      pushHistory(snapshotData());
+    }
     dispatch({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy } });
   }, []);
 

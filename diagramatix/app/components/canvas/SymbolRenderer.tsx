@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, createContext, useContext, useRef, useLayoutEffect, memo } from "react";
+import { useState, createContext, useContext, useRef, useEffect, useLayoutEffect, memo } from "react";
 import { canvasMemoEqual } from "./memoEqual";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
@@ -2344,6 +2344,14 @@ function SymbolRendererInner({
   const [isEditingGatewayLabel, setIsEditingGatewayLabel] = useState(false);
   const [editGatewayLabelValue, setEditGatewayLabelValue] = useState("");
   const [labelHighlighted, setLabelHighlighted] = useState(false);
+  // CANVAS-07/09: a drag gesture (pre-drag threshold, group move + auto-scroll
+  // interval, or single-element move) attaches window listeners / an interval
+  // that are torn down on mouseup. If this element unmounts mid-gesture (delete,
+  // navigate away) they'd leak — so the active gesture records an idempotent
+  // teardown that also runs on unmount. Only removes listeners / clears the
+  // interval (no state updates), so it's safe to run after the gesture ended.
+  const gestureCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => { gestureCleanupRef.current?.(); gestureCleanupRef.current = null; }, []);
   // Return-link variants are no longer rendered on the canvas. Skip the
   // entire element (shape, label, selection box, drill marker, hit zones).
   // The scan-links sweep will eventually drop these elements from data;
@@ -2610,6 +2618,10 @@ function SymbolRendererInner({
       };
       window.addEventListener("mousemove", onPreMove);
       window.addEventListener("mouseup", onPreUp);
+      gestureCleanupRef.current = () => {
+        window.removeEventListener("mousemove", onPreMove);
+        window.removeEventListener("mouseup", onPreUp);
+      };
       return;
     }
 
@@ -2618,57 +2630,25 @@ function SymbolRendererInner({
 
   function beginElementDrag(e: React.MouseEvent) {
 
-    // Group drag mode: when multi-selected and clicking a selected element
+    // Group drag mode: when multi-selected and clicking a selected element.
+    // NB: the group follows the cursor 1:1. There is deliberately NO edge
+    // "auto-scroll" here — the previous version drove it through onGroupMove,
+    // which MOVES THE SELECTED ELEMENTS rather than panning the viewport, so at
+    // the edge the group slid away from the cursor on its own without the canvas
+    // ever scrolling. Matches single-element drag (which also doesn't auto-pan).
     if (multiSelected && onGroupMove) {
       let lastClientX = e.clientX;
       let lastClientY = e.clientY;
-      let autoScrollTimer: ReturnType<typeof setInterval> | null = null;
-      let lastEv: MouseEvent | null = null;
-
-      const EDGE = 40; // px from edge to trigger auto-scroll
-      const SCROLL_SPEED = 8; // px per tick
-
-      function startAutoScroll() {
-        if (autoScrollTimer) return;
-        autoScrollTimer = setInterval(() => {
-          if (!lastEv) return;
-          const svg = document.querySelector("[data-canvas]") as SVGSVGElement | null;
-          if (!svg) return;
-          const rect = svg.getBoundingClientRect();
-          let sdx = 0, sdy = 0;
-          if (lastEv.clientX < rect.left + EDGE) sdx = SCROLL_SPEED;
-          else if (lastEv.clientX > rect.right - EDGE) sdx = -SCROLL_SPEED;
-          if (lastEv.clientY < rect.top + EDGE) sdy = SCROLL_SPEED;
-          else if (lastEv.clientY > rect.bottom - EDGE) sdy = -SCROLL_SPEED;
-          if (sdx !== 0 || sdy !== 0) onGroupMove!(sdx, sdy);
-        }, 30);
-      }
-
-      function stopAutoScroll() {
-        if (autoScrollTimer) { clearInterval(autoScrollTimer); autoScrollTimer = null; }
-      }
 
       function onMouseMove(ev: MouseEvent) {
         const dx = ev.clientX - lastClientX;
         const dy = ev.clientY - lastClientY;
         lastClientX = ev.clientX;
         lastClientY = ev.clientY;
-        lastEv = ev;
         onGroupMove!(dx, dy);
-
-        // Check if near canvas edge
-        const svg = document.querySelector("[data-canvas]") as SVGSVGElement | null;
-        if (svg) {
-          const rect = svg.getBoundingClientRect();
-          const nearEdge = ev.clientX < rect.left + EDGE || ev.clientX > rect.right - EDGE ||
-                           ev.clientY < rect.top + EDGE || ev.clientY > rect.bottom - EDGE;
-          if (nearEdge) startAutoScroll();
-          else stopAutoScroll();
-        }
       }
 
       function onMouseUp() {
-        stopAutoScroll();
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
         onGroupMoveEnd?.();
@@ -2676,6 +2656,11 @@ function SymbolRendererInner({
 
       window.addEventListener("mousemove", onMouseMove);
       window.addEventListener("mouseup", onMouseUp);
+      // CANVAS-09: also tear down on unmount mid-gesture (no interval any more).
+      gestureCleanupRef.current = () => {
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+      };
       return;
     }
 
@@ -2734,6 +2719,11 @@ function SymbolRendererInner({
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
     window.addEventListener("keydown", onKeyDown);
+    gestureCleanupRef.current = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }
 
   const archimateDepthMap = useContext(ArchimateDepthCtx);

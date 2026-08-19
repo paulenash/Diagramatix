@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useContext, memo } from "react";
+import { useState, useContext, useEffect, useRef, memo } from "react";
 import { canvasMemoEqual } from "./memoEqual";
 
 import type { Connector, Point, Side } from "@/app/lib/diagram/types";
@@ -359,6 +359,12 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const [isLabelFocused, setIsLabelFocused] = useState(false);
   const [isDraggingLabel, setIsDraggingLabel] = useState(false);
   const fontScale = useContext(ConnectorFontScaleCtx);
+  // CANVAS-08: a label mousedown attaches a window "click-elsewhere" focus-clear
+  // listener (removed on the next mousedown) plus label-drag move/up listeners
+  // (removed on mouseup). If the connector unmounts mid-gesture they'd leak — the
+  // active gesture records an idempotent teardown that also runs on unmount.
+  const labelGestureCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => () => { labelGestureCleanup.current?.(); labelGestureCleanup.current = null; }, []);
 
   if (visibleWaypoints.length < 2) return null;
   // Marker-driven suppression: a parallel / event-based gateway has no
@@ -478,6 +484,11 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
     }
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+    labelGestureCleanup.current = () => {
+      window.removeEventListener("mousedown", onWindowMouseDown);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
   }
 
   function handleDoubleClick(e: React.MouseEvent) {
