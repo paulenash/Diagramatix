@@ -492,6 +492,15 @@ function layoutBpmnPreserved(
   };
 }
 
+/** R7.05 — an edge-mounted intermediate event's label sits on its OUTWARD side,
+ *  biased WEST, so the outgoing sequence connector leaves the event cleanly.
+ *  Keyed by the side the event is mounted on. */
+function boundaryLabelOffset(side: string, w: number, h: number): { labelOffsetX: number; labelOffsetY: number } {
+  if (side === "top")    return { labelOffsetX: -(w / 2 + 46), labelOffsetY: -(h + 30) };
+  if (side === "bottom") return { labelOffsetX: -(w / 2 + 46), labelOffsetY: 8 };
+  if (side === "left")   return { labelOffsetX: -(w / 2 + 90), labelOffsetY: -6 };
+  return { labelOffsetX: (w / 2 + 8), labelOffsetY: -6 };
+}
 /** R7.04 — Re-snap an edge-mounted (boundary) event onto a host rim after the
  *  host box was resized. Honours the event's STORED boundarySide (so a
  *  top-mounted event stays on top instead of flipping to an adjacent edge when
@@ -1625,15 +1634,10 @@ export function layoutBpmnDiagram(
             ...buildProps(ev),
             boundarySide: side,
             // R7.05: an edge-mounted intermediate event's label defaults to the
-            // OUTWARD side, biased WEST — so a top-mounted event's outgoing
-            // sequence connector can leave its top edge cleanly (Paul 2026-08-19).
-            // R8.16 refines / de-overlaps this later using the wrapped height.
-            ...(ev.type === "intermediate-event"
-              ? side === "top"    ? { labelOffsetX: -(W / 2 + 46), labelOffsetY: -(H + 30) }
-              : side === "bottom" ? { labelOffsetX: -(W / 2 + 46), labelOffsetY: 8 }
-              : side === "left"   ? { labelOffsetX: -(W / 2 + 90), labelOffsetY: -6 }
-              :                      { labelOffsetX:  (W / 2 + 8),  labelOffsetY: -6 }
-              : {}),
+            // OUTWARD side, biased WEST — so its outgoing sequence connector can
+            // leave the event's outward edge cleanly (Paul 2026-08-19). R8.16
+            // refines / de-overlaps this later using the wrapped height.
+            ...(ev.type === "intermediate-event" ? boundaryLabelOffset(side, W, H) : {}),
           },
           boundaryHostId: host.id,
           ...(ev.taskType ? { taskType: ev.taskType as DiagramElement["taskType"] } : {}),
@@ -3035,7 +3039,7 @@ export function layoutBpmnDiagram(
       const srcCy = src.y + src.height / 2;
       const tgtCy = tgt.y + tgt.height / 2;
 
-      // Gateway wiring (R6.16/R6.17/R6.19):
+      // Gateway wiring (catalog R6.26–R6.29 · legacy code tags R6.16/R6.17/R6.19):
       //   Decision gateway: incoming → left; outgoing assigned by target
       //                     vertical position — topmost target → top,
       //                     bottommost target → bottom, any middles → right.
@@ -3067,9 +3071,12 @@ export function layoutBpmnDiagram(
               : tgtCy > src.y + src.height + 10 ? "bottom"
               : "right";
           }
-          else if (idx === 0) srcSide = "top";
-          else if (idx === 1) srcSide = "right";
-          else srcSide = "bottom";
+          // R6.27 (n ≥ 3): branches are sorted by target Y; assign vertices
+          // round-robin in groups of three — top / right / bottom, then repeat
+          // for the next three, so doubled-up branches reuse the same three
+          // vertices in vertical order (Paul 2026-08-20). Flows sharing a vertex
+          // fan out from it (R6.29).
+          else srcSide = (["top", "right", "bottom"] as const)[idx % 3];
         } else if (srcIsMerge) {
           srcSide = "right";
         } else {
@@ -3083,9 +3090,9 @@ export function layoutBpmnDiagram(
           const n = list.length;
           if (idx < 0 || n <= 1) tgtSide = "left";
           else if (n === 2) tgtSide = idx === 0 ? "top" : "bottom";
-          else if (idx === 0) tgtSide = "top";
-          else if (idx === 1) tgtSide = "left";
-          else tgtSide = "bottom";
+          // R6.28 (n ≥ 3): mirror of the decision — sorted by source Y,
+          // round-robin top / left / bottom in groups of three.
+          else tgtSide = (["top", "left", "bottom"] as const)[idx % 3];
         } else if (tgtIsDecision) {
           tgtSide = "left";
         } else {
@@ -3487,8 +3494,8 @@ export function layoutBpmnDiagram(
       const el = elMap.get(key.slice(0, bar));
       const side = key.slice(bar + 1);
       if (!el) continue;
-      // A gateway is a DIAMOND — its only valid attachment points are its four
-      // vertices (offset 0.5 on each side). Never spread gateway ends off the
+      // R6.29: A gateway is a DIAMOND — its only valid attachment points are its
+      // four vertices (offset 0.5 on each side). Never spread gateway ends off the
       // vertex: any other offset lands mid-edge on the sloped diamond, which
       // reads as "the connector isn't joined to the vertex, just near it"
       // (Paul 2026-07-12). Multiple flows on the same face share the vertex —
@@ -4003,6 +4010,40 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R7.06: mount each EMIE on the host side that FACES its outgoing target ──
+  // so the outbound sequence connector exits DIRECTLY toward the target instead
+  // of detouring up-and-over the host. Paul: "on top if the connector goes to an
+  // element to the top-right, on the bottom if it goes to the bottom-right."
+  // Chooses top vs bottom by the target's vertical position relative to the host
+  // centre, re-mounts with one-event-width corner clearance (R7.04), and refreshes
+  // the outward label side (R7.05). Only for intermediate events whose flow LEAVES
+  // the host; an explicit left/right mount is respected.
+  for (const ev of elements) {
+    if (ev.type !== "intermediate-event" || !ev.boundaryHostId) continue;
+    const host = elMap.get(ev.boundaryHostId);
+    if (!host) continue;
+    const outSeq = [...aiConnections, ...autoConns].find(
+      (c) => c.type !== "message" && c.sourceId === ev.id,
+    );
+    if (!outSeq) continue;
+    const tgt = elMap.get(outSeq.targetId);
+    if (!tgt) continue;
+    const tcx = tgt.x + tgt.width / 2, tcy = tgt.y + tgt.height / 2;
+    // Target inside the host = an interrupt returning inward; leave it mounted.
+    if (tcx > host.x && tcx < host.x + host.width && tcy > host.y && tcy < host.y + host.height) continue;
+    const cur = ev.properties?.boundarySide as string | undefined;
+    if (cur !== "top" && cur !== "bottom") continue; // respect an explicit L/R mount
+    // Only re-face when the target is CLEARLY above/below the host box. A target
+    // roughly level with the host (exiting to the side) keeps its mounted side —
+    // flipping on a hairline vertical difference would fight a deliberate mount.
+    const want =
+      tcy > host.y + host.height ? "bottom"
+      : tcy < host.y ? "top"
+      : cur;
+    if (want === cur) continue;
+    ev.properties = { ...ev.properties, boundarySide: want, ...boundaryLabelOffset(want, ev.width, ev.height) };
+    snapBoundaryEventToRim(ev, host.x, host.y, host.width, host.height);
+  }
   // ── R8.24: FINAL decision/merge levelling ── R8.01 aligns a decision and its
   // paired merge gateway to the branch midpoint mid-layout, but the later
   // lane-centring passes can pull each gateway back toward its OWN lane band —

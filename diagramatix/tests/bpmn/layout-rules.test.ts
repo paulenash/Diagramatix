@@ -248,9 +248,14 @@ const BPMN_LAYOUT_RULES: LayoutRule[] = [
           { sourceId: "h", targetId: "e" },
         ],
       );
-      // Mounted on the host's bottom edge → exits from the event's bottom (outer).
+      // The event settles on an OUTER face facing its target (R7.06 may re-mount
+      // it top↔bottom toward "Recover"); the connector must exit THAT outer face
+      // (away from the host), never the inner face that points into the host.
+      const be = out.elements.find((e) => e.id === "be")!;
+      const t = out.elements.find((e) => e.id === "t")!;
+      const outer = be.y + be.height / 2 <= t.y + t.height / 2 ? "top" : "bottom";
       const exit = out.connectors.find((c) => c.sourceId === "be")!;
-      expect(exit.sourceSide, `boundary exit side was ${exit.sourceSide}`).toBe("bottom");
+      expect(exit.sourceSide, `boundary exit side was ${exit.sourceSide}, expected outer face ${outer}`).toBe(outer);
     },
   },
   {

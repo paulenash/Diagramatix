@@ -61,3 +61,47 @@ describe("EMIE corner clearance + outward exit (R7.04/R7.05)", () => {
     expect(conn.waypoints.some(insideOrOnEp), "no waypoint inside/on the EP").toBe(false);
   });
 });
+
+// R7.06 — an EMIE mounts on the host side that FACES its outgoing target, so the
+// connector exits directly toward it instead of detouring around the host.
+describe("EMIE target-facing side (R7.06)", () => {
+  const mk = (): { els: AiElement[]; conns: AiConnection[] } => ({
+    els: [
+      { id: "p", type: "pool", label: "P", poolType: "white-box", lanes: [{ id: "lU", name: "Upper" }, { id: "lD", name: "Lower" }] },
+      { id: "s", type: "start-event", label: "Start", pool: "p", lane: "lU" },
+      { id: "ep", type: "subprocess-expanded", label: "Do work", pool: "p", lane: "lU" },
+      { id: "es", type: "start-event", label: "", parentSubprocess: "ep" },
+      { id: "a", type: "task", label: "Step A", parentSubprocess: "ep" },
+      { id: "b", type: "task", label: "Step B", parentSubprocess: "ep" },
+      { id: "ee", type: "end-event", label: "", parentSubprocess: "ep" },
+      { id: "tb", type: "intermediate-event", label: "Timeout", eventType: "timer", boundaryHost: "b", boundarySide: "top" },
+      { id: "ds", type: "start-event", label: "L", pool: "p", lane: "lD" },
+      { id: "esc", type: "task", label: "Escalate", pool: "p", lane: "lD" },
+      { id: "de", type: "end-event", label: "L end", pool: "p", lane: "lD" },
+      { id: "e", type: "end-event", label: "Done", pool: "p", lane: "lU" },
+    ],
+    conns: [
+      { sourceId: "s", targetId: "ep" }, { sourceId: "ep", targetId: "e" },
+      { sourceId: "es", targetId: "a" }, { sourceId: "a", targetId: "b" }, { sourceId: "b", targetId: "ee" },
+      { sourceId: "ds", targetId: "esc" }, { sourceId: "esc", targetId: "de" },
+      { sourceId: "tb", targetId: "esc" },
+    ],
+  });
+
+  it("T2829 — an EMIE whose target sits below the host re-mounts on the BOTTOM and exits downward", () => {
+    const { els, conns } = mk();
+    const out = layoutBpmnDiagram(els, conns);
+    const tb = out.elements.find((e) => e.id === "tb")!;
+    const ep = out.elements.find((e) => e.id === tb.boundaryHostId)!;
+    const esc = out.elements.find((e) => e.id === "esc")!;
+    // Precondition: the target really is below the host.
+    expect(esc.y + esc.height / 2).toBeGreaterThan(ep.y + ep.height);
+    // Event mounted on the bottom rim, label biased SW (below), connector exits down.
+    expect((tb.properties as { boundarySide?: string }).boundarySide).toBe("bottom");
+    expect(Math.abs((tb.y + tb.height / 2) - (ep.y + ep.height))).toBeLessThan(2);
+    expect((tb.properties as { labelOffsetY?: number }).labelOffsetY ?? 0).toBeGreaterThan(0);
+    const c = out.connectors.find((x) => x.sourceId === "tb")!;
+    expect(c.sourceSide).toBe("bottom");
+    expect(c.waypoints[1].y).toBeGreaterThan(c.waypoints[0].y); // first step goes DOWN
+  });
+});
