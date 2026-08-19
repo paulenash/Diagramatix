@@ -45,8 +45,14 @@ describe("EP-boundary interrupt (R8.19) + re-tighten (R8.20)", () => {
       Math.abs(cx - ep.x) < T || Math.abs(cx - (ep.x + ep.width)) < T;
     expect(onRim, `timer centre (${Math.round(cx)},${Math.round(cy)}) must lie on the EP rim [x ${Math.round(ep.x)}..${Math.round(ep.x + ep.width)}, y ${Math.round(ep.y)}..${Math.round(ep.y + ep.height)}]`).toBe(true);
 
-    // The exit End event is fully to the right of the EP (outside it).
-    expect(lapse.x, `Lapse (x=${Math.round(lapse.x)}) must be right of the EP (right edge ${Math.round(ep.x + ep.width)})`).toBeGreaterThanOrEqual(ep.x + ep.width);
+    // The exit End event sits fully OUTSIDE the EP, in the timer's OUTWARD
+    // direction — above the box for a top-mounted timer (R7.04/R7.05: the timer
+    // is one event-width clear of the corner and exits straight up), never
+    // overlapping the EP.
+    const lapseOutside =
+      lapse.x + lapse.width <= ep.x || lapse.x >= ep.x + ep.width ||
+      lapse.y + lapse.height <= ep.y || lapse.y >= ep.y + ep.height;
+    expect(lapseOutside, `Lapse (x=${Math.round(lapse.x)},y=${Math.round(lapse.y)}) must be fully outside the EP [x ${Math.round(ep.x)}..${Math.round(ep.x + ep.width)}, y ${Math.round(ep.y)}..${Math.round(ep.y + ep.height)}]`).toBe(true);
 
     // The event→End connector runs fully outside the EP (no waypoint inside).
     const conn = out.connectors.find((c) => c.sourceId === "tb" && c.targetId === "lapse")!;

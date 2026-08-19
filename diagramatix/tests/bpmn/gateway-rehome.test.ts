@@ -42,3 +42,36 @@ describe("cross-lane gateway re-home (R8.01)", () => {
     expect(Math.abs(cy(o, "m") - cy(o, "sp2"))).toBeLessThan(2);
   });
 });
+
+// Partial cross-lane fork/join (R8.24): the decision lives in one lane with
+// ONE branch staying in it and the others fanning DOWN into lower lanes, while
+// the paired merge lives in a DIFFERENT (upper) lane — exactly the shape that
+// let later lane-centring pull the merge back to its own band, above the
+// decision. R8.24 re-levels the merge onto the decision as the final step.
+const els2: AiElement[] = [
+  { id: "p", type: "pool", label: "Company", poolType: "white-box", lanes: [{ id: "lFO", name: "Front Office" }, { id: "lSales", name: "Sales" }, { id: "lFin", name: "Finance" }, { id: "lMkt", name: "Marketing" }] },
+  { id: "s", type: "start-event", label: "Received", pool: "p", lane: "lFO" },
+  { id: "pre", type: "task", label: "Determine Type", pool: "p", lane: "lSales" },
+  { id: "g", type: "gateway", label: "Type?", pool: "p", lane: "lSales" },
+  { id: "b1", type: "task", label: "Sales", pool: "p", lane: "lSales" },
+  { id: "b2", type: "task", label: "Invoice", pool: "p", lane: "lFin" },
+  { id: "b3", type: "task", label: "General", pool: "p", lane: "lMkt" },
+  { id: "m", type: "gateway", label: "", pool: "p", lane: "lFO" },
+  { id: "post", type: "task", label: "Send Response", pool: "p", lane: "lFO" },
+  { id: "e", type: "end-event", label: "Sent", pool: "p", lane: "lFO" },
+];
+const conns2: AiConnection[] = [
+  { sourceId: "s", targetId: "pre" }, { sourceId: "pre", targetId: "g" },
+  { sourceId: "g", targetId: "b1" }, { sourceId: "g", targetId: "b2" }, { sourceId: "g", targetId: "b3" },
+  { sourceId: "b1", targetId: "m" }, { sourceId: "b2", targetId: "m" }, { sourceId: "b3", targetId: "m" },
+  { sourceId: "m", targetId: "post" }, { sourceId: "post", targetId: "e" },
+];
+
+describe("partial cross-lane merge levelling (R8.24)", () => {
+  it("T2827 — a merge in another lane is drawn level (same centre-Y) with its paired decision", () => {
+    const o = layoutBpmnDiagram(els2, conns2);
+    // The merge must sit on the decision's centre-Y even though it belongs to a
+    // different (upper) lane — no lane-band snap-back is allowed to diverge them.
+    expect(Math.abs(cy(o, "m") - cy(o, "g"))).toBeLessThan(2);
+  });
+});

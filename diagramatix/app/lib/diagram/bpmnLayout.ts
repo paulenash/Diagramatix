@@ -492,6 +492,38 @@ function layoutBpmnPreserved(
   };
 }
 
+/** R7.04 — Re-snap an edge-mounted (boundary) event onto a host rim after the
+ *  host box was resized. Honours the event's STORED boundarySide (so a
+ *  top-mounted event stays on top instead of flipping to an adjacent edge when
+ *  it sits near a corner), and keeps the event at least ONE EVENT WIDTH clear of
+ *  BOTH corners of that edge — so the outward sequence connector gets a clean
+ *  straight exit and never attaches on the shared corner point of the host
+ *  boundary. Short edges fall back to centring the event. */
+function snapBoundaryEventToRim(
+  be: DiagramElement, nx: number, ny: number, nw: number, nh: number,
+): void {
+  const cx = be.x + be.width / 2, cy = be.y + be.height / 2;
+  let side = be.properties?.boundarySide as string | undefined;
+  if (side !== "left" && side !== "right" && side !== "top" && side !== "bottom") {
+    const dl = Math.abs(cx - nx), dr = Math.abs(nx + nw - cx);
+    const dt = Math.abs(cy - ny), db = Math.abs(ny + nh - cy);
+    const m = Math.min(dl, dr, dt, db);
+    side = m === dl ? "left" : m === dr ? "right" : m === dt ? "top" : "bottom";
+  }
+  // Corner margin = 1.5 × event size on that axis (⇒ event outer edge sits one
+  // full event width from the corner); capped at half the edge so a short rim
+  // just centres the event.
+  const alongX = () => { const p = Math.min(be.width * 1.5, nw / 2); return Math.max(nx + p, Math.min(nx + nw - p, cx)); };
+  const alongY = () => { const p = Math.min(be.height * 1.5, nh / 2); return Math.max(ny + p, Math.min(ny + nh - p, cy)); };
+  let px: number, py: number;
+  if (side === "left")       { px = nx;      py = alongY(); }
+  else if (side === "right") { px = nx + nw; py = alongY(); }
+  else if (side === "top")   { px = alongX(); py = ny; }
+  else                       { px = alongX(); py = ny + nh; }
+  be.x = px - be.width / 2;
+  be.y = py - be.height / 2;
+}
+
 export function layoutBpmnDiagram(
   aiElements: AiElement[],
   aiConnections: AiConnection[],
@@ -1576,10 +1608,10 @@ export function layoutBpmnDiagram(
           ey = host.y + host.height / 2 - H / 2 + (i - (evs.length - 1) / 2) * (H + 10);
         } else if (side === "top") {
           // Near right corner for intermediate events (timers/interrupts)
-          ex = host.x + host.width - W - 30 - i * (W + 10);
+          ex = host.x + host.width - 2 * W - i * (W + 10);
           ey = host.y - H / 2;
         } else { // bottom
-          ex = host.x + host.width - W - 30 - i * (W + 10);
+          ex = host.x + host.width - 2 * W - i * (W + 10);
           ey = host.y + host.height - H / 2;
         }
         elements.push({
@@ -1589,7 +1621,20 @@ export function layoutBpmnDiagram(
           // R7.02: store boundarySide on the placed element so the wiring
           // pass can exit outgoing connectors from the connection point
           // furthest from the host edge the event is mounted on.
-          properties: { ...buildProps(ev), boundarySide: side },
+          properties: {
+            ...buildProps(ev),
+            boundarySide: side,
+            // R7.05: an edge-mounted intermediate event's label defaults to the
+            // OUTWARD side, biased WEST — so a top-mounted event's outgoing
+            // sequence connector can leave its top edge cleanly (Paul 2026-08-19).
+            // R8.16 refines / de-overlaps this later using the wrapped height.
+            ...(ev.type === "intermediate-event"
+              ? side === "top"    ? { labelOffsetX: -(W / 2 + 46), labelOffsetY: -(H + 30) }
+              : side === "bottom" ? { labelOffsetX: -(W / 2 + 46), labelOffsetY: 8 }
+              : side === "left"   ? { labelOffsetX: -(W / 2 + 90), labelOffsetY: -6 }
+              :                      { labelOffsetX:  (W / 2 + 8),  labelOffsetY: -6 }
+              : {}),
+          },
           boundaryHostId: host.id,
           ...(ev.taskType ? { taskType: ev.taskType as DiagramElement["taskType"] } : {}),
           ...(ev.eventType ? { eventType: ev.eventType as DiagramElement["eventType"] } : {}),
@@ -1860,16 +1905,7 @@ export function layoutBpmnDiagram(
       // (they'd otherwise float off the old, larger box edges).
       for (const be of elements) {
         if (be.boundaryHostId !== ep.id) continue;
-        const cx = be.x + be.width / 2, cy = be.y + be.height / 2;
-        const dl = Math.abs(cx - nx), dr = Math.abs(nx + nw - cx);
-        const dt = Math.abs(cy - ny), db = Math.abs(ny + nh - cy);
-        const m = Math.min(dl, dr, dt, db);
-        let px: number, py: number;
-        if (m === dl)      { px = nx;      py = clamp(cy, ny, ny + nh); }
-        else if (m === dr) { px = nx + nw; py = clamp(cy, ny, ny + nh); }
-        else if (m === dt) { px = clamp(cx, nx, nx + nw); py = ny; }
-        else               { px = clamp(cx, nx, nx + nw); py = ny + nh; }
-        be.x = px - be.width / 2; be.y = py - be.height / 2;
+        snapBoundaryEventToRim(be, nx, ny, nw, nh);
       }
 
       // Conservative de-overlap: if the (possibly grown) EP now overlaps a
@@ -2732,16 +2768,7 @@ export function layoutBpmnDiagram(
       // Re-snap edge-mounted boundary events onto the new rim.
       for (const be of elements) {
         if (be.boundaryHostId !== ep.id) continue;
-        const cx = be.x + be.width / 2, cy = be.y + be.height / 2;
-        const dl = Math.abs(cx - nx), dr = Math.abs(nx + nw - cx);
-        const dt = Math.abs(cy - ny), db = Math.abs(ny + nh - cy);
-        const m = Math.min(dl, dr, dt, db);
-        let px: number, py: number;
-        if (m === dl)      { px = nx;      py = clampW(cy, ny, ny + nh); }
-        else if (m === dr) { px = nx + nw; py = clampW(cy, ny, ny + nh); }
-        else if (m === dt) { px = clampW(cx, nx, nx + nw); py = ny; }
-        else               { px = clampW(cx, nx, nx + nw); py = ny + nh; }
-        be.x = px - be.width / 2; be.y = py - be.height / 2;
+        snapBoundaryEventToRim(be, nx, ny, nw, nh);
       }
       // Keep ancestor lanes / pools enclosing the re-wrapped box (right/bottom).
       let cur: DiagramElement | undefined = ep.parentId ? elements.find(e => e.id === ep.parentId) : undefined;
@@ -3636,15 +3663,37 @@ export function layoutBpmnDiagram(
       const lh = Math.max(1, wrapText(label, lw).length) * LH;
       const curOx = (e.properties?.labelOffsetX as number | undefined) ?? 0;
       const curOy = (e.properties?.labelOffsetY as number | undefined) ?? 7;
-      // Preference order: keep current, then below / above / right / left / far-below.
-      const candidates: [number, number][] = [
-        [curOx, curOy],
-        [0, e.height + 10],
-        [0, -(e.height + lh + 6)],
-        [e.width / 2 + lw / 2 + 6, -(e.height / 2 + lh / 2)],
-        [-(e.width / 2 + lw / 2 + 6), -(e.height / 2 + lh / 2)],
-        [0, e.height + lh + 18],
-      ];
+      // Preference order: keep current, then outward candidates. For an
+      // edge-mounted (boundary) event the label is biased to its OUTWARD side —
+      // never 'below' a top-mounted event (that lands on the host body / under
+      // the connector). NW is preferred on a top-mounted event so the outgoing
+      // sequence connector leaves the event's top edge cleanly (R7.05).
+      const bside = e.boundaryHostId
+        ? (e.properties?.boundarySide as string | undefined)
+        : undefined;
+      const nwX = -(e.width / 2 + lw / 2 + 6);
+      const neX =  (e.width / 2 + lw / 2 + 6);
+      const upY = -(e.height + lh / 2 + 6);
+      const dnY =  e.height + 10;
+      let candidates: [number, number][];
+      if (bside === "top") {
+        candidates = [[curOx, curOy], [nwX, upY], [0, -(e.height + lh + 6)], [neX, upY]];
+      } else if (bside === "bottom") {
+        candidates = [[curOx, curOy], [nwX, dnY], [0, dnY], [neX, dnY]];
+      } else if (bside === "left") {
+        candidates = [[curOx, curOy], [nwX, -6], [0, -(e.height + lh + 6)], [0, dnY]];
+      } else if (bside === "right") {
+        candidates = [[curOx, curOy], [neX, -6], [0, -(e.height + lh + 6)], [0, dnY]];
+      } else {
+        candidates = [
+          [curOx, curOy],
+          [0, e.height + 10],
+          [0, -(e.height + lh + 6)],
+          [e.width / 2 + lw / 2 + 6, -(e.height / 2 + lh / 2)],
+          [-(e.width / 2 + lw / 2 + 6), -(e.height / 2 + lh / 2)],
+          [0, e.height + lh + 18],
+        ];
+      }
       const clears = (ox: number, oy: number): boolean => {
         const box = labelRect(e, ox, oy, lw, lh);
         for (const ob of bodies) {
@@ -3954,6 +4003,26 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R8.24: FINAL decision/merge levelling ── R8.01 aligns a decision and its
+  // paired merge gateway to the branch midpoint mid-layout, but the later
+  // lane-centring passes can pull each gateway back toward its OWN lane band —
+  // leaving the merge no longer level with its decision whenever the two live in
+  // different lanes (a cross-lane fork/join, e.g. a decision in the Sales lane
+  // rejoining in the Front Office lane). Re-assert the pairing here, as the LAST
+  // Y-affecting step before routing, so a paired merge is ALWAYS drawn on its
+  // decision's centre-Y. Anchors the merge to the decision (the decision keeps
+  // its placed Y). Gateways are lane-independent, so moving the merge across a
+  // band never stretches a lane (R57 has already sized them).
+  for (const dec of elements) {
+    if (!isDecisionGateway(dec)) continue;
+    const mergeId = findPairedMerge(dec.id);
+    if (!mergeId) continue;
+    const merge = elMap.get(mergeId);
+    if (!merge) continue;
+    const decCy = dec.y + dec.height / 2;
+    const wantY = decCy - merge.height / 2;
+    if (Math.abs(merge.y - wantY) > 0.5) merge.y = wantY;
+  }
   phase(`connectors built (${connectors.length})`);
 
   // Compute waypoints for all connectors
