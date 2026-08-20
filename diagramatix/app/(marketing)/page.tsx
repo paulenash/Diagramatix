@@ -107,14 +107,22 @@ export default async function MarketingHome() {
           </Link>
         </div>
         <p className="mt-6 text-xs text-gray-400">
-          Free plan available · No credit card required to get started
+          30-day free trial · No credit card required to get started
         </p>
       </section>
 
-      {/* Screenshot placeholder */}
+      {/* Product screenshot */}
       <section className="max-w-5xl mx-auto px-6 pb-20">
-        <div className="aspect-[16/9] rounded-lg border border-gray-200 bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center">
-          <span className="text-xs text-gray-400">Product screenshot placeholder</span>
+        <div className="rounded-lg border border-gray-200 shadow-lg overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/screenshots/hero-canvas.png"
+            alt="The Diagramatix canvas editing a BPMN process, with the AI Plan panel generating a diagram from a written process description"
+            width={1525}
+            height={929}
+            className="w-full h-auto"
+            fetchPriority="high"
+          />
         </div>
       </section>
 
