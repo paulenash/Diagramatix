@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
+export const metadata: Metadata = {
+  title: "About",
+};
+
 /** Inline Diagramatix wordmark, sized to the surrounding text (h-[1em])
- *  and baseline-nudged so it sits on the text line. Used in place of the
- *  written word "Diagramatix" across this page. */
+ *  and baseline-nudged so it sits on the text line. Used in the page
+ *  heading; body prose uses the plain word "Diagramatix". */
 function Wordmark() {
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -23,22 +28,22 @@ export default function AboutPage() {
         </h1>
 
         <p className="mt-6 text-base text-gray-700 leading-relaxed">
-          <Wordmark /> is a process diagramming tool built for business analysts
+          Diagramatix is a process diagramming tool built for business analysts
           and process owners who want to draw the real thing — not the textbook
           examples. It focuses on who does what, with what, and where the
-          information to perform the task comes from and goes to. <Wordmark />{" "}
+          information to perform the task comes from and goes to. Diagramatix
           imports and exports BPMN diagrams in a wide variety of formats.
           That&apos;s what we built it for. In particular it can round-trip Visio
           diagrams using its specially designed Visio Shapes file.
         </p>
 
         <p className="mt-4 text-base text-gray-700 leading-relaxed">
-          We started <Wordmark /> because the existing tools fall into two camps:
+          We started Diagramatix because the existing tools fall into two camps:
           generic shape editors that don&apos;t understand BPMN, and BPMN-only
           tools that force you into modeller conventions no business audience
           reads. Our goal is a diagram that runs in a browser, imports the
           formats people already use, and produces output that fits straight
-          into a board paper! <Wordmark /> also supports a number of important
+          into a board paper. Diagramatix also supports a number of important
           related diagram types to allow organisations to show the full context
           of their processes and value chains.
         </p>

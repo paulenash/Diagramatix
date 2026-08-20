@@ -89,12 +89,18 @@ function ResetPasswordForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label
+          htmlFor="new-password"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
           New password
         </label>
         <div className="relative">
           <input
+            id="new-password"
+            name="new-password"
             type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -114,12 +120,18 @@ function ResetPasswordForm() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label
+          htmlFor="confirm-password"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
           Confirm password
         </label>
         <div className="relative">
           <input
+            id="confirm-password"
+            name="confirm-password"
             type={showConfirm ? "text" : "password"}
+            autoComplete="new-password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
@@ -157,22 +169,20 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center dgx-dashboard-bg">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">
-          Set a new password
-        </h1>
+    <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">
+        Set a new password
+      </h1>
 
-        <Suspense fallback={<div className="text-sm text-gray-500">Loading...</div>}>
-          <ResetPasswordForm />
-        </Suspense>
+      <Suspense fallback={<div className="text-sm text-gray-500">Loading...</div>}>
+        <ResetPasswordForm />
+      </Suspense>
 
-        <p className="mt-4 text-center text-sm text-gray-600">
-          <Link href="/login" className="text-blue-600 hover:underline">
-            Back to sign in
-          </Link>
-        </p>
-      </div>
+      <p className="mt-4 text-center text-sm text-gray-600">
+        <Link href="/login" className="text-blue-600 hover:underline">
+          Back to sign in
+        </Link>
+      </p>
     </div>
   );
 }
