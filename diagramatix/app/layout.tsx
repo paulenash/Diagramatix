@@ -17,8 +17,25 @@ const caveat = Caveat({
 });
 
 export const metadata: Metadata = {
-  title: "Diagramatix",
+  metadataBase: new URL("https://app.diagramatix.com.au"),
+  title: {
+    default: "Diagramatix",
+    template: "%s — Diagramatix",
+  },
   description: "Professional process diagramming for business analysts",
+  openGraph: {
+    siteName: "Diagramatix",
+    type: "website",
+    locale: "en_AU",
+    title: "Diagramatix",
+    description: "Professional process diagramming for business analysts",
+    // No og:image yet — add once a 1200x630 asset exists.
+  },
+  twitter: {
+    card: "summary",
+    title: "Diagramatix",
+    description: "Professional process diagramming for business analysts",
+  },
 };
 
 export default async function RootLayout({

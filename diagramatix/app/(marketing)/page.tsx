@@ -1,6 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/app/lib/db";
+
+export const metadata: Metadata = {
+  title: {
+    absolute: "Diagramatix — AI-powered process diagramming for business analysts",
+  },
+  description:
+    "BPMN diagramming that just works. Smart connector routing, BPMN 2.0 + Visio import, AI-assisted generation. Built for business analysts, not draftspeople.",
+};
 
 const FEATURES: { title: string; body: string; icon: React.ReactNode }[] = [
   {
@@ -55,6 +65,18 @@ export default async function MarketingHome() {
   if (session?.user) {
     redirect("/dashboard");
   }
+
+  // Derive the "from AU$X" teaser from the same SubscriptionLevel data the
+  // pricing page renders, so the homepage can never drift from real prices.
+  // Cheapest paid tier = min positive priceMonthly (cents).
+  const cheapestPaid = await prisma.subscriptionLevel.findFirst({
+    where: { priceMonthly: { gt: 0 } },
+    orderBy: { priceMonthly: "asc" },
+    select: { priceMonthly: true },
+  });
+  const fromPrice = cheapestPaid
+    ? `AU$${Math.round(cheapestPaid.priceMonthly / 100)}`
+    : null;
 
   return (
     <div className="bg-white">
@@ -129,7 +151,9 @@ export default async function MarketingHome() {
           Simple, transparent pricing
         </h2>
         <p className="mt-3 text-sm text-gray-600">
-          Free for individuals. AU$19 per user per month for teams. Enterprise on request.
+          30-day free trial.
+          {fromPrice && ` Paid plans from ${fromPrice} per user per month.`}
+          {" "}Enterprise on request.
         </p>
         <Link
           href="/pricing"

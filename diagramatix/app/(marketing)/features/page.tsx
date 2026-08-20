@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/app/lib/db";
 
 export const metadata = {
-  title: "Diagramatix — Features",
+  title: "Features",
   description: "Every feature Diagramatix ships with — from BPMN to ArchiMate, AI generation to Visio round-trip.",
 };
 
