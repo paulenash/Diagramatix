@@ -69,3 +69,39 @@ describe("R8.21 — global left-to-right flow enforcement", () => {
     }
   });
 });
+
+// R8.21 back-edge detection must run on the COLLAPSED graph: an EP-internal
+// element feeding an external gateway that loops back INTO the EP is a 2-cycle
+// only after collapsing internals to their EP. A raw-id DFS misses it (the EP
+// node is a sink), so the L→R sweep cascaded both nodes rightward without bound —
+// the ~14,000px empty band in "V04.01 Workforce Planning".
+describe("R8.21 collapsed-graph back-edge (EP rework loop)", () => {
+  const els2: AiElement[] = [
+    { id: "p", type: "pool", label: "Org", poolType: "white-box", lanes: [{ id: "HR", name: "HR" }] },
+    { id: "s", type: "start-event", label: "Begin", pool: "p", lane: "HR" },
+    { id: "pre", type: "task", label: "Analyse", pool: "p", lane: "HR" },
+    { id: "ep", type: "subprocess-expanded", label: "Agree plan", pool: "p", lane: "HR" },
+    { id: "es", type: "start-event", label: "", parentSubprocess: "ep" },
+    { id: "draft", type: "task", label: "Draft plan", parentSubprocess: "ep" },
+    { id: "ee", type: "end-event", label: "", parentSubprocess: "ep" },
+    { id: "g", type: "gateway", label: "Approved?", pool: "p", lane: "HR" }, // OUTSIDE the EP
+    { id: "rec", type: "task", label: "Record headcount", pool: "p", lane: "HR" },
+    { id: "done", type: "end-event", label: "Done", pool: "p", lane: "HR" },
+  ];
+  const conns2: AiConnection[] = [
+    { sourceId: "s", targetId: "pre" }, { sourceId: "pre", targetId: "ep" },
+    { sourceId: "es", targetId: "draft" }, { sourceId: "draft", targetId: "ee" },
+    { sourceId: "draft", targetId: "g" },   // EP-internal → external gateway
+    { sourceId: "g", targetId: "ep" },       // gateway loops BACK into the EP (rework)
+    { sourceId: "g", targetId: "rec" }, { sourceId: "rec", targetId: "done" },
+  ];
+
+  it("T2831 — an EP rework loop does not blow the diagram width up (no runaway L→R cascade)", () => {
+    const out = layoutBpmnDiagram(els2, conns2);
+    const xs = out.elements.map((e) => e.x);
+    const rs = out.elements.map((e) => e.x + e.width);
+    const width = Math.max(...rs) - Math.min(...xs);
+    // Before the fix this was ~14,000px; a sane layout of this size is well under 3,000.
+    expect(width, `diagram width ${Math.round(width)}px must stay bounded`).toBeLessThan(3000);
+  });
+});

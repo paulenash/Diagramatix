@@ -3744,23 +3744,6 @@ export function layoutBpmnDiagram(
       const a = outEdges.get(c.sourceId); if (a) a.push(c.targetId); else outEdges.set(c.sourceId, [c.targetId]);
       seqEdges.push({ s: c.sourceId, t: c.targetId });
     }
-    // Back-edge (cycle) detection — loops are the only legitimate R→L flow.
-    const backEdge = new Set<string>();
-    {
-      const WHITE = 0, GRAY = 1, BLACK = 2; const colour = new Map<string, number>();
-      const roots = elements.filter((e) => !DATA_A.has(e.type) && e.type !== "pool" && e.type !== "lane" && e.type !== "sublane").map((e) => e.id);
-      for (const root of roots) {
-        if ((colour.get(root) ?? WHITE) !== WHITE) continue;
-        const st: { id: string; i: number }[] = [{ id: root, i: 0 }]; colour.set(root, GRAY);
-        while (st.length) {
-          const f = st[st.length - 1]; const outs = outEdges.get(f.id) ?? [];
-          if (f.i >= outs.length) { colour.set(f.id, BLACK); st.pop(); continue; }
-          const t = outs[f.i++]; const tc = colour.get(t) ?? WHITE;
-          if (tc === GRAY) backEdge.add(`${f.id}->${t}`);
-          else if (tc === WHITE) { colour.set(t, GRAY); st.push({ id: t, i: 0 }); }
-        }
-      }
-    }
     // The element that actually moves for a given node: ride up through EP parents
     // and boundary hosts to the top-level flow element.
     const topLevelOf = (id: string): string => {
@@ -3773,6 +3756,36 @@ export function layoutBpmnDiagram(
       }
       return cur?.id ?? id;
     };
+    // Back-edge (cycle) detection — loops are the only legitimate R→L flow.
+    // The relaxation below shifts TOP-LEVEL elements (an EP-internal node rides
+    // its EP), so cycles must be detected on the SAME collapsed graph. An
+    // EP-internal element feeding an external gateway that loops back INTO the EP
+    // is a 2-cycle (sp1 ↔ gateway) that ONLY exists after collapsing — a raw-id
+    // DFS misses it (the EP node is a sink), leaving R8.21 to cascade both nodes
+    // rightward every pass until the cap: the ~14,000px empty-band bug
+    // (V04.01 Workforce Planning). Detect + skip it on the collapsed graph.
+    const backEdge = new Set<string>();
+    {
+      const cOut = new Map<string, string[]>();
+      for (const { s, t } of seqEdges) {
+        const cs = topLevelOf(s), ct = topLevelOf(t);
+        if (cs === ct) continue;                         // internal edge — no shift
+        const a = cOut.get(cs);
+        if (a) { if (!a.includes(ct)) a.push(ct); } else cOut.set(cs, [ct]);
+      }
+      const WHITE = 0, GRAY = 1, BLACK = 2; const colour = new Map<string, number>();
+      for (const root of cOut.keys()) {
+        if ((colour.get(root) ?? WHITE) !== WHITE) continue;
+        const st: { id: string; i: number }[] = [{ id: root, i: 0 }]; colour.set(root, GRAY);
+        while (st.length) {
+          const f = st[st.length - 1]; const outs = cOut.get(f.id) ?? [];
+          if (f.i >= outs.length) { colour.set(f.id, BLACK); st.pop(); continue; }
+          const t = outs[f.i++]; const tc = colour.get(t) ?? WHITE;
+          if (tc === GRAY) backEdge.add(`${f.id}->${t}`);
+          else if (tc === WHITE) { colour.set(t, GRAY); st.push({ id: t, i: 0 }); }
+        }
+      }
+    }
     const kidsByParent = new Map<string, DiagramElement[]>();
     for (const e of elements) { if (!e.parentId) continue; const a = kidsByParent.get(e.parentId); if (a) a.push(e); else kidsByParent.set(e.parentId, [e]); }
     const descOf = (rootId: string): string[] => { const out: string[] = []; const st = [rootId]; while (st.length) { const c = st.pop()!; for (const k of kidsByParent.get(c) ?? []) { out.push(k.id); st.push(k.id); } } return out; };
@@ -3785,9 +3798,10 @@ export function layoutBpmnDiagram(
     for (let pass = 0; pass < cap; pass++) {
       let moved = false;
       for (const { s, t } of seqEdges) {
-        if (backEdge.has(`${s}->${t}`)) continue;
-        const sm = elById.get(topLevelOf(s)), tm = elById.get(topLevelOf(t));
-        if (!sm || !tm || sm.id === tm.id) continue;
+        const cs = topLevelOf(s), ct = topLevelOf(t);
+        if (cs === ct || backEdge.has(`${cs}->${ct}`)) continue;
+        const sm = elById.get(cs), tm = elById.get(ct);
+        if (!sm || !tm) continue;
         const need = (sm.x + sm.width + LR_GAP) - tm.x;
         if (need > 0.5) { shiftRight(tm.id, need); moved = true; }
       }
