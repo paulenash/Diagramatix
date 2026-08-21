@@ -3371,7 +3371,7 @@ function tracePerActionRouteDiff(
 // lane-adding path (palette Pool/Lane drop, ADD_LANE, ADD_SUBLANE) and the
 // divider drag are covered uniformly instead of per-return.
 const LANE_RECONCILE_ACTIONS = new Set<Action["type"]>([
-  "ADD_ELEMENT", "ADD_LANE", "ADD_SUBLANE", "MOVE_LANE_BOUNDARY",
+  "ADD_ELEMENT", "ADD_LANE", "ADD_SUBLANE", "MOVE_LANE_BOUNDARY", "DELETE_ELEMENT",
 ]);
 
 export function reducer(state: DiagramData, action: Action): DiagramData {

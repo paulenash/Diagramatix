@@ -157,6 +157,26 @@ describe("editor edits — pool / lane", () => {
     expect(start.label, "keeps its default label in free space").toBe("Start");
   });
 
+  it("T2845 — deleting a lane re-homes its contents into the sibling that absorbs the space", () => {
+    // Two stacked lanes; a task lives in the UPPER lane. Deleting the upper lane
+    // makes the lower sibling grow up to swallow the vacated slice — the task
+    // (which does not move) must end up owned by that surviving lane, not orphaned.
+    const d0: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "P", type: "pool", x: 0, y: 0, width: 520, height: 200, label: "P", properties: {} },
+        { id: "U", type: "lane", parentId: "P", x: 40, y: 0, width: 480, height: 100, label: "Upper", properties: {} },
+        { id: "L", type: "lane", parentId: "P", x: 40, y: 100, width: 480, height: 100, label: "Lower", properties: {} },
+        { id: "t", type: "task", parentId: "U", x: 200, y: 25, width: 90, height: 50, label: "T", properties: {} },
+      ],
+      connectors: [],
+    };
+    const d = dispatch(d0, { type: "DELETE_ELEMENT", payload: { id: "U" } });
+    expect(d.elements.find((e) => e.id === "U"), "upper lane removed").toBeFalsy();
+    expect(d.elements.find((e) => e.id === "L"), "lower lane survives").toBeTruthy();
+    expect(at(d, "t").parentId, "task re-homed into the surviving lane").toBe("L");
+  });
+
   it("swapping two lanes keeps children with their lane and routing clean", () => {
     const d0 = build(POOL.elements, POOL.connections);
     const l1y0 = at(d0, "l1").y, l2y0 = at(d0, "l2").y;
