@@ -14,6 +14,11 @@
  *    don't nest); sub-lanes nest via <childLaneSet>.
  *  - Sub-process children (parentId chain) NEST inside their <subProcess>.
  *
+ * Simulation: BPMN has no native slot for sim parameters, so an optional
+ * `<bpsim:BPSimData>` block (opts.bpsimXml) is embedded in the definitions-level
+ * `<extensionElements>` per the BPSim spec — see bpsim/exportBpmnWithSim.ts,
+ * which composes the two. Tools that don't read BPSim ignore extensions.
+ *
  * Fidelity notes: incoming/outgoing refs are omitted (derived on import);
  * single-lane pools may be absorbed on re-import (matches the importer). Node
  * types with no BPMN equivalent (pain points, issues, review comments) are
@@ -29,8 +34,14 @@ function attr(name: string, val: string | number | undefined | null): string {
   if (val === undefined || val === null || val === "") return "";
   return ` ${name}="${esc(String(val))}"`;
 }
-/** BPMN ids must be NCNames (no leading digit). Prefix to guarantee validity. */
-const nid = (id: string) => `id_${String(id).replace(/[^A-Za-z0-9_.-]/g, "_")}`;
+/**
+ * BPMN ids must be NCNames (no leading digit). Prefix to guarantee validity.
+ * Exported because a companion BPSim file (standalone or embedded) must
+ * reference elements by the SAME ids this exporter emits, or the two documents
+ * don't line up for any tool reading them together.
+ */
+export const bpmnRefId = (id: string) => `id_${String(id).replace(/[^A-Za-z0-9_.-]/g, "_")}`;
+const nid = bpmnRefId;
 
 // ── Reverse type maps (Diagramatix → BPMN local name) ──────────────────────
 const TASK_ELEMENT: Record<string, string> = {
@@ -51,7 +62,15 @@ const EVENT_DEF: Record<string, string> = {
 // Elements that render as flow NODES inside a process (not pools/lanes/annotations-as-artifacts).
 const NON_NODE = new Set<string>(["pool", "lane", "sublane", "uml-pain-point", "uml-issue", "review-comment"]);
 
-export function buildBpmnXml(data: DiagramData, diagramName: string): string {
+export interface BpmnExportOpts {
+  /** A `<bpsim:BPSimData>` block (from buildBpsimData) to embed at definitions
+   *  level inside `<bpmn:extensionElements>` — the arrangement the BPSim spec
+   *  defines, so one .bpmn file carries the process AND its simulation model.
+   *  Its `elementRef`s must be in `bpmnRefId` form to resolve against this file. */
+  bpsimXml?: string;
+}
+
+export function buildBpmnXml(data: DiagramData, diagramName: string, opts: BpmnExportOpts = {}): string {
   const elements = (data.elements ?? []).filter((e) => !["uml-pain-point", "uml-issue", "review-comment"].includes(e.type));
   const connectors = data.connectors ?? [];
   const byId = new Map(elements.map((e) => [e.id, e] as const));
@@ -244,7 +263,17 @@ export function buildBpmnXml(data: DiagramData, diagramName: string): string {
     + ` xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"`
     + ` xmlns:di="http://www.omg.org/spec/DD/20100524/DI"`
     + ` xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"`
+    + (opts.bpsimXml ? ` xmlns:bpsim="http://www.bpsim.org/schemas/1.0"` : "")
     + ` id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn"${attr("name", diagramName)}>\n`;
+
+  // Simulation model, per the BPSim spec: a BPSimData block inside the
+  // definitions-level <extensionElements>. Tools that don't know BPSim ignore
+  // extensions, so the file still opens as plain BPMN everywhere.
+  const simExt = opts.bpsimXml
+    ? `  <bpmn:extensionElements>\n`
+      + opts.bpsimXml.split("\n").map((l) => (l ? `    ${l}` : l)).join("\n") + "\n"
+      + `  </bpmn:extensionElements>\n`
+    : "";
 
   let body = "";
   let planeRef: string;
@@ -284,5 +313,5 @@ export function buildBpmnXml(data: DiagramData, diagramName: string): string {
     + `    </bpmndi:BPMNPlane>\n`
     + `  </bpmndi:BPMNDiagram>\n`;
 
-  return header + body + di + `</bpmn:definitions>\n`;
+  return header + simExt + body + di + `</bpmn:definitions>\n`;
 }

@@ -58,6 +58,7 @@ import { AnimateOverlay } from "@/app/components/canvas/AnimateOverlay";
 import type { RiskCatalogItem } from "@/app/components/canvas/RiskControlSection";
 import { getRiskControl } from "@/app/lib/diagram/riskControl";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
+import { clearSimData } from "@/app/lib/simulation/clearSimData";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 import { featureVars, tonesFor } from "@/app/lib/theme/featureColors";
 import { NUMBERABLE_TYPES } from "@/app/lib/numbering/renumber";
@@ -1416,6 +1417,10 @@ export function DiagramEditor({
   const [assistEnabled, setAssistEnabled] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
   const [showAnimate, setShowAnimate] = useState(false);
+  // SuperAdmin: wipe every simulation annotation on this diagram, for repeat
+  // testing of Fill-missing / seeding from a clean slate.
+  const [confirmClearSim, setConfirmClearSim] = useState(false);
+  const [clearSimMsg, setClearSimMsg] = useState<string | null>(null);
   // BPMN and Standard Flowchart both use the 2-phase Plan panel (plan → edit →
   // apply deterministic layout). Other types use the legacy one-shot AI panel.
   const usesPlanPanel = diagramType === "bpmn" || diagramType === "flowchart";
@@ -3344,8 +3349,10 @@ export function DiagramEditor({
         return;
       }
       if (format === "bpmn") {
-        const { buildBpmnXml } = await import("@/app/lib/diagram/bpmn/exportBpmnXml");
-        setPreviewPayload({ kind: "bpmn", title: `${diagramName}.bpmn`, text: buildBpmnXml(data, diagramName), downloadName: `${diagramName}.bpmn`, downloadMime: "application/xml" });
+        // Carries the simulation model too (embedded BPSim), so the .bpmn is a
+        // complete picture of the process rather than structure alone.
+        const { buildBpmnXmlWithSim } = await import("@/app/lib/simulation/bpsim/exportBpmnWithSim");
+        setPreviewPayload({ kind: "bpmn", title: `${diagramName}.bpmn`, text: buildBpmnXmlWithSim(data, diagramName), downloadName: `${diagramName}.bpmn`, downloadMime: "application/xml" });
       }
     } catch { /* preview is best-effort */ }
   }
@@ -3474,8 +3481,8 @@ export function DiagramEditor({
 
   // Export standard OMG BPMN 2.0 XML (.bpmn) — opens in Camunda / bpmn.io / etc.
   async function handleExportBpmn() {
-    const { buildBpmnXml } = await import("@/app/lib/diagram/bpmn/exportBpmnXml");
-    const xml = buildBpmnXml(data, diagramName);
+    const { buildBpmnXmlWithSim } = await import("@/app/lib/simulation/bpsim/exportBpmnWithSim");
+    const xml = buildBpmnXmlWithSim(data, diagramName);
     const blob = new Blob([xml], { type: "application/xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -5344,6 +5351,15 @@ export function DiagramEditor({
                     ◈ Simulator
                   </button>
                 )}
+                {supportsSimulator && isActingAdmin && (
+                  <button
+                    onClick={() => { setClearMenuOpen(false); setConfirmClearSim(true); }}
+                    className="w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50"
+                    title="SuperAdmin only — delete every simulation annotation on this diagram (cycle times, teams, arrivals, branch %s) so it can be re-tested from a clean slate"
+                  >
+                    🗑 Clear simulation data
+                  </button>
+                )}
                 {data.elements.length > 0 && (
                   <button
                     onClick={() => { setClearMenuOpen(false); setShowAnimate(true); }}
@@ -5899,6 +5915,39 @@ export function DiagramEditor({
               return count;
             }}
             onApplyData={(next) => setData(next)}
+          />
+        )}
+
+        {confirmClearSim && (
+          <ConfirmDialog
+            title="Clear all simulation data?"
+            message={
+              `This deletes EVERY simulation annotation on "${diagramName}" — cycle times, arrival rates, ` +
+              `team assignments, timer delays, boundary triggers and gateway branch %s.\n\n` +
+              `The diagram itself (shapes, flows, labels) is untouched, but this CANNOT be undone ` +
+              `— it also resets the undo history.`
+            }
+            confirmLabel="Clear simulation data"
+            cancelLabel="Cancel"
+            destructive
+            onConfirm={() => {
+              const { data: cleared, cleared: n } = clearSimData(data);
+              setData(cleared);
+              setConfirmClearSim(false);
+              setClearSimMsg(n > 0
+                ? `Cleared ${n} simulation item(s) from "${diagramName}".`
+                : "This diagram had no simulation data to clear.");
+            }}
+            onCancel={() => setConfirmClearSim(false)}
+          />
+        )}
+
+        {clearSimMsg && (
+          <AlertDialog
+            title="Simulation data"
+            message={clearSimMsg}
+            tone="info"
+            onClose={() => setClearSimMsg(null)}
           />
         )}
 

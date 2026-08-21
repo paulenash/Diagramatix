@@ -17,6 +17,7 @@ import type { ScenarioRunConfig } from "@/app/lib/simulation/types";
 import { buildBpsimData } from "@/app/lib/simulation/bpsim/exportBpsim";
 import { parseBpsimScenarios } from "@/app/lib/simulation/bpsim/importBpsim";
 import { diagramToBpsimScenario, identityIdMap } from "@/app/lib/simulation/bpsim/diagramBpsim";
+import { bpmnRefId } from "@/app/lib/diagram/bpmn/exportBpmnXml";
 import { applyBpsimToDiagram } from "@/app/lib/simulation/bpsim/applyBpsimToDiagram";
 import type { BpsimScenario } from "@/app/lib/simulation/bpsim/types";
 import { MatrixButton } from "./matrix/MatrixChrome";
@@ -49,6 +50,9 @@ export function BpsimInterchange({
     const scenario = diagramToBpsimScenario(data, {
       name: diagramName, calendars,
       horizon: runCfg?.horizon, warmUp: runCfg?.warmUp, replication: runCfg?.replications,
+      // Reference elements by the same ids the .bpmn exporter emits, so this
+      // file and a .bpmn export of the same diagram form a resolvable pair.
+      refId: bpmnRefId,
     });
     const xml = buildBpsimData([scenario], runCfg?.clockUnit ?? "minute");
     const blob = new Blob([xml], { type: "application/xml" });
@@ -76,7 +80,10 @@ export function BpsimInterchange({
       // Richest scenario (most parameterised elements).
       const scenario = scenarios.reduce((a, b) => (Object.keys(b.elements).length > Object.keys(a.elements).length ? b : a));
       const refs = Object.keys(scenario.elements);
-      const matched = refs.filter((ref) => data.elements.some((el) => el.id === ref) || data.connectors.some((c) => c.id === ref)).length;
+      // Count matches through the SAME map the apply uses, so a file whose refs
+      // are in BPMN-id form (the aligned export) isn't misreported as 0-matched.
+      const ids = identityIdMap(data);
+      const matched = refs.filter((ref) => ids[ref] !== undefined).length;
       setPending({ name: file.name, scenario, total: refs.length, matched, scenarioCount: scenarios.length });
     } catch {
       setErr("Couldn't read that file as BPSim XML.");
