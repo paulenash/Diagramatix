@@ -103,6 +103,18 @@ export function assembleFromDiagram(
     }
     return undefined;
   };
+  /** The team NAME for an element by its nearest lane/pool LABEL (how teams are
+   *  named + how teamCalendars is keyed), for elements that carry no own teamId. */
+  const laneLabelTeamOf = (el: DiagramElement): string | undefined => {
+    let cur = el.parentId ? byId.get(el.parentId) : undefined;
+    const seen = new Set<string>();
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      if (cur.type === "lane" || cur.type === "pool") return (cur.label || "").trim() || undefined;
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    return undefined;
+  };
   /** Nearest ancestor EP — the scope a body node belongs to. */
   const scopeOf = (el: DiagramElement): string | undefined => {
     let cur = el.parentId ? byId.get(el.parentId) : undefined;
@@ -228,6 +240,23 @@ export function assembleFromDiagram(
       if (teamId) teamIds.add(teamId);
     } else if (kind === "delay") {
       node.delay = sim.delay ?? { kind: "fixed", value: 0 };
+      // Timer-delay semantics from the label parse (autofill) or explicit params:
+      //   "until"   → wait to a wall-clock time (delay ignored)
+      //   "working" → count `delay` only during working hours; the calendar is
+      //               the timer's own (calendarId) or its lane team's calendar.
+      if (sim.delayMode === "until" && sim.delayUntil) {
+        node.delayMode = "until";
+        node.delayUntil = sim.delayUntil;
+      } else if (sim.delayMode === "working") {
+        node.delayMode = "working";
+        // Working hours = the timer's own calendar (calendarId) or its lane
+        // team's. teamCalendars is keyed by team NAME (the lane label), so
+        // resolve the team the same way autofill does — by the lane's label.
+        const teamName = sim.teamId ?? laneLabelTeamOf(el);
+        const teamCal = teamName ? opts?.teamCalendars?.[teamName] : undefined;
+        const cal = (sim.calendarId ? opts?.calendarsById?.[sim.calendarId] : undefined) ?? teamCal;
+        if (cal) node.calendar = cal;
+      }
       if (isInlineCompThrow(el)) {
         node.compensationThrow = true; // fires armed handlers on entry
       } else {

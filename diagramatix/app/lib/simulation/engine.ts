@@ -19,7 +19,7 @@ import { sample } from "./distributions";
 import { compileExpr, type CompiledExpr, type Value } from "./expr";
 import type { SimNetwork, SimNode, SimEdge, EventSub, EventChannel } from "./model";
 import { SECONDS_PER_UNIT, type SimRunConfig, type PlannedIntervention } from "./types";
-import { isOpenAt, nextOpenAt, rateAt, boundariesIn } from "./calendar";
+import { isOpenAt, nextOpenAt, rateAt, boundariesIn, advanceWorkingClock, nextTimeOfDayClock } from "./calendar";
 import type { RepStats, NodeStat } from "./statistics";
 
 type EventType = "GENERATE" | "SERVICE_END" | "RESUME" | "EVENT_TRIGGER" | "INTERVENTION" | "CALENDAR_CAP" | "BOUNDARY_TRIGGER" | "CATCH_TIMEOUT";
@@ -324,13 +324,28 @@ export class Engine {
         if (node.compensationThrow) return this.fireCompensation(token, node);
         if (node.throw) return this.enterThrow(token, node);
         if (node.catch) return this.enterCatch(token, node);
-        this.calendar.schedule(this.clock + (node.delay ? sample(node.delay, this.rng) : 0), { type: "RESUME", nodeId, tokenId: token.id });
+        this.calendar.schedule(this.delayResumeAt(node), { type: "RESUME", nodeId, tokenId: token.id });
         return;
       case "task": return this.startOrQueue(token, node);
       case "gateway": return this.routeGateway(token, node);
       case "subprocess": return this.enterSubprocess(token, node);
       case "source": return this.moveNext(token, node);
     }
+  }
+
+  /** When a timer delay resumes: an absolute wall-clock time ("until 3pm"),
+   *  working-time advanced through the node's calendar ("10 working days"), or
+   *  plain elapsed time (the default). */
+  private delayResumeAt(node: SimNode): number {
+    const unit = this.config.clockUnit;
+    if (node.delayMode === "until" && node.delayUntil) {
+      return nextTimeOfDayClock(this.clock, node.delayUntil, unit);
+    }
+    const d = node.delay ? sample(node.delay, this.rng) : 0;
+    if (node.delayMode === "working" && node.calendar) {
+      return advanceWorkingClock(this.clock, d, node.calendar, unit);
+    }
+    return this.clock + d;
   }
 
   // ── Subprocess scopes: recurse into the inline body, with loop / MI ──────

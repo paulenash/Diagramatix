@@ -44,6 +44,11 @@ export interface ElementSimParams {
   resourceUnits?: number;
   // delay / timer
   delay?: SimDist;
+  // How the delay magnitude is interpreted (default "elapsed" when absent):
+  //   "working" → `delay` counts only during working hours (the lane's calendar)
+  //   "until"   → the token waits until `delayUntil` (wall-clock "HH:MM"), `delay` ignored
+  delayMode?: "elapsed" | "working" | "until";
+  delayUntil?: string;
   // boundary catch event on an activity: races the host's cycle time. `trigger`
   // = time from host-start until the event fires; `fireProb` (0..1, default 1) =
   // chance it fires at all this execution (e.g. a boundary error at ~5%).

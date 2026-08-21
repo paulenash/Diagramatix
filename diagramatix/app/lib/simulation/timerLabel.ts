@@ -10,10 +10,9 @@
  * simulator's default clock unit), working time using an 8h day / 5-day week.
  * Absolute times are returned as 24h "HH:MM". Returns null when nothing parses.
  *
- * NOTE the engine currently advances a delay as plain elapsed time, so the
- * "working" magnitude is filled as a fixed duration and the "until" tier is
- * recognised but not yet applied — calendar-gated + absolute delays are a
- * follow-up in the engine. The parser is complete so that work is data-ready.
+ * autofill stores the tier on sim.delayMode ("working" / "until"); the engine
+ * then advances a working delay through the lane's calendar and an "until" delay
+ * to the next wall-clock occurrence of the time (see engine delayResumeAt).
  */
 
 export type TimerParse =

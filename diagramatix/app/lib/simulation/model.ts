@@ -86,6 +86,11 @@ export interface SimNode {
   units?: number;        // resource Quantity (default 1)
   // delay
   delay?: SimDist;
+  // Timer-delay interpretation: "working" advances `delay` only through this
+  // node's `calendar` (open hours); "until" waits to the wall-clock `delayUntil`
+  // ("HH:MM"), ignoring `delay`. Absent → plain elapsed time.
+  delayMode?: "working" | "until";
+  delayUntil?: string;
   // boundary catch events mounted on this activity (task / subprocess), armed
   // while the host is in service (see BoundaryEvent).
   boundaryEvents?: BoundaryEvent[];

@@ -38,7 +38,7 @@ describe("parseTimerLabel", () => {
     expect(parseTimerLabel("")).toBeNull();
     expect(timerDelayMinutes("Wait 3 hours")).toBe(180);
     expect(timerDelayMinutes("10 working days")).toBe(4800);
-    expect(timerDelayMinutes("until 3pm")).toBeNull(); // absolute tier not fillable yet
+    expect(timerDelayMinutes("until 3pm")).toBeNull(); // "until" has no minute magnitude (engine uses delayUntil)
   });
 });
 

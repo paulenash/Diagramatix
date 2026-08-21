@@ -15,7 +15,7 @@
 
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { getSimParams, type ElementSimParams, type SimDist } from "@/app/lib/diagram/simParams";
-import { timerDelayMinutes } from "./timerLabel";
+import { parseTimerLabel } from "./timerLabel";
 
 const DEF_ARRIVAL: SimDist = { kind: "exponential", mean: 10 };
 const DEF_CYCLE: SimDist = { kind: "triangular", min: 3, mode: 5, max: 8 };
@@ -71,11 +71,15 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
       }
       if (DELAY.has(el.type) && !sim.delay) {
         // Read the duration straight off the label ("Wait 3 hours", "7 days",
-        // "10 working days") when it carries one; fall back to the flat default.
-        // Value is in minutes (the default clock unit); working time uses an 8h
-        // day. See timerLabel.ts for the tier semantics + engine limitations.
-        const mins = timerDelayMinutes(el.label ?? "");
-        sim.delay = mins !== null ? { kind: "fixed", value: Math.round(mins * 100) / 100 } : DEF_DELAY;
+        // "10 working days", "until 3pm") when it carries one; else the flat
+        // default. Values are in minutes (the default clock unit); the engine
+        // honours delayMode (working = calendar-gated, until = wall-clock).
+        const p = parseTimerLabel(el.label ?? "");
+        const round = (n: number) => Math.round(n * 100) / 100;
+        if (p?.mode === "until") { sim.delay = { kind: "fixed", value: 0 }; sim.delayMode = "until"; sim.delayUntil = p.timeOfDay; }
+        else if (p?.mode === "working") { sim.delay = { kind: "fixed", value: round(p.minutes) }; sim.delayMode = "working"; }
+        else if (p?.mode === "elapsed") { sim.delay = { kind: "fixed", value: round(p.minutes) }; }
+        else { sim.delay = DEF_DELAY; }
         auto.add("delay"); filled++; changed = true;
       }
     }
@@ -121,6 +125,9 @@ export function unfillSimulation(data: DiagramData): { data: DiagramData; cleare
     const next = { ...sim } as Record<string, unknown>;
     for (const key of sim.autofilled) {
       if (next[key] !== undefined) { delete next[key]; cleared++; }
+      // delayMode / delayUntil are satellites of an auto-filled delay — clear
+      // them with it so an unfilled timer doesn't keep a stale working/until tag.
+      if (key === "delay") { delete next.delayMode; delete next.delayUntil; }
     }
     delete next.autofilled;
     return { ...el, properties: { ...el.properties, sim: next as ElementSimParams } };

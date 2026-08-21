@@ -168,6 +168,41 @@ export function nextOpenAt(t: number, cal: WorkCalendar, clockUnit: ClockUnit): 
   return weekStart + weekLen + windows[0].s;
 }
 
+/**
+ * Advance `duration` clock-units of WORKING (open) time from `t`, returning the
+ * clock time at which that much open time has elapsed — closed windows (nights,
+ * weekends, lunch) don't count. An always-open calendar (no windows) degrades to
+ * plain elapsed time. Used for "working-time" timer delays ("10 working days").
+ */
+export function advanceWorkingClock(t: number, duration: number, cal: WorkCalendar, clockUnit: ClockUnit): number {
+  if (duration <= 0) return t;
+  const windows = intervalsToClock(cal, clockUnit);
+  if (windows.length === 0) return t + duration; // always open → elapsed
+  const weekLen = weekLengthClock(clockUnit);
+  let cur = t, remaining = duration, guard = 0;
+  while (remaining > 1e-9 && guard++ < 200000) {
+    const tow = timeOfWeek(cur, weekLen);
+    const w = windows.find((win) => tow >= win.s && tow < win.e);
+    if (!w) { cur = nextOpenAt(cur, cal, clockUnit); continue; } // jump over the closed gap
+    const end = (cur - tow) + w.e; // absolute end of the current open window (w.e > tow)
+    const avail = end - cur;
+    if (avail >= remaining) return cur + remaining;
+    remaining -= avail;
+    cur = end;
+  }
+  return cur;
+}
+
+/** The next clock time ≥ `t` whose wall-clock time-of-day equals "HH:MM" (today
+ *  if `t` is at/before it, else tomorrow). For absolute "until 3pm" timer delays. */
+export function nextTimeOfDayClock(t: number, hhmm: string, clockUnit: ClockUnit): number {
+  const dayLen = 86400 / SECONDS_PER_UNIT[clockUnit];
+  const target = hhmmToSeconds(hhmm) / SECONDS_PER_UNIT[clockUnit];
+  const tod = ((t % dayLen) + dayLen) % dayLen;
+  const dayStart = t - tod;
+  return tod <= target + 1e-9 ? dayStart + target : dayStart + dayLen + target;
+}
+
 /** A staffing transition on the calendar — schedule capacity full/0 at each. */
 export interface CalendarBoundary {
   t: number;
