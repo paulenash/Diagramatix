@@ -87,6 +87,76 @@ describe("editor edits — pool / lane", () => {
     expect(v, `\n  - ${v.join("\n  - ")}`).toEqual([]);
   });
 
+  it("T2842 — adding the first lane adopts a pool-parented EP into the new lane", () => {
+    // An expanded subprocess added to a pool BEFORE it had lanes is parented to
+    // the pool. Adding a lane (which fills the pool body) must re-home the EP
+    // into that lane — otherwise nesting-aware consumers (the simulator replay
+    // backdrop, exporters) can't tell it sits inside the lane and paint over it.
+    const d0: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "p", type: "pool", x: 0, y: 0, width: 1000, height: 600, label: "Pool", properties: {} },
+        { id: "ep", type: "subprocess-expanded", parentId: "p", x: 120, y: 120, width: 400, height: 150, label: "EP", properties: {} },
+        { id: "kid", type: "task", parentId: "ep", x: 160, y: 160, width: 90, height: 50, label: "inside EP", properties: {} },
+      ],
+      connectors: [],
+    };
+    const d = dispatch(d0, { type: "ADD_LANE", payload: { poolId: "p" } });
+    const lane = d.elements.find((e) => e.type === "lane" && e.parentId === "p")!;
+    expect(lane, "a lane should have been created").toBeTruthy();
+    // The EP is now a child of the lane, not the pool.
+    expect(at(d, "ep").parentId, "EP should be adopted into the lane").toBe(lane.id);
+    // Its own descendant stays parented to the EP (only pool-DIRECT children move).
+    expect(at(d, "kid").parentId, "EP's child stays under the EP").toBe("ep");
+  });
+
+  it("T2843 — dragging a lane boundary re-homes elements that cross into the other lane", () => {
+    // Two stacked lanes; a task sits in the UPPER lane near the divider. Dragging
+    // the divider UP past the task's centre must re-parent it to the LOWER lane —
+    // the element didn't move, but which lane owns it did.
+    const d0: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "P", type: "pool", x: 0, y: 0, width: 520, height: 200, label: "P", properties: {} },
+        { id: "U", type: "lane", parentId: "P", x: 40, y: 0, width: 480, height: 100, label: "Upper", properties: {} },
+        { id: "L", type: "lane", parentId: "P", x: 40, y: 100, width: 480, height: 100, label: "Lower", properties: {} },
+        { id: "t", type: "task", parentId: "U", x: 200, y: 70, width: 90, height: 50, label: "T", properties: {} }, // centre y = 95, in Upper
+      ],
+      connectors: [],
+    };
+    expect(at(d0, "t").parentId, "starts in Upper").toBe("U");
+    // Drag the U|L divider up by 30 → divider now at y=70, task centre (95) is below it.
+    const d = dispatch(d0, { type: "MOVE_LANE_BOUNDARY", payload: { aboveLaneId: "U", belowLaneId: "L", dy: -30 } });
+    expect(at(d, "t").parentId, "task re-homed into Lower after boundary crossed it").toBe("L");
+    expect(at(d, "t").y, "the task itself did not move").toBe(70);
+  });
+
+  it("T2844 — a Start / End event dropped inside an EP is unlabelled", () => {
+    const d0: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "ep", type: "subprocess-expanded", x: 100, y: 100, width: 500, height: 300, label: "EP", properties: {} },
+      ],
+      connectors: [],
+    };
+    const d = dispatch(d0, { type: "ADD_ELEMENT", payload: { symbolType: "start-event", position: { x: 300, y: 250 } } });
+    const start = d.elements.find((e) => e.type === "start-event")!;
+    expect(start.parentId, "start adopted by the EP").toBe("ep");
+    expect(start.label, "start inside an EP is unlabelled").toBe("");
+    const d2 = dispatch(d, { type: "ADD_ELEMENT", payload: { symbolType: "end-event", position: { x: 450, y: 250 } } });
+    const end = d2.elements.find((e) => e.type === "end-event")!;
+    expect(end.parentId, "end adopted by the EP").toBe("ep");
+    expect(end.label, "end inside an EP is unlabelled").toBe("");
+  });
+
+  it("T2844 — a Start event dropped OUTSIDE any EP keeps its default label", () => {
+    const d0: DiagramData = { viewport: { x: 0, y: 0, zoom: 1 }, elements: [], connectors: [] };
+    const d = dispatch(d0, { type: "ADD_ELEMENT", payload: { symbolType: "start-event", position: { x: 300, y: 300 } } });
+    const start = d.elements.find((e) => e.type === "start-event")!;
+    expect(start.parentId, "no EP parent").toBeFalsy();
+    expect(start.label, "keeps its default label in free space").toBe("Start");
+  });
+
   it("swapping two lanes keeps children with their lane and routing clean", () => {
     const d0 = build(POOL.elements, POOL.connections);
     const l1y0 = at(d0, "l1").y, l2y0 = at(d0, "l2").y;

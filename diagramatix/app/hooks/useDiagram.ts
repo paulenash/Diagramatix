@@ -596,6 +596,48 @@ function getAllDescendantIds(elements: DiagramElement[], containerId: string): S
 }
 
 /**
+ * Re-home lane-scoped flow elements into the lane that geometrically contains
+ * their centre. A flow element belongs to whichever pool lane (deepest / smallest
+ * on nesting) encloses it; that membership goes stale whenever lanes are added,
+ * split, or a boundary divider is dragged. Only elements currently parented to a
+ * LANE or a POOL are reconsidered — an EP's own children, boundary events, and
+ * anything owned by a subprocess / composite-state keep their container. Pools
+ * without lanes are left untouched (nothing to adopt into). Pure.
+ */
+function reconcileLaneMembership(elements: DiagramElement[]): DiagramElement[] {
+  const lanes = elements.filter((e) => e.type === "lane");
+  if (lanes.length === 0) return elements;
+  const byId = new Map(elements.map((e) => [e.id, e]));
+  const poolOf = (el: DiagramElement | undefined): string | undefined => {
+    for (let cur = el, i = 0; cur && i < 24; i++) {
+      if (cur.type === "pool") return cur.id;
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    return undefined;
+  };
+  let changed = false;
+  const out = elements.map((el) => {
+    if (el.type === "lane" || el.type === "pool") return el;
+    if (el.boundaryHostId) return el; // boundary events follow their host, not a lane
+    const parent = el.parentId ? byId.get(el.parentId) : undefined;
+    // Only reconcile elements hanging directly off a lane or a pool; anything
+    // parented to an EP / subprocess / composite-state belongs to that owner.
+    if (!parent || (parent.type !== "lane" && parent.type !== "pool")) return el;
+    const pool = poolOf(el);
+    if (!pool) return el;
+    const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+    // Half-open vertical bounds so an element whose centre lands exactly on a
+    // divider is assigned to the lower lane (single, deterministic match).
+    const host = lanes
+      .filter((ln) => poolOf(ln) === pool && cx >= ln.x && cx <= ln.x + ln.width && cy >= ln.y && cy < ln.y + ln.height)
+      .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]; // deepest / smallest lane wins
+    if (host && host.id !== el.parentId) { changed = true; return { ...el, parentId: host.id }; }
+    return el;
+  });
+  return changed ? out : elements;
+}
+
+/**
  * Find the snapped group containing the given element.
  * A snapped group = set of chevron/chevron-collapsed elements where each overlaps
  * horizontally by ~10px and has ≥75% vertical overlap with at least one neighbour.
@@ -3323,7 +3365,25 @@ function tracePerActionRouteDiff(
 /** The diagram editor's pure state transition. Exported so tests can drive
  *  editor actions (move / align / insert-space / re-route …) without React and
  *  assert invariants on the result — the characterisation net for manual edits. */
+// Actions that change lane structure or bounds — after any of these, an
+// element's owning lane can go stale, so the wrapper re-derives lane membership
+// from geometry (see reconcileLaneMembership). Kept in one place so every
+// lane-adding path (palette Pool/Lane drop, ADD_LANE, ADD_SUBLANE) and the
+// divider drag are covered uniformly instead of per-return.
+const LANE_RECONCILE_ACTIONS = new Set<Action["type"]>([
+  "ADD_ELEMENT", "ADD_LANE", "ADD_SUBLANE", "MOVE_LANE_BOUNDARY",
+]);
+
 export function reducer(state: DiagramData, action: Action): DiagramData {
+  const next = reducerCore(state, action);
+  if (next !== state && LANE_RECONCILE_ACTIONS.has(action.type)) {
+    const reconciled = reconcileLaneMembership(next.elements);
+    if (reconciled !== next.elements) return { ...next, elements: reconciled };
+  }
+  return next;
+}
+
+function reducerCore(state: DiagramData, action: Action): DiagramData {
   if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
     console.log(`[TRACE reducer] action=${action.type}`);
   }
@@ -4018,6 +4078,15 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // Text annotations start already tight around their default label
       if (newEl.type === "text-annotation") {
         newEl = autoResizeTextAnnotation(newEl);
+      }
+
+      // A Start / End event dropped inside an Expanded Subprocess carries no
+      // label — the EP's own name is the sub-process boundary, and BPMN
+      // sub-process start/end nodes are conventionally unnamed. Only the default
+      // is blanked; a caller-supplied initial.label is respected.
+      if ((newEl.type === "start-event" || newEl.type === "end-event") && newEl.parentId && initial?.label === undefined) {
+        const parent = state.elements.find((e) => e.id === newEl.parentId);
+        if (parent?.type === "subprocess-expanded") newEl = { ...newEl, label: "" };
       }
 
       // EP boundary-aware growth: if the new element's parent is an
@@ -9264,6 +9333,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       }
       elements = rescaleSubs(elements, aboveLaneId, above.y, newAboveH, above.x, above.width);
       elements = rescaleSubs(elements, belowLaneId, newBelowY, newBelowH, below.x, below.width);
+      // (Lane membership is re-derived centrally by the reducer wrapper — a
+      // divider move can push an element's centre into the adjacent lane.)
 
       // Recompute any connector whose source / target moved during the
       // redistribute (sublane shifts can drag boundary events / tasks
