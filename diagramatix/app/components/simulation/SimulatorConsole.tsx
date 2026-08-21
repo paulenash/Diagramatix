@@ -14,12 +14,13 @@ import { MatrixRain } from "./matrix/MatrixRain";
 import { MatrixButton, MatrixPanel } from "./matrix/MatrixChrome";
 import { ReplayView } from "./replay/ReplayView";
 import { SimulationHeatmap } from "./results/SimulationHeatmap";
+import { TokenTraceTable } from "./results/TokenTraceTable";
 import { TeamLibraryManager } from "./TeamLibraryManager";
 import { CalendarLibraryManager, type CalendarRow } from "./CalendarLibraryManager";
 import { BpsimInterchange } from "./BpsimInterchange";
 import { StudyManager } from "./StudyManager";
 import { SimDataPanel } from "./SimDataPanel";
-import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
+import { defaultReplayConfig, buildReplay } from "@/app/lib/simulation/replaySource";
 import { autofillSimulation, unfillSimulation } from "@/app/lib/simulation/autofill";
 import type { ScenarioRunConfig, WorkCalendar } from "@/app/lib/simulation/types";
 
@@ -32,7 +33,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
   // project name + a variant selector across all its processes for comparison.
   // Diagram mode = entered from one diagram: single-process, just that name.
   const projectMode = !diagramId;
-  const [mode, setMode] = useState<"home" | "replay" | "heatmap">("home");
+  const [mode, setMode] = useState<"home" | "replay" | "heatmap" | "table">("home");
   const [teamCapacities, setTeamCapacities] = useState<Record<string, number>>({});
   // Working calendars: the library (from the Calendars panel) + the team→calendar
   // assignment (from the Teams panel). Resolved into the maps the assembler wants
@@ -58,7 +59,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
   // rather than a short default window. One replication + no warm-up so every
   // token is shown from t=0.
   const [lastRunCfg, setLastRunCfg] = useState<ScenarioRunConfig | null>(null);
-  const replayCfg = lastRunCfg ? { ...defaultReplayConfig(lastRunCfg.seed ?? 1), ...lastRunCfg, replications: 1, warmUp: 0 } : defaultReplayConfig();
+  const replayCfg = useMemo(() => lastRunCfg ? { ...defaultReplayConfig(lastRunCfg.seed ?? 1), ...lastRunCfg, replications: 1, warmUp: 0 } : defaultReplayConfig(), [lastRunCfg]);
 
   // ── Variant selector ─────────────────────────────────────────────────────
   // For a comparison study the panels (Simulation Data, missing-data highlight,
@@ -123,6 +124,12 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
     applyActive(cleared);
     return n;
   }, [activeData, applyActive]);
+  // The trace table runs one traced replication (like the replay) — built only
+  // while the table is open so it costs nothing otherwise.
+  const tableReplay = useMemo(
+    () => mode === "table" ? buildReplay(activeData, replayCfg, teamCapacities, { rootId: activeId ?? diagramId, byId: diagramsById, teamCalendars, calendarsById }) : null,
+    [mode, activeData, replayCfg, teamCapacities, activeId, diagramId, diagramsById, teamCalendars, calendarsById],
+  );
   const canEditActive = isOpen ? !!onApplyData : !!variantData;
 
   return (
@@ -183,6 +190,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
                 <div className="flex flex-col gap-2">
                   <MatrixButton onClick={() => setMode("replay")}>▶ Launch replay</MatrixButton>
                   <MatrixButton onClick={() => setMode("heatmap")}>▦ Heatmap</MatrixButton>
+                  <MatrixButton onClick={() => setMode("table")}>▤ Trace table</MatrixButton>
                 </div>
               </MatrixPanel>
               <MatrixPanel title="Calendars — working hours" className="md:col-span-3">
@@ -227,9 +235,13 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
           <main className="flex-1 overflow-hidden p-4">
             <ReplayView data={activeData} colorConfig={colorConfig} config={replayCfg} teamCapacities={teamCapacities} teamCalendars={teamCalendars} calendarsById={calendarsById} diagramId={activeId ?? diagramId} diagramsById={diagramsById} onClose={() => setMode("home")} />
           </main>
-        ) : (
+        ) : mode === "heatmap" ? (
           <main className="flex-1 overflow-hidden p-4">
             <SimulationHeatmap data={activeData} teamCapacities={teamCapacities} teamCalendars={teamCalendars} calendarsById={calendarsById} diagramId={activeId ?? diagramId} diagramsById={diagramsById} onClose={() => setMode("home")} />
+          </main>
+        ) : (
+          <main className="flex-1 overflow-hidden p-4">
+            {tableReplay && <TokenTraceTable replay={tableReplay} clockUnit={replayCfg.clockUnit} onClose={() => setMode("home")} />}
           </main>
         )}
       </div>

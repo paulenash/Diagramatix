@@ -11,6 +11,7 @@ import { spliceLinkedSubprocesses } from "./spliceLinks";
 import type { SimNetwork } from "./model";
 import { getSimParams } from "@/app/lib/diagram/simParams";
 import { DEFAULT_RUN_CONFIG, type SimRunConfig } from "./types";
+import type { NodeMeta } from "./tokenTable";
 
 export interface ReplayData {
   trace: TraceEvent[];
@@ -18,6 +19,12 @@ export interface ReplayData {
   /** Assembled node id → team id, so the live stats credit the right teams
    *  (including those inside linked/expanded subprocesses). */
   nodeTeam: Map<string, string>;
+  /** Assembled node id → label/kind/team, for the token-trace table columns. */
+  nodeMeta: Map<string, NodeMeta>;
+}
+
+function nodeMetaOf(net: SimNetwork): Map<string, NodeMeta> {
+  return new Map(net.nodes.map((n) => [n.id, { label: n.label ?? n.id, kind: n.kind, team: n.teamId }]));
 }
 
 /** Optional project diagrams so linked (collapsed) subprocesses are flattened in
@@ -63,7 +70,7 @@ export function buildReplay(
   const net = assembleForReplay(data, teamCapacities, opts);
   const e = new Engine(net, config, undefined, { trace: true, maxTrace: 50000 });
   e.run();
-  return { trace: e.getTrace(), durationSim: endOf(e.getTrace(), config.horizon), nodeTeam: nodeTeamOf(net) };
+  return { trace: e.getTrace(), durationSim: endOf(e.getTrace(), config.horizon), nodeTeam: nodeTeamOf(net), nodeMeta: nodeMetaOf(net) };
 }
 
 /**
@@ -86,5 +93,5 @@ export function forkReplay(
   e.runUntil(atSimT);
   e.applyIntervention(iv);
   e.runUntil(config.horizon);
-  return { trace: e.getTrace(), durationSim: endOf(e.getTrace(), config.horizon), nodeTeam: nodeTeamOf(net) };
+  return { trace: e.getTrace(), durationSim: endOf(e.getTrace(), config.horizon), nodeTeam: nodeTeamOf(net), nodeMeta: nodeMetaOf(net) };
 }
