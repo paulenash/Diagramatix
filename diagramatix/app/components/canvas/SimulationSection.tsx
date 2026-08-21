@@ -49,9 +49,17 @@ export function SimulationSection({
   const isEP = element.type === "subprocess-expanded";
   const isEventEP = isEP && element.properties?.subprocessType === "event";
   const isLane = element.type === "lane" || element.type === "pool";
-  const isSource = SOURCE_TYPES.has(element.type);
+  // A boundary catch event (raced against its host) and an inline message/signal/
+  // escalation/conditional catch/throw get their own controls, not the arrival
+  // block — so exclude them from isSource.
+  const CHANNEL_TYPES = new Set(["message", "signal", "escalation", "conditional"]);
+  const isBoundaryEvt = element.type === "intermediate-event" && !!element.boundaryHostId && element.eventType !== "compensation";
+  const isChannelEvt = element.type === "intermediate-event" && !element.boundaryHostId && !!element.eventType && CHANNEL_TYPES.has(element.eventType);
+  const isThrow = isChannelEvt && element.flowType === "throwing";
+  const isCatch = isChannelEvt && !isThrow;
+  const isSource = SOURCE_TYPES.has(element.type) && !isBoundaryEvt && !isChannelEvt;
   const isTask = TASK_TYPES.has(element.type) && !isEventEP; // event subs use their own controls
-  const applicable = isSource || isTask || isEventEP || isLane;
+  const applicable = isSource || isTask || isEventEP || isLane || isBoundaryEvt || isChannelEvt;
 
   return (
     <div className="border-t border-gray-200">
@@ -146,6 +154,64 @@ export function SimulationSection({
                 )}
               </div>
             </Field>
+          )}
+
+          {isBoundaryEvt && (
+            <>
+              <Field label="Trigger (time from host start until it fires)">
+                <DistributionInput value={sim.boundary?.trigger ?? defaultDist()} onChange={(trigger) => patch({ boundary: { ...sim.boundary, trigger } })} />
+              </Field>
+              <Field label="Fire probability (0–1, blank = always)">
+                <input
+                  type="number" min={0} max={1} step={0.05}
+                  className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded bg-white text-gray-900 [color-scheme:light]"
+                  value={sim.boundary?.fireProb ?? ""}
+                  onChange={(e) =>
+                    patch({ boundary: { ...sim.boundary, fireProb: e.target.value === "" ? undefined : Math.min(1, Math.max(0, parseFloat(e.target.value) || 0)) } })
+                  }
+                />
+              </Field>
+              <p className="text-[10px] text-gray-400">
+                Races the host&rsquo;s cycle time.{" "}
+                {element.properties?.interruptionType === "non-interrupting"
+                  ? "Non-interrupting: runs the boundary flow alongside; the activity keeps going."
+                  : "Interrupting: cancels the activity and diverts to the boundary flow."}
+              </p>
+            </>
+          )}
+
+          {isThrow && (
+            <Field label={`Throw channel (${element.eventType} name)`}>
+              <input
+                type="text"
+                className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded bg-white text-gray-900 [color-scheme:light]"
+                placeholder={element.label || "channel name"}
+                value={sim.channel ?? ""}
+                onChange={(e) => patch({ channel: e.target.value || undefined })}
+              />
+              <span className="text-[10px] text-gray-400">Releases catches waiting on the same {element.eventType} name.</span>
+            </Field>
+          )}
+
+          {isCatch && (
+            <>
+              <Field label={`Catch channel (${element.eventType} name)`}>
+                <input
+                  type="text"
+                  className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded bg-white text-gray-900 [color-scheme:light]"
+                  placeholder={element.label || "channel name"}
+                  value={sim.channel ?? ""}
+                  onChange={(e) => patch({ channel: e.target.value || undefined })}
+                />
+              </Field>
+              <Field label="Timeout / external arrival (blank = wait for a throw)">
+                <DistributionInput value={sim.catchTimeout} onChange={(catchTimeout) => patch({ catchTimeout })} />
+              </Field>
+              <p className="text-[10px] text-gray-400">
+                Blocks until a matching throw fires{sim.catchTimeout ? ", or the timeout elapses" : ""}.{" "}
+                {element.eventType === "message" ? "Message = 1:1 (buffered)." : "Signal = broadcast to all waiters."}
+              </p>
+            </>
           )}
 
           {isLane && (

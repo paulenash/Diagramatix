@@ -96,6 +96,7 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
   const keyframes = useMemo(() => {
     const m = new Map<string, { frames: Frame[]; endT: number }>();
     for (const ev of replay.trace) {
+      if (ev.kind === "fire") continue; // element-activation flash, not a token move
       let k = m.get(ev.tokenId);
       if (!k) { k = { frames: [], endT: ev.t }; m.set(ev.tokenId, k); }
       if (ev.kind === "exit") k.endT = ev.t;
@@ -104,6 +105,16 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
     }
     return m;
   }, [replay.trace]);
+
+  // Element-activation flashes: a boundary event that fired (red, 3 blinks) or an
+  // inline catch that was triggered by a throw (green, 2 blinks). Each is visible
+  // for a small slice of the run's sim-time around its instant.
+  const flashEvents = useMemo(
+    () => replay.trace
+      .filter((e) => e.kind === "fire" && e.nodeId)
+      .map((e) => ({ t: e.t, nodeId: e.nodeId as string, variant: e.variant ?? "boundary" })),
+    [replay.trace],
+  );
 
   // Connector id → its routed waypoints, so tokens can glide along the actual
   // sequence connectors between nodes.
@@ -330,6 +341,26 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
     arr.forEach((tk, k) => { const p = boundaryStackPos(node, tk.entryEdgeId, Math.min(k, 18)); liveTokens.push({ id: tk.id, x: p.x, y: p.y }); });
   }
 
+  // Flashes active at the current instant. Blink on/off across the window so a
+  // boundary fire pulses red 3× and a catch trigger pulses green 2×.
+  const flashWindow = Math.max(replay.durationSim * 0.02, 1e-6);
+  const flashOverlays: { key: string; node: NodePos; color: string; opacity: number }[] = [];
+  flashEvents.forEach((f, i) => {
+    if (simT < f.t || simT >= f.t + flashWindow) return;
+    const vid = visibleNodeId(f.nodeId, prefix);
+    const node = vid ? nodeById.get(vid) : undefined;
+    if (!node) return;
+    const e = (simT - f.t) / flashWindow; // 0..1 through the window
+    const blinks = f.variant === "boundary" ? 3 : 2;
+    const on = Math.floor(e * blinks * 2) % 2 === 0;
+    flashOverlays.push({
+      key: `${f.nodeId}-${f.t.toFixed(3)}-${i}`,
+      node,
+      color: f.variant === "boundary" ? "#ef4444" : "#22c55e",
+      opacity: on ? 0.95 : 0.1,
+    });
+  });
+
   function forkCapacity() {
     if (!forkTeam) return;
     setReplay(forkReplay(data, config, simT, { kind: "capacity", teamId: forkTeam, capacity: forkCap }, teamCapacities, replayOpts));
@@ -389,6 +420,11 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
                 ☾ {team} — {reason}
               </text>
             </g>
+          ))}
+          {flashOverlays.map((fo) => (
+            <rect key={fo.key} x={fo.node.x - 4} y={fo.node.y - 4} width={fo.node.w + 8} height={fo.node.h + 8}
+              rx={6} fill="none" stroke={fo.color} strokeWidth={3} opacity={fo.opacity}
+              style={{ filter: `drop-shadow(0 0 4px ${fo.color})` }} />
           ))}
           {liveTokens.map((tk) => (
             <circle key={tk.id} cx={tk.x} cy={tk.y} r={4} fill="#166534" stroke="#052e16" strokeWidth={1} style={{ filter: "drop-shadow(0 0 2px #052e16)" }} />

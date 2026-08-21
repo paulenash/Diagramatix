@@ -44,6 +44,16 @@ export interface ElementSimParams {
   resourceUnits?: number;
   // delay / timer
   delay?: SimDist;
+  // boundary catch event on an activity: races the host's cycle time. `trigger`
+  // = time from host-start until the event fires; `fireProb` (0..1, default 1) =
+  // chance it fires at all this execution (e.g. a boundary error at ~5%).
+  boundary?: { trigger?: SimDist; fireProb?: number };
+  // intermediate catch/throw synchronisation. `channel` names the signal/message
+  // (defaults to the element label); a THROW fires it, a CATCH blocks until it
+  // fires. `catchTimeout` (catch only) is a fallback / external-arrival release
+  // so a catch with no reachable throw still proceeds.
+  channel?: string;
+  catchTimeout?: SimDist;
   // expanded subprocess loop / multi-instance
   loop?: LoopParams;
   // event subprocess: how long after the parent scope starts its trigger fires

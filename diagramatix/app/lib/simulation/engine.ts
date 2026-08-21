@@ -17,17 +17,17 @@ import { ResourcePool, type PoolState, type QueuedRequest } from "./resourcePool
 import { makeRng, type Rng } from "./rng";
 import { sample } from "./distributions";
 import { compileExpr, type CompiledExpr, type Value } from "./expr";
-import type { SimNetwork, SimNode, SimEdge, EventSub } from "./model";
+import type { SimNetwork, SimNode, SimEdge, EventSub, EventChannel } from "./model";
 import { SECONDS_PER_UNIT, type SimRunConfig, type PlannedIntervention } from "./types";
 import { isOpenAt, nextOpenAt, rateAt, boundariesIn } from "./calendar";
 import type { RepStats, NodeStat } from "./statistics";
 
-type EventType = "GENERATE" | "SERVICE_END" | "RESUME" | "EVENT_TRIGGER" | "INTERVENTION" | "CALENDAR_CAP";
+type EventType = "GENERATE" | "SERVICE_END" | "RESUME" | "EVENT_TRIGGER" | "INTERVENTION" | "CALENDAR_CAP" | "BOUNDARY_TRIGGER" | "CATCH_TIMEOUT";
 /** Runtime form of a planned intervention carried on an INTERVENTION event.
  *  A revert event (scheduled after a `duration`) is the same shape with the
  *  captured prior value and no duration. */
 interface IvPayload { kind: PlannedIntervention["kind"]; target: string; value: number; duration?: number }
-interface Ev { type: EventType; nodeId: string; tokenId?: string; scopeInst?: string; esubId?: string; iv?: IvPayload; cap?: number }
+interface Ev { type: EventType; nodeId: string; tokenId?: string; scopeInst?: string; esubId?: string; iv?: IvPayload; cap?: number; beId?: string; armId?: number }
 
 interface Pending { tokenId: string; nodeId: string; units: number; requestedAt: number }
 /** A subprocess scope instance a token is currently inside. `remaining` =
@@ -52,8 +52,11 @@ interface Token {
 function cloneStack(s: Frame[]): Frame[] { return s.map((f) => ({ ...f })); }
 
 /** A token-movement event for the live replay player (green-token animation). */
-export type TraceEventKind = "spawn" | "enter" | "queue" | "service" | "exit";
-export interface TraceEvent { t: number; tokenId: string; kind: TraceEventKind; nodeId?: string; edgeId?: string }
+export type TraceEventKind = "spawn" | "enter" | "queue" | "service" | "exit" | "fire";
+/** `fire` = an element ACTIVATION flash (not a token move): a boundary event that
+ *  fired (variant "boundary" → red) or an inline catch that was triggered by a
+ *  matching throw (variant "catch" → green). tokenId is empty for these. */
+export interface TraceEvent { t: number; tokenId: string; kind: TraceEventKind; nodeId?: string; edgeId?: string; variant?: "boundary" | "catch" }
 
 /** A live Operator intervention applied mid-run (the "reach in" levers). */
 export type Intervention =
@@ -79,6 +82,14 @@ export interface SimState {
   nextJoinId?: number;
   activeScopes: string[];
   cancelledTokens: string[];
+  /** Boundary-event + throw/catch runtime state (optional so a snapshot taken
+   *  before these existed still resumes). */
+  boundaryArm?: Record<string, { nodeId: string; armId: number }>;
+  nextBoundaryArm?: number;
+  blockedAtCatch?: Record<string, { tokenId: string; nodeId: string }[]>;
+  messageQueue?: Record<string, number>;
+  catchArm?: Record<string, number>;
+  nextCatchArm?: number;
   inService: Record<string, { teamId: string; units: number }>;
   arrivalsByNode: Record<string, number>;
   // Applied-intervention state (so an Operator fork preserves timed changes).
@@ -98,6 +109,18 @@ export class Engine {
   private joinCount = new Map<string, number>(); // parallel-MI scope instance → outstanding instances
   private branchJoin = new Map<string, number>(); // AND/OR branch group → outstanding branches
   private nextJoinId = 1;
+  // Boundary events: while a token is in service at a host, one arm is live; a
+  // fresh armId per startService lets a stale (post-completion) trigger be
+  // ignored. Cleared on service end / cancel.
+  private boundaryArm = new Map<string, { nodeId: string; armId: number }>(); // tokenId → live arm
+  private nextBoundaryArm = 1;
+  // Throw→catch synchronisation: tokens blocked at a catch (FIFO per channel),
+  // buffered messages for message channels with no waiter, and the live timeout
+  // arm per blocked token.
+  private blockedAtCatch = new Map<string, { tokenId: string; nodeId: string }[]>();
+  private messageQueue = new Map<string, number>();
+  private catchArm = new Map<string, number>(); // tokenId → live catch-timeout arm
+  private nextCatchArm = 1;
   private inCount = new Map<string, number>();   // node id → incoming edge count (converging test)
   private activeScopes = new Set<string>();      // scope instances currently running (for event-sub triggers)
   private cancelledTokens = new Set<string>();   // tokens whose pending events must be ignored (interrupt)
@@ -232,6 +255,8 @@ export class Engine {
     if (ev.type === "INTERVENTION") return this.applyPlanned(ev.iv!);
     if (ev.type === "EVENT_TRIGGER") return this.onEventTrigger(ev.scopeInst!, ev.esubId!);
     if (ev.tokenId && this.cancelledTokens.has(ev.tokenId)) return; // token was interrupted
+    if (ev.type === "BOUNDARY_TRIGGER") return ev.scopeInst ? this.onScopeBoundaryTrigger(ev) : this.onBoundaryTrigger(ev);
+    if (ev.type === "CATCH_TIMEOUT") return this.onCatchTimeout(ev);
     const token = ev.tokenId ? this.tokens.get(ev.tokenId) : undefined;
     const node = this.nodeById.get(ev.nodeId);
     if (!token || !node) return;
@@ -297,6 +322,8 @@ export class Engine {
       case "sink": return this.onReachEnd(token, node);
       case "delay":
         if (node.compensationThrow) return this.fireCompensation(token, node);
+        if (node.throw) return this.enterThrow(token, node);
+        if (node.catch) return this.enterCatch(token, node);
         this.calendar.schedule(this.clock + (node.delay ? sample(node.delay, this.rng) : 0), { type: "RESUME", nodeId, tokenId: token.id });
         return;
       case "task": return this.startOrQueue(token, node);
@@ -343,7 +370,55 @@ export class Engine {
     const scopeInst = `s${this.nextScopeId++}`;
     token.callStack.push({ sub: node.id, scopeInst, remaining, loopBack });
     this.armEventSubs(node, scopeInst);
+    this.armScopeBoundary(node, scopeInst);
     this.enterNode(token, node.bodyStart, undefined);
+  }
+
+  /** Arm an Expanded Subprocess's boundary events for this scope instance: each
+   *  races the WHOLE inline body (armed at scope entry, disarmed when the scope
+   *  completes / is cancelled). Only the standard / sequential-MI path arms —
+   *  parallel MI is a follow-up, matching armEventSubs. */
+  private armScopeBoundary(sub: SimNode, scopeInst: string): void {
+    const bes = sub.boundaryEvents;
+    if (!bes || bes.length === 0) return;
+    this.activeScopes.add(scopeInst); // so the trigger's active-scope guard applies
+    for (const be of bes) {
+      if (be.fireProb < 1 && this.rng.next() >= be.fireProb) continue; // didn't occur this run
+      this.calendar.schedule(this.clock + sample(be.trigger, this.rng), { type: "BOUNDARY_TRIGGER", nodeId: sub.id, scopeInst, beId: be.id });
+    }
+  }
+
+  private onScopeBoundaryTrigger(ev: Ev): void {
+    if (!ev.scopeInst || !this.activeScopes.has(ev.scopeInst)) return; // scope finished / left first
+    const host = this.nodeById.get(ev.nodeId);
+    const be = host?.boundaryEvents?.find((b) => b.id === ev.beId);
+    if (!be) return;
+    this.emitFlash(be.id, "boundary"); // the boundary event activated → red pulse
+
+    if (be.interrupting) {
+      // Cancel the whole scope's in-flight work (like an interrupting event sub);
+      // a continuation carrying the frames BELOW the EP then exits it and runs
+      // the boundary flow (which lives at the EP's parent level).
+      this.activeScopes.delete(ev.scopeInst);
+      let lower: Frame[] = []; let props: Record<string, Value> = {}; let enteredAt = this.clock; let captured = false;
+      for (const t of [...this.tokens.values()]) {
+        const idx = t.callStack.findIndex((f) => f.scopeInst === ev.scopeInst);
+        if (idx < 0) continue;
+        if (!captured) { lower = cloneStack(t.callStack.slice(0, idx)); props = { ...t.props }; enteredAt = t.enteredAt; captured = true; }
+        this.cancelToken(t.id);
+      }
+      const cont: Token = { id: `t${this.nextTokenId++}`, enteredAt, props, callStack: lower, internal: lower.some((f) => f.parallel) };
+      this.tokens.set(cont.id, cont);
+      this.emit("spawn", cont.id, be.bodyStart);
+      this.enterNode(cont, be.bodyStart, undefined);
+    } else {
+      // Non-interrupting: a parallel side token runs the boundary flow while the
+      // scope keeps running. Internal, so it never counts as a separate case.
+      const side: Token = { id: `t${this.nextTokenId++}`, enteredAt: this.clock, props: {}, callStack: [], internal: true };
+      this.tokens.set(side.id, side);
+      this.emit("spawn", side.id, be.bodyStart);
+      this.enterNode(side, be.bodyStart, undefined);
+    }
   }
 
   /** Schedule each event subprocess's timer trigger for this scope instance. */
@@ -412,9 +487,125 @@ export class Engine {
       // may be queued somewhere — drop its pending request from every pool
       for (const pool of this.pools.values()) pool.cancelWhere(this.clock, (p) => p.tokenId === tokenId);
     }
+    this.boundaryArm.delete(tokenId);
+    this.catchArm.delete(tokenId);
     this.cancelledTokens.add(tokenId);
     this.emit("exit", tokenId);
     this.tokens.delete(tokenId);
+  }
+
+  // ── Boundary events on activities (race the host's cycle time) ────────────
+  /** Arm the host's boundary events for this service instance. Each rolls its
+   *  fireProb then, if it occurs, is scheduled at clock + trigger; a fresh armId
+   *  per startService lets onServiceEnd / cancel disarm stale (post-completion)
+   *  triggers. */
+  private armBoundary(token: Token, node: SimNode): void {
+    this.boundaryArm.delete(token.id);
+    const bes = node.boundaryEvents;
+    if (!bes || bes.length === 0) return;
+    const armId = this.nextBoundaryArm++;
+    this.boundaryArm.set(token.id, { nodeId: node.id, armId });
+    for (const be of bes) {
+      if (be.fireProb < 1 && this.rng.next() >= be.fireProb) continue; // didn't occur this run
+      this.calendar.schedule(this.clock + sample(be.trigger, this.rng), {
+        type: "BOUNDARY_TRIGGER", nodeId: node.id, tokenId: token.id, beId: be.id, armId,
+      });
+    }
+  }
+
+  private onBoundaryTrigger(ev: Ev): void {
+    const arm = ev.tokenId ? this.boundaryArm.get(ev.tokenId) : undefined;
+    if (!arm || arm.armId !== ev.armId || arm.nodeId !== ev.nodeId) return; // host finished / disarmed
+    const token = this.tokens.get(ev.tokenId!);
+    const host = this.nodeById.get(ev.nodeId);
+    const be = host?.boundaryEvents?.find((b) => b.id === ev.beId);
+    if (!token || !host || !be) return;
+    this.emitFlash(be.id, "boundary"); // the boundary event activated → red pulse
+
+    if (be.interrupting) {
+      // Cancel the host (release its resources + blacklist its SERVICE_END); a
+      // FRESH continuation token then carries the case down the boundary flow (a
+      // new id is required because cancelToken blacklists the old one).
+      const cont: Token = {
+        id: `t${this.nextTokenId++}`, enteredAt: token.enteredAt, props: { ...token.props },
+        callStack: cloneStack(token.callStack), internal: token.internal,
+        joinStack: token.joinStack ? [...token.joinStack] : undefined,
+        armed: token.armed ? [...token.armed] : undefined,
+      };
+      this.cancelToken(token.id);
+      this.tokens.set(cont.id, cont);
+      this.emit("spawn", cont.id, be.bodyStart);
+      this.enterNode(cont, be.bodyStart, undefined);
+    } else {
+      // Non-interrupting: a parallel token runs the boundary flow; the host keeps
+      // its in-flight service and its arm (other boundary events can still fire).
+      const side: Token = {
+        id: `t${this.nextTokenId++}`, enteredAt: this.clock, props: { ...token.props },
+        callStack: cloneStack(token.callStack), internal: true,
+      };
+      this.tokens.set(side.id, side);
+      this.emit("spawn", side.id, be.bodyStart);
+      this.enterNode(side, be.bodyStart, undefined);
+    }
+  }
+
+  // ── Throw → catch synchronisation (signal broadcast / message 1:1) ────────
+  private enterThrow(token: Token, node: SimNode): void {
+    this.releaseCatches(node.throw!);
+    this.moveNext(token, node); // the throw carries on down its own flow
+  }
+
+  private enterCatch(token: Token, node: SimNode): void {
+    const cat = node.catch!;
+    if (cat.correlation === "message") {
+      const q = this.messageQueue.get(cat.channel) ?? 0;
+      if (q > 0) { this.messageQueue.set(cat.channel, q - 1); this.emitFlash(node.id, "catch"); return this.moveNext(token, node); } // consume a buffered message → triggered
+    }
+    const arr = this.blockedAtCatch.get(cat.channel) ?? this.blockedAtCatch.set(cat.channel, []).get(cat.channel)!;
+    arr.push({ tokenId: token.id, nodeId: node.id });
+    this.emit("queue", token.id, node.id); // render as waiting for its trigger
+    if (node.catchTimeout) {
+      const armId = this.nextCatchArm++;
+      this.catchArm.set(token.id, armId);
+      this.calendar.schedule(this.clock + sample(node.catchTimeout, this.rng), { type: "CATCH_TIMEOUT", nodeId: node.id, tokenId: token.id, armId });
+    }
+  }
+
+  private releaseCatches(chan: EventChannel): void {
+    const waiters = this.blockedAtCatch.get(chan.channel);
+    if (chan.correlation === "signal") {
+      if (!waiters || waiters.length === 0) return; // a signal with no waiter is transient — lost
+      this.blockedAtCatch.set(chan.channel, []); // broadcast: release every current waiter
+      for (const w of waiters) this.releaseWaiter(w.tokenId, w.nodeId);
+      return;
+    }
+    // Message: release exactly one LIVE waiter (FIFO); if none, buffer the message.
+    while (waiters && waiters.length) {
+      const w = waiters.shift()!;
+      if (!this.tokens.has(w.tokenId) || this.cancelledTokens.has(w.tokenId)) continue; // stale waiter
+      return this.releaseWaiter(w.tokenId, w.nodeId);
+    }
+    this.messageQueue.set(chan.channel, (this.messageQueue.get(chan.channel) ?? 0) + 1);
+  }
+
+  private releaseWaiter(tokenId: string, nodeId: string): void {
+    this.catchArm.delete(tokenId); // its timeout (if any) is now moot
+    const token = this.tokens.get(tokenId), node = this.nodeById.get(nodeId);
+    if (token && node && !this.cancelledTokens.has(tokenId)) {
+      this.emitFlash(nodeId, "catch"); // the catch was triggered by a throw → green pulse
+      this.moveNext(token, node);
+    }
+  }
+
+  private onCatchTimeout(ev: Ev): void {
+    if (!ev.tokenId || this.catchArm.get(ev.tokenId) !== ev.armId) return; // already released by a throw
+    this.catchArm.delete(ev.tokenId);
+    const token = this.tokens.get(ev.tokenId);
+    const node = this.nodeById.get(ev.nodeId);
+    if (!token || !node || !node.catch) return;
+    const arr = this.blockedAtCatch.get(node.catch.channel);
+    if (arr) { const i = arr.findIndex((w) => w.tokenId === ev.tokenId); if (i >= 0) arr.splice(i, 1); }
+    this.moveNext(token, node); // external trigger "arrived" / gave up waiting
   }
 
   /** A sink: either the end of the current subprocess scope (return to parent,
@@ -496,10 +687,12 @@ export class Engine {
     if (node.setupTime) dur += sample(node.setupTime, this.rng);
     if (node.cycleTime) dur += sample(node.cycleTime, this.rng);
     this.calendar.schedule(this.clock + dur, { type: "SERVICE_END", nodeId: node.id, tokenId: token.id });
+    this.armBoundary(token, node);
   }
 
   private onServiceEnd(token: Token, node: SimNode): void {
     this.inService.delete(token.id);
+    this.boundaryArm.delete(token.id); // host finished first → disarm its boundary events
     if (node.teamId) {
       const pool = this.pools.get(node.teamId);
       if (pool) {
@@ -742,6 +935,12 @@ export class Engine {
       nextJoinId: this.nextJoinId,
       activeScopes: [...this.activeScopes],
       cancelledTokens: [...this.cancelledTokens],
+      boundaryArm: Object.fromEntries(this.boundaryArm),
+      nextBoundaryArm: this.nextBoundaryArm,
+      blockedAtCatch: Object.fromEntries([...this.blockedAtCatch].map(([k, v]) => [k, v.map((w) => ({ ...w }))])),
+      messageQueue: Object.fromEntries(this.messageQueue),
+      catchArm: Object.fromEntries(this.catchArm),
+      nextCatchArm: this.nextCatchArm,
       inService: Object.fromEntries(this.inService),
       arrivalsByNode: Object.fromEntries(this.arrivalsByNode),
       arrivalMult: Object.fromEntries(this.arrivalMult),
@@ -765,6 +964,12 @@ export class Engine {
     e.nextJoinId = snap.nextJoinId ?? 1;
     e.activeScopes = new Set(snap.activeScopes ?? []);
     e.cancelledTokens = new Set(snap.cancelledTokens ?? []);
+    e.boundaryArm = new Map(Object.entries(snap.boundaryArm ?? {}));
+    e.nextBoundaryArm = snap.nextBoundaryArm ?? 1;
+    e.blockedAtCatch = new Map(Object.entries(snap.blockedAtCatch ?? {}).map(([k, v]) => [k, v.map((w) => ({ ...w }))]));
+    e.messageQueue = new Map(Object.entries(snap.messageQueue ?? {}));
+    e.catchArm = new Map(Object.entries(snap.catchArm ?? {}));
+    e.nextCatchArm = snap.nextCatchArm ?? 1;
     e.inService = new Map(Object.entries(snap.inService ?? {}));
     e.arrivalsByNode = new Map(Object.entries(snap.arrivalsByNode));
     e.arrivalMult = new Map(Object.entries(snap.arrivalMult ?? {}));
@@ -779,6 +984,14 @@ export class Engine {
   private emit(kind: TraceEventKind, tokenId: string, nodeId?: string, edgeId?: string): void {
     if (this.tracing && this.traceLog.length < this.maxTrace) {
       this.traceLog.push({ t: this.clock, tokenId, kind, nodeId, edgeId });
+    }
+  }
+
+  /** Record an element-activation flash for the replay (a boundary event that
+   *  fired, or a catch that was triggered) — rendered as a coloured pulse. */
+  private emitFlash(nodeId: string, variant: "boundary" | "catch"): void {
+    if (this.tracing && this.traceLog.length < this.maxTrace) {
+      this.traceLog.push({ t: this.clock, tokenId: "", kind: "fire", nodeId, variant });
     }
   }
 

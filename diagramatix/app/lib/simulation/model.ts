@@ -28,6 +28,29 @@ export interface EventSub {
   interrupting: boolean;
 }
 
+/** A boundary catch event mounted on an activity (task / subprocess). While the
+ *  host is IN SERVICE it races the host's cycle time: if `trigger` elapses (and
+ *  a `fireProb` roll succeeds) before the host finishes, the event fires —
+ *  interrupting cancels the host and diverts to `bodyStart`; non-interrupting
+ *  spawns a parallel token down `bodyStart` and the host keeps running. If the
+ *  host finishes first the event is disarmed. Timer/message/signal/conditional/
+ *  escalation all use this one shape (a timer is just fireProb=1). */
+export interface BoundaryEvent {
+  id: string;
+  bodyStart: string;     // the boundary event's outgoing sequence-flow target
+  trigger: SimDist;      // time from host service-start until the event fires
+  fireProb: number;      // 0..1 chance it fires at all this execution (default 1)
+  interrupting: boolean;
+}
+
+/** A throw→catch synchronisation channel on an inline intermediate event.
+ *  `correlation` = "signal" (broadcast: a throw releases ALL waiting catches)
+ *  or "message" (1:1 + buffered: a throw releases one waiter, else it queues). */
+export interface EventChannel {
+  channel: string;
+  correlation: "signal" | "message";
+}
+
 /** Set a token property when a token passes through (BPSim PropertyParameters):
  *  value is either a distribution to sample or an expression to evaluate. */
 export interface Assignment {
@@ -63,6 +86,17 @@ export interface SimNode {
   units?: number;        // resource Quantity (default 1)
   // delay
   delay?: SimDist;
+  // boundary catch events mounted on this activity (task / subprocess), armed
+  // while the host is in service (see BoundaryEvent).
+  boundaryEvents?: BoundaryEvent[];
+  // inline intermediate CATCH event: block until a matching throw fires on
+  // `catch.channel`; `catchTimeout` (if set) releases the token as a fallback /
+  // external-arrival time. A delay node with `catch` set is a synchroniser.
+  catch?: EventChannel;
+  catchTimeout?: SimDist;
+  // inline intermediate THROW event: on entry, fire `throw.channel` (releasing
+  // waiting catches) then continue.
+  throw?: EventChannel;
   // gateway
   //  decision  — XOR: exactly one outgoing edge is taken (BPMN exclusive; also
   //              the approximation used for event-based, where the race has one

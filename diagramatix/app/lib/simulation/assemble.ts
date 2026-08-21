@@ -22,7 +22,7 @@
 
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { getSimParams, type LoopParams } from "@/app/lib/diagram/simParams";
-import type { SimNetwork, SimNode, SimEdge, SimTeam, NodeKind, Assignment, LoopSpec, EventSub } from "./model";
+import type { SimNetwork, SimNode, SimEdge, SimTeam, NodeKind, Assignment, LoopSpec, EventSub, BoundaryEvent, EventChannel } from "./model";
 import type { SimDist, WorkCalendar } from "./types";
 
 /** Resolvers for working calendars: team calendars keyed by team name (like
@@ -51,6 +51,17 @@ function baseKind(type: string): NodeKind | null {
 
 const isEP = (el?: DiagramElement) => !!el && el.type === "subprocess-expanded";
 const isEventEP = (el?: DiagramElement) => isEP(el) && el!.properties?.subprocessType === "event";
+
+/** Inline intermediate event types that participate in throw→catch
+ *  synchronisation. Message correlates 1:1 (buffered); the rest broadcast. */
+const CHANNEL_TYPES = new Set(["message", "signal", "escalation", "conditional"]);
+function channelOf(el: DiagramElement): EventChannel | undefined {
+  const et = el.eventType;
+  if (!et || !CHANNEL_TYPES.has(et)) return undefined;
+  // Channel is keyed by type + name so a signal never releases a message catch.
+  const name = getSimParams(el).channel?.trim() || el.label?.trim() || el.id;
+  return { channel: `${et}:${name}`, correlation: et === "message" ? "message" : "signal" };
+}
 
 /** Map a diagram LoopParams (+ repeatType fallback) to the engine LoopSpec. */
 function loopOf(el: DiagramElement): LoopSpec | undefined {
@@ -147,6 +158,45 @@ export function assembleFromDiagram(
     arr.push({ id: el.id, bodyStart, trigger, interrupting });
   }
 
+  // ── Boundary catch events on activities ──
+  // A boundary event is not a flow node; it's armed while its host runs and races
+  // the host's duration (see engine). On a task / collapsed subprocess the race
+  // is against the cycle time (armed at service start); on an Expanded Subprocess
+  // it's against the whole inline body (armed at scope entry, like an event sub).
+  // Compensation boundary events keep their own handling above and are excluded.
+  const boundaryByHost = new Map<string, BoundaryEvent[]>();
+  const isBoundaryCatch = (el: DiagramElement) =>
+    el.type === "intermediate-event" && !!el.boundaryHostId && el.eventType !== "compensation";
+  const RACEABLE_HOSTS = new Set(["task", "subprocess", "subprocess-expanded"]);
+  for (const el of data.elements) {
+    if (!isBoundaryCatch(el)) continue;
+    skip.add(el.id); // reached only via the race, never by sequence flow
+    const host = byId.get(el.boundaryHostId!);
+    if (!host || !RACEABLE_HOSTS.has(host.type) || isEventEP(host)) continue;
+    const bodyStart = firstOutTarget(el.id);
+    if (!bodyStart) continue; // no handler flow → nothing to divert to
+    const bp = getSimParams(el).boundary;
+    const be: BoundaryEvent = {
+      id: el.id,
+      bodyStart,
+      trigger: bp?.trigger ?? DEFAULT_TRIGGER,
+      fireProb: bp?.fireProb ?? 1,
+      interrupting: el.properties?.interruptionType !== "non-interrupting",
+    };
+    (boundaryByHost.get(el.boundaryHostId!) ?? boundaryByHost.set(el.boundaryHostId!, []).get(el.boundaryHostId!)!).push(be);
+  }
+
+  // Throw channels present in THIS diagram — a catch only blocks if something can
+  // release it (a matching throw here, or a timeout); otherwise it stays a plain
+  // pass-through delay so a bare message/signal event never deadlocks the run.
+  const throwChannels = new Set<string>();
+  for (const el of data.elements) {
+    if (el.type === "intermediate-event" && !el.boundaryHostId && el.flowType === "throwing") {
+      const ch = channelOf(el);
+      if (ch) throwChannels.add(ch.channel);
+    }
+  }
+
   // ── Map elements to engine nodes ──
   const nodes: SimNode[] = [];
   const teamIds = new Set<string>();
@@ -178,7 +228,28 @@ export function assembleFromDiagram(
       if (teamId) teamIds.add(teamId);
     } else if (kind === "delay") {
       node.delay = sim.delay ?? { kind: "fixed", value: 0 };
-      if (isInlineCompThrow(el)) node.compensationThrow = true; // fires armed handlers on entry
+      if (isInlineCompThrow(el)) {
+        node.compensationThrow = true; // fires armed handlers on entry
+      } else {
+        // Message/signal/escalation/conditional intermediate event → a THROW
+        // (fires its channel on entry) or a CATCH (blocks until the channel
+        // fires; catchTimeout is the fallback / external-arrival release).
+        const chan = channelOf(el);
+        if (chan) {
+          if (el.flowType === "throwing") {
+            node.throw = chan;
+          } else {
+            // Only BLOCK when the catch can be released — a matching throw is in
+            // this diagram, or a timeout is set. Otherwise it stays a plain
+            // pass-through delay (backward-compatible; readiness flags it).
+            const to = getSimParams(el).catchTimeout;
+            if (to || throwChannels.has(chan.channel)) {
+              node.catch = chan;
+              if (to) node.catchTimeout = to;
+            }
+          }
+        }
+      }
     } else if (kind === "gateway") {
       // Event-based stays a decision (the race has exactly one winner) and so
       // does complex (we don't model its expression) — both are exclusive
@@ -207,6 +278,9 @@ export function assembleFromDiagram(
     // Host activity → its armed compensation handler(s).
     const ch = compHandlersByHost.get(el.id);
     if (ch && ch.length) node.compensationHandlers = ch;
+    // Boundary catch events mounted on this activity (raced while in service).
+    const bes = boundaryByHost.get(el.id);
+    if (bes && bes.length) node.boundaryEvents = bes;
     nodes.push(node);
   }
 
@@ -216,6 +290,12 @@ export function assembleFromDiagram(
     if (!n.compensationHandlers) continue;
     n.compensationHandlers = n.compensationHandlers.filter((id) => nodeIds.has(id));
     if (n.compensationHandlers.length === 0) delete n.compensationHandlers;
+  }
+  // Prune boundary events whose diverted target isn't a real sim node.
+  for (const n of nodes) {
+    if (!n.boundaryEvents) continue;
+    n.boundaryEvents = n.boundaryEvents.filter((b) => nodeIds.has(b.bodyStart));
+    if (n.boundaryEvents.length === 0) delete n.boundaryEvents;
   }
   // Only CONTROL-FLOW connectors form the executable graph. Associations (incl.
   // the compensation association) and message flows are NOT control flow — the

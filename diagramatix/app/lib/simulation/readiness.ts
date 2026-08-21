@@ -45,6 +45,22 @@ export function checkSimReadiness(diagrams: DiagramData[], teams: TeamLite[]): R
     }
   }
 
+  // Throw channels declared anywhere in the study — a catch may synchronise with
+  // a throw in a linked child diagram, so this is collected study-wide.
+  const CHANNEL_TYPES = new Set(["message", "signal", "escalation", "conditional"]);
+  const channelKey = (el: DiagramElement) => {
+    const name = (sim(el).channel as string | undefined)?.trim() || el.label?.trim() || el.id;
+    return `${el.eventType}:${name}`;
+  };
+  const isChannelCatch = (el: DiagramElement) =>
+    el.type === "intermediate-event" && !el.boundaryHostId && !!el.eventType && CHANNEL_TYPES.has(el.eventType) && el.flowType !== "throwing";
+  const throwChannels = new Set<string>();
+  for (const d of diagrams) for (const el of d.elements) {
+    if (el.type === "intermediate-event" && !el.boundaryHostId && el.eventType && CHANNEL_TYPES.has(el.eventType) && el.flowType === "throwing") {
+      throwChannels.add(channelKey(el));
+    }
+  }
+
   for (const d of diagrams) {
     const byId = new Map(d.elements.map((e) => [e.id, e]));
     const teamAncestor = (el: DiagramElement): string | undefined => {
@@ -124,6 +140,26 @@ export function checkSimReadiness(diagrams: DiagramData[], teams: TeamLite[]): R
       if (isProcessSource && !sim(el).arrival) {
         issues.push({ severity: "warn", elementId: el.id, elementLabel: nameOf(el),
           message: `Start event "${nameOf(el)}" has no arrival rate — a default inter-arrival time is assumed.` });
+      }
+    }
+
+    // 6. Catch events with nothing to release them act as a pass-through.
+    for (const el of d.elements) {
+      if (!isChannelCatch(el)) continue;
+      if (!throwChannels.has(channelKey(el)) && !sim(el).catchTimeout) {
+        issues.push({ severity: "warn", elementId: el.id, elementLabel: nameOf(el),
+          message: `Catch event "${nameOf(el)}" has no matching throw and no timeout — it passes straight through instead of waiting. Add a throwing ${el.eventType} with the same name, or set a timeout / external-arrival time, to make it synchronise.` });
+      }
+    }
+
+    // 7. Boundary events on activities: missing trigger time.
+    for (const el of d.elements) {
+      if (el.type !== "intermediate-event" || !el.boundaryHostId || el.eventType === "compensation") continue;
+      const host = byId.get(el.boundaryHostId);
+      if (host && !sim(el).boundary?.trigger) {
+        const what = host.type === "subprocess-expanded" ? "the whole subprocess" : "the host's cycle time";
+        issues.push({ severity: "warn", elementId: el.id, elementLabel: nameOf(el),
+          message: `Boundary event "${nameOf(el)}" has no trigger time — a default is assumed (it races ${what}).` });
       }
     }
   }
