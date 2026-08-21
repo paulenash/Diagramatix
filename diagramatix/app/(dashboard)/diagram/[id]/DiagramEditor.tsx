@@ -5887,6 +5887,7 @@ export function DiagramEditor({
         {showSimulator && (
           <SimulatorOverlay
             data={data}
+            colorConfig={diagramColorConfig}
             diagramId={diagramId}
             projectId={projectId}
             isAdmin={isAdmin}

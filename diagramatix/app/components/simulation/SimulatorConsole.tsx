@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { MatrixRain } from "./matrix/MatrixRain";
 import { MatrixButton, MatrixPanel } from "./matrix/MatrixChrome";
 import { ReplayView } from "./replay/ReplayView";
@@ -24,8 +25,8 @@ import type { ScenarioRunConfig, WorkCalendar } from "@/app/lib/simulation/types
 
 const EMPTY_DIAGRAM: DiagramData = { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } };
 
-export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, isAdmin, diagramName, projectName, onClose, onFillTestData, onApplyData }: {
-  data?: DiagramData; diagramId?: string; projectId: string | null; isAdmin?: boolean; diagramName?: string; projectName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
+export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId, projectId, isAdmin, diagramName, projectName, onClose, onFillTestData, onApplyData }: {
+  data?: DiagramData; colorConfig?: SymbolColorConfig; diagramId?: string; projectId: string | null; isAdmin?: boolean; diagramName?: string; projectName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
 }) {
   // Project mode = entered from a Project (no single open diagram): show the
   // project name + a variant selector across all its processes for comparison.
@@ -224,7 +225,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
           </main>
         ) : mode === "replay" ? (
           <main className="flex-1 overflow-hidden p-4">
-            <ReplayView data={activeData} config={replayCfg} teamCapacities={teamCapacities} teamCalendars={teamCalendars} calendarsById={calendarsById} diagramId={activeId ?? diagramId} diagramsById={diagramsById} onClose={() => setMode("home")} />
+            <ReplayView data={activeData} colorConfig={colorConfig} config={replayCfg} teamCapacities={teamCapacities} teamCalendars={teamCalendars} calendarsById={calendarsById} diagramId={activeId ?? diagramId} diagramsById={diagramsById} onClose={() => setMode("home")} />
           </main>
         ) : (
           <main className="flex-1 overflow-hidden p-4">

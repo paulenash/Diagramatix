@@ -7,15 +7,16 @@
 
 import { useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { SimulatorIntro } from "./SimulatorIntro";
 import { SimulatorConsole } from "./SimulatorConsole";
 
-export function SimulatorOverlay({ data, diagramId, projectId, isAdmin, diagramName, projectName, onClose, onFillTestData, onApplyData }: {
-  data?: DiagramData; diagramId?: string; projectId: string | null; isAdmin?: boolean; diagramName?: string; projectName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
+export function SimulatorOverlay({ data, colorConfig, diagramId, projectId, isAdmin, diagramName, projectName, onClose, onFillTestData, onApplyData }: {
+  data?: DiagramData; colorConfig?: SymbolColorConfig; diagramId?: string; projectId: string | null; isAdmin?: boolean; diagramName?: string; projectName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
 }) {
   const [entered, setEntered] = useState(false);
   return entered ? (
-    <SimulatorConsole data={data} diagramId={diagramId} projectId={projectId} isAdmin={isAdmin} diagramName={diagramName} projectName={projectName} onClose={onClose} onFillTestData={onFillTestData} onApplyData={onApplyData} />
+    <SimulatorConsole data={data} colorConfig={colorConfig} diagramId={diagramId} projectId={projectId} isAdmin={isAdmin} diagramName={diagramName} projectName={projectName} onClose={onClose} onFillTestData={onFillTestData} onApplyData={onApplyData} />
   ) : (
     <SimulatorIntro onEnter={() => setEntered(true)} />
   );

@@ -11,6 +11,7 @@
 import { memo } from "react";
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { SymbolRenderer } from "@/app/components/canvas/SymbolRenderer";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { ConnectorRenderer } from "@/app/components/canvas/ConnectorRenderer";
 
 const noop = () => {};
@@ -27,7 +28,7 @@ function depthOf(el: DiagramElement, byId: Map<string, DiagramElement>): number 
 // too — otherwise their box paints over the connectors drawn within.
 const CONTAINER = new Set(["pool", "lane", "subprocess-expanded"]);
 
-export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data, visibleIds, emphasize }: { data: DiagramData; visibleIds?: Set<string>; emphasize?: Set<string> }) {
+export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data, colorConfig, visibleIds, emphasize }: { data: DiagramData; colorConfig?: SymbolColorConfig; visibleIds?: Set<string>; emphasize?: Set<string> }) {
   const byId = new Map(data.elements.map((e) => [e.id, e]));
   // Optional progressive-reveal gate (the Animate feature): render only ids in
   // the set. Undefined = render everything (the normal replay backdrop).
@@ -43,6 +44,7 @@ export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data,
     <g key={el.id} opacity={dim(el.id)}>
       <SymbolRenderer
         element={el}
+        colorConfig={colorConfig}
         selected={false}
         isDropTarget={false}
         showConnectionPoints={false}

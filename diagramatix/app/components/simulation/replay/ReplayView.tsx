@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { SimRunConfig, WorkCalendar } from "@/app/lib/simulation/types";
 import { buildReplay, forkReplay, teamIdsInDiagram, type ReplayData } from "@/app/lib/simulation/replaySource";
 import { closedReason, simClockLabel } from "@/app/lib/simulation/calendar";
@@ -45,7 +46,7 @@ function pointAlongPolyline(pts: { x: number; y: number }[], f: number): { x: nu
 }
 
 
-export function ReplayView({ data, config, teamCapacities, teamCalendars, calendarsById, diagramId, diagramsById, onClose }: { data: DiagramData; config: SimRunConfig; teamCapacities?: Record<string, number>; teamCalendars?: Record<string, WorkCalendar>; calendarsById?: Record<string, WorkCalendar>; diagramId?: string; diagramsById?: Map<string, DiagramData>; onClose?: () => void }) {
+export function ReplayView({ data, colorConfig, config, teamCapacities, teamCalendars, calendarsById, diagramId, diagramsById, onClose }: { data: DiagramData; colorConfig?: SymbolColorConfig; config: SimRunConfig; teamCapacities?: Record<string, number>; teamCalendars?: Record<string, WorkCalendar>; calendarsById?: Record<string, WorkCalendar>; diagramId?: string; diagramsById?: Map<string, DiagramData>; onClose?: () => void }) {
   // Flatten linked (collapsed) subprocesses into the run, exactly as ▶ Run does,
   // so their timing/teams are honest instead of a pass-through. Working calendars
   // make tokens queue outside hours, matching the authoritative run.
@@ -146,7 +147,7 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
   }, [replayOpts]);
   // Stable element so the heavy read-only diagram isn't re-rendered every
   // animation frame — only when `data` changes (never during a run).
-  const backdrop = useMemo(() => <ReplayDiagramBackdrop data={viewData} />, [viewData]);
+  const backdrop = useMemo(() => <ReplayDiagramBackdrop data={viewData} colorConfig={colorConfig} />, [viewData, colorConfig]);
 
   // Lanes/pools whose team follows a working calendar — candidates for the
   // "off-shift" dim cue. Resolved once per view; the open/closed state is
