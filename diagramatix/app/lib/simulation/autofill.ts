@@ -15,6 +15,7 @@
 
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { getSimParams, type ElementSimParams, type SimDist } from "@/app/lib/diagram/simParams";
+import { timerDelayMinutes } from "./timerLabel";
 
 const DEF_ARRIVAL: SimDist = { kind: "exponential", mean: 10 };
 const DEF_CYCLE: SimDist = { kind: "triangular", min: 3, mode: 5, max: 8 };
@@ -68,7 +69,15 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
         if (!sim.teamId) { sim.teamId = laneTeamId(el, byId); auto.add("teamId"); filled++; changed = true; }
         if (sim.resourceUnits === undefined) { sim.resourceUnits = 1; auto.add("resourceUnits"); changed = true; }
       }
-      if (DELAY.has(el.type) && !sim.delay) { sim.delay = DEF_DELAY; auto.add("delay"); filled++; changed = true; }
+      if (DELAY.has(el.type) && !sim.delay) {
+        // Read the duration straight off the label ("Wait 3 hours", "7 days",
+        // "10 working days") when it carries one; fall back to the flat default.
+        // Value is in minutes (the default clock unit); working time uses an 8h
+        // day. See timerLabel.ts for the tier semantics + engine limitations.
+        const mins = timerDelayMinutes(el.label ?? "");
+        sim.delay = mins !== null ? { kind: "fixed", value: Math.round(mins * 100) / 100 } : DEF_DELAY;
+        auto.add("delay"); filled++; changed = true;
+      }
     }
 
     if (!changed) return el;
