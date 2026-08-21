@@ -19,7 +19,7 @@ import { BpsimInterchange } from "./BpsimInterchange";
 import { StudyManager } from "./StudyManager";
 import { SimDataPanel } from "./SimDataPanel";
 import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
-import { autofillSimulation } from "@/app/lib/simulation/autofill";
+import { autofillSimulation, unfillSimulation } from "@/app/lib/simulation/autofill";
 import type { ScenarioRunConfig, WorkCalendar } from "@/app/lib/simulation/types";
 
 const EMPTY_DIAGRAM: DiagramData = { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -117,6 +117,11 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
     applyActive(filled);
     return n;
   }, [activeData, applyActive]);
+  const unfillActive = useCallback(() => {
+    const { data: cleared, cleared: n } = unfillSimulation(activeData);
+    applyActive(cleared);
+    return n;
+  }, [activeData, applyActive]);
   const canEditActive = isOpen ? !!onApplyData : !!variantData;
 
   return (
@@ -193,7 +198,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
                   </p>
                 )}
                 {canEditActive
-                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} onOpenDiagram={setActiveId} calendars={calendars} teams={Object.keys(teamCapacities)} />
+                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} onUnfillMissing={unfillActive} onOpenDiagram={setActiveId} calendars={calendars} teams={Object.keys(teamCapacities)} />
                   : <p className="text-xs text-green-400/60">{loadingVariant ? "Loading variant…" : "Open this diagram from its editor to edit simulation data here."}</p>}
               </MatrixPanel>
               <MatrixPanel title="Interchange — BPSim export / import" className="md:col-span-3">
