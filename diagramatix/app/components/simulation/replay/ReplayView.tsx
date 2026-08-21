@@ -53,7 +53,8 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
   const [replay, setReplay] = useState<ReplayData>(() => buildReplay(data, config, teamCapacities, replayOpts));
   const [simT, setSimT] = useState(0);
   const [playing, setPlaying] = useState(true);
-  const [speed, setSpeed] = useState(20);
+  const [speed, setSpeed] = useState(50); // % of "whole run in ~2 min" (see the loop)
+  const [showCounts, setShowCounts] = useState(false); // #tokens that took each connector
   const teamIds = useMemo(() => teamIdsInDiagram(data), [data]);
   const [forkTeam, setForkTeam] = useState(teamIds[0] ?? "");
   const [forkCap, setForkCap] = useState(3);
@@ -103,6 +104,17 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
       else if (ev.nodeId) k.frames.push({ t: ev.t, nodeId: ev.nodeId, edgeId: ev.edgeId });
       k.endT = Math.max(k.endT, ev.t);
     }
+    return m;
+  }, [replay.trace]);
+
+  // Per-connector traversal times (raw namespaced edge id → sorted enter times),
+  // so "token counts" can show how many tokens have taken each path by now.
+  const edgeTimes = useMemo(() => {
+    const m = new Map<string, number[]>();
+    for (const ev of replay.trace) {
+      if (ev.kind === "enter" && ev.edgeId) (m.get(ev.edgeId) ?? m.set(ev.edgeId, []).get(ev.edgeId)!).push(ev.t);
+    }
+    for (const a of m.values()) a.sort((x, y) => x - y);
     return m;
   }, [replay.trace]);
 
@@ -268,7 +280,11 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
       const dt = (ts - last.current) / 1000;
       last.current = ts;
       if (playing) setSimT((t) => {
-        const next = t + dt * speed;
+        // `speed` is a % of "finish the whole horizon in ~2 minutes": at 100%
+        // maxSpeed = durationSim/120 sim-units per second → the full run plays in
+        // ~2 min regardless of horizon scale; lower % = proportionally slower.
+        const maxSpeed = Math.max(1, replay.durationSim / 120);
+        const next = t + dt * (maxSpeed * speed) / 100;
         if (next >= replay.durationSim) { setPlaying(false); return replay.durationSim; }
         return next;
       });
@@ -351,15 +367,31 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
     const node = vid ? nodeById.get(vid) : undefined;
     if (!node) return;
     const e = (simT - f.t) / flashWindow; // 0..1 through the window
-    const blinks = f.variant === "boundary" ? 3 : 2;
-    const on = Math.floor(e * blinks * 2) % 2 === 0;
+    // ONE flash: fully on for the first half of the window, then fade off — and
+    // the filter above drops it entirely once `e` passes 1, so it always resets
+    // to the normal render (no persisting highlight).
+    const on = e < 0.5;
     flashOverlays.push({
       key: `${f.nodeId}-${f.t.toFixed(3)}-${i}`,
       node,
       color: f.variant === "boundary" ? "#ef4444" : "#22c55e",
-      opacity: on ? 0.95 : 0.1,
+      opacity: on ? 0.95 : 0,
     });
   });
+
+  // Token counts: how many tokens have traversed each connector by the current
+  // clock, at the current drill level (raw edge ids are namespaced; strip the
+  // drill prefix to match the on-screen connectors).
+  const edgeCount = new Map<string, number>();
+  if (showCounts) {
+    for (const [rawId, times] of edgeTimes) {
+      if (prefix && !rawId.startsWith(prefix)) continue;
+      const local = prefix && rawId.startsWith(prefix) ? rawId.slice(prefix.length) : rawId;
+      let lo = 0, hi = times.length;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (times[mid] <= simT) lo = mid + 1; else hi = mid; }
+      if (lo > 0) edgeCount.set(local, (edgeCount.get(local) ?? 0) + lo);
+    }
+  }
 
   function forkCapacity() {
     if (!forkTeam) return;
@@ -379,10 +411,11 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
       <div className="flex items-center gap-3 flex-wrap">
         <MatrixButton onClick={() => setPlaying((p) => !p)}>{playing ? "❚❚ Pause" : "▶ Play"}</MatrixButton>
         <MatrixButton onClick={resetRun}>↺ Reset</MatrixButton>
-        <label className="flex items-center gap-2 text-[11px] text-green-400/70 font-mono">
+        <MatrixButton onClick={() => setShowCounts((v) => !v)}>{showCounts ? "① Counts on" : "① Token counts"}</MatrixButton>
+        <label className="flex items-center gap-2 text-[11px] text-green-400/70 font-mono" title="100% plays the whole run in ~2 minutes; lower is proportionally slower">
           speed
-          <input type="range" min={1} max={120} value={speed} onChange={(e) => setSpeed(parseInt(e.target.value, 10))} className="accent-green-500" />
-          <span className="w-9 text-right">{speed}×</span>
+          <input type="range" min={1} max={100} value={speed} onChange={(e) => setSpeed(parseInt(e.target.value, 10))} className="accent-green-500" />
+          <span className="w-24 text-right">{speed}% · ~{Math.max(1, Math.round(replay.durationSim / (Math.max(1, replay.durationSim / 120) * speed / 100)))}s</span>
         </label>
         <input type="range" min={0} max={Math.max(1, replay.durationSim)} value={simT}
           onChange={(e) => { setSimT(parseFloat(e.target.value)); setPlaying(false); }} className="flex-1 min-w-[120px] accent-green-500" />
@@ -421,6 +454,16 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
               </text>
             </g>
           ))}
+          {showCounts && viewData.connectors.map((c) => {
+            const n = edgeCount.get(c.id);
+            const wp = n ? connWaypoints.get(c.id) : undefined;
+            if (!wp) return null;
+            const p = pointAlongPolyline(wp, 0.5);
+            return (
+              <text key={`cnt-${c.id}`} x={p.x} y={p.y - 4} textAnchor="middle" fontSize={11} fontWeight={700}
+                fill="#4ade80" stroke="#000" strokeWidth={3} style={{ paintOrder: "stroke" }}>{n}</text>
+            );
+          })}
           {flashOverlays.map((fo) => (
             <rect key={fo.key} x={fo.node.x - 4} y={fo.node.y - 4} width={fo.node.w + 8} height={fo.node.h + 8}
               rx={6} fill="none" stroke={fo.color} strokeWidth={3} opacity={fo.opacity}
