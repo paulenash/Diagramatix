@@ -459,9 +459,15 @@ export function ReplayView({ data, config, teamCapacities, teamCalendars, calend
             const wp = n ? connWaypoints.get(c.id) : undefined;
             if (!wp) return null;
             const p = pointAlongPolyline(wp, 0.5);
+            // Offset PERPENDICULAR to the connector so the count clears the token
+            // queue that stacks along it. Dark green + no outline reads cleanly on
+            // the light (working-hours) diagram background.
+            const a = pointAlongPolyline(wp, 0.4), b = pointAlongPolyline(wp, 0.6);
+            const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+            const off = 26;
             return (
-              <text key={`cnt-${c.id}`} x={p.x} y={p.y - 4} textAnchor="middle" fontSize={11} fontWeight={700}
-                fill="#4ade80" stroke="#000" strokeWidth={3} style={{ paintOrder: "stroke" }}>{n}</text>
+              <text key={`cnt-${c.id}`} x={p.x - (dy / len) * off} y={p.y + (dx / len) * off}
+                textAnchor="middle" dominantBaseline="central" fontSize={22} fontWeight={700} fill="#166534">{n}</text>
             );
           })}
           {flashOverlays.map((fo) => (
