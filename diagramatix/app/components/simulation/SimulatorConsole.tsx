@@ -7,7 +7,7 @@
  * phases.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { MatrixRain } from "./matrix/MatrixRain";
 import { MatrixButton, MatrixPanel } from "./matrix/MatrixChrome";
@@ -38,9 +38,19 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
   // so replay/heatmap honour working hours, exactly like the authoritative run.
   const [calendars, setCalendars] = useState<CalendarRow[]>([]);
   const [teamCalMap, setTeamCalMap] = useState<Record<string, string>>({}); // team name → calendarId
-  const calendarsById: Record<string, WorkCalendar> = Object.fromEntries(calendars.map((c) => [c.id, c.pattern]));
-  const teamCalendars: Record<string, WorkCalendar> = Object.fromEntries(
-    Object.entries(teamCalMap).filter(([, calId]) => calId && calendarsById[calId]).map(([name, calId]) => [name, calendarsById[calId]]),
+  // Memoised so their identity is STABLE across renders — otherwise a fresh
+  // object every render churns ReplayView's `replayOpts`, whose "rebuild on
+  // diagrams load" effect then keeps resetting the clock to Monday 00:00 and
+  // restarting the run (the replay-clock reset loop).
+  const calendarsById = useMemo<Record<string, WorkCalendar>>(
+    () => Object.fromEntries(calendars.map((c) => [c.id, c.pattern])),
+    [calendars],
+  );
+  const teamCalendars = useMemo<Record<string, WorkCalendar>>(
+    () => Object.fromEntries(
+      Object.entries(teamCalMap).filter(([, calId]) => calId && calendarsById[calId]).map(([name, calId]) => [name, calendarsById[calId]]),
+    ),
+    [teamCalMap, calendarsById],
   );
   // Config of the LAST scenario that ran (from Studies & Scenarios), so "Launch
   // replay" animates that run — its full horizon → the real volume of tokens —
