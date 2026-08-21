@@ -28,8 +28,28 @@ function depthOf(el: DiagramElement, byId: Map<string, DiagramElement>): number 
 // too — otherwise their box paints over the connectors drawn within.
 const CONTAINER = new Set(["pool", "lane", "subprocess-expanded"]);
 
+// Paint containers back-to-front by BPMN nesting, NOT by parentId depth alone.
+// An expanded subprocess is often parented to the POOL (not the lane it visually
+// sits in), so parentId depth ties it with the lane — and on a tie the giant
+// lane can paint OVER the EP box, hiding it (only its children, drawn last, then
+// show). Ranking pool → lane → subprocess guarantees the lane is always behind
+// the EP regardless of a stale parent; depth then area break remaining ties.
+const CONTAINER_RANK: Record<string, number> = { pool: 0, lane: 1, "subprocess-expanded": 2 };
+
+/** The container elements in back-to-front paint order (pure, so it's unit
+ *  testable). Rank pool → lane → subprocess first, then parentId depth, then
+ *  larger area behind smaller — so a stale-parented EP never hides behind its
+ *  own lane. */
+export function orderBackdropContainers(elements: DiagramElement[]): DiagramElement[] {
+  const byId = new Map(elements.map((e) => [e.id, e]));
+  return elements.filter((e) => CONTAINER.has(e.type)).sort((a, b) =>
+    (CONTAINER_RANK[a.type] - CONTAINER_RANK[b.type]) ||
+    (depthOf(a, byId) - depthOf(b, byId)) ||
+    (b.width * b.height - a.width * a.height) // larger behind smaller
+  );
+}
+
 export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data, colorConfig, visibleIds, emphasize }: { data: DiagramData; colorConfig?: SymbolColorConfig; visibleIds?: Set<string>; emphasize?: Set<string> }) {
-  const byId = new Map(data.elements.map((e) => [e.id, e]));
   // Optional progressive-reveal gate (the Animate feature): render only ids in
   // the set. Undefined = render everything (the normal replay backdrop).
   const showEl = (id: string) => !visibleIds || visibleIds.has(id);
@@ -37,7 +57,7 @@ export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data,
   // elements/connectors NOT in the set so the highlighted path stands out in
   // context. Undefined = no fading.
   const dim = (id: string) => (emphasize && !emphasize.has(id) ? 0.1 : 1);
-  const containers = data.elements.filter((e) => CONTAINER.has(e.type) && showEl(e.id)).sort((a, b) => depthOf(a, byId) - depthOf(b, byId));
+  const containers = orderBackdropContainers(data.elements).filter((e) => showEl(e.id));
   const others = data.elements.filter((e) => !CONTAINER.has(e.type) && showEl(e.id));
 
   const sym = (el: DiagramElement) => (
