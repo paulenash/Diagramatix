@@ -301,6 +301,10 @@ export interface Connector {
   // Condition, e.g. "getProperty('noOfIssues') > 0"). A gateway edge uses one
   // or the other; an edge may be marked the default/else branch.
   branchProbability?: number;
+  /** true when `branchProbability` was set by "Fill missing" (not the user), so
+   *  "Unfill missing" can clear it and the panel can render it purple. Cleared
+   *  when the user edits the branch %. */
+  branchProbabilityAuto?: boolean;
   branchCondition?: string;
   isDefaultFlow?: boolean;
   // DIAGRAM-level branch share (0..100) for an outgoing edge of a decision

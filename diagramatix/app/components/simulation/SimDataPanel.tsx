@@ -35,13 +35,15 @@ function distOfKind(kind: SimDist["kind"]): SimDist {
     case "exponential": return { kind: "exponential", mean: 1 };
   }
 }
-function MatrixDist({ value, onChange }: { value?: SimDist; onChange: (d: SimDist | undefined) => void }) {
+function MatrixDist({ value, onChange, auto }: { value?: SimDist; onChange: (d: SimDist | undefined) => void; auto?: boolean }) {
+  // Auto-filled ("Fill missing") values render purple; user values green.
+  const cls = `bg-black border rounded px-1 py-0.5 text-[11px] [color-scheme:dark] ${auto ? "border-purple-400/60 text-purple-300" : "border-green-500/40 text-green-200"}`;
   return (
     <span className="inline-flex items-center gap-1">
       <select
         value={value?.kind ?? ""}
         onChange={(e) => onChange(e.target.value ? distOfKind(e.target.value as SimDist["kind"]) : undefined)}
-        className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-[11px] [color-scheme:dark]"
+        className={cls}
       >
         <option value="">—</option>
         {DISTRIBUTION_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
@@ -53,7 +55,7 @@ function MatrixDist({ value, onChange }: { value?: SimDist; onChange: (d: SimDis
           value={(value as any)[f]}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           onChange={(e) => onChange({ ...(value as any), [f]: Number(e.target.value) })}
-          className="w-14 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-[11px] [color-scheme:dark]"
+          className={`w-14 ${cls}`}
         />
       ))}
     </span>
@@ -62,10 +64,12 @@ function MatrixDist({ value, onChange }: { value?: SimDist; onChange: (d: SimDis
 
 const num = (v: string) => (v === "" ? undefined : Math.max(0, Number(v) || 0));
 
-export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, calendars = [], teams = [], clockUnit = "minute" }: {
+export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing, onOpenDiagram, calendars = [], teams = [], clockUnit = "minute" }: {
   data: DiagramData;
   onApplyData: (next: DiagramData) => void;
   onFillMissing?: () => number;
+  /** Undo Fill missing — clears only auto-filled values the user hasn't overridden. */
+  onUnfillMissing?: () => number;
   /** Switch the console to another diagram — used to edit a linked subprocess's
    *  own tasks (its sim data lives in the child diagram). */
   onOpenDiagram?: (diagramId: string) => void;
@@ -94,6 +98,10 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
   // fed by an arrival rate — so it's NOT an arrival source. Excluding it keeps
   // the panel in step with the run's readiness check (which ignores it too).
   const sources = data.elements.filter((e) => SOURCE_TYPES.has(e.type) && !e.boundaryHostId);
+  // Boundary catch events (timer/message/error/… mounted on a task or EP) are not
+  // arrivals — they race their host — but they DO carry simulation values
+  // (trigger + fire probability), so they get their own section.
+  const boundaries = data.elements.filter((e) => e.type === "intermediate-event" && !!e.boundaryHostId && e.eventType !== "compensation");
   const tasks = data.elements.filter((e) => TASK_TYPES.has(e.type) && !isEventEP(e));
   const eventEPs = data.elements.filter(isEventEP);
   // Only real decisions belong here: exclusive / inclusive SPLITS (≥ 2 outgoing
@@ -110,6 +118,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
   const branchSum = (g: DiagramElement) => data.connectors.filter((c) => c.sourceId === g.id);
   const missingItems: string[] = [];
   for (const s of sources) if (!getSimParams(s).arrival) missingItems.push(`${nameOf(s)} — arrival`);
+  for (const b of boundaries) if (!getSimParams(b).boundary?.trigger) missingItems.push(`${nameOf(b)} — boundary trigger`);
   for (const t of tasks) if (!getSimParams(t).cycleTime) missingItems.push(`${nameOf(t)} — cycle time`);
   for (const g of gateways) {
     const edges = branchSum(g);
@@ -129,7 +138,9 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
   }
   const missing = missingItems.length;
 
+  const isAuto = (el: DiagramElement, key: string) => (getSimParams(el).autofilled ?? []).includes(key);
   function doFill() { const n = onFillMissing?.() ?? 0; setMsg(`Filled ${n} value(s).`); }
+  function doUnfill() { const n = onUnfillMissing?.() ?? 0; setMsg(`Unfilled ${n} auto value(s) (manual edits kept).`); }
 
   // Take the CT/WT + branch shares the DIAGRAM already documents. Only offered
   // when there is something to take, so the control is never a no-op.
@@ -161,7 +172,8 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
             <MatrixButton onClick={doUseDiagram}>↧ Use diagram values</MatrixButton>
           </span>
         )}
-        {onFillMissing && <MatrixButton onClick={doFill}>⚙ Fill missing</MatrixButton>}
+        {onFillMissing && <MatrixButton variant="purple" onClick={doFill}>⚙ Fill missing</MatrixButton>}
+        {onUnfillMissing && <MatrixButton variant="purple" onClick={doUnfill}>⎌ Unfill missing</MatrixButton>}
         {!confirmClear
           ? <MatrixButton variant="danger" onClick={() => setConfirmClear(true)}>🗑 Clear all</MatrixButton>
           : <span className="flex items-center gap-2">
@@ -188,7 +200,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
               <Row key={s.id}>
                 <Cell w={W.flag}>{flag(!sim.arrival)}</Cell>
                 <Cell w={W.name} truncate>{s.label || s.id}</Cell>
-                <Cell w={W.dist}><MatrixDist value={sim.arrival} onChange={(arrival) => patchEl(s.id, { arrival })} /></Cell>
+                <Cell w={W.dist}><MatrixDist value={sim.arrival} auto={isAuto(s, "arrival")} onChange={(arrival) => patchEl(s.id, { arrival })} /></Cell>
                 <Cell w={W.maxArr}><input type="number" value={sim.maxArrivals ?? ""} placeholder="∞" onChange={(e) => patchEl(s.id, { maxArrivals: num(e.target.value) })} className={`${inp} w-20`} /></Cell>
                 <Cell w={W.cal}>
                   <select value={sim.calendarId ?? ""} onChange={(e) => patchEl(s.id, { calendarId: e.target.value || undefined })} title="Operating hours: only generate arrivals when this calendar is open" className={`${inp} w-28`}>
@@ -196,6 +208,31 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
                     {calendars.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </Cell>
+              </Row>
+            );
+          })}
+        </Section>
+      )}
+
+      {/* Boundary events */}
+      {boundaries.length > 0 && (
+        <Section title="Boundary events (race the host)" cols={[{ label: "", w: W.flag }, { label: "element", w: W.name }, { label: "on activity", w: W.name }, { label: "trigger", w: W.dist }, { label: "fire prob", w: W.units }, { label: "mode", w: W.team }]}>
+          {boundaries.map((b) => {
+            const sim = getSimParams(b);
+            const host = data.elements.find((e) => e.id === b.boundaryHostId);
+            const interrupting = b.properties?.interruptionType !== "non-interrupting";
+            return (
+              <Row key={b.id}>
+                <Cell w={W.flag}>{flag(!sim.boundary?.trigger)}</Cell>
+                <Cell w={W.name} truncate>{b.label || b.id}</Cell>
+                <Cell w={W.name} truncate>{host?.label || host?.id || "—"}</Cell>
+                <Cell w={W.dist}><MatrixDist value={sim.boundary?.trigger} auto={isAuto(b, "boundary")} onChange={(trigger) => patchEl(b.id, { boundary: { ...sim.boundary, trigger } })} /></Cell>
+                <Cell w={W.units}>
+                  <input type="number" min={0} max={1} step={0.05} value={sim.boundary?.fireProb ?? ""} placeholder="1"
+                    onChange={(e) => patchEl(b.id, { boundary: { ...sim.boundary, fireProb: e.target.value === "" ? undefined : Math.min(1, Math.max(0, Number(e.target.value) || 0)) } })}
+                    className={`${inp} w-12`} title="Chance it fires at all this execution (blank = always). E.g. a boundary error ≈ 0.05." />
+                </Cell>
+                <Cell w={W.team}>{interrupting ? "interrupting" : "non-interrupting"}</Cell>
               </Row>
             );
           })}
@@ -211,7 +248,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onOpenDiagram, 
               <Row key={t.id}>
                 <Cell w={W.flag}>{flag(!sim.cycleTime)}</Cell>
                 <Cell w={W.name} truncate>{t.label || t.id}</Cell>
-                <Cell w={W.dist}><MatrixDist value={sim.cycleTime} onChange={(cycleTime) => patchEl(t.id, { cycleTime })} /></Cell>
+                <Cell w={W.dist}><MatrixDist value={sim.cycleTime} auto={isAuto(t, "cycleTime")} onChange={(cycleTime) => patchEl(t.id, { cycleTime })} /></Cell>
                 <Cell w={W.dist}><MatrixDist value={sim.waitTime} onChange={(waitTime) => patchEl(t.id, { waitTime })} /></Cell>
                 <Cell w={W.team}>
                   {onOpenDiagram && typeof t.properties?.linkedDiagramId === "string"

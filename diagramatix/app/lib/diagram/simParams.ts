@@ -63,6 +63,11 @@ export interface ElementSimParams {
   // subprocess: simulate the linked/inline body, or use a black-box summary
   subMode?: "simulate" | "summary";
   summaryCycleTime?: SimDist;
+  /** Param keys on THIS element that were populated by "Fill missing" (not the
+   *  user). Rendered purple; "Unfill missing" clears only still-listed keys. A
+   *  manual edit to a field removes it from here (see simPatch), so a value the
+   *  user has since overridden is never unfilled. */
+  autofilled?: string[];
 }
 
 /** Process-level property definitions (BPSim Property), stored on DiagramData
@@ -90,7 +95,16 @@ export function getSimParams(el: Pick<DiagramElement, "properties">): ElementSim
 }
 
 /** Build the `{ sim }` properties patch for onUpdateProperties, merging a
- *  partial change over the element's current sim params. */
+ *  partial change over the element's current sim params. A manual edit here
+ *  removes the touched keys from `autofilled` (see ElementSimParams) so a value
+ *  the user has overridden is no longer treated as auto-filled. */
 export function simPatch(el: Pick<DiagramElement, "properties">, patch: Partial<ElementSimParams>): { sim: ElementSimParams } {
-  return { sim: { ...getSimParams(el), ...patch } };
+  const cur = getSimParams(el);
+  const touched = Object.keys(patch);
+  const next: ElementSimParams = { ...cur, ...patch };
+  if (cur.autofilled && cur.autofilled.length) {
+    const remaining = cur.autofilled.filter((k) => !touched.includes(k));
+    if (remaining.length) next.autofilled = remaining; else delete next.autofilled;
+  }
+  return { sim: next };
 }

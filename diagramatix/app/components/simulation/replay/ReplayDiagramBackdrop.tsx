@@ -37,7 +37,11 @@ export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data,
   // context. Undefined = no fading.
   const dim = (id: string) => (emphasize && !emphasize.has(id) ? 0.1 : 1);
   const containers = data.elements.filter((e) => CONTAINER.has(e.type) && showEl(e.id)).sort((a, b) => depthOf(a, byId) - depthOf(b, byId));
-  const others = data.elements.filter((e) => !CONTAINER.has(e.type) && showEl(e.id));
+  const others = data.elements.filter((e) => !CONTAINER.has(e.type) && showEl(e.id) && !e.boundaryHostId);
+  // Boundary events (mounted on a task / EP rim) render LAST — on top of their
+  // host and everything else — so a container fill or sibling can never paint
+  // over them (they were being lost on an EP with boundary events on its edge).
+  const boundaryEvents = data.elements.filter((e) => !CONTAINER.has(e.type) && showEl(e.id) && !!e.boundaryHostId);
 
   const sym = (el: DiagramElement) => (
     <g key={el.id} opacity={dim(el.id)}>
@@ -60,6 +64,7 @@ export const ReplayDiagramBackdrop = memo(function ReplayDiagramBackdrop({ data,
       {containers.map(sym)}
       {data.connectors.filter((c) => showEl(c.id)).map((c) => <g key={c.id} opacity={dim(c.id)}><ConnectorRenderer connector={c} selected={false} onSelect={noop} /></g>)}
       {others.map(sym)}
+      {boundaryEvents.map(sym)}
     </g>
   );
 });

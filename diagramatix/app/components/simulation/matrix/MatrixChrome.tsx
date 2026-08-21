@@ -16,11 +16,13 @@ export function MatrixButton({
 }: {
   children: React.ReactNode;
   onClick?: () => void;
-  variant?: "default" | "danger";
+  variant?: "default" | "danger" | "purple";
   className?: string;
   type?: "button" | "submit";
 }) {
-  const colour = variant === "danger" ? "text-red-400 border-red-400 hover:bg-red-400/10" : "text-green-400 border-green-400 hover:bg-green-400/10";
+  const colour = variant === "danger" ? "text-red-400 border-red-400 hover:bg-red-400/10"
+    : variant === "purple" ? "text-purple-300 border-purple-400 hover:bg-purple-400/10"
+    : "text-green-400 border-green-400 hover:bg-green-400/10";
   return (
     <button
       type={type}
