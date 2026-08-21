@@ -7,7 +7,7 @@
  * phases.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { MatrixRain } from "./matrix/MatrixRain";
@@ -21,6 +21,7 @@ import { BpsimInterchange } from "./BpsimInterchange";
 import { StudyManager } from "./StudyManager";
 import { SimDataPanel } from "./SimDataPanel";
 import { defaultReplayConfig, buildReplay } from "@/app/lib/simulation/replaySource";
+import { seedSimulationDefaults } from "@/app/lib/simulation/seedDefaults";
 import { autofillSimulation, unfillSimulation } from "@/app/lib/simulation/autofill";
 import type { ScenarioRunConfig, WorkCalendar } from "@/app/lib/simulation/types";
 
@@ -95,6 +96,24 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
   useEffect(() => {
     if (projectMode && !activeId && diagramList.length) setActiveId(diagramList[0].id);
   }, [projectMode, activeId, diagramList]);
+
+  // ── Auto-seed the default setup on first open ────────────────────────────
+  // So the simulator is usable immediately instead of an empty library: the
+  // three working calendars, one team per lane (capacity 1, Business Hours), and
+  // an Initial Study / Baseline scenario if the project has none. Idempotent
+  // (planDefaultSetup only creates what's missing). Runs once the project's
+  // diagrams have loaded so lane-team harvest sees them; `seedKey` bump remounts
+  // the library panels to show the newly-created rows.
+  const [seedKey, setSeedKey] = useState(0);
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (!projectId || seededRef.current) return;
+    if (diagramList.length > 0 && diagramsById.size === 0) return; // wait for diagrams
+    seededRef.current = true;
+    seedSimulationDefaults(projectId, [...diagramsById.values()])
+      .then((res) => { if (res.calendarsCreated || res.teamsCreated || res.studyCreated) setSeedKey((k) => k + 1); })
+      .catch(() => { seededRef.current = false; }); // allow a retry on the next change
+  }, [projectId, diagramList, diagramsById]);
 
   const isOpen = !activeId || activeId === diagramId;
   useEffect(() => {
@@ -178,7 +197,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
                 whole width. */}
             <div className="max-w-6xl mx-auto grid gap-3 md:grid-cols-3 content-start">
               <MatrixPanel title="Teams" className="md:col-span-2">
-                <TeamLibraryManager projectId={projectId} onCapacities={setTeamCapacities} calendars={calendars} onTeamCalendars={setTeamCalMap} />
+                <TeamLibraryManager key={`teams-${seedKey}`} projectId={projectId} onCapacities={setTeamCapacities} calendars={calendars} onTeamCalendars={setTeamCalMap} />
               </MatrixPanel>
               <MatrixPanel title="Run / Replay">
                 <p className="text-xs text-green-400/60 mb-3">
@@ -194,10 +213,10 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
                 </div>
               </MatrixPanel>
               <MatrixPanel title="Calendars — working hours" className="md:col-span-3">
-                <CalendarLibraryManager projectId={projectId} onCalendars={setCalendars} />
+                <CalendarLibraryManager key={`cals-${seedKey}`} projectId={projectId} onCalendars={setCalendars} />
               </MatrixPanel>
               <MatrixPanel title="Studies & Scenarios" className="md:col-span-3">
-                <StudyManager projectId={projectId} isAdmin={isAdmin} onRan={(cfg) => { setLastRunCfg(cfg); setMode("replay"); }} />
+                <StudyManager key={`studies-${seedKey}`} projectId={projectId} isAdmin={isAdmin} onRan={(cfg) => { setLastRunCfg(cfg); setMode("replay"); }} />
               </MatrixPanel>
               <MatrixPanel title={`Simulation Data — see, edit, fill & clear${!isOpen ? ` · ${diagramList.find((d) => d.id === activeId)?.name ?? "variant"}` : ""}`} className="md:col-span-3">
                 {!isOpen && (
