@@ -32,6 +32,27 @@ export interface CalendarOpts {
   calendarsById?: Record<string, WorkCalendar>;
 }
 
+/**
+ * Resource lookup that tolerates the drift a NAME-matched link inevitably
+ * collects — case and surrounding whitespace. "sales team" and "Sales Team " are
+ * the same resource; treating them as different silently produced a second,
+ * one-person pool that no capacity setting could reach.
+ */
+function resourceIndex<T>(map: Record<string, T> | undefined): Map<string, { key: string; value: T }> {
+  const out = new Map<string, { key: string; value: T }>();
+  for (const [k, v] of Object.entries(map ?? {})) out.set(k.trim().toLowerCase(), { key: k, value: v });
+  return out;
+}
+
+export interface AssembleOpts extends CalendarOpts {
+  /** Resource name → capacity, from the project's Resources library. */
+  teamCapacities?: Record<string, number>;
+  /** Deny a pool to any resource the library does not declare, so only visible,
+   *  adjustable resources can affect a run. The app sets this; tests and the
+   *  BPSim interchange keep the permissive behaviour. */
+  strictTeams?: boolean;
+}
+
 const DEFAULT_ARRIVAL: SimDist = { kind: "exponential", mean: 10 };
 const DEFAULT_CYCLE: SimDist = { kind: "fixed", value: 1 };
 const DEFAULT_TRIGGER: SimDist = { kind: "exponential", mean: 60 };
@@ -81,7 +102,7 @@ function loopOf(el: DiagramElement): LoopSpec | undefined {
 
 export function assembleFromDiagram(
   data: DiagramData,
-  opts?: { teamCapacities?: Record<string, number> } & CalendarOpts,
+  opts?: AssembleOpts,
 ): SimNetwork {
   const byId = new Map(data.elements.map((e) => [e.id, e]));
   const childrenOf = new Map<string, DiagramElement[]>();
@@ -350,11 +371,51 @@ export function assembleFromDiagram(
       isDefault: c.isDefaultFlow,
     }));
 
-  const teams: SimTeam[] = [...teamIds].map((id) => ({
-    id,
-    capacity: opts?.teamCapacities?.[id] ?? 1,
-    ...(opts?.teamCalendars?.[id] ? { calendar: opts.teamCalendars[id] } : {}),
-  }));
+  // ── Resources: only what the library actually declares ────────────────────
+  // A pool used to be created for ANY string an activity named, defaulting to
+  // capacity 1 — so a stale or mistyped name became an invisible one-person team
+  // that no setting could reach, and the run reported plausible, wrong numbers.
+  // Names are matched ignoring case and surrounding whitespace; anything the
+  // library does not declare is reported, and under `strictTeams` is denied a
+  // pool entirely so it cannot influence the run at all.
+  const capIndex = resourceIndex(opts?.teamCapacities);
+  const calIndex = resourceIndex(opts?.teamCalendars);
+  const haveLibrary = capIndex.size > 0 || opts?.strictTeams === true;
+  const unknownTeams: string[] = [];
+  const teams = new Map<string, SimTeam>();
+  // Task spelling → the library's canonical name. Matching is deliberately
+  // fuzzy (case + surrounding whitespace) but the RESULT never is: every pool is
+  // created under the library's own name, and each activity is rewritten to it.
+  // Keeping the activity's variant would leave a second pool under a name that
+  // appears nowhere in the Resources list — a hidden version of the same team,
+  // splitting its capacity and its utilisation in two.
+  const canonical = new Map<string, string>();
+  for (const id of teamIds) {
+    const hit = capIndex.get(id.trim().toLowerCase());
+    if (!hit) {
+      if (haveLibrary) {
+        unknownTeams.push(id);
+        if (opts?.strictTeams) continue; // no pool — the run cannot use it
+      }
+      canonical.set(id, id);
+      const cal = calIndex.get(id.trim().toLowerCase())?.value;
+      if (!teams.has(id)) teams.set(id, { id, capacity: 1, ...(cal ? { calendar: cal } : {}) });
+      continue;
+    }
+    canonical.set(id, hit.key);
+    if (!teams.has(hit.key)) {
+      const cal = calIndex.get(hit.key.trim().toLowerCase())?.value;
+      teams.set(hit.key, { id: hit.key, capacity: hit.value, ...(cal ? { calendar: cal } : {}) });
+    }
+  }
+  // Point every activity at the canonical resource — or at nothing when strict
+  // mode denied it a pool, so it cannot queue on a team that does not exist.
+  for (const n of nodes) {
+    if (!n.teamId) continue;
+    const target = canonical.get(n.teamId);
+    if (target) n.teamId = target;
+    else if (opts?.strictTeams) delete n.teamId;
+  }
 
-  return { nodes, edges, teams };
+  return { nodes, edges, teams: [...teams.values()], ...(unknownTeams.length ? { unknownTeams } : {}) };
 }

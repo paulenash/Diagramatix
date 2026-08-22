@@ -161,4 +161,16 @@ export interface SimNetwork {
   edges: SimEdge[];
   teams: SimTeam[];
   properties?: SimPropertyDef[];
+  /**
+   * Resource names activities referenced that are NOT in the supplied library —
+   * a lane since renamed, a typo, a deleted resource. Populated whenever a
+   * library is supplied so a caller can always SHOW them.
+   *
+   * Under `strictTeams` these get no pool at all: a resource that is not visible
+   * and adjustable must not be able to affect a run. Without it the assembler
+   * silently invented a one-person pool for any string it found, and a capacity
+   * set on the real resource applied to none of that work — results looked
+   * plausible and were wrong.
+   */
+  unknownTeams?: string[];
 }

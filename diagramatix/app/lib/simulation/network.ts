@@ -60,7 +60,10 @@ function namespaceFragment(net: SimNetwork, diagramId: string): SimNetwork {
     target: ns(diagramId, e.target),
   }));
 
-  return { nodes, edges, teams: net.teams, properties: net.properties };
+  // unknownTeams is carried through: a resource missing from the library must
+  // still be reportable after namespacing, or it would vanish silently in a
+  // portfolio run — precisely the failure this reporting exists to prevent.
+  return { nodes, edges, teams: net.teams, properties: net.properties, unknownTeams: net.unknownTeams };
 }
 
 /**
@@ -71,17 +74,19 @@ function namespaceFragment(net: SimNetwork, diagramId: string): SimNetwork {
  */
 export function assemblePortfolio(
   diagrams: PortfolioDiagram[],
-  opts?: { teamCapacities?: Record<string, number> } & CalendarOpts,
+  opts?: { teamCapacities?: Record<string, number>; strictTeams?: boolean } & CalendarOpts,
 ): SimNetwork {
   const nodes: SimNode[] = [];
   const edges: SimEdge[] = [];
   const teamCap = new Map<string, number>();
+  const unknown = new Set<string>();
 
   for (const d of diagrams) {
     const frag = namespaceFragment(
-      assembleFromDiagram(d.data, { teamCapacities: opts?.teamCapacities, teamCalendars: opts?.teamCalendars, calendarsById: opts?.calendarsById }),
+      assembleFromDiagram(d.data, { teamCapacities: opts?.teamCapacities, strictTeams: opts?.strictTeams, teamCalendars: opts?.teamCalendars, calendarsById: opts?.calendarsById }),
       d.id,
     );
+    for (const u of frag.unknownTeams ?? []) unknown.add(u);
     nodes.push(...frag.nodes);
     edges.push(...frag.edges);
     for (const t of frag.teams) {
@@ -100,7 +105,11 @@ export function assemblePortfolio(
     capacity,
     ...(opts?.teamCalendars?.[id] ? { calendar: opts.teamCalendars[id] } : {}),
   }));
-  return { nodes, edges, teams };
+  // Carry every undeclared resource up from the fragments, so a portfolio run
+  // can report them exactly as a single-diagram run does — a name that is not in
+  // the Resources list must never be able to hide inside a linked diagram.
+  const unknownTeams = [...unknown];
+  return { nodes, edges, teams, ...(unknownTeams.length ? { unknownTeams } : {}) };
 }
 
 /**

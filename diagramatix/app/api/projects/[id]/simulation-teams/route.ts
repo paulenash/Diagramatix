@@ -42,6 +42,15 @@ export async function POST(req: Request, { params }: Params) {
   const body = await req.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
+  // Resources are matched to activities BY NAME, so two rows sharing one name
+  // (or differing only by case/spacing) split that resource's capacity in two
+  // and make it impossible to tell which one a task is using. Names are unique
+  // per project: return the existing row rather than creating a twin, which also
+  // makes the simulator's on-open seeding idempotent by construction.
+  const existing = await prisma.simulationTeam.findFirst({
+    where: { projectId: id, name: { equals: name, mode: "insensitive" } },
+  });
+  if (existing) return NextResponse.json({ team: existing, existing: true });
   const team = await prisma.simulationTeam.create({
     data: {
       name,

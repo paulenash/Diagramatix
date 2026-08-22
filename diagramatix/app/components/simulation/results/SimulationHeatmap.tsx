@@ -107,7 +107,7 @@ export function SimulationHeatmap({ data, teamCapacities, teamCalendars, calenda
       // Splice linked subprocesses in, exactly as ▶ Run does — otherwise their
       // internal work contributes no load and the bottleneck can be wrong.
       const src = diagramsById && diagramId ? spliceLinkedSubprocesses(data, diagramId, diagramsById) : data;
-      const net = assembleFromDiagram(src, { teamCapacities, teamCalendars, calendarsById });
+      const net = assembleFromDiagram(src, { teamCapacities, strictTeams: true, teamCalendars, calendarsById });
       const teamOf = new Map(net.nodes.map((n) => [n.id, n.teamId]));
       const { stats } = runMonteCarlo(net, { ...DEFAULT_RUN_CONFIG, horizon: 2000, warmUp: 200, replications: Math.max(1, reps), seed: 1, collectQueues: true });
 

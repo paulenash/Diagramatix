@@ -132,7 +132,7 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   // ── Assemble + run ─────────────────────────────────────────────────────
-  const baseline = assemblePortfolio(rootDiagrams, { teamCapacities, teamCalendars, calendarsById });
+  const baseline = assemblePortfolio(rootDiagrams, { teamCapacities, strictTeams: true, teamCalendars, calendarsById });
   const net = applyOverrides(baseline, overrides);
 
   const run = await prisma.simulationRun.create({

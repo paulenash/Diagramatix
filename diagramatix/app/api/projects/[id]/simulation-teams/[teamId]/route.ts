@@ -25,7 +25,22 @@ export async function PUT(req: Request, { params }: Params) {
 
   const body = await req.json();
   const data: Record<string, unknown> = {};
-  if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
+  if (typeof body.name === "string" && body.name.trim()) {
+    const name = body.name.trim();
+    // Names are unique per project: two resources sharing one name split that
+    // resource's capacity and make it impossible to tell which a task uses.
+    const clash = await prisma.simulationTeam.findFirst({
+      where: { projectId: id, name: { equals: name, mode: "insensitive" }, NOT: { id: teamId } },
+      select: { id: true, name: true },
+    });
+    if (clash) {
+      return NextResponse.json(
+        { error: `Another resource is already called "${clash.name}". Resource names must be unique.` },
+        { status: 409 },
+      );
+    }
+    data.name = name;
+  }
   if (body.capacity !== undefined) data.capacity = Math.max(1, Math.round(Number(body.capacity)) || 1);
   if (body.costPerHour !== undefined) data.costPerHour = body.costPerHour === null ? null : Number(body.costPerHour);
   if (body.efficiency !== undefined) data.efficiency = Number(body.efficiency) > 0 ? Number(body.efficiency) : 1;

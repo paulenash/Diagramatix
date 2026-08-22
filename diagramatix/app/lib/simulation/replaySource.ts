@@ -87,7 +87,8 @@ export interface ReplayOpts extends CalendarOpts { rootId?: string; byId?: Map<s
 
 function assembleForReplay(data: DiagramData, teamCapacities: Record<string, number> | undefined, opts?: ReplayOpts): SimNetwork {
   const src = opts?.byId && opts.rootId ? spliceLinkedSubprocesses(data, opts.rootId, opts.byId) : data;
-  return assembleFromDiagram(src, { teamCapacities, teamCalendars: opts?.teamCalendars, calendarsById: opts?.calendarsById });
+  // strictTeams: only resources the user can SEE and adjust may affect a run.
+  return assembleFromDiagram(src, { teamCapacities, strictTeams: true, teamCalendars: opts?.teamCalendars, calendarsById: opts?.calendarsById });
 }
 
 function nodeTeamOf(net: SimNetwork): Map<string, string> {
