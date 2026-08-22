@@ -7,7 +7,7 @@
  * defaulting everything to 1.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MatrixButton } from "./matrix/MatrixChrome";
 import type { CalendarRow } from "./CalendarLibraryManager";
 
@@ -24,6 +24,7 @@ export function TeamLibraryManager({
   onCapacities,
   calendars = [],
   onTeamCalendars,
+  usedNames,
 }: {
   projectId: string | null;
   onCapacities?: (caps: Record<string, number>) => void;
@@ -31,6 +32,11 @@ export function TeamLibraryManager({
   calendars?: CalendarRow[];
   /** Publishes team name → assigned calendarId so the console can resolve hours. */
   onTeamCalendars?: (map: Record<string, string>) => void;
+  /** Team names actually referenced by the project's diagrams — a lane/pool name
+   *  or a task's sim.teamId. Teams are matched by NAME, so a lane that is renamed
+   *  or deleted leaves its old team row behind with nothing pointing at it.
+   *  Undefined = don't mark anything (the diagrams haven't loaded yet). */
+  usedNames?: Set<string>;
 }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [newName, setNewName] = useState("");
@@ -157,6 +163,14 @@ export function TeamLibraryManager({
     } finally { setMatching(false); }
   }
 
+  // Compare case-insensitively: a team row and the lane it came from can drift
+  // in casing without the link being "broken".
+  const unused = useMemo(() => {
+    if (!usedNames) return new Set<string>();
+    const used = new Set([...usedNames].map((n) => n.trim().toLowerCase()));
+    return new Set(teams.filter((t) => !used.has(t.name.trim().toLowerCase())).map((t) => t.name));
+  }, [teams, usedNames]);
+
   if (!projectId) return <p className="text-xs text-green-400/50">Open this diagram from a project to manage teams.</p>;
 
   return (
@@ -172,7 +186,15 @@ export function TeamLibraryManager({
         )}
         {teams.map((t) => (
           <div key={t.id} className="flex items-center gap-2 py-0.5">
-            <span className="w-52 shrink-0 text-green-300 truncate" title={t.name}>{t.name}</span>
+            <span className="w-52 shrink-0 truncate flex items-center gap-1" title={t.name}>
+              <span className={unused.has(t.name) ? "text-green-300/50 truncate" : "text-green-300 truncate"}>{t.name}</span>
+              {unused.has(t.name) && (
+                <span
+                  className="shrink-0 text-[9px] uppercase tracking-wider text-amber-300/90 border border-amber-500/40 rounded px-1"
+                  title="No lane or task in this project refers to this team — usually a lane that was renamed or deleted. Safe to delete with ✕ (nothing links to it by id; tasks match teams by NAME)."
+                >unused</span>
+              )}
+            </span>
             <input
               type="number" min={1} value={t.capacity}
               onChange={(e) => setCapacity(t.id, Math.max(1, parseInt(e.target.value, 10) || 1))}

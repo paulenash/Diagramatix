@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { arrivalSourcesOf, isArrivalSource } from "@/app/lib/simulation/arrivalSources";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import { reducer, type Action } from "@/app/hooks/useDiagram";
+import { usedTeamNames } from "@/app/lib/simulation/harvestTeams";
 import { getSimParams } from "@/app/lib/diagram/simParams";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
@@ -45,6 +46,26 @@ describe("arrival sources", () => {
     const { data } = autofillSimulation(epDiagram);
     expect(getSimParams(data.elements.find((e) => e.id === "epStart")!).arrival).toBeUndefined();
     expect(getSimParams(data.elements.find((e) => e.id === "realStart")!).arrival).toBeDefined();
+  });
+});
+
+describe("usedTeamNames — which library rows are still referenced", () => {
+  it("collects lane/pool labels and task teamIds, so a renamed lane's old team reads as unused", () => {
+    const d: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "P", type: "pool", x: 0, y: 0, width: 600, height: 200, label: "My Company", properties: {} },
+        { id: "l", type: "lane", parentId: "P", x: 40, y: 0, width: 560, height: 200, label: "Sales Team", properties: {} },
+        // A task deliberately assigned across lanes still counts as a reference.
+        { id: "t", type: "task", parentId: "l", x: 200, y: 60, width: 90, height: 50, label: "Do it",
+          properties: { sim: { teamId: "Specialists" } } },
+      ],
+      connectors: [],
+    } as unknown as DiagramData;
+    const used = usedTeamNames([d]);
+    expect([...used].sort()).toEqual(["My Company", "Sales Team", "Specialists"]);
+    // The pre-rename name is gone from the diagram, so its library row is unused.
+    expect(used.has("Sales Taem")).toBe(false);
   });
 });
 

@@ -22,6 +22,7 @@ import { StudyManager } from "./StudyManager";
 import { SimDataPanel } from "./SimDataPanel";
 import { defaultReplayConfig, buildReplay } from "@/app/lib/simulation/replaySource";
 import { seedSimulationDefaults } from "@/app/lib/simulation/seedDefaults";
+import { usedTeamNames } from "@/app/lib/simulation/harvestTeams";
 import { autofillSimulation, unfillSimulation } from "@/app/lib/simulation/autofill";
 import type { ScenarioRunConfig, WorkCalendar } from "@/app/lib/simulation/types";
 
@@ -169,6 +170,13 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
     const n = fillActive();
     if (n > 0) setAutoFilled(n);
   }, [activeId, diagramId, needsRootPick, canEditActive, activeData, fillActive]);
+  // Team names the project's diagrams actually reference, so the Teams panel can
+  // mark rows nothing points at (a renamed or deleted lane leaves its old team
+  // behind). Undefined until the diagrams load, so nothing is marked prematurely.
+  const usedTeams = useMemo(
+    () => (diagramsById.size === 0 && isOpen ? usedTeamNames([activeData]) : usedTeamNames([...diagramsById.values(), activeData])),
+    [diagramsById, activeData, isOpen],
+  );
   // The trace table runs one traced replication (like the replay) — built only
   // while the table is open so it costs nothing otherwise.
   const tableReplay = useMemo(
@@ -248,7 +256,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
                 whole width. */}
             <div className="max-w-6xl mx-auto grid gap-3 md:grid-cols-3 content-start">
               <MatrixPanel title="Teams" className="md:col-span-2">
-                <TeamLibraryManager key={`teams-${seedKey}`} projectId={projectId} onCapacities={setTeamCapacities} calendars={calendars} onTeamCalendars={setTeamCalMap} />
+                <TeamLibraryManager key={`teams-${seedKey}`} projectId={projectId} onCapacities={setTeamCapacities} calendars={calendars} onTeamCalendars={setTeamCalMap} usedNames={usedTeams} />
               </MatrixPanel>
               <MatrixPanel title="Run / Replay">
                 <p className="text-xs text-green-400/60 mb-3">

@@ -35,6 +35,28 @@ export function laneTeamName(el: DiagramElement, byId: Map<string, DiagramElemen
 /** Distinct team names across a set of diagrams — the lowest active lane/sublane
  *  (or pool) of every task, deduped by name (case-insensitive dedupe, keeping the
  *  first spelling seen). */
+/**
+ * Every team name the diagrams actually refer to — each lane/pool label plus
+ * each task's `sim.teamId`. Teams are matched by NAME (there is no id link from
+ * a task to a SimulationTeam row), so a lane that is renamed or deleted leaves
+ * its old team row in the library with nothing pointing at it. The Teams panel
+ * uses this to mark those rows "unused" rather than silently accumulating them.
+ */
+export function usedTeamNames(diagrams: DiagramData[]): Set<string> {
+  const out = new Set<string>();
+  for (const d of diagrams) {
+    for (const el of d?.elements ?? []) {
+      if (el.type === "lane" || el.type === "pool") {
+        const n = (el.label || "").trim();
+        if (n) out.add(n);
+      }
+      const team = (getSimParams(el).teamId ?? "").trim();
+      if (team) out.add(team);
+    }
+  }
+  return out;
+}
+
 export function harvestLaneTeams(diagrams: DiagramData[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
