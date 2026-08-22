@@ -40,6 +40,16 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
   // whether it did, so the header's back climbs the hierarchy before leaving.
   const replayBackRef = useRef<(() => boolean) | null>(null);
   const [teamCapacities, setTeamCapacities] = useState<Record<string, number>>({});
+  // Whether the Resources library has actually been read. A run built before it
+  // arrives uses NO capacities — every activity would look unresourced and the
+  // results would show no contention at all, which is worse than useless because
+  // it looks like a finished answer. Nothing that consumes capacities may start
+  // until this is true.
+  const [resourcesLoaded, setResourcesLoaded] = useState(false);
+  const publishCapacities = useCallback((caps: Record<string, number>) => {
+    setTeamCapacities(caps);
+    setResourcesLoaded(true);
+  }, []);
   // Working calendars: the library (from the Calendars panel) + the team→calendar
   // assignment (from the Teams panel). Resolved into the maps the assembler wants
   // so replay/heatmap honour working hours, exactly like the authoritative run.
@@ -183,8 +193,8 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
   // The trace table runs one traced replication (like the replay) — built only
   // while the table is open so it costs nothing otherwise.
   const tableReplay = useMemo(
-    () => mode === "table" ? buildReplay(activeData, replayCfg, teamCapacities, { rootId: activeId ?? diagramId, byId: diagramsById, teamCalendars, calendarsById }) : null,
-    [mode, activeData, replayCfg, teamCapacities, activeId, diagramId, diagramsById, teamCalendars, calendarsById],
+    () => mode === "table" && resourcesLoaded ? buildReplay(activeData, replayCfg, teamCapacities, { rootId: activeId ?? diagramId, byId: diagramsById, teamCalendars, calendarsById }) : null,
+    [mode, resourcesLoaded, activeData, replayCfg, teamCapacities, activeId, diagramId, diagramsById, teamCalendars, calendarsById],
   );
 
   return (
@@ -271,7 +281,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
                 whole width. */}
             <div className="max-w-6xl mx-auto grid gap-3 md:grid-cols-3 content-start">
               <MatrixPanel title="Resources — people &amp; automation" className="md:col-span-2">
-                <TeamLibraryManager key={`teams-${seedKey}`} projectId={projectId} onCapacities={setTeamCapacities} calendars={calendars} onTeamCalendars={setTeamCalMap} usedNames={usedTeams} />
+                <TeamLibraryManager key={`teams-${seedKey}`} projectId={projectId} onCapacities={publishCapacities} calendars={calendars} onTeamCalendars={setTeamCalMap} usedNames={usedTeams} />
               </MatrixPanel>
               <MatrixPanel title="Run / Replay">
                 <p className="text-xs text-green-400/60 mb-3">
@@ -322,6 +332,17 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
                   alternative). Then Run a scenario, or launch the replay to watch the flow and fork the timeline.
                 </p>
               </MatrixPanel>
+            </div>
+          </main>
+        ) : !resourcesLoaded ? (
+          // Nothing that consumes capacities may start before the Resources
+          // library has been read. Built too early, a run sees NO capacities and
+          // reports a process with no contention at all — a finished-looking
+          // answer that is entirely wrong.
+          <main className="flex-1 overflow-hidden p-4">
+            <div className="max-w-md mx-auto mt-10 text-center text-green-400/70 font-mono text-xs">
+              <div className="animate-pulse text-green-300 tracking-widest mb-2">◈ LOADING RESOURCES</div>
+              Waiting for this project&rsquo;s Resources so the run uses their real capacities.
             </div>
           </main>
         ) : mode === "replay" ? (

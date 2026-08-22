@@ -380,7 +380,13 @@ export function assembleFromDiagram(
   // pool entirely so it cannot influence the run at all.
   const capIndex = resourceIndex(opts?.teamCapacities);
   const calIndex = resourceIndex(opts?.teamCalendars);
-  const haveLibrary = capIndex.size > 0 || opts?.strictTeams === true;
+  // An EMPTY capacity map means the library isn't available — almost always
+  // "not loaded yet" rather than "this project has no resources". Applying the
+  // strict rule then would declare EVERY resource unknown and strip the lot,
+  // showing a run with no contention at all. Degrade to the permissive path
+  // instead: wrong-but-familiar beats confidently-empty. The console also gates
+  // on load, so this is the second line of defence, not the first.
+  const haveLibrary = capIndex.size > 0;
   const unknownTeams: string[] = [];
   const teams = new Map<string, SimTeam>();
   // Task spelling → the library's canonical name. Matching is deliberately

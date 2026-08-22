@@ -30,6 +30,9 @@ import { ProjectStructureSection } from "@/app/components/entityLists/ProjectStr
 import { ProjectSopsSection } from "@/app/components/sop/ProjectSopsSection";
 import { RiskControlConsole } from "@/app/components/riskControls/RiskControlConsole";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
+import { TeamLibraryManager } from "@/app/components/simulation/TeamLibraryManager";
+import { CalendarLibraryManager } from "@/app/components/simulation/CalendarLibraryManager";
+import type { WorkCalendar } from "@/app/lib/simulation/types";
 import { ProcessMiningOverlay } from "@/app/components/mining/ProcessMiningOverlay";
 import { useSuperAdminChrome, effectiveEntitlements } from "@/app/hooks/useSuperAdminChrome";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
@@ -528,6 +531,11 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   // from the toolbar (same as the dashboard project menu).
   const [showSim, setShowSim] = useState(false);
   const [showMining, setShowMining] = useState(false);
+  // Simulation resources (people + automation) and working calendars are
+  // PROJECT-level, shared by every process in it — so they are maintainable from
+  // the project without first opening the Simulator on some particular diagram.
+  const [showResources, setShowResources] = useState(false);
+  const [resourceCalendars, setResourceCalendars] = useState<{ id: string; name: string; pattern: WorkCalendar }[]>([]);
   const [showRcm, setShowRcm] = useState(false);
   // Deep-link (?rcm=1) — e.g. adopting a Risk & Control example lands here and
   // opens the Risk & Control console straight away rather than the bare project.
@@ -2841,6 +2849,15 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
                 {"◈"} Simulator
               </button>
               )}
+              {ent.simulator && (
+              <button
+                onClick={() => setShowResources(true)}
+                className="px-3 py-1 text-xs font-medium rounded-md border text-green-700 border-green-400 hover:bg-green-50"
+                title="Maintain this project's simulation resources (people + automation) and working calendars — shared by every process in the project"
+              >
+                {"⚙"} Resources
+              </button>
+              )}
               {ent.processMining && (
               <button
                 onClick={() => setShowMining(true)}
@@ -3519,6 +3536,37 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
             refreshProjectData();
           }}
         />
+      )}
+
+      {/* Project-level RESOURCES. Capacities and working calendars belong to the
+          project, not to any one diagram, so they are maintained here as well as
+          inside the Simulator — the same managers, so there is one implementation
+          and no chance of the two drifting. Kept on the Simulator's dark ground
+          because these ARE its libraries. */}
+      {showResources && (
+        <div className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-6" onClick={() => setShowResources(false)}>
+          <div className="bg-black border border-green-500/40 rounded-lg w-full max-w-5xl max-h-[85vh] overflow-auto p-4 font-mono" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-green-300 text-sm tracking-widest">⚙ SIMULATION RESOURCES</h2>
+                <p className="text-green-400/50 text-[11px] mt-0.5">
+                  {project.name} — shared by every process in this project. Activities are matched to a resource by NAME.
+                </p>
+              </div>
+              <button onClick={() => setShowResources(false)} className="text-green-400/70 hover:text-green-200 text-xs border border-green-500/40 rounded px-3 py-1.5">✕ Close</button>
+            </div>
+            <div className="flex flex-col gap-4">
+              <section>
+                <h3 className="text-green-400/70 text-[11px] uppercase tracking-wider mb-1.5">Resources — people &amp; automation</h3>
+                <TeamLibraryManager projectId={project.id} calendars={resourceCalendars} />
+              </section>
+              <section>
+                <h3 className="text-green-400/70 text-[11px] uppercase tracking-wider mb-1.5">Working calendars</h3>
+                <CalendarLibraryManager projectId={project.id} onCalendars={setResourceCalendars} />
+              </section>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Project-level Simulator + Process Mining consoles (full-screen overlays) */}

@@ -15,7 +15,7 @@ import type { DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/t
 import { getSimParams, simPatch, DISTRIBUTION_KINDS, type SimDist, type ElementSimParams } from "@/app/lib/diagram/simParams";
 import { clearSimData } from "@/app/lib/simulation/clearSimData";
 import { hasInlineBody } from "@/app/lib/simulation/autofill";
-import { repeatCountOf, isSequentialRepeat, implausibleRepeatCount } from "@/app/lib/simulation/repeats";
+import { repeatCountOf, isSequentialRepeat, implausibleRepeatCount, hasRepeat, loopParamsForMarker } from "@/app/lib/simulation/repeats";
 import { useDiagramValues, hasDiagramValues } from "@/app/lib/simulation/useDiagramValues";
 import type { ClockUnit } from "@/app/lib/simulation/types";
 import { isArrivalSource } from "@/app/lib/simulation/arrivalSources";
@@ -309,7 +309,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
 
       {/* Tasks */}
       {tasks.length > 0 && (
-        <Section title="Tasks" cols={[{ label: "", w: W.flag }, { label: "element", w: W.name }, { label: "cycle time", w: W.dist }, { label: "wait", w: W.dist }, { label: "resource", w: W.team }, { label: "units", w: W.units }]}>
+        <Section title="Tasks" cols={[{ label: "", w: W.flag }, { label: "element", w: W.name }, { label: "cycle time", w: W.dist }, { label: "wait", w: W.dist }, { label: "repeats", w: W.dist }, { label: "resource", w: W.team }, { label: "units", w: W.units }]}>
           {tasks.map((t) => {
             const sim = getSimParams(t);
             // A sub-process that runs its own body takes its time from the steps
@@ -326,6 +326,25 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
                     : <MatrixDist value={sim.cycleTime} auto={isAuto(t, "cycleTime")} onChange={(cycleTime) => patchEl(t.id, { cycleTime })} />}
                 </Cell>
                 <Cell w={W.dist}><MatrixDist value={sim.waitTime} onChange={(waitTime) => patchEl(t.id, { waitTime })} /></Cell>
+                {/* How many times the work happens. The marker on the diagram
+                    says THAT it repeats; this says how often — and it is a
+                    distribution, because "about 3, sometimes 6" is commoner than
+                    exactly 3. Only shown where a marker exists; the count used
+                    to be an invisible hardcoded 2/3 that nothing could edit. */}
+                <Cell w={W.dist}>
+                  {hasRepeat(t) ? (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-green-500/50 text-[9px] uppercase shrink-0" title={isSequentialRepeat(t) ? "One uninterrupted block — the resource is held for every pass" : "Instances run together, as far as the resource allows"}>
+                        {isSequentialRepeat(t) ? "seq" : "par"}
+                      </span>
+                      <MatrixDist
+                        value={repeatCountOf(t)}
+                        auto={isAuto(t, "loop")}
+                        onChange={(d) => patchEl(t.id, { loop: d ? loopParamsForMarker(t.repeatType, d) : undefined })}
+                      />
+                    </span>
+                  ) : <span className="text-green-500/25">—</span>}
+                </Cell>
                 <Cell w={W.team}>
                   {onOpenDiagram && typeof t.properties?.linkedDiagramId === "string"
                     ? <button onClick={() => onOpenDiagram(t.properties!.linkedDiagramId as string)} className="text-green-300 hover:text-green-200 text-[10px]" title="Open the linked subprocess diagram to edit its tasks">⤢ edit child →</button>
