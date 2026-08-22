@@ -16,9 +16,8 @@ import { getSimParams, simPatch, DISTRIBUTION_KINDS, type SimDist, type ElementS
 import { clearSimData } from "@/app/lib/simulation/clearSimData";
 import { useDiagramValues, hasDiagramValues } from "@/app/lib/simulation/useDiagramValues";
 import type { ClockUnit } from "@/app/lib/simulation/types";
+import { isArrivalSource } from "@/app/lib/simulation/arrivalSources";
 import { MatrixButton } from "./matrix/MatrixChrome";
-
-const SOURCE_TYPES = new Set(["start-event", "intermediate-event"]);
 const TASK_TYPES = new Set(["task", "subprocess", "subprocess-expanded"]);
 const isEventEP = (e: DiagramElement) => e.type === "subprocess-expanded" && e.properties?.subprocessType === "event";
 
@@ -94,10 +93,13 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
     onApplyData({ ...data, connectors: data.connectors.map((c) => (c.id === id ? { ...c, ...fields } : c)) });
   };
 
-  // A boundary event (timer/message/error attached to a task) is triggered, not
-  // fed by an arrival rate — so it's NOT an arrival source. Excluding it keeps
-  // the panel in step with the run's readiness check (which ignores it too).
-  const sources = data.elements.filter((e) => SOURCE_TYPES.has(e.type) && !e.boundaryHostId);
+  const elById = new Map(data.elements.map((e) => [e.id, e]));
+  // Arrival sources per the shared rule (see arrivalSources.ts): boundary events
+  // are triggered rather than fed by a rate, and a start event inside an EP is a
+  // pass-through delay in the run — neither is an arrival, so listing them here
+  // would show phantom rows the engine never generates tokens for.
+  const sources = data.elements.filter((e) =>
+    isArrivalSource(e, elById) || (e.type === "intermediate-event" && !e.boundaryHostId && !!getSimParams(e).arrival));
   // Boundary catch events (timer/message/error/… mounted on a task or EP) are not
   // arrivals — they race their host — but they DO carry simulation values
   // (trigger + fire probability), so they get their own section.
@@ -111,7 +113,16 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
     e.type === "gateway" && e.gatewayType !== "parallel"
     && data.connectors.filter((c) => c.sourceId === e.id && c.type === "sequence").length >= 2);
   const labelOf = (id: string) => data.elements.find((e) => e.id === id)?.label || id;
-  const nameOf = (e: DiagramElement) => e.label || e.id;
+  // Unlabelled elements (e.g. a start/end event inside an EP, which is
+  // deliberately unnamed) would otherwise show a meaningless raw id — name them
+  // by what they are, plus their container so they're still tellable apart.
+  const nameOf = (e: DiagramElement) => {
+    if (e.label?.trim()) return e.label;
+    const kind = (e.type === "start-event" ? "start" : e.type === "end-event" ? "end"
+      : e.type === "intermediate-event" ? "event" : e.type).replace(/-/g, " ");
+    const parent = e.parentId ? elById.get(e.parentId) : undefined;
+    return parent?.label?.trim() ? `(${kind} in ${parent.label.trim()})` : `(unnamed ${kind})`;
+  };
 
   // Missing-value flags — collected WITH the element name + what's missing, so
   // the toolbar can say exactly which item to fix (not just a count).
@@ -120,6 +131,23 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
   for (const s of sources) if (!getSimParams(s).arrival) missingItems.push(`${nameOf(s)} — arrival`);
   for (const b of boundaries) if (!getSimParams(b).boundary?.trigger) missingItems.push(`${nameOf(b)} — boundary trigger`);
   for (const t of tasks) if (!getSimParams(t).cycleTime) missingItems.push(`${nameOf(t)} — cycle time`);
+  // A task pointing at a team that no longer exists — classically a lane that was
+  // renamed or deleted, leaving the assignment behind. The run would staff it
+  // from a team nobody can see, so say so rather than silently carrying on.
+  // (An auto-filled team follows its lane automatically; this catches the rest.)
+  {
+    const known = new Set<string>([
+      ...teams.map((n) => n.trim().toLowerCase()),
+      ...data.elements.filter((e) => e.type === "lane" || e.type === "pool")
+        .map((e) => (e.label || "").trim().toLowerCase()).filter(Boolean),
+    ]);
+    for (const t of tasks) {
+      const team = getSimParams(t).teamId?.trim();
+      if (team && known.size && !known.has(team.toLowerCase())) {
+        missingItems.push(`${nameOf(t)} — team "${team}" no longer exists`);
+      }
+    }
+  }
   for (const g of gateways) {
     const edges = branchSum(g);
     if (edges.length < 2) continue;

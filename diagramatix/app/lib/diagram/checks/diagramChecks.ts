@@ -187,6 +187,82 @@ export function checkContainment(d: DiagramLike): Violation[] {
   return out;
 }
 
+/**
+ * Every element is owned by the container it actually sits in.
+ *
+ * `containment` asks "does the declared parent enclose the child?". This asks
+ * the converse — "is the declared parent the RIGHT one?" — and catches the case
+ * that check can't see: an element whose parent still encloses it, but which a
+ * smaller container now also encloses. Classically a task left parented to the
+ * pool (or to a deleted lane's slot) while sitting inside a lane, or a child
+ * left on an outer sub-process after an inner one was drawn around it.
+ *
+ * Wrong ownership is invisible on the canvas but changes real output: the BPMN
+ * export puts the element in the wrong swimlane, and the simulator bills its
+ * work to the wrong team.
+ *
+ * The expected owner is the SMALLEST container whose bounds hold the element's
+ * centre, preferring an expanded sub-process over a lane over a pool — the same
+ * rule the editor applies when lanes are added, resized or deleted.
+ */
+export function checkParentage(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const out: Violation[] = [];
+  const area = (e: DiagramElement) => e.width * e.height;
+  const holds = (box: DiagramElement, cx: number, cy: number) =>
+    cx >= box.x - PAD_TOLERANCE && cx <= rightOf(box) + PAD_TOLERANCE &&
+    cy >= box.y - PAD_TOLERANCE && cy <= bottomOf(box) + PAD_TOLERANCE;
+  // Descendants of `id`, so an element is never assigned to its own child.
+  const descendantsOf = (id: string): Set<string> => {
+    const seen = new Set<string>([id]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const e of d.elements) {
+        if (e.parentId && seen.has(e.parentId) && !seen.has(e.id)) { seen.add(e.id); grew = true; }
+      }
+    }
+    return seen;
+  };
+  const eps = d.elements.filter((e) => e.type === "subprocess-expanded");
+  const lanes = d.elements.filter((e) => e.type === "lane");
+  const pools = d.elements.filter((e) => e.type === "pool");
+
+  for (const el of d.elements) {
+    // Pools own themselves; boundary events belong to their host; markers stick
+    // to the shape they annotate; a dangling parent is ref-integrity's business.
+    if (el.type === "pool" || el.boundaryHostId) continue;
+    if (el.type === "uml-pain-point" || el.type === "uml-issue" || el.type === "review-comment") continue;
+    if (el.parentId && !byId.get(el.parentId)) continue;
+
+    const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+    const own = descendantsOf(el.id);
+    const pick = (list: DiagramElement[]) =>
+      list.filter((c) => !own.has(c.id) && holds(c, cx, cy)).sort((a, b) => area(a) - area(b))[0];
+    // A lane is owned by a lane/pool, never by a sub-process.
+    const expected = (el.type === "lane" ? undefined : pick(eps)) ?? pick(lanes) ?? pick(pools);
+
+    if (!expected) {
+      // Outside every container — only worth reporting if it claims a parent.
+      if (el.parentId) {
+        out.push({
+          rule: "parentage", severity: "warning", ids: [el.id, el.parentId],
+          message: `"${nameOf(el)}" is owned by "${nameOf(byId.get(el.parentId))}" but sits outside it`,
+        });
+      }
+      continue;
+    }
+    if (expected.id === el.parentId) continue;
+    out.push({
+      rule: "parentage", severity: "warning", ids: [el.id, expected.id],
+      message: el.parentId
+        ? `"${nameOf(el)}" sits inside ${expected.type} "${nameOf(expected)}" but is owned by ${byId.get(el.parentId)?.type ?? "?"} "${nameOf(byId.get(el.parentId))}"`
+        : `"${nameOf(el)}" sits inside ${expected.type} "${nameOf(expected)}" but has no owner`,
+    });
+  }
+  return out;
+}
+
 /** No fabricated "Main Process" wrapper. A pool-level event subprocess must
  *  render directly in its pool, not inside an auto-generated container. */
 export function checkNoFabricatedWrapper(d: DiagramLike): Violation[] {
@@ -1912,6 +1988,15 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkContainment,
+  },
+  {
+    code: "B47",
+    id: "parentage",
+    title: "Element owned by the wrong container",
+    description: "An element's parent is not the container it actually sits in — e.g. a task inside a Lane but still owned by the Pool (or by a Lane that was deleted), or a shape inside an expanded Sub-Process but owned by the Lane behind it. Invisible on the canvas, but it exports to the wrong swimlane and bills simulation work to the wrong team.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkParentage,
   },
   {
     code: "B06",

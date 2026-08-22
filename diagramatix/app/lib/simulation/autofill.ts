@@ -16,13 +16,13 @@
 import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { getSimParams, type ElementSimParams, type SimDist } from "@/app/lib/diagram/simParams";
 import { parseTimerLabel } from "./timerLabel";
+import { isArrivalSource } from "./arrivalSources";
 
 const DEF_ARRIVAL: SimDist = { kind: "exponential", mean: 10 };
 const DEF_CYCLE: SimDist = { kind: "triangular", min: 3, mode: 5, max: 8 };
 const DEF_DELAY: SimDist = { kind: "fixed", value: 2 };
 const DEF_TRIGGER: SimDist = { kind: "exponential", mean: 60 };
 
-const SOURCE = new Set(["start-event"]);
 const TASK = new Set(["task", "subprocess", "subprocess-expanded"]);
 const DELAY = new Set(["intermediate-event"]);
 const isBoundaryCatch = (el: DiagramElement) =>
@@ -63,7 +63,7 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
     if (isBoundaryCatch(el)) {
       if (!sim.boundary?.trigger) { sim.boundary = { ...sim.boundary, trigger: DEF_TRIGGER }; auto.add("boundary"); filled++; changed = true; }
     } else {
-      if (SOURCE.has(el.type) && !sim.arrival) { sim.arrival = DEF_ARRIVAL; auto.add("arrival"); filled++; changed = true; }
+      if (isArrivalSource(el, byId) && !sim.arrival) { sim.arrival = DEF_ARRIVAL; auto.add("arrival"); filled++; changed = true; }
       if (TASK.has(el.type)) {
         if (!sim.cycleTime) { sim.cycleTime = DEF_CYCLE; auto.add("cycleTime"); filled++; changed = true; }
         if (!sim.teamId) { sim.teamId = laneTeamId(el, byId); auto.add("teamId"); filled++; changed = true; }

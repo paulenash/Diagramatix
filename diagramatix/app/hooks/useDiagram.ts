@@ -604,9 +604,26 @@ function getAllDescendantIds(elements: DiagramElement[], containerId: string): S
  * anything owned by a subprocess / composite-state keep their container. Pools
  * without lanes are left untouched (nothing to adopt into). Pure.
  */
+/**
+ * When an element moves to a different lane, an AUTO-FILLED simulation team
+ * (which "Fill missing" derived from the old lane's name) must follow it —
+ * otherwise deleting a lane leaves work billed to a team that no longer exists,
+ * and the simulator keeps reporting the departed lane. A team the user set by
+ * hand is never touched: assigning a task to a team other than its lane is a
+ * legitimate model, so only our own derived value is re-derived.
+ */
+function retagAutoTeam(el: DiagramElement, lane: DiagramElement): DiagramElement {
+  const sim = (el.properties?.sim ?? undefined) as { teamId?: string; autofilled?: string[] } | undefined;
+  if (!sim?.autofilled?.includes("teamId")) return el;
+  const name = (lane.label || "").trim();
+  if (!name || name === sim.teamId) return el;
+  return { ...el, properties: { ...el.properties, sim: { ...sim, teamId: name } } };
+}
+
 function reconcileLaneMembership(elements: DiagramElement[]): DiagramElement[] {
   const lanes = elements.filter((e) => e.type === "lane");
-  if (lanes.length === 0) return elements;
+  const pools = elements.filter((e) => e.type === "pool");
+  if (lanes.length === 0 && pools.length === 0) return elements;
   const byId = new Map(elements.map((e) => [e.id, e]));
   const poolOf = (el: DiagramElement | undefined): string | undefined => {
     for (let cur = el, i = 0; cur && i < 24; i++) {
@@ -615,24 +632,68 @@ function reconcileLaneMembership(elements: DiagramElement[]): DiagramElement[] {
     }
     return undefined;
   };
+  const encloses = (box: DiagramElement, cx: number, cy: number) =>
+    cx >= box.x && cx <= box.x + box.width && cy >= box.y && cy < box.y + box.height;
   let changed = false;
   const out = elements.map((el) => {
     if (el.type === "lane" || el.type === "pool") return el;
     if (el.boundaryHostId) return el; // boundary events follow their host, not a lane
+    if (MARKER_TYPES.has(el.type)) return el; // markers stick to their host shape
     const parent = el.parentId ? byId.get(el.parentId) : undefined;
-    // Only reconcile elements hanging directly off a lane or a pool; anything
-    // parented to an EP / subprocess / composite-state belongs to that owner.
-    if (!parent || (parent.type !== "lane" && parent.type !== "pool")) return el;
-    const pool = poolOf(el);
-    if (!pool) return el;
     const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+    // An EP's contents belong to the EP, not to a lane — UNLESS the element no
+    // longer sits inside its EP's box (the EP was shrunk or the child dragged
+    // clear). A child stranded outside still renders and simulates as part of
+    // the sub-process, which is invisible to the user; release it so it re-joins
+    // whatever actually contains it. Other owners (subprocess / composite-state)
+    // keep their children unconditionally.
+    if (parent && parent.type !== "lane" && parent.type !== "pool") {
+      if (parent.type !== "subprocess-expanded" || encloses(parent, cx, cy)) return el;
+    }
+    // EPs nest. A child released from an inner EP may still sit inside an OUTER
+    // one — it belongs there, not in the lane behind them both. Prefer the
+    // smallest enclosing EP, skipping the element itself and its own descendants
+    // (which would create a parent cycle).
+    if (parent?.type === "subprocess-expanded") {
+      const own = getAllDescendantIds(elements, el.id);
+      const outer = elements
+        .filter((e) => e.type === "subprocess-expanded" && e.id !== el.id && !own.has(e.id) && encloses(e, cx, cy))
+        .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0];
+      if (outer) {
+        if (outer.id === el.parentId) return el;
+        changed = true;
+        return { ...el, parentId: outer.id };
+      }
+    }
+    // Reconcile elements hanging off a lane or a pool, ORPHANS (no parent — what
+    // a pool/lane cascade delete leaves behind, which would otherwise be stranded
+    // forever), and EP children released above. Without the orphan case, deleting
+    // a lane strands its former contents: every later lane add/split/resize skips
+    // them, so they never re-join a lane.
+    const pool = parent && parent.type !== "subprocess-expanded" ? poolOf(el) : undefined;
     // Half-open vertical bounds so an element whose centre lands exactly on a
     // divider is assigned to the lower lane (single, deterministic match).
     const host = lanes
-      .filter((ln) => poolOf(ln) === pool && cx >= ln.x && cx <= ln.x + ln.width && cy >= ln.y && cy < ln.y + ln.height)
+      .filter((ln) => (pool === undefined || poolOf(ln) === pool) && encloses(ln, cx, cy))
       .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]; // deepest / smallest lane wins
-    if (host && host.id !== el.parentId) { changed = true; return { ...el, parentId: host.id }; }
-    return el;
+    if (!host) {
+      // No lane contains it. Fall back to the pool it sits in, so a released or
+      // orphaned element still belongs to its pool rather than floating free
+      // (a parentless element exports outside the pool's process entirely).
+      const owner = pools.filter((p) => encloses(p, cx, cy))
+        .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0];
+      if (!owner || owner.id === el.parentId) return el;
+      changed = true;
+      return { ...el, parentId: owner.id };
+    }
+    // Re-home if the owning lane changed, and ALWAYS re-derive an auto-filled
+    // team from the lane the element actually sits in. The team must be checked
+    // even when the parent is already right, because other paths (the lane-delete
+    // absorb, in particular) re-parent the element themselves — leaving the old
+    // lane's name behind on the task if we only retagged on a move.
+    const next = retagAutoTeam(host.id === el.parentId ? el : { ...el, parentId: host.id }, host);
+    if (next !== el) changed = true;
+    return next;
   });
   return changed ? out : elements;
 }
@@ -3372,11 +3433,21 @@ function tracePerActionRouteDiff(
 // divider drag are covered uniformly instead of per-return.
 const LANE_RECONCILE_ACTIONS = new Set<Action["type"]>([
   "ADD_ELEMENT", "ADD_LANE", "ADD_SUBLANE", "MOVE_LANE_BOUNDARY", "DELETE_ELEMENT",
+  // Commit points of a drag: resizing a lane's edge or dragging a lane/element
+  // changes which lane encloses what, just as much as adding or deleting one.
+  // Hooked at the END of the gesture (not every intermediate frame) so the pass
+  // runs once per change.
+  "RESIZE_END", "MOVE_END",
 ]);
 
 export function reducer(state: DiagramData, action: Action): DiagramData {
   const next = reducerCore(state, action);
-  if (next !== state && LANE_RECONCILE_ACTIONS.has(action.type)) {
+  // Note: this deliberately does NOT skip when the core reducer returned state
+  // unchanged. RESIZE_END / MOVE_END are commit markers that often produce no
+  // state change of their own, yet they are exactly the moment a drag's final
+  // geometry must be re-evaluated. reconcileLaneMembership returns the SAME
+  // array when nothing moved, so the pass is cheap and identity-preserving.
+  if (LANE_RECONCILE_ACTIONS.has(action.type)) {
     const reconciled = reconcileLaneMembership(next.elements);
     if (reconciled !== next.elements) return { ...next, elements: reconciled };
   }
