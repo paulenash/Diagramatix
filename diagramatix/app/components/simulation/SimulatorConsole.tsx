@@ -36,6 +36,9 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
   // Diagram mode = entered from one diagram: single-process, just that name.
   const projectMode = !diagramId;
   const [mode, setMode] = useState<"home" | "replay" | "heatmap" | "table">("home");
+  // Set by ReplayView while it is mounted: pops one drill level and reports
+  // whether it did, so the header's back climbs the hierarchy before leaving.
+  const replayBackRef = useRef<(() => boolean) | null>(null);
   const [teamCapacities, setTeamCapacities] = useState<Record<string, number>>({});
   // Working calendars: the library (from the Calendars panel) + the team→calendar
   // assignment (from the Teams panel). Resolved into the maps the assembler wants
@@ -213,7 +216,19 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
             ) : diagramName ? (
               <span className="text-green-400/50 text-xs">{diagramName}</span>
             ) : null}
-            {mode !== "home" && <button onClick={() => setMode("home")} className="text-green-400/60 text-xs hover:text-green-300">‹ back</button>}
+            {mode !== "home" && (
+              <button
+                onClick={() => {
+                  // Climb OUT of a drilled sub-process first — leaving the run
+                  // entirely because you wanted to go up one level loses your
+                  // place in it. Only at the top does this return to the console.
+                  if (replayBackRef.current?.()) return;
+                  setMode("home");
+                }}
+                className="text-green-400/60 text-xs hover:text-green-300"
+                title="Step back up one level; at the top level, return to the console"
+              >‹ back</button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <a href="/help?c=simulation" target="_blank" rel="noopener noreferrer"
@@ -311,7 +326,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
           </main>
         ) : mode === "replay" ? (
           <main className="flex-1 overflow-hidden p-4">
-            <ReplayView data={activeData} colorConfig={colorConfig} config={replayCfg} teamCapacities={teamCapacities} teamCalendars={teamCalendars} calendarsById={calendarsById} diagramId={activeId ?? diagramId} diagramsById={diagramsById} onClose={() => setMode("home")} />
+            <ReplayView backHandlerRef={replayBackRef} data={activeData} colorConfig={colorConfig} config={replayCfg} teamCapacities={teamCapacities} teamCalendars={teamCalendars} calendarsById={calendarsById} diagramId={activeId ?? diagramId} diagramsById={diagramsById} onClose={() => setMode("home")} />
           </main>
         ) : mode === "heatmap" ? (
           <main className="flex-1 overflow-hidden p-4">

@@ -19,6 +19,7 @@ import { closedReason, simClockLabel } from "@/app/lib/simulation/calendar";
 import { getSimParams } from "@/app/lib/diagram/simParams";
 import { buildStatTimeline } from "@/app/lib/simulation/runningStats";
 import { drillPrefix, visibleNodeId } from "@/app/lib/simulation/drillIds";
+import { arrivalSourcesOf } from "@/app/lib/simulation/arrivalSources";
 import { LiveStatsTable } from "./LiveStatsTable";
 import { ReplayDiagramBackdrop } from "./ReplayDiagramBackdrop";
 import { MatrixButton } from "../matrix/MatrixChrome";
@@ -46,7 +47,14 @@ function pointAlongPolyline(pts: { x: number; y: number }[], f: number): { x: nu
 }
 
 
-export function ReplayView({ data, colorConfig, config, teamCapacities, teamCalendars, calendarsById, diagramId, diagramsById, onClose }: { data: DiagramData; colorConfig?: SymbolColorConfig; config: SimRunConfig; teamCapacities?: Record<string, number>; teamCalendars?: Record<string, WorkCalendar>; calendarsById?: Record<string, WorkCalendar>; diagramId?: string; diagramsById?: Map<string, DiagramData>; onClose?: () => void }) {
+export function ReplayView({ data, colorConfig, config, teamCapacities, teamCalendars, calendarsById, diagramId, diagramsById, onClose, backHandlerRef }: { data: DiagramData; colorConfig?: SymbolColorConfig; config: SimRunConfig; teamCapacities?: Record<string, number>; teamCalendars?: Record<string, WorkCalendar>; calendarsById?: Record<string, WorkCalendar>; diagramId?: string; diagramsById?: Map<string, DiagramData>; onClose?: () => void;
+  /** Lets the console's own "back" step UP the drill hierarchy instead of
+   *  leaving the replay. Returns true when it consumed the press (a level was
+   *  popped); false at the top, where leaving is the right thing to do. Without
+   *  this the header's "‹ back" and the breadcrumb's "‹ back" look identical but
+   *  do opposite things — pressing the obvious one threw you out of the run. */
+  backHandlerRef?: React.MutableRefObject<(() => boolean) | null>;
+}) {
   // Flatten linked (collapsed) subprocesses into the run, exactly as ▶ Run does,
   // so their timing/teams are honest instead of a pass-through. Working calendars
   // make tokens queue outside hours, matching the authoritative run.
@@ -75,6 +83,18 @@ export function ReplayView({ data, colorConfig, config, teamCapacities, teamCale
   // silent no-op (set window.__DIAG_DRILL_TRACE = true for the full breakdown).
   const [drillHint, setDrillHint] = useState<string | null>(null);
   useEffect(() => { setDrillStack([]); setZoomBox(null); }, [data]);
+  // Publish "go up one level" so the console's back button climbs the hierarchy
+  // before it considers leaving. Re-registered as the depth changes so it always
+  // pops from the CURRENT stack — one level per press, however deep.
+  useEffect(() => {
+    if (!backHandlerRef) return;
+    backHandlerRef.current = () => {
+      if (drillStack.length === 0) return false; // at the top — let the console leave
+      setDrillStack((s) => s.slice(0, -1));
+      return true;
+    };
+    return () => { backHandlerRef.current = null; };
+  }, [drillStack, backHandlerRef]);
   const viewData = useMemo(() => {
     if (!drillStack.length) return data;
     return diagramsById?.get(drillStack[drillStack.length - 1].diagramId) ?? data;
@@ -444,7 +464,11 @@ export function ReplayView({ data, colorConfig, config, teamCapacities, teamCale
     setForked(true); setPlaying(true);
   }
   function forkInject() {
-    const src = data.elements.find((e) => e.type === "start-event");
+    // The process's real ARRIVAL point — not merely the first start-event in the
+    // array, which can be one inside an expanded sub-process. Those are entered
+    // by a token that already exists, so injecting there would manufacture work
+    // in the middle of the process instead of at its front door.
+    const src = arrivalSourcesOf(data)[0];
     if (!src) return;
     setReplay(forkReplay(data, config, simT, { kind: "inject", nodeId: src.id, count: 10 }, teamCapacities, replayOpts));
     setForked(true); setPlaying(true);
@@ -566,7 +590,13 @@ export function ReplayView({ data, colorConfig, config, teamCapacities, teamCale
                   <button onClick={() => setDrillStack((s) => s.slice(0, i + 1))} className={i === drillStack.length - 1 ? "text-green-200" : "text-green-400/70 hover:text-green-200"}>{d.label || "sub"}</button>
                 </span>
               ))}
-              <button onClick={() => setDrillStack((s) => s.slice(0, -1))} className="ml-1 text-green-300 hover:text-green-200">‹ back</button>
+              {/* Name the destination: "back" alone gave no clue whether it
+                  climbed one level or left the run. */}
+              <button
+                onClick={() => setDrillStack((s) => s.slice(0, -1))}
+                className="ml-1 text-green-300 hover:text-green-200"
+                title="Go up one level (Esc does the same)"
+              >‹ up to {drillStack.length > 1 ? (drillStack[drillStack.length - 2].label || "sub-process") : "top"}</button>
             </div>
           )}
           <div>
