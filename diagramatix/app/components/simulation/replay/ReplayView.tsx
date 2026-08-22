@@ -80,6 +80,16 @@ export function ReplayView({ data, colorConfig, config, teamCapacities, teamCale
     return diagramsById?.get(drillStack[drillStack.length - 1].diagramId) ?? data;
   }, [drillStack, data, diagramsById]);
   const prefix = drillPrefix(drillStack.map((d) => d.subId));
+  /** Sub-processes in the current view that CAN be opened: they link to a child
+   *  diagram and that diagram has been loaded. An expanded sub-process is drawn
+   *  in place, so it is deliberately not drillable. */
+  const drillable = useMemo(
+    () => viewData.elements.filter((el) =>
+      (el.type === "subprocess" || el.type === "subprocess-expanded")
+      && typeof el.properties?.linkedDiagramId === "string"
+      && !!diagramsById?.has(el.properties.linkedDiagramId as string)),
+    [viewData, diagramsById],
+  );
 
   // ── Geometry (of the current view) ──
   const nodes = useMemo<NodePos[]>(
@@ -447,6 +457,29 @@ export function ReplayView({ data, colorConfig, config, teamCapacities, teamCale
         <MatrixButton onClick={() => setPlaying((p) => !p)}>{playing ? "❚❚ Pause" : "▶ Play"}</MatrixButton>
         <MatrixButton onClick={resetRun}>↺ Reset</MatrixButton>
         <MatrixButton onClick={() => setShowCounts((v) => !v)}>{showCounts ? "① Counts on" : "① Token counts"}</MatrixButton>
+        {/* Explicit drill control. Double-clicking the shape also works, but a
+            gesture that silently does nothing when it misses is impossible to
+            tell from a broken one — this lists exactly what CAN be opened, so
+            "nothing is drillable here" is visible rather than inferred. */}
+        {drillable.length > 0 ? (
+          <label className="flex items-center gap-1 text-[11px] text-green-400/70 font-mono" title="Open a linked sub-process's own diagram and watch its tokens; ‹ back returns">
+            <select
+              value=""
+              onChange={(e) => {
+                const el = drillable.find((d) => d.id === e.target.value);
+                if (el) { setDrillHint(null); setDrillStack((s) => [...s, { subId: el.id, diagramId: el.properties!.linkedDiagramId as string, label: el.label || "subprocess" }]); }
+              }}
+              className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-[11px] [color-scheme:dark]"
+            >
+              <option value="">⤢ Drill into…</option>
+              {drillable.map((d) => <option key={d.id} value={d.id}>{(d.label || d.id).replace(/\s+/g, " ")}</option>)}
+            </select>
+          </label>
+        ) : (
+          <span className="text-[11px] text-green-400/35 font-mono" title="Drill-down opens a sub-process that LINKS to its own diagram. An expanded sub-process is already drawn in place, so there is nothing separate to open.">
+            ⤢ nothing to drill into
+          </span>
+        )}
         <label className="flex items-center gap-2 text-[11px] text-green-400/70 font-mono" title="100% plays the whole run in ~2 minutes; lower is proportionally slower">
           speed
           <input type="range" min={1} max={100} value={speed} onChange={(e) => setSpeed(parseInt(e.target.value, 10))} className="accent-green-500" />
