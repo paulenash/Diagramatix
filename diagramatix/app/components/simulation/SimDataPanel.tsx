@@ -14,6 +14,7 @@ import { useState } from "react";
 import type { DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/types";
 import { getSimParams, simPatch, DISTRIBUTION_KINDS, type SimDist, type ElementSimParams } from "@/app/lib/diagram/simParams";
 import { clearSimData } from "@/app/lib/simulation/clearSimData";
+import { hasInlineBody } from "@/app/lib/simulation/autofill";
 import { useDiagramValues, hasDiagramValues } from "@/app/lib/simulation/useDiagramValues";
 import type { ClockUnit } from "@/app/lib/simulation/types";
 import { isArrivalSource } from "@/app/lib/simulation/arrivalSources";
@@ -130,7 +131,11 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
   const missingItems: string[] = [];
   for (const s of sources) if (!getSimParams(s).arrival) missingItems.push(`${nameOf(s)} — arrival`);
   for (const b of boundaries) if (!getSimParams(b).boundary?.trigger) missingItems.push(`${nameOf(b)} — boundary trigger`);
-  for (const t of tasks) if (!getSimParams(t).cycleTime) missingItems.push(`${nameOf(t)} — cycle time`);
+  // A sub-process timed by its own contents has no duration to be missing.
+  for (const t of tasks) {
+    if (hasInlineBody(t, data.elements)) continue;
+    if (!getSimParams(t).cycleTime) missingItems.push(`${nameOf(t)} — cycle time`);
+  }
   // A task pointing at a team that no longer exists — classically a lane that was
   // renamed or deleted, leaving the assignment behind. The run would staff it
   // from a team nobody can see, so say so rather than silently carrying on.
@@ -272,11 +277,19 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
         <Section title="Tasks" cols={[{ label: "", w: W.flag }, { label: "element", w: W.name }, { label: "cycle time", w: W.dist }, { label: "wait", w: W.dist }, { label: "team", w: W.team }, { label: "units", w: W.units }]}>
           {tasks.map((t) => {
             const sim = getSimParams(t);
+            // A sub-process that runs its own body takes its time from the steps
+            // inside it, so it has no duration of its own to set — show that
+            // rather than an editable field the engine would ignore.
+            const isScope = hasInlineBody(t, data.elements);
             return (
               <Row key={t.id}>
-                <Cell w={W.flag}>{flag(!sim.cycleTime)}</Cell>
-                <Cell w={W.name} truncate>{t.label || t.id}</Cell>
-                <Cell w={W.dist}><MatrixDist value={sim.cycleTime} auto={isAuto(t, "cycleTime")} onChange={(cycleTime) => patchEl(t.id, { cycleTime })} /></Cell>
+                <Cell w={W.flag}>{isScope ? <span className="text-green-500/40" title="Timed by its own contents">◇</span> : flag(!sim.cycleTime)}</Cell>
+                <Cell w={W.name} truncate>{nameOf(t)}</Cell>
+                <Cell w={W.dist}>
+                  {isScope
+                    ? <span className="text-green-400/40 italic" title="This sub-process is timed by the steps inside it — the engine runs its children and never reads a duration from the container.">from its contents</span>
+                    : <MatrixDist value={sim.cycleTime} auto={isAuto(t, "cycleTime")} onChange={(cycleTime) => patchEl(t.id, { cycleTime })} />}
+                </Cell>
                 <Cell w={W.dist}><MatrixDist value={sim.waitTime} onChange={(waitTime) => patchEl(t.id, { waitTime })} /></Cell>
                 <Cell w={W.team}>
                   {onOpenDiagram && typeof t.properties?.linkedDiagramId === "string"

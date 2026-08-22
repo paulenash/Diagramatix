@@ -114,3 +114,54 @@ describe("stale team after a lane is deleted", () => {
     expect(getSimParams(t).teamId, "manual team preserved").toBe("Exception Team");
   });
 });
+
+/**
+ * T2856 — a sub-process that runs a body of its own is a SCOPE, not a unit of
+ * work. The engine runs its children and never reads a duration from the
+ * container (assemble's `subprocess` branch copies only bodyStart/loop/eventSubs),
+ * so filling one would show a number that changes nothing. It still belongs to a
+ * lane, so the TEAM is filled either way — that is what says whose sub-process
+ * it is. A linked sub-process counts as a scope too: its child diagram is spliced
+ * in before assembly, giving it a body just the same.
+ */
+describe("sub-process scopes — team but no duration", () => {
+  const withSub = (subProps: Record<string, unknown>, inlineBody: boolean): DiagramData => ({
+    viewport: { x: 0, y: 0, zoom: 1 },
+    elements: [
+      { id: "P", type: "pool", x: 0, y: 0, width: 900, height: 300, label: "Co", properties: {} },
+      { id: "L", type: "lane", parentId: "P", x: 40, y: 0, width: 860, height: 300, label: "Sales Team", properties: {} },
+      { id: "sp", type: "subprocess-expanded", parentId: "L", x: 100, y: 40, width: 400, height: 200, label: "Sub", properties: subProps },
+      ...(inlineBody
+        ? [{ id: "s2", type: "start-event", parentId: "sp", x: 130, y: 90, width: 40, height: 40, label: "", properties: {} },
+           { id: "kid", type: "task", parentId: "sp", x: 220, y: 85, width: 90, height: 50, label: "Inner", properties: {} }]
+        : []),
+      { id: "plain", type: "task", parentId: "L", x: 600, y: 90, width: 90, height: 50, label: "Real work", properties: {} },
+    ],
+    connectors: [],
+  } as unknown as DiagramData);
+
+  it("an inline-body sub-process gets its lane's team but NO cycle time", () => {
+    const { data } = autofillSimulation(withSub({}, true));
+    const sp = getSimParams(data.elements.find((e) => e.id === "sp")!);
+    expect(sp.teamId, "still belongs to its lane").toBe("Sales Team");
+    expect(sp.cycleTime, "timed by its contents").toBeUndefined();
+    // A real task alongside it is unaffected.
+    const plain = getSimParams(data.elements.find((e) => e.id === "plain")!);
+    expect(plain.cycleTime).toBeDefined();
+    expect(plain.teamId).toBe("Sales Team");
+  });
+
+  it("a LINKED sub-process is a scope too — its child diagram is spliced in before the run", () => {
+    const { data } = autofillSimulation(withSub({ linkedDiagramId: "child-123" }, false));
+    const sp = getSimParams(data.elements.find((e) => e.id === "sp")!);
+    expect(sp.teamId).toBe("Sales Team");
+    expect(sp.cycleTime).toBeUndefined();
+  });
+
+  it("a sub-process with neither body nor link IS a unit of work, so it keeps a duration", () => {
+    const { data } = autofillSimulation(withSub({}, false));
+    const sp = getSimParams(data.elements.find((e) => e.id === "sp")!);
+    expect(sp.cycleTime).toBeDefined();
+    expect(sp.teamId).toBe("Sales Team");
+  });
+});

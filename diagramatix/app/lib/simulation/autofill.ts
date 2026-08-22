@@ -44,12 +44,17 @@ function laneTeamId(el: DiagramElement, byId: Map<string, DiagramElement>): stri
   return "team";
 }
 
-/** Does this sub-process contain its own runnable body (a start event somewhere
- *  beneath it)? If so the engine runs the CHILDREN and ignores the container's
- *  own cycle time / team — see the `subprocess` branch in assemble.ts, which
- *  copies only bodyStart / loop / eventSubs onto the node. */
+/**
+ * Does this sub-process run a body of its own, rather than being a unit of work?
+ * True when it holds an inline body (a start event beneath it) OR links to a
+ * child diagram — a linked one is spliced in before assembly, so it ends up with
+ * a body just the same. Either way the engine runs the CHILDREN and ignores the
+ * container's own cycle time: the `subprocess` branch in assemble.ts copies only
+ * bodyStart / loop / eventSubs onto the node.
+ */
 export function hasInlineBody(el: DiagramElement, elements: DiagramElement[]): boolean {
   if (el.type !== "subprocess" && el.type !== "subprocess-expanded") return false;
+  if (el.properties?.linkedDiagramId) return true; // spliced in before the run
   const kids = new Set<string>([el.id]);
   let grew = true;
   while (grew) {
@@ -81,14 +86,17 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
       if (!sim.boundary?.trigger) { sim.boundary = { ...sim.boundary, trigger: DEF_TRIGGER }; auto.add("boundary"); filled++; changed = true; }
     } else {
       if (isArrivalSource(el, byId) && !sim.arrival) { sim.arrival = DEF_ARRIVAL; auto.add("arrival"); filled++; changed = true; }
-      // A sub-process that has its own body is a SCOPE, not a unit of work: the
-      // assembler gives it bodyStart/loop and the engine runs the children, never
-      // reading a cycle time or team from the container itself. Filling those
-      // would put numbers in the Tasks list that change nothing about the run.
-      if (TASK.has(el.type) && !hasInlineBody(el, data.elements)) {
-        if (!sim.cycleTime) { sim.cycleTime = DEF_CYCLE; auto.add("cycleTime"); filled++; changed = true; }
+      if (TASK.has(el.type)) {
+        // A sub-process that runs a body of its own is a SCOPE, not a unit of
+        // work: the engine runs its children and never reads a duration from the
+        // container, so giving it one would show a number that changes nothing.
+        // It still belongs to a lane, though — the team is what says WHOSE
+        // sub-process this is, so that is filled either way.
+        if (!hasInlineBody(el, data.elements)) {
+          if (!sim.cycleTime) { sim.cycleTime = DEF_CYCLE; auto.add("cycleTime"); filled++; changed = true; }
+          if (sim.resourceUnits === undefined) { sim.resourceUnits = 1; auto.add("resourceUnits"); changed = true; }
+        }
         if (!sim.teamId) { sim.teamId = laneTeamId(el, byId); auto.add("teamId"); filled++; changed = true; }
-        if (sim.resourceUnits === undefined) { sim.resourceUnits = 1; auto.add("resourceUnits"); changed = true; }
       }
       if (DELAY.has(el.type) && !sim.delay) {
         // Read the duration straight off the label ("Wait 3 hours", "7 days",
