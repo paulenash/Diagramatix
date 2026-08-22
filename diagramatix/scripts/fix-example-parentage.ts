@@ -44,8 +44,95 @@ const sqlStr = (s: string) => `'${s.replace(/'/g, "''")}'`;
 /** A JSON scalar for jsonb_set's value argument. */
 const sqlJson = (v: string | undefined) => (v === undefined ? `'null'::jsonb` : `${sqlStr(JSON.stringify(v))}::jsonb`);
 
+interface Fix { table: string; slug: string; diagram: string; elId: string; from?: string; to?: string; note: string }
+
+/**
+ * The portable repair: a single DO block that LOCATES each element by id rather
+ * than by array position, so it does not depend on the target's arrays being
+ * ordered like the database this was generated from. It can be pasted straight
+ * into prod without running this script there. Each fix is guarded on the
+ * element's CURRENT parent, so it is idempotent (a second run finds nothing to
+ * do) and cannot touch an element that has since been corrected by hand.
+ */
+function buildPortableSql(fixes: Fix[]): string {
+  const q = (s: string | undefined) => (s === undefined ? "NULL" : `'${s.replace(/'/g, "''")}'`);
+  const rows = fixes.map((f, i) =>
+    `      (${q(f.table)}, ${q(f.slug)}, ${q(f.diagram)}, ${q(f.elId)}, ${q(f.from)}, ${q(f.to)})${i === fixes.length - 1 ? "" : ","}` +
+    `  -- ${f.note}`,
+  );
+  return `-- Repair container ownership (B47 parentage) in the example catalogues.
+-- PORTABLE: elements are found by id, not by array position, so this is safe to
+-- run on any environment regardless of how its packages are ordered.
+-- Idempotent: each fix only applies while the element still has the OLD parent.
+-- Wrapped in a transaction; RAISE NOTICE reports what it did.
+BEGIN;
+
+DO $$
+DECLARE
+  f       RECORD;
+  pkg     jsonb;
+  di      int;
+  ei      int;
+  changed boolean;
+  applied int := 0;
+  skipped int := 0;
+BEGIN
+  FOR f IN
+    SELECT * FROM (VALUES
+${rows.join("\n")}
+    ) AS t(tbl, slug, diagram_name, el_id, old_parent, new_parent)
+  LOOP
+    EXECUTE format('SELECT package FROM %I WHERE slug = $1', f.tbl) INTO pkg USING f.slug;
+    IF pkg IS NULL THEN
+      RAISE NOTICE 'SKIP  %.% — row not found', f.tbl, f.slug;
+      skipped := skipped + 1;
+      CONTINUE;
+    END IF;
+
+    changed := false;
+    FOR di IN 0 .. COALESCE(jsonb_array_length(pkg -> 'diagrams'), 0) - 1 LOOP
+      -- Element ids are unique only WITHIN a diagram, so match the diagram by
+      -- name too: two diagrams in one package can legitimately share an id.
+      CONTINUE WHEN pkg #>> ARRAY['diagrams', di::text, 'name'] IS DISTINCT FROM f.diagram_name;
+      FOR ei IN 0 .. COALESCE(jsonb_array_length(pkg -> 'diagrams' -> di -> 'data' -> 'elements'), 0) - 1 LOOP
+        IF pkg #>> ARRAY['diagrams', di::text, 'data', 'elements', ei::text, 'id'] = f.el_id
+           AND pkg #>> ARRAY['diagrams', di::text, 'data', 'elements', ei::text, 'parentId']
+               IS NOT DISTINCT FROM f.old_parent
+        THEN
+          IF f.new_parent IS NULL THEN
+            pkg := pkg #- ARRAY['diagrams', di::text, 'data', 'elements', ei::text, 'parentId'];
+          ELSE
+            pkg := jsonb_set(pkg,
+                     ARRAY['diagrams', di::text, 'data', 'elements', ei::text, 'parentId'],
+                     to_jsonb(f.new_parent), true);
+          END IF;
+          changed := true;
+        END IF;
+      END LOOP;
+    END LOOP;
+
+    IF changed THEN
+      EXECUTE format('UPDATE %I SET package = $1, "updatedAt" = NOW() WHERE slug = $2', f.tbl)
+        USING pkg, f.slug;
+      applied := applied + 1;
+      RAISE NOTICE 'FIXED %.% / % — % : % -> %', f.tbl, f.slug, f.diagram_name, f.el_id,
+        COALESCE(f.old_parent, '(none)'), COALESCE(f.new_parent, '(none)');
+    ELSE
+      skipped := skipped + 1;
+      RAISE NOTICE 'NO-OP %.% / % — % (already correct, or parent differs)', f.tbl, f.slug, f.diagram_name, f.el_id;
+    END IF;
+  END LOOP;
+
+  RAISE NOTICE '--- applied % fix(es), % skipped ---', applied, skipped;
+END $$;
+
+COMMIT;
+`;
+}
+
 async function main() {
   const statements: string[] = [];
+  const fixes: Fix[] = [];
   let scannedDiagrams = 0, totalFixes = 0, affectedExamples = 0;
 
   for (const { table, label } of TABLES) {
@@ -91,6 +178,7 @@ async function main() {
           );
           const name = (el.label || r.id).replace(/\s+/g, " ").slice(0, 40);
           console.log(`  · ${row.slug} / "${d.name ?? `diagram ${di}`}" — ${el.type} "${name}": ${r.from ?? "(none)"} → ${r.to ?? "(none)"}`);
+          fixes.push({ table, slug: row.slug, diagram: d.name ?? "", elId: r.id, from: r.from, to: r.to, note: `${el.type} "${name}"` });
           totalFixes++;
         }
       });
@@ -121,7 +209,11 @@ async function main() {
   ].join("\n");
   const file = "scripts/sql/fix-example-parentage.sql";
   writeFileSync(file, out, "utf8");
-  console.log(`\nSQL written to ${file}`);
+  const portable = "scripts/sql/fix-example-parentage-portable.sql";
+  writeFileSync(portable, buildPortableSql(fixes), "utf8");
+  console.log(`\nSQL written to:`);
+  console.log(`  ${portable}   <- run this one (finds elements by id; order-independent)`);
+  console.log(`  ${file}   (path-addressed equivalent, generated from THIS database)`);
 }
 
 main()
