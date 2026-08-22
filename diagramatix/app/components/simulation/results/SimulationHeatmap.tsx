@@ -34,8 +34,8 @@ export function SimulationHeatmap({ data, teamCapacities, teamCalendars, calenda
   const [reps, setReps] = useState(12);
   const [nonce, setNonce] = useState(0);
   const [computing, setComputing] = useState(false);
-  const [heat, setHeat] = useState<{ byNode: Map<string, Heat>; topNode: string | null; bottleneck: string | null; teams: Record<string, number> }>(
-    { byNode: new Map(), topNode: null, bottleneck: null, teams: {} },
+  const [heat, setHeat] = useState<{ byNode: Map<string, Heat>; topNode: string | null; bottleneck: string | null; teams: Record<string, number>; unknownTeams: string[] }>(
+    { byNode: new Map(), topNode: null, bottleneck: null, teams: {}, unknownTeams: [] },
   );
 
   // ── Drill-down: which linked subprocess instance we're looking inside, as in
@@ -134,7 +134,7 @@ export function SimulationHeatmap({ data, teamCapacities, teamCalendars, calenda
       // bottleneck is reported across everything, not just the visible boxes.
       const bottleneck = Object.entries(stats.perTeam).sort((a, b) => b[1].utilization.mean - a[1].utilization.mean)[0]?.[0] ?? null;
       const teams = Object.fromEntries(Object.entries(stats.perTeam).map(([t, s]) => [t, s.utilization.mean]));
-      setHeat({ byNode, topNode, bottleneck, teams });
+      setHeat({ byNode, topNode, bottleneck, teams, unknownTeams: net.unknownTeams ?? [] });
       setComputing(false);
     }, 0);
     return () => window.clearTimeout(id);
@@ -157,6 +157,15 @@ export function SimulationHeatmap({ data, teamCapacities, teamCalendars, calenda
 
   return (
     <div className="flex flex-col h-full gap-2">
+      {/* Unresourced work has no utilisation and no wait, so it can never show
+          as a bottleneck — the heatmap would look reassuringly cool exactly
+          where the model is incomplete. Say so rather than let it read as fine. */}
+      {heat.unknownTeams.length > 0 && (
+        <div className="border border-amber-500/50 bg-amber-500/[0.07] rounded px-2 py-1.5 text-amber-200 text-[11px] font-mono">
+          ⚠ {heat.unknownTeams.map((t) => `"${t}"`).join(", ")} {heat.unknownTeams.length === 1 ? "is" : "are"} not in this
+          project&rsquo;s Resources — that work is unresourced, so it shows no load here.
+        </div>
+      )}
       <div className="flex items-center gap-3 flex-wrap text-[11px] font-mono text-green-400/80">
         <span className="text-green-300 tracking-widest">▦ HEATMAP</span>
         <label className="flex items-center gap-2">

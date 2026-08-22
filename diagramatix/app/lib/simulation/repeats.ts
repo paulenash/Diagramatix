@@ -51,6 +51,29 @@ export function isSequentialRepeat(el: DiagramElement): boolean {
   return el.repeatType !== "mi-parallel";
 }
 
+/**
+ * A repeat count this large is a data error, not a model. The engine clamps at
+ * 10,000 passes so a runaway count can't exhaust memory mid-run — but a clamp
+ * that fires SILENTLY would quietly change the answer, so anything approaching
+ * it is reported here instead, before the run, where it can be corrected.
+ *
+ * `undefined` means "sane". Otherwise the representative size, so the message
+ * can name the number the user actually typed.
+ */
+export const IMPLAUSIBLE_REPEAT_COUNT = 1000;
+export function implausibleRepeatCount(el: DiagramElement): number | undefined {
+  const d = repeatCountOf(el);
+  if (!d) return undefined;
+  // The largest value the distribution realistically produces.
+  const size =
+    d.kind === "fixed" ? d.value
+    : d.kind === "uniform" ? d.max
+    : d.kind === "triangular" ? d.max
+    : d.kind === "normal" ? d.mean + 3 * d.sd
+    : d.mean; // exponential — the mean already implies a long tail
+  return Number.isFinite(size) && size > IMPLAUSIBLE_REPEAT_COUNT ? Math.round(size) : undefined;
+}
+
 /** The LoopParams an element should carry for its marker, for Fill missing to
  *  write so the count stops being an invisible default. */
 export function loopParamsForMarker(rt: RepeatType | undefined, count: SimDist): LoopParams | undefined {

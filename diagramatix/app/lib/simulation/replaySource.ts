@@ -27,6 +27,11 @@ export interface ReplayData {
    *  can't tell you, because a rarely-taken branch and a sub-process's own
    *  short-lived tokens both distort any ordering derived from visit times. */
   flowOrder: string[];
+  /** Resources activities named that are NOT in the project's Resources list.
+   *  Under strict assembly these get no pool, so the work is unresourced — which
+   *  is correct but must never be silent: the view shows these so a run can
+   *  always explain why an activity is not queueing for anyone. */
+  unknownTeams: string[];
 }
 
 /**
@@ -123,7 +128,7 @@ export function buildReplay(
   const net = assembleForReplay(data, teamCapacities, opts);
   const e = new Engine(net, config, undefined, { trace: true, maxTrace: 50000 });
   e.run();
-  return { trace: e.getTrace(), durationSim: endOf(e.getTrace(), config.horizon), nodeTeam: nodeTeamOf(net), nodeMeta: nodeMetaOf(net), flowOrder: flowOrderOf(net) };
+  return { trace: e.getTrace(), durationSim: endOf(e.getTrace(), config.horizon), nodeTeam: nodeTeamOf(net), nodeMeta: nodeMetaOf(net), flowOrder: flowOrderOf(net), unknownTeams: net.unknownTeams ?? [] };
 }
 
 /**
@@ -146,5 +151,5 @@ export function forkReplay(
   e.runUntil(atSimT);
   e.applyIntervention(iv);
   e.runUntil(config.horizon);
-  return { trace: e.getTrace(), durationSim: endOf(e.getTrace(), config.horizon), nodeTeam: nodeTeamOf(net), nodeMeta: nodeMetaOf(net), flowOrder: flowOrderOf(net) };
+  return { trace: e.getTrace(), durationSim: endOf(e.getTrace(), config.horizon), nodeTeam: nodeTeamOf(net), nodeMeta: nodeMetaOf(net), flowOrder: flowOrderOf(net), unknownTeams: net.unknownTeams ?? [] };
 }

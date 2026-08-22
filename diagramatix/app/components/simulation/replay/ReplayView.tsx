@@ -528,6 +528,23 @@ export function ReplayView({ data, colorConfig, config, teamCapacities, teamCale
         {forked && <span className="text-green-300">timeline forked ✓</span>}
       </div>
 
+      {/* A resource an activity names that is not in the project's Resources
+          list gets no pool, so that work seizes nothing — correct, but it must
+          never be silent: without this the run simply shows no queue and the
+          user has no way to know why. */}
+      {replay.unknownTeams.length > 0 && (
+        <div className="flex items-start gap-2 text-[11px] font-mono border border-amber-500/50 bg-amber-500/[0.07] rounded px-2 py-1.5 text-amber-200">
+          <span className="shrink-0">⚠</span>
+          <span>
+            {replay.unknownTeams.length === 1 ? "An activity references" : "Activities reference"}{" "}
+            {replay.unknownTeams.map((t) => `"${t}"`).join(", ")} —{" "}
+            {replay.unknownTeams.length === 1 ? "which is" : "which are"} not in this project&rsquo;s Resources.
+            That work is running <span className="text-amber-100">unresourced</span> (no capacity limit, no queue).
+            Add {replay.unknownTeams.length === 1 ? "it" : "them"} in Resources, or fix the assignment in Simulation Data.
+          </span>
+        </div>
+      )}
+
       <div className="relative flex-1 border border-green-500/30 rounded overflow-hidden bg-black min-h-[240px]">
         <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} className="w-full h-full cursor-zoom-in" preserveAspectRatio="xMidYMid meet" onClick={onSvgClick} onDoubleClick={onSvgDoubleClick}>
           {/* Transparent hit layer so clicks anywhere (incl. empty space) zoom. */}

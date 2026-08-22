@@ -159,3 +159,42 @@ describe("parallel multi-instance does not leak capacity", () => {
     expect(lastGap, "the last case should not be slower than the first").toBeCloseTo(firstGap, 5);
   });
 });
+
+/**
+ * T2864 — a repeat count is a DISTRIBUTION, so an unlucky sample or a mistyped
+ * mean can ask for an enormous number of passes. Each pass is materialised to
+ * sample its own duration, so unbounded that is an arbitrarily large allocation
+ * inside the event loop — and this runs SERVER-SIDE for the authoritative run,
+ * where it could take the whole app down rather than one browser tab. Clamped,
+ * a data error stays a wrong number instead of becoming an outage.
+ */
+describe("a runaway repeat count cannot exhaust memory", () => {
+  it("completes promptly instead of allocating without limit", () => {
+    const insane: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        el("s", "start-event", 0, { properties: { sim: { arrival: { kind: "fixed", value: 10 }, maxArrivals: 1 } } }),
+        el("t", "task", 100, {
+          properties: { sim: {
+            cycleTime: { kind: "fixed", value: 1 }, teamId: "T",
+            loop: { kind: "multi", instances: { kind: "fixed", value: 5_000_000_000 }, ordering: "sequential" },
+          } },
+        }),
+        el("e", "end-event", 300),
+      ],
+      connectors: [
+        { id: "c1", sourceId: "s", targetId: "t", type: "sequence" },
+        { id: "c2", sourceId: "t", targetId: "e", type: "sequence" },
+      ],
+    } as unknown as DiagramData;
+
+    const started = Date.now();
+    const e = new Engine(assembleFromDiagram(insane, { teamCapacities: { T: 1 } }), cfg, undefined, { trace: true });
+    e.run();
+    // The point is that it RETURNS. Without the clamp this allocates billions of
+    // entries and never gets here.
+    expect(Date.now() - started, "must not hang or thrash").toBeLessThan(5000);
+    const svc = e.getTrace().filter((x) => x.kind === "service" && x.nodeId === "t");
+    expect(svc.length, "the activity still ran").toBe(1);
+  });
+});

@@ -15,7 +15,7 @@ import type { DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/t
 import { getSimParams, simPatch, DISTRIBUTION_KINDS, type SimDist, type ElementSimParams } from "@/app/lib/diagram/simParams";
 import { clearSimData } from "@/app/lib/simulation/clearSimData";
 import { hasInlineBody } from "@/app/lib/simulation/autofill";
-import { repeatCountOf, isSequentialRepeat } from "@/app/lib/simulation/repeats";
+import { repeatCountOf, isSequentialRepeat, implausibleRepeatCount } from "@/app/lib/simulation/repeats";
 import { useDiagramValues, hasDiagramValues } from "@/app/lib/simulation/useDiagramValues";
 import type { ClockUnit } from "@/app/lib/simulation/types";
 import { isArrivalSource } from "@/app/lib/simulation/arrivalSources";
@@ -135,6 +135,16 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
   const missingItems: string[] = [];
   for (const s of sources) if (!getSimParams(s).arrival) missingItems.push(`${nameOf(s)} — arrival`);
   for (const b of boundaries) if (!getSimParams(b).boundary?.trigger) missingItems.push(`${nameOf(b)} — boundary trigger`);
+  // A repeat count large enough to be a data error. The engine clamps at 10,000
+  // passes so a runaway count cannot exhaust memory mid-run, but a clamp that
+  // fired silently would quietly change the answer — so it is reported here,
+  // before the run, where the number can actually be corrected.
+  for (const t of tasks) {
+    const n = implausibleRepeatCount(t);
+    if (n !== undefined) {
+      missingItems.push(`${nameOf(t)} — repeats ${n.toLocaleString()} times; over 10,000 is capped, so results would be wrong`);
+    }
+  }
   // Parallel multi-instance that the team is too small to actually run in
   // parallel. The run doesn't fail — it fits as many instances at once as the
   // team allows and does the rest in waves — but the model says "all at once"

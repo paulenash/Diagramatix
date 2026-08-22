@@ -58,6 +58,15 @@ export function TokenTraceTable({ replay, clockUnit = "minute", onClose }: {
   const s = table.stats;
   return (
     <div className="flex flex-col h-full gap-2 text-[11px] text-green-200 font-mono">
+      {/* Work charged to a resource that is not in the project's Resources list
+          runs unresourced — no capacity limit and no queue. Said plainly here,
+          because otherwise the only clue is a suspiciously short wait column. */}
+      {replay.unknownTeams.length > 0 && (
+        <div className="border border-amber-500/50 bg-amber-500/[0.07] rounded px-2 py-1.5 text-amber-200 text-[11px]">
+          ⚠ {replay.unknownTeams.map((t) => `"${t}"`).join(", ")} {replay.unknownTeams.length === 1 ? "is" : "are"} not in
+          this project&rsquo;s Resources — that work ran with no capacity limit, so its wait times are understated.
+        </div>
+      )}
       {/* Summary stats */}
       <div className="flex flex-wrap items-stretch gap-2">
         <Stat label="Cases in" value={s.cases} />

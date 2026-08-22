@@ -61,6 +61,20 @@ function loopCount(loop: NonNullable<SimNode["loop"]>) {
   return loop.kind === "standard" ? (loop.iterations ?? { kind: "fixed" as const, value: 2 }) : loop.instances;
 }
 
+/**
+ * Upper bound on the passes of one repeat / multi-instance activity.
+ *
+ * The count is a DISTRIBUTION, so an unlucky sample (or a mistyped mean) can
+ * return an enormous number, and each pass is materialised to sample its own
+ * duration. Unbounded that is an arbitrarily large allocation inside the event
+ * loop — and this code runs SERVER-SIDE for the authoritative scenario run, so
+ * it could take the whole app down rather than just one browser tab. No real
+ * process performs a step ten thousand times in one go; a model that asks for
+ * more is a data error, and clamping keeps it a wrong number instead of an
+ * outage.
+ */
+const MAX_REPEAT_PASSES = 10_000;
+
 /** A token-movement event for the live replay player (green-token animation). */
 export type TraceEventKind = "spawn" | "enter" | "queue" | "service" | "exit" | "fire";
 /** `fire` = an element ACTIVATION flash (not a token move): a boundary event that
@@ -705,7 +719,7 @@ export class Engine {
   private repeatPlan(node: SimNode): RepeatPlan {
     const units = node.units ?? 1;
     if (node.kind !== "task" || !node.loop) return { passes: 1, units, concurrency: 1 };
-    const passes = Math.max(1, Math.round(sample(loopCount(node.loop), this.rng)));
+    const passes = Math.min(MAX_REPEAT_PASSES, Math.max(1, Math.round(sample(loopCount(node.loop), this.rng))));
     const wantsParallel = node.loop.kind === "multi" && node.loop.ordering === "parallel";
     if (passes === 1 || !wantsParallel) return { passes, units, concurrency: 1 };
     // No team = no constraint; otherwise fit as many instances as the team holds.
