@@ -114,3 +114,48 @@ describe("Fill missing writes the repeat count", () => {
     expect(getSimParams(data.elements.find((e) => e.id === "t")!).loop).toBeUndefined();
   });
 });
+
+/**
+ * T2862 — resource accounting must balance.
+ *
+ * A parallel multi-instance activity seizes units × concurrency but the release
+ * path returned node.units, so every execution leaked the difference. The pool
+ * drained to zero, every token queued forever, and the run reported "Running"
+ * while nothing moved. A token must release exactly what it held.
+ */
+describe("parallel multi-instance does not leak capacity", () => {
+  const many = (instances: number, arrivals: number): DiagramData => ({
+    viewport: { x: 0, y: 0, zoom: 1 },
+    elements: [
+      el("s", "start-event", 0, { properties: { sim: { arrival: { kind: "fixed", value: 10 }, maxArrivals: arrivals } } }),
+      el("t", "task", 100, {
+        repeatType: "mi-parallel",
+        properties: { sim: { cycleTime: { kind: "fixed", value: 5 }, teamId: "T", loop: { kind: "multi", instances: { kind: "fixed", value: instances }, ordering: "parallel" } } },
+      }),
+      el("e", "end-event", 300),
+    ],
+    connectors: [
+      { id: "c1", sourceId: "s", targetId: "t", type: "sequence" },
+      { id: "c2", sourceId: "t", targetId: "e", type: "sequence" },
+    ],
+  } as unknown as DiagramData);
+
+  it("every arrival still completes — the pool is not drained", () => {
+    // 3 instances against a team of 3: the whole seizure must come back each
+    // time, or later arrivals starve.
+    const e = new Engine(assembleFromDiagram(many(3, 20), { teamCapacities: { T: 3 } }), cfg, undefined, { trace: true });
+    e.run();
+    const exits = e.getTrace().filter((x) => x.kind === "exit").length;
+    expect(exits, "all 20 cases should finish").toBe(20);
+  });
+
+  it("throughput does not decay as the run proceeds", () => {
+    // The leak showed up as later cases taking ever longer until nothing moved.
+    const e = new Engine(assembleFromDiagram(many(3, 12), { teamCapacities: { T: 3 } }), cfg, undefined, { trace: true });
+    e.run();
+    const exits = e.getTrace().filter((x) => x.kind === "exit").map((x) => x.t);
+    const firstGap = exits[1] - exits[0];
+    const lastGap = exits[exits.length - 1] - exits[exits.length - 2];
+    expect(lastGap, "the last case should not be slower than the first").toBeCloseTo(firstGap, 5);
+  });
+});

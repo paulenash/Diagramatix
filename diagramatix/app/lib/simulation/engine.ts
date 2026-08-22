@@ -29,7 +29,12 @@ type EventType = "GENERATE" | "SERVICE_END" | "RESUME" | "EVENT_TRIGGER" | "INTE
 interface IvPayload { kind: PlannedIntervention["kind"]; target: string; value: number; duration?: number }
 interface Ev { type: EventType; nodeId: string; tokenId?: string; scopeInst?: string; esubId?: string; iv?: IvPayload; cap?: number; beId?: string; armId?: number }
 
-interface Pending { tokenId: string; nodeId: string; units: number; requestedAt: number }
+/** A queued seize request. `plan` carries the repeat/multi-instance decision made
+ *  when the request was MADE, so a token that waits in the queue starts service
+ *  on the same terms it queued for — re-deciding on release would seize a
+ *  different number of units than the pool actually granted. */
+interface Pending { tokenId: string; nodeId: string; units: number; requestedAt: number; plan?: RepeatPlan }
+interface RepeatPlan { passes: number; units: number; concurrency: number }
 /** A subprocess scope instance a token is currently inside. `remaining` =
  *  further body re-runs queued (standard loop / sequential MI); `loopBack` =
  *  per-pass repeat probability (0..100); `parallel` marks a parallel-MI body
@@ -314,7 +319,7 @@ export class Engine {
     if (!pool) return;
     for (const p of pool.setCapacity(this.clock, Math.max(0, Math.round(capacity)))) {
       const t = this.tokens.get(p.tokenId), n = this.nodeById.get(p.nodeId);
-      if (t && n) this.startService(t, n, this.clock - p.requestedAt);
+      if (t && n) this.startService(t, n, this.clock - p.requestedAt, p.plan);
     }
   }
 
@@ -500,7 +505,7 @@ export class Engine {
       const pool = this.pools.get(held.teamId);
       if (pool) for (const p of pool.release(this.clock, held.units)) {
         const gt = this.tokens.get(p.tokenId), gn = this.nodeById.get(p.nodeId);
-        if (gt && gn) this.startService(gt, gn, this.clock - p.requestedAt);
+        if (gt && gn) this.startService(gt, gn, this.clock - p.requestedAt, p.plan);
       }
       this.inService.delete(tokenId);
     } else {
@@ -697,7 +702,7 @@ export class Engine {
    * Returns the units to seize and how many passes overlap; the service duration
    * follows in startService.
    */
-  private repeatPlan(node: SimNode): { passes: number; units: number; concurrency: number } {
+  private repeatPlan(node: SimNode): RepeatPlan {
     const units = node.units ?? 1;
     if (node.kind !== "task" || !node.loop) return { passes: 1, units, concurrency: 1 };
     const passes = Math.max(1, Math.round(sample(loopCount(node.loop), this.rng)));
@@ -715,7 +720,7 @@ export class Engine {
     if (node.teamId) {
       const pool = this.pools.get(node.teamId);
       if (pool) {
-        const pending: Pending = { tokenId: token.id, nodeId: node.id, units: plan.units, requestedAt: this.clock };
+        const pending: Pending = { tokenId: token.id, nodeId: node.id, units: plan.units, requestedAt: this.clock, plan };
         const granted = pool.request(this.clock, plan.units, pending);
         if (granted) this.startService(token, node, 0, plan);
         else this.emit("queue", token.id, node.id); // queued — service starts on a future release
@@ -725,7 +730,7 @@ export class Engine {
     this.startService(token, node, 0, plan);
   }
 
-  private startService(token: Token, node: SimNode, wait: number, plan?: { passes: number; units: number; concurrency: number }): void {
+  private startService(token: Token, node: SimNode, wait: number, plan?: RepeatPlan): void {
     const p = plan ?? this.repeatPlan(node);
     this.emit("service", token.id, node.id);
     if (node.teamId) this.inService.set(token.id, { teamId: node.teamId, units: p.units });
@@ -751,16 +756,22 @@ export class Engine {
   }
 
   private onServiceEnd(token: Token, node: SimNode): void {
+    const held = this.inService.get(token.id); // what this token actually seized
     this.inService.delete(token.id);
     this.boundaryArm.delete(token.id); // host finished first → disarm its boundary events
     if (node.teamId) {
       const pool = this.pools.get(node.teamId);
       if (pool) {
-        const granted = pool.release(this.clock, node.units ?? 1);
+        // Release exactly what this token HELD. A parallel multi-instance
+        // activity seizes units × concurrency, so releasing node.units instead
+        // leaked the difference on every execution: the pool drained to zero,
+        // every token queued forever, and the run reported "Running" while
+        // nothing moved.
+        const granted = pool.release(this.clock, held?.units ?? node.units ?? 1);
         for (const p of granted) {
           const gToken = this.tokens.get(p.tokenId);
           const gNode = this.nodeById.get(p.nodeId);
-          if (gToken && gNode) this.startService(gToken, gNode, this.clock - p.requestedAt);
+          if (gToken && gNode) this.startService(gToken, gNode, this.clock - p.requestedAt, p.plan);
         }
       }
     }
@@ -1074,7 +1085,7 @@ export class Engine {
         const prev = pool.currentCapacity;
         for (const p of pool.setCapacity(this.clock, Math.max(0, Math.round(iv.value)))) {
           const t = this.tokens.get(p.tokenId), n = this.nodeById.get(p.nodeId);
-          if (t && n) this.startService(t, n, this.clock - p.requestedAt);
+          if (t && n) this.startService(t, n, this.clock - p.requestedAt, p.plan);
         }
         if (iv.duration && iv.duration > 0) this.scheduleRevert(iv.target, { kind: "capacity", target: iv.target, value: prev }, iv.duration);
         break;
@@ -1113,7 +1124,7 @@ export class Engine {
       if (!pool) return;
       for (const p of pool.setCapacity(this.clock, iv.capacity)) {
         const t = this.tokens.get(p.tokenId), n = this.nodeById.get(p.nodeId);
-        if (t && n) this.startService(t, n, this.clock - p.requestedAt);
+        if (t && n) this.startService(t, n, this.clock - p.requestedAt, p.plan);
       }
     } else if (iv.kind === "inject") {
       for (let i = 0; i < iv.count; i++) {
