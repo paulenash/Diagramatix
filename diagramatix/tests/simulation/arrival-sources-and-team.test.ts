@@ -71,6 +71,21 @@ describe("stale team after a lane is deleted", () => {
     expect(getSimParams(t).teamId, "auto team re-derived from the new lane").toBe("Sales Team");
   });
 
+  it("renaming a lane re-derives the auto-filled team (a typo survives its own correction otherwise)", () => {
+    const d: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "P", type: "pool", x: 0, y: 0, width: 600, height: 200, label: "Co", properties: {} },
+        { id: "lane", type: "lane", parentId: "P", x: 40, y: 0, width: 560, height: 200, label: "Sales Taem", properties: {} },
+        { id: "t", type: "task", parentId: "lane", x: 200, y: 60, width: 90, height: 50, label: "Do it",
+          properties: { sim: { teamId: "Sales Taem", autofilled: ["teamId"] } } },
+      ],
+      connectors: [],
+    } as unknown as DiagramData;
+    const renamed = reducer(d, { type: "UPDATE_LABEL", payload: { id: "lane", label: "Sales Team" } } as Action);
+    expect(getSimParams(renamed.elements.find((e) => e.id === "t")!).teamId).toBe("Sales Team");
+  });
+
   it("a hand-set team is NOT rewritten — assigning across lanes is legitimate", () => {
     const after = del(twoLanes(false), "exc");
     const t = after.elements.find((e) => e.id === "t")!;

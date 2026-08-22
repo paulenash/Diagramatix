@@ -91,11 +91,17 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
       .catch(() => {});
   }, [projectId]);
 
-  // Project mode has no open diagram — default the panels to the first process
-  // once the list loads, so they aren't empty.
+  // Project mode has no open diagram, so the ROOT process must be chosen before
+  // anything is meaningful — silently defaulting to the first diagram in the
+  // list simulates whichever process happens to sort first, which is rarely the
+  // one the user meant. With exactly one candidate there is nothing to ask.
+  const [rootPicked, setRootPicked] = useState(!projectMode);
   useEffect(() => {
-    if (projectMode && !activeId && diagramList.length) setActiveId(diagramList[0].id);
+    if (!projectMode || activeId || diagramList.length !== 1) return;
+    setActiveId(diagramList[0].id);
+    setRootPicked(true);
   }, [projectMode, activeId, diagramList]);
+  const needsRootPick = projectMode && !rootPicked && diagramList.length > 1;
 
   // ── Auto-seed the default setup on first open ────────────────────────────
   // So the simulator is usable immediately instead of an empty library: the
@@ -128,6 +134,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
   }, [activeId, isOpen]);
 
   const activeData = isOpen ? data : (variantData ?? data);
+  const canEditActive = isOpen ? !!onApplyData : !!variantData;
   const applyActive = useCallback((next: DiagramData) => {
     if (isOpen) { onApplyData?.(next); return; }
     setVariantData(next);
@@ -143,13 +150,31 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
     applyActive(cleared);
     return n;
   }, [activeData, applyActive]);
+
+  // ── Fill the process's missing simulation values on first open ────────────
+  // Seeding the team/calendar/study libraries isn't enough to make the simulator
+  // usable: without cycle times, arrival rates and branch %s there is nothing to
+  // run. Fill them once per process, the same way the "⚙ Fill missing" button
+  // does — so every value is provenance-tagged (shown purple) and "⎌ Unfill
+  // missing" reverses it exactly, leaving anything typed by hand untouched.
+  // Keyed by diagram id so switching variant fills that one too, but re-opening
+  // never re-fills what is already there (autofill only writes absent values).
+  const [autoFilled, setAutoFilled] = useState(0);
+  const filledRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const key = activeId ?? diagramId;
+    if (!key || needsRootPick || filledRef.current.has(key)) return;
+    if (!canEditActive || activeData.elements.length === 0) return;
+    filledRef.current.add(key);
+    const n = fillActive();
+    if (n > 0) setAutoFilled(n);
+  }, [activeId, diagramId, needsRootPick, canEditActive, activeData, fillActive]);
   // The trace table runs one traced replication (like the replay) — built only
   // while the table is open so it costs nothing otherwise.
   const tableReplay = useMemo(
     () => mode === "table" ? buildReplay(activeData, replayCfg, teamCapacities, { rootId: activeId ?? diagramId, byId: diagramsById, teamCalendars, calendarsById }) : null,
     [mode, activeData, replayCfg, teamCapacities, activeId, diagramId, diagramsById, teamCalendars, calendarsById],
   );
-  const canEditActive = isOpen ? !!onApplyData : !!variantData;
 
   return (
     <div className="fixed inset-0 z-[60] bg-black text-green-400 font-mono overflow-hidden">
@@ -190,7 +215,33 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
           </div>
         </header>
 
-        {mode === "home" ? (
+        {needsRootPick ? (
+          // Entered from the Project screen: ask WHICH process to simulate
+          // before filling anything, rather than silently picking whichever
+          // diagram happens to sort first.
+          <main className="flex-1 overflow-auto p-4">
+            <div className="max-w-2xl mx-auto mt-6">
+              <MatrixPanel title="Choose the root process">
+                <p className="text-xs text-green-400/60 mb-3">
+                  This project has {diagramList.length} processes. Pick the one to simulate — its
+                  teams, calendars and missing values are set up for you. You can switch process at
+                  any time from the header.
+                </p>
+                <div className="flex flex-col gap-1.5 max-h-[50vh] overflow-auto">
+                  {diagramList.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => { setActiveId(d.id); setRootPicked(true); }}
+                      className="text-left px-3 py-2 rounded border border-green-500/30 text-green-200 text-xs hover:bg-green-400/10 hover:border-green-400"
+                    >
+                      ▸ {d.name}
+                    </button>
+                  ))}
+                </div>
+              </MatrixPanel>
+            </div>
+          </main>
+        ) : mode === "home" ? (
           <main className="flex-1 overflow-auto p-4">
             {/* Centred, compact column of panels — the ambient Matrix rain shows
                 in the margins on either side rather than the panels filling the

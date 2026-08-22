@@ -3441,6 +3441,12 @@ const LANE_RECONCILE_ACTIONS = new Set<Action["type"]>([
   // Hooked at the END of the gesture (not every intermediate frame) so the pass
   // runs once per change.
   "RESIZE_END", "MOVE_END",
+  // RENAMING a lane changes no geometry, but an auto-filled team is DERIVED
+  // FROM THE LANE'S NAME — without this every task keeps the old name (and a
+  // typo survives its own correction), so the simulator goes on reporting a
+  // team that no longer exists. UPDATE_LABEL is the commit; UPDATE_LABEL_LIVE
+  // fires per keystroke and is deliberately excluded.
+  "UPDATE_LABEL",
 ]);
 
 export function reducer(state: DiagramData, action: Action): DiagramData {
