@@ -22,7 +22,7 @@ const KIND_ABBR: Record<string, string> = {
 export function TokenTraceTable({ replay, clockUnit = "minute", onClose }: {
   replay: ReplayData; clockUnit?: ClockUnit; onClose?: () => void;
 }) {
-  const table = useMemo(() => buildTokenTable(replay.trace, replay.nodeMeta), [replay]);
+  const table = useMemo(() => buildTokenTable(replay.trace, replay.nodeMeta, replay.flowOrder), [replay]);
   const [metric, setMetric] = useState<Metric>("time");
   const [outcomeFilter, setOutcomeFilter] = useState<string>("");
   const [interruptedOnly, setInterruptedOnly] = useState(false);

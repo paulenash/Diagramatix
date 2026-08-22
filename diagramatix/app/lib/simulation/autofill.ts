@@ -44,6 +44,23 @@ function laneTeamId(el: DiagramElement, byId: Map<string, DiagramElement>): stri
   return "team";
 }
 
+/** Does this sub-process contain its own runnable body (a start event somewhere
+ *  beneath it)? If so the engine runs the CHILDREN and ignores the container's
+ *  own cycle time / team — see the `subprocess` branch in assemble.ts, which
+ *  copies only bodyStart / loop / eventSubs onto the node. */
+export function hasInlineBody(el: DiagramElement, elements: DiagramElement[]): boolean {
+  if (el.type !== "subprocess" && el.type !== "subprocess-expanded") return false;
+  const kids = new Set<string>([el.id]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const e of elements) {
+      if (e.parentId && kids.has(e.parentId) && !kids.has(e.id)) { kids.add(e.id); grew = true; }
+    }
+  }
+  return elements.some((e) => e.type === "start-event" && e.id !== el.id && kids.has(e.id));
+}
+
 export interface AutofillResult {
   data: DiagramData;
   filled: number; // count of attributes populated
@@ -64,7 +81,11 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
       if (!sim.boundary?.trigger) { sim.boundary = { ...sim.boundary, trigger: DEF_TRIGGER }; auto.add("boundary"); filled++; changed = true; }
     } else {
       if (isArrivalSource(el, byId) && !sim.arrival) { sim.arrival = DEF_ARRIVAL; auto.add("arrival"); filled++; changed = true; }
-      if (TASK.has(el.type)) {
+      // A sub-process that has its own body is a SCOPE, not a unit of work: the
+      // assembler gives it bodyStart/loop and the engine runs the children, never
+      // reading a cycle time or team from the container itself. Filling those
+      // would put numbers in the Tasks list that change nothing about the run.
+      if (TASK.has(el.type) && !hasInlineBody(el, data.elements)) {
         if (!sim.cycleTime) { sim.cycleTime = DEF_CYCLE; auto.add("cycleTime"); filled++; changed = true; }
         if (!sim.teamId) { sim.teamId = laneTeamId(el, byId); auto.add("teamId"); filled++; changed = true; }
         if (sim.resourceUnits === undefined) { sim.resourceUnits = 1; auto.add("resourceUnits"); changed = true; }

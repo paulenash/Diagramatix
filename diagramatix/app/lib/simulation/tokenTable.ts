@@ -37,7 +37,10 @@ function quantile(sorted: number[], q: number): number {
   return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
 }
 
-export function buildTokenTable(trace: TraceEvent[], nodeMeta: Map<string, NodeMeta>): TokenTable {
+export function buildTokenTable(trace: TraceEvent[], nodeMeta: Map<string, NodeMeta>, flowOrder?: string[]): TokenTable {
+  // Authoritative left-to-right order when the caller supplies the network's
+  // topology; the trace-derived ordering below is the fallback.
+  const flowRank = new Map<string, number>((flowOrder ?? []).map((id, i) => [id, i]));
   const byToken = new Map<string, TraceEvent[]>();
   for (const ev of trace) {
     if (ev.kind === "fire" || !ev.tokenId) continue; // element flashes aren't token moves
@@ -45,7 +48,13 @@ export function buildTokenTable(trace: TraceEvent[], nodeMeta: Map<string, NodeM
   }
 
   const rows: TokenRow[] = [];
-  const colFirst = new Map<string, number[]>(); // nodeId → first-enter times (column order)
+  const colFirst = new Map<string, number[]>(); // nodeId → first-enter times (tie-break)
+  // Column order: where a node sits in a token's RUN, normalised to 0..1 and
+  // averaged. Ordering by average first-enter TIME puts a rarely-taken branch
+  // (an error path one early token happened to hit) at the far left, because its
+  // average is computed over only the few tokens that reached it. Position in the
+  // sequence is what "left to right in execution order" actually means.
+  const colPos = new Map<string, number[]>();
   let maxCellTime = 0;
 
   for (const [id, evs] of byToken) {
@@ -72,6 +81,9 @@ export function buildTokenTable(trace: TraceEvent[], nodeMeta: Map<string, NodeM
       c.time += time; c.wait += wait; c.service += service; c.visits += 1; c.firstEnter = Math.min(c.firstEnter, tEnter);
       if (c.time > maxCellTime) maxCellTime = c.time;
       (colFirst.get(nodeId) ?? colFirst.set(nodeId, []).get(nodeId)!).push(tEnter);
+      // Normalised position of this visit within the token's own sequence, so
+      // tokens of different lengths contribute comparably.
+      (colPos.get(nodeId) ?? colPos.set(nodeId, []).get(nodeId)!).push(pos.length > 1 ? i / (pos.length - 1) : 0);
     }
 
     const start = pos[0].t;
@@ -86,8 +98,15 @@ export function buildTokenTable(trace: TraceEvent[], nodeMeta: Map<string, NodeM
   rows.forEach((r, i) => (r.num = i + 1));
 
   const cols: ColMeta[] = [...colFirst.keys()]
-    .map((cid) => ({ cid, ord: avg(colFirst.get(cid)!), meta: nodeMeta.get(cid) }))
-    .sort((a, b) => a.ord - b.ord) // flow order
+    .map((cid) => ({
+      cid,
+      // Topological rank when known; otherwise fall back to the token's own
+      // normalised visit position. Unranked nodes sort after ranked ones.
+      ord: flowRank.has(cid) ? flowRank.get(cid)! : (flowRank.size ? Number.MAX_SAFE_INTEGER : avg(colPos.get(cid) ?? [])),
+      first: Math.min(...colFirst.get(cid)!),
+      meta: nodeMeta.get(cid),
+    }))
+    .sort((a, b) => (a.ord - b.ord) || (a.first - b.first)) // execution order, earliest-reached breaks ties
     .map(({ cid, meta }) => ({ id: cid, label: meta?.label || cid, kind: meta?.kind || "?", team: meta?.team }));
 
   const completedRows = rows.filter((r) => r.completed);
