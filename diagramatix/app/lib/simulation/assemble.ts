@@ -89,6 +89,8 @@ export function assembleFromDiagram(
     if (e.parentId) (childrenOf.get(e.parentId) ?? childrenOf.set(e.parentId, []).get(e.parentId)!).push(e);
   }
   const firstOutTarget = (id: string) => data.connectors.find((c) => c.sourceId === id)?.targetId;
+  /** The outgoing connector itself, so a diverted token can record the edge it travelled. */
+  const firstOutEdge = (id: string) => data.connectors.find((c) => c.sourceId === id)?.id;
   /** Nearest ancestor lane/pool team — a task with no own team inherits it. */
   const laneTeamOf = (el: DiagramElement): string | undefined => {
     let cur = el.parentId ? byId.get(el.parentId) : undefined;
@@ -167,7 +169,7 @@ export function assembleFromDiagram(
     const trigger = getSimParams(startEv).eventTrigger ?? getSimParams(el).eventTrigger ?? DEFAULT_TRIGGER;
     const interrupting = startEv.properties?.interruptionType !== "non-interrupting";
     const arr = eventSubsByParent.get(parentScope) ?? eventSubsByParent.set(parentScope, []).get(parentScope)!;
-    arr.push({ id: el.id, bodyStart, trigger, interrupting });
+    arr.push({ id: el.id, bodyStart, viaEdge: firstOutEdge(startEv.id), trigger, interrupting });
   }
 
   // ── Boundary catch events on activities ──
@@ -191,6 +193,7 @@ export function assembleFromDiagram(
     const be: BoundaryEvent = {
       id: el.id,
       bodyStart,
+      viaEdge: firstOutEdge(el.id),
       trigger: bp?.trigger ?? DEFAULT_TRIGGER,
       fireProb: bp?.fireProb ?? 1,
       interrupting: el.properties?.interruptionType !== "non-interrupting",

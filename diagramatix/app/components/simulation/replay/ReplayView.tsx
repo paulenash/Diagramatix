@@ -71,6 +71,9 @@ export function ReplayView({ data, colorConfig, config, teamCapacities, teamCale
   // entry adds a "<subId>~" segment to the token-id prefix; the view swaps to
   // that subprocess's child diagram. Empty = the top-level diagram. ──
   const [drillStack, setDrillStack] = useState<{ subId: string; diagramId: string; label: string }[]>([]);
+  // Why a drill attempt did nothing — shown briefly so the gesture is never a
+  // silent no-op (set window.__DIAG_DRILL_TRACE = true for the full breakdown).
+  const [drillHint, setDrillHint] = useState<string | null>(null);
   useEffect(() => { setDrillStack([]); setZoomBox(null); }, [data]);
   const viewData = useMemo(() => {
     if (!drillStack.length) return data;
@@ -256,14 +259,45 @@ export function ReplayView({ data, colorConfig, config, teamCapacities, teamCale
       return { x: w.x - nw / 2, y: w.y - nh / 2, w: nw, h: nh };
     });
   }
+  /**
+   * Drill into the sub-process under the cursor. Three separate things must hold
+   * — the cursor is over a sub-process, it links to a child diagram, and that
+   * child has been loaded — and previously ALL THREE failed the same way: by
+   * doing nothing at all, which is indistinguishable from a broken gesture.
+   *
+   * Now the reason is reported: a short on-screen hint, plus a full breakdown to
+   * the console when `window.__DIAG_DRILL_TRACE = true` (the same convention as
+   * __DIAG_ROUTE_TRACE for connector problems).
+   */
   function drillAt(clientX: number, clientY: number) {
-    const w = clientToWorld(clientX, clientY); if (!w) return;
-    const hit = viewData.elements
-      .filter((el) => (el.type === "subprocess" || el.type === "subprocess-expanded")
-        && !!el.properties?.linkedDiagramId && !!diagramsById?.has(el.properties.linkedDiagramId as string)
-        && w.x >= el.x && w.x <= el.x + el.width && w.y >= el.y && w.y <= el.y + el.height)
-      .sort((a, b) => a.width * a.height - b.width * b.height)[0];
-    if (hit) setDrillStack((s) => [...s, { subId: hit.id, diagramId: hit.properties!.linkedDiagramId as string, label: hit.label || "subprocess" }]);
+    const w = clientToWorld(clientX, clientY);
+    const trace = typeof window !== "undefined" && (window as unknown as { __DIAG_DRILL_TRACE?: boolean }).__DIAG_DRILL_TRACE;
+    if (!w) { if (trace) console.log("[drill] no world point — the SVG did not resolve the click"); return; }
+
+    const subs = viewData.elements.filter((el) => el.type === "subprocess" || el.type === "subprocess-expanded");
+    const under = subs
+      .filter((el) => w.x >= el.x && w.x <= el.x + el.width && w.y >= el.y && w.y <= el.y + el.height)
+      .sort((a, b) => a.width * a.height - b.width * b.height);
+
+    if (trace) {
+      console.log(`[drill] click at world (${Math.round(w.x)},${Math.round(w.y)}) — ${subs.length} sub-process(es) on view, ${under.length} under the cursor`);
+      console.log(`[drill] loaded child diagrams: ${diagramsById ? [...diagramsById.keys()].join(", ") || "(none)" : "(map not supplied)"}`);
+      for (const el of subs) {
+        const link = el.properties?.linkedDiagramId as string | undefined;
+        console.log(`[drill]   ${el.type} "${el.label ?? el.id}" link=${link ?? "(none)"} loaded=${link ? !!diagramsById?.has(link) : "n/a"} box=[${Math.round(el.x)},${Math.round(el.y)} ${Math.round(el.width)}x${Math.round(el.height)}]`);
+      }
+    }
+
+    if (under.length === 0) { setDrillHint("Nothing to open here — double-click a sub-process that links to another diagram."); return; }
+    const linked = under.find((el) => !!el.properties?.linkedDiagramId);
+    if (!linked) { setDrillHint(`"${under[0].label ?? "This sub-process"}" has no linked diagram — its body is already on screen.`); return; }
+    const childId = linked.properties!.linkedDiagramId as string;
+    if (!diagramsById?.has(childId)) {
+      setDrillHint(`"${linked.label ?? "Sub-process"}" links to a diagram that isn't loaded here — it must be a BPMN diagram in this project.`);
+      return;
+    }
+    setDrillHint(null);
+    setDrillStack((s) => [...s, { subId: linked.id, diagramId: childId, label: linked.label || "subprocess" }]);
   }
   function onSvgClick(e: React.MouseEvent) {
     const { clientX, clientY } = e;
@@ -484,6 +518,12 @@ export function ReplayView({ data, colorConfig, config, teamCapacities, teamCale
           <LiveStatsTable timeline={statTimeline} simT={simT} teamCapacities={teamCapacities} unit={config.clockUnit} />
         </div>
         <div className="absolute top-3 left-3 font-mono text-[10px] text-green-400/60 bg-black/70 border border-green-500/40 rounded px-2 py-1 flex flex-col gap-1">
+          {drillHint && (
+            <div className="flex items-center gap-2 text-[11px] text-amber-300/90">
+              <span>⌕ {drillHint}</span>
+              <button onClick={() => setDrillHint(null)} className="text-green-400/60 hover:text-green-200">dismiss</button>
+            </div>
+          )}
           {drillStack.length > 0 && (
             <div className="flex items-center gap-1 flex-wrap">
               <button onClick={() => setDrillStack([])} className="text-green-400/70 hover:text-green-200">◆ top</button>

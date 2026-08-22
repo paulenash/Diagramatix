@@ -108,3 +108,58 @@ describe("buildTokenTable — column order", () => {
     expect(labels.some((l) => /^[a-z0-9]{6,}$/i.test(l)), "no raw ids").toBe(false);
   });
 });
+
+/**
+ * T2857 — token accounting. Every token row is either a CASE (spawned at a start
+ * event) or an INTERNAL token the engine made to run a sub-process body or a
+ * boundary handler, and every row's fate is exactly one of completed /
+ * interrupted / in progress. Reporting all of them as "tokens" and everything
+ * unfinished as "interrupted" made a healthy but under-resourced run look broken:
+ * the row count exceeded the arrivals, and a queue that simply hadn't drained by
+ * the horizon was labelled an error.
+ */
+describe("buildTokenTable — token accounting", () => {
+  const meta = new Map<string, NodeMeta>([
+    ["src", { label: "Start", kind: "source" }],
+    ["a", { label: "Step A", kind: "task" }],
+    ["handler", { label: "Handle Error", kind: "task" }],
+    ["end", { label: "Done", kind: "sink" }],
+  ]);
+  const trace: TraceEvent[] = [
+    // case 1 — completes
+    { t: 0, tokenId: "c1", kind: "spawn", nodeId: "src" },
+    { t: 1, tokenId: "c1", kind: "enter", nodeId: "a" },
+    { t: 2, tokenId: "c1", kind: "enter", nodeId: "end" },
+    { t: 2, tokenId: "c1", kind: "exit", nodeId: "end" },
+    // case 2 — cancelled by a boundary (exits without reaching a sink)
+    { t: 3, tokenId: "c2", kind: "spawn", nodeId: "src" },
+    { t: 4, tokenId: "c2", kind: "enter", nodeId: "a" },
+    { t: 5, tokenId: "c2", kind: "exit", nodeId: "a" },
+    // case 3 — still queued when the run ended (no exit)
+    { t: 6, tokenId: "c3", kind: "spawn", nodeId: "src" },
+    { t: 7, tokenId: "c3", kind: "enter", nodeId: "a" },
+    // internal — the boundary handler token, spawned mid-flow
+    { t: 5, tokenId: "i1", kind: "spawn", nodeId: "handler" },
+    { t: 6, tokenId: "i1", kind: "enter", nodeId: "end" },
+    { t: 6, tokenId: "i1", kind: "exit", nodeId: "end" },
+  ] as TraceEvent[];
+
+  it("separates cases from internal tokens, and the three fates add up", () => {
+    const s = buildTokenTable(trace, meta, ["src", "a", "handler", "end"]).stats;
+    expect(s.cases, "only tokens spawned at a start event are arrivals").toBe(3);
+    expect(s.internal, "the boundary handler token is not an arrival").toBe(1);
+    expect(s.cases + s.internal).toBe(s.tokens);
+    expect(s.completed).toBe(2);   // c1 + i1 reached the sink
+    expect(s.interrupted).toBe(1); // c2 exited early
+    expect(s.inProgress).toBe(1);  // c3 never exited
+    expect(s.completed + s.interrupted + s.inProgress).toBe(s.tokens);
+  });
+
+  it("labels an unfinished token 'in progress', not 'interrupted'", () => {
+    const rows = buildTokenTable(trace, meta).rows;
+    expect(rows.find((r) => r.id === "c3")!.outcome).toBe("in progress");
+    expect(rows.find((r) => r.id === "c3")!.inProgress).toBe(true);
+    expect(rows.find((r) => r.id === "c2")!.outcome).toBe("interrupted");
+    expect(rows.find((r) => r.id === "i1")!.internal).toBe(true);
+  });
+});

@@ -24,6 +24,9 @@ export type LoopSpec =
 export interface EventSub {
   id: string;
   bodyStart: string;     // entry node of the handler body (body nodes scope = id)
+  /** The sequence flow into the handler body, so the replay can count tokens
+   *  travelling it like any other connector. */
+  viaEdge?: string;
   trigger: SimDist;      // timer: delay from scope entry until the event fires
   interrupting: boolean;
 }
@@ -38,6 +41,10 @@ export interface EventSub {
 export interface BoundaryEvent {
   id: string;
   bodyStart: string;     // the boundary event's outgoing sequence-flow target
+  /** The sequence flow the diverted token travels along. Recorded so the replay
+   *  can count traversals of the handler connector like any other — without it a
+   *  boundary event's outgoing flow shows no token count at all. */
+  viaEdge?: string;
   trigger: SimDist;      // time from host service-start until the event fires
   fireProb: number;      // 0..1 chance it fires at all this execution (default 1)
   interrupting: boolean;

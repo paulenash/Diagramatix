@@ -15,6 +15,15 @@ export interface TokenRow {
   id: string; num: number; cells: Record<string, TokenCell>;
   start: number; end: number; total: number;
   outcome: string; completed: boolean; hitBoundary: boolean;
+  /** Still moving when the run hit its horizon — neither finished nor stopped.
+   *  In an under-resourced process this is most of them, and calling it
+   *  "interrupted" reads as an error when it just means the clock ran out. */
+  inProgress: boolean;
+  /** A real CASE (spawned at a start event) versus an internal token the engine
+   *  created to run a sub-process body or a boundary handler. Both are real
+   *  tokens, but only cases are arrivals — counting them together makes the
+   *  token total exceed the number that entered the process. */
+  internal: boolean;
 }
 export interface ColMeta { id: string; label: string; kind: string; team?: string }
 export interface ElementStat { id: string; label: string; count: number; avgTime: number; avgWait: number; maxTime: number }
@@ -24,6 +33,13 @@ export interface TokenTable {
   maxCellTime: number; // for the heatmap tint
   stats: {
     tokens: number; completed: number; interrupted: number;
+    /** Still moving at the horizon — in an overloaded process, most of them. */
+    inProgress: number;
+    /** Real arrivals (spawned at a start event). `tokens` also counts the
+     *  internal tokens the engine runs sub-process bodies and boundary handlers
+     *  with, which is why the two differ. */
+    cases: number;
+    internal: number;
     flow: { avg: number; median: number; p90: number; min: number; max: number } | null;
     perElement: ElementStat[];
     outcomes: { label: string; count: number }[];
@@ -89,9 +105,18 @@ export function buildTokenTable(trace: TraceEvent[], nodeMeta: Map<string, NodeM
     const start = pos[0].t;
     const lastNode = pos[pos.length - 1].nodeId as string;
     const completed = nodeMeta.get(lastNode)?.kind === "sink";
-    const outcome = completed ? (nodeMeta.get(lastNode)?.label || lastNode) : "interrupted";
-    const hitBoundary = !completed; // an interrupted token was diverted by a boundary event
-    rows.push({ id, num: 0, cells, start, end: exitT, total: exitT - start, outcome, completed, hitBoundary });
+    // Three distinct fates, previously collapsed into "interrupted":
+    //   · completed   — reached an end event
+    //   · interrupted — left the run early (a boundary event cancelled its scope)
+    //   · in progress — no exit at all: still moving when the horizon arrived
+    const inProgress = !completed && !exitEv;
+    const hitBoundary = !completed && !!exitEv;
+    const outcome = completed ? (nodeMeta.get(lastNode)?.label || lastNode)
+      : inProgress ? "in progress" : "interrupted";
+    // A case starts at a source; anything else the engine spawned mid-flow is an
+    // internal token running a sub-process body or a boundary handler.
+    const internal = !(pos[0].kind === "spawn" && nodeMeta.get(pos[0].nodeId as string)?.kind === "source");
+    rows.push({ id, num: 0, cells, start, end: exitT, total: exitT - start, outcome, completed, hitBoundary, inProgress, internal });
   }
 
   rows.sort((a, b) => a.start - b.start || (a.id < b.id ? -1 : 1)); // arrival order
@@ -126,5 +151,16 @@ export function buildTokenTable(trace: TraceEvent[], nodeMeta: Map<string, NodeM
   for (const r of rows) outCount.set(r.outcome, (outCount.get(r.outcome) ?? 0) + 1);
   const outcomes = [...outCount.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
 
-  return { rows, cols, maxCellTime, stats: { tokens: rows.length, completed: completedRows.length, interrupted: rows.length - completedRows.length, flow, perElement, outcomes } };
+  return {
+    rows, cols, maxCellTime,
+    stats: {
+      tokens: rows.length,
+      completed: completedRows.length,
+      interrupted: rows.filter((r) => r.hitBoundary).length,
+      inProgress: rows.filter((r) => r.inProgress).length,
+      cases: rows.filter((r) => !r.internal).length,
+      internal: rows.filter((r) => r.internal).length,
+      flow, perElement, outcomes,
+    },
+  };
 }

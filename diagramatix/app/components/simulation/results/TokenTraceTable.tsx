@@ -33,7 +33,7 @@ export function TokenTraceTable({ replay, clockUnit = "minute", onClose }: {
 
   const rows = useMemo(() => table.rows.filter((r) =>
     (!outcomeFilter || r.outcome === outcomeFilter) &&
-    (!interruptedOnly || !r.completed) &&
+    (!interruptedOnly || r.hitBoundary) &&
     (minFlow === "" || r.total >= minFlow),
   ), [table.rows, outcomeFilter, interruptedOnly, minFlow]);
 
@@ -60,9 +60,17 @@ export function TokenTraceTable({ replay, clockUnit = "minute", onClose }: {
     <div className="flex flex-col h-full gap-2 text-[11px] text-green-200 font-mono">
       {/* Summary stats */}
       <div className="flex flex-wrap items-stretch gap-2">
-        <Stat label="Tokens" value={s.tokens} />
+        <Stat label="Cases in" value={s.cases} />
         <Stat label="Completed" value={s.completed} accent="text-green-300" />
+        <Stat label="In progress" value={s.inProgress} accent={s.inProgress ? "text-cyan-300" : undefined} />
         <Stat label="Interrupted" value={s.interrupted} accent={s.interrupted ? "text-amber-300" : undefined} />
+        {s.internal > 0 && (
+          <div className="px-2 py-1 border border-green-500/20 rounded bg-green-500/[0.02] flex flex-col justify-center min-w-[64px]"
+            title="Tokens the engine created to run a sub-process body or a boundary handler. They are real tokens but not arrivals, which is why the row count exceeds the cases that entered.">
+            <div className="text-[9px] text-green-500/50 uppercase tracking-wider">+ internal</div>
+            <div className="text-sm text-green-400/60">{s.internal}</div>
+          </div>
+        )}
         {s.flow && <>
           <Stat label={`Flow avg (${unit})`} value={s.flow.avg.toFixed(1)} />
           <Stat label="median" value={s.flow.median.toFixed(1)} />
@@ -117,7 +125,7 @@ export function TokenTraceTable({ replay, clockUnit = "minute", onClose }: {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className={r.completed ? "" : "bg-amber-500/[0.06]"}>
+              <tr key={r.id} className={r.hitBoundary ? "bg-amber-500/[0.06]" : r.inProgress ? "bg-cyan-500/[0.05]" : ""}>
                 <td className="sticky left-0 z-10 bg-black border border-green-500/25 px-2 py-0.5 text-green-400/80">{r.num}</td>
                 {table.cols.map((c) => { const v = cellVal(r.cells[c.id]); return (
                   <td key={c.id} className="border border-green-500/15 px-1.5 py-0.5 text-center text-green-200" style={{ background: tint(v) }}
@@ -126,7 +134,7 @@ export function TokenTraceTable({ replay, clockUnit = "minute", onClose }: {
                   </td>
                 ); })}
                 <td className="border border-green-500/25 px-2 py-0.5 text-right text-green-300">{r.total.toFixed(1)}</td>
-                <td className={`border border-green-500/25 px-2 py-0.5 ${r.completed ? "text-green-300" : "text-amber-300"}`}>{r.outcome}</td>
+                <td className={`border border-green-500/25 px-2 py-0.5 ${r.completed ? "text-green-300" : r.inProgress ? "text-cyan-300" : "text-amber-300"}`}>{r.outcome}</td>
               </tr>
             ))}
             {rows.length === 0 && <tr><td colSpan={table.cols.length + 3} className="px-3 py-4 text-green-400/50">No tokens match the filter.</td></tr>}

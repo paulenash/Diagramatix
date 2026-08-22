@@ -425,14 +425,14 @@ export class Engine {
       const cont: Token = { id: `t${this.nextTokenId++}`, enteredAt, props, callStack: lower, internal: lower.some((f) => f.parallel) };
       this.tokens.set(cont.id, cont);
       this.emit("spawn", cont.id, be.bodyStart);
-      this.enterNode(cont, be.bodyStart, undefined);
+      this.enterNode(cont, be.bodyStart, be.viaEdge);
     } else {
       // Non-interrupting: a parallel side token runs the boundary flow while the
       // scope keeps running. Internal, so it never counts as a separate case.
       const side: Token = { id: `t${this.nextTokenId++}`, enteredAt: this.clock, props: {}, callStack: [], internal: true };
       this.tokens.set(side.id, side);
       this.emit("spawn", side.id, be.bodyStart);
-      this.enterNode(side, be.bodyStart, undefined);
+      this.enterNode(side, be.bodyStart, be.viaEdge);
     }
   }
 
@@ -459,7 +459,7 @@ export class Engine {
       };
       this.tokens.set(handler.id, handler);
       this.emit("spawn", handler.id, es.bodyStart);
-      this.enterNode(handler, es.bodyStart, undefined);
+      this.enterNode(handler, es.bodyStart, es.viaEdge);
       return;
     }
 
@@ -484,7 +484,7 @@ export class Engine {
     };
     this.tokens.set(handler.id, handler);
     this.emit("spawn", handler.id, es.bodyStart);
-    this.enterNode(handler, es.bodyStart, undefined);
+    this.enterNode(handler, es.bodyStart, es.viaEdge);
   }
 
   /** Cancel a token: release/dequeue any resource it holds and ignore its
@@ -550,7 +550,7 @@ export class Engine {
       this.cancelToken(token.id);
       this.tokens.set(cont.id, cont);
       this.emit("spawn", cont.id, be.bodyStart);
-      this.enterNode(cont, be.bodyStart, undefined);
+      this.enterNode(cont, be.bodyStart, be.viaEdge);
     } else {
       // Non-interrupting: a parallel token runs the boundary flow; the host keeps
       // its in-flight service and its arm (other boundary events can still fire).
@@ -560,7 +560,7 @@ export class Engine {
       };
       this.tokens.set(side.id, side);
       this.emit("spawn", side.id, be.bodyStart);
-      this.enterNode(side, be.bodyStart, undefined);
+      this.enterNode(side, be.bodyStart, be.viaEdge);
     }
   }
 
