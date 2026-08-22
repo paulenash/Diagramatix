@@ -205,9 +205,37 @@ export function checkContainment(d: DiagramLike): Violation[] {
  * centre, preferring an expanded sub-process over a lane over a pool — the same
  * rule the editor applies when lanes are added, resized or deleted.
  */
-export function checkParentage(d: DiagramLike): Violation[] {
+/** Elements that are never owned by a lane: markers annotate a shape, and a
+ *  text annotation / review comment floats deliberately. */
+const UNOWNED_TYPES = new Set<string>(["uml-pain-point", "uml-issue", "review-comment", "text-annotation"]);
+/** The container types whose ownership this rule reasons about. An element held
+ *  by any OTHER container (group, system-boundary, uml-package, composite-state,
+ *  collapsed subprocess) is left alone. */
+const OWNERSHIP_CONTAINERS = new Set<string>(["pool", "lane", "subprocess-expanded"]);
+
+export interface ParentageRepair {
+  /** Element whose owner is wrong. */
+  id: string;
+  /** Its current parentId (undefined when it has none). */
+  from?: string;
+  /** The container it actually sits in — undefined means "no container encloses
+   *  it", i.e. the element should be released rather than re-homed. */
+  to?: string;
+}
+
+/**
+ * The ownership corrections a diagram needs, as structured data — the same
+ * resolution `checkParentage` reports, so a repair can never drift from the
+ * rule that flags it.
+ */
+export function parentageRepairs(d: DiagramLike): ParentageRepair[] {
+  return resolveParentage(d).repairs;
+}
+
+function resolveParentage(d: DiagramLike): { repairs: ParentageRepair[]; violations: Violation[] } {
   const byId = new Map(d.elements.map((e) => [e.id, e]));
   const out: Violation[] = [];
+  const repairs: ParentageRepair[] = [];
   const area = (e: DiagramElement) => e.width * e.height;
   const holds = (box: DiagramElement, cx: number, cy: number) =>
     cx >= box.x - PAD_TOLERANCE && cx <= rightOf(box) + PAD_TOLERANCE &&
@@ -229,11 +257,18 @@ export function checkParentage(d: DiagramLike): Violation[] {
   const pools = d.elements.filter((e) => e.type === "pool");
 
   for (const el of d.elements) {
-    // Pools own themselves; boundary events belong to their host; markers stick
-    // to the shape they annotate; a dangling parent is ref-integrity's business.
+    // Pools own themselves; boundary events belong to their host; markers and
+    // free-floating notes stick to what they annotate rather than to a lane; a
+    // dangling parent is ref-integrity's business.
     if (el.type === "pool" || el.boundaryHostId) continue;
-    if (el.type === "uml-pain-point" || el.type === "uml-issue" || el.type === "review-comment") continue;
+    if (UNOWNED_TYPES.has(el.type)) continue;
     if (el.parentId && !byId.get(el.parentId)) continue;
+    // This rule reasons only about pool / lane / expanded-sub-process ownership.
+    // Groups, system boundaries, UML packages, composite states and collapsed
+    // sub-processes are containers too — an element they own is theirs, and
+    // "correcting" it to the lane behind them would strip a real relationship.
+    const declared = el.parentId ? byId.get(el.parentId) : undefined;
+    if (declared && !OWNERSHIP_CONTAINERS.has(declared.type)) continue;
 
     const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
     const own = descendantsOf(el.id);
@@ -245,6 +280,7 @@ export function checkParentage(d: DiagramLike): Violation[] {
     if (!expected) {
       // Outside every container — only worth reporting if it claims a parent.
       if (el.parentId) {
+        repairs.push({ id: el.id, from: el.parentId, to: undefined });
         out.push({
           rule: "parentage", severity: "warning", ids: [el.id, el.parentId],
           message: `"${nameOf(el)}" is owned by "${nameOf(byId.get(el.parentId))}" but sits outside it`,
@@ -253,6 +289,7 @@ export function checkParentage(d: DiagramLike): Violation[] {
       continue;
     }
     if (expected.id === el.parentId) continue;
+    repairs.push({ id: el.id, from: el.parentId, to: expected.id });
     out.push({
       rule: "parentage", severity: "warning", ids: [el.id, expected.id],
       message: el.parentId
@@ -260,7 +297,11 @@ export function checkParentage(d: DiagramLike): Violation[] {
         : `"${nameOf(el)}" sits inside ${expected.type} "${nameOf(expected)}" but has no owner`,
     });
   }
-  return out;
+  return { repairs, violations: out };
+}
+
+export function checkParentage(d: DiagramLike): Violation[] {
+  return resolveParentage(d).violations;
 }
 
 /** No fabricated "Main Process" wrapper. A pool-level event subprocess must

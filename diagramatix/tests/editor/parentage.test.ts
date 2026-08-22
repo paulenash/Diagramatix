@@ -101,6 +101,30 @@ describe("B47 parentage scan rule", () => {
     expect(v.map((x) => x.message)).toContain('"t" sits inside subprocess-expanded "IN" but is owned by subprocess-expanded "OUT"');
   });
 
+  it("leaves elements owned by a container it does not model (group / system-boundary / package)", () => {
+    // Found by scanning the real example catalogues: chevrons owned by a group
+    // and use-cases owned by a system boundary were being reported as "should
+    // have no owner", which would have stripped a real relationship.
+    for (const holder of ["group", "system-boundary", "uml-package", "composite-state", "subprocess"]) {
+      const d = data([
+        el("P", "pool", undefined, 0, 0, 800, 300),
+        el("L", "lane", "P", 40, 0, 760, 300),
+        el("g1", holder, "L", 100, 50, 400, 200),
+        el("kid", "use-case", "g1", 150, 100, 80, 50), // inside g1, which is inside L
+      ]);
+      expect(checkParentage(d as never), `${holder}-owned child must be left alone`).toEqual([]);
+    }
+  });
+
+  it("leaves free-floating annotations unowned", () => {
+    const d = data([
+      el("P", "pool", undefined, 0, 0, 800, 200),
+      el("L", "lane", "P", 40, 0, 760, 200),
+      el("note", "text-annotation", undefined, 300, 80, 120, 40), // sits over the lane, deliberately unowned
+    ]);
+    expect(checkParentage(d as never)).toEqual([]);
+  });
+
   it("passes a correctly-owned diagram, and ignores boundary events", () => {
     const clean = data([
       el("P", "pool", undefined, 0, 0, 600, 200),

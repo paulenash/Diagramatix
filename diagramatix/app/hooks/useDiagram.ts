@@ -639,6 +639,9 @@ function reconcileLaneMembership(elements: DiagramElement[]): DiagramElement[] {
     if (el.type === "lane" || el.type === "pool") return el;
     if (el.boundaryHostId) return el; // boundary events follow their host, not a lane
     if (MARKER_TYPES.has(el.type)) return el; // markers stick to their host shape
+    // Free-floating notes are deliberately unowned — adopting one into a lane
+    // would make it travel with that lane.
+    if (el.type === "text-annotation" || el.type === "review-comment") return el;
     const parent = el.parentId ? byId.get(el.parentId) : undefined;
     const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
     // An EP's contents belong to the EP, not to a lane — UNLESS the element no
