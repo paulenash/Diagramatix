@@ -9,7 +9,7 @@
 
 import type { DiagramData } from "@/app/lib/diagram/types";
 import type { WorkCalendar } from "./types";
-import { harvestLaneTeams } from "./harvestTeams";
+import { harvestReferencedTeams } from "./harvestTeams";
 
 const MON_FRI = [0, 1, 2, 3, 4]; // sim clock: day 0 = Monday
 
@@ -45,7 +45,7 @@ export function planDefaultSetup(
   const haveTeam = new Set(existing.teams.map((t) => t.name.trim().toLowerCase()));
 
   const calendarsToCreate = DEFAULT_CALENDARS.filter((c) => !haveCal.has(c.name.toLowerCase()));
-  const teamsToCreate = harvestLaneTeams(diagrams).filter((name) => !haveTeam.has(name.trim().toLowerCase()));
+  const teamsToCreate = harvestReferencedTeams(diagrams).filter((name) => !haveTeam.has(name.trim().toLowerCase()));
 
   return {
     calendarsToCreate,

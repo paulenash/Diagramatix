@@ -57,6 +57,40 @@ export function usedTeamNames(diagrams: DiagramData[]): Set<string> {
   return out;
 }
 
+/**
+ * Every team name the model REFERENCES — lane/sublane names plus any team an
+ * activity has been assigned directly — so each one becomes a real, visible,
+ * editable row instead of a phantom.
+ *
+ * A name an activity uses but no lane declares (a typo, or a lane that was since
+ * renamed) would otherwise never be created: the assembler then invents a pool
+ * for it at capacity 1, so the work is silently done by one invisible person
+ * while everything set on the real team applies to none of it. Surfacing both
+ * names side by side in the Teams list makes the discrepancy something the user
+ * can see and correct, rather than something the run quietly absorbs.
+ *
+ * Note this harvests only names the model actually uses — it never invents one.
+ */
+export function harvestReferencedTeams(diagrams: DiagramData[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (name: string | undefined) => {
+    const n = (name ?? "").trim();
+    if (!n || seen.has(n.toLowerCase())) return;
+    seen.add(n.toLowerCase());
+    out.push(n);
+  };
+  for (const name of harvestLaneTeams(diagrams)) add(name);
+  for (const d of diagrams) {
+    for (const el of d?.elements ?? []) {
+      if (!TASKISH.has(el.type)) continue;
+      if (el.properties?.subprocessType === "event") continue;
+      add(getSimParams(el).teamId);
+    }
+  }
+  return out;
+}
+
 export function harvestLaneTeams(diagrams: DiagramData[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();

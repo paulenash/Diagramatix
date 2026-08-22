@@ -29,20 +29,36 @@ const DELAY = new Set(["intermediate-event"]);
 const isBoundaryCatch = (el: DiagramElement) =>
   el.type === "intermediate-event" && !!el.boundaryHostId && el.eventType !== "compensation";
 
-/** Walk parentId up to the nearest lane/pool and use its label as the team id —
- *  the readable name the user sees on the lane, so the Teams library + the
- *  Simulation Data "team" column read as the lane names, not an internal slug. */
-function laneTeamId(el: DiagramElement, byId: Map<string, DiagramElement>): string {
+/**
+ * The team for an element: the name of the nearest lane/pool it sits in — the
+ * readable name the user already put on the lane, so the Teams library and the
+ * "team" column read as lane names rather than an internal slug.
+ *
+ * Returns UNDEFINED when there is no lane or pool. It previously invented the
+ * literal name "team" in that case, which nothing ever created: seeding harvests
+ * teams from LANES, so a diagram drawn without pools produced tasks assigned to
+ * a team that did not exist, and the assembler then gave that phantom a capacity
+ * of 1 — one invisible worker shared by the entire process, silently throttling
+ * the whole run. A team is only ever named after something the user actually
+ * drew; where they have drawn nothing, the value is missing and is reported as
+ * missing, never conjured.
+ */
+function laneTeamId(el: DiagramElement, byId: Map<string, DiagramElement>): string | undefined {
   let cur: DiagramElement | undefined = el;
   const seen = new Set<string>();
   while (cur?.parentId && !seen.has(cur.id)) {
     seen.add(cur.id);
     const parent = byId.get(cur.parentId);
     if (!parent) break;
-    if (parent.type === "lane" || parent.type === "pool") return (parent.label || "").trim() || "team";
+    if (parent.type === "lane" || parent.type === "pool") {
+      // Honour a team explicitly set ON the lane, exactly as harvestTeams does,
+      // so the name assigned here is always the name that gets seeded.
+      const own = (getSimParams(parent).teamId ?? "").trim();
+      return own || (parent.label || "").trim() || undefined;
+    }
     cur = parent;
   }
-  return "team";
+  return undefined;
 }
 
 /**
@@ -97,7 +113,13 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
           if (!sim.cycleTime) { sim.cycleTime = DEF_CYCLE; auto.add("cycleTime"); filled++; changed = true; }
           if (sim.resourceUnits === undefined) { sim.resourceUnits = 1; auto.add("resourceUnits"); changed = true; }
         }
-        if (!sim.teamId) { sim.teamId = laneTeamId(el, byId); auto.add("teamId"); filled++; changed = true; }
+        if (!sim.teamId) {
+          // Only when the drawing actually says who does the work. No lane or
+          // pool means no team — left missing (and reported as missing) rather
+          // than invented.
+          const lane = laneTeamId(el, byId);
+          if (lane) { sim.teamId = lane; auto.add("teamId"); filled++; changed = true; }
+        }
         // A repeat / multi-instance marker means the work happens more than
         // once, so the model needs a COUNT. Write it explicitly rather than
         // leaving the engine to fall back on an invisible hardcoded 2 or 3 —

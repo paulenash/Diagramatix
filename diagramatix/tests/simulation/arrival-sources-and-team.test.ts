@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { arrivalSourcesOf, isArrivalSource } from "@/app/lib/simulation/arrivalSources";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import { reducer, type Action } from "@/app/hooks/useDiagram";
-import { usedTeamNames } from "@/app/lib/simulation/harvestTeams";
+import { usedTeamNames, harvestReferencedTeams } from "@/app/lib/simulation/harvestTeams";
 import { getSimParams } from "@/app/lib/diagram/simParams";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
@@ -163,5 +163,74 @@ describe("sub-process scopes — team but no duration", () => {
     const sp = getSimParams(data.elements.find((e) => e.id === "sp")!);
     expect(sp.cycleTime).toBeDefined();
     expect(sp.teamId).toBe("Sales Team");
+  });
+});
+
+/**
+ * T2859 — a team is only ever named after something the user drew, and every
+ * name the model REFERENCES becomes a real row.
+ *
+ * Fill used to invent the literal name "team" for an activity with no lane or
+ * pool. Nothing ever created it (seeding harvests from LANES), so the assembler
+ * gave that phantom capacity 1 — one invisible worker shared by the whole
+ * process, silently throttling a diagram drawn without pools.
+ *
+ * The converse case must not be hidden either: when one diagram says "Sales
+ * Team" and another says "Sales Taem", BOTH belong in the Teams list so the
+ * discrepancy is visible and correctable, instead of the typo quietly becoming a
+ * phantom one-person team.
+ */
+describe("teams are named from the drawing, never invented", () => {
+  const noLane: DiagramData = {
+    viewport: { x: 0, y: 0, zoom: 1 },
+    elements: [
+      { id: "s", type: "start-event", x: 0, y: 0, width: 40, height: 40, label: "Start", properties: {} },
+      { id: "t", type: "task", x: 100, y: 0, width: 90, height: 50, label: "Do it", properties: {} },
+    ],
+    connectors: [],
+  } as unknown as DiagramData;
+
+  it("no lane or pool → no team is filled (nothing is conjured)", () => {
+    const { data } = autofillSimulation(noLane);
+    const sim = getSimParams(data.elements.find((e) => e.id === "t")!);
+    expect(sim.teamId, 'must not invent "team"').toBeUndefined();
+    expect(sim.cycleTime, "the rest is still filled").toBeDefined();
+  });
+
+  it("a lane's own teamId is honoured, so the name assigned is the name seeded", () => {
+    const d: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "P", type: "pool", x: 0, y: 0, width: 600, height: 200, label: "Co", properties: {} },
+        { id: "l", type: "lane", parentId: "P", x: 40, y: 0, width: 560, height: 200, label: "Lane 1",
+          properties: { sim: { teamId: "Specialists" } } },
+        { id: "t", type: "task", parentId: "l", x: 200, y: 60, width: 90, height: 50, label: "Do it", properties: {} },
+      ],
+      connectors: [],
+    } as unknown as DiagramData;
+    const { data } = autofillSimulation(d);
+    expect(getSimParams(data.elements.find((e) => e.id === "t")!).teamId).toBe("Specialists");
+    expect(harvestReferencedTeams([data]), "seeded under the same name").toContain("Specialists");
+  });
+
+  it("a near-duplicate across linked diagrams yields BOTH rows, for the user to reconcile", () => {
+    const withLane = (lane: string, taskTeam?: string): DiagramData => ({
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: "P", type: "pool", x: 0, y: 0, width: 600, height: 200, label: "Co", properties: {} },
+        { id: "l", type: "lane", parentId: "P", x: 40, y: 0, width: 560, height: 200, label: lane, properties: {} },
+        { id: "t", type: "task", parentId: "l", x: 200, y: 60, width: 90, height: 50, label: "Do it",
+          properties: taskTeam ? { sim: { teamId: taskTeam } } : {} },
+      ],
+      connectors: [],
+    } as unknown as DiagramData);
+
+    const names = harvestReferencedTeams([withLane("Sales Team"), withLane("Sales Taem")]);
+    expect(names).toEqual(expect.arrayContaining(["Sales Team", "Sales Taem"]));
+
+    // And a name only an ACTIVITY uses (a lane since renamed) is surfaced too,
+    // rather than becoming a phantom the assembler staffs at capacity 1.
+    const stale = harvestReferencedTeams([withLane("Sales Team", "Sales Taem")]);
+    expect(stale).toEqual(expect.arrayContaining(["Sales Team", "Sales Taem"]));
   });
 });

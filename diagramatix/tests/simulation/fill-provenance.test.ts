@@ -12,12 +12,16 @@ const el = (id: string, type: string, extra?: Partial<DiagramElement>): DiagramE
   ({ id, type, x: 0, y: 0, width: 80, height: 40, label: id, properties: {}, ...extra }) as DiagramElement;
 const conn = (id: string, s: string, t: string): Connector => ({ id, sourceId: s, targetId: t, type: "sequence" }) as unknown as Connector;
 
+// The tasks sit in a LANE: a team is only ever named after something the user
+// drew, so without one there is no team to fill (and nothing is invented).
 const base = (): DiagramData => ({
   viewport: { x: 0, y: 0, zoom: 1 },
   elements: [
-    el("s", "start-event"),
-    el("g", "gateway", { gatewayType: "exclusive" } as Partial<DiagramElement>),
-    el("a", "task"), el("b", "task"),
+    el("p", "pool", { x: 0, y: 0, width: 800, height: 200, label: "Co" } as Partial<DiagramElement>),
+    el("l", "lane", { parentId: "p", x: 40, y: 0, width: 760, height: 200, label: "Ops" } as Partial<DiagramElement>),
+    el("s", "start-event", { parentId: "l" } as Partial<DiagramElement>),
+    el("g", "gateway", { parentId: "l", gatewayType: "exclusive" } as Partial<DiagramElement>),
+    el("a", "task", { parentId: "l" } as Partial<DiagramElement>), el("b", "task", { parentId: "l" } as Partial<DiagramElement>),
   ],
   connectors: [conn("c0", "s", "g"), conn("ga", "g", "a"), conn("gb", "g", "b")],
 });

@@ -148,6 +148,14 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
       missingItems.push(`${nameOf(t)} — ${rc.value} parallel instances need ${need} unit(s), team has ${cap} (runs in waves)`);
     }
   }
+  // No team means the activity seizes nothing, so it is never queued and never
+  // shows in utilisation — the run looks fine and quietly reports a process with
+  // no resource constraint. Usually it means the diagram has no lane saying who
+  // does the work. Nothing is invented; it is reported so it can be set.
+  for (const t of tasks) {
+    if (hasInlineBody(t, data.elements)) continue;
+    if (!getSimParams(t).teamId?.trim()) missingItems.push(`${nameOf(t)} — team (no lane says who does this)`);
+  }
   // A sub-process timed by its own contents has no duration to be missing.
   for (const t of tasks) {
     if (hasInlineBody(t, data.elements)) continue;
