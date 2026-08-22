@@ -17,6 +17,7 @@ import type { DiagramData, DiagramElement } from "@/app/lib/diagram/types";
 import { getSimParams, type ElementSimParams, type SimDist } from "@/app/lib/diagram/simParams";
 import { parseTimerLabel } from "./timerLabel";
 import { isArrivalSource } from "./arrivalSources";
+import { loopParamsForMarker, repeatCountOf, DEFAULT_REPEAT_COUNT } from "./repeats";
 
 const DEF_ARRIVAL: SimDist = { kind: "exponential", mean: 10 };
 const DEF_CYCLE: SimDist = { kind: "triangular", min: 3, mode: 5, max: 8 };
@@ -97,6 +98,14 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
           if (sim.resourceUnits === undefined) { sim.resourceUnits = 1; auto.add("resourceUnits"); changed = true; }
         }
         if (!sim.teamId) { sim.teamId = laneTeamId(el, byId); auto.add("teamId"); filled++; changed = true; }
+        // A repeat / multi-instance marker means the work happens more than
+        // once, so the model needs a COUNT. Write it explicitly rather than
+        // leaving the engine to fall back on an invisible hardcoded 2 or 3 —
+        // a number driving real results should be on screen and editable.
+        if (!sim.loop && el.repeatType && el.repeatType !== "none") {
+          const lp = loopParamsForMarker(el.repeatType, repeatCountOf(el) ?? DEFAULT_REPEAT_COUNT);
+          if (lp) { sim.loop = lp; auto.add("loop"); filled++; changed = true; }
+        }
       }
       if (DELAY.has(el.type) && !sim.delay) {
         // Read the duration straight off the label ("Wait 3 hours", "7 days",

@@ -15,6 +15,7 @@ import type { DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/t
 import { getSimParams, simPatch, DISTRIBUTION_KINDS, type SimDist, type ElementSimParams } from "@/app/lib/diagram/simParams";
 import { clearSimData } from "@/app/lib/simulation/clearSimData";
 import { hasInlineBody } from "@/app/lib/simulation/autofill";
+import { repeatCountOf, isSequentialRepeat } from "@/app/lib/simulation/repeats";
 import { useDiagramValues, hasDiagramValues } from "@/app/lib/simulation/useDiagramValues";
 import type { ClockUnit } from "@/app/lib/simulation/types";
 import { isArrivalSource } from "@/app/lib/simulation/arrivalSources";
@@ -64,7 +65,7 @@ function MatrixDist({ value, onChange, auto }: { value?: SimDist; onChange: (d: 
 
 const num = (v: string) => (v === "" ? undefined : Math.max(0, Number(v) || 0));
 
-export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing, onOpenDiagram, calendars = [], teams = [], clockUnit = "minute" }: {
+export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing, onOpenDiagram, calendars = [], teams = [], teamCapacities = {}, clockUnit = "minute" }: {
   data: DiagramData;
   onApplyData: (next: DiagramData) => void;
   onFillMissing?: () => number;
@@ -77,6 +78,9 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
   calendars?: { id: string; name: string }[];
   /** Defined team names (from the Team library) for the per-task Team picker. */
   teams?: string[];
+  /** Team name → capacity, so a parallel multi-instance activity can be checked
+   *  against the team that would have to supply the concurrency. */
+  teamCapacities?: Record<string, number>;
   /** The run's base time unit, so diagram CT/WT authored in hours/days converts
    *  correctly when taken into the simulation model. */
   clockUnit?: ClockUnit;
@@ -131,6 +135,19 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
   const missingItems: string[] = [];
   for (const s of sources) if (!getSimParams(s).arrival) missingItems.push(`${nameOf(s)} — arrival`);
   for (const b of boundaries) if (!getSimParams(b).boundary?.trigger) missingItems.push(`${nameOf(b)} — boundary trigger`);
+  // Parallel multi-instance that the team is too small to actually run in
+  // parallel. The run doesn't fail — it fits as many instances at once as the
+  // team allows and does the rest in waves — but the model says "all at once"
+  // while the resource says otherwise, and that gap belongs on screen.
+  for (const t of tasks) {
+    const rc = repeatCountOf(t);
+    if (!rc || isSequentialRepeat(t) || rc.kind !== "fixed") continue;
+    const cap = teamCapacities[getSimParams(t).teamId ?? ""] ?? 1;
+    const need = (getSimParams(t).resourceUnits ?? 1) * rc.value;
+    if (need > cap) {
+      missingItems.push(`${nameOf(t)} — ${rc.value} parallel instances need ${need} unit(s), team has ${cap} (runs in waves)`);
+    }
+  }
   // A sub-process timed by its own contents has no duration to be missing.
   for (const t of tasks) {
     if (hasInlineBody(t, data.elements)) continue;

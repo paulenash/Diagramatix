@@ -241,6 +241,11 @@ export function assembleFromDiagram(
       node.teamId = teamId;
       node.units = sim.resourceUnits ?? 1;
       if (teamId) teamIds.add(teamId);
+      // A repeat / multi-instance marker on a TASK means the work is performed
+      // more than once. This used to be read only for sub-processes, so the
+      // marker on a task was drawn and exported but silently ignored by the run,
+      // understating that task's load and every queue behind it.
+      node.loop = loopOf(el);
     } else if (kind === "delay") {
       node.delay = sim.delay ?? { kind: "fixed", value: 0 };
       // Timer-delay semantics from the label parse (autofill) or explicit params:

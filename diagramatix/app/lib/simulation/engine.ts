@@ -51,6 +51,11 @@ interface Token {
 
 function cloneStack(s: Frame[]): Frame[] { return s.map((f) => ({ ...f })); }
 
+/** How many times a loop / multi-instance spec says the work happens. */
+function loopCount(loop: NonNullable<SimNode["loop"]>) {
+  return loop.kind === "standard" ? (loop.iterations ?? { kind: "fixed" as const, value: 2 }) : loop.instances;
+}
+
 /** A token-movement event for the live replay player (green-token animation). */
 export type TraceEventKind = "spawn" | "enter" | "queue" | "service" | "exit" | "fire";
 /** `fire` = an element ACTIVATION flash (not a token move): a boundary event that
@@ -675,24 +680,55 @@ export class Engine {
     this.tokens.delete(token.id); // internal MI instance — no top-level stats
   }
 
+  /**
+   * How a repeat / multi-instance marker on a TASK is performed.
+   *
+   * The activity is done `n` times. Sequential passes are ONE UNINTERRUPTED
+   * BLOCK: the team is seized once and holds it for all the passes, so other
+   * work does not slip in between them — the usual reading of "do this three
+   * times" on a single task.
+   *
+   * Parallel passes run AS CONCURRENTLY AS THE TEAM ALLOWS: as many instances
+   * at once as `units` and the team's capacity permit, in waves. Five instances
+   * against a team of two run 2 + 2 + 1, not all five and not one at a time —
+   * pretending to a concurrency the resource can't supply would understate the
+   * duration, and serialising it all would overstate it.
+   *
+   * Returns the units to seize and how many passes overlap; the service duration
+   * follows in startService.
+   */
+  private repeatPlan(node: SimNode): { passes: number; units: number; concurrency: number } {
+    const units = node.units ?? 1;
+    if (node.kind !== "task" || !node.loop) return { passes: 1, units, concurrency: 1 };
+    const passes = Math.max(1, Math.round(sample(loopCount(node.loop), this.rng)));
+    const wantsParallel = node.loop.kind === "multi" && node.loop.ordering === "parallel";
+    if (passes === 1 || !wantsParallel) return { passes, units, concurrency: 1 };
+    // No team = no constraint; otherwise fit as many instances as the team holds.
+    const capacity = node.teamId ? this.pools.get(node.teamId)?.size ?? 0 : Infinity;
+    const fits = Number.isFinite(capacity) ? Math.floor(capacity / units) : passes;
+    const concurrency = Math.max(1, Math.min(passes, fits));
+    return { passes, units: units * concurrency, concurrency };
+  }
+
   private startOrQueue(token: Token, node: SimNode): void {
+    const plan = this.repeatPlan(node);
     if (node.teamId) {
       const pool = this.pools.get(node.teamId);
       if (pool) {
-        const units = node.units ?? 1;
-        const pending: Pending = { tokenId: token.id, nodeId: node.id, units, requestedAt: this.clock };
-        const granted = pool.request(this.clock, units, pending);
-        if (granted) this.startService(token, node, 0);
+        const pending: Pending = { tokenId: token.id, nodeId: node.id, units: plan.units, requestedAt: this.clock };
+        const granted = pool.request(this.clock, plan.units, pending);
+        if (granted) this.startService(token, node, 0, plan);
         else this.emit("queue", token.id, node.id); // queued — service starts on a future release
         return;
       }
     }
-    this.startService(token, node, 0);
+    this.startService(token, node, 0, plan);
   }
 
-  private startService(token: Token, node: SimNode, wait: number): void {
+  private startService(token: Token, node: SimNode, wait: number, plan?: { passes: number; units: number; concurrency: number }): void {
+    const p = plan ?? this.repeatPlan(node);
     this.emit("service", token.id, node.id);
-    if (node.teamId) this.inService.set(token.id, { teamId: node.teamId, units: node.units ?? 1 });
+    if (node.teamId) this.inService.set(token.id, { teamId: node.teamId, units: p.units });
     if (this.warmedUp) {
       const acc = this.perNode.get(node.id) ?? { count: 0, waitSum: 0 };
       acc.count++; acc.waitSum += wait;
@@ -700,7 +736,16 @@ export class Engine {
     }
     let dur = 0;
     if (node.setupTime) dur += sample(node.setupTime, this.rng);
-    if (node.cycleTime) dur += sample(node.cycleTime, this.rng);
+    if (node.cycleTime) {
+      // Each pass is sampled independently — repeats vary like any other work.
+      // Passes run in waves of `concurrency`; a wave takes as long as its
+      // SLOWEST member, and the waves add up. concurrency 1 (sequential, or a
+      // team too small to overlap) therefore sums every pass — one held block.
+      const each = Array.from({ length: p.passes }, () => sample(node.cycleTime!, this.rng));
+      for (let i = 0; i < each.length; i += p.concurrency) {
+        dur += Math.max(...each.slice(i, i + p.concurrency));
+      }
+    }
     this.calendar.schedule(this.clock + dur, { type: "SERVICE_END", nodeId: node.id, tokenId: token.id });
     this.armBoundary(token, node);
   }
@@ -722,6 +767,7 @@ export class Engine {
     // A compensation handler just finished → run the next armed handler; the
     // main flow resumes only once all handlers are done.
     if (token.comp) return this.runNextCompensation(token);
+
     this.moveNext(token, node);
   }
 

@@ -37,6 +37,9 @@ export interface PoolState<R> {
 
 export class ResourcePool<R = unknown> {
   private capacity: number;
+  /** The pool's current size. Read by the engine to decide how many instances
+   *  of a parallel multi-instance activity can actually overlap. */
+  get size(): number { return this.capacity; }
   private busyUnits = 0;
   private queue: QueuedRequest<R>[] = [];
   // Time-weighted integrals, accrued before every state change.
