@@ -270,7 +270,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
                 in the margins on either side rather than the panels filling the
                 whole width. */}
             <div className="max-w-6xl mx-auto grid gap-3 md:grid-cols-3 content-start">
-              <MatrixPanel title="Teams" className="md:col-span-2">
+              <MatrixPanel title="Resources — people &amp; automation" className="md:col-span-2">
                 <TeamLibraryManager key={`teams-${seedKey}`} projectId={projectId} onCapacities={setTeamCapacities} calendars={calendars} onTeamCalendars={setTeamCalMap} usedNames={usedTeams} />
               </MatrixPanel>
               <MatrixPanel title="Run / Replay">

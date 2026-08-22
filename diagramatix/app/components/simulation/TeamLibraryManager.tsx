@@ -179,7 +179,7 @@ export function TeamLibraryManager({
         {teams.length === 0 && <p className="text-green-400/50">No teams yet — add one below.</p>}
         {teams.length > 0 && (
           <div className="flex items-center gap-2 text-green-400/40 pb-0.5 border-b border-green-500/20 uppercase tracking-wide text-[10px]">
-            <span className="w-52 shrink-0 text-left">Team Name</span>
+            <span className="w-52 shrink-0 text-left">Resource</span>
             <span className="w-16 shrink-0 text-left">Capacity</span>
             <span className="w-32 shrink-0 text-left">Calendar</span>
           </div>
@@ -215,7 +215,7 @@ export function TeamLibraryManager({
       </div>
       <div className="flex items-center gap-2 pt-1 border-t border-green-500/20">
         <input
-          type="text" value={newName} placeholder="new team (e.g. analysts)"
+          type="text" value={newName} placeholder="new resource (e.g. analysts)"
           onChange={(e) => setNewName(e.target.value)}
           className="w-52 shrink-0 bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-200 [color-scheme:dark]"
         />

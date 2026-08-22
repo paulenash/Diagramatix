@@ -18,6 +18,7 @@ import { getSimParams, type ElementSimParams, type SimDist } from "@/app/lib/dia
 import { parseTimerLabel } from "./timerLabel";
 import { isArrivalSource } from "./arrivalSources";
 import { loopParamsForMarker, repeatCountOf, DEFAULT_REPEAT_COUNT } from "./repeats";
+import { isAutomatedActivity, AUTOMATED_RESOURCE_NAME } from "./automation";
 
 const DEF_ARRIVAL: SimDist = { kind: "exponential", mean: 10 };
 const DEF_CYCLE: SimDist = { kind: "triangular", min: 3, mode: 5, max: 8 };
@@ -114,11 +115,13 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
           if (sim.resourceUnits === undefined) { sim.resourceUnits = 1; auto.add("resourceUnits"); changed = true; }
         }
         if (!sim.teamId) {
-          // Only when the drawing actually says who does the work. No lane or
-          // pool means no team — left missing (and reported as missing) rather
-          // than invented.
-          const lane = laneTeamId(el, byId);
-          if (lane) { sim.teamId = lane; auto.add("teamId"); filled++; changed = true; }
+          // A system task consumes no one's time, so it is charged to the shared
+          // Automation resource (24/7) rather than the lane's people — the lane
+          // still says who OWNS the step. Everything else takes the lane's team,
+          // and only when the drawing actually says who does the work: no lane
+          // means the value is left missing and reported, never invented.
+          const resource = isAutomatedActivity(el) ? AUTOMATED_RESOURCE_NAME : laneTeamId(el, byId);
+          if (resource) { sim.teamId = resource; auto.add("teamId"); filled++; changed = true; }
         }
         // A repeat / multi-instance marker means the work happens more than
         // once, so the model needs a COUNT. Write it explicitly rather than

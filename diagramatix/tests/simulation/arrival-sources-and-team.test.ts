@@ -234,3 +234,61 @@ describe("teams are named from the drawing, never invented", () => {
     expect(stale).toEqual(expect.arrayContaining(["Sales Team", "Sales Taem"]));
   });
 });
+
+/**
+ * T2861 — a system task in a human lane is charged to Automation, not to the
+ * people in that lane.
+ *
+ * Task 1 (Manual), Task 2 (Service), Task 3 (User) in one lane: the middle one
+ * is automated. Treating it as human work took a person from the pool, stopped
+ * it overnight on their calendar and queued it behind their other work —
+ * inflating the team's utilisation AND inventing delays that don't exist. The
+ * lane still says who OWNS the step; the resource says what it CONSUMES, which
+ * saves drawing an "Automation" lane and zig-zagging the flow through it.
+ */
+describe("system tasks are charged to Automation, not the lane's people", () => {
+  const threeInARow: DiagramData = {
+    viewport: { x: 0, y: 0, zoom: 1 },
+    elements: [
+      { id: "P", type: "pool", x: 0, y: 0, width: 900, height: 200, label: "Co", properties: {} },
+      { id: "L", type: "lane", parentId: "P", x: 40, y: 0, width: 860, height: 200, label: "Sales Team", properties: {} },
+      { id: "t1", type: "task", parentId: "L", x: 100, y: 60, width: 90, height: 50, label: "Prepare", taskType: "manual", properties: {} },
+      { id: "t2", type: "task", parentId: "L", x: 300, y: 60, width: 90, height: 50, label: "Score", taskType: "service", properties: {} },
+      { id: "t3", type: "task", parentId: "L", x: 500, y: 60, width: 90, height: 50, label: "Review", taskType: "user", properties: {} },
+    ],
+    connectors: [],
+  } as unknown as DiagramData;
+
+  const teamOf = (d: DiagramData, id: string) => getSimParams(d.elements.find((e) => e.id === id)!).teamId;
+
+  it("the middle (Service) task goes to Automation; the humans either side do not", () => {
+    const { data } = autofillSimulation(threeInARow);
+    expect(teamOf(data, "t1"), "manual → the lane's people").toBe("Sales Team");
+    expect(teamOf(data, "t2"), "service → Automation").toBe("Automation");
+    expect(teamOf(data, "t3"), "user → the lane's people").toBe("Sales Team");
+  });
+
+  it("script and business-rule are automated too; send/receive and none stay human", () => {
+    const withType = (taskType?: string) => {
+      const d: DiagramData = {
+        ...threeInARow,
+        elements: threeInARow.elements.map((e) => (e.id === "t2" ? { ...e, taskType } : e)),
+      } as DiagramData;
+      return teamOf(autofillSimulation(d).data, "t2");
+    };
+    expect(withType("script")).toBe("Automation");
+    expect(withType("business-rule")).toBe("Automation");
+    // A message task is as often a person emailing a customer — human by default.
+    expect(withType("send")).toBe("Sales Team");
+    expect(withType("receive")).toBe("Sales Team");
+    expect(withType(undefined)).toBe("Sales Team");
+  });
+
+  it("a resource the user set by hand is never reassigned", () => {
+    const d: DiagramData = {
+      ...threeInARow,
+      elements: threeInARow.elements.map((e) => (e.id === "t2" ? { ...e, properties: { sim: { teamId: "Payments API" } } } : e)),
+    } as DiagramData;
+    expect(teamOf(autofillSimulation(d).data, "t2")).toBe("Payments API");
+  });
+});

@@ -154,7 +154,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
   // does the work. Nothing is invented; it is reported so it can be set.
   for (const t of tasks) {
     if (hasInlineBody(t, data.elements)) continue;
-    if (!getSimParams(t).teamId?.trim()) missingItems.push(`${nameOf(t)} — team (no lane says who does this)`);
+    if (!getSimParams(t).teamId?.trim()) missingItems.push(`${nameOf(t)} — resource (no lane says who does this)`);
   }
   // A sub-process timed by its own contents has no duration to be missing.
   for (const t of tasks) {
@@ -174,7 +174,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
     for (const t of tasks) {
       const team = getSimParams(t).teamId?.trim();
       if (team && known.size && !known.has(team.toLowerCase())) {
-        missingItems.push(`${nameOf(t)} — team "${team}" no longer exists`);
+        missingItems.push(`${nameOf(t)} — resource "${team}" no longer exists`);
       }
     }
   }
@@ -299,7 +299,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
 
       {/* Tasks */}
       {tasks.length > 0 && (
-        <Section title="Tasks" cols={[{ label: "", w: W.flag }, { label: "element", w: W.name }, { label: "cycle time", w: W.dist }, { label: "wait", w: W.dist }, { label: "team", w: W.team }, { label: "units", w: W.units }]}>
+        <Section title="Tasks" cols={[{ label: "", w: W.flag }, { label: "element", w: W.name }, { label: "cycle time", w: W.dist }, { label: "wait", w: W.dist }, { label: "resource", w: W.team }, { label: "units", w: W.units }]}>
           {tasks.map((t) => {
             const sim = getSimParams(t);
             // A sub-process that runs its own body takes its time from the steps
@@ -332,7 +332,7 @@ export function SimDataPanel({ data, onApplyData, onFillMissing, onUnfillMissing
                             </select>
                           );
                         })()
-                      : <input type="text" value={sim.teamId ?? ""} placeholder="team" onChange={(e) => patchEl(t.id, { teamId: e.target.value || undefined })} className={`${inp} w-40`} />}
+                      : <input type="text" value={sim.teamId ?? ""} placeholder="resource" onChange={(e) => patchEl(t.id, { teamId: e.target.value || undefined })} className={`${inp} w-40`} />}
                 </Cell>
                 <Cell w={W.units}><input type="number" min={1} value={sim.resourceUnits ?? 1} onChange={(e) => patchEl(t.id, { resourceUnits: Math.max(1, parseInt(e.target.value, 10) || 1) })} className={`${inp} w-10`} /></Cell>
               </Row>

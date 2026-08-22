@@ -60,15 +60,20 @@ export async function seedSimulationDefaults(
     await post(`${base}/simulation-calendars`, { name: c.name, pattern: c.calendar });
   }
 
-  // 2 · teams — need the Business-Hours calendar id, which may have just been
-  //     created above, so re-read the calendars before assigning it.
+  // 2 · resources — each carries its own capacity and calendar (people on
+  //     Business Hours; Automation around the clock), so re-read the calendars
+  //     first: the one a resource needs may have just been created above.
   if (plan.teamsToCreate.length) {
     const fresh = await getJson(`${base}/simulation-calendars`);
-    const bhId = rows(fresh, "calendars").find(
-      (c) => c.name?.trim().toLowerCase() === BUSINESS_HOURS_NAME.toLowerCase(),
-    )?.id;
-    for (const name of plan.teamsToCreate) {
-      await post(`${base}/simulation-teams`, { name, capacity: 1, calendarId: bhId });
+    const calByName = new Map(
+      rows(fresh, "calendars").map((c) => [(c.name ?? "").trim().toLowerCase(), c.id]),
+    );
+    for (const t of plan.teamsToCreate) {
+      await post(`${base}/simulation-teams`, {
+        name: t.name,
+        capacity: t.capacity,
+        calendarId: calByName.get(t.calendarName.trim().toLowerCase()),
+      });
     }
   }
 

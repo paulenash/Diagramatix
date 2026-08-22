@@ -10,6 +10,7 @@
 import type { DiagramData } from "@/app/lib/diagram/types";
 import type { WorkCalendar } from "./types";
 import { harvestReferencedTeams } from "./harvestTeams";
+import { hasAutomatedWork, AUTOMATED_RESOURCE_NAME, AUTOMATED_RESOURCE_CAPACITY, AUTOMATED_CALENDAR_NAME } from "./automation";
 
 const MON_FRI = [0, 1, 2, 3, 4]; // sim clock: day 0 = Monday
 
@@ -28,8 +29,10 @@ const DEFAULT_SCENARIO_NAME = "Baseline";
 
 export interface DefaultSetupPlan {
   calendarsToCreate: { name: string; calendar: WorkCalendar }[];
-  /** Team names to create (default capacity 1, calendar = Business Hours). */
-  teamsToCreate: string[];
+  /** Resources to create. People default to one person on Business Hours; the
+   *  shared Automation resource runs around the clock and is effectively
+   *  unconstrained, so system steps never become an accidental bottleneck. */
+  teamsToCreate: { name: string; capacity: number; calendarName: string }[];
   /** true when the project has no studies → create Initial Study + Baseline. */
   createStudy: boolean;
   studyName: string;
@@ -45,7 +48,19 @@ export function planDefaultSetup(
   const haveTeam = new Set(existing.teams.map((t) => t.name.trim().toLowerCase()));
 
   const calendarsToCreate = DEFAULT_CALENDARS.filter((c) => !haveCal.has(c.name.toLowerCase()));
-  const teamsToCreate = harvestReferencedTeams(diagrams).filter((name) => !haveTeam.has(name.trim().toLowerCase()));
+  // People, from the lanes and assignments the model references.
+  const names = harvestReferencedTeams(diagrams);
+  // …plus the shared Automation resource, but ONLY when the model actually
+  // contains system work. Like the lane resources it is harvested from what the
+  // user drew, never conjured, and it is editable like any other row.
+  if (hasAutomatedWork(diagrams) && !names.some((n) => n.toLowerCase() === AUTOMATED_RESOURCE_NAME.toLowerCase())) {
+    names.push(AUTOMATED_RESOURCE_NAME);
+  }
+  const teamsToCreate = names
+    .filter((name) => !haveTeam.has(name.trim().toLowerCase()))
+    .map((name) => (name.toLowerCase() === AUTOMATED_RESOURCE_NAME.toLowerCase()
+      ? { name, capacity: AUTOMATED_RESOURCE_CAPACITY, calendarName: AUTOMATED_CALENDAR_NAME }
+      : { name, capacity: 1, calendarName: BUSINESS_HOURS_NAME }));
 
   return {
     calendarsToCreate,
