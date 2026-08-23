@@ -1816,7 +1816,7 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 - *(admin) catalog manager loads for a superuser and CRUD works* — the manager page + create / publish / duplicate / delete.
 - *(admin) Save run as example: capture route works + the button renders in the console* — capture a run into a draft example; the admin capture button renders.
 
-### Simulation — resources, repeats, recursive fill & the runaway guard (T2856–T2868)
+### Simulation — resources, repeats, recursive fill, the runaway guard & external waits (T2856–T2871)
 
 | ID | File | What it pins |
 |---|---|---|
@@ -1833,6 +1833,9 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T2866 | `tests/simulation/autofill-project.test.ts` | A start event that is ENTERED (linked child, or expanded-subprocess body) reads fixed 0; an event-subprocess trigger does not. |
 | T2867 | `tests/simulation/autofill-project.test.ts` | Resource seeding is scoped to one process tree — opening a process does not provision unrelated processes' teams. |
 | T2868 | `tests/simulation/overload-guard.test.ts` | An unstable model is stopped AND explained — a part-run is never presented as a finished answer. |
+| T2869 | `tests/xml/xsd-enum-drift.test.ts` | Every typed-enum value the app can export is declared in the XSD (structural, not sample-based). |
+| T2870 | `tests/simulation/external-wait.test.ts` | A Receive task / Message catch event is filled as exponential — waiting on someone else is memoryless, not bounded work. |
+| T2871 | `tests/simulation/external-wait.test.ts` | WaitTime is simulated as a NON-SEIZING delay: it lengthens the case without holding the resource. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

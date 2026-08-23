@@ -19,6 +19,7 @@ import { parseTimerLabel } from "./timerLabel";
 import { isArrivalSource } from "./arrivalSources";
 import { loopParamsForMarker, repeatCountOf, DEFAULT_REPEAT_COUNT } from "./repeats";
 import { isAutomatedActivity, AUTOMATED_RESOURCE_NAME } from "./automation";
+import { isExternalWait, DEF_EXTERNAL_WAIT } from "./externalWait";
 
 const DEF_ARRIVAL: SimDist = { kind: "exponential", mean: 10 };
 const DEF_CYCLE: SimDist = { kind: "triangular", min: 3, mode: 5, max: 8 };
@@ -111,7 +112,13 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
         // It still belongs to a lane, though — the team is what says WHOSE
         // sub-process this is, so that is filled either way.
         if (!hasInlineBody(el, data.elements)) {
-          if (!sim.cycleTime) { sim.cycleTime = DEF_CYCLE; auto.add("cycleTime"); filled++; changed = true; }
+          // A Receive task is waiting on an outside party, not working: that is
+          // memoryless and long-tailed, so it takes the exponential default
+          // rather than triangular's "always between 3 and 8 minutes".
+          if (!sim.cycleTime) {
+            sim.cycleTime = isExternalWait(el) ? DEF_EXTERNAL_WAIT : DEF_CYCLE;
+            auto.add("cycleTime"); filled++; changed = true;
+          }
           if (sim.resourceUnits === undefined) { sim.resourceUnits = 1; auto.add("resourceUnits"); changed = true; }
         }
         if (!sim.teamId) {
@@ -142,7 +149,7 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
         if (p?.mode === "until") { sim.delay = { kind: "fixed", value: 0 }; sim.delayMode = "until"; sim.delayUntil = p.timeOfDay; }
         else if (p?.mode === "working") { sim.delay = { kind: "fixed", value: round(p.minutes) }; sim.delayMode = "working"; }
         else if (p?.mode === "elapsed") { sim.delay = { kind: "fixed", value: round(p.minutes) }; }
-        else { sim.delay = DEF_DELAY; }
+        else { sim.delay = isExternalWait(el) ? DEF_EXTERNAL_WAIT : DEF_DELAY; }
         auto.add("delay"); filled++; changed = true;
       }
     }

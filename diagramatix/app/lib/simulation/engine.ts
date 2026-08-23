@@ -22,7 +22,7 @@ import { SECONDS_PER_UNIT, type SimRunConfig, type PlannedIntervention } from ".
 import { isOpenAt, nextOpenAt, rateAt, boundariesIn, advanceWorkingClock, nextTimeOfDayClock } from "./calendar";
 import type { RepStats, NodeStat } from "./statistics";
 
-type EventType = "GENERATE" | "SERVICE_END" | "RESUME" | "EVENT_TRIGGER" | "INTERVENTION" | "CALENDAR_CAP" | "BOUNDARY_TRIGGER" | "CATCH_TIMEOUT";
+type EventType = "GENERATE" | "SERVICE_END" | "WAIT_END" | "RESUME" | "EVENT_TRIGGER" | "INTERVENTION" | "CALENDAR_CAP" | "BOUNDARY_TRIGGER" | "CATCH_TIMEOUT";
 /** Runtime form of a planned intervention carried on an INTERVENTION event.
  *  A revert event (scheduled after a `duration`) is the same shape with the
  *  captured prior value and no duration. */
@@ -323,7 +323,7 @@ export class Engine {
     const node = this.nodeById.get(ev.nodeId);
     if (!token || !node) return;
     if (ev.type === "SERVICE_END") this.onServiceEnd(token, node);
-    else this.moveNext(token, node); // RESUME
+    else this.moveNext(token, node); // RESUME | WAIT_END
   }
 
   private onGenerate(nodeId: string): void {
@@ -830,6 +830,24 @@ export class Engine {
     // A compensation handler just finished → run the next armed handler; the
     // main flow resumes only once all handlers are done.
     if (token.comp) return this.runNextCompensation(token);
+
+    // BPSim WaitTime — a NON-SEIZING delay after the work is done: the courier
+    // is collecting, the customer is deciding, the batch is waiting for tonight's
+    // run. The case cannot advance, but nobody is working on it.
+    //
+    // It is scheduled AFTER the release above, which is the whole point of the
+    // field: put such a wait in cycleTime instead and the engine holds a person
+    // for its full duration, inflating utilisation and inventing queues that do
+    // not exist. The value was carried through the model, the panel and BPSim
+    // import/export, but nothing ever read it — so every wait entered here
+    // silently changed no result. Now it does.
+    if (node.waitTime) {
+      const w = sample(node.waitTime, this.rng);
+      if (w > 0) {
+        this.calendar.schedule(this.clock + w, { type: "WAIT_END", nodeId: node.id, tokenId: token.id });
+        return;
+      }
+    }
 
     this.moveNext(token, node);
   }
