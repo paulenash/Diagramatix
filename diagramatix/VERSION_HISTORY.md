@@ -15,6 +15,41 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.2.2310 — 2026-08-23 — Simulator repair + XSD enum catch-up (schema 46)
+
+**Simulation — the model the user can see is the model that runs.**
+- **Fill reaches the whole drill-down tree.** A run splices linked sub-processes in, so their
+  tasks are real work in the result; filling only the open diagram left every level below it
+  empty and the assembler quietly substituted its own defaults. Each level now takes its own lane
+  as its resource, and values the user set are never overwritten.
+- **A start event that is *entered* rather than *triggered* reads `fixed 0`** — a linked child's
+  top-level start, and any start inside an expanded sub-process at any level including the root.
+  Event-sub-process starts keep their trigger semantics.
+- **Resources are seeded from the process tree, not the whole project.** Opening one process was
+  provisioning the teams of every unrelated process beside it. Also fixes the race that made
+  harvesting a coin toss (seeding ran before any diagram had loaded, then marked itself done).
+- **Drill-down keeps an ancestor stack**, so back climbs one level and names where it is going.
+- **Trace Table:** a blank cell now means only *never visited*; a zero-time visit shows `0`, set
+  back visually so it does not out-shout the times that carry magnitude.
+- **Runaway guard.** An unstable model — work arriving faster than the resources can finish it —
+  grew live tokens until it exhausted the server, taking the whole app down rather than one tab.
+  A run now stops at 50,000 live cases **and says so above every figure in the report**: stopping
+  alone would present a part-run as a finished answer.
+
+**Schema: 45 → 46 (SHAPE CHANGE — enum catch-up + drift repair).**
+- `SymbolTypeEnum` + `history-state` / `deep-history-state` and the 21 `flowchart-*` shapes;
+  `ConnectorTypeEnum` + `flowline` / `flowchart-association`; `DiagramTypeEnum` + `flowchart`.
+- These were being **exported without being declared**. The XSD enumerations are closed and
+  `@type` is required, so every Standard Flowchart export (since June) and every history-state
+  State Machine (since August) was *invalid* against the published schema. No migration is needed
+  — the files were always this shape; only the declaration was missing.
+- Also formally records `Connector/@branchPercent`, added to the XSD on 2026-08-14 with the
+  gateway branch-share work and deliberately deferred to this batch.
+- A drift guard (`tests/xml/xsd-enum-drift.test.ts`) now compares the TypeScript unions against
+  the schema directly, so a new value cannot ship undeclared again.
+
+Product version: unchanged at **2.2** — no physical DB change this release.
+
 ## 2.2.2185 — 2026-08-13 — Version scheme: build count becomes the third part
 - **Version numbering tweak (Paul):** kept the two-tier `major.minor` line (`2.2`) and made the
   **git commit count the third part** of the displayed version — the header badge now reads

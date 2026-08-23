@@ -6,7 +6,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 - **`schemaVersion`** — a standalone **integer** (the XSD schema version). Bumped only when the XSD **export shape** changes (a field/element/enum added, removed, or renamed). Carried on `<xs:schema version="…">`. This changelog tracks THIS number.
 - **`appVersion`** = **`PRODUCT_VERSION`** (`major.middle.patch`) — the Diagramatix *product* version. Its MIDDLE increments on any physical DB change; patch on fixes; major manually. The header badge appends `(build <git-commit-count>)` for display. Product-version history lives in [`../VERSION_HISTORY.md`](../VERSION_HISTORY.md).
 
-**Current XSD schema version:** `45` · **Product version:** `2.1.1` (split 2026-08-10 — the old single `major.minor` reached `1.45`; the `45` minor became this standalone integer, and the product version restarted at `2.1.1`). Versioning began at **v1.0**; **v1.2** was the first enumerated XSD content; the XSD inline history block starts at **v1.10**.
+**Current XSD schema version:** `46` · **Product version:** `2.2` (split 2026-08-10 — the old single `major.minor` reached `1.45`; the `45` minor became this standalone integer, and the product version restarted at `2.1.1`). Versioning began at **v1.0**; **v1.2** was the first enumerated XSD content; the XSD inline history block starts at **v1.10**.
 
 > **When to bump the schema integer:** ONLY when the **XSD export shape** changes (the original, narrow criterion) — a new first-class element/attribute or a typed-enum value. Physical-DB changes and open-`properties` additions do NOT bump it — they move `PRODUCT_VERSION.middle` instead (recorded in `VERSION_HISTORY.md`, not here). See [`UPDATE_EVERYTHING.md`](UPDATE_EVERYTHING.md) Step 0 (Q1 = DB → product middle; Q2 = XSD → schema integer).
 
@@ -20,6 +20,7 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 
 | Version | Title | Schema shape change? |
 |---|---|---|
+| **schema 46** | **Enum catch-up — the schema now declares what the exporter already writes.** `SymbolTypeEnum` + `history-state` / `deep-history-state` and the twenty-one `flowchart-*` shapes; `ConnectorTypeEnum` + `flowline` / `flowchart-association`; `DiagramTypeEnum` + `flowchart`. Also formally records `Connector/@branchPercent` (added to the XSD 2026-08-14, bump deferred to this batch). | **Yes** — 24 additive enumerations. They were being **exported without being declared**, so every Standard Flowchart and every history-state State Machine was invalid against the published schema. |
 | **schema 45** (was 1.45) | **Version model split** — `schemaVersion` became a standalone integer (this changelog); the product version restarted at **2.1.1** and now carries DB/JSON structure changes (its middle bumps on any physical-DB change, logged in VERSION_HISTORY.md). The XSD integer stays **45** and moves only on an XSD-shape change. | **No** — pure renumbering; no XSD shape change. |
 | **1.44** | Full BPMN Tier-1 palette + compensation. *(Feature window 2026-08-04 also carries the AI Assist + Abracadabra Mode suite — assist-while-you-draw ghosts, live voice/typed command editing, the editable Assist/NL-Rules catalog, and voice-dictation metering — but that half is feature-only, no export-shape change.)* | **Yes** — new `GatewayType "complex"` + `EventType "multiple"` / `"parallel-multiple"` enumerations. The Assist/Abracadabra half changes nothing in the diagram XML (existing types + open `properties` + DB/telemetry tables only). |
 | **1.43** | AI-Prompt link — persist the prompt that generated a diagram (any type): on-canvas "AI Prompt: … Generated on: …" annotation, Diagram-Properties linked-prompt + Regenerate, show/hide toggle | **No XSD change** — new optional `DiagramData.aiGeneration` (link + snapshot) + `showAiPromptAnnotation` boolean; JSON metadata only (like `aiFeedback`), not in the BPMN XML interchange |
@@ -70,6 +71,33 @@ Canonical human-readable changelog for the export schema. Mirrors the inline his
 ---
 
 ## Details (newest first)
+
+### schema 46 — Enum catch-up: declaring what was already being exported  · SHAPE CHANGE (additive)
+
+**What changed**
+
+| Enum | Added |
+|---|---|
+| `SymbolTypeEnum` | `history-state`, `deep-history-state` (State Machine history states, shipped 2026-08-18) and the 21 `flowchart-*` shapes — `flowchart-terminator`, `-process`, `-decision`, `-io`, `-document`, `-multidoc`, `-predefined`, `-preparation`, `-manual-input`, `-manual-op`, `-display`, `-delay`, `-database`, `-onpage`, `-offpage`, `-merge`, `-parallel`, `-comment`, `-vswimlane` (Standard Flowchart, shipped 2026-06-19) |
+| `ConnectorTypeEnum` | `flowline`, `flowchart-association` |
+| `DiagramTypeEnum` | `flowchart` |
+| `Connector/@branchPercent` | Already present in the XSD since 2026-08-14 (diagram-level branch share, distinct from the simulation input `branchProbability`); this release records it against a version number. |
+
+**Why this is a repair, not just an addition.** The XSD's enumerations are CLOSED and `@type` is
+`use="required"`, so a value the exporter emits but the schema does not list does not degrade
+validation — it fails it. Every Standard Flowchart export had been invalid against the published
+schema since June, and every State Machine using a history state since August.
+
+It went unnoticed because the export round-trip validation sampled neither diagram type. Adding
+another sample diagram would only have moved the blind spot, so the guard added with this release
+(`tests/xml/xsd-enum-drift.test.ts`, T2869) compares the TypeScript unions against the schema
+directly: a new enum value cannot ship undeclared regardless of which diagrams the other tests
+happen to cover. The guard also pins the assumption it rests on — that `@type` is still the closed
+enum — so it cannot quietly become vacuous.
+
+**Migration: none.** Files written before schema 46 were already this shape; only the declaration
+was missing. A pre-46 flowchart export validates against the 46 schema unchanged.
+
 
 ### schema 45 (was v1.45) — Version model SPLIT into two numbers  · no export-XSD change
 The single `major.minor` scheme (which had reached `1.45`) was split into two independent numbers

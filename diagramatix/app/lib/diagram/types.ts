@@ -1130,6 +1130,22 @@ export interface TemplateData {
  *             appVersion (major.minor.BUILD) still advances automatically via the git commit
  *             count in /api/schema, so the release is reflected there.
  *
+ *  2026-08-23 (schema 46 — SHAPE CHANGE, and a DRIFT REPAIR): three sets of typed-enum
+ *             values that the exporter already emits are now declared in the XSD, so the
+ *             diagrams carrying them validate instead of failing:
+ *               • SymbolTypeEnum    + "history-state" / "deep-history-state" (State Machine
+ *                 history states, shipped 2026-08-18) and the twenty-one "flowchart-*"
+ *                 shapes (Standard Flowchart, shipped 2026-06-19).
+ *               • ConnectorTypeEnum + "flowline" / "flowchart-association".
+ *               • DiagramTypeEnum   + "flowchart".
+ *             Also records `Connector.branchPercent` (added to the XSD on 2026-08-14 with the
+ *             gateway-semantics work, its version bump deliberately deferred to this batch).
+ *             The flowchart family had been missing since June: the XSD's enumerations are
+ *             CLOSED and `type` is required, so every flowchart and every history-state export
+ *             was invalid against the published schema — silently, because the round-trip
+ *             validation covered neither diagram type. A drift guard now fails the build if a
+ *             TS union value has no XSD enumeration, so this cannot recur unnoticed.
+ *
  *  2026-08-10 (VERSION MODEL SPLIT — two independent numbers, per Paul):
  *             • SCHEMA_VERSION is now a STANDALONE INTEGER = the XSD schema version (currently
  *               "45", the old `1.45` minor). It is stamped as `schemaVersion` in every export and
@@ -1170,7 +1186,7 @@ export interface TemplateData {
  * change (new first-class element/attribute or typed-enum value). NOT bumped by DB-only or
  * open-`properties` changes — those move PRODUCT_VERSION instead.
  */
-export const SCHEMA_VERSION = "45";
+export const SCHEMA_VERSION = "46";
 
 /**
  * DIAGRAMATIX PRODUCT VERSION — a two-tier `major.minor` product line (currently "2.2"). The

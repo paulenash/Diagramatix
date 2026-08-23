@@ -463,6 +463,24 @@
     schema/SCHEMA_CHANGELOG.md and schema/UPDATE_EVERYTHING.md Step 0.
     (Inline entries for v1.42-1.44 were not added here; those releases' shape
     notes live in schema/SCHEMA_CHANGELOG.md.)
+
+  v46 — Enum catch-up: the schema now declares what the exporter already writes.
+    SHAPE CHANGE (all additive enumerations):
+      SymbolTypeEnum    + "history-state" / "deep-history-state" (State Machine
+                          history states, shipped 2026-08-18)
+                        + the twenty-one "flowchart-*" shapes (Standard Flowchart,
+                          shipped 2026-06-19)
+      ConnectorTypeEnum + "flowline" / "flowchart-association"
+      DiagramTypeEnum   + "flowchart"
+    These values were being exported without being declared. The enumerations here
+    are CLOSED and @type is required, so every Standard Flowchart export — and every
+    State Machine using a history state — was INVALID against this schema. It went
+    unnoticed because the export round-trip validation covered neither diagram type;
+    a drift guard (tests/xml/xsd-enum-drift.test.ts) now fails if a TS union value has
+    no enumeration here.
+    Also formally records Connector/@branchPercent, added to this file on 2026-08-14
+    with the gateway branch-share work, whose version bump was deferred to this batch.
+    Files written before v46 need no migration: they were already this shape.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -569,6 +587,8 @@
       <xs:enumeration value="domain"/>
       <xs:enumeration value="value-chain"/>
       <xs:enumeration value="archimate"/>          <!-- schema 1.9 -->
+      <!-- schema 46 — Standard Flowchart diagram type. -->
+      <xs:enumeration value="flowchart"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -793,6 +813,31 @@
            gated by the diagram-level showIssues / showIssueDescriptions
            booleans. Type-agnostic. -->
       <xs:enumeration value="uml-issue"/>
+      <!-- schema 46 — State Machine history states (shipped 2026-08-18). -->
+      <xs:enumeration value="history-state"/>
+      <xs:enumeration value="deep-history-state"/>
+      <!-- schema 46 — Standard Flowchart shapes (shipped 2026-06-19; the exporter
+           has emitted these since, so pre-46 flowchart exports are valid 46 files
+           that simply were not declared here). -->
+      <xs:enumeration value="flowchart-terminator"/>
+      <xs:enumeration value="flowchart-process"/>
+      <xs:enumeration value="flowchart-decision"/>
+      <xs:enumeration value="flowchart-io"/>
+      <xs:enumeration value="flowchart-document"/>
+      <xs:enumeration value="flowchart-multidoc"/>
+      <xs:enumeration value="flowchart-predefined"/>
+      <xs:enumeration value="flowchart-preparation"/>
+      <xs:enumeration value="flowchart-manual-input"/>
+      <xs:enumeration value="flowchart-manual-op"/>
+      <xs:enumeration value="flowchart-display"/>
+      <xs:enumeration value="flowchart-delay"/>
+      <xs:enumeration value="flowchart-database"/>
+      <xs:enumeration value="flowchart-onpage"/>
+      <xs:enumeration value="flowchart-offpage"/>
+      <xs:enumeration value="flowchart-merge"/>
+      <xs:enumeration value="flowchart-parallel"/>
+      <xs:enumeration value="flowchart-comment"/>
+      <xs:enumeration value="flowchart-vswimlane"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -1273,6 +1318,9 @@
       <!-- schema 1.15 — pink link from a review-comment note to the
            element it concerns (Phase 3). -->
       <xs:enumeration value="review-comment-link"/>
+      <!-- schema 46 — Standard Flowchart connectors. -->
+      <xs:enumeration value="flowline"/>
+      <xs:enumeration value="flowchart-association"/>
     </xs:restriction>
   </xs:simpleType>
 
