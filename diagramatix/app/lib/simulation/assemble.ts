@@ -219,6 +219,15 @@ export function assembleFromDiagram(
       fireProb: bp?.fireProb ?? 1,
       interrupting: el.properties?.interruptionType !== "non-interrupting",
     };
+    // "7 working days" is not 7 elapsed days — a reminder timer that ignores
+    // nights and weekends fires while nobody could have acted. Working hours
+    // come from the HOST's team: the reminder is chased by whoever owns the
+    // step. Absent → elapsed, which is what an unqualified "2 days" means.
+    if (bp?.triggerMode === "working") {
+      const hostTeam = getSimParams(host).teamId ?? laneLabelTeamOf(host);
+      const cal = hostTeam ? opts?.teamCalendars?.[hostTeam] : undefined;
+      if (cal) { be.triggerMode = "working"; be.calendar = cal; }
+    }
     (boundaryByHost.get(el.boundaryHostId!) ?? boundaryByHost.set(el.boundaryHostId!, []).get(el.boundaryHostId!)!).push(be);
   }
 

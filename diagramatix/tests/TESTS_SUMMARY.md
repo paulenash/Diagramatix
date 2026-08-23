@@ -1816,7 +1816,7 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 - *(admin) catalog manager loads for a superuser and CRUD works* — the manager page + create / publish / duplicate / delete.
 - *(admin) Save run as example: capture route works + the button renders in the console* — capture a run into a draft example; the admin capture button renders.
 
-### Simulation — resources, repeats, recursive fill, the runaway guard & external waits (T2856–T2871)
+### Simulation — resources, repeats, recursive fill, the runaway guard, external waits & working timers (T2856–T2873)
 
 | ID | File | What it pins |
 |---|---|---|
@@ -1836,6 +1836,8 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T2869 | `tests/xml/xsd-enum-drift.test.ts` | Every typed-enum value the app can export is declared in the XSD (structural, not sample-based). |
 | T2870 | `tests/simulation/external-wait.test.ts` | A Receive task / Message catch event is filled as exponential — waiting on someone else is memoryless, not bounded work. |
 | T2871 | `tests/simulation/external-wait.test.ts` | WaitTime is simulated as a NON-SEIZING delay: it lengthens the case without holding the resource. |
+| T2872 | `tests/simulation/boundary-working-timer.test.ts` | A boundary timer reads its duration off the label; the working/business qualifier is honoured and an unqualified one stays elapsed. |
+| T2873 | `tests/simulation/boundary-working-timer.test.ts` | A working boundary timer advances only through open hours, so it cannot expire overnight or across a weekend. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

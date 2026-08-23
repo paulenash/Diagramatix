@@ -584,7 +584,14 @@ export class Engine {
     this.boundaryArm.set(token.id, { nodeId: node.id, armId });
     for (const be of bes) {
       if (be.fireProb < 1 && this.rng.next() >= be.fireProb) continue; // didn't occur this run
-      this.calendar.schedule(this.clock + sample(be.trigger, this.rng), {
+      // A "working" trigger counts only through the host team's open hours, so
+      // "7 working days" cannot expire over a weekend when nobody could have
+      // acted on it. Everything else is plain elapsed time.
+      const d = sample(be.trigger, this.rng);
+      const at = be.triggerMode === "working" && be.calendar
+        ? advanceWorkingClock(this.clock, d, be.calendar, this.config.clockUnit)
+        : this.clock + d;
+      this.calendar.schedule(at, {
         type: "BOUNDARY_TRIGGER", nodeId: node.id, tokenId: token.id, beId: be.id, armId,
       });
     }

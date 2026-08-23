@@ -52,7 +52,11 @@ export interface ElementSimParams {
   // boundary catch event on an activity: races the host's cycle time. `trigger`
   // = time from host-start until the event fires; `fireProb` (0..1, default 1) =
   // chance it fires at all this execution (e.g. a boundary error at ~5%).
-  boundary?: { trigger?: SimDist; fireProb?: number };
+  // `triggerMode` "working" counts the trigger only during working hours —
+  // a reminder "after 7 working days" is not the same as 7 elapsed days. It is
+  // set from the event's LABEL when the label says so ("7 working days"), and
+  // absent means ELAPSED, which is the ordinary reading of "2 days".
+  boundary?: { trigger?: SimDist; fireProb?: number; triggerMode?: "working" };
   // intermediate catch/throw synchronisation. `channel` names the signal/message
   // (defaults to the element label); a THROW fires it, a CATCH blocks until it
   // fires. `catchTimeout` (catch only) is a fallback / external-arrival release

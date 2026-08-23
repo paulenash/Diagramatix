@@ -102,7 +102,26 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
     // A boundary catch event is an intermediate-event too, so test it first and
     // treat it as a boundary (trigger), not a delay.
     if (isBoundaryCatch(el)) {
-      if (!sim.boundary?.trigger) { sim.boundary = { ...sim.boundary, trigger: DEF_TRIGGER }; auto.add("boundary"); filled++; changed = true; }
+      if (!sim.boundary?.trigger) {
+        // Read the duration off the label the same way a timer delay does — a
+        // boundary timer saying "2 days" or "7 working days" is stating its own
+        // value, and the flat exponential default overwrote what the drawing
+        // already said. The WORKING qualifier is the user's, not a guess: "2
+        // hours" is elapsed, "2 working hours" counts only through open hours,
+        // and anything unqualified stays elapsed.
+        const p = parseTimerLabel(el.label ?? "");
+        const round = (n: number) => Math.round(n * 100) / 100;
+        if (p?.mode === "elapsed" || p?.mode === "working") {
+          sim.boundary = {
+            ...sim.boundary,
+            trigger: { kind: "fixed", value: round(p.minutes) },
+            ...(p.mode === "working" ? { triggerMode: "working" as const } : {}),
+          };
+        } else {
+          sim.boundary = { ...sim.boundary, trigger: DEF_TRIGGER };
+        }
+        auto.add("boundary"); filled++; changed = true;
+      }
     } else {
       if (isArrivalSource(el, byId) && !sim.arrival) { sim.arrival = DEF_ARRIVAL; auto.add("arrival"); filled++; changed = true; }
       if (TASK.has(el.type)) {

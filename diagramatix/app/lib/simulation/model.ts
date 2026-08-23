@@ -46,6 +46,11 @@ export interface BoundaryEvent {
    *  boundary event's outgoing flow shows no token count at all. */
   viaEdge?: string;
   trigger: SimDist;      // time from host service-start until the event fires
+  /** "working" counts `trigger` only through `calendar`'s open hours; absent =
+   *  plain elapsed time, which is what an unqualified "2 days" means. */
+  triggerMode?: "working";
+  /** Working hours for a "working" trigger — the host's team calendar. */
+  calendar?: WorkCalendar;
   fireProb: number;      // 0..1 chance it fires at all this execution (default 1)
   interrupting: boolean;
 }
