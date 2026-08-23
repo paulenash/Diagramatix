@@ -115,6 +115,15 @@ async function main() {
       });
       if (!chapter) { console.log(`\n?? no "${a.chapter}" chapter in ${COLLECTION} — skipped`); continue; }
       console.log(`\nCHAPTER "${chapter.title}"`);
+
+      // Repair any section already filed under the wrong collection (see the
+      // note on create below). Re-running this script is how an environment
+      // that got the first, broken version is put right.
+      const misfiled = chapter.sections.filter((s) => s.collection !== COLLECTION);
+      for (const s of misfiled) {
+        await prisma.helpSection.update({ where: { id: s.id }, data: { collection: COLLECTION } });
+        console.log(`  REPAIR  collection ${s.collection} -> ${COLLECTION}  "${s.heading}"`);
+      }
       let next = Math.max(0, ...chapter.sections.map((s) => s.sortOrder)) + 1;
       for (const s of a.sections) {
         const existing = chapter.sections.find((x) => x.heading === s.heading);
@@ -124,7 +133,16 @@ async function main() {
           await prisma.helpSection.update({ where: { id: existing.id }, data: { bodyMarkdown: s.body } });
           console.log(`  update  "${s.heading}"`);
         } else {
-          await prisma.helpSection.create({ data: { chapterId: chapter.id, heading: s.heading, bodyMarkdown: s.body, sortOrder: next++ } });
+          // `collection` is DENORMALISED onto the section (the chapter has one
+          // too) and defaults to "user-guide". Omitting it here filed every
+          // tech-design note under the user guide: the section rows existed with
+          // their content, but the viewer's collection-scoped query skipped
+          // them, so the chapter rendered with nothing under it. The scoped
+          // delete on save keys off the same column, so this is not merely
+          // cosmetic.
+          await prisma.helpSection.create({
+            data: { chapterId: chapter.id, collection: COLLECTION, heading: s.heading, bodyMarkdown: s.body, sortOrder: next++ },
+          });
           console.log(`  insert  "${s.heading}"`);
         }
       }
