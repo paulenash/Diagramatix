@@ -153,7 +153,7 @@ export async function POST(req: Request, { params }: Params) {
   if (stale.length) await prisma.simulationRun.deleteMany({ where: { id: { in: stale } } });
 
   try {
-    const { stats } = runMonteCarlo(net, cfg, cfg.interventions, teamCosts);
+    const { stats, overload } = runMonteCarlo(net, cfg, cfg.interventions, teamCosts);
     // Bottleneck ranking: teams by mean utilisation (highest first).
     const bottlenecks = Object.entries(stats.perTeam)
       .sort((a, b) => b[1].utilization.mean - a[1].utilization.mean)
@@ -162,7 +162,10 @@ export async function POST(req: Request, { params }: Params) {
     // showing namespaced ids.
     const nodeLabels: Record<string, { label: string; kind: string }> = {};
     for (const n of net.nodes) nodeLabels[n.id] = { label: n.label ?? n.id.split("::").pop() ?? n.id, kind: n.kind };
-    const metrics = { stats, bottlenecks, nodeLabels, clockUnit: cfg.clockUnit, teamCapacities };
+    // An overloaded run is a real finding about the process, not an error — it
+    // is stored with the results so the report can explain why the numbers stop
+    // where they do instead of showing a part-run as a complete one.
+    const metrics = { stats, bottlenecks, nodeLabels, clockUnit: cfg.clockUnit, teamCapacities, ...(overload ? { overload } : {}) };
 
     const finished = await prisma.simulationRun.update({
       where: { id: run.id },

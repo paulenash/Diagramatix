@@ -11,6 +11,10 @@ export interface RunMetrics {
   stats: AggregatedStats;
   /** Team ids ranked by mean utilisation, highest first. */
   bottlenecks: string[];
+  /** Present when the run was stopped short because the model could not keep
+   *  up. Its stats therefore cover less than the requested horizon, so the
+   *  report must say so rather than present them as a finished answer. */
+  overload?: { at: number; liveTokens: number };
   /** Engine node id → display label + kind (id is namespaced per diagram). */
   nodeLabels: Record<string, { label: string; kind: string }>;
   clockUnit: string;

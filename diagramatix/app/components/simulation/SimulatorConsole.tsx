@@ -24,6 +24,7 @@ import { defaultReplayConfig, buildReplay } from "@/app/lib/simulation/replaySou
 import { seedSimulationDefaults } from "@/app/lib/simulation/seedDefaults";
 import { usedTeamNames } from "@/app/lib/simulation/harvestTeams";
 import { autofillSimulation, unfillSimulation } from "@/app/lib/simulation/autofill";
+import { autofillProject, reachableDiagramIds } from "@/app/lib/simulation/autofillProject";
 import type { ScenarioRunConfig, WorkCalendar } from "@/app/lib/simulation/types";
 
 const EMPTY_DIAGRAM: DiagramData = { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -85,6 +86,22 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
   const [activeId, setActiveId] = useState<string | null>(diagramId ?? null);
   const [variantData, setVariantData] = useState<DiagramData | null>(null);
   const [loadingVariant, setLoadingVariant] = useState(false);
+  // Ancestors of the diagram currently shown in Simulation Data, innermost last.
+  // Drilling into a linked sub-process used to just replace the active diagram,
+  // so "back" had nowhere to return to and jumped to the top of the tree —
+  // losing your place after two levels down.
+  const [dataDrill, setDataDrill] = useState<string[]>([]);
+  const openDiagramFromData = useCallback((childId: string) => {
+    setDataDrill((s) => [...s, activeId ?? diagramId ?? ""].filter(Boolean) as string[]);
+    setActiveId(childId);
+  }, [activeId, diagramId]);
+  const dataDrillUp = useCallback(() => {
+    setDataDrill((s) => {
+      if (s.length === 0) { setActiveId(diagramId ?? diagramList[0]?.id ?? null); return s; }
+      setActiveId(s[s.length - 1]);
+      return s.slice(0, -1);
+    });
+  }, [diagramId, diagramList]);
   // Full data of every project BPMN diagram, so the replay can splice linked
   // (collapsed) subprocesses in (their child diagrams live in this map).
   const [diagramsById, setDiagramsById] = useState<Map<string, DiagramData>>(new Map());
@@ -125,15 +142,31 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
   // diagrams have loaded so lane-team harvest sees them; `seedKey` bump remounts
   // the library panels to show the newly-created rows.
   const [seedKey, setSeedKey] = useState(0);
-  const seededRef = useRef(false);
+  // Keyed by the set of resource names the diagrams reference, so seeding re-runs
+  // when a NEW one appears (a lane added three levels down) and is skipped when
+  // nothing has changed. Previously it ran once on mount — and on first render
+  // the diagram list is still empty, so `list.length > 0 && byId.size === 0` was
+  // false and it seeded with ZERO diagrams, then marked itself done for good.
+  // Whether a team was ever harvested came down to which fetch resolved first.
+  //
+  // Scoped to the process TREE (root + everything it links into), not the whole
+  // project: a project holds unrelated processes, and opening one of them should
+  // not provision the resources of all the others.
+  const seededSigRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!projectId || seededRef.current) return;
-    if (diagramList.length > 0 && diagramsById.size === 0) return; // wait for diagrams
-    seededRef.current = true;
-    seedSimulationDefaults(projectId, [...diagramsById.values()])
+    const rootId = activeId ?? diagramId;
+    if (!projectId || !rootId || diagramsById.size === 0) return; // no process picked, or nothing to harvest from yet
+    const diagrams = reachableDiagramIds(rootId, diagramsById)
+      .map((id) => diagramsById.get(id))
+      .filter((d): d is DiagramData => !!d);
+    if (diagrams.length === 0) return;
+    const sig = usedTeamNames(diagrams).size === 0 ? "" : [...usedTeamNames(diagrams)].sort().join("|");
+    if (seededSigRef.current === sig) return;
+    seededSigRef.current = sig;
+    seedSimulationDefaults(projectId, diagrams)
       .then((res) => { if (res.calendarsCreated || res.teamsCreated || res.studyCreated) setSeedKey((k) => k + 1); })
-      .catch(() => { seededRef.current = false; }); // allow a retry on the next change
-  }, [projectId, diagramList, diagramsById]);
+      .catch(() => { seededSigRef.current = null; }); // allow a retry on the next change
+  }, [projectId, diagramsById, activeId, diagramId]);
 
   const isOpen = !activeId || activeId === diagramId;
   useEffect(() => {
@@ -154,11 +187,37 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
     setVariantData(next);
     fetch(`/api/diagrams/${activeId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: next, unconditional: true }) }).catch(() => {}); // authoritative sim write-back (DATA-32)
   }, [isOpen, activeId, onApplyData]);
+  /**
+   * Fill the whole drill-down tree, not just the diagram on screen. A run
+   * splices linked sub-processes in, so their tasks are real work in the result;
+   * filling only the open diagram left every level below it empty and the
+   * assembler quietly substituted its own defaults. Children are written back
+   * through the same authoritative API the variant editor uses.
+   */
   const fillActive = useCallback(() => {
-    const { data: filled, filled: n } = autofillSimulation(activeData);
-    applyActive(filled);
+    const rootId = activeId ?? diagramId;
+    if (!rootId || diagramsById.size === 0) {
+      // No project context (or diagrams not loaded) — fill just what we have.
+      const { data: filled, filled: n } = autofillSimulation(activeData);
+      applyActive(filled);
+      return n;
+    }
+    // Use the live copy of the active diagram, which may be ahead of the map.
+    const byId = new Map(diagramsById);
+    byId.set(rootId, activeData);
+    const { changed, filled: n } = autofillProject(rootId, byId);
+    for (const [id, data] of changed) {
+      if (id === rootId) applyActive(data);
+      else {
+        setDiagramsById((prev) => new Map(prev).set(id, data));
+        fetch(`/api/diagrams/${id}`, {
+          method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data, unconditional: true }),
+        }).catch(() => {});
+      }
+    }
     return n;
-  }, [activeData, applyActive]);
+  }, [activeData, activeId, diagramId, diagramsById, applyActive]);
   const unfillActive = useCallback(() => {
     const { data: cleared, cleared: n } = unfillSimulation(activeData);
     applyActive(cleared);
@@ -306,11 +365,14 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
                 {!isOpen && (
                   <p className="text-[10px] text-green-400/50 mb-1">
                     Editing <span className="text-green-300">{diagramList.find((d) => d.id === activeId)?.name ?? "selected"}</span> — changes save straight to that diagram.
-                    <button onClick={() => setActiveId(diagramId ?? diagramList[0]?.id ?? null)} className="ml-2 text-green-400/70 hover:text-green-200">‹ back</button>
+                    <button onClick={dataDrillUp} className="ml-2 text-green-400/70 hover:text-green-200"
+                      title={dataDrill.length ? `Back to ${diagramList.find((d) => d.id === dataDrill[dataDrill.length - 1])?.name ?? "the level above"}` : "Back to the top-level process"}>
+                      ‹ back to {dataDrill.length ? (diagramList.find((d) => d.id === dataDrill[dataDrill.length - 1])?.name ?? "the level above") : "top"}
+                    </button>
                   </p>
                 )}
                 {canEditActive
-                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} onUnfillMissing={unfillActive} onOpenDiagram={setActiveId} calendars={calendars} teams={Object.keys(teamCapacities)} teamCapacities={teamCapacities} />
+                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} onUnfillMissing={unfillActive} onOpenDiagram={openDiagramFromData} calendars={calendars} teams={Object.keys(teamCapacities)} teamCapacities={teamCapacities} />
                   : <p className="text-xs text-green-400/60">{loadingVariant ? "Loading variant…" : "Open this diagram from its editor to edit simulation data here."}</p>}
               </MatrixPanel>
               <MatrixPanel title="Interchange — BPSim export / import" className="md:col-span-3">

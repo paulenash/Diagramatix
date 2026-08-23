@@ -29,7 +29,12 @@ export function TokenTraceTable({ replay, clockUnit = "minute", onClose }: {
   const [minFlow, setMinFlow] = useState<number | "">("");
 
   const unit = clockUnit === "minute" ? "min" : clockUnit === "hour" ? "hr" : clockUnit === "day" ? "d" : clockUnit;
-  const fmt = (n: number) => (n === 0 ? "" : n < 10 ? n.toFixed(1) : Math.round(n).toString());
+  // A cell is blank ONLY when the token never visited that element. A visit that
+  // took no time (a scope, a pass-through) shows "0" — previously both rendered
+  // identically, so real data looked missing. The zero is set back visually: it
+  // carries no magnitude, and at full strength a column of them out-shouts the
+  // times that do.
+  const fmt = (n: number) => (n === 0 ? "0" : n < 10 ? n.toFixed(1) : Math.round(n).toString());
 
   const rows = useMemo(() => table.rows.filter((r) =>
     (!outcomeFilter || r.outcome === outcomeFilter) &&
@@ -137,7 +142,7 @@ export function TokenTraceTable({ replay, clockUnit = "minute", onClose }: {
               <tr key={r.id} className={r.hitBoundary ? "bg-amber-500/[0.06]" : r.inProgress ? "bg-cyan-500/[0.05]" : ""}>
                 <td className="sticky left-0 z-10 bg-black border border-green-500/25 px-2 py-0.5 text-green-400/80">{r.num}</td>
                 {table.cols.map((c) => { const v = cellVal(r.cells[c.id]); return (
-                  <td key={c.id} className="border border-green-500/15 px-1.5 py-0.5 text-center text-green-200" style={{ background: tint(v) }}
+                  <td key={c.id} className={`border border-green-500/15 px-1.5 py-0.5 text-center ${v === 0 ? "text-green-500/40 font-normal" : "text-green-200"}`} style={{ background: tint(v) }}
                     title={r.cells[c.id] ? `time ${r.cells[c.id]!.time.toFixed(1)} · wait ${r.cells[c.id]!.wait.toFixed(1)} · ${r.cells[c.id]!.visits}×` : undefined}>
                     {fmt(v)}
                   </td>

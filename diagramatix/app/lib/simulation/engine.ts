@@ -75,6 +75,17 @@ function loopCount(loop: NonNullable<SimNode["loop"]>) {
  */
 const MAX_REPEAT_PASSES = 10_000;
 
+/**
+ * Most cases that may be in progress at once before a run is declared overloaded.
+ *
+ * A stable process holds a roughly steady number; an unstable one — where work
+ * arrives faster than the resources can finish it — grows linearly with the
+ * horizon and never comes back. 50,000 is far beyond any real process and is
+ * reached only by a model that cannot keep up, so stopping there costs nothing
+ * legitimate and prevents the run from consuming the server it runs on.
+ */
+const MAX_LIVE_TOKENS = 50_000;
+
 /** A token-movement event for the live replay player (green-token animation). */
 export type TraceEventKind = "spawn" | "enter" | "queue" | "service" | "exit" | "fire";
 /** `fire` = an element ACTIVATION flash (not a token move): a boundary event that
@@ -241,14 +252,41 @@ export class Engine {
   /** Process all events up to and including time `t`. */
   runUntil(t: number): void {
     let ev = this.calendar.peek();
+    let sinceCheck = 0;
     while (ev && ev.time <= t) {
       this.calendar.pop();
       this.clock = ev.time;
       this.maybeWarmup();
       this.handle(ev.payload);
+      // ── Runaway guard ──────────────────────────────────────────────────
+      // In an UNSTABLE model — work arriving faster than the resources can
+      // complete it — the queue never drains, so live tokens grow linearly with
+      // the horizon and memory grows with them. Unbounded that eventually
+      // exhausts the process, and because the authoritative run executes
+      // SERVER-SIDE it takes the whole application down with it rather than one
+      // browser tab. Stopping early and SAYING SO turns an outage into a
+      // diagnosis: an unstable model is a real finding about the process, and
+      // the user needs to be told, not have the app die on them.
+      if (++sinceCheck >= 1000) {
+        sinceCheck = 0;
+        if (this.tokens.size > MAX_LIVE_TOKENS) {
+          this.overloadedAt = this.clock;
+          this.liveAtOverload = this.tokens.size;
+          break;
+        }
+      }
       ev = this.calendar.peek();
     }
-    if (this.clock < t) this.clock = t;
+    if (this.clock < t && this.overloadedAt === undefined) this.clock = t;
+  }
+
+  /** Set when the run was stopped early because the model could not keep up. */
+  private overloadedAt?: number;
+  private liveAtOverload = 0;
+  /** Why a run stopped short, or undefined when it completed its horizon. Read
+   *  by the caller so the UI can explain rather than quietly show a part-run. */
+  get overload(): { at: number; liveTokens: number } | undefined {
+    return this.overloadedAt === undefined ? undefined : { at: this.overloadedAt, liveTokens: this.liveAtOverload };
   }
 
   /** Convenience: reset + run to the configured horizon. */

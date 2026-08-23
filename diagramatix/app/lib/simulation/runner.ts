@@ -74,6 +74,12 @@ export interface MonteCarloResult {
   stats: AggregatedStats;
   /** Per-replication raw stats — kept for drill-down + per-rep comparison. */
   reps: RepStats[];
+  /** Set when the run was stopped short because the model could not keep up:
+   *  work arrives faster than the resources can finish it, so the queue grows
+   *  for as long as the run continues. The numbers here are a real finding about
+   *  the process — the caller must SHOW them rather than present a part-run as
+   *  though it were a complete answer. */
+  overload?: { at: number; liveTokens: number };
 }
 
 /** Run `cfg.replications` replications of `net` and aggregate. Each replication
@@ -91,9 +97,15 @@ export function runMonteCarlo(
     ? { ...(planned && planned.length ? { planned } : {}), ...(teamCosts ? { teamCosts } : {}) }
     : undefined;
   const reps: RepStats[] = [];
+  let overload: { at: number; liveTokens: number } | undefined;
   for (let r = 0; r < n; r++) {
     const rng = makeRng(deriveSeed(cfg.seed, r));
-    reps.push(new Engine(net, cfg, rng, opts).run());
+    const engine = new Engine(net, cfg, rng, opts);
+    reps.push(engine.run());
+    // An overloaded model is overloaded in EVERY replication — the arrival rate
+    // simply exceeds what the resources can do. Repeating it would burn the same
+    // time and memory again for the same answer, so stop and report it once.
+    if (engine.overload) { overload = engine.overload; break; }
   }
-  return { stats: aggregate(reps), reps };
+  return { stats: aggregate(reps), reps, ...(overload ? { overload } : {}) };
 }

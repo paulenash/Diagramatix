@@ -52,6 +52,24 @@ export function ResultsReport({ runUrl, initial }: { runUrl: string; initial?: R
 
   return (
     <div className="flex flex-col gap-3 text-[10px] text-green-300/90">
+      {/* Said before any number, because it changes what every number below
+          means: these stats cover the part of the horizon that ran, not the
+          horizon that was asked for. */}
+      {metrics.overload && (
+        <div className="border border-amber-500/60 bg-amber-500/[0.08] rounded px-2 py-1.5 text-amber-200">
+          <div className="font-semibold">⚠ Stopped early — the model cannot keep up</div>
+          <div className="mt-0.5 text-amber-200/85">
+            {metrics.overload.liveTokens.toLocaleString()} cases were still in progress at time
+            {" "}{Math.round(metrics.overload.at).toLocaleString()}{unit ? " " + unit : ""}, and the number was still climbing:
+            work is arriving faster than the resources can finish it, so the queue never drains.
+            The figures below cover only the part of the run that completed.
+          </div>
+          <div className="mt-1 text-amber-200/70">
+            Raise capacity on the busiest team below, lower the arrival rate, or shorten the
+            longest task — then run again.
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap gap-x-6 gap-y-1">
         <Metric label="Replications" value={String(stats.replications)} />
         <Metric label="Completed" value={fmtRange(stats.completed, 0)} />

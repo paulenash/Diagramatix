@@ -1816,6 +1816,24 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 - *(admin) catalog manager loads for a superuser and CRUD works* — the manager page + create / publish / duplicate / delete.
 - *(admin) Save run as example: capture route works + the button renders in the console* — capture a run into a draft example; the admin capture button renders.
 
+### Simulation — resources, repeats, recursive fill & the runaway guard (T2856–T2868)
+
+| ID | File | What it pins |
+|---|---|---|
+| T2856 | `tests/simulation/arrival-sources-and-team.test.ts` | A sub-process with a body of its own is a SCOPE, not a unit of work — it takes no time itself. |
+| T2857 | `tests/simulation/token-table.test.ts` | Token accounting: every row is a case or an internal token, and the two reconcile with the arrivals. |
+| T2858 | `tests/simulation/task-repeats.test.ts` | A repeat / multi-instance marker on a task is simulated — sequential runs as one block, parallel spreads across units. |
+| T2859 | `tests/simulation/arrival-sources-and-team.test.ts` | A team is only ever named after something the user drew; no resource is invented under the hood. |
+| T2860 | `tests/simulation/default-setup.test.ts` | A model containing system work gets the one shared Automation resource (24/7), not a per-task invention. |
+| T2861 | `tests/simulation/arrival-sources-and-team.test.ts` | A system task sitting in a human lane is charged to Automation, not to that lane's team. |
+| T2862 | `tests/simulation/task-repeats.test.ts` | Resource accounting balances: what a repeat seizes is exactly what it releases (the capacity-leak guard). |
+| T2863 | `tests/simulation/resource-integrity.test.ts` | Only visible, explicitly declared resources may affect a run. |
+| T2864 | `tests/simulation/task-repeats.test.ts` | A repeat count is a distribution, so an implausible sample is reported BEFORE the run rather than silently clamped. |
+| T2865 | `tests/simulation/autofill-project.test.ts` | Fill reaches the whole drill-down tree, each level taking its own lane as its resource; user-set values are never overwritten. |
+| T2866 | `tests/simulation/autofill-project.test.ts` | A start event that is ENTERED (linked child, or expanded-subprocess body) reads fixed 0; an event-subprocess trigger does not. |
+| T2867 | `tests/simulation/autofill-project.test.ts` | Resource seeding is scoped to one process tree — opening a process does not provision unrelated processes' teams. |
+| T2868 | `tests/simulation/overload-guard.test.ts` | An unstable model is stopped AND explained — a part-run is never presented as a finished answer. |
+
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 
 ---
