@@ -267,8 +267,12 @@ async function main() {
         const at = s.sortOrder ?? (ours ? i + 1 : next++);
         const existing = chapter.sections.find((x) => x.heading === s.heading);
         if (existing) {
-          await prisma.helpSection.update({ where: { id: existing.id }, data: { bodyMarkdown: s.body, sortOrder: at } });
-          console.log(`  update  "${s.heading}"  (sortOrder ${at})`);
+          // Content only — NOT position. Re-asserting a position here fought the
+          // order pass below: this loop shoved each section to the end of the
+          // chapter and the order pass pulled it back, so every run reported the
+          // same six moves and the script never settled.
+          await prisma.helpSection.update({ where: { id: existing.id }, data: { bodyMarkdown: s.body } });
+          console.log(`  update  "${s.heading}"`);
         } else {
           await prisma.helpSection.create({ data: { chapterId: chapter.id, heading: s.heading, bodyMarkdown: s.body, sortOrder: at } });
           console.log(`  insert  "${s.heading}"  (sortOrder ${at})`);
@@ -279,15 +283,26 @@ async function main() {
     const sim = await prisma.helpChapter.findFirst({ where: { slug: "simulation", collection: COLLECTION }, include: { sections: true } });
     if (sim) {
       console.log("\nORDER  Simulating Processes");
-      for (const [i, heading] of SIMULATION_ORDER.entries()) {
+      const move = async (s: { id: string; sortOrder: number }, at: number, label: string) => {
+        if (s.sortOrder === at) return;
+        await prisma.helpSection.update({ where: { id: s.id }, data: { sortOrder: at } });
+        console.log(`  ${String(s.sortOrder).padStart(3)} -> ${String(at).padStart(3)}  ${label}`);
+      };
+      let at = 1; // 0 is the chapter intro (heading null)
+      for (const heading of SIMULATION_ORDER) {
         const s = sim.sections.find((x) => x.heading === heading);
-        if (!s) { console.log(`  ?? missing section "${heading}" — order left alone`); continue; }
-        const at = i + 1; // 0 is the chapter intro (heading null)
-        if (s.sortOrder !== at) {
-          await prisma.helpSection.update({ where: { id: s.id }, data: { sortOrder: at } });
-          console.log(`  ${String(s.sortOrder).padStart(3)} -> ${String(at).padStart(3)}  ${heading}`);
-        }
+        if (!s) { console.log(`  ?? missing section "${heading}" — skipped`); continue; }
+        await move(s, at++, heading);
       }
+      // Sections this script does not know about — an environment may carry its
+      // own — keep their relative order but move BELOW the ordered block. Left
+      // where they are they would collide with the numbers just assigned, and a
+      // tie renders in an arbitrary order that changes under you.
+      const listed = new Set(SIMULATION_ORDER);
+      const rest = sim.sections
+        .filter((s) => s.heading !== null && !listed.has(s.heading))
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      for (const s of rest) await move(s, at++, `(kept) ${s.heading}`);
     }
 
     console.log("\nDone.");
