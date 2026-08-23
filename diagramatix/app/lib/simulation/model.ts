@@ -48,7 +48,7 @@ export interface BoundaryEvent {
   trigger: SimDist;      // time from host service-start until the event fires
   /** "working" counts `trigger` only through `calendar`'s open hours; absent =
    *  plain elapsed time, which is what an unqualified "2 days" means. */
-  triggerMode?: "working";
+  triggerMode?: "working" | "working-days";
   /** Working hours for a "working" trigger — the host's team calendar. */
   calendar?: WorkCalendar;
   fireProb: number;      // 0..1 chance it fires at all this execution (default 1)
@@ -98,10 +98,15 @@ export interface SimNode {
   units?: number;        // resource Quantity (default 1)
   // delay
   delay?: SimDist;
-  // Timer-delay interpretation: "working" advances `delay` only through this
-  // node's `calendar` (open hours); "until" waits to the wall-clock `delayUntil`
-  // ("HH:MM"), ignoring `delay`. Absent → plain elapsed time.
-  delayMode?: "working" | "until";
+  // Timer-delay interpretation. Absent → plain elapsed time.
+  //   "working"      — `delay` is MINUTES of open time, advanced through this
+  //                    node's `calendar` ("5 working hours").
+  //   "working-days" — `delay` is a COUNT OF DAYS: whole days, closed days
+  //                    stepped over, time of day kept ("7 working days"). NOT
+  //                    N x 8 hours — the length of the working day is irrelevant.
+  //   "until"        — wait to the wall-clock `delayUntil` ("HH:MM"), ignoring
+  //                    `delay`.
+  delayMode?: "working" | "working-days" | "until";
   delayUntil?: string;
   // boundary catch events mounted on this activity (task / subprocess), armed
   // while the host is in service (see BoundaryEvent).

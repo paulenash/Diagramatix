@@ -47,7 +47,10 @@ export interface ElementSimParams {
   // How the delay magnitude is interpreted (default "elapsed" when absent):
   //   "working" → `delay` counts only during working hours (the lane's calendar)
   //   "until"   → the token waits until `delayUntil` (wall-clock "HH:MM"), `delay` ignored
-  delayMode?: "elapsed" | "working" | "until";
+  // "working"      → the value is MINUTES of open time ("5 working hours")
+  // "working-days" → the value is a COUNT OF DAYS, closed days stepped over
+  //                  and the time of day kept ("7 working days")
+  delayMode?: "elapsed" | "working" | "working-days" | "until";
   delayUntil?: string;
   // boundary catch event on an activity: races the host's cycle time. `trigger`
   // = time from host-start until the event fires; `fireProb` (0..1, default 1) =
@@ -56,7 +59,7 @@ export interface ElementSimParams {
   // a reminder "after 7 working days" is not the same as 7 elapsed days. It is
   // set from the event's LABEL when the label says so ("7 working days"), and
   // absent means ELAPSED, which is the ordinary reading of "2 days".
-  boundary?: { trigger?: SimDist; fireProb?: number; triggerMode?: "working" };
+  boundary?: { trigger?: SimDist; fireProb?: number; triggerMode?: "working" | "working-days" };
   // intermediate catch/throw synchronisation. `channel` names the signal/message
   // (defaults to the element label); a THROW fires it, a CATCH blocks until it
   // fires. `catchTimeout` (catch only) is a fallback / external-arrival release

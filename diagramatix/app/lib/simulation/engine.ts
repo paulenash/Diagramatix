@@ -19,7 +19,7 @@ import { sample } from "./distributions";
 import { compileExpr, type CompiledExpr, type Value } from "./expr";
 import type { SimNetwork, SimNode, SimEdge, EventSub, EventChannel } from "./model";
 import { SECONDS_PER_UNIT, type SimRunConfig, type PlannedIntervention } from "./types";
-import { isOpenAt, nextOpenAt, rateAt, boundariesIn, advanceWorkingClock, nextTimeOfDayClock } from "./calendar";
+import { isOpenAt, nextOpenAt, rateAt, boundariesIn, advanceWorkingClock, advanceWorkingDays, nextTimeOfDayClock } from "./calendar";
 import type { RepStats, NodeStat } from "./statistics";
 
 type EventType = "GENERATE" | "SERVICE_END" | "WAIT_END" | "RESUME" | "EVENT_TRIGGER" | "INTERVENTION" | "CALENDAR_CAP" | "BOUNDARY_TRIGGER" | "CATCH_TIMEOUT";
@@ -404,8 +404,12 @@ export class Engine {
       return nextTimeOfDayClock(this.clock, node.delayUntil, unit);
     }
     const d = node.delay ? sample(node.delay, this.rng) : 0;
-    if (node.delayMode === "working" && node.calendar) {
-      return advanceWorkingClock(this.clock, d, node.calendar, unit);
+    if (node.calendar) {
+      // "working-days" carries a COUNT OF DAYS, not minutes: seven 24-hour
+      // periods with the closed days stepped over, so a 3pm deadline still
+      // falls due at 3pm. "working" carries minutes of open time.
+      if (node.delayMode === "working-days") return advanceWorkingDays(this.clock, d, node.calendar, unit);
+      if (node.delayMode === "working") return advanceWorkingClock(this.clock, d, node.calendar, unit);
     }
     return this.clock + d;
   }
@@ -588,9 +592,11 @@ export class Engine {
       // "7 working days" cannot expire over a weekend when nobody could have
       // acted on it. Everything else is plain elapsed time.
       const d = sample(be.trigger, this.rng);
-      const at = be.triggerMode === "working" && be.calendar
-        ? advanceWorkingClock(this.clock, d, be.calendar, this.config.clockUnit)
-        : this.clock + d;
+      const at = be.calendar && be.triggerMode === "working-days"
+        ? advanceWorkingDays(this.clock, d, be.calendar, this.config.clockUnit)
+        : be.calendar && be.triggerMode === "working"
+          ? advanceWorkingClock(this.clock, d, be.calendar, this.config.clockUnit)
+          : this.clock + d;
       this.calendar.schedule(at, {
         type: "BOUNDARY_TRIGGER", nodeId: node.id, tokenId: token.id, beId: be.id, armId,
       });

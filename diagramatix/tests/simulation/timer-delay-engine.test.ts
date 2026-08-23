@@ -102,8 +102,11 @@ describe("autofill → assemble — working delay inherits the lane team's calen
     const { data } = autofillSimulation(diagram); // parses the label → working delay
     const net = assembleFromDiagram(data, { teamCalendars: { Sales: NINE_TO_FIVE } });
     const wait = net.nodes.find((n) => n.id === "wait")!;
-    expect(wait.delayMode).toBe("working");
-    expect(wait.delay).toEqual({ kind: "fixed", value: 10 * 8 * 60 }); // 4800 working-min
+    // The VALUE is a day count now, not minutes: "10 working days" means ten
+    // 24-hour periods with the closed days stepped over, so how long the working
+    // day happens to be does not enter into it.
+    expect(wait.delayMode).toBe("working-days");
+    expect(wait.delay).toEqual({ kind: "fixed", value: 10 });
     expect(wait.calendar, "inherited the Sales lane calendar").toEqual(NINE_TO_FIVE);
   });
 });

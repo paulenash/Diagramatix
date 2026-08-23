@@ -111,7 +111,10 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
         // and anything unqualified stays elapsed.
         const p = parseTimerLabel(el.label ?? "");
         const round = (n: number) => Math.round(n * 100) / 100;
-        if (p?.mode === "elapsed" || p?.mode === "working") {
+        if (p?.mode === "working-days") {
+          // The VALUE is a day count here, not minutes — the engine counts days.
+          sim.boundary = { ...sim.boundary, trigger: { kind: "fixed", value: p.days }, triggerMode: "working-days" as const };
+        } else if (p?.mode === "elapsed" || p?.mode === "working") {
           sim.boundary = {
             ...sim.boundary,
             trigger: { kind: "fixed", value: round(p.minutes) },
@@ -166,6 +169,7 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
         const p = parseTimerLabel(el.label ?? "");
         const round = (n: number) => Math.round(n * 100) / 100;
         if (p?.mode === "until") { sim.delay = { kind: "fixed", value: 0 }; sim.delayMode = "until"; sim.delayUntil = p.timeOfDay; }
+        else if (p?.mode === "working-days") { sim.delay = { kind: "fixed", value: p.days }; sim.delayMode = "working-days"; }
         else if (p?.mode === "working") { sim.delay = { kind: "fixed", value: round(p.minutes) }; sim.delayMode = "working"; }
         else if (p?.mode === "elapsed") { sim.delay = { kind: "fixed", value: round(p.minutes) }; }
         else { sim.delay = isExternalWait(el) ? DEF_EXTERNAL_WAIT : DEF_DELAY; }

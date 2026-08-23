@@ -17,16 +17,22 @@
 
 export type TimerParse =
   | { mode: "elapsed"; minutes: number }
+  /** Sub-day working period: consume `minutes` of OPEN time. "5 working hours"
+   *  from Friday 3pm on a 9–5 week lands Monday noon. */
   | { mode: "working"; minutes: number }
+  /** Whole working DAYS: step over closed days and keep the time of day. "7
+   *  working days" is seven 24-hour periods skipping weekends — NOT 7 x 8 hours,
+   *  which would make the answer depend on how long the working day happens to
+   *  be. A week counts as 5 working days. */
+  | { mode: "working-days"; days: number }
   | { mode: "until"; timeOfDay: string };
 
 const MIN_PER: Record<string, number> = {
   second: 1 / 60, minute: 1, hour: 60, day: 1440, week: 10080,
 };
-const WORKING_DAY_MIN = 8 * 60;
-const WORKING_MIN_PER: Record<string, number> = {
-  second: 1 / 60, minute: 1, hour: 60, day: WORKING_DAY_MIN, week: 5 * WORKING_DAY_MIN,
-};
+// (A working day's LENGTH is deliberately not modelled here: "7 working days"
+// counts days, not hours, so an 8-hour assumption would have silently decided
+// the answer for every non-8-hour calendar.)
 
 /** Map a unit token (any common spelling/abbreviation) to a canonical unit. */
 function canonicalUnit(u: string): keyof typeof MIN_PER | null {
@@ -70,7 +76,14 @@ export function parseTimerLabel(label: string): TimerParse | null {
     const working = !!d[2];
     const unit = canonicalUnit(d[3].toLowerCase());
     if (unit && Number.isFinite(n)) {
-      const minutes = n * (working ? WORKING_MIN_PER : MIN_PER)[unit];
+      // "working" splits by unit, because the phrase means two different things.
+      // DAYS/WEEKS count whole days and skip the closed ones, keeping the time of
+      // day — a deadline set at 3pm still falls due at 3pm. HOURS and below
+      // consume open time. Anything unqualified is plain elapsed.
+      if (working && (unit === "day" || unit === "week")) {
+        return { mode: "working-days", days: n * (unit === "week" ? 5 : 1) };
+      }
+      const minutes = n * MIN_PER[unit];
       return working ? { mode: "working", minutes } : { mode: "elapsed", minutes };
     }
   }

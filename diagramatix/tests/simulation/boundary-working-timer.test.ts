@@ -46,9 +46,11 @@ describe("boundary timer wording", () => {
     expect(boundaryOf("2 days")?.triggerMode, "unqualified means elapsed").toBeUndefined();
   });
 
-  it("reads the WORKING qualifier when the label states it", () => {
-    const b = boundaryOf("7 working days");
-    expect(b).toMatchObject({ trigger: { kind: "fixed", value: 7 * 8 * 60 }, triggerMode: "working" });
+  it("reads working DAYS as a day count, not as N x 8 hours", () => {
+    // Seven 24-hour periods skipping the closed days — the shift length is
+    // irrelevant, so a 7.5-hour or 12-hour calendar gives the same deadline.
+    expect(boundaryOf("7 working days")).toMatchObject({ trigger: { kind: "fixed", value: 7 }, triggerMode: "working-days" });
+    expect(boundaryOf("1 working week")).toMatchObject({ trigger: { kind: "fixed", value: 5 }, triggerMode: "working-days" });
   });
 
   it("distinguishes '2 hours' from '2 working hours' — same number, different clock", () => {

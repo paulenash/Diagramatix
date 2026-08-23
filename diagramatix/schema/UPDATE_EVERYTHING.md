@@ -92,6 +92,15 @@ Update `Current version: N`, add a **summary-table row** (newest first, with the
 change? Yes/No" verdict) **and** a **detail section** for vN.
 
 ## ⭐ Step 5 — `VERSION_HISTORY.md`  *(ALWAYS — every release)*
+
+> **The rule (Paul, 2026-08-24).** Every release gets an entry. Not every commit
+> needs its own — if one issue took five commits to fix, a single entry covering
+> it is right. But a **new feature, or any change to the product, belongs in the
+> entry for the release it shipped in**, as far as is possible: the log is what
+> someone reads to find out when something appeared, and a feature folded into a
+> later summary loses that. The release checker compares the newest entry's build
+> number against HEAD, so "five commits unlogged" is reported, not discovered
+> later.
 Prepend one entry, newest first. This is the **only** place feature-only releases are recorded,
 so it runs whether or not Step 0 bumped:
 
@@ -158,7 +167,33 @@ Record the technical/architecture note for the release via the SuperAdmin Docume
 
 ---
 
+## Also checked (changed 2026-08-24, per Paul)
+- **`tests/TESTS_SUMMARY.md`** — the append-only `Tnnnn` numbering is still orthogonal to the
+  VERSION, but the document must be **up to date whenever a test is added**, and is now **checked on
+  every release**. Excluding it meant nothing ever looked: 107 entries went missing and the header
+  carried three contradictory suite totals while reading as authoritative.
+  Enforced by `tests/config/tests-summary-coverage.test.ts` (every suite run) and reported by the
+  release checker below.
+
 ## Not part of this procedure
-- **`tests/TESTS_SUMMARY.md`** — the append-only `Tnnnn` test numbering is an orthogonal system,
-  not the version. Leave it out of "update everything".
 - **`package.json` `"version"`** — vestigial; do not sync it.
+
+---
+
+## The checklist, and the checker
+
+The step-by-step above is the PROCEDURE. The CHECKLIST — what must be true before
+and after a release, and which parts are verified automatically — lives in
+[`../PUSH_EVERYTHING.md`](../PUSH_EVERYTHING.md).
+
+Run it at the start and end of every "update everything" / "push everything":
+
+```
+cd diagramatix
+npx tsx scripts/check-push-everything.ts                                    # local
+DATABASE_URL="<prod url>" npx tsx scripts/check-push-everything.ts --prod   # + live + DB
+```
+
+It reports each item as OK / BEHIND / check / skip and exits non-zero if anything
+is behind. `skip` means it could not be checked (no network, no DATABASE_URL) —
+that is not a pass.

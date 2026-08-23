@@ -193,6 +193,48 @@ export function advanceWorkingClock(t: number, duration: number, cal: WorkCalend
   return cur;
 }
 
+/**
+ * Advance `days` WORKING DAYS from `t`, keeping the time of day.
+ *
+ * A working day is a whole day that the calendar opens at all — a weekend is
+ * skipped entirely, not shortened. "7 working days" is seven periods of 24
+ * hours with the closed days stepped over, so a deadline set at 3pm still falls
+ * due at 3pm. That is what the phrase means to the person who wrote it on the
+ * diagram, and it is deliberately NOT the same as consuming N × 8 hours of open
+ * time: the length of the working day is irrelevant to it, and a 7.5-hour or
+ * shift calendar must not shift the answer.
+ *
+ * Sub-day working periods are the other rule and belong in
+ * `advanceWorkingClock`: "5 working hours" consumes five hours of OPEN time, so
+ * from Friday 3pm on a 9–5 week it lands Monday at noon. Days count days; hours
+ * count hours worked.
+ *
+ * Starting on a closed day is fine — the count simply begins at the next day
+ * that is open. A fractional part (rare: "1.5 working days") is added after the
+ * whole days as plain elapsed time, since half a working day has no agreed
+ * meaning independent of the calendar.
+ */
+export function advanceWorkingDays(t: number, days: number, cal: WorkCalendar, clockUnit: ClockUnit): number {
+  if (days <= 0) return t;
+  const windows = intervalsToClock(cal, clockUnit);
+  if (windows.length === 0) return t + days * (86400 / SECONDS_PER_UNIT[clockUnit]); // always open → elapsed
+  const dayLen = 86400 / SECONDS_PER_UNIT[clockUnit];
+  const weekLen = weekLengthClock(clockUnit);
+  /** Does the day containing `x` open at any point? */
+  const opensOn = (x: number): boolean => {
+    const dayStart = Math.floor(timeOfWeek(x, weekLen) / dayLen) * dayLen;
+    return windows.some((w) => w.s < dayStart + dayLen && w.e > dayStart);
+  };
+  let cur = t;
+  let whole = Math.floor(days);
+  let guard = 0;
+  while (whole > 0 && guard++ < 3650) {
+    cur += dayLen;
+    if (opensOn(cur)) whole--;
+  }
+  return cur + (days - Math.floor(days)) * dayLen;
+}
+
 /** The next clock time ≥ `t` whose wall-clock time-of-day equals "HH:MM" (today
  *  if `t` is at/before it, else tomorrow). For absolute "until 3pm" timer delays. */
 export function nextTimeOfDayClock(t: number, hhmm: string, clockUnit: ClockUnit): number {

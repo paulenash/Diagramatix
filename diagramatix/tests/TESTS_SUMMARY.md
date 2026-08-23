@@ -1,13 +1,13 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-07-09  ·  **Document version:** 6.3  ·  **Suite:** 131 test files · 820 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T0676  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-08-24  ·  **Document version:** 6.4  ·  **Suite:** 335 test files · 2,066 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T2874  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
 ## 1. Executive summary
 
 ### What this is
-Diagramatix has an automated **regression safety net** — a suite of 436 tests across 66 files that runs the app's real code and fails loudly (“goes red”) the moment a change breaks documented behaviour. It is the early-warning system that lets the product change quickly without silently breaking sharing rules, data integrity, diagram layout, exports, the simulator, or AI generation.
+Diagramatix has an automated **regression safety net** — a suite of **2,066 tests across 335 files** that runs the app's real code and fails loudly (“goes red”) the moment a change breaks documented behaviour. It is the early-warning system that lets the product change quickly without silently breaking sharing rules, data integrity, diagram layout, exports, the simulator, or AI generation.
 
 ### How it's built (philosophy)
 - **Real code, not mocks.** Database tests run against a real PostgreSQL database (`diagramatix_test`) using the actual Prisma client and the real authorisation resolvers — no faked database, no faked sign-in. A signed-in user is supplied as a plain session object so the genuine permission logic is exercised. This catches whole classes of “missing access guard” and “broken cascade” bugs that mocks would hide.
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T2875**, the one after **T2876**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0650`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T2874`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -1838,6 +1838,138 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T2871 | `tests/simulation/external-wait.test.ts` | WaitTime is simulated as a NON-SEIZING delay: it lengthens the case without holding the resource. |
 | T2872 | `tests/simulation/boundary-working-timer.test.ts` | A boundary timer reads its duration off the label; the working/business qualifier is honoured and an unqualified one stays elapsed. |
 | T2873 | `tests/simulation/boundary-working-timer.test.ts` | A working boundary timer advances only through open hours, so it cannot expire overnight or across a weekend. |
+| T2874 | `tests/config/tests-summary-coverage.test.ts` | Every `Tnnnn` in the test tree has a row in this document — the guard that stops it drifting again. |
+
+
+### Backfill - entries that existed in the tree but were never listed here (T2218-T2283, T2824-T2826)
+
+> Recorded 2026-08-24. These tests were written across earlier sessions and have
+> been green throughout; only their rows here were missing.
+> `UPDATE_EVERYTHING.md` deliberately excludes this file from the release
+> procedure, so no step ever checked it - which is how sixty-eight entries went
+> absent unnoticed. A guard now fails if any `Tnnnn` in the tree has no row here
+> (`tests/config/tests-summary-coverage.test.ts`).
+
+| ID | File | What it pins |
+|---|---|---|
+| T2218 | `tests/bpmn/compensation-scan.test.ts` | A non-ad-hoc Expanded Sub-Process allows exactly one orphan entry and one exit. |
+| T2219 | `tests/bpmn/compensation-connector.test.ts` | Drawing a compensation association marks `isForCompensation` on the target activity. |
+| T2220 | `tests/simulation/compensation.test.ts` | A handler fires only when its host actually executed AND a throw is reached. |
+| T2221 | `tests/bpmn/compensation-connector.test.ts` | Deleting the association un-marks the target; a compensation activity takes no sequence flow; the intermediate event defaults to Throwing. |
+| T2222 | `tests/bpmn/compensation-connector.test.ts` | One compensation association per edge-mounted event (A4); inline intermediate-event sequence endpoints are cardinal (A3). |
+| T2224 | `tests/diagram/merge-diagram.test.ts` | Non-overlapping concurrent edits merge silently; a same-id overlap is reported rather than clobbered. |
+| T2225 | `tests/diagram/next-steps.test.ts` | A ranked next-step menu per source type, every candidate canConnect-legal. |
+| T2226 | `tests/mining/analytics.test.ts` | Per-activity metrics rank the bottleneck first and split edges faithfully. |
+| T2227 | `tests/mining/analytics.test.ts` | The per-case index carries cycle time + variant index; overall cycle stats are exact. |
+| T2228 | `tests/mining/analytics.test.ts` | An empty or degenerate log yields safe zeros rather than throwing. |
+| T2229 | `tests/mining/variantView.test.ts` | `variantPareto` shares sum to 1 with a rising cumulative. |
+| T2230 | `tests/mining/variantView.test.ts` | `variantDiff` separates activities unique to each variant from the shared ones. |
+| T2231 | `tests/mining/variantView.test.ts` | `variantPathIds` isolates one variant's elements, connectors and start/end. |
+| T2232 | `tests/mining/replayRunners.test.ts` | `buildRunners` walks start to activities to end centres. |
+| T2233 | `tests/mining/replayRunners.test.ts` | `pointAt` interpolates linearly along the polyline. |
+| T2234 | `tests/mining/outcomes.test.ts` | Cases classify on-time vs late against the SLA. |
+| T2235 | `tests/mining/outcomes.test.ts` | The slow variant and its unique activity drive lateness (lift > 1). |
+| T2236 | `tests/mining/outcomes.test.ts` | No SLA gives null: nothing to classify, rather than a fabricated verdict. |
+| T2237 | `tests/mining/edgeBadges.test.ts` | Numeric edge labels become `transitionCount` badges; other labels are untouched. |
+| T2238 | `tests/bpmn/split-connector-event.test.ts` | A click (zero-move) on an element sitting on a flow line does NOT auto-fuse it. |
+| T2239 | `tests/bpmn/split-connector-event.test.ts` | A real drag onto the line still splices - the guard blocks clicks only. |
+| T2240 | `tests/mining/calibrate.test.ts` | Gateway branch probabilities still calibrate after edge counts are badged. |
+| T2241 | `tests/mining/aiFrequencies.test.ts` | Gateway out-edges take the mined directly-follows counts as branch probabilities. |
+| T2242 | `tests/mining/aiFrequencies.test.ts` | An early-exit branch to the end carries the mined end count. |
+| T2243 | `tests/mining/enrich.test.ts` | `activityLaneMap` / `activityStateMap` read the model. |
+| T2244 | `tests/mining/enrich.test.ts` | Resources fill from lanes, by exact and fuzzy match. |
+| T2245 | `tests/mining/enrich.test.ts` | States fill from the State Machine's transitions. |
+| T2246 | `tests/mining/enrich.test.ts` | `buildEventLog` falls back to `activityResource` when the log has no resource column. |
+| T2247 | `tests/mining/stateMachineCoverage.test.ts` | Reconciliation adds back every state, transition, entry and terminal a curated plan dropped. |
+| T2248 | `tests/mining/stateMachineCoverage.test.ts` | After reconciliation the log conforms 100% to its own generated reference. |
+| T2249 | `tests/mining/stateMachineCoverage.test.ts` | It is a no-op on an already-complete deterministic discovery. |
+| T2250 | `tests/mining/transitionConformance.test.ts` | Matching is whitespace-insensitive: a reference label wrapped across lines still conforms. |
+| T2251 | `tests/video/ffmpegArgs.test.ts` | VFR timestamps are preserved and audio async-resampled, so A/V stays in sync. |
+| T2252 | `tests/microsoft/tokenCrypto.test.ts` | A token round-trips unchanged, with a fresh IV each time. |
+| T2253 | `tests/microsoft/tokenCrypto.test.ts` | Tampered ciphertext fails to decrypt (GCM auth tag). |
+| T2254 | `tests/microsoft/oauth.test.ts` | `pkcePair` produces a verifier whose S256 challenge matches. |
+| T2255 | `tests/microsoft/oauth.test.ts` | The authorize URL targets the multi-tenant authority with PKCE + `select_account`. |
+| T2256 | `tests/microsoft/oauth.test.ts` | `decodeIdToken` pulls tid, UPN and name from the payload. |
+| T2257 | `tests/microsoft/oauth.test.ts` | `sanitizeReturnTo` keeps same-origin targets and rejects cross-origin ones. |
+| T2258 | `tests/schema/version-split.test.ts` | The two version constants have their expected shapes. |
+| T2259 | `tests/schema/version-split.test.ts` | `structuralSchemaVersion` reads both the new integer and legacy `1.NN` forms. |
+| T2260 | `tests/schema/version-split.test.ts` | Compatibility accepts equal/older, blocks newer, and tolerates legacy tags. |
+| T2261 | `tests/diagram/review-collapse.test.ts` | Collapse shrinks to the 38x32 icon and stashes the expanded geometry; idempotent. |
+| T2262 | `tests/diagram/review-collapse.test.ts` | `collapseAllReviewComments` touches review-comment elements only. |
+| T2263 | `tests/diagram/review-collapse.test.ts` | `buildReviewComment` makes a review-comment plus a link tether to its target. |
+| T2264 | `tests/features/feature-availability.test.ts` | Registry keys are unique and every feature has a label and category. |
+| T2265 | `tests/features/feature-availability.test.ts` | The seed covers every registry key x 5 levels (incl. enterprise) with valid states. |
+| T2266 | `tests/features/feature-availability.test.ts` | The xlsx 1/80 mapping landed: sharepoint Expert+, soc2 Enterprise-only, typed-prompt all. |
+| T2267 | `tests/mining/task-mining-spike.test.ts` | The task-log schema projects onto the miner's {headers, rows, mapping}. |
+| T2268 | `tests/mining/task-mining-spike.test.ts` | `buildEventLog` compresses the task log into cases + variants. |
+| T2269 | `tests/mining/task-mining-spike.test.ts` | `discoverProcess` renders a routine map with a branch and a rework back-edge. |
+| T2270 | `tests/mining/task-mining-spike.test.ts` | `computePerformance` mines step durations, calibration-ready. |
+| T2271 | `tests/mining/task-mining-spike.test.ts` | Task-specific insights: ping-pong, rework, automation signal. |
+| T2272 | `tests/mining/task-mining-spike.test.ts` | `automationOpportunities` ranks the dominant routine first, from variants alone. |
+| T2273 | `tests/mining/task-mining-spike.test.ts` | `buildAutomationSpec` emits a Markdown RPA recipe of the steps. |
+| T2274 | `tests/mining/task-mining-spike.test.ts` | The flagship task example package is valid and adoptable (sample log + variants). |
+| T2275 | `tests/mining/task-mining-spike.test.ts` | `isTaskRun` detects a task log by its UI-step vocabulary, and rejects a process log. |
+| T2276 | `tests/mining/task-mining-spike.test.ts` | `pingPongFromVariants` matches the interaction-based ping-pong count. |
+| T2277 | `tests/mining/task-mining-spike.test.ts` | `automationRoi` estimates savings from the automatable routines. |
+| T2278 | `tests/mining/task-mining-spike.test.ts` | `buildTaskProcedure` emits an as-actually-done SOP with steps, apps and rework. |
+| T2279 | `tests/mining/task-mining-spike.test.ts` | The deterministic Explain is task-framed when `isTask` (automation callout). |
+| T2280 | `tests/mining/task-mining-spike.test.ts` | `collapseNavForDiscovery` drops app-switch steps, keeping a clean rework loop. |
+| T2281 | `tests/mining/live-demo.test.ts` | Six poll batches, each with events, keyed to the mapping fields. |
+| T2282 | `tests/mining/live-demo.test.ts` | The run grows cumulatively as batches are ingested (few activities to many). |
+| T2283 | `tests/mining/live-demo.test.ts` | The example package is valid and adopts as a LIVE demo - batches, not a pre-built run. |
+| T2824 | `tests/ai/aiClient.test.ts` | A DeepSeek model uses `DEEPSEEK_API_KEY` + the Anthropic-compatible endpoint by default. |
+| T2825 | `tests/ai/aiClient.test.ts` | `DEEPSEEK_BASE_URL` overrides the endpoint. |
+| T2826 | `tests/ai/aiClient.test.ts` | Without `DEEPSEEK_API_KEY` the id isn't registered, so it doesn't route to DeepSeek. |
+
+
+### Backfill 2 - older ids outside the T2xxx range (T0618-T1077)
+
+> Recorded 2026-08-24, immediately after the first backfill. The first pass
+> searched only `T2xxx` and so missed these thirty-nine entirely; the coverage
+> guard found them on its first run. That is the argument for the guard rather
+> than a careful one-off audit: the audit was mine, and it was wrong.
+
+| ID | File | What it pins |
+|---|---|---|
+| T0618 | `tests/mining/validate-log.test.ts` | Excel serial dates are recognised and usable, not silently dropped. |
+| T0651 | `tests/diagram/animate-order.test.ts` | Reveal order is pools then lanes then flow; a connector appears only once both endpoints exist; complete and unique. |
+| T0652 | `tests/diagram/animate-order.test.ts` | BFS reveals both branches before descending; DFS descends one branch first. |
+| T0901 | `tests/documents/collection-scope.test.ts` | Importing a Technical Design Notes backup under the User Guide is rejected. |
+| T0902 | `tests/help/guide-backup-roundtrip.test.ts` | The Technical Design Notes collection round-trips independently of the guide. |
+| T0903 | `tests/help/image-usage.test.ts` | `computeImageUsages` maps ids across both collections (image field and inline). |
+| T0904 | `tests/help/image-usage.test.ts` | `repointReferences` re-points target to source in the selected collections only, keeping the target. |
+| T0905 | `tests/entity-lists/entity-structures.test.ts` | A Document node round-trips its SharePoint link across set / patch / clear. |
+| T0906 | `tests/entity-lists/entity-structures.test.ts` | A structure bundles the five lists and cascades on delete. |
+| T0907 | `tests/entity-lists/adopt-sync.test.ts` | Adopt clones all five lists with provenance, SharePoint links and tree intact. |
+| T0908 | `tests/entity-lists/adopt-sync.test.ts` | Sync applies master adds/renames/removes yet keeps the project's own additions. |
+| T0909 | `tests/entity-lists/entity-drift.test.ts` | Drift flags only names absent from the mapped list. |
+| T0910 | `tests/schema/diagram-schema.test.ts` | A valid diagram is accepted, and unknown / forward-compatible keys are ignored. |
+| T0911 | `tests/schema/diagram-schema.test.ts` | Wrong field types and missing required fields are rejected. |
+| T0912 | `tests/schema/diagram-schema.test.ts` | Referential problems are caught: dangling ref, duplicate ids, parent cycle, orphan. |
+| T0913 | `tests/schema/diagram-schema.test.ts` | The envelope validates and embeds the body schema. |
+| T0914 | `tests/editor/edits.test.ts` | Two adjacent sub-lanes (nested divisions) can be swapped. |
+| T0915 | `tests/editor/edits.test.ts` | A gateway's top/bottom branches flip when the lanes they point into are swapped. |
+| T0916 | `tests/entity-lists/collapse.test.ts` | `idsWithChildren` flags exactly the parents. |
+| T0917 | `tests/entity-lists/collapse.test.ts` | `visibleSuggestions` hides descendants of a collapsed node. |
+| T0918 | `tests/theme/feature-colors.test.ts` | `shade` darkens a hex by a percentage, clamped. |
+| T0919 | `tests/theme/feature-colors.test.ts` | `resolveFeatureScheme` fills defaults, merges valid overrides and ignores junk. |
+| T0920 | `tests/theme/feature-colors.test.ts` | `tonesFor` + `featureVars` expose bg / text / highlight. |
+| T0921 | `tests/enterprise/org-policy.test.ts` | A fresh org allows every capability by default. |
+| T0922 | `tests/enterprise/org-policy.test.ts` | Disabling a flag is reflected; an unknown org defaults to all-allowed. |
+| T0923 | `tests/enterprise/audit-log.test.ts` | A privileged action is recorded with actor, target and stringified meta. |
+| T0924 | `tests/enterprise/audit-log.test.ts` | Meta defaults to {} and the call never throws - audit must not break the action. |
+| T0925 | `tests/enterprise/erase-user.test.ts` | Erasing a sole-member user removes their now-empty org. |
+| T0926 | `tests/enterprise/erase-user.test.ts` | An org that still has another member is kept. |
+| T0927 | `tests/enterprise/erase-user.test.ts` | The user's project cascades, then the emptied org is removed. |
+| T0928 | `tests/enterprise/sso-registration.test.ts` | `requireSso` blocks password login even with the correct password. |
+| T0929 | `tests/enterprise/sso-registration.test.ts` | A normal org still allows password login. |
+| T0930 | `tests/enterprise/sso-registration.test.ts` | `REGISTRATION_ALLOWED_DOMAINS` gates self-registration. |
+| T0931 | `tests/ai/custom-models.test.ts` | `AI_CUSTOM_MODELS` parses `id|Label` and bare id, trims, and ignores blanks. |
+| T0932 | `tests/ai/custom-models.test.ts` | Unset means no custom models and plain Claude behaviour. |
+| T0933 | `tests/ai/custom-models.test.ts` | A configured local model becomes known, labelled and resolvable. |
+| T0961 | `tests/ai/aiClient.test.ts` | A Moonshot client authenticates with Bearer (authToken), not `x-api-key`. |
+| T1061 | `tests/routing/boundary-event-side.test.ts` | A corner event whose target is BELOW exits the bottom, not the right. |
+| T1077 | `tests/archimate/catalogue-v32.test.ts` | Every dual-form type maps to a `-box` key whose `-icon` sibling exists, so image ingestion can pick either form. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

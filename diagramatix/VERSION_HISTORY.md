@@ -15,6 +15,60 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.2.2316 — 2026-08-24 — Simulation semantics: waits, working timers, and renaming things
+
+**Waiting on someone else is neither work nor free.**
+- A **Receive task** and a **Message catch event** now fill as *exponential*, not
+  triangular. An external reply is memoryless and long-tailed; triangular claims it
+  always arrives inside a narrow band, which deletes the tail that makes timeouts,
+  chasing and escalation paths worth drawing.
+- **WaitTime is now actually simulated.** It was declared as a non-seizing delay,
+  editable in the panel and round-tripped through BPSim — and the engine never read
+  it, so every wait entered there silently changed no result. It now delays the case
+  without holding the resource: on a 10-minute task with a 30-minute wait, flow time
+  15.0 → 45.0 and utilisation unchanged.
+
+**A boundary timer means what its label says.**
+- The label sets the value, and the `working`/`business` qualifier sets the clock.
+  Unqualified stays ELAPSED. Boundary timers previously ignored the label entirely
+  and took a flat exponential default, so a timer drawn as "7 working days" ran as a
+  random hour.
+- **BREAKING (semantics): "N working days" now counts DAYS, not N × 8 hours.** Per
+  Paul: seven working days is seven 24-hour periods with the closed days stepped
+  over, so a 3pm deadline still falls due at 3pm and the shift length is irrelevant.
+  Sub-day working periods are unchanged — "5 working hours" still consumes open time,
+  so from Friday 3pm on a 9–5 week it lands Monday noon.
+- ⚠ **Existing diagrams are affected.** A saved working-day timer holds MINUTES under
+  the old rule (e.g. `4800` for "10 working days"); under the new rule that value
+  reads as 4,800 days. Fill never overwrites an existing value, so these do not
+  self-correct — re-enter or re-fill any working-day timer.
+- `timerDelayMinutes()` returns null for a working-DAY label: a day count has no
+  minute magnitude, the same as "until".
+
+**An imported bundle is not an example.**
+- `/api/simulation/import` shared its code with catalog adoption, which hardcoded
+  `exampleType`. Your own imported bundle was flagged as an example you could not
+  find in the Examples list, and was refused for sharing and publishing — each
+  refusal advising a rename the UI did not offer. The flag now follows
+  `sourceExampleId`, which is what separates adoption from import.
+- **Rename a project** — ✎ in Project Properties (owner-only), the missing escape
+  hatch those three refusals pointed at.
+- **Rename a scenario** — ✎ in the scenario row; previously duplicate-and-delete,
+  which cost the original's run history.
+
+**Documentation discipline.**
+- New [`PUSH_EVERYTHING.md`](PUSH_EVERYTHING.md) — the release checklist — and
+  `scripts/check-push-everything.ts`, which verifies it and exits non-zero if
+  anything is behind. `skip` (could not check) is reported distinctly from `OK`.
+- `TESTS_SUMMARY.md`: **107 missing rows backfilled** and three contradictory suite
+  totals corrected (820 vs 436 tests; T0676 vs T0650 vs "next is T0377"). A guard
+  now fails if any `Tnnnn` lacks a row or the stated highest ref is wrong.
+- Tech Design Notes sections written on 2026-08-23 were filed under the wrong
+  `collection` and rendered as empty chapters; repaired on prod.
+
+Schema: no bump — no XSD export-shape change. Product version: unchanged at **2.2**
+(no physical DB change). Tests T2865–T2874. Full suite 2,069 passing.
+
 ## 2.2.2310 — 2026-08-23 — Simulator repair + XSD enum catch-up (schema 46)
 
 **Simulation — the model the user can see is the model that runs.**

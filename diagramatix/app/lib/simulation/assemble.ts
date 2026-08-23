@@ -223,10 +223,10 @@ export function assembleFromDiagram(
     // nights and weekends fires while nobody could have acted. Working hours
     // come from the HOST's team: the reminder is chased by whoever owns the
     // step. Absent → elapsed, which is what an unqualified "2 days" means.
-    if (bp?.triggerMode === "working") {
+    if (bp?.triggerMode === "working" || bp?.triggerMode === "working-days") {
       const hostTeam = getSimParams(host).teamId ?? laneLabelTeamOf(host);
       const cal = hostTeam ? opts?.teamCalendars?.[hostTeam] : undefined;
-      if (cal) { be.triggerMode = "working"; be.calendar = cal; }
+      if (cal) { be.triggerMode = bp.triggerMode; be.calendar = cal; }
     }
     (boundaryByHost.get(el.boundaryHostId!) ?? boundaryByHost.set(el.boundaryHostId!, []).get(el.boundaryHostId!)!).push(be);
   }
@@ -285,8 +285,8 @@ export function assembleFromDiagram(
       if (sim.delayMode === "until" && sim.delayUntil) {
         node.delayMode = "until";
         node.delayUntil = sim.delayUntil;
-      } else if (sim.delayMode === "working") {
-        node.delayMode = "working";
+      } else if (sim.delayMode === "working" || sim.delayMode === "working-days") {
+        node.delayMode = sim.delayMode;
         // Working hours = the timer's own calendar (calendarId) or its lane
         // team's. teamCalendars is keyed by team NAME (the lane label), so
         // resolve the team the same way autofill does — by the lane's label.

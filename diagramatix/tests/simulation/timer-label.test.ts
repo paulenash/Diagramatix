@@ -19,10 +19,26 @@ describe("parseTimerLabel", () => {
     expect(parseTimerLabel("45 seconds")).toEqual({ mode: "elapsed", minutes: 0.75 });
   });
 
-  it("Tier 2 — working-time durations use an 8h day / 5-day week", () => {
-    expect(parseTimerLabel("10 working days")).toEqual({ mode: "working", minutes: 10 * 8 * 60 });
+  // Working DAYS and working HOURS are different rules, because the phrase means
+  // two different things. "7 working days" is seven 24-hour periods with the
+  // closed days stepped over — a deadline set at 3pm still falls due at 3pm, and
+  // the length of the working day is irrelevant to it. "3 working hours" is three
+  // hours of actual open time. This previously multiplied days by an assumed 8h
+  // day, which silently made the answer depend on the calendar's shift length.
+  it("Tier 2a — working DAYS count days, not hours", () => {
+    expect(parseTimerLabel("10 working days")).toEqual({ mode: "working-days", days: 10 });
+    expect(parseTimerLabel("1 working week")).toEqual({ mode: "working-days", days: 5 });
+    expect(parseTimerLabel("7 business days")).toEqual({ mode: "working-days", days: 7 });
+  });
+
+  it("Tier 2b — working HOURS consume open time", () => {
     expect(parseTimerLabel("3 business hours")).toEqual({ mode: "working", minutes: 180 });
-    expect(parseTimerLabel("1 working week")).toEqual({ mode: "working", minutes: 5 * 8 * 60 });
+    expect(parseTimerLabel("90 working minutes")).toEqual({ mode: "working", minutes: 90 });
+  });
+
+  it("an unqualified duration is ELAPSED, whatever the unit", () => {
+    expect(parseTimerLabel("2 days")).toEqual({ mode: "elapsed", minutes: 2880 });
+    expect(parseTimerLabel("2 hours")).toEqual({ mode: "elapsed", minutes: 120 });
   });
 
   it("Tier 3 — absolute time-of-day, 12h and 24h", () => {
@@ -37,7 +53,10 @@ describe("parseTimerLabel", () => {
     expect(parseTimerLabel("Review complete")).toBeNull();
     expect(parseTimerLabel("")).toBeNull();
     expect(timerDelayMinutes("Wait 3 hours")).toBe(180);
-    expect(timerDelayMinutes("10 working days")).toBe(4800);
+    // A working-DAY value is a day count, not minutes, so it has no minute
+    // magnitude to report — same as "until".
+    expect(timerDelayMinutes("10 working days")).toBeNull();
+    expect(timerDelayMinutes("3 working hours")).toBe(180);
     expect(timerDelayMinutes("until 3pm")).toBeNull(); // "until" has no minute magnitude (engine uses delayUntil)
   });
 });
