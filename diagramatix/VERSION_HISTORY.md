@@ -38,10 +38,11 @@ a `schemaVersion` bump). Newest first.
   over, so a 3pm deadline still falls due at 3pm and the shift length is irrelevant.
   Sub-day working periods are unchanged — "5 working hours" still consumes open time,
   so from Friday 3pm on a 9–5 week it lands Monday noon.
-- ⚠ **Existing diagrams are affected.** A saved working-day timer holds MINUTES under
-  the old rule (e.g. `4800` for "10 working days"); under the new rule that value
-  reads as 4,800 days. Fill never overwrites an existing value, so these do not
-  self-correct — re-enter or re-fill any working-day timer.
+- **Existing diagrams carry the old values** (no migration needed — per Paul, every
+  simulation to date is a test). A saved working-day timer holds MINUTES under the
+  old rule (e.g. `4800` for "10 working days"); under the new rule that value reads
+  as 4,800 days. Fill never overwrites an existing value, so these do not
+  self-correct — re-enter any working-day timer you want to keep.
 - `timerDelayMinutes()` returns null for a working-DAY label: a day count has no
   minute magnitude, the same as "until".
 

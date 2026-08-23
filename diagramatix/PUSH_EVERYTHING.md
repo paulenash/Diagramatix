@@ -60,6 +60,17 @@ release it shipped in** — as far as is possible. The log is what someone reads
 find out when something appeared and why; a feature folded into a later summary
 loses that.
 
+**Record a fix in the version where it PASSED, not where it was attempted.**
+If something was claimed fixed in one release and turned out still broken, the
+claim is **actively removed** from that entry and written into the release where
+it actually worked. Otherwise the log answers "when did we work on this?" when
+the question being asked is always "which build can I trust?" — and a reader
+checking whether a bug is fixed gets a yes that isn't true.
+
+This is the one rule here that cannot be automated: only a person knows whether a
+fix held. The checker verifies that an entry EXISTS for every release; it cannot
+verify that what the entry says is true.
+
 The checker compares the newest entry's build number against `HEAD`, so "five
 commits unlogged" is reported rather than discovered months later.
 

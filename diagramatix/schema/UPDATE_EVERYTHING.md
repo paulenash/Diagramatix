@@ -98,9 +98,15 @@ change? Yes/No" verdict) **and** a **detail section** for vN.
 > it is right. But a **new feature, or any change to the product, belongs in the
 > entry for the release it shipped in**, as far as is possible: the log is what
 > someone reads to find out when something appeared, and a feature folded into a
-> later summary loses that. The release checker compares the newest entry's build
-> number against HEAD, so "five commits unlogged" is reported, not discovered
-> later.
+> later summary loses that.
+>
+> **And record a fix in the version where it PASSED, not where it was attempted**
+> — actively REMOVING the claim from any earlier entry that said it was fixed and
+> was wrong. A reader consults this log to decide which build to trust; a fix
+> listed against a release where it did not work makes it answer the wrong
+> question. The checker can verify an entry exists; only you can verify it is
+> true. The release checker compares the newest entry's build number against
+> HEAD, so "five commits unlogged" is reported, not discovered later.
 Prepend one entry, newest first. This is the **only** place feature-only releases are recorded,
 so it runs whether or not Step 0 bumped:
 
