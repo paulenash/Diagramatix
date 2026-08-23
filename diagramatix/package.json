@@ -15,7 +15,6 @@
     "kill": "npx kill-port 3000",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:list": "node scripts/gen-tests-md.cjs",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
     "e2e:ui": "playwright test --ui",

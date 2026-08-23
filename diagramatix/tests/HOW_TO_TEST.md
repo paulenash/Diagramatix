@@ -40,7 +40,7 @@ npm run e2e:ui       # interactive runner — step through, time-travel, pick te
 ## 3. Reading what's tested
 
 - **`tests/TESTS_SUMMARY.md`** — the hand-maintained catalog: every test as a `Tnnnn` row with "Protects you against" / "How it would break". Read this to understand coverage in plain terms.
-- **`tests/TESTS.md`** — a browsable file→test inventory, regenerated with `npm run test:list`.
+- **`tests/TESTS_SUMMARY.md`** — the maintained record: one row per `Tnnnn` saying what it pins and what breaking it would cost. Adding a test without a row fails the suite.
 
 ## 4. What runs in CI (GitHub Actions, every push + PR)
 

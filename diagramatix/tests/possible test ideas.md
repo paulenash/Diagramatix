@@ -4,7 +4,7 @@ A living backlog of test ideas we want but haven't built yet. Add to it as ideas
 come up; promote an item into real tests when we pick it up, and delete it from
 here once it's covered.
 
-> Current automated coverage lives in [TESTS.md](./TESTS.md) (regenerate with `npm run test:list`).
+> Current automated coverage lives in [TESTS_SUMMARY.md](./TESTS_SUMMARY.md).
 
 ---
 

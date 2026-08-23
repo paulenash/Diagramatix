@@ -27,7 +27,7 @@ live means **code + a pinned test**. Do all of this:
 3. **Run the whole suite** (`npm test`). Two things happen automatically:
    - if the new behaviour changes anything an existing test asserts, **that test fails** — reconcile it (the rule may supersede or conflict with another);
    - the `clean-layout` invariants fire if the rule introduces an overlap/conflict.
-4. **Regenerate the inventory:** `npm run test:list` → updates `../TESTS.md`.
+4. **Record it:** add a row to `../TESTS_SUMMARY.md` with the next `Tnnnn`. The suite fails if you don't (`tests/config/tests-summary-coverage.test.ts`).
 5. Flip the catalog rule `[PROPOSED]` → live.
 
 ## Compound rules — split independent facets into sub-ids
@@ -52,7 +52,7 @@ make compound coverage honest.
 ```
 npm test                       # whole suite
 npx vitest run tests/bpmn/     # just these guards
-npm run test:list              # regenerate ../TESTS.md
+npx vitest run tests/config    # checks every Tnnnn has a row in TESTS_SUMMARY.md
 ```
 
 ## Honest limits (don't assume more safety than there is)
