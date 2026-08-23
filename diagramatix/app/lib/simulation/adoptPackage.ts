@@ -204,7 +204,22 @@ export async function adoptPackage(pkg: ExamplePackage, ctx: AdoptCtx): Promise<
   // One transaction so a partial failure never leaves a half-built project.
   return prisma.$transaction(async (tx) => {
     const project = await tx.project.create({
-      data: { name: ctx.projectName, userId: ctx.userId, orgId: ctx.orgId, ownerName: ctx.ownerName, exampleType: "simulation", sourceExampleId: ctx.sourceExampleId ?? null },
+      // `exampleType` means "created by adopting a ready-made example from the
+      // catalog" — it tints the tile green and BLOCKS sharing and publishing
+      // until the project is renamed. This function also serves plain bundle
+      // IMPORT (/api/simulation/import), which is the user's own work and no
+      // example at all; hardcoding the flag marked those projects as examples
+      // they could not find in the Examples list, and quietly refused to share
+      // or publish them. The catalog-adopt path is the one that passes a source
+      // example, so that is what distinguishes the two.
+      data: {
+        name: ctx.projectName,
+        userId: ctx.userId,
+        orgId: ctx.orgId,
+        ownerName: ctx.ownerName,
+        exampleType: ctx.sourceExampleId ? "simulation" : null,
+        sourceExampleId: ctx.sourceExampleId ?? null,
+      },
     });
 
     // Calendars first, so a source's `sim.calendarId` can be re-pointed at the

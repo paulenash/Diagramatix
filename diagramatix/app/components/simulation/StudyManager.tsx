@@ -241,6 +241,11 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
   // status) plus any run in this session — so "compare scenarios" only enables
   // once there's something to compare.
   const [ranIds, setRanIds] = useState<Set<string>>(new Set());
+  /** Scenario being renamed, with its current name to prefill. A scenario's name
+   *  was previously fixed at creation — the only way to change it was to
+   *  duplicate it (which names the copy for you) and delete the original, losing
+   *  its run history with it. */
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const hasRun = (s: ScenarioRow) => s.status === "DONE" || ranIds.has(s.id);
   const ranCount = detail.scenarios.filter(hasRun).length;
   const canCompare = ranCount >= 2;
@@ -320,6 +325,7 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
               {s.isBaseline
                 ? <span className="text-green-300/80 text-[9px] border border-green-500/40 rounded px-1">BASELINE</span>
                 : <button onClick={() => patchScenario(s.id, { isBaseline: true })} className="text-green-400/50 hover:text-green-300 text-[9px]">set baseline</button>}
+              <button onClick={() => setRenaming({ id: s.id, name: s.name })} className="text-green-400/60 hover:text-green-300" title="Rename scenario">✎</button>
               <button onClick={() => addScenario(s.id)} className="text-green-400/60 hover:text-green-300" title="Duplicate">⎘</button>
               <button onClick={() => deleteScenario(s.id)} className="text-red-400/70 hover:text-red-300" title="Delete">✕</button>
             </div>
@@ -346,6 +352,24 @@ function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { proje
         />
         <MatrixButton onClick={() => addScenario()}>+ Scenario</MatrixButton>
       </div>
+
+      {renaming && (
+        <PromptDialog
+          title="Rename scenario"
+          message="Runs already saved under this scenario keep their own names and stay with it."
+          defaultValue={renaming.name}
+          placeholder="e.g. Surge staffing (peak week)"
+          confirmLabel="Rename"
+          validate={(v) => (v.trim() ? null : "A scenario needs a name.")}
+          onConfirm={async (v) => {
+            const name = v.trim();
+            setRenaming(null);
+            if (!name || name === renaming.name) return;
+            await patchScenario(renaming.id, { name });
+          }}
+          onCancel={() => setRenaming(null)}
+        />
+      )}
     </div>
   );
 }

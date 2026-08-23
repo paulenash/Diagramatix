@@ -45,6 +45,24 @@ body {
   }
 }
 
+/* Long admin list cards (Features Catalog, and any list like it).
+ *
+ * A list of ~50 cards, each holding native form controls, runs to well over
+ * 10,000px. Chrome was failing to repaint the text inside those inputs as they
+ * scrolled back into view — the values were present in the DOM throughout, they
+ * simply weren't painted, so the page read as "headings with no contents" and
+ * the content appeared and disappeared as you scrolled.
+ *
+ * `content-visibility: auto` lets the browser skip layout and paint for cards
+ * that are off-screen, which is the designed answer to this rather than a
+ * workaround. `contain-intrinsic-size: auto <h>` gives it a size to reserve —
+ * the `auto` keyword makes it remember each card's last real height, so the
+ * scrollbar stays honest instead of jumping as cards render. */
+.dgx-list-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}
+
 /* Cursor scheme (G05). Inline `style={{ cursor }}` can't reach the
  * :active pseudo, so the grab→grabbing swap on element drag uses
  * these utility classes. SVG elements respect cursor like HTML. */

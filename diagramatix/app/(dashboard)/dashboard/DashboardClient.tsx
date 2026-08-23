@@ -10,6 +10,7 @@ import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { MicrosoftConnectionSettings } from "@/app/components/MicrosoftConnectionSettings";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { PromptDialog } from "@/app/components/PromptDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
 import { NotificationsBell } from "@/app/components/NotificationsBell";
 import { TierPicker, type TierCard } from "@/app/components/TierPicker";
@@ -419,6 +420,26 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fields),
     }).catch(() => {});
+  }
+
+  /** Project being renamed from the Properties panel, with its current name to
+   *  prefill. Renaming was previously only possible at creation — which left the
+   *  "rename it to make it your own" advice on an adopted example impossible to
+   *  act on. */
+  const [renamingProject, setRenamingProject] = useState<{ id: string; name: string } | null>(null);
+
+  /** Rename, then mirror the server's own example-decoupling into local state:
+   *  the API drops `exampleType` (and the link to the source example) on a real
+   *  rename, so the tile must lose its example tint here too rather than keeping
+   *  it until the next reload. */
+  async function renameProject(projectId: string, name: string) {
+    const res = await fetch(`/api/projects/${projectId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) return;
+    setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, name, exampleType: null } : p)));
   }
 
   // Confirm dialog state
@@ -2136,7 +2157,18 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           <div className="space-y-2">
             <div>
               <label className="text-[10px] text-gray-500">Name</label>
-              <p className="text-xs font-medium text-gray-800">{selectedProject.name}</p>
+              <div className="flex items-start gap-1">
+                <p className="text-xs font-medium text-gray-800 flex-1 break-words">{selectedProject.name}</p>
+                {selectedRole === "owner" && !readOnly && (
+                  <button
+                    onClick={() => setRenamingProject({ id: selectedProject.id, name: selectedProject.name })}
+                    className="text-gray-400 hover:text-gray-700 text-xs shrink-0 leading-none mt-0.5"
+                    title="Rename project"
+                  >
+                    {"✎"}
+                  </button>
+                )}
+              </div>
             </div>
             {/* Project Owner (registered user). For shared tiles the
                 viewer sees the project owner's identity here \u2014 clearly
@@ -3188,6 +3220,29 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             </div>
           </div>
         </div>
+      )}
+
+      {renamingProject && (
+        <PromptDialog
+          title="Rename project"
+          message={
+            projects.find((p) => p.id === renamingProject.id)?.exampleType
+              ? "Renaming a ready-made example makes it your own project: it loses the example tint and can then be shared and published."
+              : "Diagrams, folders and settings are unaffected."
+          }
+          defaultValue={renamingProject.name}
+          placeholder="Project name"
+          confirmLabel="Rename"
+          validate={(v) => (v.trim() ? null : "A project needs a name.")}
+          onConfirm={async (v) => {
+            const name = v.trim();
+            const target = renamingProject;
+            setRenamingProject(null);
+            if (!name || name === target.name) return;
+            await renameProject(target.id, name);
+          }}
+          onCancel={() => setRenamingProject(null)}
+        />
       )}
 
       {confirmDialog && (

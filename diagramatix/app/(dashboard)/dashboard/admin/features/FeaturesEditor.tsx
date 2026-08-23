@@ -252,7 +252,12 @@ export function FeaturesEditor({ initial }: { initial: FeatureRow[] }) {
               return (
                 <div
                   key={r.id}
-                  className={`bg-white border rounded-lg shadow-sm p-4 ${
+                  /* dgx-list-card: skip rendering work for cards scrolled out of
+                     view. With ~50 features this list is 100+ native form
+                     controls over 14,000px, and Chrome was dropping the painted
+                     text of inputs as they scrolled back in — the values were
+                     in the DOM the whole time, they just weren't on screen. */
+                  className={`dgx-list-card bg-white border rounded-lg shadow-sm p-4 ${
                     dirty ? "border-amber-300" : "border-gray-200"
                   }`}
                 >
@@ -328,7 +333,13 @@ export function FeaturesEditor({ initial }: { initial: FeatureRow[] }) {
                         value={r.summary}
                         onChange={(e) => patch(r.id, { summary: e.target.value })}
                         placeholder="Benefit-oriented headline"
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:border-blue-400 focus:outline-none"
+                        /* Own its colour rather than inheriting: the name input
+                           above hardcodes text-gray-900, so anything that moves
+                           the inherited default leaves headings readable and
+                           bodies invisible — the exact shape of "header but no
+                           contents". globals.css records this rule breaking once
+                           already. */
+                        className="w-full px-2 py-1 text-xs text-gray-900 border border-gray-300 rounded focus:border-blue-400 focus:outline-none"
                       />
                     </div>
                     <div>
@@ -338,7 +349,7 @@ export function FeaturesEditor({ initial }: { initial: FeatureRow[] }) {
                         onChange={(e) => patch(r.id, { details: e.target.value })}
                         rows={Math.max(4, r.details.split("\n").length)}
                         placeholder="- Bullet 1&#10;- Bullet 2"
-                        className="w-full px-2 py-1 text-xs font-mono border border-gray-300 rounded focus:border-blue-400 focus:outline-none resize-y"
+                        className="w-full px-2 py-1 text-xs font-mono text-gray-900 border border-gray-300 rounded focus:border-blue-400 focus:outline-none resize-y"
                       />
                     </div>
                   </div>
