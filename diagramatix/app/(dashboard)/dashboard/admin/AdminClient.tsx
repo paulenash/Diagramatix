@@ -854,6 +854,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "notifications", title: "Notifications & Feedback", description: "Inspect any user's notification feed — filter by Org & User.", href: "/notifications?from=/dashboard/admin" },
   { id: "templates", title: "Template Management", description: "Every diagram template — built-in + all users'. Preview each thumbnail, edit name / group / description, delete, and regenerate previews (single template or bulk) after a renderer change.", href: "/dashboard/admin/templates" },
   { id: "md-diagrams", title: "Create Project Diagrams from .md", description: "Upload a Value-Chain markdown (Process Repository format), pick a chain, and generate a whole project of diagrams — Value Chain, Context, Process Context, ArchiMate + each BPMN process — via AI Generate + Auto Layout, with live progress.", href: "/dashboard/admin/md-diagrams", feature: "ai" },
+  { id: "nimb", title: "n × n Nimb", description: "A two-player misère placement game: fill 1–4 consecutive squares in a row or column, no passing, and whoever places the LAST ✕ loses. Pick n (2–4) and every genuinely different move is listed and solved — green wins, red loses, rotations and reflections collapsed.", href: "/dashboard/admin/nimb" },
   { id: "orbit-sim", title: "Orbit Simulator", description: "N-body point-mass gravity playground — configure 2–50 “stars” (colours + relative masses), Newtonian softened force, virial-bound 3D initial conditions, then Test to watch it run. Esc returns to config.", href: "/dashboard/admin/orbit-sim" },
 ];
 
