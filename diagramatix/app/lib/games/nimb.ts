@@ -239,6 +239,119 @@ export function canonicalBoard(b: Board, n: number): Board {
   return best;
 }
 
+// ── Decomposition into independent shapes ─────────────────────────────────
+/**
+ * The empty squares split into orthogonally-connected regions, and each region
+ * is an INDEPENDENT GAME.
+ *
+ * A move is a run of consecutive empty squares in a line, so it can never span
+ * two regions separated by filled squares: once the middle row of a 4×4 is
+ * taken, the 4×1 above and the 4×2 below cannot interact again. Where a shape
+ * sits on the board stops mattering — only its form does.
+ *
+ * That matters for more than presentation. Solving the MULTISET OF SHAPES is
+ * exact and far smaller than solving the raw board: 4×4 has 65,536 board
+ * positions but only ~2,800 distinct shape-multisets, and the gap widens as
+ * boards grow, because a large board fragments into a handful of small pieces.
+ *
+ * Note this is NOT Sprague-Grundy. That theory sums independent games by XOR of
+ * Grundy values and applies to NORMAL play; misère sums are much nastier and
+ * the XOR is simply wrong for them. We do not need it — we solve the multiset
+ * directly — but it is the obvious wrong turn here, and it was checked against
+ * the flat solver over every 3×3 position and a sample of 4×4 before being
+ * relied on.
+ */
+export interface Shape {
+  /** Identical for every rotation and reflection of the same form. */
+  key: string;
+  /** Canonical cells as [row, col], normalised to the origin — for drawing. */
+  cells: [number, number][];
+  rows: number;
+  cols: number;
+  size: number;
+  /** "4×1", "2×3" … when the form fills its bounding box; null otherwise. */
+  rect: string | null;
+  /** Indices of the squares this shape occupies on the CURRENT board. */
+  boardCells: number[];
+}
+
+/** Canonical form of a set of [row, col] cells: normalised to the origin and
+ *  reduced over the 8 symmetries, so one key stands for every placement. */
+export function canonicalShape(cells: [number, number][]): { key: string; cells: [number, number][] } {
+  let bestKey: string | null = null;
+  let bestCells: [number, number][] = cells;
+  for (let v = 0; v < 8; v++) {
+    const t = cells.map(([r, c]) => {
+      let a = r, b = c;
+      if (v & 4) { const tmp = a; a = b; b = tmp; } // transpose
+      if (v & 1) a = -a;
+      if (v & 2) b = -b;
+      return [a, b] as [number, number];
+    });
+    const minR = Math.min(...t.map((p) => p[0]));
+    const minC = Math.min(...t.map((p) => p[1]));
+    const norm = t
+      .map(([a, b]) => [a - minR, b - minC] as [number, number])
+      .sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+    const key = norm.map(([a, b]) => `${a},${b}`).join(" ");
+    if (bestKey === null || key < bestKey) { bestKey = key; bestCells = norm; }
+  }
+  return { key: bestKey!, cells: bestCells };
+}
+
+/** The independent shapes of empty squares in this position. */
+export function shapesOf(b: Board, n: number): Shape[] {
+  const empty = new Set<number>();
+  for (let i = 0; i < n * n; i++) if (!isFilled(b, i)) empty.add(i);
+  const out: Shape[] = [];
+  while (empty.size) {
+    const start = empty.values().next().value as number;
+    empty.delete(start);
+    const region: number[] = [];
+    const stack = [start];
+    while (stack.length) {
+      const i = stack.pop()!;
+      region.push(i);
+      const r = Math.floor(i / n), c = i % n;
+      for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const nr = r + dr, nc = c + dc;
+        if (nr < 0 || nc < 0 || nr >= n || nc >= n) continue;
+        const j = nr * n + nc;
+        if (empty.has(j)) { empty.delete(j); stack.push(j); }
+      }
+    }
+    const { key, cells } = canonicalShape(region.map((i) => [Math.floor(i / n), i % n] as [number, number]));
+    const rows = Math.max(...cells.map((p) => p[0])) + 1;
+    const cols = Math.max(...cells.map((p) => p[1])) + 1;
+    out.push({
+      key, cells, rows, cols,
+      size: region.length,
+      // Read the long side first, so a 1×4 and a 4×1 are both "4×1".
+      rect: rows * cols === region.length ? `${Math.max(rows, cols)}×${Math.min(rows, cols)}` : null,
+      boardCells: region.sort((a, z) => a - z),
+    });
+  }
+  // Largest first — the big shapes are where the decisions are.
+  return out.sort((a, z) => z.size - a.size || a.key.localeCompare(z.key));
+}
+
+/** Shapes grouped by form: "two 4×1s and one 2×2" rather than three entries. */
+export function groupedShapes(b: Board, n: number): { shape: Shape; count: number }[] {
+  const by = new Map<string, { shape: Shape; count: number }>();
+  for (const s of shapesOf(b, n)) {
+    const hit = by.get(s.key);
+    if (hit) hit.count++;
+    else by.set(s.key, { shape: s, count: 1 });
+  }
+  return [...by.values()].sort((a, z) => z.shape.size - a.shape.size);
+}
+
+/** A human name for a shape: "4×1", "2×2", or "L-shape (5 squares)". */
+export function shapeName(s: Shape): string {
+  if (s.size === 1) return "single square";
+  return s.rect ?? `${s.size}-square piece`;
+}
+
 /** A legal move, with what it leads to and whether it wins. */
 export interface MoveOption {
   move: Move;

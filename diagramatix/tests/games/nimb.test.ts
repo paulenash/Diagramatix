@@ -3,6 +3,7 @@ import {
   legalMoves, isLegalSelection, winning, bestMove, fullBoard, isFull,
   idx, emptyCount, MAX_RUN, solvable,
   distinctMoves, canonicalBoard, symmetries, transform,
+  shapesOf, groupedShapes, shapeName, canonicalShape,
 } from "@/app/lib/games/nimb";
 
 /**
@@ -187,5 +188,87 @@ describe("Nimb — distinct moves", () => {
     const b = (1 << idx(n, 0, 0)) | (1 << idx(n, 0, 1)); // a border domino
     const canon = canonicalBoard(b, n);
     for (const p of symmetries(n)) expect(canonicalBoard(transform(b, p), n)).toBe(canon);
+  });
+});
+
+/**
+ * T2880 — the board decomposes into independent shapes.
+ *
+ * A move is a contiguous run in a line, so it can never span two regions
+ * separated by filled squares. Once the middle row of a 4×4 is taken, the 4×1
+ * above and the 4×2 below cannot interact again — and WHERE a shape sits stops
+ * mattering, only its form.
+ *
+ * This is the basis for describing a position as a bag of shapes rather than a
+ * bitmask, so it is checked rather than assumed. (It is emphatically NOT
+ * Sprague-Grundy: that sums independent games by XOR and applies to NORMAL
+ * play; misère sums are far nastier and the XOR is wrong for them. Nothing here
+ * relies on it.)
+ */
+describe("Nimb — shape decomposition", () => {
+  const n = 4;
+  const rowMove = [0, 1, 2, 3].reduce((b, c) => b | (1 << idx(n, 1, c)), 0); // 4 ✕ across row 2
+  const colMove = [0, 1, 2, 3].reduce((b, r) => b | (1 << idx(n, r, 2)), 0); // the same, rotated
+
+  it("splits a 4x4 with its 2nd row taken into a 4x1 and a 4x2", () => {
+    const g = groupedShapes(rowMove, n);
+    expect(g.map((x) => shapeName(x.shape)).sort()).toEqual(["4×1", "4×2"]);
+    expect(g.every((x) => x.count === 1)).toBe(true);
+  });
+
+  it("a move and its rotation leave the SAME shapes — position is irrelevant", () => {
+    const a = shapesOf(rowMove, n).map((s) => s.key).sort();
+    const b = shapesOf(colMove, n).map((s) => s.key).sort();
+    expect(a).toEqual(b);
+  });
+
+  it("names rectangles longest-side-first, so 1x4 and 4x1 are one shape", () => {
+    const across = shapesOf(rowMove, n).find((s) => s.size === 4)!;
+    const down = shapesOf(colMove, n).find((s) => s.size === 4)!;
+    expect(across.rect).toBe("4×1");
+    expect(down.rect).toBe("4×1");
+    expect(across.key).toBe(down.key);
+  });
+
+  it("groups repeats: taking the middle column of a 3x3 leaves two 3x1s", () => {
+    const b = [0, 1, 2].reduce((acc, r) => acc | (1 << idx(3, r, 1)), 0);
+    const g = groupedShapes(b, 3);
+    expect(g).toHaveLength(1);
+    expect(g[0].count).toBe(2);
+    expect(shapeName(g[0].shape)).toBe("3×1");
+  });
+
+  it("a non-rectangle has no rect name but keeps its geometry", () => {
+    // Take one corner of a 3x3 — the rest is a connected L of 8 squares.
+    const b = 1 << idx(3, 0, 0);
+    const s = shapesOf(b, 3);
+    expect(s).toHaveLength(1);
+    expect(s[0].size).toBe(8);
+    expect(s[0].rect).toBeNull();
+    expect(s[0].cells).toHaveLength(8);
+  });
+
+  it("every square is accounted for exactly once", () => {
+    for (const b of [0, rowMove, colMove, 1 << idx(n, 2, 2)]) {
+      const cells = shapesOf(b, n).flatMap((s) => s.boardCells);
+      expect(new Set(cells).size).toBe(cells.length);
+      expect(cells).toHaveLength(emptyCount(b, n));
+    }
+  });
+
+  it("canonicalShape is stable across all eight orientations", () => {
+    const L: [number, number][] = [[0, 0], [1, 0], [2, 0], [2, 1]];
+    const keys = new Set<string>();
+    for (let v = 0; v < 8; v++) {
+      const t = L.map(([r, c]) => {
+        let a = r, b = c;
+        if (v & 4) { const x = a; a = b; b = x; }
+        if (v & 1) a = -a;
+        if (v & 2) b = -b;
+        return [a, b] as [number, number];
+      });
+      keys.add(canonicalShape(t).key);
+    }
+    expect(keys.size, "all eight orientations share one key").toBe(1);
   });
 });
