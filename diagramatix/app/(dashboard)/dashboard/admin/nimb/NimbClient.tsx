@@ -186,18 +186,18 @@ export function NimbClient() {
         <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
           <h2 className="text-sm font-semibold text-gray-900">Moves for Player {turn}</h2>
           <p className="text-[11px] text-gray-500 mb-3">
-            Rotations and reflections collapsed. Click to select and see the replies; click again to play it.
+            You choose for BOTH players. Click a move to see it on the board and list the replies; press Play to make it — including a losing one, deliberately.
           </p>
           {over ? <p className="text-xs text-gray-500">No moves — the board is full.</p> : (
             <div className="grid sm:grid-cols-2 gap-3">
               <MoveColumn
                 title={`Winning (${wins.length})`} tone="win" moves={wins} n={n} board={board}
-                selKey={selKey} onSelect={setSelKey} onPlay={play} onHover={setHover}
+                selKey={selKey} onSelect={setSelKey} onPlay={play} onHover={setHover} player={turn}
                 empty="No winning move — this position is lost against perfect play."
               />
               <MoveColumn
                 title={`Losing (${loses.length})`} tone="lose" moves={loses} n={n} board={board}
-                selKey={selKey} onSelect={setSelKey} onPlay={play} onHover={setHover}
+                selKey={selKey} onSelect={setSelKey} onPlay={play} onHover={setHover} player={turn}
                 empty="Every move here wins."
               />
             </div>
@@ -226,13 +226,13 @@ export function NimbClient() {
                   <MoveColumn
                     title={`Winning for P${opponent} (${replies.filter((r) => r.wins).length})`} tone="win"
                     moves={replies.filter((r) => r.wins)} n={n} board={selected.result}
-                    selKey={null} onSelect={() => {}} onPlay={() => {}} onHover={() => {}} readOnly
+                    selKey={null} onSelect={() => {}} onPlay={() => {}} onHover={() => {}} player={opponent} readOnly
                     empty="None — every reply loses."
                   />
                   <MoveColumn
                     title={`Losing for P${opponent} (${replies.filter((r) => !r.wins).length})`} tone="lose"
                     moves={replies.filter((r) => !r.wins)} n={n} board={selected.result}
-                    selKey={null} onSelect={() => {}} onPlay={() => {}} onHover={() => {}} readOnly
+                    selKey={null} onSelect={() => {}} onPlay={() => {}} onHover={() => {}} player={opponent} readOnly
                     empty="None — every reply wins."
                   />
                 </div>
@@ -247,11 +247,11 @@ export function NimbClient() {
 }
 
 function MoveColumn({
-  title, tone, moves, n, board, selKey, onSelect, onPlay, onHover, empty, readOnly = false,
+  title, tone, moves, n, board, selKey, onSelect, onPlay, onHover, empty, player, readOnly = false,
 }: {
   title: string; tone: "win" | "lose"; moves: MoveOption[]; n: number; board: Board;
   selKey: Board | null; onSelect: (k: Board) => void; onPlay: (o: MoveOption) => void;
-  onHover: (c: number[] | null) => void; empty: string; readOnly?: boolean;
+  onHover: (c: number[] | null) => void; empty: string; player: number; readOnly?: boolean;
 }) {
   const head = tone === "win" ? "text-green-700" : "text-red-700";
   const box = tone === "win"
@@ -267,19 +267,33 @@ function MoveColumn({
           {moves.map((o) => {
             const isSel = selKey === o.key;
             return (
-              <li key={o.key}>
+              // Inspect and play are SEPARATE controls. They were one button
+              // where the first click selected and the second played, which is
+              // a gesture nobody discovers — and it made playing a move you can
+              // see is losing feel like a mis-click rather than a choice.
+              <li key={o.key} className={`flex items-stretch gap-1 rounded border ${box}` + (isSel ? " ring-2 ring-blue-500" : "")}>
                 <button
-                  onClick={() => { if (readOnly) return; isSel ? onPlay(o) : onSelect(o.key); }}
+                  onClick={() => { if (!readOnly) onSelect(o.key); }}
                   onMouseEnter={() => onHover(o.move.cells)}
                   onMouseLeave={() => onHover(null)}
                   disabled={readOnly}
-                  className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded border text-left text-[11px] transition-colors ${box}` +
-                    (isSel ? " ring-2 ring-blue-500" : "") + (readOnly ? " cursor-default" : "")}
-                  title={readOnly ? undefined : isSel ? "Click again to play this move" : "Click to see the replies"}
+                  className={"flex-1 flex items-center justify-between gap-2 px-2.5 py-1.5 text-left text-[11px] rounded-l" + (readOnly ? " cursor-default" : "")}
+                  title={readOnly ? undefined : "Show this move on the board and list the replies"}
                 >
                   <span className="font-medium">{describe(o)}</span>
                   <MiniBoard n={n} before={board} cells={o.move.cells} />
                 </button>
+                {!readOnly && (
+                  <button
+                    onClick={() => onPlay(o)}
+                    onMouseEnter={() => onHover(o.move.cells)}
+                    onMouseLeave={() => onHover(null)}
+                    className="px-2 text-[10px] font-semibold uppercase tracking-wide border-l border-black/10 hover:bg-black/5 rounded-r"
+                    title={`Play this move for Player ${player} — you may pick a losing move deliberately`}
+                  >
+                    Play ▸
+                  </button>
+                )}
               </li>
             );
           })}
