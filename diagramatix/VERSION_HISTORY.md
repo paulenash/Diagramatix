@@ -15,6 +15,30 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.2.2319 — 2026-08-24 — Replay actually replays; error triggers stop at 5pm
+
+**"Launch replay" showed a clock ticking and nothing happening.** Two causes, both
+about the window rather than the engine:
+- The cold-start replay horizon is four hours from t=0 — and **t=0 is Monday
+  00:00** — so a team working 09:00–17:00 had a replay window containing no
+  working hours at all. Measured on P01: horizon 240 gave 0 service events, 480
+  gave 0, 1440 gave 397. The window is now stretched past the first open moment
+  plus a shift; a 24/7 model keeps the short window.
+- **"Replay uses your last scenario run" was only true within one session.** The
+  config lived in React state set by the Run button, so a returning session had
+  none and fell back to that dead default. It was on disk the whole time
+  (`SimulationRun.configSnapshot`); a new `last-run` endpoint hands it back.
+
+**Edge-mounted triggers that are not timers now stop when the team does.** An
+error, escalation, conditional, signal or message boundary event represents
+something arising DURING the work, and none of them can happen while nobody is
+working — an error firing at 2am cancelled a case no one had touched. Those
+accrue only through the host team's open hours. A TIMER is a deadline and keeps
+the label rule: unqualified means elapsed, because a customer's "2 days"
+includes the nights. Say "2 working days" to gate it.
+
+Tests T2875–T2876. Full suite green.
+
 ## 2.2.2316 — 2026-08-24 — Simulation semantics: waits, working timers, and renaming things
 
 **Waiting on someone else is neither work nor free.**

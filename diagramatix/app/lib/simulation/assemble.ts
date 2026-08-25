@@ -219,14 +219,23 @@ export function assembleFromDiagram(
       fireProb: bp?.fireProb ?? 1,
       interrupting: el.properties?.interruptionType !== "non-interrupting",
     };
-    // "7 working days" is not 7 elapsed days — a reminder timer that ignores
-    // nights and weekends fires while nobody could have acted. Working hours
-    // come from the HOST's team: the reminder is chased by whoever owns the
-    // step. Absent → elapsed, which is what an unqualified "2 days" means.
-    if (bp?.triggerMode === "working" || bp?.triggerMode === "working-days") {
+    // When the trigger's clock runs. Working hours come from the HOST's team —
+    // whoever owns the step is who would be doing the work, or chasing it.
+    //
+    //  • A NON-TIMER trigger (error, escalation, conditional, signal, message)
+    //    represents something arising DURING the work. None of those can happen
+    //    while nobody is working, so it accrues only through open hours. An
+    //    error boundary firing at 2am cancels a case that no one had touched.
+    //  • A TIMER is a deadline and keeps the label rule: unqualified means
+    //    ELAPSED, because a customer's "2 days" includes the nights. Say
+    //    "2 working days" to gate it.
+    //
+    // An explicit triggerMode always wins over the default.
+    const mode = bp?.triggerMode ?? (el.eventType === "timer" ? undefined : "working");
+    if (mode) {
       const hostTeam = getSimParams(host).teamId ?? laneLabelTeamOf(host);
       const cal = hostTeam ? opts?.teamCalendars?.[hostTeam] : undefined;
-      if (cal) { be.triggerMode = bp.triggerMode; be.calendar = cal; }
+      if (cal) { be.triggerMode = mode; be.calendar = cal; }
     }
     (boundaryByHost.get(el.boundaryHostId!) ?? boundaryByHost.set(el.boundaryHostId!, []).get(el.boundaryHostId!)!).push(be);
   }

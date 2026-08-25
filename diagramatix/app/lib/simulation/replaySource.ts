@@ -10,7 +10,8 @@ import { assembleFromDiagram, type CalendarOpts } from "./assemble";
 import { spliceLinkedSubprocesses } from "./spliceLinks";
 import type { SimNetwork } from "./model";
 import { getSimParams } from "@/app/lib/diagram/simParams";
-import { DEFAULT_RUN_CONFIG, type SimRunConfig } from "./types";
+import { DEFAULT_RUN_CONFIG, SECONDS_PER_UNIT, type SimRunConfig, type WorkCalendar, type ClockUnit } from "./types";
+import { nextOpenAt } from "./calendar";
 import type { NodeMeta } from "./tokenTable";
 
 export interface ReplayData {
@@ -103,6 +104,33 @@ function nodeTeamOf(net: SimNetwork): Map<string, string> {
 /** A short, watchable default run for the interactive replay. */
 export function defaultReplayConfig(seed = 1): SimRunConfig {
   return { ...DEFAULT_RUN_CONFIG, horizon: 240, warmUp: 0, replications: 1, seed, collectQueues: true };
+}
+
+/**
+ * A replay horizon that actually contains some work.
+ *
+ * The simulation clock starts at **t=0 ≙ Monday 00:00** and the short default
+ * window is four hours — so a model whose teams work 09:00–17:00 has a replay
+ * covering Mon 00:00–04:00, in which nothing can happen at all. The clock ticks,
+ * tokens arrive and queue, and no work ever starts: the replay looks stuck, and
+ * a run of the same model looks fine because a scenario run uses its own
+ * multi-day horizon.
+ *
+ * So extend the window past the first open moment across the calendared teams
+ * and give it a full shift beyond that. With no calendars (24/7) the short
+ * window is already fine and is left alone.
+ */
+export function replayHorizonFor(
+  base: number,
+  teamCalendars: Record<string, WorkCalendar> | undefined,
+  clockUnit: ClockUnit,
+): number {
+  const cals = Object.values(teamCalendars ?? {}).filter((c) => (c?.intervals?.length ?? 0) > 0);
+  if (cals.length === 0) return base; // always open — the short window shows work
+  // The soonest any calendared team could start, and one shift beyond it.
+  const firstOpen = Math.min(...cals.map((c) => nextOpenAt(0, c, clockUnit)));
+  const shift = (8 * 3600) / SECONDS_PER_UNIT[clockUnit];
+  return Math.max(base, Math.ceil(firstOpen + shift));
 }
 
 /** Distinct team ids referenced by the diagram's tasks (for the Operator panel). */

@@ -111,6 +111,12 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
         // and anything unqualified stays elapsed.
         const p = parseTimerLabel(el.label ?? "");
         const round = (n: number) => Math.round(n * 100) / 100;
+        // A non-TIMER trigger (error, escalation, conditional, signal, message)
+        // arises DURING the work, so its clock runs only through the host team's
+        // open hours — written here rather than assumed at run time, so the mode
+        // is visible in the panel and can be changed. A TIMER keeps the label
+        // rule: unqualified is elapsed.
+        const workingByDefault = el.eventType !== "timer" ? { triggerMode: "working" as const } : {};
         if (p?.mode === "working-days") {
           // The VALUE is a day count here, not minutes — the engine counts days.
           sim.boundary = { ...sim.boundary, trigger: { kind: "fixed", value: p.days }, triggerMode: "working-days" as const };
@@ -118,10 +124,11 @@ export function autofillSimulation(data: DiagramData): AutofillResult {
           sim.boundary = {
             ...sim.boundary,
             trigger: { kind: "fixed", value: round(p.minutes) },
+            ...workingByDefault,
             ...(p.mode === "working" ? { triggerMode: "working" as const } : {}),
           };
         } else {
-          sim.boundary = { ...sim.boundary, trigger: DEF_TRIGGER };
+          sim.boundary = { ...sim.boundary, trigger: DEF_TRIGGER, ...workingByDefault };
         }
         auto.add("boundary"); filled++; changed = true;
       }

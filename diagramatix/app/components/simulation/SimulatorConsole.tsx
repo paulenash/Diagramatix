@@ -20,7 +20,7 @@ import { CalendarLibraryManager, type CalendarRow } from "./CalendarLibraryManag
 import { BpsimInterchange } from "./BpsimInterchange";
 import { StudyManager } from "./StudyManager";
 import { SimDataPanel } from "./SimDataPanel";
-import { defaultReplayConfig, buildReplay } from "@/app/lib/simulation/replaySource";
+import { defaultReplayConfig, buildReplay, replayHorizonFor } from "@/app/lib/simulation/replaySource";
 import { seedSimulationDefaults } from "@/app/lib/simulation/seedDefaults";
 import { usedTeamNames } from "@/app/lib/simulation/harvestTeams";
 import { autofillSimulation, unfillSimulation } from "@/app/lib/simulation/autofill";
@@ -75,7 +75,37 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, colorConfig, diagramId,
   // rather than a short default window. One replication + no warm-up so every
   // token is shown from t=0.
   const [lastRunCfg, setLastRunCfg] = useState<ScenarioRunConfig | null>(null);
-  const replayCfg = useMemo(() => lastRunCfg ? { ...defaultReplayConfig(lastRunCfg.seed ?? 1), ...lastRunCfg, replications: 1, warmUp: 0 } : defaultReplayConfig(), [lastRunCfg]);
+  /**
+   * Recover the last run's config on entry. It was only ever set by the Run
+   * button, so a returning session had none and the replay fell back to its
+   * four-hour default — which begins at Monday 00:00 and so contains no working
+   * hours at all. "Replay uses your last scenario run" was true only if you had
+   * just run one. The config is on disk (`SimulationRun.configSnapshot`).
+   */
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    fetch(`/api/projects/${projectId}/simulation/last-run`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const cfg = j?.run?.config as ScenarioRunConfig | undefined;
+        // Never overwrite a config from a run made in THIS session — that one is
+        // newer than anything on disk.
+        if (!cancelled && cfg?.horizon) setLastRunCfg((prev) => prev ?? cfg);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [projectId]);
+  // With no scenario run to replay, the short default window is four hours from
+  // t=0 — and t=0 is MONDAY 00:00, so a team working 09:00–17:00 can do nothing
+  // in it. The clock ticked, tokens queued, and the replay looked stuck while a
+  // run of the same model was fine (a scenario run brings its own multi-day
+  // horizon). Stretch the cold-start window past the first open moment.
+  const replayCfg = useMemo(() => {
+    if (lastRunCfg) return { ...defaultReplayConfig(lastRunCfg.seed ?? 1), ...lastRunCfg, replications: 1, warmUp: 0 };
+    const base = defaultReplayConfig();
+    return { ...base, horizon: replayHorizonFor(base.horizon, teamCalendars, base.clockUnit) };
+  }, [lastRunCfg, teamCalendars]);
 
   // ── Variant selector ─────────────────────────────────────────────────────
   // For a comparison study the panels (Simulation Data, missing-data highlight,
