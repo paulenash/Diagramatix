@@ -352,6 +352,183 @@ export function shapeName(s: Shape): string {
   return s.rect ?? `${s.size}-square piece`;
 }
 
+// ── Move classes: the same idea, wherever it is played ────────────────────
+/**
+ * A CLASS of moves — one idea, such as "take an end square of the 4×1" — with
+ * every concrete board move that expresses it.
+ *
+ * Why a class is safe to speak about as a unit: two moves related by a symmetry
+ * OF THEIR OWN SHAPE leave the same multiset of shapes behind. That symmetry
+ * need not extend to the whole board — the other shapes may be arranged quite
+ * differently — but it does not have to, because the shapes are independent
+ * games and the value of the position depends only on which shapes remain. So
+ * every move in a class has the same value, and advice given about the class is
+ * true of all of it. `T2881` pins exactly this.
+ */
+export interface MoveClass {
+  /** Canonical key for (shape, move-within-shape) — the class identity. */
+  key: string;
+  /** The shape this is played in. */
+  shape: Shape;
+  length: number;
+  /** The run's cells in the SHAPE's canonical frame, for drawing. */
+  cellsInShape: [number, number][];
+  wins: boolean;
+  /** How many concrete board moves belong to this class. */
+  count: number;
+  /** One concrete move, so the class can actually be played. */
+  example: Move;
+  /** Every concrete move in this class, as board masks. The UI highlights them
+   *  all — "anywhere in the 4x1" should be able to SHOW the anywhere — and the
+   *  safety test asserts they all share the class verdict. */
+  memberMasks: Board[];
+  /** Plain English for where in the shape, when the shape is simple enough to
+   *  describe honestly ("either end", "the middle"); null when a picture is the
+   *  only truthful description. */
+  where: string | null;
+}
+
+/** Canonical key for a run inside a shape, quotiented by the shape's own
+ *  symmetry — so "an end square" is one key however the shape is turned. */
+function classKey(shapeCells: [number, number][], runCells: [number, number][]): {
+  key: string; shape: [number, number][]; run: [number, number][];
+} {
+  let best: { key: string; shape: [number, number][]; run: [number, number][] } | null = null;
+  for (let v = 0; v < 8; v++) {
+    const tf = ([r, c]: [number, number]): [number, number] => {
+      let a = r, b = c;
+      if (v & 4) { const t = a; a = b; b = t; }
+      if (v & 1) a = -a;
+      if (v & 2) b = -b;
+      return [a, b];
+    };
+    const ts = shapeCells.map(tf);
+    const minR = Math.min(...ts.map((p) => p[0]));
+    const minC = Math.min(...ts.map((p) => p[1]));
+    const norm = (p: [number, number]): [number, number] => [p[0] - minR, p[1] - minC];
+    const shape = ts.map(norm).sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+    const run = runCells.map(tf).map(norm).sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+    const key = shape.map((p) => p.join(",")).join(" ") + "|" + run.map((p) => p.join(",")).join(" ");
+    if (best === null || key < best.key) best = { key, shape, run };
+  }
+  return best!;
+}
+
+/**
+ * English for where a run sits, but ONLY where it can be said truthfully.
+ *
+ * Restricted to straight strips (1×k), where "end" and "middle" mean something
+ * exact. For an L, a T or any ragged remnant there is no honest short phrase,
+ * and inventing one ("near the corner") would be worse than the picture the UI
+ * draws anyway — so it returns null and the caller shows the glyph.
+ */
+function whereInShape(shape: Shape, run: [number, number][]): string | null {
+  const isStrip = shape.rows === 1 || shape.cols === 1;
+  if (!isStrip || shape.rect === null) return null;
+  const k = shape.size;
+  const L = run.length;
+  const along = shape.rows === 1 ? run.map((p) => p[1]) : run.map((p) => p[0]);
+  const start = Math.min(...along);
+  const end = start + L - 1;
+  if (L === k) return "the whole strip";
+  const atStart = start === 0, atEnd = end === k - 1;
+  if (atStart || atEnd) return L === 1 ? "either end square" : `flush with either end`;
+  // Exactly centred?
+  if (start === k - 1 - end) return L === 1 ? "the middle square" : "the middle";
+  return `starting ${start + 1} in from either end`;
+}
+
+/**
+ * Every distinct IDEA available to the player to move, with its verdict.
+ *
+ * Concrete moves are grouped into classes; the count says how many board moves
+ * each class covers. Sorted winning-first, then by how much of the board they
+ * consume, so the cheapest winning idea reads first.
+ */
+export function moveClasses(b: Board, n: number, memo = new Map<Board, boolean>()): MoveClass[] {
+  const shapes = shapesOf(b, n);
+  /** board cell index → the shape containing it */
+  const shapeOf = new Map<number, Shape>();
+  for (const s of shapes) for (const i of s.boardCells) shapeOf.set(i, s);
+
+  const classes = new Map<string, MoveClass>();
+  for (const move of legalMoves(b, n)) {
+    const shape = shapeOf.get(move.cells[0]);
+    if (!shape) continue; // unreachable: a legal move only covers empty squares
+    const shapeCells = shape.boardCells.map((i) => [Math.floor(i / n), i % n] as [number, number]);
+    const runCells = move.cells.map((i) => [Math.floor(i / n), i % n] as [number, number]);
+    const { key, run } = classKey(shapeCells, runCells);
+    const hit = classes.get(key);
+    if (hit) { hit.count++; hit.memberMasks.push(move.mask); continue; }
+    classes.set(key, {
+      key, shape, length: move.length, cellsInShape: run,
+      wins: solvable(n) ? !winning(b | move.mask, n, memo) : false,
+      count: 1, example: move, memberMasks: [move.mask],
+      where: whereInShape(shape, run),
+    });
+  }
+  return [...classes.values()].sort((a, z) =>
+    Number(z.wins) - Number(a.wins) || a.length - z.length || z.count - a.count);
+}
+
+/**
+ * Winning advice as sentences, stated only where every move covered is winning.
+ *
+ * A rule like "take one square anywhere in the 4×1" is worth more than a list —
+ * but only if it is TRUE of every square in that shape. Where the winning moves
+ * in a shape do not fill a whole category, the narrower class is named instead.
+ * A memorable rule that loses games is worse than a fussy one that does not.
+ */
+export function strategyAdvice(b: Board, n: number, memo = new Map<Board, boolean>()): string[] {
+  const classes = moveClasses(b, n, memo);
+  const winners = classes.filter((c) => c.wins);
+  if (winners.length === 0) return [];
+
+  const out: string[] = [];
+  const covered = new Set<string>();
+
+  // Strongest first: is EVERY move of length L in this shape a winner?
+  const byShapeLen = new Map<string, MoveClass[]>();
+  for (const c of classes) {
+    const k = `${c.shape.key}|${c.length}`;
+    (byShapeLen.get(k) ?? byShapeLen.set(k, []).get(k)!).push(c);
+  }
+  /** Shape+length groups where EVERY move wins — the broad rules. */
+  const broad = [...byShapeLen.values()].filter((g) => g.length > 0 && g.every((c) => c.wins));
+
+  // Broader still: does a length win in EVERY shape on the board? Then it is
+  // one rule — "any 4-in-a-row, in any shape" — rather than one per shape.
+  const shapeKeys = new Set(classes.map((c) => c.shape.key));
+  const byLen = new Map<number, MoveClass[][]>();
+  for (const g of broad) (byLen.get(g[0].length) ?? byLen.set(g[0].length, []).get(g[0].length)!).push(g);
+  const universal = new Set<number>();
+  for (const [len, groups] of byLen) {
+    const shapesCovered = new Set(groups.map((g) => g[0].shape.key));
+    // Only "in any shape" when the length is legal in every shape AND wins there.
+    const shapesWhereLegal = new Set(classes.filter((c) => c.length === len).map((c) => c.shape.key));
+    if (shapesCovered.size === shapeKeys.size && shapesWhereLegal.size === shapeKeys.size) universal.add(len);
+  }
+  for (const len of [...universal].sort((a, z) => a - z)) {
+    out.push(`Play any ${len === 1 ? "single square" : `${len}-in-a-row`} in ANY remaining shape.`);
+    for (const g of broad) if (g[0].length === len) for (const c of g) covered.add(c.key);
+  }
+  for (const group of broad) {
+    if (covered.has(group[0].key)) continue;
+    const c = group[0];
+    out.push(`Play any ${c.length === 1 ? "single square" : `${c.length}-in-a-row`} anywhere in the ${shapeName(c.shape)}.`);
+    for (const g of group) covered.add(g.key);
+  }
+  // Then the individual winning ideas not already covered by a broader rule.
+  for (const c of winners) {
+    if (covered.has(c.key)) continue;
+    const what = c.length === 1 ? "one square" : `${c.length} in a row`;
+    out.push(c.where
+      ? `Take ${what} at ${c.where} of the ${shapeName(c.shape)}.`
+      : `Take ${what} in the ${shapeName(c.shape)} — see the shaded squares.`);
+  }
+  return out;
+}
+
 /** A legal move, with what it leads to and whether it wins. */
 export interface MoveOption {
   move: Move;

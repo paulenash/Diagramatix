@@ -4,6 +4,7 @@ import {
   idx, emptyCount, MAX_RUN, solvable,
   distinctMoves, canonicalBoard, symmetries, transform,
   shapesOf, groupedShapes, shapeName, canonicalShape,
+  moveClasses, strategyAdvice,
 } from "@/app/lib/games/nimb";
 
 /**
@@ -270,5 +271,84 @@ describe("Nimb — shape decomposition", () => {
       keys.add(canonicalShape(t).key);
     }
     expect(keys.size, "all eight orientations share one key").toBe(1);
+  });
+});
+
+/**
+ * T2881 — advice is only stated when it is true of everything it covers.
+ *
+ * A rule like "take one square anywhere in the 4×1" is worth far more than a
+ * list of squares — but only if EVERY square in that shape really does win. A
+ * memorable rule that loses games is worse than a fussy one that does not.
+ *
+ * The soundness argument: two moves related by a symmetry of THEIR OWN SHAPE
+ * leave the same multiset of shapes behind. That symmetry need not extend to
+ * the whole board, and usually does not — but it does not have to, because the
+ * shapes are independent games and the position's value depends only on which
+ * shapes remain. So a class is value-homogeneous, and speaking about it as a
+ * unit is honest. These tests check that rather than trusting it.
+ */
+describe("Nimb — move classes and advice", () => {
+  const n = 4;
+  const rowTaken = [0, 1, 2, 3].reduce((b, c) => b | (1 << idx(n, 1, c)), 0);
+
+  it("every concrete move in a class shares the class verdict", () => {
+    const memo = new Map<number, boolean>();
+    const boards = [0, rowTaken, 1 << idx(n, 0, 0), (1 << idx(n, 0, 0)) | (1 << idx(n, 3, 3))];
+    let moves = 0;
+    for (const b of boards) {
+      for (const c of moveClasses(b, n, memo)) {
+        for (const mask of c.memberMasks) {
+          moves++;
+          expect(!winning(b | mask, n, memo), `class ${c.key}`).toBe(c.wins);
+        }
+      }
+    }
+    expect(moves, "the check must actually have looked at moves").toBeGreaterThan(200);
+  });
+
+  it("classes account for every legal move, exactly once", () => {
+    for (const b of [0, rowTaken]) {
+      const covered = moveClasses(b, n).reduce((t, c) => t + c.count, 0);
+      expect(covered).toBe(legalMoves(b, n).length);
+      const masks = moveClasses(b, n).flatMap((c) => c.memberMasks);
+      expect(new Set(masks).size).toBe(masks.length);
+    }
+  });
+
+  it("Paul's example: a 4x4 with its 2nd row taken advises the 4-in-a-row rule", () => {
+    const advice = strategyAdvice(rowTaken, n);
+    expect(advice.join(" ")).toMatch(/any 4-in-a-row in ANY remaining shape/i);
+    expect(advice.join(" ")).toMatch(/middle of the 4×1/i);
+  });
+
+  it("a rule is never stated over a category containing a losing move", () => {
+    const memo = new Map<number, boolean>();
+    for (const b of [0, rowTaken, 1 << idx(n, 2, 1)]) {
+      const cls = moveClasses(b, n, memo);
+      // For every "anywhere in the <shape>" rule, all classes of that shape and
+      // length must win — that is precisely the promise the sentence makes.
+      for (const line of strategyAdvice(b, n, memo)) {
+        const m = line.match(/any (\d)-in-a-row|any single square/);
+        if (!m) continue;
+        const len = m[1] ? Number(m[1]) : 1;
+        const shapeMatch = line.match(/in the (.+?)\.$/);
+        const affected = cls.filter((c) => c.length === len && (!shapeMatch || shapeName(c.shape) === shapeMatch[1]));
+        expect(affected.every((c) => c.wins), line).toBe(true);
+      }
+    }
+  });
+
+  it("says nothing when there is nothing true to say", () => {
+    // A lost position yields no advice at all rather than a hopeful guess.
+    expect(winning(0, 4)).toBe(false);
+    expect(strategyAdvice(0, 4)).toEqual([]);
+  });
+
+  it("only describes position-in-shape for straight strips, where it is exact", () => {
+    for (const c of moveClasses(rowTaken, n)) {
+      const isStrip = c.shape.rows === 1 || c.shape.cols === 1;
+      if (!isStrip) expect(c.where, `${shapeName(c.shape)} should not be described in words`).toBeNull();
+    }
   });
 });

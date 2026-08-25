@@ -25,6 +25,7 @@ import {
   type Board, type MoveOption, type Shape,
   isFilled, distinctMoves, legalMoves, winning, emptyCount,
   isLegalSelection, MAX_RUN, groupedShapes, shapeName,
+  type MoveClass, moveClasses, strategyAdvice,
 } from "@/app/lib/games/nimb";
 
 type Player = 1 | 2;
@@ -110,6 +111,17 @@ export function NimbClient() {
     });
   }, [board, n, over]);
 
+  /** Play one representative of a class — every member has the same value, so
+   *  which one is arbitrary. */
+  const playClass = useCallback((c: MoveClass) => {
+    const m = c.example;
+    const label = `${m.length} ✕ in ${m.orientation === "row" ? "row" : "column"} ${m.line + 1}, from ${m.orientation === "row" ? "col" : "row"} ${m.start + 1}`;
+    setHistory((h) => [...h, { board, turn, label }]);
+    setBoard(board | m.mask);
+    setTurn(turn === 1 ? 2 : 1);
+    setSel([]); setHover(null); setSelKey(null);
+  }, [board, turn]);
+
   const playSelection = useCallback(() => {
     if (!selValid) return;
     const after = sel.reduce((b, i) => b | (1 << i), board);
@@ -126,6 +138,18 @@ export function NimbClient() {
 
   /** The independent regions of empty squares — each an independent game. */
   const shapes = useMemo(() => (started ? groupedShapes(board, n) : []), [started, board, n]);
+  /** Distinct IDEAS available, and the safe rules describing the winning ones. */
+  const classes = useMemo(() => (started && !over ? moveClasses(board, n) : []), [started, over, board, n]);
+  const advice = useMemo(() => (started && !over ? strategyAdvice(board, n) : []), [started, over, board, n]);
+
+  /** Highlight EVERY square a class could be played on — so "anywhere in the
+   *  4×1" can actually show the anywhere rather than assert it. */
+  const highlightClass = useCallback((c: MoveClass | null) => {
+    if (!c) { setHover(null); return; }
+    const cells = new Set<number>();
+    for (const m of c.memberMasks) for (let i = 0; i < n * n; i++) if (m & (1 << i)) cells.add(i);
+    setHover([...cells]);
+  }, [n]);
 
   if (!started) {
     return (
@@ -260,8 +284,55 @@ export function NimbClient() {
           )}
         </div>
 
-        {/* ── Remaining shapes + moves ──────────────────────────── */}
+        {/* ── Strategy, shapes + moves ──────────────────────────── */}
         <div className="space-y-4">
+        {!over && (
+          <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+            <h2 className="text-sm font-semibold text-gray-900">Strategy for Player {turn}</h2>
+            {advice.length > 0 ? (
+              <>
+                <ul className="mt-2 space-y-1">
+                  {advice.map((a, k) => (
+                    <li key={k} className="text-xs text-green-900 bg-green-50 border border-green-300 rounded px-2.5 py-1.5">{a}</li>
+                  ))}
+                </ul>
+                <p className="text-[11px] text-gray-500 mt-2">
+                  Each rule is stated only when EVERY move it covers wins — a memorable rule that
+                  loses games would be worse than a fussy one that does not.
+                </p>
+              </>
+            ) : (
+              <p className="mt-2 text-xs text-red-900 bg-red-50 border border-red-300 rounded px-2.5 py-1.5 font-semibold">
+                No winning move exists. You have already lost against perfect play.
+              </p>
+            )}
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mt-4 mb-1.5">
+              Distinct ideas ({classes.length})
+            </h3>
+            <ul className="flex flex-wrap gap-1.5">
+              {classes.map((c) => (
+                <li key={c.key}>
+                  <button
+                    onClick={() => playClass(c)}
+                    onMouseEnter={() => highlightClass(c)}
+                    onMouseLeave={() => highlightClass(null)}
+                    className={"flex items-center gap-2 px-2 py-1.5 rounded border text-[11px] transition-colors " +
+                      (c.wins ? "border-green-400 bg-green-50 hover:bg-green-100 text-green-900"
+                              : "border-red-300 bg-red-50 hover:bg-red-100 text-red-900")}
+                    title={`${c.count} placement${c.count === 1 ? "" : "s"} on the board — click to play one`}
+                  >
+                    <ClassGlyph c={c} />
+                    <span>
+                      <span className="font-medium">{c.length} in {shapeName(c.shape)}</span>
+                      {c.where && <span className="text-gray-600"> · {c.where}</span>}
+                      <span className="text-gray-400"> · ×{c.count}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {!over && (
           <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
             <h2 className="text-sm font-semibold text-gray-900">Remaining shapes</h2>
@@ -437,6 +508,22 @@ function ShapeGlyph({ shape }: { shape: Shape }) {
         const on = shape.cells.some(([a, b]) => a === r && b === c);
         return <span key={k} style={{ width: px, height: px }}
           className={on ? "bg-white border border-gray-400 rounded-[1px]" : ""} />;
+      })}
+    </span>
+  );
+}
+
+/** The shape with this move's squares filled in — the idea, drawn. */
+function ClassGlyph({ c }: { c: MoveClass }) {
+  const px = c.shape.rows > 4 || c.shape.cols > 4 ? 7 : 10;
+  return (
+    <span className="grid gap-px shrink-0" style={{ gridTemplateColumns: `repeat(${c.shape.cols}, ${px}px)` }}>
+      {Array.from({ length: c.shape.rows * c.shape.cols }, (_, k) => {
+        const r = Math.floor(k / c.shape.cols), col = k % c.shape.cols;
+        const inShape = c.shape.cells.some(([a, b]) => a === r && b === col);
+        const inRun = c.cellsInShape.some(([a, b]) => a === r && b === col);
+        return <span key={k} style={{ width: px, height: px }}
+          className={inRun ? "bg-current rounded-[1px]" : inShape ? "bg-white border border-gray-400 rounded-[1px]" : ""} />;
       })}
     </span>
   );
