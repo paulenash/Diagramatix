@@ -49,6 +49,7 @@ next-env.d.ts
 # tool consumes and which is verified secret-free.
 /new features/*
 !/new features/Process Repository Final.md
+!/new features/Process Repository v2 — Plan.md
 
 # Playwright e2e artifacts
 /test-results/

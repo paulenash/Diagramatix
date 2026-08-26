@@ -15,6 +15,22 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.2.2331 — 2026-08-26 — The Process Repository v2 plan joins the repo
+
+`new features/Process Repository v2 — Plan.md` is now tracked. It sat outside the
+repo because `/new features/*` is gitignored with a single allow-listed
+exception; there are now two, so the file stays tracked without needing `-f`
+again.
+
+Its status block said "plan only — nothing built", which stopped being true when
+Part 2 shipped this morning. Replaced with a per-part table that says what is in
+the repo and what is not, plus a note recording what Part 2 actually built and the
+two places it departed from the plan (no legacy-signature detection, because the
+categories are new; and the built-in registry as its own module, because the
+hardcoding being removed lived in two places rather than one).
+
+---
+
 ## 2.2.2330 — 2026-08-26 — The Process Repository prompts become editable
 
 **The problem this closes.** The Process Repository document holds **140 diagram
