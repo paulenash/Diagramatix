@@ -15,6 +15,64 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.2.2330 — 2026-08-26 — The Process Repository prompts become editable
+
+**The problem this closes.** The Process Repository document holds **140 diagram
+prompts** — 104 BPMN plus 9 each of Value Chain, Context, Process Context and
+ArchiMate — and every one was hand-authored in conversation. There was no script
+and no master prompt behind them: the structure is consistent because one author
+held it in their head. The app only ever CONSUMED them. So nobody could change
+how prompts are written, and nobody could audit why they are written that way.
+
+**Five master templates, extracted from the prompts that work.** Not invented —
+each codifies the shape the existing blocks already follow, including the
+canonical BPMN six-section order (Pools & Lanes → Pool properties → Layout → Lane
+contents in flow order → Edge-mounted events → Connectors), which is deliberate:
+pools before anything can be placed in them, properties before layout because
+black-box pools have no contents to lay out, and connectors last because every
+connector names elements the earlier sections introduced.
+
+Each template is a **read-only built-in in code plus editable additions stored as
+a `DiagramRules` row** — the Staff Narrative pattern. The two halves have
+different lifetimes: the built-in is a house standard that should improve for
+everyone on a deploy, the additions are one organisation's conventions that must
+survive every deploy untouched. Editable in the Rules editor under five new
+"Repository Prompt — …" categories.
+
+That editor arrangement was hardcoded to `category === "staff-narrative"` in two
+places — the API that decorates a row and the render site that picks a component
+— so a sixth built-in category meant editing both and finding out at runtime if
+you missed one. Both now ask a registry.
+
+**A generator, at `/dashboard/admin/md-prompts`.** Upload the `.md`, pick a chain
+and the diagram types, and the finished blocks come back ready to paste. It is
+the other end of "Create Project Diagrams from .md": that tool consumes the
+blocks, this one writes them, so the loop closes — template → generator → `.md` →
+`parseValueChainMd` → batch tool → diagrams.
+
+**Two details that decide whether it actually works.**
+
+The model never sees the existing prompts. `chainNarrative` strips them, which
+matters more than it sounds: leave them in and the model copies the nearest one
+almost verbatim, so a template change appears to do nothing while the generator
+launders its input and looks successful. On the real document a chain section is
+41–57 KB of which only 6–7 KB is narrative — 85% of what would otherwise be sent
+is prompts.
+
+And **every generated block is parsed straight back with `parseValueChainMd`**,
+the batch runner's own reader, before it is shown. The results table has a
+"Parses" column for exactly this. A prompt that reads beautifully but the batch
+tool cannot find is worse than no prompt, because the failure would otherwise
+surface only when someone asked for 140 diagrams.
+
+**Verified end to end against the live model**, not just in unit tests: generating
+V01.03 with the built-in alone names an IT pool `"ERP / Credit System"`; adding
+one house rule about naming systems product-then-vendor renames it
+`"ERP / Credit System (SAP)"`. The editable half demonstrably reaches the output.
+All generated blocks parsed back.
+
+---
+
 ## 2.2.2329 — 2026-08-26 — Mastermind, played as information rather than guesswork
 
 A new SuperAdmin tile. The code setter configures **6–10 colours** and a **3–6 peg**

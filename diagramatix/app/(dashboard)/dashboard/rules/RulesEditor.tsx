@@ -42,9 +42,18 @@ const CATEGORY_LABELS: Record<string, string> = {
   // aliases / phrasing hints that reach the AI command fallback, plus RED
   // code-enforced container naming & sizing invariants (reference only).
   assist: "Assist / Voice Commands",
+  // The five "md-prompt-*" categories hold the house conventions layered on top
+  // of the built-in master templates that write the diagram prompts inside a
+  // Process Repository .md. Editing one changes how every prompt of that type is
+  // generated from then on — see app/lib/valueChain/promptTemplates.ts.
+  "md-prompt-bpmn": "Repository Prompt — BPMN",
+  "md-prompt-value-chain": "Repository Prompt — Value Chain",
+  "md-prompt-context": "Repository Prompt — Context",
+  "md-prompt-process-context": "Repository Prompt — Process Context",
+  "md-prompt-archimate": "Repository Prompt — ArchiMate",
 };
 
-const CATEGORY_ORDER = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "staff-narrative", "assist"];
+const CATEGORY_ORDER = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "staff-narrative", "assist", "md-prompt-bpmn", "md-prompt-value-chain", "md-prompt-context", "md-prompt-process-context", "md-prompt-archimate"];
 
 interface ClassifiedLine {
   index: number;       // original line index
@@ -306,6 +315,10 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
   const [loading, setLoading] = useState(true);
   const [showPreview, setShowPreview] = useState(true);
   const [deleteRuleConfirm, setDeleteRuleConfirm] = useState<{ lineIndex: number; ruleId: string } | null>(null);
+  /** The read-only house standard for this category, when it has one. Non-null
+   *  turns this whole screen into the built-in + additions editor; the API
+   *  decides which categories those are, so nothing here names them. */
+  const activeBuiltin = ruleSets.find(r => r.category === activeCategory)?.builtin || null;
   const [resetConfirm, setResetConfirm] = useState(false);
   // Pending save that would remove one or more code-backed (red) rules
   // via a raw textarea edit — held until the admin confirms.
@@ -367,10 +380,10 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
   }
 
   async function handleSave() {
-    // Staff Narrative is freeform prose, not numbered rules — its row holds
-    // only the green "Additional Rules" (the red built-in lives in code). Save
-    // the textarea verbatim, skipping the numbering / red-rule guard.
-    if (activeCategory === "staff-narrative") {
+    // A built-in-backed category is freeform prose, not numbered rules — its row
+    // holds only the green "Additional Rules" (the red built-in lives in code).
+    // Save the textarea verbatim, skipping the numbering / red-rule guard.
+    if (activeBuiltin) {
       await persistText(editText, "Additional rules saved");
       return;
     }
@@ -558,7 +571,7 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
               <h2 className="text-sm font-semibold text-gray-900">
                 {CATEGORY_LABELS[activeCategory] ?? activeCategory} Rules
               </h2>
-              {activeCategory === "staff-narrative" ? (
+              {activeBuiltin ? (
                 <p className="text-[10px] text-gray-400">
                   <span className="text-red-500">Built-in</span> (read-only) + your{" "}
                   <span className="text-green-600">Additional Rules</span>
@@ -605,15 +618,15 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
             </div>
           </div>
 
-          {activeCategory === "staff-narrative" && (
-            <StaffNarrativeEditor
-              builtin={ruleSets.find(r => r.category === "staff-narrative")?.builtin ?? ""}
+          {activeBuiltin && (
+            <BuiltinPlusAdditionsEditor
+              builtin={activeBuiltin}
               value={editText}
               onChange={setEditText}
             />
           )}
 
-          {activeCategory !== "staff-narrative" && (
+          {!activeBuiltin && (
           <div className={`flex-1 flex ${showPreview ? "gap-3" : ""}`}>
             {/* Textarea editor */}
             <textarea
@@ -716,11 +729,11 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
             </p>
           )}
 
-          {activeCategory === "staff-narrative" ? (
+          {activeBuiltin ? (
             <p className="mt-2 text-[10px] text-gray-400">
               The <span className="text-red-600">Built-in Rules</span> are the core briefing, managed in code and
-              always applied. Your <span className="text-green-600">Additional Rules</span> are appended to it when a
-              Staff Narrative is generated — use them for house style, naming, or tone.
+              always applied. Your <span className="text-green-600">Additional Rules</span> are appended to it at
+              generation time — use them for house style, naming, or tone.
             </p>
           ) : (
             <p className="mt-2 text-[10px] text-gray-400">
@@ -775,10 +788,14 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-/** Staff Narrative briefing editor: a read-only RED "Built-in Rules" panel (the
- *  core briefing, managed in code) above a GREEN editable "Additional Rules"
- *  textarea (house style, appended to the briefing at generation time). */
-function StaffNarrativeEditor({ builtin, value, onChange }: {
+/** Editor for any briefing split into halves: a read-only RED "Built-in Rules"
+ *  panel (the core briefing, managed in code) above a GREEN editable "Additional
+ *  Rules" textarea (house style, appended at generation time).
+ *
+ *  Used by Staff Narrative and by the five Process Repository prompt templates.
+ *  Which categories get it is decided by the row carrying a `builtin`, not by a
+ *  name checked here — see app/lib/ai/builtinRuleCategories.ts. */
+function BuiltinPlusAdditionsEditor({ builtin, value, onChange }: {
   builtin: string; value: string; onChange: (v: string) => void;
 }) {
   return (

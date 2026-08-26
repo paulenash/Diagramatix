@@ -2,18 +2,22 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
-import { DEFAULT_STAFF_NARRATIVE_BRIEFING, extractAdditionalRules } from "@/app/lib/ai/staffNarrative";
+import { builtinFor } from "@/app/lib/ai/builtinRuleCategories";
+import { MD_PROMPT_CATEGORIES } from "@/app/lib/valueChain/promptTemplates";
 
-/** The Staff Narrative briefing is split into a read-only built-in (managed in
- *  code) and the editable "Additional Rules" stored in the row. Decorate that
- *  category's payload so the editor can show both; for every other category the
- *  row is returned unchanged (builtin = null). */
+/** Some briefings are split into a read-only built-in (managed in code, so it
+ *  improves for everyone on a deploy) and the editable additions stored in the
+ *  row. Decorate those categories so the editor can show both; every other
+ *  category is returned unchanged (builtin = null).
+ *
+ *  Which categories those are lives in `builtinRuleCategories` rather than here:
+ *  this was hardcoded to "staff-narrative" in this function AND at the editor's
+ *  render site, so a sixth built-in category meant editing both and finding out
+ *  at runtime if you missed one. */
 type RuleRow = { id: string | null; category: string; rules: string; isDefault: boolean; updatedAt?: Date };
 function decorate(row: RuleRow): RuleRow & { builtin: string | null } {
-  if (row.category === "staff-narrative") {
-    return { ...row, rules: extractAdditionalRules(row.rules), builtin: DEFAULT_STAFF_NARRATIVE_BRIEFING };
-  }
-  return { ...row, builtin: null };
+  const b = builtinFor(row.category);
+  return b ? { ...row, rules: b.extractAdditions(row.rules), builtin: b.builtin } : { ...row, builtin: null };
 }
 
 /** GET /api/bpmn-rules?category=bpmn — return default rules for a category */
@@ -40,7 +44,7 @@ export async function POST(req: Request) {
 
   // Action: "list" — return all categories with default rules
   if (action === "list") {
-    const categories = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "staff-narrative"];
+    const categories = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "staff-narrative", ...MD_PROMPT_CATEGORIES];
     const result = [];
 
     for (const cat of categories) {
