@@ -15,6 +15,38 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.2.2327 — 2026-08-26 — Nimb: a catalogue of the shapes worth handing over
+
+**Shape enquiry.** Pick a number of squares and see every distinct form that many
+empty squares can take on the current board, coloured by what happens to the
+player who faces it **alone**: green they win, red they lose. Rotations,
+reflections and translations are collapsed, so one drawing stands for every way a
+form can sit.
+
+The red ones come first, because they are the point: a shape that loses for
+whoever faces it is a shape you want to **hand over**. They are also the rare
+ones — on a 5 × 5 at 16 squares, 2,244 forms out of 48,353 — and at 3, 5 and 7
+squares there are none at all.
+
+**Every connected form counts, and that turned out to be provable rather than
+searched for.** A single square is always a legal move, so a player can fill the
+board one square at a time; every subset of the board is therefore reachable, and
+every connected region of empty squares is a shape the game can actually produce.
+The previous implementation established this by searching all reachable positions
+breadth-first — work that could only ever return everything.
+
+Two measurements shape the rest. Verdicts are read off the solved table (fill in
+every square except the shape, ask who wins) rather than run through the shape
+solver, which is what makes 48,353 forms possible at all; `T2884` checks the two
+against each other on **every one of the 1,280 forms that fit a 4 × 4**. And the
+cap is on DRAWING, never on counting: the totals are exact, and the panel says how
+many it left undrawn.
+
+Worst case on 5 × 5 is ~580 ms, at 16 squares — under 100 ms up to 10 squares, and
+nothing at all on a repeat.
+
+---
+
 ## 2.2.2326 — 2026-08-26 — Nimb solves 5×5, and a move may take a whole line
 
 **The move cap now scales with the board.** "1–4 ✕" was the rule as first written;

@@ -16,6 +16,11 @@
  * way. That second ply is where the game explains itself: a winning move is
  * exactly one whose replies are *all* red.
  *
+ * Below all of that, a SHAPE ENQUIRY: pick a number of squares and see every
+ * distinct form that many empty squares can take on this board, red where the
+ * player facing it alone loses. Those are the shapes worth handing over, and
+ * they are the rare ones.
+ *
  * 5 × 5 is solved in timed slices (33.5M positions, ~3s) and every board below
  * it in one go; `useNimbOracle` hides which, so nothing here knows the
  * difference beyond showing a progress bar while a big board is still solving.
@@ -24,13 +29,14 @@
  * `app/lib/games/nimb.ts`; this file is interaction and presentation only.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   type Board, type MoveOption, type Shape,
   isFilled, distinctMoves, legalMoves, emptyCount,
   isLegalSelection, maxRun, groupedShapes, shapeName,
   type MoveClass, moveClasses, strategyAdvice, MAX_SOLVE_N,
+  type Oracle, type ShapeCatalogue, shapeCatalogue,
 } from "@/app/lib/games/nimb";
 import { useNimbOracle, INLINE_SOLVE_N } from "@/app/lib/games/useNimbOracle";
 
@@ -460,6 +466,10 @@ export function NimbClient() {
           )}
           <Rules className="mt-4" />
         </section>
+
+        <div className="lg:col-span-3">
+          <ShapeEnquiry n={n} oracle={oracle} />
+        </div>
       </main>
     </div>
   );
@@ -492,6 +502,136 @@ function Solving({ n, progress, solving }: { n: number; progress: number; solvin
       <p className="text-[11px] text-gray-500 mt-1.5">
         {pct}% · run in slices, so the page keeps responding. The board is playable now.
       </p>
+    </div>
+  );
+}
+
+/**
+ * Shape enquiry — the catalogue of what a size of leftover region is worth.
+ *
+ * Pick a number of squares and see every distinct form that many empty squares
+ * can take on this board, coloured by what happens to whoever FACES it alone:
+ * green they win, red they lose. Rotations, reflections and translations are all
+ * collapsed, so each drawing stands for every way that form can sit.
+ *
+ * THE RED ONES COME FIRST, and are the reason the section exists. A shape that
+ * loses for the player facing it is a shape you want to HAND OVER — that is a
+ * won game. They are also far rarer: on a 5 × 5, 2,244 forms of 48,353 at 16
+ * squares, and at 3, 5 and 7 squares there are none at all, which is itself
+ * worth knowing.
+ *
+ * Big sizes run to tens of thousands of forms. Every one is counted and judged;
+ * only the first ${CATALOGUE_CAP} of each colour are drawn, and the panel says
+ * how many it left out rather than quietly showing a partial list.
+ */
+const CATALOGUE_CAP = 120;
+
+function ShapeEnquiry({ n, oracle }: { n: number; oracle: Oracle | null }) {
+  const N = n * n;
+  const [size, setSize] = useState(4);
+  const [cat, setCat] = useState<ShapeCatalogue | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // Clamp when the board shrinks under a selection made on a bigger one.
+  useEffect(() => { setSize((s) => Math.min(s, N)); }, [N]);
+
+  // A big catalogue takes up to ~0.6s to build. Painting "working…" first and
+  // computing on the next tick costs nothing and is the difference between a
+  // considered pause and a page that appears to have died.
+  useEffect(() => {
+    if (!oracle) { setCat(null); return; }
+    setBusy(true);
+    let live = true;
+    const t = window.setTimeout(() => {
+      const built = shapeCatalogue(n, size, oracle, CATALOGUE_CAP);
+      if (!live) return;
+      setCat(built);
+      setBusy(false);
+    }, 0);
+    return () => { live = false; window.clearTimeout(t); };
+  }, [n, size, oracle]);
+
+  return (
+    <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+      <h2 className="text-sm font-semibold text-gray-900">Shape enquiry</h2>
+      <p className="text-[11px] text-gray-500 mt-1 mb-3">
+        Every distinct form a region of empty squares can take on this {n}×{n} board,
+        coloured by what happens to the player who faces it <em>on its own</em>:
+        <span className="text-green-700 font-medium"> green they win</span>,
+        <span className="text-red-700 font-medium"> red they lose</span>. Rotations,
+        reflections and translations are collapsed — one drawing per form.
+      </p>
+
+      <div className="flex flex-wrap items-center gap-1 mb-3">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mr-1">Squares</span>
+        {Array.from({ length: N }, (_, k) => k + 1).map((k) => (
+          <button key={k} onClick={() => setSize(k)}
+            className={"w-7 h-7 rounded border text-[11px] font-medium transition-colors " +
+              (k === size ? "bg-blue-600 border-blue-600 text-white"
+                          : "bg-white border-gray-300 text-gray-700 hover:border-blue-400")}>
+            {k}
+          </button>
+        ))}
+      </div>
+
+      {!oracle ? (
+        <p className="text-xs text-gray-500">Waiting for the board to be solved.</p>
+      ) : busy || !cat ? (
+        <p className="text-xs text-gray-500">Working out every form of {size} square{size === 1 ? "" : "s"}…</p>
+      ) : (
+        <>
+          <p className="text-xs text-gray-800 mb-3">
+            <strong>{cat.total.toLocaleString()}</strong> distinct form{cat.total === 1 ? "" : "s"} of {size} square{size === 1 ? "" : "s"} —{" "}
+            <span className="text-red-700 font-semibold">{cat.losing.toLocaleString()} lose</span> for whoever faces them,{" "}
+            <span className="text-green-700 font-semibold">{cat.winning.toLocaleString()} win</span>.
+          </p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ShapeGallery
+              title={`Hand these over — the player facing them loses (${cat.losing.toLocaleString()})`}
+              tone="lose" shapes={cat.losingShapes} omitted={cat.losingOmitted}
+              empty={`None. Every form of ${size} square${size === 1 ? "" : "s"} is a win for whoever faces it.`}
+            />
+            <ShapeGallery
+              title={`The player facing them wins (${cat.winning.toLocaleString()})`}
+              tone="win" shapes={cat.winningShapes} omitted={cat.winningOmitted}
+              empty={`None. Every form of ${size} square${size === 1 ? "" : "s"} loses for whoever faces it.`}
+            />
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** One coloured wall of shapes, with an honest count of what is not drawn. */
+function ShapeGallery({ title, tone, shapes, omitted, empty }: {
+  title: string; tone: "win" | "lose"; shapes: Shape[]; omitted: number; empty: string;
+}) {
+  const head = tone === "win" ? "text-green-700" : "text-red-700";
+  const box = tone === "win" ? "border-green-400 bg-green-50" : "border-red-300 bg-red-50";
+  return (
+    <div>
+      <h3 className={`text-[11px] font-semibold uppercase tracking-wide mb-1.5 ${head}`}>{title}</h3>
+      {shapes.length === 0 ? (
+        <p className="text-[11px] text-gray-500 italic">{empty}</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1.5">
+            {shapes.map((sh) => (
+              <span key={sh.key} title={`${shapeName(sh)} · ${sh.size} squares`}
+                className={`inline-flex items-center justify-center p-1.5 rounded border ${box}`}>
+                <ShapeGlyph shape={sh} />
+              </span>
+            ))}
+          </div>
+          {omitted > 0 && (
+            <p className="text-[11px] text-gray-500 mt-2">
+              Showing {shapes.length} of {(shapes.length + omitted).toLocaleString()} — the simplest first.
+              The counts above are exact; the rest are just not drawn.
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

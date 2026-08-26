@@ -553,35 +553,192 @@ export function shapeWins(key: string, cap: number, memo = new Map<string, boole
   return outcomeOfShapes([key], cap, memo);
 }
 
+// ── The shape catalogue ───────────────────────────────────────────────────
 /**
- * Every shape that can actually arise on an n × n board, with its solo verdict.
+ * Canonical form of a placed shape, as an integer.
  *
- * Reachability matters: not every polyomino of a given size can appear as a
- * leftover region — it has to be what remains after some sequence of legal
- * moves. Enumerating free polyominoes instead would list shapes this game never
- * produces (and at 16 squares there are 13,079,255 of them, so the distinction
- * is the difference between a usable catalogue and none).
+ * The same job as `canonicalShape`, done in bit arithmetic and returning a
+ * number rather than a string. It exists because the catalogue below deduplicates
+ * up to 390,000 placements at a time, where building an array of coordinate
+ * pairs and joining it into a key for each one costs about ten times as much.
+ * The string form is still what a `Shape` carries; this is only the sieve.
  *
- * Translations, rotations and reflections are all collapsed by `canonicalShape`,
- * so each entry stands for every way that form can sit on the board.
+ * Minimum over the eight symmetries of the square (four rotations × a
+ * reflection), each normalised to the top-left corner so translation drops out.
  */
-export function possibleShapes(n: number): { shape: Shape; wins: boolean }[] {
-  // Reachable positions, breadth-first from the empty board.
-  const seen = new Set<Board>([0]);
-  const queue: Board[] = [0];
-  const byKey = new Map<string, Shape>();
-  while (queue.length) {
-    const b = queue.shift()!;
-    for (const s of shapesOf(b, n)) if (!byKey.has(s.key)) byKey.set(s.key, s);
-    for (const m of legalMoves(b, n)) {
-      const next = b | m.mask;
-      if (!seen.has(next)) { seen.add(next); queue.push(next); }
+export function canonicalMask(mask: Board, n: number): number {
+  let best = Infinity;
+  const cells: number[] = [];
+  for (let i = 0; i < n * n; i++) if (mask & (1 << i)) cells.push(i);
+  for (let v = 0; v < 8; v++) {
+    let minR = n, minC = n;
+    const pts: number[] = [];
+    for (const i of cells) {
+      let a = (i / n) | 0, b = i % n;
+      if (v & 4) { const t = a; a = b; b = t; }   // transpose
+      if (v & 1) a = n - 1 - a;                   // flip rows
+      if (v & 2) b = n - 1 - b;                   // flip columns
+      if (a < minR) minR = a;
+      if (b < minC) minC = b;
+      pts.push(a * n + b);
     }
+    let m = 0;
+    for (const p of pts) m |= 1 << (((p / n | 0) - minR) * n + (p % n - minC));
+    if (m < best) best = m;
   }
-  const memo = new Map<string, boolean>();
-  return [...byKey.values()]
-    .map((shape) => ({ shape, wins: shapeWins(shape.key, maxRun(n), memo) }))
-    .sort((a, z) => a.shape.size - z.shape.size || a.shape.key.localeCompare(z.shape.key));
+  return best;
+}
+
+/**
+ * Every connected placement of `size` squares on an n × n board, by size.
+ *
+ * Grown one square at a time from single cells, keeping PLACED masks rather than
+ * canonical forms — growth needs to know where a shape sits in order to know
+ * which squares it can grow into. Levels are cached, so asking for size 12 after
+ * size 11 costs one step rather than eleven.
+ */
+const levelCache = new Map<number, Map<number, Set<Board>>>();
+
+function placementsOfSize(n: number, size: number): Set<Board> {
+  const byN = levelCache.get(n) ?? levelCache.set(n, new Map()).get(n)!;
+  const hit = byN.get(size);
+  if (hit) return hit;
+  const N = n * n;
+  const nbr = new Int32Array(N);
+  for (let i = 0; i < N; i++) {
+    const r = (i / n) | 0, c = i % n;
+    let m = 0;
+    if (r > 0) m |= 1 << (i - n);
+    if (r < n - 1) m |= 1 << (i + n);
+    if (c > 0) m |= 1 << (i - 1);
+    if (c < n - 1) m |= 1 << (i + 1);
+    nbr[i] = m;
+  }
+  let level = byN.get(1);
+  if (!level) {
+    level = new Set<Board>();
+    for (let i = 0; i < N; i++) level.add(1 << i);
+    byN.set(1, level);
+  }
+  let have = 1;
+  for (const k of byN.keys()) if (k <= size && k > have) have = k;
+  level = byN.get(have)!;
+  for (let step = have + 1; step <= size; step++) {
+    const next = new Set<Board>();
+    for (const mask of level) {
+      let frontier = 0;
+      for (let i = 0; i < N; i++) if (mask & (1 << i)) frontier |= nbr[i];
+      frontier &= ~mask;
+      let f = frontier;
+      while (f) { const b = f & -f; next.add(mask | b); f ^= b; }
+    }
+    byN.set(step, next);
+    level = next;
+  }
+  return level;
+}
+
+/**
+ * Every distinct shape of `size` squares that can be left on an n × n board,
+ * counted by verdict, with a capped sample of each drawn.
+ *
+ * WHY EVERY CONNECTED FORM COUNTS. A single square is always a legal move, so a
+ * player can fill the board one square at a time — which means EVERY subset of
+ * the board is reachable, and therefore every connected region of empty squares
+ * is a shape this game can actually produce. (An earlier version searched the
+ * reachable positions breadth-first to establish this. The search always returned
+ * everything, because it had to.)
+ *
+ * THE VERDICT comes from the oracle, not from the shape solver: fill in every
+ * square except this shape and ask who wins that position. Same question, one
+ * array lookup — which is what makes a catalogue of 48,353 forms possible at all.
+ * `T2884` pins the two against each other.
+ *
+ * THE CAP is on DRAWING, not on counting. Every form of the requested size is
+ * enumerated and judged; only `cap` of each verdict are turned into a `Shape`,
+ * because building the rest would triple the cost to produce a wall of glyphs
+ * nobody can read. The counts are exact and the omitted totals are reported, so
+ * the panel never implies it is showing everything.
+ *
+ * Losing forms come first throughout: those are the ones worth knowing, since a
+ * shape you can HAND your opponent is a won game — and there are far fewer of
+ * them (on 5 × 5, 2,244 of 48,353 at 16 squares).
+ *
+ * Cost, measured on 5 × 5: under 100 ms up to 10 squares, ~580 ms at the worst
+ * size (16 squares, 392,525 placements collapsing to 48,353 forms), and nothing
+ * at all on a repeat — the growth levels and the finished catalogue are both
+ * cached.
+ */
+export interface ShapeCatalogue {
+  size: number;
+  /** Exact counts over ALL forms of this size, whatever was drawn. */
+  total: number;
+  winning: number;
+  losing: number;
+  /** Drawn samples, simplest first. */
+  losingShapes: Shape[];
+  winningShapes: Shape[];
+  /** How many of each were left undrawn by the cap. */
+  losingOmitted: number;
+  winningOmitted: number;
+}
+
+const catalogueCache = new Map<string, ShapeCatalogue>();
+
+export function shapeCatalogue(n: number, size: number, oracle: Oracle, cap = 120): ShapeCatalogue {
+  const ck = `${n}:${size}:${cap}`;
+  const hit = catalogueCache.get(ck);
+  if (hit) return hit;
+  const empty: ShapeCatalogue = {
+    size, total: 0, winning: 0, losing: 0,
+    losingShapes: [], winningShapes: [], losingOmitted: 0, winningOmitted: 0,
+  };
+  if (size < 1 || size > n * n) return empty;
+
+  const full = fullBoard(n);
+  const reps = new Map<number, Board>();
+  for (const mask of placementsOfSize(n, size)) {
+    const c = canonicalMask(mask, n);
+    if (!reps.has(c)) reps.set(c, mask);
+  }
+
+  /** A form, with its sort keys worked out ONCE. Sorting 48,000 entries with a
+   *  comparator that recomputed the canonical form would dominate the whole
+   *  catalogue — measured at roughly twice everything else put together. */
+  interface Form { mask: Board; canon: number; area: number }
+  const won: Form[] = [], lost: Form[] = [];
+  for (const [canon, mask] of reps) {
+    const box = boxOf(canon, n);
+    const form: Form = { mask, canon, area: box.rows * box.cols };
+    // The board on which THIS shape is the only empty region.
+    (oracle.wins(full & ~mask) ? won : lost).push(form);
+  }
+  // Simplest first: tightest bounding box, then by canonical form so the order
+  // is stable rather than dependent on enumeration order.
+  const simplest = (a: Form, z: Form) => a.area - z.area || a.canon - z.canon;
+  won.sort(simplest); lost.sort(simplest);
+  const draw = (forms: Form[]) => forms.slice(0, cap).map((f) => shapesOf(full & ~f.mask, n)[0]);
+
+  const out: ShapeCatalogue = {
+    size, total: reps.size, winning: won.length, losing: lost.length,
+    losingShapes: draw(lost), winningShapes: draw(won),
+    losingOmitted: Math.max(0, lost.length - cap),
+    winningOmitted: Math.max(0, won.length - cap),
+  };
+  catalogueCache.set(ck, out);
+  return out;
+}
+
+/** Bounding box of a placed mask — used only to sort compact forms first. */
+function boxOf(mask: Board, n: number): { rows: number; cols: number } {
+  let minR = n, maxR = -1, minC = n, maxC = -1;
+  for (let i = 0; i < n * n; i++) {
+    if (!(mask & (1 << i))) continue;
+    const r = (i / n) | 0, c = i % n;
+    if (r < minR) minR = r; if (r > maxR) maxR = r;
+    if (c < minC) minC = c; if (c > maxC) maxC = c;
+  }
+  return { rows: maxR - minR + 1, cols: maxC - minC + 1 };
 }
 
 // ── Move classes: the same idea, wherever it is played ────────────────────

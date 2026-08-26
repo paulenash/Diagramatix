@@ -5,6 +5,7 @@ import {
   distinctMoves, canonicalBoard, symmetries, transform,
   shapesOf, groupedShapes, shapeName, canonicalShape,
   moveClasses, strategyAdvice, memoOracle, buildSolveTable, tableOracle,
+  shapeCatalogue, shapeWins, canonicalMask,
 } from "@/app/lib/games/nimb";
 
 /**
@@ -463,5 +464,81 @@ describe("Nimb — 5×5", () => {
     // third winning opening with it.
     expect(maxRun(n)).toBe(n);
     expect(legalMoves(0, n).filter((m) => m.length === n)).toHaveLength(2 * n);
+  });
+});
+
+/**
+ * T2884 — the shape catalogue, and the two solvers behind it agreeing.
+ *
+ * The catalogue reads a shape's verdict off the solved table: fill in every
+ * square except the shape and ask who wins that position. The shape solver
+ * (`shapeWins`) answers the same question by decomposing and searching. They are
+ * genuinely independent routes to the same number, so they are checked against
+ * each other — that check is the whole warrant for using the fast one.
+ *
+ * The other thing pinned here is the counting: the totals must be exact even
+ * when the drawing is capped, because a panel that quietly showed 120 of 2,244
+ * and reported 120 would read as a complete catalogue.
+ */
+describe("Nimb — the shape catalogue", () => {
+  const n = 4;
+  const oracle = tableOracle(buildSolveTable(n));
+
+  it("agrees with the shape solver on every form it draws", () => {
+    const memo = new Map<string, boolean>();
+    let checked = 0;
+    for (let size = 1; size <= n * n; size++) {
+      // Cap lifted: every form is checked, not just the ones a panel would draw.
+      const cat = shapeCatalogue(n, size, oracle, 10_000);
+      for (const s of cat.winningShapes) { expect(shapeWins(s.key, maxRun(n), memo), s.key).toBe(true); checked++; }
+      for (const s of cat.losingShapes) { expect(shapeWins(s.key, maxRun(n), memo), s.key).toBe(false); checked++; }
+    }
+    // 1,280 is every distinct form that fits on a 4 × 4 board, at any size.
+    expect(checked, "every form of every size must have been checked").toBe(1280);
+  });
+
+  it("counts every form of a size, and each form only once", () => {
+    // 4×4 by size: the free polyominoes that fit in a 4×4 box. 1,1,2,5,... is the
+    // start of the polyomino sequence itself, which is the check that translation,
+    // rotation and reflection are all being collapsed.
+    const counts = Array.from({ length: n * n }, (_, k) => shapeCatalogue(n, k + 1, oracle).total);
+    expect(counts).toEqual([1, 1, 2, 5, 11, 29, 66, 140, 224, 287, 255, 169, 66, 20, 3, 1]);
+    for (let size = 1; size <= n * n; size++) {
+      const cat = shapeCatalogue(n, size, oracle);
+      expect(cat.winning + cat.losing, `size ${size}`).toBe(cat.total);
+      const keys = [...cat.winningShapes, ...cat.losingShapes].map((s) => s.key);
+      expect(new Set(keys).size, `size ${size}: no form drawn twice`).toBe(keys.length);
+      for (const s of [...cat.winningShapes, ...cat.losingShapes]) expect(s.size).toBe(size);
+    }
+  });
+
+  it("caps the drawing, never the counting", () => {
+    const cat = shapeCatalogue(n, 10, oracle, 4);
+    expect(cat.total).toBe(287);
+    expect(cat.losing).toBe(38);
+    expect(cat.losingShapes).toHaveLength(4);
+    expect(cat.losingOmitted).toBe(34);
+    expect(cat.winningShapes).toHaveLength(4);
+    expect(cat.winningOmitted).toBe(cat.winning - 4);
+  });
+
+  it("a single square loses and a domino wins — the two ends of the catalogue", () => {
+    // Facing one empty square you must take it, and taking the last ✕ loses.
+    // Facing two you take one and hand the loss back.
+    expect(shapeCatalogue(n, 1, oracle).losing).toBe(1);
+    expect(shapeCatalogue(n, 2, oracle).winning).toBe(1);
+  });
+
+  it("canonicalMask collapses exactly the eight symmetries and nothing else", () => {
+    // An L-tromino in all four corners of the board is one form; an L and an
+    // I-tromino are two.
+    const cells = (...cs: [number, number][]) => cs.reduce((m, [r, c]) => m | (1 << idx(n, r, c)), 0);
+    const cornerL = cells([0, 0], [0, 1], [1, 0]);
+    const otherL = cells([3, 3], [3, 2], [2, 3]);
+    const bar = cells([0, 0], [0, 1], [0, 2]);
+    expect(canonicalMask(cornerL, n)).toBe(canonicalMask(otherL, n));
+    expect(canonicalMask(bar, n)).not.toBe(canonicalMask(cornerL, n));
+    // Sliding a form around the board never changes its canonical value.
+    expect(canonicalMask(bar, n)).toBe(canonicalMask(cells([2, 1], [2, 2], [2, 3]), n));
   });
 });
