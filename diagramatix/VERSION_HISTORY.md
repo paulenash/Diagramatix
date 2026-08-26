@@ -15,6 +15,51 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.2.2329 — 2026-08-26 — Mastermind, played as information rather than guesswork
+
+A new SuperAdmin tile. The code setter configures **6–10 colours** and a **3–6 peg**
+hidden code (repeats allowed) and then either holds the code, hands it to the
+tile, or answers from outside while you type the pegs in. The breaker plays it —
+and sees, at every turn, the two things nobody can work out in their head.
+
+**What this guess is worth.** Every guess sorts the codes still standing into
+buckets, one per peg answer it could draw; the setter's answer says which bucket
+the code is in. Shannon's entropy over those bucket sizes is the expected number
+of **bits** that answer will hand over. The panel shows the number, the split it
+comes from as a bar per answer, the expected and worst-case field left, and
+whether the guess could simply win outright. Beside it, the sharpest questions
+available, ranked.
+
+**What is left.** Not a list — there may be 300,000 — but a picture: how many
+codes survive, how many bits that still is, and a position × colour grid showing
+where the survivors agree. A column collapsed to one colour is a peg already
+settled even though no black peg ever said so.
+
+Each played row then compares the bits the guess **promised** against the bits the
+answer **delivered**. They differ every turn, because entropy is an average over
+answers you did not get, and watching them differ is the clearest way to see what
+the number means.
+
+**Two results the engine reproduces rather than asserts**, both on the classic
+6 × 4 game and both checked in `T2889`: Knuth's minimax opening is two pairs, with
+a worst answer leaving 256 codes; the maximum-**entropy** opening is four
+different colours, at 3.0567 bits. They are *different guesses*, and getting both
+— including their disagreement — is stronger evidence than any self-consistency
+check. Playing the highest-entropy consistent guess every turn breaks all 1,296
+codes in **4.4653 turns on average, worst case 6** (`T2890`).
+
+**The opening is exact even at a million codes.** Before any answer is known the
+candidate set survives both renaming the colours and reordering the positions, so
+only a guess's *shape* matters — 5 genuinely different openings on 6 × 4 and 11 on
+10 × 6, rather than the whole space. The one turn where sampling would be worst is
+the one turn it is not needed. `T2887` pins the claim. Later turns say plainly
+when a ranking is estimated, and from how large a sample.
+
+Also: the Nimb tile description was corrected — it still advertised the old 1–4
+move cap and a 2–4 board.
+
+---
+
 ## 2.2.2328 — 2026-08-26 — Clearing stale example flags without Node
 
 `scripts/clear-stale-example-flags.sql` — the SQL twin of the existing TypeScript
