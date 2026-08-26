@@ -15,6 +15,21 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.2.2328 — 2026-08-26 — Clearing stale example flags without Node
+
+`scripts/clear-stale-example-flags.sql` — the SQL twin of the existing TypeScript
+repair, for reaching prod with `psql` when the Node route is not available (the
+prod `DATABASE_URL` is a Key Vault reference, so the script's usual invocation
+needs a secret read).
+
+It touches exactly the fingerprint of a wrong flag — `exampleType` set with
+`sourceExampleId` NULL — and leaves genuine adoptions alone. It prints both lists
+before writing anything, wraps the update in a transaction with `RETURNING` so the
+output records what actually changed, and ends with an after-check. Rehearsed
+against a real database with the `COMMIT` swapped for `ROLLBACK`.
+
+---
+
 ## 2.2.2327 — 2026-08-26 — Nimb: a catalogue of the shapes worth handing over
 
 **Shape enquiry.** Pick a number of squares and see every distinct form that many
