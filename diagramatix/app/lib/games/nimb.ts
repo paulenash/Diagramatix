@@ -3,8 +3,8 @@
  *
  * RULES
  *  1. An n × n grid of empty squares.
- *  2. A turn places 1–4 x's in a single row OR a single column. The squares
- *     must be CONSECUTIVE and all of them must currently be empty.
+ *  2. A turn places 1..n x's — up to a WHOLE LINE — in a single row OR a
+ *     single column. The squares must be CONSECUTIVE and all currently empty.
  *  3. No passing.
  *  4. **Misère: whoever places the last x LOSES.**
  *
@@ -52,10 +52,22 @@ export interface Move {
   length: number;
 }
 
-export const MAX_RUN = 4;
+/**
+ * The longest run a turn may place: the WHOLE LINE, so an n × n board allows
+ * 1..n (Paul, 2026-08-26 — "scale to 1-n").
+ *
+ * This changes nothing below 5 × 5: `legalMoves` always bounded the run by the
+ * board as well, so on a 4 × 4 the old fixed cap of 4 and the board's own width
+ * were the same number. The first size where the two readings diverge is 5 × 5,
+ * where a full row of five is now legal — and that genuinely alters the game
+ * there, so its outcome had to be recomputed rather than carried over.
+ */
+export const maxRun = (n: number): number => n;
 /** Above this the exact solver is refused rather than left to hang — see
- *  `solvable()`. 5×5 = 25 bits = 33.5M positions, already slow in a browser. */
-export const MAX_SOLVE_N = 4;
+ *  `solvable()`. 5×5 = 25 bits = 33.5M positions and ~3s to solve — done once in
+ *  a worker, then every query is a lookup. 6×6 would be 68.7 BILLION (68 GB), so
+ *  the line is drawn here rather than left to exhaust the tab. */
+export const MAX_SOLVE_N = 5;
 
 export const idx = (n: number, r: number, c: number): number => r * n + c;
 export const isFilled = (b: Board, i: number): boolean => (b & (1 << i)) !== 0;
@@ -73,7 +85,7 @@ export const isFull = (b: Board, n: number): boolean => b === fullBoard(n);
  */
 export function legalMoves(b: Board, n: number): Move[] {
   const out: Move[] = [];
-  const maxLen = Math.min(MAX_RUN, n);
+  const maxLen = maxRun(n);
   for (let len = 1; len <= maxLen; len++) {
     // Rows
     for (let r = 0; r < n; r++) {
@@ -110,7 +122,7 @@ export function legalMoves(b: Board, n: number): Move[] {
 
 /** Is a specific set of squares a legal move? Used to validate a UI selection. */
 export function isLegalSelection(b: Board, n: number, cells: number[]): boolean {
-  if (cells.length < 1 || cells.length > MAX_RUN) return false;
+  if (cells.length < 1 || cells.length > maxRun(n)) return false;
   if (cells.some((i) => i < 0 || i >= n * n || isFilled(b, i))) return false;
   if (new Set(cells).size !== cells.length) return false;
   const sorted = [...cells].sort((a, z) => a - z);
@@ -154,6 +166,112 @@ export function winning(b: Board, n: number, memo = new Map<Board, boolean>()): 
 
 /** Is an exact solve tractable for this size? Above it, play is heuristic. */
 export const solvable = (n: number): boolean => n >= 1 && n <= MAX_SOLVE_N;
+
+// ── The solved table ──────────────────────────────────────────────────────
+/**
+ * Solve EVERY position of an n × n board in one pass: `table[pos] === 1` when
+ * the player to move wins from `pos`.
+ *
+ * Retrograde, not recursive. A move only ever SETS bits, so `pos | mask` is
+ * always numerically greater than `pos` — which means a single descending loop
+ * over every mask visits each position's successors before the position itself.
+ * No recursion, no stack, no memo map.
+ *
+ * That difference is what makes 5 × 5 possible at all. The recursive solver with
+ * a `Map` memo handles 4 × 4 instantly and dies at 5 × 5: 33.5 million entries.
+ * This builds the same answers in a flat `Uint8Array` — 33.6 MB, ~3 seconds —
+ * and every later query is an array lookup rather than a search.
+ *
+ * (The shape-decomposition solver reaches the same verdicts and is far faster
+ * once a board FRAGMENTS, but far slower here: an empty 5 × 5 is one 25-square
+ * blob with nothing to decompose, and it took 151s against this 3.3s. The two
+ * are complementary — measured, not assumed.)
+ *
+ * WHY IT IS RESUMABLE, rather than one call. 5 × 5 is 33.5 million positions and about three seconds of
+ * straight-line work. Three seconds inside a click handler is a frozen tab with
+ * no explanation, so the caller runs it a slice at a time and yields between
+ * slices, which buys a live progress bar and a page that keeps responding.
+ *
+ * A Web Worker would be the textbook answer and was built first. Turbopack does
+ * not compile `new Worker(new URL("./x.ts", import.meta.url))` — it copies the
+ * TypeScript file into `static/media` verbatim, so the browser would fetch raw
+ * TS as a script. A `blob:` worker avoids the bundler but needs `blob:` added
+ * to `script-src`, which is a real CSP concession for a game tile. Slicing costs
+ * neither. (Verified by building, not assumed.)
+ *
+ * The sweep lives HERE and nowhere else: `buildSolveTable` is a thin wrapper
+ * that runs a job to completion, so the tested implementation and the one the UI
+ * drives are the same code.
+ */
+export interface SolveJob {
+  /** Advance by at most `positions`; true once the whole board is solved. */
+  step(positions: number): boolean;
+  /** Positions decided so far, out of `total`. */
+  readonly done: number;
+  readonly total: number;
+  /** Complete only once `step` has returned true. */
+  readonly table: Uint8Array;
+}
+
+export function startSolve(n: number): SolveJob {
+  const N = n * n;
+  const size = 1 << N;
+  const masks = Int32Array.from(new Set(legalMoves(0, n).map((m) => m.mask)));
+  const M = masks.length;
+  const table = new Uint8Array(size);
+  table[size - 1] = 1; // full board: the opponent placed the last ✕ and lost
+  let pos = size - 2;
+  return {
+    table,
+    total: size,
+    get done() { return size - 1 - pos; },
+    step(positions: number): boolean {
+      const stop = Math.max(-1, pos - positions);
+      for (; pos > stop; pos--) {
+        let win = 0;
+        for (let i = 0; i < M; i++) {
+          const m = masks[i];
+          if ((pos & m) === 0 && table[pos | m] === 0) { win = 1; break; }
+        }
+        table[pos] = win;
+      }
+      return pos < 0;
+    },
+  };
+}
+
+/** Solve a whole board in one go — the reference path, and what tests use. */
+export function buildSolveTable(n: number, onProgress?: (done: number, total: number) => void): Uint8Array {
+  const job = startSolve(n);
+  // ~32 reports whatever the size, so progress is meaningful on a 512-position
+  // board and on a 33-million one alike.
+  const slice = Math.max(1, job.total >> 5);
+  let finished = false;
+  while (!finished) {
+    finished = job.step(slice);
+    onProgress?.(job.done, job.total);
+  }
+  return job.table;
+}
+
+/**
+ * Who wins from a position — the one question every other analysis asks.
+ *
+ * Backed either by a solved table (instant, any size we can build) or, with no
+ * table, by the recursive solver. Passing this around instead of a bare memo is
+ * what let 5 × 5 join without every caller learning how it is solved.
+ */
+export interface Oracle {
+  wins(b: Board): boolean;
+}
+
+/** An oracle over a prebuilt table. */
+export const tableOracle = (table: Uint8Array): Oracle => ({ wins: (b) => table[b] === 1 });
+
+/** An oracle that solves on demand and remembers — fine up to 4 × 4. */
+export function memoOracle(n: number, memo = new Map<Board, boolean>()): Oracle {
+  return { wins: (b) => winning(b, n, memo) };
+}
 
 /**
  * The best move: one that leaves the opponent losing, if any exists.
@@ -352,6 +470,120 @@ export function shapeName(s: Shape): string {
   return s.rect ?? `${s.size}-square piece`;
 }
 
+// ── Solving a shape on its own ────────────────────────────────────────────
+/** The runs available inside a set of cells (a shape), up to `cap` long. */
+function runsInCells(cells: [number, number][], cap: number): [number, number][][] {
+  const has = new Set(cells.map(([r, c]) => `${r},${c}`));
+  const out: [number, number][][] = [];
+  for (const [r, c] of cells) {
+    for (const [dr, dc] of [[0, 1], [1, 0]] as const) {
+      const run: [number, number][] = [];
+      for (let k = 0; k < cap; k++) {
+        const rr = r + dr * k, cc = c + dc * k;
+        if (!has.has(`${rr},${cc}`)) break;
+        run.push([rr, cc]);
+        // A single cell is the same move either way round — emit it once.
+        if (run.length === 1 && dr === 1) continue;
+        out.push([...run]);
+      }
+    }
+  }
+  return out;
+}
+
+/** Split a set of cells into orthogonally-connected pieces. */
+function splitCells(cells: [number, number][]): [number, number][][] {
+  const set = new Set(cells.map(([r, c]) => `${r},${c}`));
+  const out: [number, number][][] = [];
+  while (set.size) {
+    const first = set.values().next().value as string;
+    set.delete(first);
+    const piece: [number, number][] = [];
+    const stack = [first];
+    while (stack.length) {
+      const key = stack.pop()!;
+      const [r, c] = key.split(",").map(Number);
+      piece.push([r, c]);
+      for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const k = `${r + dr},${c + dc}`;
+        if (set.has(k)) { set.delete(k); stack.push(k); }
+      }
+    }
+    out.push(piece);
+  }
+  return out;
+}
+
+/**
+ * Misère outcome of a MULTISET of shapes: does the player to move win?
+ *
+ * This is the decomposed solver. Because no move can span two shapes, a
+ * position is fully described by which shapes remain — and solving that is far
+ * smaller than solving the raw board (4×4: ~2,800 multisets against 65,536
+ * positions), which is what makes larger boards approachable at all.
+ *
+ * Emphatically NOT Sprague-Grundy: that sums independent games by XOR of Grundy
+ * values and holds for NORMAL play. Misère sums are far nastier and the XOR is
+ * simply wrong for them. Nothing here uses it — the multiset is solved directly,
+ * and the result was checked against the flat solver over every 3×3 position.
+ */
+export function outcomeOfShapes(keys: string[], cap: number, memo = new Map<string, boolean>()): boolean {
+  if (keys.length === 0) return true; // nothing to do — the opponent placed the last ✕
+  const id = [...keys].sort().join("|");
+  const hit = memo.get(id);
+  if (hit !== undefined) return hit;
+  let win = false;
+  outer:
+  for (let i = 0; i < keys.length && !win; i++) {
+    const cells = keys[i].split(" ").map((p) => p.split(",").map(Number) as [number, number]);
+    for (const run of runsInCells(cells, cap)) {
+      const gone = new Set(run.map(([r, c]) => `${r},${c}`));
+      const rest = cells.filter(([r, c]) => !gone.has(`${r},${c}`));
+      const pieces = splitCells(rest).map((p) => canonicalShape(p).key);
+      const next = [...keys.slice(0, i), ...keys.slice(i + 1), ...pieces];
+      if (!outcomeOfShapes(next, cap, memo)) { win = true; break outer; }
+    }
+  }
+  memo.set(id, win);
+  return win;
+}
+
+/** Facing this shape ALONE, does the player to move win? */
+export function shapeWins(key: string, cap: number, memo = new Map<string, boolean>()): boolean {
+  return outcomeOfShapes([key], cap, memo);
+}
+
+/**
+ * Every shape that can actually arise on an n × n board, with its solo verdict.
+ *
+ * Reachability matters: not every polyomino of a given size can appear as a
+ * leftover region — it has to be what remains after some sequence of legal
+ * moves. Enumerating free polyominoes instead would list shapes this game never
+ * produces (and at 16 squares there are 13,079,255 of them, so the distinction
+ * is the difference between a usable catalogue and none).
+ *
+ * Translations, rotations and reflections are all collapsed by `canonicalShape`,
+ * so each entry stands for every way that form can sit on the board.
+ */
+export function possibleShapes(n: number): { shape: Shape; wins: boolean }[] {
+  // Reachable positions, breadth-first from the empty board.
+  const seen = new Set<Board>([0]);
+  const queue: Board[] = [0];
+  const byKey = new Map<string, Shape>();
+  while (queue.length) {
+    const b = queue.shift()!;
+    for (const s of shapesOf(b, n)) if (!byKey.has(s.key)) byKey.set(s.key, s);
+    for (const m of legalMoves(b, n)) {
+      const next = b | m.mask;
+      if (!seen.has(next)) { seen.add(next); queue.push(next); }
+    }
+  }
+  const memo = new Map<string, boolean>();
+  return [...byKey.values()]
+    .map((shape) => ({ shape, wins: shapeWins(shape.key, maxRun(n), memo) }))
+    .sort((a, z) => a.shape.size - z.shape.size || a.shape.key.localeCompare(z.shape.key));
+}
+
 // ── Move classes: the same idea, wherever it is played ────────────────────
 /**
  * A CLASS of moves — one idea, such as "take an end square of the 4×1" — with
@@ -417,14 +649,21 @@ function classKey(shapeCells: [number, number][], runCells: [number, number][]):
 /**
  * English for where a run sits, but ONLY where it can be said truthfully.
  *
- * Restricted to straight strips (1×k), where "end" and "middle" mean something
- * exact. For an L, a T or any ragged remnant there is no honest short phrase,
- * and inventing one ("near the corner") would be worse than the picture the UI
- * draws anyway — so it returns null and the caller shows the glyph.
+ * Restricted to two shapes where the words mean something exact: a straight
+ * strip (1×k), and a full ODD square, whose centre line can be named. For an L,
+ * a T or any ragged remnant there is no honest short phrase, and inventing one
+ * ("near the corner") would be worse than the picture the UI draws anyway — so
+ * it returns null and the caller shows the glyph.
+ *
+ * The square case earns its place at 5 × 5: all three winning openings there are
+ * centred on the middle row — the centre square, the middle three of it, and the
+ * whole of it. "See the shaded squares" is true but forgettable; "take the centre
+ * square" is the rule someone can actually carry to the next game.
  */
 function whereInShape(shape: Shape, run: [number, number][]): string | null {
   const isStrip = shape.rows === 1 || shape.cols === 1;
-  if (!isStrip || shape.rect === null) return null;
+  if (!isStrip) return whereInSquare(shape, run);
+  if (shape.rect === null) return null;
   const k = shape.size;
   const L = run.length;
   const along = shape.rows === 1 ? run.map((p) => p[1]) : run.map((p) => p[0]);
@@ -439,13 +678,43 @@ function whereInShape(shape: Shape, run: [number, number][]): string | null {
 }
 
 /**
+ * Where a run sits inside a FULL, ODD square — or null when it has no name.
+ *
+ * Only a run centred on the square's own middle line gets one. A run somewhere
+ * along the middle row but off to one side is not "the middle" of anything, and
+ * calling it that would be the invented phrase this whole function exists to
+ * avoid.
+ */
+function whereInSquare(shape: Shape, run: [number, number][]): string | null {
+  const k = shape.rows;
+  if (shape.cols !== k || shape.size !== k * k || k % 2 === 0) return null;
+  const mid = (k - 1) / 2;
+  const rows = new Set(run.map((p) => p[0]));
+  const cols = new Set(run.map((p) => p[1]));
+  const horizontal = rows.size === 1;
+  const line = horizontal ? [...rows][0] : [...cols][0];
+  if ((horizontal ? cols.size : rows.size) !== run.length && run.length > 1) return null;
+  if (line !== mid) return null;
+  const along = horizontal ? run.map((p) => p[1]) : run.map((p) => p[0]);
+  const start = Math.min(...along), end = Math.max(...along);
+  if (start !== k - 1 - end) return null; // not centred on the middle
+  // Phrased to complete "Take <n in a row> at ___ of the 5×5", which is the one
+  // sentence these strings are ever read in.
+  if (run.length === 1) return "the centre";
+  const which = horizontal ? "the centre row" : "the centre column";
+  // A run as long as the square's side can only BE the whole centre line, so
+  // naming the line is already exact — no "the whole" needed.
+  return run.length === k ? which : `the middle of ${which}`;
+}
+
+/**
  * Every distinct IDEA available to the player to move, with its verdict.
  *
  * Concrete moves are grouped into classes; the count says how many board moves
  * each class covers. Sorted winning-first, then by how much of the board they
  * consume, so the cheapest winning idea reads first.
  */
-export function moveClasses(b: Board, n: number, memo = new Map<Board, boolean>()): MoveClass[] {
+export function moveClasses(b: Board, n: number, oracle: Oracle = memoOracle(n)): MoveClass[] {
   const shapes = shapesOf(b, n);
   /** board cell index → the shape containing it */
   const shapeOf = new Map<number, Shape>();
@@ -462,7 +731,7 @@ export function moveClasses(b: Board, n: number, memo = new Map<Board, boolean>(
     if (hit) { hit.count++; hit.memberMasks.push(move.mask); continue; }
     classes.set(key, {
       key, shape, length: move.length, cellsInShape: run,
-      wins: solvable(n) ? !winning(b | move.mask, n, memo) : false,
+      wins: solvable(n) ? !oracle.wins(b | move.mask) : false,
       count: 1, example: move, memberMasks: [move.mask],
       where: whereInShape(shape, run),
     });
@@ -479,8 +748,8 @@ export function moveClasses(b: Board, n: number, memo = new Map<Board, boolean>(
  * in a shape do not fill a whole category, the narrower class is named instead.
  * A memorable rule that loses games is worse than a fussy one that does not.
  */
-export function strategyAdvice(b: Board, n: number, memo = new Map<Board, boolean>()): string[] {
-  const classes = moveClasses(b, n, memo);
+export function strategyAdvice(b: Board, n: number, oracle: Oracle = memoOracle(n)): string[] {
+  const classes = moveClasses(b, n, oracle);
   const winners = classes.filter((c) => c.wins);
   if (winners.length === 0) return [];
 
@@ -557,7 +826,7 @@ export interface MoveOption {
  * Each option carries its perfect-play verdict when the size is solvable, so a
  * caller can colour winning and losing moves without re-deriving anything.
  */
-export function distinctMoves(b: Board, n: number, memo = new Map<Board, boolean>()): MoveOption[] {
+export function distinctMoves(b: Board, n: number, oracle: Oracle = memoOracle(n)): MoveOption[] {
   const seen = new Map<Board, MoveOption>();
   for (const move of legalMoves(b, n)) {
     const result = b | move.mask;
@@ -565,7 +834,7 @@ export function distinctMoves(b: Board, n: number, memo = new Map<Board, boolean
     if (seen.has(key)) continue;
     const opt: MoveOption = { move, result, key };
     // Misère: my move wins if it leaves the opponent in a losing position.
-    if (solvable(n)) opt.wins = !winning(result, n, memo);
+    if (solvable(n)) opt.wins = !oracle.wins(result);
     seen.set(key, opt);
   }
   return [...seen.values()];

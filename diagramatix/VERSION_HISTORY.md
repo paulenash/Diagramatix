@@ -15,6 +15,52 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.2.2326 — 2026-08-26 — Nimb solves 5×5, and a move may take a whole line
+
+**The move cap now scales with the board.** "1–4 ✕" was the rule as first written;
+it is now **1..n** — up to a whole line — which is the same rule on every board
+up to 4 × 4 (a run was always bounded by the board too) and a genuinely different
+game at 5 × 5, where a full row of five becomes legal. The series was recomputed
+under the new rule rather than carried over: 2 × 2 loses (0 of 2 openings win),
+3 × 3 wins (3 of 7), 4 × 4 loses (0 of 11), **5 × 5 wins (3 of 24)**.
+
+**5 × 5 is now solved, exactly.** The recursive solver dies there — 33.5 million
+positions in a `Map`. A retrograde sweep over a flat `Uint8Array` builds the same
+answers in 33.6 MB and ~3.5 s, because a move only ever SETS bits: `pos | mask` is
+always greater than `pos`, so one descending loop visits every successor before
+its position. Guarded by comparing it against the recursive solver on **every**
+position of 1 × 1 through 4 × 4.
+
+Three seconds cannot sit in a click handler, so the sweep is **resumable** and the
+page runs it in slices sized to fit a frame, with a live progress bar. A Web
+Worker was built first and abandoned on evidence: Turbopack does not compile
+`new Worker(new URL("./x.ts", import.meta.url))` — it copies the TypeScript file
+into `static/media` verbatim, so the browser would have fetched raw TS as a
+script. A `blob:` worker would have worked but needs `blob:` in `script-src`.
+Slicing costs neither.
+
+**The 5 × 5 answer is worth stating:** of 24 genuinely different openings only
+three win, and all three are **centred on the middle line** — the centre square,
+the middle three of it, and the whole of it. Advice can now name a centre line on
+a full odd square, so that reads as "take the centre square" instead of "see the
+shaded squares".
+
+Also in this release, from the preceding commits:
+
+- **`2.2.2320`–`2.2.2323` — the Nimb tile itself.** A SuperAdmin explorer for the
+  misère placement game: every genuinely different move (rotations and
+  reflections collapsed) split into winning and losing columns, the opponent's
+  replies to a selected move, any move playable directly on the board including
+  a deliberately losing one, the position decomposed into independent shapes, and
+  shape-level advice stated only where it is true of every move it covers.
+- **`2.2.2324` — example flags stopped reappearing.** The Azure deploy ran
+  `backfill-example-types.ts` on every push, which re-flagged projects whose
+  example flag had been deliberately cleared. Two prod projects had it come back
+  twice. The backfill was a one-off migration and no longer runs on deploy.
+- **`2.2.2325`** — a scratch file removed from the previous commit.
+
+---
+
 ## 2.2.2319 — 2026-08-24 — Replay actually replays; error triggers stop at 5pm
 
 **"Launch replay" showed a clock ticking and nothing happening.** Two causes, both

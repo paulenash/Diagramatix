@@ -3,8 +3,9 @@
 /**
  * n × n Nimb — an explorer for a two-player misère placement game.
  *
- *   1. Choose n (2–4).
- *   2. A turn places 1–4 ✕ on CONSECUTIVE empty squares in one row or column.
+ *   1. Choose n (2–5).
+ *   2. A turn places 1..n ✕ — up to a whole line — on CONSECUTIVE empty squares
+ *      in one row or one column.
  *   3. No passing.
  *   4. Whoever places the LAST ✕ loses.
  *
@@ -15,6 +16,10 @@
  * way. That second ply is where the game explains itself: a winning move is
  * exactly one whose replies are *all* red.
  *
+ * 5 × 5 is solved in timed slices (33.5M positions, ~3s) and every board below
+ * it in one go; `useNimbOracle` hides which, so nothing here knows the
+ * difference beyond showing a progress bar while a big board is still solving.
+ *
  * All the rules, the solver and the symmetry reduction live in
  * `app/lib/games/nimb.ts`; this file is interaction and presentation only.
  */
@@ -23,15 +28,16 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   type Board, type MoveOption, type Shape,
-  isFilled, distinctMoves, legalMoves, winning, emptyCount,
-  isLegalSelection, MAX_RUN, groupedShapes, shapeName,
-  type MoveClass, moveClasses, strategyAdvice,
+  isFilled, distinctMoves, legalMoves, emptyCount,
+  isLegalSelection, maxRun, groupedShapes, shapeName,
+  type MoveClass, moveClasses, strategyAdvice, MAX_SOLVE_N,
 } from "@/app/lib/games/nimb";
+import { useNimbOracle, INLINE_SOLVE_N } from "@/app/lib/games/useNimbOracle";
 
 type Player = 1 | 2;
 interface Ply { board: Board; turn: Player; label: string }
 
-const MAX_N = 4;
+const MAX_N = MAX_SOLVE_N;
 
 /** "2 ✕ in row 1, from col 1" — the move in words. */
 function describe(o: MoveOption): string {
@@ -55,22 +61,34 @@ export function NimbClient() {
    *  including one the symmetry-reduced list does not offer. */
   const [sel, setSel] = useState<number[]>([]);
 
-  const options = useMemo<MoveOption[]>(() => (started ? distinctMoves(board, n) : []), [started, board, n]);
+  /** Solved inline below 5 × 5, in slices at 5 × 5 — see `useNimbOracle`. */
+  const { oracle, solving, progress } = useNimbOracle(n, started);
+
   const allLegal = useMemo(() => (started ? legalMoves(board, n).length : 0), [started, board, n]);
+  // Every panel below needs a solved oracle to colour anything. Until one
+  // exists they show the solving state rather than an empty list, which would
+  // read as "no moves" — the exact opposite of the truth.
+  const options = useMemo<MoveOption[]>(
+    () => (started && oracle ? distinctMoves(board, n, oracle) : []),
+    [started, oracle, board, n],
+  );
   const wins = useMemo(() => options.filter((o) => o.wins), [options]);
   const loses = useMemo(() => options.filter((o) => !o.wins), [options]);
 
   const selected = useMemo(() => options.find((o) => o.key === selKey) ?? null, [options, selKey]);
   /** The opponent's distinct replies to the selected move — the second ply. */
   const replies = useMemo<MoveOption[]>(
-    () => (selected ? distinctMoves(selected.result, n) : []),
-    [selected, n],
+    () => (selected && oracle ? distinctMoves(selected.result, n, oracle) : []),
+    [selected, oracle, n],
   );
 
-  const over = started && options.length === 0;
+  // From the LEGAL moves, not the analysed ones: with a 5 × 5 still solving the
+  // analysed list is empty, and reading that as "game over" would end the game
+  // on the opening position.
+  const over = started && allLegal === 0;
   /** Misère: the opponent just placed the last ✕, so the player to move wins. */
   const winner: Player | null = over ? turn : null;
-  const toMoveWins = useMemo(() => (started && !over ? winning(board, n) : null), [started, over, board, n]);
+  const toMoveWins = useMemo(() => (started && !over && oracle ? oracle.wins(board) : null), [started, over, oracle, board]);
 
   const play = useCallback((o: MoveOption) => {
     setHistory((h) => [...h, { board, turn, label: describe(o) }]);
@@ -94,10 +112,10 @@ export function NimbClient() {
   /** Verdict for the hand-picked selection, so the board tells you what the
    *  list would have. */
   const selVerdict = useMemo(() => {
-    if (!selValid) return null;
+    if (!selValid || !oracle) return null;
     const after = sel.reduce((b, i) => b | (1 << i), board);
-    return !winning(after, n);
-  }, [selValid, sel, board, n]);
+    return !oracle.wins(after);
+  }, [selValid, oracle, sel, board]);
 
   /** Click behaviour: extend the run when this square legally extends it, else
    *  start a new run here. Never a dead click on an empty square. */
@@ -107,7 +125,7 @@ export function NimbClient() {
     setSel((cur) => {
       if (cur.includes(i)) return cur.filter((x) => x !== i);
       const next = [...cur, i].sort((a, z) => a - z);
-      return next.length <= MAX_RUN && isLegalSelection(board, n, next) ? next : [i];
+      return next.length <= maxRun(n) && isLegalSelection(board, n, next) ? next : [i];
     });
   }, [board, n, over]);
 
@@ -139,8 +157,8 @@ export function NimbClient() {
   /** The independent regions of empty squares — each an independent game. */
   const shapes = useMemo(() => (started ? groupedShapes(board, n) : []), [started, board, n]);
   /** Distinct IDEAS available, and the safe rules describing the winning ones. */
-  const classes = useMemo(() => (started && !over ? moveClasses(board, n) : []), [started, over, board, n]);
-  const advice = useMemo(() => (started && !over ? strategyAdvice(board, n) : []), [started, over, board, n]);
+  const classes = useMemo(() => (started && !over && oracle ? moveClasses(board, n, oracle) : []), [started, over, oracle, board, n]);
+  const advice = useMemo(() => (started && !over && oracle ? strategyAdvice(board, n, oracle) : []), [started, over, oracle, board, n]);
 
   /** Highlight EVERY square a class could be played on — so "anywhere in the
    *  4×1" can actually show the anywhere rather than assert it. */
@@ -160,11 +178,12 @@ export function NimbClient() {
             <h2 className="text-sm font-semibold text-gray-900 mb-1">Choose the board size</h2>
             <p className="text-xs text-gray-600 mb-4">
               An <strong>n × n</strong> grid. Solving is exhaustive, so every move can be
-              labelled winning or losing — which is why n stops at {MAX_N}
-              ({MAX_N * MAX_N} squares ≈ 65,000 positions).
+              labelled winning or losing — which is why n stops at {MAX_N}: that is
+              already {MAX_N * MAX_N} squares, {(2 ** (MAX_N * MAX_N) / 1e6).toFixed(1)}M
+              positions. {MAX_N + 1}×{MAX_N + 1} would be 68 <em>billion</em>.
             </p>
-            <div className="flex items-center gap-2 mb-5">
-              {[2, 3, 4].map((k) => (
+            <div className="flex items-center gap-2 mb-2">
+              {[2, 3, 4, 5].map((k) => (
                 <button key={k} onClick={() => setN(k)}
                   className={"w-16 h-16 rounded-lg border-2 text-lg font-semibold transition-colors " +
                     (n === k ? "bg-blue-600 border-blue-600 text-white" : "bg-white border-gray-300 text-gray-700 hover:border-blue-400")}>
@@ -172,6 +191,11 @@ export function NimbClient() {
                 </button>
               ))}
             </div>
+            <p className="text-[11px] text-gray-500 mb-5">
+              {n > INLINE_SOLVE_N
+                ? `${n}×${n} takes about three seconds to solve — once, in slices, with the page still responding.`
+                : `${n}×${n} solves instantly.`}
+            </p>
             <button onClick={() => { restart(); setStarted(true); }}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700">
               Start — Player 1 to move
@@ -183,7 +207,7 @@ export function NimbClient() {
     );
   }
 
-  const cellSize = n === 2 ? 72 : n === 3 ? 64 : 56;
+  const cellSize = n === 2 ? 72 : n === 3 ? 64 : n === 4 ? 56 : 46;
   const opponent: Player = turn === 1 ? 2 : 1;
 
   return (
@@ -228,7 +252,7 @@ export function NimbClient() {
                   onClick={playSelection}
                   disabled={!selValid}
                   className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-gray-300"
-                  title={selValid ? `Play these ${sel.length} for Player ${turn}` : "Click 1–4 consecutive empty squares in one row or column"}
+                  title={selValid ? `Play these ${sel.length} for Player ${turn}` : `Click up to ${maxRun(n)} consecutive empty squares in one row or column`}
                 >
                   {sel.length ? `Play ${sel.length} ✕` : "Or click squares to play any move"}
                 </button>
@@ -258,11 +282,12 @@ export function NimbClient() {
               <>
                 <p className="text-sm text-gray-900">
                   <span className="font-semibold">Player {turn}</span> to move —{" "}
-                  {toMoveWins ? <span className="text-green-700 font-medium">winning position</span>
-                              : <span className="text-red-700 font-medium">losing position</span>}
+                  {toMoveWins === null ? <span className="text-gray-500 font-medium">solving…</span>
+                    : toMoveWins ? <span className="text-green-700 font-medium">winning position</span>
+                                 : <span className="text-red-700 font-medium">losing position</span>}
                 </p>
                 <p className="text-[11px] text-gray-500 mt-1">
-                  {options.length} distinct of {allLegal} legal · {emptyCount(board, n)} squares empty
+                  {oracle ? `${options.length} distinct of ` : ""}{allLegal} legal · {emptyCount(board, n)} squares empty
                 </p>
               </>
             )}
@@ -289,7 +314,7 @@ export function NimbClient() {
         {!over && (
           <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
             <h2 className="text-sm font-semibold text-gray-900">Strategy for Player {turn}</h2>
-            {advice.length > 0 ? (
+            {!oracle ? <Solving n={n} progress={progress} solving={solving} /> : advice.length > 0 ? (
               <>
                 <ul className="mt-2 space-y-1">
                   {advice.map((a, k) => (
@@ -366,7 +391,7 @@ export function NimbClient() {
           <p className="text-[11px] text-gray-500 mb-3">
             You choose for BOTH players. Click a move to see it on the board and list the replies; press Play to make it — including a losing one, deliberately.
           </p>
-          {over ? <p className="text-xs text-gray-500">No moves — the board is full.</p> : (
+          {over ? <p className="text-xs text-gray-500">No moves — the board is full.</p> : !oracle ? <Solving n={n} progress={progress} solving={solving} /> : (
             <>
               {/* Said once, plainly, at the top. An empty "Winning" column is
                   technically the same information and reads as a rendering
@@ -401,7 +426,7 @@ export function NimbClient() {
         {/* ── The opponent's replies to the selected move ───────── */}
         <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
           <h2 className="text-sm font-semibold text-gray-900">Player {opponent}&rsquo;s replies</h2>
-          {!selected ? (
+          {!oracle ? <Solving n={n} progress={progress} solving={solving} /> : !selected ? (
             <p className="text-[11px] text-gray-500 mt-1">
               Select one of Player {turn}&rsquo;s moves to see every distinct reply it allows.
             </p>
@@ -436,6 +461,37 @@ export function NimbClient() {
           <Rules className="mt-4" />
         </section>
       </main>
+    </div>
+  );
+}
+
+/**
+ * What a panel shows while the table is still being built.
+ *
+ * It says the size and the reason, because "loading…" on a page that has been
+ * instant at every other size invites the reader to assume something is broken.
+ * The board stays playable throughout — the analysis is what waits, not the game.
+ */
+function Solving({ n, progress, solving }: { n: number; progress: number; solving: boolean }) {
+  if (!solving) {
+    return (
+      <p className="mt-2 text-xs text-gray-500">
+        {n}×{n} is beyond exhaustive solving, so no move can be labelled here.
+      </p>
+    );
+  }
+  const pct = Math.round(progress * 100);
+  return (
+    <div className="mt-2">
+      <p className="text-xs text-gray-700">
+        Solving {n}×{n} — all {(2 ** (n * n) / 1e6).toFixed(1)} million positions, once.
+      </p>
+      <div className="mt-2 h-1.5 w-full rounded bg-gray-200 overflow-hidden">
+        <div className="h-full bg-blue-600 transition-[width] duration-150" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="text-[11px] text-gray-500 mt-1.5">
+        {pct}% · run in slices, so the page keeps responding. The board is playable now.
+      </p>
     </div>
   );
 }
@@ -534,7 +590,7 @@ function Header() {
     <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3">
       <Link href="/dashboard/admin" className="text-sm text-blue-600 hover:text-blue-800 underline">← SuperAdmin</Link>
       <h1 className="text-lg font-semibold text-gray-900">n × n Nimb</h1>
-      <span className="text-xs text-gray-500">1–4 in a line · no passing · <strong>last ✕ loses</strong></span>
+      <span className="text-xs text-gray-500">up to a whole line · no passing · <strong>last ✕ loses</strong></span>
     </header>
   );
 }
@@ -560,7 +616,7 @@ function Rules({ className = "" }: { className?: string }) {
       <h2 className="text-xs font-semibold text-gray-900 mb-1.5">Rules</h2>
       <ol className="text-[11px] text-gray-700 space-y-0.5 list-decimal list-inside">
         <li>An n × n grid of empty squares.</li>
-        <li>A turn places <strong>1–4 ✕</strong> on <strong>consecutive empty</strong> squares in one row <em>or</em> one column.</li>
+        <li>A turn places <strong>1 to n ✕</strong> — up to a <strong>whole line</strong> — on <strong>consecutive empty</strong> squares in one row <em>or</em> one column.</li>
         <li>No player may pass.</li>
         <li>Whoever places the <strong>last ✕ loses</strong>.</li>
       </ol>

@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   legalMoves, isLegalSelection, winning, bestMove, fullBoard, isFull,
-  idx, emptyCount, MAX_RUN, solvable,
+  idx, emptyCount, maxRun, solvable,
   distinctMoves, canonicalBoard, symmetries, transform,
   shapesOf, groupedShapes, shapeName, canonicalShape,
-  moveClasses, strategyAdvice,
+  moveClasses, strategyAdvice, memoOracle, buildSolveTable, tableOracle,
 } from "@/app/lib/games/nimb";
 
 /**
@@ -23,8 +23,12 @@ describe("Nimb — legal moves", () => {
     expect(legalMoves(0, 3)).toHaveLength(27);
   });
 
-  it("never offers a run longer than 4, even on a big board", () => {
-    expect(Math.max(...legalMoves(0, 6).map((m) => m.length))).toBe(MAX_RUN);
+  it("the longest run is the whole line, whatever the board size", () => {
+    // Paul, 2026-08-26: the cap scales with n rather than sitting at four. On a
+    // 6 × 6 that means a full row of six — the reading that used to be capped.
+    for (const n of [3, 4, 5, 6]) {
+      expect(Math.max(...legalMoves(0, n).map((m) => m.length)), `n=${n}`).toBe(maxRun(n));
+    }
   });
 
   it("a single square is offered once, not once per orientation", () => {
@@ -58,8 +62,13 @@ describe("Nimb — validating a hand-made selection", () => {
     expect(isLegalSelection(1 << idx(n, 2, 2), n, [idx(n, 2, 2)]), "occupied").toBe(false);
     expect(isLegalSelection(0, n, []), "empty selection").toBe(false);
   });
-  it("rejects a run of five", () => {
-    expect(isLegalSelection(0, 6, [0, 1, 2, 3, 4])).toBe(false);
+  it("rejects a run longer than the line it sits in", () => {
+    // A run may now be as long as the board is wide, so the rejection to test
+    // is one that OVERRUNS the line — five squares needs a 5-wide board, and on
+    // a 4 × 4 the fifth would have wrapped onto the next row.
+    expect(isLegalSelection(0, 6, [0, 1, 2, 3, 4])).toBe(true);
+    expect(isLegalSelection(0, 6, [0, 1, 2, 3, 4, 5, 6])).toBe(false);
+    expect(isLegalSelection(0, 4, [0, 1, 2, 3, 4])).toBe(false);
   });
 });
 
@@ -120,8 +129,11 @@ describe("Nimb — misère outcomes", () => {
   });
 
   it("knows which sizes it can actually solve, rather than hanging on the rest", () => {
+    // 5 × 5 joined once the retrograde table made it a 3s worker job rather than
+    // a hang; 6 × 6 is 68 billion positions and stays out.
     expect(solvable(4)).toBe(true);
-    expect(solvable(5)).toBe(false);
+    expect(solvable(5)).toBe(true);
+    expect(solvable(6)).toBe(false);
   });
 });
 
@@ -294,10 +306,11 @@ describe("Nimb — move classes and advice", () => {
 
   it("every concrete move in a class shares the class verdict", () => {
     const memo = new Map<number, boolean>();
+    const oracle = memoOracle(n, memo);
     const boards = [0, rowTaken, 1 << idx(n, 0, 0), (1 << idx(n, 0, 0)) | (1 << idx(n, 3, 3))];
     let moves = 0;
     for (const b of boards) {
-      for (const c of moveClasses(b, n, memo)) {
+      for (const c of moveClasses(b, n, oracle)) {
         for (const mask of c.memberMasks) {
           moves++;
           expect(!winning(b | mask, n, memo), `class ${c.key}`).toBe(c.wins);
@@ -324,11 +337,12 @@ describe("Nimb — move classes and advice", () => {
 
   it("a rule is never stated over a category containing a losing move", () => {
     const memo = new Map<number, boolean>();
+    const oracle = memoOracle(n, memo);
     for (const b of [0, rowTaken, 1 << idx(n, 2, 1)]) {
-      const cls = moveClasses(b, n, memo);
+      const cls = moveClasses(b, n, oracle);
       // For every "anywhere in the <shape>" rule, all classes of that shape and
       // length must win — that is precisely the promise the sentence makes.
-      for (const line of strategyAdvice(b, n, memo)) {
+      for (const line of strategyAdvice(b, n, oracle)) {
         const m = line.match(/any (\d)-in-a-row|any single square/);
         if (!m) continue;
         const len = m[1] ? Number(m[1]) : 1;
@@ -350,5 +364,104 @@ describe("Nimb — move classes and advice", () => {
       const isStrip = c.shape.rows === 1 || c.shape.cols === 1;
       if (!isStrip) expect(c.where, `${shapeName(c.shape)} should not be described in words`).toBeNull();
     }
+  });
+});
+
+/**
+ * T2882 — the solved table is the same solver, not a second one.
+ *
+ * 5 × 5 exists only because the retrograde sweep replaced the recursive solver
+ * at that size. Two independent implementations of the same question is exactly
+ * the setup where one of them quietly drifts, so the guard is not "the table
+ * looks plausible" but "the table agrees with the recursive solver on EVERY
+ * position of a board small enough to check both ways". 4 × 4 is 65,536
+ * positions — cheap to check exhaustively, and big enough that an off-by-one in
+ * the sweep direction or the terminal value could not survive it.
+ */
+describe("Nimb — the solved table", () => {
+  it("agrees with the recursive solver on every position, 1×1 through 4×4", () => {
+    for (const n of [1, 2, 3, 4]) {
+      const table = buildSolveTable(n);
+      expect(table).toHaveLength(1 << (n * n));
+      const memo = new Map<number, boolean>();
+      for (let pos = 0; pos < table.length; pos++) {
+        expect(table[pos] === 1, `n=${n} pos=${pos}`).toBe(winning(pos, n, memo));
+      }
+    }
+  });
+
+  it("a full board is a win for the player to move — the misère terminal", () => {
+    // The whole inversion rests on this one entry: nobody can move, so the
+    // OPPONENT placed the last ✕ and lost. Get it wrong and every value flips.
+    for (const n of [2, 3]) expect(buildSolveTable(n)[fullBoard(n)]).toBe(1);
+  });
+
+  it("a table oracle and a memo oracle answer identically", () => {
+    const n = 3;
+    const table = tableOracle(buildSolveTable(n));
+    const memo = memoOracle(n);
+    for (let pos = 0; pos < 1 << (n * n); pos++) expect(table.wins(pos)).toBe(memo.wins(pos));
+  });
+
+  it("reports progress that ends at exactly 100%", () => {
+    // The progress bar is the only thing a user sees for three seconds, so a
+    // sweep that stops reporting at 97% reads as a hang.
+    const seen: number[] = [];
+    buildSolveTable(3, (done, total) => seen.push(done / total));
+    expect(seen.length).toBeGreaterThan(1);
+    expect(seen[seen.length - 1]).toBe(1);
+    expect(Math.min(...seen)).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * T2883 — the 5 × 5 result, and the sentence that describes it.
+ *
+ * 5 × 5 is the size the whole table-and-slices apparatus was built for, and its
+ * answer is the most interesting one in the game: the first player wins, and of
+ * the 24 genuinely different openings only THREE do — the centre square, the
+ * middle three of the centre line, and the whole centre line. Every one of them
+ * is centred on the middle. That is a real claim about the game, so it is
+ * pinned; if a change to the move rules or the solver moves it, this says so
+ * rather than leaving a wrong strategy on screen.
+ *
+ * It costs ~3.5s to build the table. That is the price of asserting the headline
+ * fact rather than trusting it.
+ */
+describe("Nimb — 5×5", () => {
+  const n = 5;
+  const oracle = tableOracle(buildSolveTable(n));
+
+  it("is a first-player win", () => {
+    expect(oracle.wins(0)).toBe(true);
+  });
+
+  it("has exactly three winning openings, all centred on the middle line", () => {
+    const opts = distinctMoves(0, n, oracle);
+    expect(opts, "24 distinct openings out of 125 legal moves").toHaveLength(24);
+    const won = opts.filter((o) => o.wins);
+    expect(won.map((o) => o.move.length).sort()).toEqual([1, 3, 5]);
+    for (const o of won) {
+      // Centred on the middle line: the run sits in line index 2 and its cells
+      // are symmetric about the centre of that line.
+      expect(o.move.line, `${o.move.length}-run should sit on the middle line`).toBe(2);
+      expect(o.move.start).toBe((n - o.move.length) / 2);
+    }
+  });
+
+  it("names those openings by the centre rather than by shading", () => {
+    // "see the shaded squares" is true but forgettable. On a full odd square the
+    // centre line CAN be named, and this is where that matters.
+    const advice = strategyAdvice(0, n, oracle);
+    expect(advice).toHaveLength(3);
+    for (const line of advice) expect(line, line).toMatch(/centre/);
+    expect(advice.join(" ")).not.toMatch(/shaded/);
+  });
+
+  it("a run may now be a whole line — the rule change 5×5 depends on", () => {
+    // Under the old fixed cap of four, "5 in a row" would not exist and the
+    // third winning opening with it.
+    expect(maxRun(n)).toBe(n);
+    expect(legalMoves(0, n).filter((m) => m.length === n)).toHaveLength(2 * n);
   });
 });
