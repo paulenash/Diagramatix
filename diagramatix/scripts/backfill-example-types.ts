@@ -9,6 +9,16 @@
  * a mining run → "mining"; else a simulation study → "simulation"; else a
  * Risk & Control library → "risk-control". Idempotent (skips already-tagged rows).
  *
+ * ⚠ ONE-TIME MIGRATION — DO NOT run on a schedule or from the deploy.
+ *
+ * It was in the Azure deploy step and re-tagged projects on EVERY deploy, which
+ * silently undid deliberate clearing: a project renamed "… - Demo2" matched the
+ * name heuristic, got its example flag back, and with it the block on sharing
+ * and publishing. Removed from the workflow 2026-08-26.
+ *
+ * The name is not evidence. `sourceExampleId` is the real signal and the three
+ * adopt paths set it at creation, so this script has no remaining routine job.
+ *
  * Run: DATABASE_URL="…" npx tsx scripts/backfill-example-types.ts
  */
 import { PrismaClient } from "../app/generated/prisma/client";

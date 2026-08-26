@@ -244,7 +244,15 @@ jobs:
           # an adoptable entry in the Risk & Control Examples gallery
           # (seed-risk-control-examples.ts above). Run the script by hand if the
           # pre-built demo project is ever wanted again.
-          npx --yes tsx@4 scripts/backfill-example-types.ts || echo "backfill-example-types skipped"
+          # NOTE: backfill-example-types.ts is intentionally NOT run. It tagged any
+          # project whose NAME contains "demo" / "(example)" and carried matching
+          # feature content — a reasonable one-time migration for rows created
+          # before Project.exampleType existed, but wrong as a recurring step: it
+          # re-flagged projects whose flags had been deliberately cleared, on EVERY
+          # deploy, so "Order to Cash Project - Demo2" and "A New Project for Sim
+          # and Test - Demo2" kept returning as example tiles that could not be
+          # shared or published. A name is not evidence; sourceExampleId is the
+          # real signal and the adopt paths set it at creation. Run by hand only.
           npx --yes tsx@4 scripts/add-tech-design-notes.ts || echo "add-tech-design-notes skipped"
           npx --yes tsx@4 scripts/add-guide-tech-design-notes.ts || echo "add-guide-tech-design-notes skipped"
           npx --yes tsx@4 scripts/add-guide-ddl.ts || echo "add-guide-ddl skipped"
