@@ -166,6 +166,14 @@ describe("diffProcesses", () => {
       ],
       [{ sourceId: "s", targetId: "t" }, { sourceId: "t", targetId: "ie" }, { sourceId: "ie", targetId: "e" }],
     );
+    // `layoutBpmnDiagram` forces every edge-mounted intermediate event to
+    // INTERRUPTING (T2896) — that rule is scoped to GENERATED diagrams. A
+    // hand-drawn one can still carry a non-interrupting boundary event, and the
+    // diff has to report it honestly, so the flag is set here the way the editor
+    // would rather than by asking the generator for something it will not make.
+    const bt = withEvents.elements.find((el) => el.id === "bt")!;
+    bt.properties = { ...(bt.properties ?? {}), interruptionType: "non-interrupting" };
+
     const ed = diffProcesses(base, "v1", withEvents, "v2").eventDiff;
     const triggers = ed.added.map((e) => e.trigger).sort();
     expect(triggers).toEqual(["error", "timer"]);
@@ -173,6 +181,37 @@ describe("diffProcesses", () => {
     expect(timer?.kind).toBe("boundary");
     expect(timer?.interrupting).toBe(false);
     expect(ed.removed).toEqual([]);
+  });
+
+  it("T2898 — a GENERATED boundary event is reported as interrupting", () => {
+    // The other side of the same coin: straight out of the generator, the same
+    // fixture comes back interrupting, so the diff reports it that way. Together
+    // with the check above this pins that the diff reads the flag rather than
+    // assuming one — which is what makes it useful on a hand-edited diagram.
+    const base = build(
+      [
+        { id: "p", type: "pool", label: "P", poolType: "white-box" },
+        { id: "s", type: "start-event", label: "S", pool: "p" },
+        { id: "t", type: "task", label: "Wait for approval", pool: "p" },
+        { id: "e", type: "end-event", label: "E", pool: "p" },
+      ],
+      [{ sourceId: "s", targetId: "t" }, { sourceId: "t", targetId: "e" }],
+    );
+    const generated = build(
+      [
+        { id: "p", type: "pool", label: "P", poolType: "white-box" },
+        { id: "s", type: "start-event", label: "S", pool: "p" },
+        { id: "t", type: "task", label: "Wait for approval", pool: "p" },
+        { id: "bt", type: "intermediate-event", label: "2 days", pool: "p", eventType: "timer",
+          boundaryHost: "t", properties: { interruptionType: "non-interrupting" } },
+        { id: "e", type: "end-event", label: "E", pool: "p" },
+      ],
+      [{ sourceId: "s", targetId: "t" }, { sourceId: "t", targetId: "e" }],
+    );
+    const ed = diffProcesses(base, "v1", generated, "v2").eventDiff;
+    const timer = ed.added.find((e) => e.trigger === "timer");
+    expect(timer?.kind).toBe("boundary");
+    expect(timer?.interrupting, "the generator overrides the plan's request").toBe(true);
   });
 
   it("reports review status: pain point + review comment removed = review addressed", () => {

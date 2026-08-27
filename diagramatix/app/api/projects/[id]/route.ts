@@ -87,7 +87,7 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   const body = await req.json();
-  const { name, colorConfig, fontConfig, description, ownerName, folderTree, pcf, numberingConfig } = body;
+  const { name, colorConfig, fontConfig, description, ownerName, folderTree, pcf, numberingConfig, diagramSort } = body;
 
   if (name !== undefined && !name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -102,6 +102,14 @@ export async function PUT(req: Request, { params }: Params) {
     if (name !== undefined) dataUpdate.name = name.trim();
     if (description !== undefined) dataUpdate.description = description;
     if (ownerName !== undefined) dataUpdate.ownerName = ownerName;
+    // How this project's diagrams are ordered on the project screen. A property
+    // OF the project rather than a per-browser preference, so a generated project
+    // can be handed over already sorted and the choice survives a change of
+    // machine. Unknown values are ignored rather than stored.
+    if (diagramSort !== undefined) {
+      const allowed = ["manual", "name-asc", "name-desc", "modified-asc", "modified-desc", "type"];
+      if (diagramSort === null || allowed.includes(diagramSort)) dataUpdate.diagramSort = diagramSort;
+    }
     // Renaming an adopted example makes it the user's own project — drop the
     // example tint (normal white tile) AND decouple it from its source example
     // so a future re-adopt creates a fresh copy instead of overwriting this work.

@@ -312,6 +312,20 @@ function putFolderTree(projectId: string, tree: FolderTree): Promise<void> {
   });
 }
 
+/** Persist the project's diagram order. Not debounced: it changes on a deliberate
+ *  menu pick, not on every drag like the folder tree. */
+function putDiagramSort(projectId: string, sort: string): Promise<void> {
+  return fetch(`/api/projects/${projectId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ diagramSort: sort }),
+  }).then(r => {
+    if (!r.ok) console.error("[saveDiagramSort] failed:", r.status);
+  }).catch(err => {
+    console.error("[saveDiagramSort] error:", err);
+  });
+}
+
 function saveFolderTreeToDb(projectId: string, tree: FolderTree) {
   if (_folderTreeSaveTimer) clearTimeout(_folderTreeSaveTimer);
   _folderTreePending = { projectId, tree };
@@ -371,6 +385,9 @@ interface ProjectDetail {
   fontConfig?: unknown;
   folderTree?: unknown;
   pcf?: unknown; // Prisma JsonValue; narrowed to ProjectPcf at use
+  /** Stored diagram order for this project. Null on a project saved before the
+   *  field existed — the mount effect migrates that browser's old value in. */
+  diagramSort?: string | null;
   diagrams: DiagramSummary[];
 }
 
@@ -887,9 +904,11 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
   const [navWidth, setNavWidth] = useState(416);
   const resizingRef = useRef(false);
 
-  // Diagram sort order within each folder in the nav tree. Persists per
-  // project in localStorage. "manual" preserves the user's drag-and-drop
-  // order stored in folderTree.diagramOrder; other modes override it.
+  // Diagram sort order within each folder in the nav tree. Stored ON THE PROJECT
+  // (Project.diagramSort) rather than per-browser, so a generated project can be
+  // handed over already sorted and the choice survives a change of machine.
+  // "manual" preserves the user's drag-and-drop order stored in
+  // folderTree.diagramOrder; other modes override it.
   type DiagramSort =
     | "manual"
     | "name-asc"
@@ -898,23 +917,31 @@ export function ProjectDetailClient({ project, orgName, allOrgs, otherProjects, 
     | "modified-asc"
     | "type";
   const diagramTypeStyle = useDiagramTypeStyles();
-  const [diagramSort, setDiagramSort] = useState<DiagramSort>("manual");
+  const isDiagramSort = (v: unknown): v is DiagramSort =>
+    v === "manual" || v === "name-asc" || v === "name-desc"
+    || v === "modified-asc" || v === "modified-desc" || v === "type";
+  const [diagramSort, setDiagramSort] = useState<DiagramSort>(
+    isDiagramSort(project.diagramSort) ? project.diagramSort : "manual");
+  // One-time migration off the old per-browser key. A project saved before the
+  // field existed has none, so adopt whatever THIS browser remembered and write
+  // it to the project — after which the localStorage copy is never read again.
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || project.diagramSort) return;
     try {
       const raw = window.localStorage.getItem(`diagram-sort-${project.id}`);
-      if (raw === "manual" || raw === "name-asc" || raw === "name-desc"
-          || raw === "modified-asc" || raw === "modified-desc" || raw === "type") {
+      if (isDiagramSort(raw)) {
         setDiagramSort(raw);
+        void putDiagramSort(project.id, raw);
       }
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Persist a CHANGE, never the initial value — otherwise simply opening a
+  // project would write its own sort order back and touch updatedAt.
+  const sortHydrated = useRef(false);
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(`diagram-sort-${project.id}`, diagramSort);
-    } catch { /* ignore */ }
+    if (!sortHydrated.current) { sortHydrated.current = true; return; }
+    void putDiagramSort(project.id, diagramSort);
   }, [diagramSort, project.id]);
 
   // Initialize folder tree from DB prop, with one-time migration from localStorage

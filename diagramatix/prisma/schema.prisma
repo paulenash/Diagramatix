@@ -326,6 +326,14 @@ model Project {
   colorConfig Json      @default("{}")
   fontConfig  Json      @default("{}")
   folderTree  Json      @default("{}")
+  // How the project's diagrams are ordered on the project screen:
+  // manual | name-asc | name-desc | modified-asc | modified-desc | type.
+  // Was a per-browser localStorage key (`diagram-sort-<projectId>`), so a
+  // generated project could not be handed over already sorted and the choice
+  // did not survive moving machine. Now a property OF the project, which is what
+  // it always was in intent. The old localStorage value still migrates in on
+  // first open when this is null.
+  diagramSort String?
   // APQC PCF association — set when the project is generated/seeded from an
   // APQC framework (L2 folder-seed or a Create-APQC-Process diagram), or
   // chosen in the Project Properties panel. Shape:

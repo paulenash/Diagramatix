@@ -52,6 +52,9 @@ export function MdDiagramsClient() {
   const [rows, setRows] = useState<Row[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [summary, setSummary] = useState<{ created: number; failed: number } | null>(null);
+  /** The two tidy-up steps that run once the diagrams exist — see `finish()`. */
+  const [finishing, setFinishing] = useState<string | null>(null);
+  const [finished, setFinished] = useState<{ sorted: boolean; linked: number; probable: number; error?: string } | null>(null);
 
   const selectedChain = useMemo(() => chains.find((c) => c.code === selected) ?? null, [chains, selected]);
   const doneCount = rows.filter((r) => r.status === "done").length;
@@ -132,6 +135,64 @@ export function MdDiagramsClient() {
     }
   }, [selectedChain, running, md, projectName]);
 
+  /**
+   * The two things a freshly generated project always needs, done for you.
+   *
+   * Paul, 2026-08-27. Both were manual steps after every run:
+   *   1. Set the project's diagram order to "type", so the eleven BPMN diagrams
+   *      of a chain group together instead of interleaving with the four
+   *      chain-level ones.
+   *   2. Run "Scan Diagrams for Links", which finds a subprocess element whose
+   *      label matches another diagram's name and links them — Value Chain and
+   *      Process Context down to BPMN, and across the high-level group.
+   *
+   * ONLY DEFINITE MATCHES ARE APPLIED. The scan also returns fuzzy (edit-distance)
+   * candidates; those are reported for review rather than adopted, because an
+   * automatic run has nobody watching it and a wrong link is worse than a missing
+   * one. Driven from the browser with the user's own session so it reuses exactly
+   * the code path the manual button uses.
+   */
+  async function finish(newProjectId: string) {
+    const out = { sorted: false, linked: 0, probable: 0 } as { sorted: boolean; linked: number; probable: number; error?: string };
+    try {
+      setFinishing("Setting the diagram order to type…");
+      const r = await fetch(`/api/projects/${newProjectId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diagramSort: "type" }),
+      });
+      out.sorted = r.ok;
+
+      setFinishing("Scanning the diagrams for links…");
+      const scan = await fetch(`/api/projects/${newProjectId}/scan-links`);
+      if (scan.ok) {
+        const j = await scan.json() as {
+          definiteCandidates?: { parentDiagramId: string; parentElementId: string; candidateDiagramId: string }[];
+          probableCandidates?: unknown[];
+        };
+        const adds = (j.definiteCandidates ?? []).map((c) => ({
+          parentDiagramId: c.parentDiagramId,
+          parentElementId: c.parentElementId,
+          candidateDiagramId: c.candidateDiagramId,
+        }));
+        out.probable = (j.probableCandidates ?? []).length;
+        if (adds.length > 0) {
+          const applied = await fetch(`/api/projects/${newProjectId}/scan-links`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ adds, removes: [] }),
+          });
+          if (applied.ok) out.linked = adds.length;
+        }
+      }
+    } catch (e) {
+      out.error = e instanceof Error ? e.message : String(e);
+    } finally {
+      setFinishing(null);
+      setFinished(out);
+    }
+  }
+
   function handleMessage(msg: Record<string, unknown>) {
     const t = msg.t as string;
     if (t === "project") {
@@ -148,6 +209,10 @@ export function MdDiagramsClient() {
       } : r));
     } else if (t === "done") {
       setSummary({ created: (msg.created as number) ?? 0, failed: (msg.failed as number) ?? 0 });
+      // Only worth doing if something was actually created.
+      const created = (msg.created as number) ?? 0;
+      const pid = (msg.projectId as string) ?? null;
+      if (created > 0 && pid) void finish(pid);
     } else if (t === "error") {
       setError((msg.message as string) ?? "Run failed");
     }
@@ -280,6 +345,26 @@ export function MdDiagramsClient() {
               {projectId && (
                 <> <button onClick={() => router.push(`/dashboard/projects/${projectId}`)} className="ml-1 font-semibold underline hover:text-green-900">Open the new project →</button></>
               )}
+            </div>
+          )}
+
+          {finishing && (
+            <p className="mt-2 text-xs text-gray-600">{finishing}</p>
+          )}
+          {finished && (
+            <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs text-gray-700">
+              {finished.sorted
+                ? <>Diagram order set to <b>type</b>. </>
+                : <><span className="text-amber-700">Could not set the diagram order.</span> </>}
+              {finished.linked > 0
+                ? <>Linked <b>{finished.linked}</b> diagram{finished.linked === 1 ? "" : "s"} by name.</>
+                : <>No definite links found.</>}
+              {finished.probable > 0 && (
+                <> <b>{finished.probable}</b> near-match{finished.probable === 1 ? "" : "es"} left for you —
+                  only exact name matches are linked automatically, since nobody is watching this run.
+                  Use <i>Scan Diagrams for Links</i> on the project to review them.</>
+              )}
+              {finished.error && <span className="text-amber-700"> ({finished.error})</span>}
             </div>
           )}
         </div>

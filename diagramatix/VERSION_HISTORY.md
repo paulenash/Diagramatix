@@ -15,6 +15,52 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.3.2333 — 2026-08-27 — Generated-diagram tidy-ups, and sort order becomes a property of the project
+
+Four pieces of feedback from reviewing the regenerated V03 diagrams.
+
+**The "AI Generated" annotation is gone.** It was stamped above the start event of
+every generated diagram, naming the prompt, because that was once the only way to
+see where a diagram came from. It is not any more — a generated diagram stores its
+prompt on `data.aiGeneration` and the editor shows it on demand — so the
+annotation was duplicating that in ink, permanently, on every diagram. Diagrams
+generated before this keep theirs: nothing rewrites stored data.
+
+**Every edge-mounted intermediate event is now interrupting**, enforced in the
+layout rather than asked for in the prompt. The subtlety worth recording is the
+exception: the non-interrupting START event that R6.11 places INSIDE an Event
+Expanded Subprocess is not edge-mounted, and its non-interrupting flavour is what
+says its tasks run in parallel with the outer ones. A blanket rule would have
+silently changed the meaning of every event subprocess, so `T2897` pins that case
+alongside `T2896`.
+
+**Diagram sort order moved onto the project.** It lived in a per-browser
+`localStorage` key, which meant a generated project could not be handed over
+already sorted and the choice did not survive a change of machine. It is now
+`Project.diagramSort` — a property of the project, which is what it always was in
+intent. A project saved before the field existed migrates that browser's value in
+on first open.
+
+**A value-chain run now finishes the job.** When the batch generator completes it
+sets the new project's diagram order to *type* and runs the link scan, linking
+diagrams whose names match. Only DEFINITE matches are applied — the scan also
+returns fuzzy candidates, and those are reported for review rather than adopted,
+because an automatic run has nobody watching it and a wrong link is worse than a
+missing one.
+
+Worth noting for anyone expecting an extension here: **the link scan already spans
+Value Chain, Process Context, ArchiMate and BPMN** — `LINKABLE_DIAGRAM_TYPES` has
+covered all four for some time. What was missing was only the automatic
+invocation, not the coverage.
+
+*Not in this release:* activity boxes still do not size to their text, especially
+inside an Expanded Subprocess. That needs `wrapText` extracted from the canvas so
+the layout and the renderer measure identically, and it moves layout expectations
+across many existing tests — it deserves its own change rather than riding along
+with these.
+
+---
+
 ## 2.2.2332 — 2026-08-27 — The BPMN master template asked for a shape the code strips
 
 **The defect.** The template shipped saying *"say explicitly where a branch

@@ -2094,8 +2094,11 @@ export function layoutBpmnDiagram(
   // which can sit a long way from the element it documents. Place it just
   // ABOVE the associated element (centred, small gap); if that would escape
   // the top of its containing lane / pool, flip it directly BELOW instead.
-  // The "_ai_gen_annotation" is positioned by R56 and left alone here. Runs
-  // before connector waypoints are computed so the association routes short.
+  // "_ai_gen_annotation" is skipped. Nothing creates one any more (see the note
+  // where R56 used to be), but a diagram generated before that still carries one
+  // in its stored data, and re-laying it out must leave it where the author last
+  // saw it rather than dragging it to a new position. Runs before connector
+  // waypoints are computed so the association routes short.
   {
     const ANNOT_GAP = 20;
     const containerOf = (el: DiagramElement): DiagramElement | null => {
@@ -4221,65 +4224,44 @@ export function layoutBpmnDiagram(
     }
   }
 
-  // R56: "AI Generated" annotation attached to the process-level Start Event.
-  // Injected post-layout so it doesn't go through the column/lane placement.
-  // Annotations can float anywhere — no need to stay inside the pool.
-  const finalConnectors: Connector[] = [...computedConnectors];
-  if (opts?.promptLabel) {
-    const startEl = elements.find(e =>
-      e.type === "start-event" && !e.boundaryHostId
-      && !aiElements.find(a => a.id === e.id)?.parentSubprocess);
-    if (startEl) {
-      const annotId = "_ai_gen_annotation";
-      const annotW = 160, annotH = 44;
-      const startCx = startEl.x + startEl.width / 2;
-      // Walk ancestors to find the top of the enclosing pool — the
-      // annotation sits above it.
-      let topOfContainer = startEl.y;
-      let cur = startEl as DiagramElement | undefined;
-      while (cur?.parentId) {
-        const parent = elements.find(p => p.id === cur!.parentId);
-        if (!parent) break;
-        topOfContainer = parent.y;
-        if (parent.type === "pool") break;
-        cur = parent;
-      }
-      // Sit the annotation to the LEFT of the start event (right edge a gap left
-      // of its left edge), not centred on it: a process that opens with a message
-      // flow to a partner pool sends that connector straight UP from the start
-      // event, and a centred annotation lands on top of the connector + its label.
-      // Left-aligned clears that column and matches the BPMN top-left convention.
-      const annotX = startEl.x - 16 - annotW;
-      const annotY = topOfContainer - annotH - 20;
-      elements.push({
-        id: annotId,
-        type: "text-annotation",
-        x: annotX,
-        y: annotY,
-        width: annotW,
-        height: annotH,
-        label: `AI Generated\n${opts.promptLabel}`,
-        properties: {},
-      } as DiagramElement);
-      finalConnectors.push({
-        id: `conn-${annotId}-${startEl.id}`,
-        sourceId: annotId,
-        targetId: startEl.id,
-        sourceSide: "bottom",
-        targetSide: "top",
-        type: "associationBPMN",
-        directionType: "non-directed",
-        routingType: "direct",
-        sourceInvisibleLeader: false,
-        targetInvisibleLeader: false,
-        waypoints: [
-          { x: annotX + annotW / 2, y: annotY + annotH },
-          { x: startCx,             y: startEl.y },
-        ],
-        label: "",
-      } as Connector);
-    }
+  // ── Every edge-mounted intermediate event is INTERRUPTING ──────────────────
+  //
+  // Paul, 2026-08-27: "all edge-mounted intermediate events must be interrupting
+  // in generated BPMN diagrams." Enforced here rather than asked for in the
+  // prompt, because a rule the model can forget is not a rule — and this one is
+  // cheap to guarantee.
+  //
+  // SCOPE, which is the whole subtlety. This applies ONLY to intermediate events
+  // carrying a boundaryHostId — events mounted on an activity's edge. It must NOT
+  // touch the non-interrupting START event that R6.11 places INSIDE an Event
+  // Expanded Subprocess: that one is internal (parentId, never boundaryHostId),
+  // and its non-interrupting flavour is what says the inner tasks run in parallel
+  // with the outer ones. Forcing that to interrupting would silently change what
+  // every event subprocess means.
+  //
+  // Done as one pass over the finished element list rather than at each
+  // construction site: boundary events are built in several places, including the
+  // EP tidy-up that adopts a stray intermediate event sitting on an EP edge, and
+  // a pass cannot be forgotten by whichever path runs next.
+  for (const el of elements) {
+    if (el.type !== "intermediate-event" || !el.boundaryHostId) continue;
+    const props = (el.properties ?? {}) as Record<string, unknown>;
+    if (props.interruptionType === "interrupting") continue;
+    el.properties = { ...props, interruptionType: "interrupting" };
   }
+
+  // The generated diagram carries NO "AI Generated" annotation.
+  //
+  // It used to: an R56 text-annotation pinned above the process start event,
+  // naming the prompt. That was once the only way to see where a diagram came
+  // from. It is not any more — a generated diagram stores its prompt on
+  // `data.aiGeneration` (promptId, promptName, promptText, model, generatedAt)
+  // and the editor surfaces it on demand, so the annotation was duplicating
+  // that in ink, on every diagram, permanently. Paul, 2026-08-27: remove it.
+  //
+  // Diagrams generated BEFORE this still carry the element in their stored
+  // data — nothing rewrites them, so an old diagram keeps its annotation.
+  const finalConnectors: Connector[] = [...computedConnectors];
 
   // ── R5.09: place gateway labels top-left, close, and clear of obstacles ─────
   // The label rides an ARC around the gateway centre at the nearest-clearing

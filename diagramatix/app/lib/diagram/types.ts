@@ -1198,8 +1198,12 @@ export const SCHEMA_VERSION = "46";
  *   • build  → automatic (git commit count, NEXT_PUBLIC_COMMIT_COUNT); never hand-edited.
  * `appVersion` stamped in exports is the bare two-tier `PRODUCT_VERSION` (the build is display-only).
  * See schema/UPDATE_EVERYTHING.md Step 0.
+ * 2.3 (2026-08-27) — DB: Project.diagramSort. How a project orders its diagrams
+ *   moved off a per-browser localStorage key and onto the project itself, so a
+ *   generated project can be handed over already sorted by type and the choice
+ *   survives a change of machine. XSD unchanged.
  */
-export const PRODUCT_VERSION = "2.2";
+export const PRODUCT_VERSION = "2.3";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the
