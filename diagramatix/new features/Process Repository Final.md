@@ -2299,66 +2299,141 @@ Actors / Teams / IT Systems matrix above.
 **BPMN diagram prompt.**
 
 ```text
-BPMN: V03.01 Capture Financial Transactions — first stage of the Record to Report (R2R) value chain.
+BPMN: V03.01 Capture Financial Transactions — the entry point of the
+Record to Report value chain, where operational activity from source and
+sub-ledger systems is drawn into finance as validated transaction data.
 
 1. Pools & Lanes
-- Pool "Finance Organisation" — the organisation running the process,
-  with two lanes top-to-bottom: "Accounts Payable / Receivable",
-  "Financial Accounting".
-- Pool "Sub-Ledger / Source Systems" — the supporting IT system.
+Pool "Finance Organisation" — the white-box pool holding the process flow,
+with lanes top-to-bottom: Accounts Payable / Receivable, Financial
+Accounting.
+Pool "Sub-Ledger / Source Systems" — the sales, procurement, payroll,
+assets, inventory and banking systems that originate financial
+transactions and hold the sub-ledgers.
 
 2. Pool properties
-- Finance Organisation: white-box (holds the process flow).
-- Sub-Ledger / Source Systems: black-box, System = true, single instance.
+Pool "Finance Organisation" — white-box, holds the full process flow,
+single instance.
+Pool "Sub-Ledger / Source Systems" — black-box, System = true, single
+instance.
 
 3. Layout
-- Finance Organisation pool at the top, Sub-Ledger / Source Systems pool
-  at the bottom.
+Top to bottom: "Finance Organisation" (lanes Accounts Payable /
+Receivable, then Financial Accounting), then "Sub-Ledger / Source
+Systems" at the bottom as the supporting IT system pool. There is no
+external participant pool in this subprocess; the trigger arrives from
+the source systems.
 
 4. Lane contents in flow order (Finance Organisation)
+
 Accounts Payable / Receivable lane:
-- Message start event "Source transactions ready for capture" (the
-  operational systems signal that a batch of transactions is available)
-- Service task "Import transactions from sub-ledgers / operational
-  systems"
-- Service task "Validate transactions (account, cost centre, currency)"
-- Exclusive gateway "All transactions valid?"
-    - branch "No – rejected items": Expanded Subprocess (LOOP marker)
-      "Correct rejected transactions": internals — User task
-      "Investigate rejected item", then User task "Correct and re-submit
-      to interface", then exclusive gateway "Loaded now?": branch "Yes"
-      → subprocess end event "Transactions loaded". The loop marker
-      repeats the attempt while rejected items remain.
-    - branch "Yes": continue to Financial Accounting
+- Message start event "Daily transaction feed available from Sub-Ledger /
+  Source Systems"
+- Service task "Retrieve transaction feed from Sub-Ledger / Source
+  Systems"
+- User task "Identify sub-ledgers in scope for the capture cycle"
+- Expanded Subprocess "Repeat Until All Sub-Ledger Feeds Captured"
+  (standard loop) containing, in order: Service task "Extract transaction
+  batch from source system", Service task "Check batch control totals and
+  record counts", User task "Classify transactions to sub-ledger and
+  posting category", Service task "Stage validated batch for general
+  ledger interface"
+- Exclusive gateway "All batches validated?"
+  - branch "yes — control totals agree": proceed to the merge
+  - branch "no — rejected or suspended items": User task "Investigate
+    rejected transactions against source records"; Send task "Return
+    correction request to Sub-Ledger / Source Systems"; Intermediate
+    message catch event "Corrected transaction batch received"; then
+    proceed to the merge
+- Exclusive merge gateway "Batches validated"
+- User task "Confirm capture completeness for the cycle"
+
 Financial Accounting lane:
-- Service task "Post captured transactions to general ledger"
-- End event "Transactions captured — ready for Post Journals (V03.02)"
+- User task "Review sub-ledger to general ledger interface report"
+- Exclusive gateway "Sub-ledger and interface totals agree?"
+  - branch "yes — agreed": proceed to the merge
+  - branch "no — variance identified": User task "Analyse interface
+    variance against accounting policy"; User task "Record capture
+    exception and remediation note"; then proceed to the merge
+  - branch "feed unusable — source system reload required": User task
+    "Escalate failed capture to finance controller"; End event "Capture
+    cycle abandoned — source reload required, no hand-off to V03.02".
+    This branch does not rejoin.
+- Exclusive merge gateway "Interface reconciled"
+- Service task "Confirm captured batches in Sub-Ledger / Source Systems"
+- User task "Sign off captured transaction population for posting"
+- End event "Captured transactions ready for Post Journals (V03.02)"
 
 5. Edge-mounted (boundary) events
-- INTERRUPTING timer boundary event on the "Correct rejected
-  transactions" Expanded Subprocess: "Rejects not cleared by the daily
-  cut-off" → User task "Escalate to Finance Controller" → escalation end
-  event "Escalated — transactions not captured in time".
+- Interrupting timer boundary event on Expanded Subprocess "Repeat Until
+  All Sub-Ledger Feeds Captured", labelled "Capture window closes
+  (4 hours)" — flow continues to User task "Investigate rejected
+  transactions against source records".
+- Interrupting error boundary event on Service task "Retrieve transaction
+  feed from Sub-Ledger / Source Systems", labelled "Feed extract failed"
+  — flow continues to User task "Escalate failed capture to finance
+  controller" in the Financial Accounting lane.
+- Non-interrupting timer boundary event on User task "Review sub-ledger to
+  general ledger interface report", labelled "Review overdue by one
+  business day" — triggers Send task "Notify finance controller of delayed
+  capture review", which then rejoins before the "Interface reconciled"
+  merge gateway.
 
 6. Connectors
-Sequence flows: follow the lane order above, including the gateway
-branch. The retry subprocess repeats via its loop marker (no internal
-loop-back flow drawn).
+Sequence flows: the flow runs from the message start event through the
+Accounts Payable / Receivable lane — retrieve feed, identify sub-ledgers,
+the standard-loop subprocess, the "All batches validated?" gateway whose
+two branches rejoin at "Batches validated", then capture completeness
+confirmation — and crosses into the Financial Accounting lane for the
+interface review, where the "Sub-ledger and interface totals agree?"
+gateway sends its "yes" and "variance identified" branches to the
+"Interface reconciled" merge while the "feed unusable" branch terminates
+at its own end event; from the merge the flow runs through confirmation
+in the source systems and sign-off to the end event handing to V03.02.
 Message flows:
-- Sub-Ledger / Source Systems → start event "Source transactions ready
-  for capture" (transaction feed available)
-- "Import transactions from sub-ledgers / operational systems" →
-  Sub-Ledger / Source Systems
-- Sub-Ledger / Source Systems → "Validate transactions (account, cost
-  centre, currency)" (transaction detail)
-- "Post captured transactions to general ledger" → Sub-Ledger / Source
-  Systems
+- Sub-Ledger / Source Systems → Message start event "Daily transaction
+  feed available from Sub-Ledger / Source Systems" (transaction feed
+  notification)
+- Sub-Ledger / Source Systems → Service task "Retrieve transaction feed
+  from Sub-Ledger / Source Systems" (raw transaction records from sales,
+  procurement, payroll, assets, inventory and banking)
+- Service task "Extract transaction batch from source system" →
+  Sub-Ledger / Source Systems (batch extract request)
+- Sub-Ledger / Source Systems → Service task "Check batch control totals
+  and record counts" (control totals and record counts)
+- Send task "Return correction request to Sub-Ledger / Source Systems" →
+  Sub-Ledger / Source Systems (rejected item correction request)
+- Sub-Ledger / Source Systems → Intermediate message catch event
+  "Corrected transaction batch received" (corrected batch)
+- Service task "Confirm captured batches in Sub-Ledger / Source Systems" →
+  Sub-Ledger / Source Systems (capture confirmation and batch status)
 
-This is the internal entry point of R2R: each period's operational
-transactions are imported from the sub-ledgers and source systems,
-validated and corrected until every item loads (retried until clean),
-then posted to the general ledger — leaving captured transactions ready
-to be journalised.
+7. Data objects
+Data Object "Transaction Feed File" — read by "Retrieve transaction feed
+from Sub-Ledger / Source Systems", read by "Extract transaction batch from
+source system".
+Data Object "Batch Control Report" — written by "Check batch control
+totals and record counts", read by "Review sub-ledger to general ledger
+interface report".
+Data Object "Capture Exception Log" — written by "Record capture exception
+and remediation note", read by "Escalate failed capture to finance
+controller".
+Data Object "Sub-Ledger to General Ledger Interface Report" — written by
+"Stage validated batch for general ledger interface", read by "Review
+sub-ledger to general ledger interface report".
+Data Store "Sub-Ledger Transaction Register" — written by "Stage validated
+batch for general ledger interface", read by "Confirm capture completeness
+for the cycle".
+Data Store "Fixed Asset Register" — read by "Classify transactions to
+sub-ledger and posting category".
+
+This subprocess turns raw operational activity from the sales,
+procurement, payroll, asset, inventory and banking source systems into a
+validated, classified and complete population of financial transactions,
+with control totals agreed and exceptions logged. It hands the signed-off
+captured transaction population and its interface report to Post Journals
+(V03.02), where the entries are drafted, approved and posted to the
+general ledger.
 ```
 
 ### V03.02 — Post Journals
@@ -2366,62 +2441,162 @@ to be journalised.
 **BPMN diagram prompt.**
 
 ```text
-BPMN: V03.02 Post Journals — second stage of the Record to Report (R2R) value chain.
+BPMN: V03.02 Post Journals — the step that turns captured transactions and
+manual adjustments into approved, posted entries in the general ledger.
 
 1. Pools & Lanes
-- Pool "Finance Organisation" — the organisation, with two lanes
-  top-to-bottom: "Financial Accounting", "Finance Controller".
-- Pool "ERP / General Ledger System" — the supporting IT system.
+Pool "Finance Organisation" — the organisation running the process; lanes,
+top to bottom: Financial Accounting, Finance Controller.
+Pool "ERP / General Ledger System" — the system of record for the general
+ledger, journal templates, posting rules and period status.
 
 2. Pool properties
-- Finance Organisation: white-box (holds the process flow).
-- ERP / General Ledger System: black-box, System = true, single
-  instance.
+Pool "Finance Organisation" — white-box, holds the entire process flow,
+single instance.
+Pool "ERP / General Ledger System" — black-box, System = true, single
+instance.
 
 3. Layout
-- Finance Organisation pool at the top, ERP / General Ledger System pool
-  at the bottom.
+Top to bottom: "Finance Organisation" (lanes Financial Accounting, then
+Finance Controller), then "ERP / General Ledger System" at the bottom as the
+supporting IT system. This subprocess is cycle-driven and has no external
+participant pool.
 
 4. Lane contents in flow order (Finance Organisation)
+
 Financial Accounting lane:
-- Message start event "Captured transactions ready to journalise"
-- User task "Prepare journal entries (accruals, adjustments,
-  allocations)"
-- Service task "Validate journals (balanced, coding, approval limits)"
+- Message start event "Captured transactions and adjustment requests received
+  from V03.01"
+- Service task "Retrieve trial balance and open period status from ERP /
+  General Ledger System"
+- User task "Determine journal type — recurring, correcting or manual
+  adjustment"
+- Expanded Subprocess "Repeat Until Journal Validated" (standard loop)
+  containing, in order: User task "Enter journal header and line detail";
+  User task "Attach supporting documentation and narrative"; Service task
+  "Run journal validation in ERP / General Ledger System"; User task "Correct
+  rejected lines and balancing errors"
+- Service task "Record validated journal as parked entry in ERP / General
+  Ledger System"
+- Exclusive gateway "Approval required under financial delegation policy?"
+  - branch "Below delegated threshold and system-generated": continue to
+    Service task "Auto-approve journal under standing delegation"
+  - branch "Above threshold or manual adjustment": Send task "Submit journal
+    to Finance Controller for approval" and continue in the Finance
+    Controller lane
+- Exclusive merge gateway "Journal approval resolved"
+
 Finance Controller lane:
-- Exclusive gateway "Journals valid and within limits?"
-    - branch "No – rejected / over limit": Expanded Subprocess (LOOP
-      marker) "Correct and re-submit journal": internals — User task
-      "Amend journal", then User task "Re-submit for approval", then
-      exclusive gateway "Approved now?": branch "Yes" → subprocess end
-      event "Journal approved". The loop marker repeats while the
-      journal is rejected.
-    - branch "Yes": continue
-- Service task "Post journals to general ledger"
-- End event "Journals posted — ready for Maintain Chart of Accounts
-  (V03.03)"
+- Intermediate message catch event "Journal submitted for approval"
+- User task "Review journal against accounting policy and journal posting
+  procedure"
+- User task "Check supporting evidence and account coding"
+- Exclusive gateway "Journal approved?"
+  - branch "Approved": Service task "Record approval decision in ERP /
+    General Ledger System"; flow rejoins "Journal approval resolved" in the
+    Financial Accounting lane
+  - branch "Rejected — rework required": Send task "Return journal to
+    preparer with rejection reason"; flow rejoins "Journal approval resolved"
+    in the Financial Accounting lane
+  - branch "Rejected — journal withdrawn": User task "Cancel parked journal
+    in ERP / General Ledger System"; End event "Journal withdrawn — no
+    posting made" (this branch does not rejoin)
+
+Financial Accounting lane (continued):
+- Exclusive gateway "Outcome of approval?"
+  - branch "Approved": Service task "Post journal to general ledger in ERP /
+    General Ledger System"
+  - branch "Returned for rework": User task "Amend journal and resubmit for
+    approval"; flow continues to Service task "Post journal to general ledger
+    in ERP / General Ledger System" once approval is granted
+- Exclusive merge gateway "Posting complete"
+- Service task "Refresh trial balance and posting audit trail in ERP /
+  General Ledger System"
+- User task "Review posting exception listing and unposted items"
+- Data-based exclusive gateway "Coding gap or missing account identified?"
+  - branch "Yes — account structure change needed": Send task "Raise chart of
+    accounts change request"; continue to merge
+  - branch "No": continue to merge
+- Exclusive merge gateway "Journal register reconciled"
+- End event "Journals posted and ledger updated — ready for Maintain Chart of
+  Accounts (V03.03)"
 
 5. Edge-mounted (boundary) events
-- INTERRUPTING timer boundary event on the "Correct and re-submit
-  journal" Expanded Subprocess: "Not posted within the close window" →
-  User task "Escalate to CFO" → escalation end event "Escalated —
-  journals not posted in time".
+- Interrupting timer boundary event on Expanded Subprocess "Repeat Until
+  Journal Validated", labelled "Close cut-off reached", leading to User task
+  "Escalate unvalidated journal to Finance Controller" in the Finance
+  Controller lane, then to the "Journal approval resolved" merge.
+- Interrupting error boundary event on Service task "Post journal to general
+  ledger in ERP / General Ledger System", labelled "Posting rejected — period
+  closed or account blocked", leading to User task "Investigate posting
+  failure and re-date journal", which returns the flow to the "Posting
+  complete" merge gateway.
+- Non-interrupting message boundary event on User task "Review journal against
+  accounting policy and journal posting procedure", labelled "Additional
+  evidence supplied", leading to User task "Re-check supporting evidence" in
+  the Finance Controller lane.
 
 6. Connectors
-Sequence flows: follow the lane order above, including the gateway
-branch. The retry subprocess repeats via its loop marker (no internal
-loop-back flow drawn).
-Message flows:
-- "Validate journals (balanced, coding, approval limits)" → ERP /
-  General Ledger System
-- ERP / General Ledger System → "Journals valid and within limits?"
-  (balances, coding validation, approval limits)
-- "Post journals to general ledger" → ERP / General Ledger System
+Sequence flows: the flow runs from the message start event in Financial
+Accounting through retrieval, journal typing and the "Repeat Until Journal
+Validated" subprocess to the parking of the journal; the "Approval required
+under financial delegation policy?" gateway splits into the auto-approval
+branch and the controller submission branch, both rejoining at "Journal
+approval resolved". In the Finance Controller lane, "Journal approved?"
+splits into approved, returned-for-rework and withdrawn branches; the first
+two rejoin "Journal approval resolved", the third terminates at its own end
+event. The "Outcome of approval?" gateway splits into approved and rework
+branches, both rejoining at "Posting complete". "Coding gap or missing
+account identified?" splits into yes and no branches, both rejoining at
+"Journal register reconciled" before the end event.
 
-This stage prepares the period's journal entries, validates and approves
-them (corrected and re-submitted until they pass), and posts them to the
-general ledger — leaving a complete, approved set of postings ready for
-chart-of-accounts maintenance.
+Message flows:
+- ERP / General Ledger System → Service task "Retrieve trial balance and open
+  period status from ERP / General Ledger System" (trial balance, open period
+  status, posting rules).
+- Service task "Run journal validation in ERP / General Ledger System" → ERP
+  / General Ledger System (draft journal lines for validation).
+- ERP / General Ledger System → Expanded Subprocess "Repeat Until Journal
+  Validated" (validation errors and balancing exceptions).
+- Service task "Record validated journal as parked entry in ERP / General
+  Ledger System" → ERP / General Ledger System (parked journal and
+  attachments).
+- Service task "Record approval decision in ERP / General Ledger System" →
+  ERP / General Ledger System (approver identity, decision, timestamp).
+- Service task "Post journal to general ledger in ERP / General Ledger
+  System" → ERP / General Ledger System (approved journal for posting).
+- ERP / General Ledger System → Service task "Refresh trial balance and
+  posting audit trail in ERP / General Ledger System" (posted document
+  number, updated trial balance, exception listing).
+
+7. Data objects
+Data Object "Journal Entry" — written by "Enter journal header and line
+detail", read by "Review journal against accounting policy and journal
+posting procedure".
+Data Object "Supporting Documentation Pack" — written by "Attach supporting
+documentation and narrative", read by "Check supporting evidence and account
+coding".
+Data Object "Journal Approval Record" — written by "Record approval decision
+in ERP / General Ledger System", read by "Post journal to general ledger in
+ERP / General Ledger System".
+Data Object "Posting Exception Listing" — written by "Refresh trial balance
+and posting audit trail in ERP / General Ledger System", read by "Review
+posting exception listing and unposted items".
+Data Object "Chart of Accounts Change Request" — written by "Raise chart of
+accounts change request".
+Data Store "General Ledger" — written by "Post journal to general ledger in
+ERP / General Ledger System", read by "Retrieve trial balance and open period
+status from ERP / General Ledger System".
+Data Store "Journal Audit Trail" — written by "Refresh trial balance and
+posting audit trail in ERP / General Ledger System".
+
+Post Journals converts validated transactions and manual adjustments into
+approved, auditable entries in the general ledger, applying the journal
+posting procedure and the financial delegation policy to every entry above
+threshold. It leaves a complete approval and posting audit trail and an
+updated trial balance. It hands an accurate posted ledger, plus any chart of
+accounts change requests it has raised, to Maintain Chart of Accounts
+(V03.03) and on to the reconciliation and close steps that follow.
 ```
 
 ### V03.03 — Maintain Chart of Accounts
@@ -2429,63 +2604,136 @@ chart-of-accounts maintenance.
 **BPMN diagram prompt.**
 
 ```text
-BPMN: V03.03 Maintain Chart of Accounts — third stage of the Record to Report (R2R) value chain.
+BPMN: V03.03 Maintain Chart of Accounts — the general ledger structure
+governance step that keeps account codes valid for posting, reconciliation and
+consolidation across the Record to Report chain.
 
 1. Pools & Lanes
-- Pool "Finance Organisation" — the organisation, with two lanes
-  top-to-bottom: "Financial Accounting", "Finance Controller".
-- Pool "ERP / General Ledger System" — the supporting IT system.
+Pool "Finance Organisation" — the organisation running the process, with lanes
+top-to-bottom: Financial Accounting; Finance Controller.
+Pool "ERP / General Ledger System" — the system of record holding the chart of
+accounts master data, account hierarchies and posting rules.
 
 2. Pool properties
-- Finance Organisation: white-box (holds the process flow).
-- ERP / General Ledger System: black-box, System = true, single
-  instance.
+Pool "Finance Organisation" — white-box, holds the process flow, single
+instance.
+Pool "ERP / General Ledger System" — black-box, System = true, single instance.
 
 3. Layout
-- Finance Organisation pool at the top, ERP / General Ledger System pool
-  at the bottom.
+Top to bottom: "Finance Organisation" (lanes Financial Accounting, then Finance
+Controller), then "ERP / General Ledger System" at the bottom as the supporting
+IT system.
 
 4. Lane contents in flow order (Finance Organisation)
+
 Financial Accounting lane:
-- Message start event "Chart of accounts change requested" (new account,
-  mapping or hierarchy change)
-- User task "Assess CoA change request (new account, mapping,
-  hierarchy)"
+- Message start event "Chart of accounts change request received from V03.02"
+- User task "Register account change request"
+- Service task "Retrieve current chart of accounts structure from ERP / General
+  Ledger System"
+- Expanded Subprocess "Repeat Until Request Details Complete" (standard loop)
+  containing, in order: User task "Review request against chart of accounts
+  governance policy", User task "Query missing account attributes with
+  requesting team", User task "Update account change request record"
+- User task "Classify change type"
+- Exclusive gateway "Change type?"
+  - branch "New account or hierarchy node": User task "Draft new account
+    definition and posting rules"
+  - branch "Amend existing account": User task "Draft amendment to account
+    attributes"
+  - branch "Deactivate or block account": User task "Check open balances and
+    in-flight postings before deactivation"
+- Exclusive merge gateway "Change drafted"
+- User task "Prepare impact assessment on reporting and consolidation mappings"
+- Send task "Submit change for governance approval"
+
 Finance Controller lane:
-- Exclusive gateway "Change approved under CoA governance?"
-    - branch "Rejected": End event "Change rejected — chart of accounts
-      unchanged"
-    - branch "Refer – needs rework": Expanded Subprocess (LOOP marker)
-      "Revise chart-of-accounts change": internals — User task "Revise
-      change request (mapping / hierarchy)", then User task "Re-submit
-      for governance approval", then exclusive gateway "Approved now?":
-      branch "Yes" → subprocess end event "Change approved". The loop
-      marker repeats while approval is withheld.
-    - branch "Approved": continue
-- Service task "Apply change and update mappings in general ledger"
+- User task "Review change against accounting policy and financial delegation
+  policy"
+- Exclusive gateway "Change approved?"
+  - branch "Rejected": User task "Record rejection rationale"; Send task
+    "Notify requesting team of rejection"; End event "Change request rejected —
+    chart of accounts unchanged" (this branch does not rejoin)
+  - branch "Approved": User task "Authorise chart of accounts change"
+- User task "Confirm effective period for the change"
+
+Financial Accounting lane:
+- Intermediate timer catch event "Next scheduled master data release window"
+- Service task "Apply account change in ERP / General Ledger System"
+- Service task "Update account hierarchies and reporting mappings in ERP /
+  General Ledger System"
+- User task "Validate test posting against changed account"
+- Exclusive gateway "Validation clean?"
+  - branch "Errors found": User task "Correct account configuration"; rejoins
+    the merge below
+  - branch "Clean": User task "Confirm account available for posting"
+- Exclusive merge gateway "Account validated"
+- Service task "Record change in chart of accounts change log"
+- Send task "Publish updated chart of accounts to finance teams"
 - End event "Chart of accounts maintained — ready for Reconcile Accounts
   (V03.04)"
 
 5. Edge-mounted (boundary) events
-- INTERRUPTING timer boundary event on the "Revise chart-of-accounts
-  change" Expanded Subprocess: "Not approved in 5 business days" → User
-  task "Escalate to CFO" → escalation end event "Escalated — CoA change
-  not approved in time".
+- Interrupting timer boundary event on Expanded Subprocess "Repeat Until
+  Request Details Complete", labelled "10 working days without complete
+  details" → User task "Return request to originator as incomplete" → End event
+  "Change request withdrawn — chart of accounts unchanged".
+- Interrupting error boundary event on Service task "Apply account change in ERP
+  / General Ledger System", labelled "Master data update rejected by ERP" →
+  User task "Investigate ERP validation error" → flow returns into User task
+  "Correct account configuration".
+- Non-interrupting timer boundary event on User task "Review change against
+  accounting policy and financial delegation policy", labelled "5 working days
+  elapsed" → Send task "Escalate pending approval to finance controller".
 
 6. Connectors
-Sequence flows: follow the lane order above, including the gateway
-branches. The retry subprocess repeats via its loop marker (no internal
-loop-back flow drawn).
-Message flows:
-- ERP / General Ledger System → "Assess CoA change request (new account,
-  mapping, hierarchy)" (existing accounts, usage, hierarchy)
-- "Apply change and update mappings in general ledger" → ERP / General
-  Ledger System
+Sequence flows: the flow runs Financial Accounting (registration, completeness
+loop, classification, drafting, impact assessment, submission) → Finance
+Controller (policy review, approval gateway, effective period) → Financial
+Accounting (release window wait, ERP application, validation, logging,
+publication). Gateway "Change type?" branches to new account, amend existing
+account, and deactivate or block, all merging at "Change drafted". Gateway
+"Change approved?" branches to Rejected, which terminates at its own end event
+and does not rejoin, and Approved, which continues. Gateway "Validation clean?"
+branches to Errors found and Clean, both merging at "Account validated".
 
-This stage governs the chart of accounts: a change request is assessed
-and approved under governance — reworked and re-submitted where referred,
-rejected where out of policy — then applied and re-mapped in the general
-ledger, keeping the account structure clean before reconciliation.
+Message flows:
+- ERP / General Ledger System → Service task "Retrieve current chart of accounts
+  structure from ERP / General Ledger System" (current account codes,
+  hierarchies and posting rules).
+- Service task "Apply account change in ERP / General Ledger System" → ERP /
+  General Ledger System (new, amended or deactivated account definitions).
+- Service task "Update account hierarchies and reporting mappings in ERP /
+  General Ledger System" → ERP / General Ledger System (hierarchy and mapping
+  updates).
+- ERP / General Ledger System → User task "Validate test posting against changed
+  account" (test posting result and validation messages).
+- Service task "Record change in chart of accounts change log" → ERP / General
+  Ledger System (approved change record with effective date).
+
+7. Data objects
+Data Object "Account Change Request" — written by "Register account change
+request", read by "Review request against chart of accounts governance policy".
+Data Object "Impact Assessment" — written by "Prepare impact assessment on
+reporting and consolidation mappings", read by "Review change against accounting
+policy and financial delegation policy".
+Data Object "Account Definition Draft" — written by "Draft new account
+definition and posting rules" and "Draft amendment to account attributes", read
+by "Apply account change in ERP / General Ledger System".
+Data Store "Chart of Accounts Master" — read by "Retrieve current chart of
+accounts structure from ERP / General Ledger System", written by "Update account
+hierarchies and reporting mappings in ERP / General Ledger System".
+Data Store "Chart of Accounts Change Log" — written by "Record change in chart
+of accounts change log", read by "Record rejection rationale".
+Data Object "Published Chart of Accounts" — written by "Publish updated chart of
+accounts to finance teams".
+
+This subprocess keeps the general ledger structure governed and current:
+requests to add, amend or retire accounts are completed, assessed for reporting
+impact, approved under the delegation policy, applied in the ERP general ledger
+and validated by test posting. It hands a published, effective-dated chart of
+accounts and a logged change record to Reconcile Accounts (V03.04), so that
+balances are reconciled against account codes that are valid for the period.
 ```
 
 ### V03.04 — Reconcile Accounts
@@ -2493,66 +2741,144 @@ ledger, keeping the account structure clean before reconciliation.
 **BPMN diagram prompt.**
 
 ```text
-BPMN: V03.04 Reconcile Accounts — fourth stage of the Record to Report (R2R) value chain.
+BPMN: V03.04 Reconcile Accounts — the control step of Record to Report
+that proves ledger balances against external and sub-ledger evidence
+before accruals are raised and the period is closed.
 
 1. Pools & Lanes
-- Pool "Bank" — the external party that provides statements and
-  confirmations.
-- Pool "Finance Organisation" — the organisation, with one lane:
-  "Financial Accounting".
-- Pool "Reconciliation System" — the supporting IT system.
+Pool "Finance Organisation" — the white-box pool holding the whole
+reconciliation flow. Lanes, top to bottom:
+- Financial Accounting (reconciliations analyst)
+Pool "Bank" — external party supplying statements and balance
+confirmations for cash and loan accounts.
+Pool "Reconciliation System" — IT system holding reconciliation
+templates, matching rules, breaks and sign-off records.
 
 2. Pool properties
-- Bank: black-box, single instance.
-- Finance Organisation: white-box (holds the process flow).
-- Reconciliation System: black-box, System = true, single instance.
+Pool "Bank" — black-box, single instance, System = false.
+Pool "Finance Organisation" — white-box, single instance, holds the
+process flow.
+Pool "Reconciliation System" — black-box, System = true, single
+instance.
 
 3. Layout
-- Bank pool at the top, Finance Organisation pool in the middle,
-  Reconciliation System pool at the bottom.
+Top to bottom: "Bank", then "Finance Organisation", then
+"Reconciliation System" at the bottom as the supporting IT system.
 
 4. Lane contents in flow order (Finance Organisation)
+
 Financial Accounting lane:
-- Message start event "Ledgers ready to reconcile" (period sub-ledger
-  and general-ledger balances available)
-- Service task "Import balances and statements"
-- Service task "Match sub-ledger, general ledger and bank balances"
-- Exclusive gateway "All balances reconciled?"
-    - branch "No – reconciling items": Expanded Subprocess (LOOP marker)
-      "Resolve reconciling item": internals — User task "Investigate
-      reconciling item", then Send task "Query source / bank for
-      supporting detail", then intermediate message catch event "Source
-      / bank responds", then exclusive gateway "Cleared?": branch "Yes"
-      → subprocess end event "Reconciling item cleared". The loop marker
-      repeats while reconciling items remain.
-    - branch "Yes": continue
-- User task "Sign off reconciliation"
+- Message start event "Period ledger balances available from V03.03"
+- Service task "Extract ledger and sub-ledger balances into
+  Reconciliation System"
+- User task "Identify accounts in scope under reconciliation policy"
+- Send task "Request bank statements and balance confirmations"
+- Intermediate message catch event "Bank statement received"
+- Service task "Load statements and supporting schedules into
+  Reconciliation System"
+- Service task "Run automated matching rules"
+- Exclusive gateway "Reconciling items found?"
+  - branch "no items — balances agree": continue to "Exclusive merge
+    gateway 'Reconciliation outcome known'"
+  - branch "items found": Expanded Subprocess "Repeat Until All
+    Reconciling Items Cleared" (standard loop) containing, in order:
+    User task "Investigate reconciling item"; User task "Obtain
+    supporting evidence for item"; User task "Classify item as timing
+    difference, error or unexplained break"; User task "Raise
+    correcting journal request for V03.02"; Service task "Update item
+    status in Reconciliation System". Then continue to "Exclusive merge
+    gateway 'Reconciliation outcome known'"
+- Exclusive merge gateway "Reconciliation outcome known"
+- User task "Prepare reconciliation statement and break schedule"
+- Service task "Record completed reconciliation in Reconciliation
+  System"
+- Exclusive gateway "Unexplained breaks above tolerance?"
+  - branch "within tolerance": continue to "Exclusive merge gateway
+    'Reconciliation position agreed'"
+  - branch "above tolerance": User task "Escalate break to finance
+    controller for decision"; User task "Agree remediation or write-off
+    treatment"; then continue to "Exclusive merge gateway
+    'Reconciliation position agreed'"
+- Exclusive merge gateway "Reconciliation position agreed"
+- User task "Review and sign off reconciliation"
+- Service task "Publish signed reconciliation pack to Reconciliation
+  System"
 - End event "Accounts reconciled — ready for Manage Accruals and
   Provisions (V03.05)"
 
 5. Edge-mounted (boundary) events
-- INTERRUPTING timer boundary event on the "Resolve reconciling item"
-  Expanded Subprocess: "Not cleared within the close timetable" → User
-  task "Escalate to Finance Controller" → escalation end event
-  "Escalated — reconciliation not cleared in time".
+- Interrupting timer boundary event on Expanded Subprocess "Repeat Until
+  All Reconciling Items Cleared", labelled "Close deadline reached",
+  leading to User task "Escalate break to finance controller for
+  decision".
+- Non-interrupting timer boundary event on Intermediate message catch
+  event handling — mounted instead on Send task "Request bank statements
+  and balance confirmations", labelled "No statement after 3 working
+  days", leading to Send task "Chase bank for outstanding statement",
+  which returns no flow of its own and completes.
+- Interrupting error boundary event on Service task "Run automated
+  matching rules", labelled "Matching rules failed", leading to User task
+  "Reconcile manually from source schedules", which then joins
+  "Exclusive merge gateway 'Reconciliation outcome known'".
 
 6. Connectors
-Sequence flows: follow the lane order above, including the gateway
-branch. The retry subprocess repeats via its loop marker (no internal
-loop-back flow drawn).
-Message flows:
-- Bank → "Import balances and statements" (bank statements and balances)
-- "Import balances and statements" → Reconciliation System
-- Reconciliation System → "Match sub-ledger, general ledger and bank
-  balances" (matched / unmatched items)
-- "Query source / bank for supporting detail" → Bank
-- Bank → intermediate event "Source / bank responds"
-- "Sign off reconciliation" → Reconciliation System
+Sequence flows: the flow runs entirely within the Financial Accounting
+lane, from the message start event through extraction, scoping, the bank
+request and its catch event, loading and matching, the gateway
+"Reconciling items found?" whose two branches rejoin at "Exclusive merge
+gateway 'Reconciliation outcome known'", then statement preparation and
+recording, the gateway "Unexplained breaks above tolerance?" whose two
+branches rejoin at "Exclusive merge gateway 'Reconciliation position
+agreed'", then review, sign-off, publication and the end event.
 
-This stage reconciles the sub-ledgers, general ledger and bank balances,
-resolving any reconciling item with the source system or bank (retried
-until cleared) and signing off — leaving reconciled accounts ready for
-accruals and provisions.
+Message flows:
+- Finance Organisation "Request bank statements and balance
+  confirmations" → Bank (statement and confirmation request).
+- Finance Organisation "Chase bank for outstanding statement" → Bank
+  (reminder for outstanding statement).
+- Bank → Finance Organisation "Bank statement received" (bank statements
+  and balance confirmations).
+- Finance Organisation "Extract ledger and sub-ledger balances into
+  Reconciliation System" → Reconciliation System (ledger and sub-ledger
+  balance extract).
+- Finance Organisation "Load statements and supporting schedules into
+  Reconciliation System" → Reconciliation System (statements and
+  supporting schedules).
+- Reconciliation System → Finance Organisation "Run automated matching
+  rules" (match results and break list).
+- Finance Organisation "Record completed reconciliation in
+  Reconciliation System" → Reconciliation System (completed
+  reconciliation and item statuses).
+- Finance Organisation "Publish signed reconciliation pack to
+  Reconciliation System" → Reconciliation System (signed reconciliation
+  pack).
+
+7. Data objects
+Data Store "General Ledger Balances" — read by "Extract ledger and
+sub-ledger balances into Reconciliation System".
+Data Store "Sub-Ledger Balances" — read by "Extract ledger and
+sub-ledger balances into Reconciliation System".
+Data Object "Bank Statement" — read by "Load statements and supporting
+schedules into Reconciliation System".
+Data Object "Supporting Schedule" — read by "Obtain supporting evidence
+for item".
+Data Object "Break Schedule" — written by "Prepare reconciliation
+statement and break schedule".
+Data Object "Journal Request" — written by "Raise correcting journal
+request for V03.02".
+Data Object "Reconciliation Statement" — written by "Prepare
+reconciliation statement and break schedule", read by "Review and sign
+off reconciliation".
+Data Store "Reconciliation Register" — written by "Record completed
+reconciliation in Reconciliation System" and by "Publish signed
+reconciliation pack to Reconciliation System".
+
+This subprocess proves that every in-scope ledger balance agrees to
+external or sub-ledger evidence, clears or explains each reconciling
+item, and obtains sign-off within the reconciliation policy. It hands a
+signed reconciliation pack, an explained break schedule and any
+correcting journal requests to Manage Accruals and Provisions (V03.05)
+and, through it, to Close Accounting Periods (V03.06).
 ```
 
 ### V03.05 — Manage Accruals and Provisions
@@ -2560,61 +2886,150 @@ accruals and provisions.
 **BPMN diagram prompt.**
 
 ```text
-BPMN: V03.05 Manage Accruals and Provisions — fifth stage of the Record to Report (R2R) value chain.
+BPMN: V03.05 Manage Accruals and Provisions — the fifth subprocess of the
+Record to Report value chain, recognising costs and obligations that belong
+to the period before the ledger is closed.
 
 1. Pools & Lanes
-- Pool "Finance Organisation" — the organisation, with two lanes
-  top-to-bottom: "Financial Accounting", "Management Accounting".
-- Pool "ERP / General Ledger System" — the supporting IT system.
+Pool "Finance Organisation" — the organisation running the process, with
+lanes top-to-bottom: Financial Accounting, Management Accounting.
+Pool "ERP / General Ledger System" — the general ledger of record holding
+accrual and provision journals, balances and reversals.
 
 2. Pool properties
-- Finance Organisation: white-box (holds the process flow).
-- ERP / General Ledger System: black-box, System = true, single
-  instance.
+Pool "Finance Organisation" — white-box, holds the entire process flow,
+single instance per accounting period.
+Pool "ERP / General Ledger System" — black-box, System = true, single
+instance.
 
 3. Layout
-- Finance Organisation pool at the top, ERP / General Ledger System pool
-  at the bottom.
+Top to bottom: Finance Organisation (lanes Financial Accounting, then
+Management Accounting), then ERP / General Ledger System at the bottom as
+the supporting IT system.
 
 4. Lane contents in flow order (Finance Organisation)
+
 Financial Accounting lane:
-- Message start event "Period accruals and provisions due"
-- User task "Identify accruals, prepayments and provisions"
-- Service task "Calculate and post accrual / provision journals"
-- Exclusive gateway "Accruals complete and supported?"
-    - branch "No – query / missing support": Expanded Subprocess (LOOP
-      marker) "Resolve accrual query": internals — User task
-      "Investigate accrual / provision", then User task "Obtain
-      supporting information from budget owner", then exclusive gateway
-      "Resolved?": branch "Yes" → subprocess end event "Accrual
-      supported". The loop marker repeats while the accrual is
-      unsupported.
-    - branch "Yes": continue to Management Accounting
+- Message start event "Reconciled ledger balances received from V03.04"
+- Service task "Extract period cost and obligation data from ERP / General
+  Ledger System"
+- User task "Identify candidate accruals, prepayments and provisions
+  against accruals policy"
+- Expanded Subprocess "Repeat Until All Accrual Items Assessed" (standard
+  loop) containing, in order: User task "Select accrual or provision item";
+  User task "Gather supporting evidence and estimate basis"; User task
+  "Calculate accrual or provision amount"; User task "Record calculation in
+  accruals schedule"
+- Service task "Compile draft accruals and provisions schedule"
+- Send task "Send draft schedule to Management Accounting for review"
+
 Management Accounting lane:
-- Service task "Review accruals against budget and prior periods"
-- End event "Accruals and provisions managed — ready for Close
+- Intermediate message catch event "Draft accruals and provisions schedule
+  received"
+- User task "Review accrual estimates against budget and operational
+  expectation"
+- User task "Challenge or confirm provision assumptions with cost owners"
+- Exclusive gateway "Estimates supportable?"
+  - branch "Adjustment required": User task "Record requested adjustment and
+    rationale"; Send task "Return schedule to Financial Accounting for
+    revision"; continues to Expanded Subprocess "Do Until Schedule Agreed"
+  - branch "Estimates accepted": Send task "Confirm schedule to Financial
+    Accounting"; continues to Exclusive merge gateway "Schedule reviewed"
+- Expanded Subprocess "Do Until Schedule Agreed" (standard loop) containing,
+  in order: User task "Revise estimate and supporting basis"; User task
+  "Re-review revised estimate"; User task "Update accruals schedule"
+- Exclusive merge gateway "Schedule reviewed"
+
+Financial Accounting lane:
+- User task "Prepare accrual and provision journal entries for posting"
+- Exclusive gateway "Value within delegated posting limit?"
+  - branch "Within limit": continues to Exclusive merge gateway "Journals
+    authorised"
+  - branch "Above limit — controller approval needed": Send task "Submit
+    high-value provision for finance controller approval"; Intermediate
+    message catch event "Approval decision received"; continues to Exclusive
+    merge gateway "Journals authorised"
+- Exclusive merge gateway "Journals authorised"
+- Service task "Post accrual and provision journals to ERP / General Ledger
+  System"
+- Service task "Set automatic reversal dates for reversing accruals"
+- User task "Update provisions register with movement, utilisation and
+  release"
+- Service task "Reconcile posted accruals to accruals schedule"
+- End event "Accruals and provisions recognised — ready for Close
   Accounting Periods (V03.06)"
 
 5. Edge-mounted (boundary) events
-- INTERRUPTING timer boundary event on the "Resolve accrual query"
-  Expanded Subprocess: "Not resolved before the close cut-off" → User
-  task "Escalate to Finance Controller" → escalation end event
-  "Escalated — accruals not finalised in time".
+- Interrupting timer boundary event on Expanded Subprocess "Repeat Until All
+  Accrual Items Assessed", labelled "Close calendar cut-off reached" —
+  routes to User task "Escalate incomplete accrual items to finance
+  controller" in the Financial Accounting lane, then to Service task
+  "Compile draft accruals and provisions schedule".
+- Non-interrupting timer boundary event on Intermediate message catch event
+  path — instead mount an interrupting timer boundary event on Expanded
+  Subprocess "Do Until Schedule Agreed", labelled "Review window expired" —
+  routes to Exclusive merge gateway "Schedule reviewed" with the latest
+  estimate carried forward.
+- Interrupting error boundary event on Service task "Post accrual and
+  provision journals to ERP / General Ledger System", labelled "Posting
+  rejected by ledger", routing to User task "Correct journal and repost" in
+  the Financial Accounting lane, which returns the flow to Service task "Set
+  automatic reversal dates for reversing accruals".
 
 6. Connectors
-Sequence flows: follow the lane order above, including the gateway
-branch. The retry subprocess repeats via its loop marker (no internal
-loop-back flow drawn).
-Message flows:
-- "Calculate and post accrual / provision journals" → ERP / General
-  Ledger System
-- ERP / General Ledger System → "Review accruals against budget and
-  prior periods" (posted balances, prior-period accruals)
+Sequence flows: the flow runs from the message start event through data
+extraction, item identification and the "Repeat Until All Accrual Items
+Assessed" subprocess in the Financial Accounting lane, crosses to the
+Management Accounting lane for review at the gateway "Estimates
+supportable?" — the "Adjustment required" branch runs through the "Do Until
+Schedule Agreed" subprocess and the "Estimates accepted" branch passes
+straight on, both rejoining at the merge gateway "Schedule reviewed" — then
+returns to the Financial Accounting lane where the gateway "Value within
+delegated posting limit?" splits into "Within limit" and "Above limit —
+controller approval needed", both rejoining at the merge gateway "Journals
+authorised", after which posting, reversal setting, register update and
+reconciliation lead to the end event.
 
-This stage identifies, calculates and posts the period's accruals,
-prepayments and provisions, resolving any unsupported item (retried
-until supported) and reviewing against budget and prior periods —
-leaving the ledger fully accrued and ready to close.
+Message flows:
+- ERP / General Ledger System → Service task "Extract period cost and
+  obligation data from ERP / General Ledger System" (period cost data,
+  open commitments, prior-period accrual balances).
+- Service task "Post accrual and provision journals to ERP / General Ledger
+  System" → ERP / General Ledger System (accrual and provision journal
+  entries).
+- Service task "Set automatic reversal dates for reversing accruals" → ERP /
+  General Ledger System (reversal instructions and effective dates).
+- ERP / General Ledger System → Service task "Reconcile posted accruals to
+  accruals schedule" (posted ledger balances and journal confirmations).
+- ERP / General Ledger System → Interrupting error boundary event "Posting
+  rejected by ledger" (posting rejection message).
+
+7. Data objects
+Data Object "Accruals and Provisions Schedule" — written by "Record
+calculation in accruals schedule" and "Update accruals schedule", read by
+"Review accrual estimates against budget and operational expectation".
+Data Object "Supporting Evidence Pack" — written by "Gather supporting
+evidence and estimate basis", read by "Challenge or confirm provision
+assumptions with cost owners".
+Data Object "Accrual and Provision Journal Entries" — written by "Prepare
+accrual and provision journal entries for posting", read by "Post accrual
+and provision journals to ERP / General Ledger System".
+Data Object "Controller Approval Record" — written by "Submit high-value
+provision for finance controller approval", read by "Prepare accrual and
+provision journal entries for posting".
+Data Store "Provisions Register" — written by "Update provisions register
+with movement, utilisation and release", read by "Identify candidate
+accruals, prepayments and provisions against accruals policy".
+Data Store "General Ledger" — written by "Post accrual and provision
+journals to ERP / General Ledger System", read by "Reconcile posted
+accruals to accruals schedule".
+
+This subprocess ensures that costs and obligations belonging to the period
+are recognised in the ledger before it is frozen, with each estimate
+supported by evidence, reviewed by Management Accounting and authorised
+within the financial delegation policy. It hands a ledger carrying complete
+accrual and provision entries, agreed reversal dates and an updated
+provisions register to Close Accounting Periods (V03.06).
 ```
 
 ### V03.06 — Close Accounting Periods
@@ -2622,59 +3037,128 @@ leaving the ledger fully accrued and ready to close.
 **BPMN diagram prompt.**
 
 ```text
-BPMN: V03.06 Close Accounting Periods — sixth stage of the Record to Report (R2R) value chain.
+BPMN: V03.06 Close Accounting Periods — the period-end control step that
+locks the ledger once all close tasks are complete, between managing accruals
+and provisions (V03.05) and consolidating entities (V03.07).
 
 1. Pools & Lanes
-- Pool "Finance Organisation" — the organisation, with two lanes
-  top-to-bottom: "Financial Accounting", "Finance Controller".
-- Pool "Financial Close System" — the supporting IT system.
+Pool "Finance Organisation" — the white-box pool holding the whole close
+process, with lanes top-to-bottom: Financial Accounting, Finance Controller.
+Pool "Financial Close System" — the close task checklist, milestone and
+period-lock application.
 
 2. Pool properties
-- Finance Organisation: white-box (holds the process flow).
-- Financial Close System: black-box, System = true, single instance.
+Pool "Finance Organisation" — white-box, holds the process flow, single
+instance per accounting period.
+Pool "Financial Close System" — black-box, System = true, single instance.
 
 3. Layout
-- Finance Organisation pool at the top, Financial Close System pool at
-  the bottom.
+Top to bottom: "Finance Organisation" (lanes Financial Accounting, then
+Finance Controller), then "Financial Close System" at the bottom as the
+supporting IT system.
 
 4. Lane contents in flow order (Finance Organisation)
+
 Financial Accounting lane:
-- Timer start event "Period-end reached" (the month-end / period close
-  timetable begins)
-- Service task "Run close checklist and lock sub-ledgers"
-- User task "Review close tasks and open items"
-- Exclusive gateway "All close tasks complete?"
-    - branch "No – open tasks": Expanded Subprocess (LOOP marker)
-      "Resolve open close task": internals — User task "Complete
-      outstanding close task", then exclusive gateway "Task closed?":
-      branch "Yes" → subprocess end event "Close task completed". The
-      loop marker repeats while close tasks remain open.
-    - branch "Yes": continue to Finance Controller
+- Message start event "Accruals and provisions posted — period-end close due
+  (from V03.05)".
+- Service task "Open close calendar and task list in Financial Close System".
+- User task "Confirm sub-ledger cut-off for payables, receivables, payroll
+  and assets".
+- Service task "Run sub-ledger to general ledger interface check".
+- Expanded Subprocess "Repeat Until All Close Tasks Complete" (standard loop)
+  containing, in order: User task "Work next close checklist task"; User task
+  "Attach supporting schedule and sign-off evidence"; Service task "Update
+  close task status in Financial Close System"; User task "Escalate blocked
+  close tasks to owners".
+- User task "Prepare trial balance and period-end variance pack".
+- Send task "Submit close pack to Finance Controller for review".
+
 Finance Controller lane:
-- User task "Approve period close"
-- Service task "Lock the general ledger period"
-- End event "Period closed — ready for Consolidate Entities (V03.07)"
+- Intermediate message catch event "Close pack received for review".
+- User task "Review trial balance, reconciliation status and open items
+  against month-end close procedure".
+- Exclusive gateway "Close pack acceptable?".
+  - branch "Exceptions found": User task "Return exceptions with correction
+    instructions to Financial Accounting"; Expanded Subprocess "Do Until
+    Exceptions Cleared" (standard loop) containing, in order: User task
+    "Post correcting adjustment in the period", User task "Re-run trial
+    balance", User task "Re-review corrected close pack"; then to the merge.
+  - branch "Clean": straight to the merge.
+- Exclusive merge gateway "Close pack approved".
+- User task "Approve period close under financial delegation policy".
+- Service task "Lock accounting period in Financial Close System".
+- Service task "Publish period-close certificate and archive close evidence".
+- End event "Period closed and locked — ready for Consolidate Entities
+  (V03.07)".
 
 5. Edge-mounted (boundary) events
-- INTERRUPTING timer boundary event on the "Resolve open close task"
-  Expanded Subprocess: "Close not completed by the day-5 target" → User
-  task "Escalate to CFO" → escalation end event "Escalated — period not
-  closed in time".
+- Interrupting timer boundary event on Expanded Subprocess "Repeat Until All
+  Close Tasks Complete", labelled "Close day deadline reached"; flows to User
+  task "Escalate overdue close tasks to Finance Controller" in the Finance
+  Controller lane, which then rejoins before "Review trial balance,
+  reconciliation status and open items against month-end close procedure".
+- Non-interrupting message boundary event on User task "Review trial balance,
+  reconciliation status and open items against month-end close procedure",
+  labelled "Late journal notified"; flows to User task "Assess late journal
+  for inclusion in the period" and back into the review branch decision.
+- Interrupting error boundary event on Service task "Lock accounting period in
+  Financial Close System", labelled "Period lock failed"; flows to User task
+  "Resolve lock failure and retry period lock".
 
 6. Connectors
-Sequence flows: follow the lane order above, including the gateway
-branch. The retry subprocess repeats via its loop marker (no internal
-loop-back flow drawn).
+Sequence flows: the flow runs from the message start event through the
+Financial Accounting lane (open close calendar, confirm cut-off, interface
+check, the standard-loop subprocess of close tasks, trial balance preparation,
+submission) into the Finance Controller lane at the intermediate message catch
+event; the exclusive gateway "Close pack acceptable?" splits into the
+"Exceptions found" branch, which runs the "Do Until Exceptions Cleared"
+subprocess, and the "Clean" branch, and both rejoin at the exclusive merge
+gateway "Close pack approved"; from there the flow continues through approval,
+period lock and publication to the single end event. The timer boundary escape
+rejoins before the controller review; the error boundary escape rejoins after
+the retry task.
 Message flows:
-- "Run close checklist and lock sub-ledgers" → Financial Close System
-- Financial Close System → "Review close tasks and open items" (close
-  task status, open items)
-- "Lock the general ledger period" → Financial Close System
+- Financial Close System → "Open close calendar and task list in Financial
+  Close System" (close calendar, task list and owners).
+- "Run sub-ledger to general ledger interface check" → Financial Close System
+  (interface completeness query).
+- Financial Close System → "Prepare trial balance and period-end variance
+  pack" (trial balance and sub-ledger balances).
+- "Update close task status in Financial Close System" → Financial Close
+  System (task completion and evidence references).
+- Financial Close System → "Escalate blocked close tasks to owners" (overdue
+  and blocked task alerts).
+- "Lock accounting period in Financial Close System" → Financial Close System
+  (period lock instruction).
+- Financial Close System → "Publish period-close certificate and archive close
+  evidence" (lock confirmation and close audit trail).
 
-This stage runs the period-end close: the checklist executes and the
-sub-ledgers lock, open close tasks are completed (retried until every
-task is closed), the close is approved and the general ledger period is
-locked — leaving a closed period ready for consolidation.
+7. Data objects
+Data Object "Close Checklist" — read by / written by "Work next close
+checklist task" and "Update close task status in Financial Close System".
+Data Object "Trial Balance" — written by "Prepare trial balance and period-end
+variance pack", read by "Review trial balance, reconciliation status and open
+items against month-end close procedure".
+Data Object "Close Pack" — written by "Submit close pack to Finance
+Controller for review", read by "Re-review corrected close pack".
+Data Object "Correcting Journal" — written by "Post correcting adjustment in
+the period".
+Data Object "Period-Close Certificate" — written by "Publish period-close
+certificate and archive close evidence".
+Data Store "General Ledger" — read by "Run sub-ledger to general ledger
+interface check", written by "Lock accounting period in Financial Close
+System".
+Data Store "Close Evidence Archive" — written by "Attach supporting schedule
+and sign-off evidence" and "Publish period-close certificate and archive close
+evidence".
+
+This subprocess drives the month-end close procedure to completion: cut-off is
+confirmed, every checklist task is worked and evidenced, the trial balance is
+reviewed and exceptions corrected, and the controller approves and locks the
+period. It hands a closed, locked and certified ledger, with its trial balance
+and close evidence, to Consolidate Entities (V03.07), which relies on the
+period being final before group elimination and translation entries are made.
 ```
 
 ### V03.07 — Consolidate Entities
@@ -2682,61 +3166,137 @@ locked — leaving a closed period ready for consolidation.
 **BPMN diagram prompt.**
 
 ```text
-BPMN: V03.07 Consolidate Entities — seventh stage of the Record to Report (R2R) value chain.
+BPMN: V03.07 Consolidate Entities — the group-level roll-up that turns closed
+entity ledgers into a single consolidated set of figures for reporting.
 
 1. Pools & Lanes
-- Pool "Finance Organisation" — the organisation, with two lanes
-  top-to-bottom: "External Reporting", "Finance Controller".
-- Pool "Consolidation System" — the supporting IT system.
+Pool "Finance Organisation" — the organisation running the consolidation, with
+lanes top-to-bottom: External Reporting, Finance Controller.
+Pool "Consolidation System" — the group consolidation application holding entity
+submissions, translation rates, elimination rules and consolidated balances.
 
 2. Pool properties
-- Finance Organisation: white-box (holds the process flow).
-- Consolidation System: black-box, System = true, single instance.
+Pool "Finance Organisation" — white-box, holds the entire process flow, single
+instance.
+Pool "Consolidation System" — black-box, System = true, single instance.
 
 3. Layout
-- Finance Organisation pool at the top, Consolidation System pool at the
-  bottom.
+Top to bottom: Finance Organisation (lane External Reporting, then lane Finance
+Controller), then Consolidation System at the bottom as the supporting IT
+system.
 
 4. Lane contents in flow order (Finance Organisation)
+
 External Reporting lane:
-- Message start event "Entity ledgers closed and ready to consolidate"
-- Service task "Load entity trial balances into consolidation"
-- Service task "Translate currencies and post eliminations"
-- Exclusive gateway "Group consolidation balances?"
-    - branch "No – intercompany / elimination mismatch": Expanded
-      Subprocess (LOOP marker) "Resolve intercompany mismatch":
-      internals — User task "Analyse intercompany / elimination
-      difference", then User task "Adjust entity submission", then
-      exclusive gateway "Balanced?": branch "Yes" → subprocess end event
-      "Consolidation balanced". The loop marker repeats while the group
-      is out of balance.
-    - branch "Yes": continue to Finance Controller
+- Message start event "Closed period ledgers received from V03.06"
+- Service task "Open consolidation cycle in Consolidation System"
+- Service task "Load entity trial balances into Consolidation System"
+- Intermediate message catch event "All entity submissions received"
+- User task "Check entity submission completeness and mapping"
+- Exclusive gateway "All entities submitted and mapped?"
+  - branch "Submissions missing or unmapped": User task "Chase entity
+    submission and correct account mapping"; then rejoin
+  - branch "Complete": proceed to currency translation
+- Exclusive merge gateway "Entity data complete"
+- Service task "Apply currency translation rates in Consolidation System"
+- Expanded Subprocess "Repeat Until Eliminations Balance" (standard loop)
+  containing, in order: User task "Identify intercompany balances and
+  transactions"; User task "Post elimination entries"; Service task "Run
+  consolidation calculation in Consolidation System"; User task "Review
+  intercompany mismatch report"
+- User task "Post minority interest and equity accounting adjustments"
+- Service task "Generate consolidated trial balance from Consolidation System"
+- User task "Prepare consolidation pack and movement analysis"
+- Send task "Submit consolidated result to Finance Controller for review"
+
 Finance Controller lane:
-- User task "Review and approve consolidated position"
-- End event "Entities consolidated — ready for Prepare Management Reports
-  (V03.08)"
+- User task "Review consolidated trial balance and elimination entries"
+- Exclusive gateway "Consolidation approved?"
+  - branch "Adjustments required": User task "Record controller adjustment
+    instructions"; Service task "Post top-side adjustment in Consolidation
+    System"; then rejoin
+  - branch "Approved": proceed to lock
+- Exclusive merge gateway "Consolidation reviewed"
+- User task "Approve consolidated position under accounting policy"
+- Service task "Lock consolidation cycle in Consolidation System"
+- Send task "Release consolidated figures to reporting teams"
+- End event "Consolidated group figures released — ready for Prepare Management
+  Reports (V03.08) and Prepare Statutory Reports (V03.09)"
 
 5. Edge-mounted (boundary) events
-- INTERRUPTING timer boundary event on the "Resolve intercompany
-  mismatch" Expanded Subprocess: "Not balanced within the consolidation
-  timetable" → User task "Escalate to Group Financial Controller" →
-  escalation end event "Escalated — consolidation not balanced in time".
+- Interrupting timer boundary event on Expanded Subprocess "Repeat Until
+  Eliminations Balance", labelled "Elimination deadline reached", leading to
+  User task "Escalate unresolved intercompany difference to Finance
+  Controller", which rejoins at "Post minority interest and equity accounting
+  adjustments".
+- Interrupting error boundary event on Service task "Run consolidation
+  calculation in Consolidation System" (inside the loop subprocess), labelled
+  "Consolidation calculation failed", leading to User task "Correct
+  consolidation rules and rerun".
+- Non-interrupting timer boundary event on Intermediate message catch event is
+  not used; instead, non-interrupting timer boundary event on User task "Chase
+  entity submission and correct account mapping", labelled "Submission
+  reminder due", leading to Send task "Issue submission reminder to entity
+  finance team".
 
 6. Connectors
-Sequence flows: follow the lane order above, including the gateway
-branch. The retry subprocess repeats via its loop marker (no internal
-loop-back flow drawn).
-Message flows:
-- "Load entity trial balances into consolidation" → Consolidation System
-- Consolidation System → "Translate currencies and post eliminations"
-  (entity balances, exchange rates, intercompany data)
-- "Review and approve consolidated position" → Consolidation System
+Sequence flows: the flow runs down the External Reporting lane from the message
+start event through cycle opening, data load, the "All entity submissions
+received" catch event and the completeness check; the "All entities submitted
+and mapped?" gateway branches to chasing or straight through, and both branches
+rejoin at "Entity data complete"; translation, the "Repeat Until Eliminations
+Balance" subprocess, minority interest adjustments, consolidated trial balance
+generation and pack preparation follow in sequence; the send task hands the flow
+to the Finance Controller lane, where the "Consolidation approved?" gateway
+branches to adjustment posting or straight through, both rejoining at
+"Consolidation reviewed" before approval, locking, release and the end event.
 
-This stage consolidates the group: entity trial balances are loaded,
-currencies translated and eliminations posted, any intercompany or
-elimination mismatch is resolved with the entities (retried until the
-group balances), and the consolidated position is approved — leaving a
-consolidated result ready for reporting.
+Message flows:
+- Consolidation System → Finance Organisation "Load entity trial balances into
+  Consolidation System" (entity trial balance files and mapping status).
+- Consolidation System → Finance Organisation, intermediate message catch event
+  "All entity submissions received" (submission-complete notification).
+- Finance Organisation "Apply currency translation rates in Consolidation
+  System" → Consolidation System (translation rate set and effective dates).
+- Finance Organisation "Post elimination entries" → Consolidation System
+  (intercompany elimination journals).
+- Consolidation System → Finance Organisation "Review intercompany mismatch
+  report" (mismatch and out-of-balance report).
+- Finance Organisation "Post top-side adjustment in Consolidation System" →
+  Consolidation System (controller adjustment entries).
+- Consolidation System → Finance Organisation "Generate consolidated trial
+  balance from Consolidation System" (consolidated trial balance).
+- Finance Organisation "Lock consolidation cycle in Consolidation System" →
+  Consolidation System (cycle lock instruction).
+
+7. Data objects
+Data Object "Entity Trial Balance" — read by "Check entity submission
+completeness and mapping", written by "Load entity trial balances into
+Consolidation System".
+Data Object "Intercompany Elimination Entries" — written by "Post elimination
+entries".
+Data Object "Currency Translation Rate Table" — read by "Apply currency
+translation rates in Consolidation System".
+Data Object "Intercompany Mismatch Report" — read by "Review intercompany
+mismatch report".
+Data Object "Top-Side Adjustment Entry" — written by "Post top-side adjustment
+in Consolidation System".
+Data Object "Consolidation Pack" — written by "Prepare consolidation pack and
+movement analysis", read by "Review consolidated trial balance and elimination
+entries".
+Data Store "Consolidated Ledger" — written by "Lock consolidation cycle in
+Consolidation System", read by "Generate consolidated trial balance from
+Consolidation System".
+Data Store "Group Chart of Accounts Mapping" — read by "Check entity submission
+completeness and mapping".
+
+This subprocess takes the closed ledgers of each entity, aligns them to the
+group chart of accounts, translates currencies, eliminates intercompany
+positions and records minority interest, then puts the result through
+controller review and approval. It hands a locked, approved consolidated trial
+balance and consolidation pack to Prepare Management Reports (V03.08) and
+Prepare Statutory Reports (V03.09), and leaves an audit trail of eliminations
+and adjustments for Support Audit (V03.11).
 ```
 
 ### V03.08 — Prepare Management Reports
@@ -2744,66 +3304,134 @@ consolidated result ready for reporting.
 **BPMN diagram prompt.**
 
 ```text
-BPMN: V03.08 Prepare Management Reports — eighth stage of the Record to Report (R2R) value chain.
+BPMN: V03.08 Prepare Management Reports — turns the consolidated group
+figures into the internal performance reporting pack for management and
+the Board, ahead of statutory reporting.
 
 1. Pools & Lanes
-- Pool "Board Members" — the external party that receives the management
-  pack.
-- Pool "Finance Organisation" — the organisation, with two lanes
-  top-to-bottom: "Management Accounting", "Finance Controller".
-- Pool "Reporting / BI Platform" — the supporting IT system.
+Pool "Finance Organisation" — the white-box pool holding the whole flow,
+with lanes top-to-bottom: Management Accounting, Finance Controller.
+Pool "Board Members" — external recipients who review and question the
+management reporting pack.
+Pool "Reporting / BI Platform" — IT system holding the reporting data
+model, report templates and published packs.
 
 2. Pool properties
-- Board Members: black-box, single instance.
-- Finance Organisation: white-box (holds the process flow).
-- Reporting / BI Platform: black-box, System = true, single instance.
+Pool "Board Members" — black-box, single instance per reporting cycle.
+Pool "Finance Organisation" — white-box, holds the process flow; the only
+white-box pool in the diagram.
+Pool "Reporting / BI Platform" — black-box, System = true.
 
 3. Layout
-- Board Members pool at the top, Finance Organisation pool in the middle,
-  Reporting / BI Platform pool at the bottom.
+Top to bottom: "Board Members", then "Finance Organisation" (lanes
+Management Accounting above Finance Controller), then "Reporting / BI
+Platform" at the bottom.
 
 4. Lane contents in flow order (Finance Organisation)
+
 Management Accounting lane:
-- Message start event "Consolidated results ready for management
-  reporting"
-- Service task "Build management report pack (P&L, KPIs, variances)"
-- User task "Analyse variances against budget and forecast"
-- Exclusive gateway "Pack complete and explained?"
-    - branch "No – unexplained variance": Expanded Subprocess (LOOP
-      marker) "Resolve report query / variance": internals — User task
-      "Investigate variance", then User task "Obtain explanation from
-      budget owner", then exclusive gateway "Explained?": branch "Yes" →
-      subprocess end event "Variance explained". The loop marker repeats
-      while variances remain unexplained.
-    - branch "Yes": continue to Finance Controller
+- Message start event "Consolidated group figures received from V03.07"
+- Service task "Refresh reporting data from Reporting / BI Platform"
+- User task "Confirm reporting calendar and pack scope"
+- Service task "Extract actuals by entity, cost centre and account"
+- User task "Compare actuals to budget and forecast"
+- Expanded Subprocess "Repeat Until Variances Explained" (standard loop)
+  containing, in order: User task "Identify material variance";
+  Send task "Request explanation from budget owner"; Intermediate message
+  catch event "Budget owner responds"; User task "Record variance
+  commentary"
+  - Timer boundary event on this subprocess caps the commentary window.
+- User task "Draft management commentary and KPI narrative"
+- Service task "Assemble management reporting pack in Reporting / BI
+  Platform"
+- Send task "Submit draft pack to Finance Controller"
+
 Finance Controller lane:
-- User task "Review and finalise management pack"
-- Send task "Distribute management pack to board / executives"
+- User task "Review pack for accuracy and consistency with consolidation"
+- Exclusive gateway "Pack approved?"
+  - branch "changes required": User task "Record review comments and
+    required changes"; Send task "Return pack to Management Accounting for
+    rework"; Intermediate message catch event "Revised pack received";
+    rejoins the merge below.
+  - branch "approved": User task "Sign off management reporting pack";
+    rejoins the merge below.
+- Exclusive merge gateway "Pack review complete"
+- Service task "Publish approved pack on Reporting / BI Platform"
+- Send task "Distribute management reporting pack to Board Members"
+- Intermediate message catch event "Board questions or acceptance
+  received"
+- Exclusive gateway "Board questions raised?"
+  - branch "questions raised": User task "Prepare responses to Board
+    questions"; Send task "Send responses to Board Members"; rejoins the
+    merge below.
+  - branch "pack accepted": no further action; rejoins the merge below.
+- Exclusive merge gateway "Board feedback closed"
+- User task "Archive pack and file reporting cycle record"
 - End event "Management reports issued — ready for Prepare Statutory
   Reports (V03.09)"
 
 5. Edge-mounted (boundary) events
-- INTERRUPTING timer boundary event on the "Resolve report query /
-  variance" Expanded Subprocess: "Not explained before the reporting
-  deadline" → User task "Escalate to CFO" → escalation end event
-  "Escalated — management pack not finalised in time".
+- Interrupting timer boundary event on Expanded Subprocess "Repeat Until
+  Variances Explained", labelled "Commentary deadline reached", leading to
+  User task "Draft management commentary and KPI narrative" with
+  outstanding variances flagged as unexplained.
+- Non-interrupting timer boundary event on User task "Review pack for
+  accuracy and consistency with consolidation", labelled "Review overdue",
+  triggering Send task "Escalate review delay to Finance Controller".
+- Interrupting error boundary event on Service task "Assemble management
+  reporting pack in Reporting / BI Platform", labelled "Data extract
+  failed", leading to Service task "Refresh reporting data from Reporting
+  / BI Platform".
 
 6. Connectors
-Sequence flows: follow the lane order above, including the gateway
-branch. The retry subprocess repeats via its loop marker (no internal
-loop-back flow drawn).
-Message flows:
-- "Build management report pack (P&L, KPIs, variances)" → Reporting / BI
-  Platform
-- Reporting / BI Platform → "Analyse variances against budget and
-  forecast" (actuals, budget, forecast, KPIs)
-- "Distribute management pack to board / executives" → Board Members
+Sequence flows: the flow runs from the message start event through the
+Management Accounting lane in the order listed, crosses to the Finance
+Controller lane at "Submit draft pack to Finance Controller", and
+continues in that lane to the end event. The gateway "Pack approved?"
+splits into "changes required" and "approved", both rejoining at
+"Exclusive merge gateway 'Pack review complete'". The gateway "Board
+questions raised?" splits into "questions raised" and "pack accepted",
+both rejoining at "Exclusive merge gateway 'Board feedback closed'".
 
-This stage builds the management report pack from the consolidated
-results, analyses variances and resolves any unexplained movement with
-the budget owners (retried until explained), then finalises and
-distributes the pack to the board — leaving management reporting issued
-ahead of statutory reporting.
+Message flows:
+- Reporting / BI Platform → "Refresh reporting data from Reporting / BI
+  Platform" (consolidated actuals, budget and forecast data).
+- "Extract actuals by entity, cost centre and account" → Reporting / BI
+  Platform (extract request and filter parameters).
+- "Assemble management reporting pack in Reporting / BI Platform" →
+  Reporting / BI Platform (pack structure, tables, charts and commentary).
+- "Publish approved pack on Reporting / BI Platform" → Reporting / BI
+  Platform (approved pack version and distribution list).
+- "Distribute management reporting pack to Board Members" → Board Members
+  (management reporting pack and commentary).
+- Board Members → "Board questions or acceptance received" (questions,
+  requests for additional analysis, or acceptance).
+- "Send responses to Board Members" → Board Members (answers and
+  supporting schedules).
+
+7. Data objects
+Data Object "Management Reporting Pack" — written by "Assemble management
+reporting pack in Reporting / BI Platform", read by "Review pack for
+accuracy and consistency with consolidation".
+Data Object "Variance Commentary" — written by "Record variance
+commentary", read by "Draft management commentary and KPI narrative".
+Data Object "Review Comments" — written by "Record review comments and
+required changes", read by "Assemble management reporting pack in
+Reporting / BI Platform".
+Data Object "Board Response Note" — written by "Prepare responses to Board
+questions", read by "Send responses to Board Members".
+Data Store "Consolidated Ledger Figures" — read by "Extract actuals by
+entity, cost centre and account".
+Data Store "Budget and Forecast Data" — read by "Compare actuals to budget
+and forecast".
+Data Store "Reporting Pack Archive" — written by "Archive pack and file
+reporting cycle record".
+
+This subprocess converts the consolidated group figures into an explained,
+reviewed and approved management reporting pack, with variances commented
+on by budget owners and Board questions answered and closed. It hands the
+signed-off internal view of period performance, together with its
+commentary and archived pack, to Prepare Statutory Reports (V03.09).
 ```
 
 ### V03.09 — Prepare Statutory Reports
@@ -2811,73 +3439,162 @@ ahead of statutory reporting.
 **BPMN diagram prompt.**
 
 ```text
-BPMN: V03.09 Prepare Statutory Reports — ninth stage of the Record to Report (R2R) value chain.
+BPMN: V03.09 Prepare Statutory Reports — the statutory reporting step of the
+Record to Report value chain, turning consolidated group results into signed
+annual and interim financial statements filed with the regulator and issued
+to shareholders.
 
 1. Pools & Lanes
-- Pool "Regulator" — the external party the statements are lodged with.
-- Pool "Shareholders / Owners" — the external party that receives the
-  statements.
-- Pool "Finance Organisation" — the organisation, with three lanes
-  top-to-bottom: "External Reporting", "Finance Controller", "CFO".
-- Pool "Disclosure Management System" — the supporting IT system.
+Pool "Regulator" — external body that receives and acknowledges the filed
+statutory financial statements.
+Pool "Shareholders / Owners" — external recipients of the published annual
+and interim financial statements.
+Pool "Finance Organisation" — the organisation running the process, with
+lanes top-to-bottom: External Reporting, Finance Controller, CFO.
+Pool "Disclosure Management System" — system of record for statement
+drafting, note tagging, version control and filing packages.
 
 2. Pool properties
-- Regulator: black-box, single instance.
-- Shareholders / Owners: black-box, single instance.
-- Finance Organisation: white-box (holds the process flow).
-- Disclosure Management System: black-box, System = true, single
-  instance.
+Pool "Regulator" — black-box, single instance.
+Pool "Shareholders / Owners" — black-box, single instance.
+Pool "Finance Organisation" — white-box, holds the process flow.
+Pool "Disclosure Management System" — black-box, System = true.
 
 3. Layout
-- Regulator and Shareholders / Owners pools at the top, Finance
-  Organisation pool in the middle, Disclosure Management System pool at
-  the bottom.
+Top to bottom: "Regulator", "Shareholders / Owners", "Finance Organisation"
+(lanes External Reporting, Finance Controller, CFO), then "Disclosure
+Management System" at the bottom.
 
 4. Lane contents in flow order (Finance Organisation)
+
 External Reporting lane:
-- Message start event "Consolidated results ready for statutory
-  reporting"
-- Service task "Draft financial statements and disclosures"
-- User task "Review statutory disclosures against accounting standards"
+- Message start event "Consolidated group results received from V03.07"
+- Service task "Retrieve consolidated trial balance and consolidation
+  entries"
+- User task "Confirm statutory reporting requirements and filing calendar"
+- Service task "Open statutory reporting pack in Disclosure Management
+  System"
+- User task "Draft primary financial statements"
+- Expanded Subprocess "Repeat Until Disclosures Complete" (standard loop)
+  containing, in order: User task "Draft notes and disclosures", User task
+  "Collect supporting schedules from Finance teams", Service task "Tag and
+  version disclosures in Disclosure Management System", User task "Run
+  disclosure checklist against statutory reporting requirements"
+- Service task "Compile draft statutory report pack"
+- Send task "Submit draft pack to Finance Controller for review"
+
 Finance Controller lane:
-- Exclusive gateway "Statements compliant and complete?"
-    - branch "No – review point": Expanded Subprocess (LOOP marker)
-      "Resolve statutory review point": internals — User task "Amend
-      statement / disclosure", then User task "Re-submit for technical
-      review", then exclusive gateway "Cleared?": branch "Yes" →
-      subprocess end event "Review point cleared". The loop marker
-      repeats while review points remain.
-    - branch "Yes": continue to CFO
+- User task "Review statements against accounting policy and statutory
+  reporting requirements"
+- Exclusive gateway "Review outcome?"
+  - branch "Corrections required": User task "Log review corrections",
+    Service task "Return pack to External Reporting for rework in Disclosure
+    Management System"
+  - branch "Review passed": User task "Confirm consistency with consolidated
+    ledger balances"
+- Exclusive merge gateway "Controller review resolved"
+- User task "Prepare CFO briefing on key judgements and disclosures"
+- Send task "Forward statutory pack to CFO for approval"
+
 CFO lane:
-- User task "Approve statutory financial statements"
-- Send task "Publish statements and lodge with regulator"
-- End event "Statutory reports prepared — ready for Submit Tax /
+- User task "Review statutory financial statements and key judgements"
+- Exclusive gateway "CFO approves for signature?"
+  - branch "Approved": User task "Sign statutory financial statements"
+  - branch "Not approved": User task "Record CFO objections and required
+    changes", Service task "Reissue pack for revision in Disclosure
+    Management System"
+- Exclusive merge gateway "CFO decision resolved"
+- Service task "Record approval and signature in Disclosure Management
+  System"
+
+External Reporting lane:
+- Service task "Generate final filing package in Disclosure Management
+  System"
+- Send task "File statutory financial statements with Regulator"
+- Intermediate message catch event "Regulator filing acknowledgement
+  received"
+- Send task "Publish annual and interim statements to Shareholders / Owners"
+- Service task "Archive signed statements and supporting schedules"
+- End event "Statutory reports filed and published — ready for Submit Tax /
   Regulatory Returns (V03.10)"
 
 5. Edge-mounted (boundary) events
-- INTERRUPTING timer boundary event on the "Resolve statutory review
-  point" Expanded Subprocess: "Not cleared before the reporting
-  deadline" → User task "Escalate to Audit Committee" → escalation end
-  event "Escalated — statutory statements not finalised in time".
+- Interrupting timer boundary event on Expanded Subprocess "Repeat Until
+  Disclosures Complete", labelled "Disclosure drafting deadline reached",
+  leading to User task "Escalate incomplete disclosures to Finance
+  Controller" in the Finance Controller lane, which rejoins the flow at
+  Service task "Compile draft statutory report pack".
+- Interrupting timer boundary event on Intermediate message catch event is
+  not used; instead an interrupting timer boundary event on Send task "File
+  statutory financial statements with Regulator", labelled "Statutory filing
+  deadline at risk", leading to User task "Notify CFO of filing deadline
+  risk" in the CFO lane, which rejoins before the acknowledgement catch
+  event.
+- Interrupting error boundary event on Service task "Generate final filing
+  package in Disclosure Management System", labelled "Filing package
+  validation failed", leading to User task "Correct filing package errors"
+  in the External Reporting lane, which rejoins before Send task "File
+  statutory financial statements with Regulator".
 
 6. Connectors
-Sequence flows: follow the lane order above, including the gateway
-branch. The retry subprocess repeats via its loop marker (no internal
-loop-back flow drawn).
-Message flows:
-- "Draft financial statements and disclosures" → Disclosure Management
-  System
-- Disclosure Management System → "Review statutory disclosures against
-  accounting standards" (trial balance, prior year, disclosure
-  checklist)
-- "Publish statements and lodge with regulator" → Regulator
-- "Publish statements and lodge with regulator" → Shareholders / Owners
+Sequence flows: the flow runs External Reporting (start, retrieval,
+drafting, disclosure loop, pack compilation) to Finance Controller (review,
+"Review outcome?" branching into corrections or pass, both rejoining at
+"Controller review resolved") to CFO ("CFO approves for signature?"
+branching into approval or objections, both rejoining at "CFO decision
+resolved") and back to External Reporting for filing, acknowledgement,
+publication, archiving and the end event. No branch terminates in its own
+end event; all rejoin at the named merge gateways.
 
-This stage drafts the statutory financial statements and disclosures,
-reviews them against accounting standards — clearing every review point
-(retried until clean) — obtains CFO approval, then publishes and lodges
-them with the regulator and owners, leaving statutory reporting ready for
-the tax and regulatory filings.
+Message flows:
+- Disclosure Management System → Service task "Retrieve consolidated trial
+  balance and consolidation entries" (consolidated trial balance and
+  consolidation entries).
+- Service task "Open statutory reporting pack in Disclosure Management
+  System" → Disclosure Management System (statutory reporting pack shell).
+- Service task "Tag and version disclosures in Disclosure Management System"
+  → Disclosure Management System (tagged and versioned disclosure text).
+- Service task "Record approval and signature in Disclosure Management
+  System" → Disclosure Management System (CFO approval and signature
+  record).
+- Disclosure Management System → Service task "Generate final filing package
+  in Disclosure Management System" (validated filing package).
+- Send task "File statutory financial statements with Regulator" → Regulator
+  (signed statutory financial statements and filing package).
+- Regulator → Intermediate message catch event "Regulator filing
+  acknowledgement received" (filing acknowledgement or receipt reference).
+- Send task "Publish annual and interim statements to Shareholders / Owners"
+  → Shareholders / Owners (published annual and interim financial
+  statements).
+
+7. Data objects
+Data Store "Consolidated Ledger Balances" — read by "Retrieve consolidated
+trial balance and consolidation entries".
+Data Object "Draft Statutory Report Pack" — written by "Compile draft
+statutory report pack", read by "Review statements against accounting policy
+and statutory reporting requirements".
+Data Object "Disclosure Checklist" — read by "Run disclosure checklist
+against statutory reporting requirements".
+Data Object "Supporting Schedules" — written by "Collect supporting
+schedules from Finance teams", read by "Confirm consistency with
+consolidated ledger balances".
+Data Object "Review Corrections Log" — written by "Log review corrections".
+Data Object "Signed Statutory Financial Statements" — written by "Sign
+statutory financial statements", read by "Generate final filing package in
+Disclosure Management System".
+Data Object "Regulatory Filing Package" — written by "Generate final filing
+package in Disclosure Management System", read by "File statutory financial
+statements with Regulator".
+Data Store "Statutory Reporting Archive" — written by "Archive signed
+statements and supporting schedules".
+
+This subprocess converts the consolidated group position into statutory
+financial statements that satisfy accounting policy and statutory reporting
+requirements, secures Finance Controller review and CFO signature, files the
+package with the Regulator and publishes it to Shareholders / Owners.
+It hands the signed statements, supporting schedules and filing archive to
+Submit Tax / Regulatory Returns (V03.10) and, later, to Support Audit
+(V03.11) as evidence.
 ```
 
 ### V03.10 — Submit Tax / Regulatory Returns
@@ -2885,71 +3602,129 @@ the tax and regulatory filings.
 **BPMN diagram prompt.**
 
 ```text
-BPMN: V03.10 Submit Tax / Regulatory Returns — tenth stage of the Record to Report (R2R) value chain.
+BPMN: V03.10 Submit Tax / Regulatory Returns — the filing subprocess of the
+Record to Report value chain, converting approved statutory figures into tax
+and regulatory submissions lodged with the authorities.
 
 1. Pools & Lanes
-- Pool "Tax Authority" — the external party that receives the tax return.
-- Pool "Regulator" — the external party that receives the regulatory
-  return.
-- Pool "Finance Organisation" — the organisation, with two lanes
-  top-to-bottom: "Tax", "Treasury".
-- Pool "Tax System" — the supporting IT system.
+Pool "Tax Authority" — external revenue authority receiving tax returns and
+issuing filing receipts, assessments and queries.
+Pool "Regulator" — external supervisory body receiving regulatory and
+covenant-related compliance returns.
+Pool "Finance Organisation" — the organisation running the process, with lanes
+top-to-bottom: Tax, Treasury.
+Pool "Tax System" — IT system holding tax calculations, return templates and
+filing records.
 
 2. Pool properties
-- Tax Authority: black-box, single instance.
-- Regulator: black-box, single instance.
-- Finance Organisation: white-box (holds the process flow).
-- Tax System: black-box, System = true, single instance.
+Pool "Tax Authority" — black-box, single instance.
+Pool "Regulator" — black-box, single instance.
+Pool "Finance Organisation" — white-box, holds the process flow; lanes Tax and
+Treasury.
+Pool "Tax System" — black-box, System = true.
 
 3. Layout
-- Tax Authority and Regulator pools at the top, Finance Organisation
-  pool in the middle, Tax System pool at the bottom.
+Top to bottom: "Tax Authority", "Regulator", "Finance Organisation" (lanes Tax
+then Treasury), "Tax System".
 
 4. Lane contents in flow order (Finance Organisation)
+
 Tax lane:
-- Timer start event "Tax / regulatory filing period due"
-- Service task "Extract ledger data and calculate tax / return figures"
-- User task "Prepare tax / regulatory return"
-- Send task "Submit return to authority"
-- Intermediate message catch event "Authority acknowledges submission"
-- Exclusive gateway "Return accepted?"
-    - branch "No – query / rejected": Expanded Subprocess (LOOP marker)
-      "Resolve return query / re-file": internals — User task
-      "Investigate authority query", then Send task "Provide
-      clarification / re-file return", then intermediate message catch
-      event "Authority responds", then exclusive gateway "Accepted?":
-      branch "Yes" → subprocess end event "Return accepted". The loop
-      marker repeats while the return is queried.
-    - branch "Yes": continue to Treasury
+- Message start event "Approved statutory figures received from V03.09"
+- Service task "Extract ledger and statutory balances into Tax System"
+- User task "Determine returns due in the filing calendar"
+- Expanded Subprocess "Repeat Until All Returns Prepared" (standard loop)
+  containing, in order: User task "Select next return in scope"; User task
+  "Compute tax position under tax compliance policy"; Service task "Draft
+  return in Tax System"; User task "Reconcile return to statutory figures";
+  User task "Attach supporting schedules to the return"
+- Timer boundary event on the subprocess (see section 5)
+- User task "Review draft returns against tax compliance policy"
+- Exclusive gateway "Return type?"
+  - branch "Tax return": Send task "Submit tax return to Tax Authority"
+  - branch "Regulatory return": passes to the Treasury lane for compilation and
+    filing of the regulatory return
+  - branch "Both due": both branches run and rejoin at the merge gateway
+- Exclusive merge gateway "Returns lodged"
+- Intermediate message catch event "Filing acknowledgement received"
+- Exclusive gateway "Authority query raised?"
+  - branch "Query raised": User task "Prepare response to authority query";
+    Send task "Send query response to Tax Authority"; then to the merge
+  - branch "No query": straight to the merge
+- Exclusive merge gateway "Filing settled"
+- Service task "Record filing confirmations and payment position in Tax System"
+- End event "Returns submitted and filings evidenced — ready for Support Audit
+  (V03.11)"
+
 Treasury lane:
-- Service task "Arrange payment / refund and record submission"
-- End event "Tax and regulatory returns submitted — ready for Support
-  Audit (V03.11)"
+- User task "Compile regulatory and covenant reporting data"
+- User task "Confirm settlement of tax and levy payments due"
+- Send task "Submit regulatory return to Regulator"
+- Intermediate message catch event "Regulator confirms receipt"
+- Service task "Log regulatory filing outcome in Tax System"
 
 5. Edge-mounted (boundary) events
-- INTERRUPTING timer boundary event on the "Resolve return query /
-  re-file" Expanded Subprocess: "Not accepted before the statutory
-  deadline" → User task "Escalate to Finance Controller" → escalation
-  end event "Escalated — return not accepted in time".
+Interrupting timer boundary event on Expanded Subprocess "Repeat Until All
+Returns Prepared", labelled "Statutory filing deadline minus five days" —
+escalates to User task "Review draft returns against tax compliance policy"
+with the returns prepared so far flagged for controller attention.
+Non-interrupting message boundary event on Send task "Submit tax return to Tax
+Authority", labelled "Submission rejected by Tax Authority" — triggers User
+task "Correct and resubmit return", which rejoins at Exclusive merge gateway
+"Returns lodged".
 
 6. Connectors
-Sequence flows: follow the lane order above, including the gateway
-branch. The retry subprocess repeats via its loop marker (no internal
-loop-back flow drawn).
+Sequence flows: the flow starts in the Tax lane at the message start event,
+runs through extraction, calendar determination and the looped preparation
+subprocess to the review task, then diverges at "Return type?"; the tax branch
+files directly from the Tax lane, the regulatory branch crosses to the Treasury
+lane for compilation, payment confirmation and filing before returning, and
+both rejoin at "Returns lodged". After the acknowledgement catch event the flow
+diverges at "Authority query raised?" and both branches rejoin at "Filing
+settled" before the recording service task and the end event.
 Message flows:
-- "Extract ledger data and calculate tax / return figures" → Tax System
-- Tax System → "Prepare tax / regulatory return" (calculated figures,
-  prior returns)
-- "Submit return to authority" → Tax Authority
-- "Submit return to authority" → Regulator
-- Tax Authority → intermediate event "Authority acknowledges submission"
-- "Provide clarification / re-file return" → Tax Authority
-- Tax Authority → intermediate event "Authority responds"
+- Finance Organisation "Submit tax return to Tax Authority" → Tax Authority
+  (completed tax return and supporting schedules).
+- Tax Authority → Finance Organisation "Filing acknowledgement received"
+  (filing receipt, assessment or query).
+- Finance Organisation "Send query response to Tax Authority" → Tax Authority
+  (explanations and additional evidence).
+- Finance Organisation "Submit regulatory return to Regulator" → Regulator
+  (regulatory and covenant compliance return).
+- Regulator → Finance Organisation "Regulator confirms receipt" (acceptance
+  confirmation).
+- Finance Organisation "Extract ledger and statutory balances into Tax System"
+  → Tax System (balance extraction request) and Tax System → the task (ledger
+  and statutory balances).
+- Finance Organisation "Draft return in Tax System" → Tax System (computed tax
+  positions and draft return).
+- Finance Organisation "Record filing confirmations and payment position in Tax
+  System" → Tax System (filing receipts and payment status).
+- Finance Organisation "Log regulatory filing outcome in Tax System" → Tax
+  System (regulatory filing confirmation).
 
-This stage calculates and prepares the tax and regulatory returns,
-submits them to the authorities and clears any query or rejection
-(re-filed until accepted), then arranges the payment or refund and
-records the submission — leaving the filings accepted ahead of audit.
+7. Data objects
+Data Object "Tax Return" — written by "Draft return in Tax System", read by
+"Submit tax return to Tax Authority".
+Data Object "Regulatory / Covenant Return" — written by "Compile regulatory and
+covenant reporting data", read by "Submit regulatory return to Regulator".
+Data Object "Tax Calculation" — written by "Compute tax position under tax
+compliance policy", read by "Reconcile return to statutory figures".
+Data Object "Supporting Schedules" — read by "Attach supporting schedules to
+the return".
+Data Object "Authority Query Response" — written by "Prepare response to
+authority query".
+Data Store "Filing Register" — written by "Record filing confirmations and
+payment position in Tax System" and "Log regulatory filing outcome in Tax
+System".
+Data Store "Filing Calendar" — read by "Determine returns due in the filing
+calendar".
+
+This subprocess turns the approved statutory position into the tax and
+regulatory returns the organisation is obliged to lodge, files them with the
+Tax Authority and the Regulator, and settles any queries arising. It hands
+forward confirmed submissions, tax calculations and filing evidence, which
+Support Audit (V03.11) uses as audit evidence for external review.
 ```
 
 ### V03.11 — Support Audit
@@ -2957,70 +3732,174 @@ records the submission — leaving the filings accepted ahead of audit.
 **BPMN diagram prompt.**
 
 ```text
-BPMN: V03.11 Support Audit — final stage of the Record to Report (R2R) value chain.
+BPMN: V03.11 Support Audit — the closing subprocess of the Record to
+Report value chain, in which Finance answers external audit requests and
+clears findings on the reported figures.
 
 1. Pools & Lanes
-- Pool "External Auditor" — the external party conducting the audit.
-- Pool "Finance Organisation" — the organisation, with three lanes
-  top-to-bottom: "Internal Audit", "Financial Accounting", "Finance
-  Controller".
-- Pool "Audit Management System" — the supporting IT system.
-- Pool "Document Management System" — the supporting IT system.
+Pool "External Auditor" — the independent audit firm examining the
+financial statements and supporting records.
+Pool "Finance Organisation" — the organisation running the process, with
+lanes top-to-bottom: Internal Audit, Financial Accounting, Finance
+Controller.
+Pool "Audit Management System" — the tool holding audit requests, evidence
+logs and findings.
+Pool "Document Management System" — the repository holding supporting
+documents and evidence packs.
 
 2. Pool properties
-- External Auditor: black-box, single instance.
-- Finance Organisation: white-box (holds the process flow).
-- Audit Management System: black-box, System = true, single instance.
-- Document Management System: black-box, System = true, single instance.
+Pool "External Auditor" — black-box, single instance.
+Pool "Finance Organisation" — white-box, holds the process flow.
+Pool "Audit Management System" — black-box, System = true, single instance.
+Pool "Document Management System" — black-box, System = true, single
+instance.
 
 3. Layout
-- External Auditor pool at the top, Finance Organisation pool in the
-  middle, Audit Management System and Document Management System pools at
-  the bottom.
+Top to bottom: External Auditor; Finance Organisation (lanes Internal
+Audit, Financial Accounting, Finance Controller); Audit Management System;
+Document Management System.
 
 4. Lane contents in flow order (Finance Organisation)
+
 Internal Audit lane:
-- Message start event "Audit engagement opened"
-- Intermediate message catch event "Auditor sample / information request
-  received"
+- Message start event "Audit request received from External Auditor"
+- User task "Log audit request and prepared-by-client list"
+- Service task "Record audit request in Audit Management System"
+- User task "Assess scope and assign evidence owners"
+- Exclusive gateway "Request within agreed audit scope?"
+  - branch "In scope": continue to Financial Accounting lane
+  - branch "Out of scope or requires clarification": Send task "Query scope
+    with External Auditor", then Intermediate message catch event "Auditor
+    clarifies request", then rejoin
+- Exclusive merge gateway "Audit scope agreed"
+
 Financial Accounting lane:
-- Service task "Assemble audit evidence and supporting schedules"
-- User task "Respond to auditor requests and queries"
-- Exclusive gateway "Audit findings raised?"
-    - branch "Yes – findings": User task "Agree and action audit
-      adjustments", then Service task "Post audit adjustments and update
-      records", then continue to Finance Controller
-    - branch "No – clean": continue to Finance Controller
+- Expanded Subprocess "Repeat Until All Audit Requests Satisfied"
+  (standard loop) containing, in order: User task "Extract ledger balances
+  and supporting schedules"; Service task "Retrieve source documents from
+  Document Management System"; User task "Compile evidence pack"; User task
+  "Perform internal quality check on evidence pack"; Service task "Attach
+  evidence pack to request in Audit Management System"; Send task "Submit
+  evidence pack to External Auditor"; Intermediate message catch event
+  "Auditor acknowledges or raises follow-up"
+- Service task "Update evidence log in Audit Management System"
+- Intermediate message catch event "Audit findings received from External
+  Auditor"
+
 Finance Controller lane:
-- User task "Confirm final financial statements with auditor"
-- Send task "Send signed statements and management representation letter"
-- End event "Audit supported and accounts signed off — Record to Report
-  complete"
+- User task "Review audit findings and proposed adjustments"
+- Exclusive gateway "Adjustments or corrective actions required?"
+  - branch "Adjustments required": User task "Agree correcting entries and
+    remediation actions"; Service task "Raise adjustment and action items
+    in Audit Management System"; Send task "Send management response to
+    External Auditor"
+  - branch "No adjustments": User task "Record clean outcome on findings
+    log"
+- Exclusive merge gateway "Findings resolved"
+- User task "Prepare and sign management representation letter"
+- Send task "Issue management representation letter to External Auditor"
+- Intermediate message catch event "Audit opinion and closure notice
+  received"
+- Service task "Archive audit file in Document Management System"
+- End event "Audit supported and closed — Record to Report cycle complete"
 
 5. Edge-mounted (boundary) events
-- None.
+Interrupting timer boundary event on Expanded Subprocess "Repeat Until All
+Audit Requests Satisfied", labelled "Audit deadline reached", leading to
+User task "Escalate outstanding requests to Finance Controller" in the
+Finance Controller lane, which rejoins at Exclusive merge gateway "Findings
+resolved".
+Non-interrupting message boundary event on User task "Review audit findings
+and proposed adjustments", labelled "Additional auditor request arrives",
+leading to Service task "Log supplementary request in Audit Management
+System".
+Interrupting escalation boundary event on User task "Agree correcting
+entries and remediation actions", labelled "Material misstatement
+identified", leading to Send task "Escalate material issue to CFO and Audit
+Committee" and End event "Material issue escalated — handled outside this
+subprocess" (this branch does not rejoin).
 
 6. Connectors
-Sequence flows: follow the lane order above, including the gateway
-branches.
-Message flows:
-- External Auditor → start event "Audit engagement opened"
-- External Auditor → intermediate event "Auditor sample / information
-  request received"
-- Document Management System → "Assemble audit evidence and supporting
-  schedules" (source documents and schedules)
-- "Assemble audit evidence and supporting schedules" → Audit Management
-  System
-- "Respond to auditor requests and queries" → External Auditor
-- "Post audit adjustments and update records" → Audit Management System
-- "Send signed statements and management representation letter" →
-  External Auditor
+Sequence flows: the flow runs from the message start event in the Internal
+Audit lane through request logging, scoping and the "Request within agreed
+audit scope?" gateway, whose two branches rejoin at "Audit scope agreed";
+into the Financial Accounting lane for the looped evidence subprocess, the
+evidence log update and the catch of audit findings; then into the Finance
+Controller lane, where the "Adjustments or corrective actions required?"
+gateway branches rejoin at "Findings resolved" before the representation
+letter, the closure catch event, archiving and the end event. The
+escalation branch terminates in its own end event.
 
-This stage supports the external audit: evidence and schedules are
-assembled, auditor requests answered, any findings agreed, actioned and
-posted, and the final financial statements confirmed and signed off with
-the representation letter — completing the end-to-end Record to Report
-cycle.
+Message flows:
+External Auditor → Finance Organisation "Log audit request and
+prepared-by-client list" (audit request and PBC list).
+External Auditor → Finance Organisation "Auditor clarifies request" (scope
+clarification).
+Finance Organisation "Query scope with External Auditor" → External Auditor
+(scope query).
+Finance Organisation "Submit evidence pack to External Auditor" → External
+Auditor (evidence pack and supporting schedules).
+External Auditor → Finance Organisation "Auditor acknowledges or raises
+follow-up" (acknowledgement or follow-up question).
+External Auditor → Finance Organisation "Audit findings received from
+External Auditor" (draft findings and proposed adjustments).
+Finance Organisation "Send management response to External Auditor" →
+External Auditor (management response and remediation plan).
+Finance Organisation "Issue management representation letter to External
+Auditor" → External Auditor (signed representation letter).
+External Auditor → Finance Organisation "Audit opinion and closure notice
+received" (audit opinion and closure notice).
+Finance Organisation "Record audit request in Audit Management System" →
+Audit Management System (request record).
+Finance Organisation "Attach evidence pack to request in Audit Management
+System" → Audit Management System (evidence reference).
+Finance Organisation "Update evidence log in Audit Management System" →
+Audit Management System (evidence status).
+Finance Organisation "Raise adjustment and action items in Audit Management
+System" → Audit Management System (findings and actions).
+Finance Organisation "Log supplementary request in Audit Management System"
+→ Audit Management System (supplementary request).
+Audit Management System → Finance Organisation "Assess scope and assign
+evidence owners" (open request list and owners).
+Document Management System → Finance Organisation "Retrieve source
+documents from Document Management System" (source documents and
+contracts).
+Finance Organisation "Archive audit file in Document Management System" →
+Document Management System (closed audit file).
+
+7. Data objects
+Data Object "Audit request / PBC list" — read by "Log audit request and
+prepared-by-client list", read by "Assess scope and assign evidence
+owners".
+Data Object "Supporting schedule" — written by "Extract ledger balances and
+supporting schedules", read by "Compile evidence pack".
+Data Object "Audit evidence pack" — written by "Compile evidence pack",
+read by "Perform internal quality check on evidence pack", read by "Submit
+evidence pack to External Auditor".
+Data Object "Audit findings report" — read by "Review audit findings and
+proposed adjustments".
+Data Object "Management response" — written by "Agree correcting entries
+and remediation actions", read by "Send management response to External
+Auditor".
+Data Object "Management representation letter" — written by "Prepare and
+sign management representation letter", read by "Issue management
+representation letter to External Auditor".
+Data Store "Audit evidence log" — written by "Update evidence log in Audit
+Management System", read by "Escalate outstanding requests to Finance
+Controller".
+Data Store "Audit findings and actions register" — written by "Raise
+adjustment and action items in Audit Management System", read by "Record
+clean outcome on findings log".
+Data Store "Audit file archive" — written by "Archive audit file in
+Document Management System".
+
+This subprocess gives external audit a single controlled channel into the
+closed ledger, turning audit requests into quality-checked evidence packs,
+tracked findings and agreed corrective actions. It ends with a signed
+management representation letter, a received audit opinion and an archived
+audit file. As the last subprocess in V03, it hands no work forward: it
+closes the Record to Report cycle with assured, filed and defensible
+financial records.
 ```
 
 ## V04 — Hire to Retire
