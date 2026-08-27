@@ -150,6 +150,18 @@ describe("Process Repository — the master templates", () => {
     expect(tpl, "R3.03 — every split needs a named merge").toMatch(/MERGE gateway/);
     expect(tpl, "R4.04 — waiting is an event, not a task").toContain("WAITING IS AN EVENT ON THE FLOW");
     expect(tpl, "cross-reference at both ends").toContain("The START event names where the work arrives from");
+    // ...but BY NAME. A code in an event label couples every prompt to its
+    // neighbours' numbering, so inserting a process silently staled every quoted
+    // code downstream. Nothing read them: LINK_BEARING_ELEMENT_TYPES excludes
+    // events, so a start/end event cannot carry a link, and real cross-diagram
+    // linking matches subprocess elements to diagram NAMES.
+    expect(tpl, "cross-references must be by name").toContain("BY NAME AND NEVER BY CODE");
+    expect(tpl).toMatch(/Never write a subprocess code .* into an event label/);
+    // The worked examples must practise it, or the instruction is contradicted
+    // by the thing right underneath it — which is how the loop-back defect ran.
+    const examples = tpl.match(/^\s*(Message start event|End event) "[^"]*"$/gm) ?? [];
+    expect(examples.length, "the template must show worked event labels").toBeGreaterThanOrEqual(2);
+    for (const ex of examples) expect(ex, ex).not.toMatch(/V\d\d\.\d\d/);
     expect(tpl, "R4.06/R4.07 need data objects to exist at all").toMatch(/Data Object "<name>"/);
   });
 

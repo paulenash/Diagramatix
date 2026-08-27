@@ -116,6 +116,16 @@ GROUNDING
  * (`R4.04`), cross-references at BOTH ends of the flow, and section 7 — without
  * which `R4.06`/`R4.07` had no data objects to act on, so repository diagrams
  * could never carry one. `T2892` pins the section order and the loop wording.
+ *
+ * CROSS-REFERENCES ARE BY NAME, NEVER BY CODE (Paul, 2026-08-27). They were
+ * written as "ready for Confirm Availability (V01.04)", which coupled every
+ * prompt to its neighbours' NUMBERING: inserting or removing a process renumbers
+ * the ones after it and every quoted code goes stale, silently, in prose nobody
+ * re-reads. Nothing depended on those codes — `LINK_BEARING_ELEMENT_TYPES` does
+ * not include events, so a start or end event cannot carry a link, and real
+ * cross-diagram linking matches subprocess elements to diagram NAMES, which keep
+ * their codes regardless. Dropping the code from the label costs nothing and
+ * removes the whole cascade.
  */
 export const DEFAULT_MD_PROMPT_BPMN = `You write BPMN diagram prompts for one subprocess of a value chain.
 
@@ -148,9 +158,12 @@ Open with a single unnumbered line:
   received"; User task "Capture order details"; Service task "Record order in
   OMS"; Send task "Send acknowledgement"; Exclusive gateway "Order complete?".
 - The START event names where the work arrives from and the END event names
-  where it goes next, each carrying the subprocess code where there is one:
-    Message start event "Validated order received from V01.02"
-    End event "Credit confirmed — ready for Confirm Availability (V01.04)"
+  where it goes next, BY NAME AND NEVER BY CODE:
+    Message start event "Validated order received from Validate Customer"
+    End event "Credit confirmed — ready for Confirm Availability"
+  Never write a subprocess code (V01.04) into an event label. The label is prose;
+  nothing reads it, and a code in it goes stale the moment a process is inserted
+  or removed and the ones after it renumber. Names survive that; codes do not.
   For the first subprocess of a chain the start names the external trigger; for
   the last, the end names the outcome and stops.
 - Indent a gateway's branches under it as: - branch "<condition>": <what

@@ -15,6 +15,38 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.3.2335 — 2026-08-27 — Prompt cross-references by name, not by code
+
+The BPMN master template had every start event name where work arrives from and
+every end event name where it goes — carrying the subprocess code:
+*"ready for Confirm Availability (V01.04)"*.
+
+**That coupled every prompt to its neighbours' numbering.** Insert or remove a
+process and the ones after it renumber, so every quoted code goes stale — silently,
+in prose nobody re-reads. It would also have forced the value-chain editor to
+cascade regeneration to both neighbours of any edited process.
+
+**Nothing read those codes.** `LINK_BEARING_ELEMENT_TYPES` is `subprocess`,
+`subprocess-expanded`, `submachine`, `chevron-collapsed`, `use-case`,
+`archimate-shape` — events are not in it, so a start or end event cannot carry a
+link at all. Real cross-diagram linking matches subprocess elements to diagram
+NAMES, and those names keep their codes regardless.
+
+So the reference stays and the code goes: *"ready for Confirm Availability"*. The
+handoff still reads as a chain; the numbering dependency is gone, and with it the
+regeneration cascade.
+
+`T2892` pins the instruction AND that the template's own worked examples practise
+it — a worked example contradicting the rule beneath it is exactly how the
+loop-back defect survived 104 prompts.
+
+The document still carries codes in ~51 event labels (30 start, 21 end) written
+before this. Harmless prose, flushed by the next regeneration; not worth 104 AI
+calls on its own. Worth noting only about half the prompts ever had one, so the
+convention was never applied consistently either.
+
+---
+
 ## 2.3.2334 — 2026-08-27 — All 104 BPMN prompts regenerated, headlessly
 
 **The manual loop is gone.** Regenerating one chain used to mean: open Generate
