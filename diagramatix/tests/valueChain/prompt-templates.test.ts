@@ -120,11 +120,12 @@ describe("Process Repository — the master templates", () => {
     }
   });
 
-  it("the BPMN template carries the canonical six sections, in order", () => {
+  it("the BPMN template carries the canonical sections, in order", () => {
     const tpl = DEFAULT_MD_PROMPT.bpmn;
     const order = [
       "1. Pools & Lanes", "2. Pool properties", "3. Layout",
       "4. Lane contents in flow order", "5. Edge-mounted (boundary) events", "6. Connectors",
+      "7. Data objects",
     ];
     let at = -1;
     for (const heading of order) {
@@ -133,6 +134,23 @@ describe("Process Repository — the master templates", () => {
       expect(found, `${heading} must come after the previous section`).toBeGreaterThan(at);
       at = found;
     }
+    expect(tpl).toContain("these seven numbered sections");
+  });
+
+  it("never asks for a loop-back — the shape R3.14 forbids and the code strips", () => {
+    // The defect this template shipped with: it said "say explicitly where a
+    // branch rejoins OR LOOPS BACK TO", so the repository's own V01.01 prompt
+    // contains `then back to "Capture order details"` — repetition asked for and
+    // silently discarded, across 104 prompts. Guarded rather than remembered.
+    const tpl = DEFAULT_MD_PROMPT.bpmn;
+    expect(tpl, "the template must not invite a loop-back").not.toMatch(/loops? back to/i);
+    expect(tpl).toContain("REPETITION IS A SUBPROCESS, NEVER A LOOP-BACK");
+    expect(tpl).toContain("(standard loop)");
+    // And the four improvements adopted alongside it.
+    expect(tpl, "R3.03 — every split needs a named merge").toMatch(/MERGE gateway/);
+    expect(tpl, "R4.04 — waiting is an event, not a task").toContain("WAITING IS AN EVENT ON THE FLOW");
+    expect(tpl, "cross-reference at both ends").toContain("The START event names where the work arrives from");
+    expect(tpl, "R4.06/R4.07 need data objects to exist at all").toMatch(/Data Object "<name>"/);
   });
 
   it("uses the built-in alone when nothing is stored", () => {

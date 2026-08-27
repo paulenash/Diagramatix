@@ -1,13 +1,13 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-08-26  ·  **Document version:** 6.5  ·  **Suite:** 339 test files · 2,179 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T2894  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-08-27  ·  **Document version:** 6.6  ·  **Suite:** 339 test files · 2,180 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T2894  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
 ## 1. Executive summary
 
 ### What this is
-Diagramatix has an automated **regression safety net** — a suite of **2,179 tests across 339 files** that runs the app's real code and fails loudly (“goes red”) the moment a change breaks documented behaviour. It is the early-warning system that lets the product change quickly without silently breaking sharing rules, data integrity, diagram layout, exports, the simulator, or AI generation.
+Diagramatix has an automated **regression safety net** — a suite of **2,180 tests across 339 files** that runs the app's real code and fails loudly (“goes red”) the moment a change breaks documented behaviour. It is the early-warning system that lets the product change quickly without silently breaking sharing rules, data integrity, diagram layout, exports, the simulator, or AI generation.
 
 ### How it's built (philosophy)
 - **Real code, not mocks.** Database tests run against a real PostgreSQL database (`diagramatix_test`) using the actual Prisma client and the real authorisation resolvers — no faked database, no faked sign-in. A signed-in user is supplied as a plain session object so the genuine permission logic is exercised. This catches whole classes of “missing access guard” and “broken cascade” bugs that mocks would hide.
@@ -1856,7 +1856,7 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T2889 | `tests/games/mastermind.test.ts` | The information theory against published results: Knuth's minimax opening (two pairs, worst case 256) and the maximum-entropy opening (four colours, 3.0567 bits) are both reproduced — including the fact that they are different guesses. |
 | T2890 | `tests/games/mastermind.test.ts` | Entropy-greedy play breaks all 1,296 codes of the classic game, averaging 4.4653 turns with a worst case of 6, and finishes the largest 10×6 configuration from a real start. |
 | T2891 | `tests/valueChain/prompt-templates.test.ts` | Reading a chain out of the real 463 KB repository document: every chain code found, the section sliced with its title and subprocesses, and the narrative stripped of every existing prompt — so a template change shows up instead of the model copying the block next to it. |
-| T2892 | `tests/valueChain/prompt-templates.test.ts` | The five master templates: one per parsed diagram type, each stating the output contract, the BPMN template carrying the canonical six sections in order, and the built-in/additions split (built-in alone with no stored row, built-in first with one). |
+| T2892 | `tests/valueChain/prompt-templates.test.ts` | The five master templates: one per parsed diagram type, each stating the output contract, the BPMN template carrying its seven canonical sections in order, the built-in/additions split, and — since the loop-back defect — that the BPMN template never invites a loop-back and does carry the standard-loop, named-merge, wait-event, cross-reference and data-object instructions. |
 | T2893 | `tests/valueChain/prompt-templates.test.ts` | The round trip: every generated block parses back through `parseValueChainMd` — the batch tool's own reader — a whole chain of blocks parses as one document with prompts verbatim, a block that would NOT parse is reported rather than passed through, and a model-added fence is undone. |
 | T2894 | `tests/valueChain/prompt-templates.test.ts` | What a run asks for: targets expand to the chain-level prompts plus one per subprocess, only the requested types are generated, and every call is grounded in the narrative and the full subprocess list so a BPMN prompt can name what follows it. |
 

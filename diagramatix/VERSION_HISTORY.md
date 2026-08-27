@@ -15,6 +15,49 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.2.2332 — 2026-08-27 — The BPMN master template asked for a shape the code strips
+
+**The defect.** The template shipped saying *"say explicitly where a branch
+rejoins **or loops back to**"*. `R3.14` forbids exactly that — *"do not use a
+gateway for the loop condition or a sequence connector going back to the first
+activity"* — and loop-back pruning is code-enforced, so the connector is removed
+from the diagram anyway. The repository document duly carries
+`then back to "Capture order details"` in its V01.01 prompt. **That repetition
+was asked for and silently discarded, across 104 BPMN prompts.**
+
+Repetition is now written the way the diagram layer accepts it: an Expanded
+Subprocess named with the loop condition, carrying a standard-loop marker, with a
+timer boundary event where there is a deadline.
+
+**Four more changes went in with it**, each measured on a real generation before
+being adopted rather than argued for:
+
+- **Every diverging gateway gets a named merge**, written as its own line rather
+  than implied by "continue to" (`R3.03`).
+- **Waiting is an intermediate catch event on the flow**, with the trigger the
+  narrative implies — not a task called "Wait for …" (`R4.04`).
+- **Cross-references at both ends**: the start event names where work arrives
+  from, as the end event already named where it goes.
+- **A seventh section, Data objects.** There was none, so `R4.06`/`R4.07` had
+  nothing to act on and a repository diagram could never carry a data object.
+
+**Measured, from the built-in alone.** Generating V01.01 and V01.03 with no stored
+additions: no loop-back in either, a standard-loop subprocess in both, named
+merges, wait events, and section 7 with 3 and 6 data objects. V01.03 also carries
+a start-event cross-reference, which V01.01 correctly does not — it is the first
+subprocess of its chain, so its start names the external trigger instead. Both
+still parse back through `parseValueChainMd`.
+
+Two candidate improvements were deliberately **not** adopted — a size/lane target
+and guidance on task markers. Neither was ever measured, and they are the first
+real work for the comparison workbench: something to earn or drop rather than a
+settled question to re-litigate.
+
+Existing prompts in the repository document are unchanged; regenerating them is a
+content run, not this release.
+
+---
+
 ## 2.2.2331 — 2026-08-26 — The Process Repository v2 plan joins the repo
 
 `new features/Process Repository v2 — Plan.md` is now tracked. It sat outside the

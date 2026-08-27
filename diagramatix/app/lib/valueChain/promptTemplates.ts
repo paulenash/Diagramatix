@@ -93,20 +93,35 @@ GROUNDING
   ordinary version of it and keep it brief, rather than inventing specifics.`;
 
 /**
- * BPMN — the canonical six sections.
+ * BPMN — the canonical sections.
  *
- * This order is the house standard the 104 existing BPMN prompts follow, and it
+ * The order is the house standard the 104 existing BPMN prompts follow, and it
  * is deliberate: pools and lanes before anything can be placed in them, pool
  * PROPERTIES before layout (because black-box pools have no contents to lay
  * out), lane contents in flow order, then the edge-mounted events that hang off
- * those contents, and connectors last because every connector refers to elements
- * the earlier sections have already named.
+ * those contents, connectors after every element they join has been named, and
+ * data objects last because each one names the task it attaches to.
+ *
+ * WHAT CHANGED, AND WHY IT IS WORTH KNOWING. This template shipped saying "say
+ * explicitly where a branch rejoins OR LOOPS BACK TO" — a shape `R3.14` forbids
+ * ("do not use … a sequence connector going back to the first activity") and
+ * which loop-back pruning strips from the diagram anyway. The repository's own
+ * V01.01 prompt duly contains `then back to "Capture order details"`, so that
+ * repetition was asked for and silently discarded, across 104 prompts. The loop
+ * instruction is now the subprocess form the diagram layer actually accepts.
+ *
+ * Four more changes went in with it, each measured on a real generation before
+ * being adopted rather than argued for: a named merge for every diverging
+ * gateway (`R3.03`), waiting as an intermediate catch event rather than a task
+ * (`R4.04`), cross-references at BOTH ends of the flow, and section 7 — without
+ * which `R4.06`/`R4.07` had no data objects to act on, so repository diagrams
+ * could never carry one. `T2892` pins the section order and the loop wording.
  */
 export const DEFAULT_MD_PROMPT_BPMN = `You write BPMN diagram prompts for one subprocess of a value chain.
 
 ${SHARED}
 
-REQUIRED STRUCTURE — these six numbered sections, in this order, always.
+REQUIRED STRUCTURE — these seven numbered sections, in this order, always.
 
 Open with a single unnumbered line:
   BPMN: <code> <Subprocess Name> — <one clause placing it in the value chain>.
@@ -132,10 +147,33 @@ Open with a single unnumbered line:
   its BPMN type and its label — for example: Message start event "Order
   received"; User task "Capture order details"; Service task "Record order in
   OMS"; Send task "Send acknowledgement"; Exclusive gateway "Order complete?".
+- The START event names where the work arrives from and the END event names
+  where it goes next, each carrying the subprocess code where there is one:
+    Message start event "Validated order received from V01.02"
+    End event "Credit confirmed — ready for Confirm Availability (V01.04)"
+  For the first subprocess of a chain the start names the external trigger; for
+  the last, the end names the outcome and stops.
 - Indent a gateway's branches under it as: - branch "<condition>": <what
-  follows>. Say explicitly where a branch rejoins or loops back to.
-- End with an End event whose label says what state the process leaves behind,
-  naming the next subprocess code where there is one.
+  follows>. Every diverging gateway is matched by a named MERGE gateway that the
+  branches rejoin, written as its own line at the point they come together —
+  "Exclusive merge gateway 'Order complete'" — not left implied by "continue
+  to". A branch that ends in its own End event does not rejoin; say so.
+- REPETITION IS A SUBPROCESS, NEVER A LOOP-BACK. When work repeats until a
+  condition is met, write one line:
+    Expanded Subprocess "<loop condition>" (standard loop) containing, in order:
+    <task>, <task>, …
+  Name it with the condition itself — "Repeat Until Details Complete", "Do Until
+  Approved". Never write "then back to <task>", never describe a sequence flow
+  returning to an earlier element, and never use a gateway to test a loop
+  condition. Where the loop has a deadline, mount a timer boundary event on the
+  subprocess labelled with the limit; for cancellation or failure, a cancel or
+  error boundary event.
+- WAITING IS AN EVENT ON THE FLOW, NOT A TASK. When the process pauses between
+  two steps, put an intermediate catch event between them carrying the trigger
+  the narrative implies — timer for a duration or clock time, message for an
+  arriving reply, document or order, signal for a broadcast, conditional for a
+  data condition: Intermediate message catch event "Customer responds". Do not
+  model a wait as a task called "Wait for …".
 
 5. Edge-mounted (boundary) events
 - One line per boundary event: interrupting or non-interrupting, its type
@@ -145,10 +183,20 @@ Open with a single unnumbered line:
 
 6. Connectors
 - "Sequence flows:" — a sentence confirming the lane order above, naming the
-  gateway branches and every loop back.
+  gateway branches and where each merges.
 - "Message flows:" — one line per flow, as: <source> → <target> (<what is
   carried>). Every external pool and every IT system pool must appear here at
   least once, in the direction information actually travels.
+
+7. Data objects
+- One line per business record, document or dataset the narrative names, as:
+  Data Object "<name>" — read by / written by "<task name>".
+- Use Data Store for anything that persists beyond the process (a ledger, a
+  register, a master file); use Data Object for a document in flight (an order,
+  an invoice, a claim form).
+- Every one must name at least one task it attaches to; none may attach to a
+  pool or a lane.
+- Write "None." only when the narrative names no records at all.
 
 Close with a blank line and a short paragraph — three or four lines — saying what
 this subprocess achieves and what it hands to the next one.`;
