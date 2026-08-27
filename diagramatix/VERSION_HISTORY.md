@@ -15,6 +15,46 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.3.2334 — 2026-08-27 — All 104 BPMN prompts regenerated, headlessly
+
+**The manual loop is gone.** Regenerating one chain used to mean: open Generate
+Repository Prompts, upload a 500 KB `.md`, pick the chain, wait, Copy all, hand
+the clipboard over, splice. Nine times. Everything that page does was already a
+library, so `scripts/regenerate-chain-prompts.ts` joins them up and runs headless:
+
+    npx tsx scripts/regenerate-chain-prompts.ts --all --types bpmn --concurrency 4
+
+**All 104 BPMN prompts across all 9 chains now come from the fixed master
+template.** 93 AI calls for the eight chains outside V03, ~14 minutes at
+concurrency 4. **Loop-backs: 0. Data objects: 630**, where there were none. 140
+prompts still parse, none empty, every chain still splices byte-identically.
+
+**Two real bugs surfaced, both silent.**
+
+The splice was writing one character out of position. `chainSection()` normalises
+line endings, so once git's autocrlf rewrote the working copy to CRLF its return
+value no longer occurred in the document — `indexOf` gave **-1** and every offset
+shifted by minus one. Same file length, mostly-right content. Only the `--verify`
+round trip caught it. Blocks are now found over the WHOLE document and tagged with
+their chain, so there is no section to locate and no offset arithmetic at all.
+
+And a chain-level BPMN block could inherit the PREVIOUS chain's subprocess
+heading, and therefore its key — so a splice would have overwritten the wrong
+prompt. Found by the new test, not by reading the code.
+
+**The audit became a guard.** V06's first run produced one prompt reading
+`Sequence flow returns to "Obtain stakeholder approval…"` — a backward flow the
+template forbids, about 1 in 93. Not cosmetic: the layout code PRUNES loop-backs,
+so that rework loop would have vanished from the diagram, which is the original
+defect one level down in freshly generated content. A chain with any loop-back is
+now REFUSED rather than written. V06 re-ran clean, and modelled the repetition
+properly the second time (14 standard loops, up from 10).
+
+That last point is worth keeping: a template instruction alone gets ~99%
+compliance. The last 1% needs a check that refuses.
+
+---
+
 ## 2.3.2333 — 2026-08-27 — Generated-diagram tidy-ups, and sort order becomes a property of the project
 
 Four pieces of feedback from reviewing the regenerated V03 diagrams.

@@ -27,66 +27,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseValueChainMd } from "../app/lib/valueChain/parseValueChainMd";
-import { chainSection, chainCodes } from "../app/lib/valueChain/chainSource";
+import { chainCodes } from "../app/lib/valueChain/chainSource";
+import {
+  type PromptBlock, findBlocks, blockKey, blocksOfChain, spliceBlocks,
+} from "../app/lib/valueChain/spliceBlocks";
 
 const REPO_MD = path.join(process.cwd(), "new features", "Process Repository Final.md");
-
-/** A prompt block found in a document: its label, its fenced text, and where it sits. */
-interface Block {
-  label: string;          // "BPMN", "Value Chain", …
-  /** For BPMN, the `### V03.02 — …` heading it sits under; null for chain-level. */
-  under: string | null;
-  /** Absolute offsets of the fence BODY within the source string. */
-  start: number;
-  end: number;
-  text: string;
-}
-
-const LABEL_RE = /^\*\*(Value Chain|Context|Process Context|ArchiMate|BPMN) diagram prompt\.\*\*[ \t]*$/gm;
-
-/**
- * Every prompt block in a stretch of markdown, with the subprocess heading each
- * BPMN block belongs to.
- *
- * The heading is what makes BPMN blocks addressable: a chain has one Value Chain
- * prompt but eleven BPMN prompts, and they are told apart only by the `###`
- * heading above them.
- */
-function findBlocks(src: string): Block[] {
-  const out: Block[] = [];
-  const headings: { index: number; text: string }[] = [];
-  const h3 = /^###[ \t]+(.+?)[ \t]*$/gm;
-  let hm: RegExpExecArray | null;
-  while ((hm = h3.exec(src)) !== null) headings.push({ index: hm.index, text: hm[1].trim() });
-
-  LABEL_RE.lastIndex = 0;
-  let lm: RegExpExecArray | null;
-  while ((lm = LABEL_RE.exec(src)) !== null) {
-    const label = lm[1];
-    const after = src.slice(lm.index);
-    const fence = after.match(/```text[ \t]*\n([\s\S]*?)\n?```/);
-    if (!fence || fence.index === undefined) continue;
-    const bodyStart = lm.index + fence.index + fence[0].indexOf("\n") + 1;
-    const bodyEnd = bodyStart + fence[1].length;
-    // The nearest `###` heading ABOVE this label, if any.
-    let under: string | null = null;
-    for (const h of headings) if (h.index < lm.index) under = h.text; else break;
-    out.push({ label, under: label === "BPMN" ? under : null, start: bodyStart, end: bodyEnd, text: fence[1] });
-  }
-  return out;
-}
-
-/** The key a block is matched on: its type, plus the subprocess for BPMN. */
-const keyOf = (b: Block): string => (b.label === "BPMN" ? `BPMN|${(b.under ?? "").split(/[—–-]/)[0].trim()}` : b.label);
-
-/** Replace block bodies in `src`, back to front so earlier offsets stay valid. */
-function spliceBlocks(src: string, replacements: { block: Block; text: string }[]): string {
-  let out = src;
-  for (const r of [...replacements].sort((a, z) => z.block.start - a.block.start)) {
-    out = out.slice(0, r.block.start) + r.text + out.slice(r.block.end);
-  }
-  return out;
-}
 
 function run() {
   const argv = process.argv.slice(2);
@@ -103,10 +49,13 @@ function run() {
     return;
   }
 
-  const section = chainSection(doc, chain);
-  if (!section) { console.error(`chain ${chain} not found in ${mdPath}`); process.exit(1); }
-  const sectionStart = doc.indexOf(section);
-  const targets = findBlocks(section).map((b) => ({ ...b, start: b.start + sectionStart, end: b.end + sectionStart }));
+  // Blocks are found over the WHOLE document and filtered — never over a sliced
+  // section, whose offsets cannot be mapped back reliably (see findBlocks).
+  const targets = blocksOfChain(findBlocks(doc), chain);
+  if (targets.length === 0) {
+    console.error(`chain ${chain} has no prompt blocks in ${mdPath} — chains present: ${chainCodes(doc).join(" ")}`);
+    process.exit(1);
+  }
   console.log(`${chain}: ${targets.length} existing prompt block(s) in the document`);
 
   // Where the incoming prompts come from: a generated file, or — for --verify —
@@ -132,15 +81,15 @@ function run() {
   const incoming = findBlocks(incomingSrc);
   console.log(`incoming: ${incoming.length} prompt block(s)`);
 
-  const byKey = new Map(targets.map((b) => [keyOf(b), b]));
-  const matched: { block: Block; text: string }[] = [];
+  const byKey = new Map(targets.map((b) => [blockKey(b), b]));
+  const matched: { block: PromptBlock; text: string }[] = [];
   const unmatched: string[] = [];
   for (const inc of incoming) {
-    const target = byKey.get(keyOf(inc));
-    if (!target) { unmatched.push(keyOf(inc)); continue; }
+    const target = byKey.get(blockKey(inc));
+    if (!target) { unmatched.push(blockKey(inc)); continue; }
     matched.push({ block: target, text: inc.text });
   }
-  const missing = targets.filter((t) => !matched.some((m) => m.block === t)).map(keyOf);
+  const missing = targets.filter((t) => !matched.some((m) => m.block === t)).map(blockKey);
 
   console.log(`matched ${matched.length}`);
   if (unmatched.length) console.log(`  NOT IN THE DOCUMENT (skipped, never appended): ${unmatched.join(", ")}`);

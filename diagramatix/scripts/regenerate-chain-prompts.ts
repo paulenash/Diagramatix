@@ -1,0 +1,197 @@
+/**
+ * Regenerate a value chain's diagram prompts from the master template, in place.
+ *
+ * Replaces an onerous manual loop: open the Generate Repository Prompts page,
+ * upload the `.md`, pick a chain, wait, Copy all, paste somewhere, splice it
+ * back — once per chain, nine times. Everything that page does is already a
+ * library, so this joins them up and runs headless.
+ *
+ *   npx tsx scripts/regenerate-chain-prompts.ts --chains V01 --dry-run
+ *   npx tsx scripts/regenerate-chain-prompts.ts --chains V01,V02 --concurrency 4
+ *   npx tsx scripts/regenerate-chain-prompts.ts --all --types bpmn
+ *
+ * SAFETY. Each chain is written as it finishes, so a crash keeps completed work
+ * and a re-run resumes by naming the chains still to do. Every generated block is
+ * parsed back with `parseValueChainMd` before it is stored, and a chain whose
+ * prompts do not all parse is REPORTED AND SKIPPED rather than written — a prompt
+ * the batch tool cannot read is worse than the old one it would replace.
+ *
+ * COST. One AI call per prompt: ~15 per chain with every type, ~11 with BPMN
+ * only. The eight chains other than V03 are ~93 calls. Concurrency is per-chain
+ * across prompts; 4 is a reasonable default against a single API key.
+ *
+ * The audit line after each chain is the evidence the master template is landing
+ * — loop-backs should be 0 and data objects should be non-zero, which is exactly
+ * what the template fix in 2.2.2332 was for.
+ */
+// Load .env the way the app does, so the DATABASE_URL is present and the stored
+// template additions are read. Without it the briefing silently falls back to the
+// built-in, which is a DIFFERENT prompt than the UI would send.
+import "dotenv/config";
+import fs from "node:fs";
+import path from "node:path";
+import { chainCodes, chainSection, chainTitle, subprocessHeadings, chainNarrative } from "../app/lib/valueChain/chainSource";
+import { type MdPromptType, MD_PROMPT_TYPES, mdPromptCategory, buildMdPromptBriefing } from "../app/lib/valueChain/promptTemplates";
+import { generateMdPrompt, targetsFor, type PromptTarget } from "../app/lib/valueChain/generatePrompt";
+import { findBlocks, blockKey, blocksOfChain, spliceBlocks, auditPrompts, type PromptBlock } from "../app/lib/valueChain/spliceBlocks";
+import { parseValueChainMd } from "../app/lib/valueChain/parseValueChainMd";
+
+const REPO_MD = path.join(process.cwd(), "new features", "Process Repository Final.md");
+const DEFAULT_MODEL = "claude-sonnet-4-6";
+
+/** Run `jobs` with at most `limit` in flight. Order of results is preserved. */
+async function pooled<T, R>(items: T[], limit: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+/**
+ * The briefing for a type: the built-in template plus any stored additions.
+ *
+ * Read from the DB so this produces exactly what the UI would. If the database is
+ * unreachable — a laptop without Postgres running — it falls back to the built-in
+ * and SAYS SO, rather than silently generating against a different briefing than
+ * the app uses.
+ */
+async function briefings(types: MdPromptType[]): Promise<{ map: Map<MdPromptType, string>; source: string }> {
+  const map = new Map<MdPromptType, string>();
+  try {
+    const { prisma } = await import("../app/lib/db");
+    for (const t of types) {
+      const row = await prisma.diagramRules.findFirst({
+        where: { category: mdPromptCategory(t), isDefault: true }, select: { rules: true },
+      });
+      map.set(t, buildMdPromptBriefing(t, row?.rules));
+    }
+    return { map, source: "built-in + stored additions (database)" };
+  } catch {
+    for (const t of types) map.set(t, buildMdPromptBriefing(t, null));
+    return { map, source: "BUILT-IN ONLY — the database was unreachable" };
+  }
+}
+
+async function run() {
+  const argv = process.argv.slice(2);
+  const arg = (n: string) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : undefined; };
+  const dryRun = argv.includes("--dry-run");
+  const mdPath = arg("--md") ?? REPO_MD;
+  const model = arg("--model") ?? DEFAULT_MODEL;
+  const concurrency = Math.max(1, Number(arg("--concurrency") ?? 4));
+  const types = (arg("--types") ?? "bpmn").split(",").map((t) => t.trim())
+    .filter((t): t is MdPromptType => (MD_PROMPT_TYPES as string[]).includes(t));
+  if (types.length === 0) { console.error(`--types must name some of: ${MD_PROMPT_TYPES.join(", ")}`); process.exit(1); }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) { console.error("ANTHROPIC_API_KEY is not set (it is in diagramatix/.env)"); process.exit(1); }
+
+  let doc = fs.readFileSync(mdPath, "utf8");
+  const all = chainCodes(doc);
+  const chains = argv.includes("--all") ? all : (arg("--chains") ?? "").split(",").map((c) => c.trim()).filter(Boolean);
+  if (chains.length === 0) {
+    console.log(`chains in ${path.basename(mdPath)}: ${all.join(" ")}`);
+    console.log("pass --chains V01,V02 or --all");
+    return;
+  }
+  const unknown = chains.filter((c) => !all.includes(c));
+  if (unknown.length) { console.error(`not in the document: ${unknown.join(", ")}`); process.exit(1); }
+
+  const { map: brief, source } = await briefings(types);
+  console.log(`model ${model} · types ${types.join(",")} · concurrency ${concurrency}`);
+  console.log(`briefing: ${source}`);
+  console.log(`chains: ${chains.join(" ")}${dryRun ? "  (dry run — nothing written)" : ""}\n`);
+
+  let totalCalls = 0, totalWritten = 0;
+  for (const chain of chains) {
+    const section = chainSection(doc, chain);
+    if (!section) { console.error(`${chain}: section not found — skipped`); continue; }
+    const title = chainTitle(section);
+    const narrative = chainNarrative(section);
+    const subs = subprocessHeadings(section, chain);
+    if (!narrative.trim()) { console.error(`${chain}: no narrative to generate from — skipped`); continue; }
+
+    // Only regenerate prompts the document ACTUALLY HAS. Generating one the
+    // document has no block for would be work whose result could not be stored.
+    const existing = blocksOfChain(findBlocks(doc), chain);
+    const have = new Set(existing.map(blockKey));
+    const wanted = targetsFor(chain, title, subs, types)
+      .filter((t) => have.has(t.type === "bpmn" ? `BPMN|${t.code}` : labelOf(t)));
+    if (wanted.length === 0) { console.log(`${chain}: nothing of those types in the document — skipped`); continue; }
+
+    const t0 = Date.now();
+    process.stdout.write(`${chain} ${title} — ${wanted.length} prompt(s) `);
+    const results = await pooled(wanted, concurrency, async (target) => {
+      const res = await generateMdPrompt({
+        apiKey, model, briefing: brief.get(target.type)!,
+        chainCode: chain, chainTitle: title, narrative, subs, target,
+      });
+      process.stdout.write(res.ok ? (res.roundTrips ? "." : "?") : "x");
+      return { target, res };
+    });
+    totalCalls += wanted.length;
+
+    const failed = results.filter((r) => !r.res.ok);
+    const noParse = results.filter((r) => r.res.ok && !r.res.roundTrips);
+    console.log(` ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    if (failed.length) console.log(`  FAILED: ${failed.map((f) => f.target.code).join(", ")}`);
+    if (noParse.length) console.log(`  DID NOT PARSE BACK: ${noParse.map((f) => f.target.code).join(", ")}`);
+    if (failed.length || noParse.length) {
+      console.log(`  ${chain} NOT WRITTEN — fix or re-run this chain.\n`);
+      continue;
+    }
+
+    // Match each generated prompt to the block it replaces, by the same key the
+    // splice uses. Anything unmatched is reported, never appended.
+    const byKey = new Map(existing.map((b) => [blockKey(b), b]));
+    const matched: { block: PromptBlock; text: string }[] = [];
+    for (const { target, res } of results) {
+      if (!res.ok) continue;
+      const key = target.type === "bpmn" ? `BPMN|${target.code}` : labelOf(target);
+      const block = byKey.get(key);
+      if (!block) { console.log(`  no block for ${key} — skipped`); continue; }
+      matched.push({ block, text: res.prompt });
+    }
+
+    const next = spliceBlocks(doc, matched);
+    const before = parseValueChainMd(doc), after = parseValueChainMd(next);
+    const drift = after.filter((c) => (before.find((b) => b.code === c.code)?.diagrams.length ?? -1) !== c.diagrams.length);
+    if (drift.length) { console.log(`  ${chain} NOT WRITTEN — diagram count changed for ${drift.map((d) => d.code).join(", ")}\n`); continue; }
+
+    const a = auditPrompts(matched.map((m) => m.text).join("\n"));
+    console.log(`  loop-backs ${a.loopBacks} · standard loops ${a.standardLoops} · merges ${a.mergeGateways}`
+      + ` · waits ${a.waitEvents} · section 7 ${a.dataSections} · data objects ${a.dataObjects}`);
+
+    // A loop-back is not a style preference — `R3.14` forbids it and the layout
+    // code PRUNES it, so a prompt asking for one produces a diagram whose
+    // repetition has silently vanished. The template says so plainly and the
+    // model still writes one about once in a hundred prompts, which is exactly
+    // the rate that slips through a human reading 93 of them. Refusing the chain
+    // costs a re-run; letting it through costs a wrong diagram nobody notices.
+    if (a.loopBacks > 0) {
+      const offenders = matched.filter((m) => auditPrompts(m.text).loopBacks > 0).map((m) => blockKey(m.block));
+      console.log(`  ${chain} NOT WRITTEN — ${a.loopBacks} loop-back(s) in ${offenders.join(", ")}. Re-run this chain.\n`);
+      continue;
+    }
+
+    if (!dryRun) { fs.writeFileSync(mdPath, next); doc = next; }
+    totalWritten += matched.length;
+    console.log(`  ${dryRun ? "would write" : "written"} ${matched.length} prompt(s)\n`);
+  }
+
+  console.log(`${totalCalls} AI call(s); ${totalWritten} prompt(s) ${dryRun ? "would be " : ""}written.`);
+  if (!dryRun) console.log("Review with git diff, then npx tsx scripts/splice-chain-prompts.ts --verify <chain>.");
+}
+
+/** The block key for a chain-level target — its label, as the document writes it. */
+const labelOf = (t: PromptTarget): string =>
+  ({ "value-chain": "Value Chain", context: "Context", "process-context": "Process Context", archimate: "ArchiMate", bpmn: "BPMN" })[t.type];
+
+run().then(() => process.exit(0), (e) => { console.error(e); process.exit(1); });
