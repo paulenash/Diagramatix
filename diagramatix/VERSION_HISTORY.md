@@ -15,6 +15,46 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.3.2336 — 2026-08-27 — The catalogue reaches 26 value chains
+
+**V10–V26 written: seventeen new chains, 173 new processes.** The repository had
+nine chains described in full and nothing else — the other seventeen existed only
+as names in a plan. They now carry the same nine-part narrative as V01–V09, so the
+prompt generator can work from them exactly as it does the originals.
+
+They cover what the first pass left out: demand generation before a lead exists
+(**Market to Lead**), what happens after the sale (**Sign to Onboard**, **Renew to
+Retain**), reverse logistics (**Return to Refund**), inbound receipt (**Dock to
+Stock**), running maintenance (**Detect to Repair**), security and privacy
+response (**Detect to Respond**), governance (**Audit to Action**, **Draft to
+Publish**, **Request to Access**, **Matter to Resolution**), decisioning
+(**Application to Decision**, **Claim to Settlement**), and finance and
+information (**Meter to Cash**, **Transaction to Return**, **Data to Insight**,
+**Concept to Commissioning**).
+
+**The catalogue is now numbered and grouped.** "The Most Common Big Name Process
+Chains" — a flat list of nine — becomes "The Numbered Catalogue": all 26 under six
+headings, Customer-facing through Finance and information.
+
+**The part that nearly got missed.** The first draft carried seven narrative
+sections and looked complete — until a length comparison showed the originals at
+6.5 KB against 3.2 KB. The originals have **nine** sections, and the two extra ones
+are the important ones: a **Process ↔ Actors / Teams / IT Systems association
+matrix** with a row per subprocess, and an **Actor / Team / System roll-up**. The
+matrix's own preamble says why they matter — *"each row matches the pools, lanes
+and roles of the corresponding BPMN process prompt below"*. It is the per-process
+specification that decides which pools, lanes and system pools a generated diagram
+gets. Without it the seventeen chains would have generated their lanes from
+chain-level prose, inconsistently, and it would have looked fine.
+
+All seventeen now carry both, with a matrix row for every one of their processes.
+
+Nothing existing moved: the nine original chains still splice byte-identically,
+and all 140 prompts still parse with none empty. The new chains have no prompts
+yet — that is a generation run, not this change.
+
+---
+
 ## 2.3.2335 — 2026-08-27 — Prompt cross-references by name, not by code
 
 The BPMN master template had every start event name where work arrives from and

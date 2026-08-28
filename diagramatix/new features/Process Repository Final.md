@@ -65,17 +65,57 @@ These manage key organisational resources.
 - **Acquire to Retire** — Acquire assets, maintain them, depreciate them, and dispose of them.
 - **Request to Fulfilment** — An employee or department asks for something — equipment, access, travel, software — and the organisation approves and provides it.
 
-## The Most Common "Big Name" Process Chains
+## The Numbered Catalogue
 
-- **V01** Order to Cash
-- **V02** Procure to Pay
-- **V03** Record to Report
-- **V04** Hire to Retire
-- **V05** Plan to Produce
-- **V06** Idea to Market
-- **V07** Issue to Resolution
-- **V08** Acquire to Retire
-- **V09** Source to Contract
+Twenty-six end-to-end chains, grouped by what they are for. V01–V09 are the
+original nine; V10–V26 extend the set into areas the first pass left uncovered —
+demand generation before a lead exists, what happens after the sale, reverse
+logistics, running maintenance, security and privacy response, governance,
+decisioning, and analytics.
+
+### Customer-facing
+
+- **V01** Order to Cash — order through fulfilment, delivery, invoicing, payment
+- **V07** Issue to Resolution — complaints, faults, warranty claims, support
+- **V10** Market to Lead — campaigns and demand generation, before a lead exists
+- **V11** Sign to Onboard — contract signed through to a customer in service
+- **V12** Renew to Retain — renewal, retention, cancellation and win-back
+
+### Supply chain and operations
+
+- **V02** Procure to Pay — buy, receive, match, pay
+- **V05** Plan to Produce — plan demand, schedule, manufacture, release
+- **V09** Source to Contract — identify suppliers, tender, negotiate, award
+- **V13** Return to Refund — reverse logistics, disposition and refunds
+- **V14** Dock to Stock — inbound receipt, inspection and putaway
+- **V15** Detect to Repair — running maintenance, from fault to return to service
+
+### Product and service lifecycle
+
+- **V06** Idea to Market — opportunity through development, launch and adoption
+- **V26** Concept to Commissioning — capital projects, concept to asset in service
+
+### Risk, governance and security
+
+- **V16** Detect to Respond — security and privacy incident response
+- **V17** Audit to Action — audit planning through to remediated findings
+- **V18** Draft to Publish — policy and procedure lifecycle
+- **V19** Request to Access — access requests, review and revocation
+- **V20** Matter to Resolution — legal matters, disputes and litigation
+
+### Decisioning
+
+- **V21** Application to Decision — applications for credit, cover, grants, licences
+- **V22** Claim to Settlement — claim notification through to settlement
+
+### Finance and information
+
+- **V03** Record to Report — transactions, reconciliation, close, reporting
+- **V04** Hire to Retire — recruit, onboard, pay, develop, offboard
+- **V08** Acquire to Retire — asset acquisition through to disposal
+- **V23** Meter to Cash — measured consumption through to collected revenue
+- **V24** Transaction to Return — tax determination, lodgement and audit
+- **V25** Data to Insight — a business question through to a published, monitored result
 
 > **Prompt used for the next section:**
 > Now for each of these I need a few short paragraphs describing: 1. The Teams and Roles that would typically be involved in that process. 2. The External Participants that would initiate the process and be the main external participant during the end-to-end process (e.g. Customer, Applicant, Interviewee, Inventor, Complainant, Seller, Buyer, Owner, etc.). 3. The small number of high-level Subprocesses that would be carried out during the end-to-end Value Chain. 4. The typical IT Systems that would support these processes. 5. The main policies and procedures that would inform the processes. 6. The high-level flow of information to and from the External Participants and the Processes. 7. The high-level flow of information to and from the Processes and the IT Systems.
@@ -18363,3 +18403,1185 @@ system. On completion, the supplier is live, a vendor manager
 is assigned, and the organisation is ready to transact and
 manage the relationship under V09's successor processes.
 ```
+
+## V10 — Market to Lead
+
+**Teams and roles involved.**
+Market to Lead usually involves Marketing, Digital/Campaign Marketing, Content, Events, Marketing Operations, Sales Development, and Sales, with support from Data/Analytics and sometimes Legal or Privacy for consent handling. Key roles include marketing manager, campaign manager, content producer, digital/paid media specialist, events coordinator, marketing operations analyst, lead qualification specialist, sales development representative, and data privacy officer.
+
+**External participants.**
+The main external participant is the Prospect — an individual or organisation not yet known to the business. The process is normally initiated by the organisation itself rather than by the customer: a campaign launches, content is published, or an event opens for registration. Other external parties include media and advertising platforms, list and data providers, event venues and partners, agencies, and marketing automation vendors.
+
+**High-level subprocesses.**
+Typical subprocesses are: plan campaign, define audience and segments, produce content and assets, launch campaign across channels, capture responses and enquiries, enrich and score the response, qualify the lead, route the qualified lead to sales, nurture the unqualified response, and measure campaign performance.
+
+**Typical IT systems.**
+Supporting systems include marketing automation, CRM, content management system, web analytics, advertising and social platforms, event management platform, data enrichment services, consent and preference management, customer data platform, and business intelligence/reporting tools.
+
+**Policies and procedures.**
+Key controls include brand and messaging guidelines, marketing approval procedure, privacy and consent policy (opt-in, unsubscribe, retention), data sourcing and list acquisition policy, lead scoring and qualification criteria, service-level agreements between Marketing and Sales on lead follow-up, advertising spend approval, and campaign measurement standards.
+
+**Information flow between external participants and process.**
+The prospect provides enquiry details, registration and download information, consent and channel preferences, and engagement signals such as page visits, opens and clicks. The process provides the prospect with campaign messages, content and offers, event invitations and confirmations, follow-up communication, and preference and unsubscribe confirmations.
+
+**Information flow between process and IT systems.**
+The process creates or updates campaign definitions, audience segments, content assets, response records, lead records, scores, consent records, and attribution data. IT systems provide audience data, delivery and engagement metrics, duplicate and enrichment matches, existing customer and account context, suppression lists, and campaign performance reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Marketing Organisation" pool (key role in brackets), and IT systems
+are the `System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V10.01** Plan Campaign | — | Marketing (campaign manager), Marketing Operations (marketing operations analyst) | Marketing Automation Platform |
+| **V10.02** Define Audience & Segments | Data Provider | Marketing Operations (marketing operations analyst), Data & Analytics (data analyst) | Customer Data Platform (CDP) |
+| **V10.03** Produce Content & Assets | Agency | Content (content producer), Marketing (campaign manager) | Content Management System (CMS) |
+| **V10.04** Obtain Approvals | — | Marketing (marketing manager), Legal / Privacy (data privacy officer) | Marketing Automation Platform |
+| **V10.05** Launch Campaign | Prospect, Advertising Platform | Digital Marketing (digital media specialist), Marketing Operations (marketing operations analyst) | Marketing Automation Platform, Advertising Platform |
+| **V10.06** Capture Response | Prospect | Marketing Operations (marketing operations analyst) | Marketing Automation Platform, Web Analytics System |
+| **V10.07** Enrich & Score Response | Data Provider | Marketing Operations (marketing operations analyst), Data & Analytics (data analyst) | Data Enrichment Service, Customer Data Platform (CDP) |
+| **V10.08** Qualify Lead | Prospect | Sales Development (sales development representative) | CRM System |
+| **V10.09** Route Qualified Lead to Sales | — | Sales Development (sales development representative), Sales (account manager) | CRM System |
+| **V10.10** Nurture Unqualified Response | Prospect | Marketing (campaign manager) | Marketing Automation Platform |
+| **V10.11** Measure Campaign Performance | — | Marketing (marketing manager), Data & Analytics (data analyst) | Business Intelligence Platform |
+
+**Actor / Team / System roll-up** (every distinct participant across V10):
+
+- **External actors:** Prospect (V10.05, V10.06, V10.08, V10.10); Data Provider (V10.02, V10.07); Advertising Platform (V10.05); Agency (V10.03).
+- **Teams:** Marketing (V10.01, V10.03, V10.04, V10.10, V10.11); Marketing Operations (V10.01, V10.02, V10.05–V10.07); Content (V10.03); Legal / Privacy (V10.04); Digital Marketing (V10.05); Data & Analytics (V10.02, V10.07, V10.11); Sales Development (V10.08, V10.09); Sales (V10.09).
+- **IT systems:** Marketing Automation Platform (V10.01, V10.04–V10.06, V10.10); Customer Data Platform / CDP (V10.02, V10.07); Content Management System / CMS (V10.03); Advertising Platform (V10.05); Web Analytics System (V10.06); Data Enrichment Service (V10.07); CRM System (V10.08, V10.09); Business Intelligence Platform (V10.11).
+
+### V10.01 — Plan Campaign
+
+### V10.02 — Define Audience & Segments
+
+### V10.03 — Produce Content & Assets
+
+### V10.04 — Obtain Approvals
+
+### V10.05 — Launch Campaign
+
+### V10.06 — Capture Response
+
+### V10.07 — Enrich & Score Response
+
+### V10.08 — Qualify Lead
+
+### V10.09 — Route Qualified Lead to Sales
+
+### V10.10 — Nurture Unqualified Response
+
+### V10.11 — Measure Campaign Performance
+
+## V11 — Sign to Onboard
+
+**Teams and roles involved.**
+Sign to Onboard usually involves Sales, Customer Success, Onboarding/Implementation, Service Delivery, Finance/Billing, IT or Provisioning, Legal or Contracts, and Support. Key roles include account manager, onboarding manager, implementation consultant, solution architect, data migration specialist, trainer, billing officer, provisioning engineer, and customer success manager.
+
+**External participants.**
+The main external participant is the New Customer, represented by a sponsor, project contact and end users. The process is initiated when a contract is signed or an order for a new service is accepted. Other external parties include the customer's own IT provider, third-party implementation partners, integration vendors, and sometimes regulators where the service is licensed.
+
+**High-level subprocesses.**
+Typical subprocesses are: accept signed contract, confirm scope and entitlements, assign the onboarding team, run kick-off, collect customer requirements and data, configure and provision the service, migrate data, test and validate with the customer, train users, obtain go-live acceptance, activate billing, and hand over to business as usual.
+
+**Typical IT systems.**
+Supporting systems include CRM, contract lifecycle management, project or onboarding management tooling, provisioning and identity systems, the product or service platform itself, data migration tooling, billing and subscription management, knowledge base and learning management, and customer support/ticketing.
+
+**Policies and procedures.**
+Key controls include contract acceptance and handover procedure, entitlement and scope-change rules, customer data handling and privacy policy, migration and cut-over procedure, acceptance and sign-off criteria, training standards, billing activation rules, and escalation paths where onboarding is delayed.
+
+**Information flow between external participants and process.**
+The customer provides contacts and authorised signatories, configuration requirements, existing data for migration, environment and access details, testing feedback, and formal acceptance. The process provides the customer with an onboarding plan and schedule, configuration and readiness updates, migration reports, training materials and sessions, go-live confirmation, and the first invoice and support arrangements.
+
+**Information flow between process and IT systems.**
+The process creates or updates customer accounts, entitlements and licences, provisioned environments, user identities and roles, migrated records, onboarding tasks and milestones, and billing schedules. IT systems provide contract and order terms, provisioning status, migration validation results, usage and readiness telemetry, and support-case history.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Service Provider" pool (key role in brackets), and IT systems are
+the `System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V11.01** Accept Signed Contract | New Customer | Sales (account manager), Legal / Contracts (contracts administrator) | Contract Lifecycle Management (CLM) |
+| **V11.02** Confirm Scope & Entitlements | New Customer | Onboarding (onboarding manager), Sales (account manager) | CRM System |
+| **V11.03** Assign Onboarding Team | — | Onboarding (onboarding manager), Service Delivery (implementation consultant) | Onboarding / Project Management System |
+| **V11.04** Run Kick-off | New Customer | Onboarding (onboarding manager), Service Delivery (solution architect) | Onboarding / Project Management System |
+| **V11.05** Collect Requirements & Data | New Customer | Service Delivery (implementation consultant) | Onboarding / Project Management System |
+| **V11.06** Configure & Provision Service | — | Service Delivery (implementation consultant), IT / Provisioning (provisioning engineer) | Provisioning & Identity System, Product Platform |
+| **V11.07** Migrate Data | New Customer, Implementation Partner | Service Delivery (data migration specialist) | Data Migration Tooling, Product Platform |
+| **V11.08** Test & Validate with Customer | New Customer | Service Delivery (implementation consultant), Onboarding (onboarding manager) | Product Platform |
+| **V11.09** Train Users | New Customer | Onboarding (trainer) | Learning Management System (LMS) |
+| **V11.10** Obtain Go-Live Acceptance | New Customer | Onboarding (onboarding manager) | Onboarding / Project Management System |
+| **V11.11** Activate Billing | New Customer | Finance / Billing (billing officer) | Billing & Subscription System |
+| **V11.12** Hand Over to Business as Usual | New Customer | Customer Success (customer success manager), Support (support lead) | CRM System, Support / Ticketing System |
+
+**Actor / Team / System roll-up** (every distinct participant across V11):
+
+- **External actors:** New Customer (V11.01, V11.02, V11.04, V11.05, V11.07–V11.12); Implementation Partner (V11.07).
+- **Teams:** Sales (V11.01, V11.02); Legal / Contracts (V11.01); Onboarding (V11.02–V11.05, V11.08–V11.10); Service Delivery (V11.03–V11.08); IT / Provisioning (V11.06); Finance / Billing (V11.11); Customer Success (V11.12); Support (V11.12).
+- **IT systems:** Contract Lifecycle Management / CLM (V11.01); CRM System (V11.02, V11.12); Onboarding / Project Management System (V11.03–V11.05, V11.10); Provisioning & Identity System (V11.06); Product Platform (V11.06–V11.08); Data Migration Tooling (V11.07); Learning Management System / LMS (V11.09); Billing & Subscription System (V11.11); Support / Ticketing System (V11.12).
+
+### V11.01 — Accept Signed Contract
+
+### V11.02 — Confirm Scope & Entitlements
+
+### V11.03 — Assign Onboarding Team
+
+### V11.04 — Run Kick-off
+
+### V11.05 — Collect Requirements & Data
+
+### V11.06 — Configure & Provision Service
+
+### V11.07 — Migrate Data
+
+### V11.08 — Test & Validate with Customer
+
+### V11.09 — Train Users
+
+### V11.10 — Obtain Go-Live Acceptance
+
+### V11.11 — Activate Billing
+
+### V11.12 — Hand Over to Business as Usual
+
+## V12 — Renew to Retain
+
+**Teams and roles involved.**
+Renew to Retain usually involves Customer Success, Account Management, Sales, Renewals, Finance/Billing, Support, and Product, with Legal or Contracts involved where terms change. Key roles include customer success manager, renewals manager, account manager, support lead, billing officer, contracts administrator, and product or adoption analyst.
+
+**External participants.**
+The main external participant is the Existing Customer, usually represented by a commercial owner and a service owner. The process is initiated by an approaching contract end date, a usage or health trigger, or a customer-initiated cancellation or change request. Other external parties include resellers and channel partners, procurement teams acting for the customer, and payment providers.
+
+**High-level subprocesses.**
+Typical subprocesses are: monitor account health and usage, identify the renewal opportunity, review service performance with the customer, assess risk of churn, prepare the renewal proposal, negotiate terms, handle cancellation or downgrade requests, execute the renewal, update entitlements and billing, and run win-back for lapsed customers.
+
+**Typical IT systems.**
+Supporting systems include CRM, customer success platform, subscription and billing management, contract lifecycle management, product usage analytics, support/ticketing, survey and feedback tools, and business intelligence reporting.
+
+**Policies and procedures.**
+Key controls include renewal notice periods and auto-renewal terms, discounting and approval authority, price-increase policy, cancellation and refund terms, customer health scoring definitions, escalation procedure for at-risk accounts, and retention offer approval rules.
+
+**Information flow between external participants and process.**
+The customer provides renewal intent, feedback on service performance, changes to required volumes or scope, cancellation or non-renewal notice, and purchase orders or signatures. The process provides the customer with renewal notices, service and value reviews, proposals and pricing, negotiated terms, confirmation of renewal or cancellation, and revised billing schedules.
+
+**Information flow between process and IT systems.**
+The process creates or updates renewal opportunities, health scores and risk flags, proposals and quotes, amended contracts, entitlement changes, and billing schedules. IT systems provide contract dates and terms, usage and adoption data, support-case volumes and satisfaction scores, invoice and payment history, and churn and renewal-rate reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Service Provider" pool (key role in brackets), and IT systems are
+the `System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V12.01** Monitor Account Health & Usage | — | Customer Success (customer success manager) | Customer Success Platform, Product Usage Analytics |
+| **V12.02** Identify Renewal Opportunity | — | Renewals (renewals manager), Customer Success (customer success manager) | CRM System |
+| **V12.03** Review Service Performance with Customer | Existing Customer | Customer Success (customer success manager), Support (support lead) | Customer Success Platform, Support / Ticketing System |
+| **V12.04** Assess Churn Risk | — | Customer Success (customer success manager), Product (adoption analyst) | Product Usage Analytics, Business Intelligence Platform |
+| **V12.05** Prepare Renewal Proposal | — | Renewals (renewals manager), Account Management (account manager) | CRM System |
+| **V12.06** Negotiate Terms | Existing Customer, Channel Partner | Renewals (renewals manager), Legal / Contracts (contracts administrator) | Contract Lifecycle Management (CLM) |
+| **V12.07** Handle Cancellation or Downgrade | Existing Customer | Customer Success (customer success manager), Renewals (renewals manager) | CRM System, Billing & Subscription System |
+| **V12.08** Execute Renewal | Existing Customer | Renewals (renewals manager), Legal / Contracts (contracts administrator) | Contract Lifecycle Management (CLM) |
+| **V12.09** Update Entitlements & Billing | Payment Provider | Finance / Billing (billing officer) | Billing & Subscription System |
+| **V12.10** Run Win-Back | Existing Customer | Account Management (account manager), Customer Success (customer success manager) | CRM System |
+
+**Actor / Team / System roll-up** (every distinct participant across V12):
+
+- **External actors:** Existing Customer (V12.03, V12.06–V12.08, V12.10); Channel Partner (V12.06); Payment Provider (V12.09).
+- **Teams:** Customer Success (V12.01–V12.04, V12.07, V12.10); Renewals (V12.02, V12.05–V12.08); Support (V12.03); Product (V12.04); Account Management (V12.05, V12.10); Legal / Contracts (V12.06, V12.08); Finance / Billing (V12.09).
+- **IT systems:** Customer Success Platform (V12.01, V12.03); Product Usage Analytics (V12.01, V12.04); CRM System (V12.02, V12.05, V12.07, V12.10); Support / Ticketing System (V12.03); Business Intelligence Platform (V12.04); Contract Lifecycle Management / CLM (V12.06, V12.08); Billing & Subscription System (V12.07, V12.09).
+
+### V12.01 — Monitor Account Health & Usage
+
+### V12.02 — Identify Renewal Opportunity
+
+### V12.03 — Review Service Performance with Customer
+
+### V12.04 — Assess Churn Risk
+
+### V12.05 — Prepare Renewal Proposal
+
+### V12.06 — Negotiate Terms
+
+### V12.07 — Handle Cancellation or Downgrade
+
+### V12.08 — Execute Renewal
+
+### V12.09 — Update Entitlements & Billing
+
+### V12.10 — Run Win-Back
+
+## V13 — Return to Refund
+
+**Teams and roles involved.**
+Return to Refund usually involves Customer Service, Returns/Reverse Logistics, Warehouse, Quality, Repairs or Refurbishment, Finance/Accounts Receivable, and sometimes Supplier Management where the fault lies upstream. Key roles include customer service agent, returns coordinator, warehouse receiver, quality inspector, repair technician, disposition analyst, credit controller, and finance officer.
+
+**External participants.**
+The main external participant is the Customer returning goods. The process is initiated when the customer requests a return, reports a fault, exercises a right of withdrawal, or a recall is issued. Other external parties include freight carriers, third-party returns processors, suppliers and manufacturers, recyclers and disposal partners, and payment providers.
+
+**High-level subprocesses.**
+Typical subprocesses are: receive return request, validate eligibility against policy, authorise the return and issue an RMA, arrange collection or return shipping, receive and inspect the goods, decide disposition (restock, repair, refurbish, scrap, return to supplier), process the refund or replacement, update inventory and financial records, recover cost from the supplier where applicable, and analyse return reasons.
+
+**Typical IT systems.**
+Supporting systems include customer service/ticketing, order management, returns management, warehouse management, quality management, repair or field-service management, inventory and ERP, transport management, billing and accounts receivable, payment gateway, and reporting/analytics.
+
+**Policies and procedures.**
+Key controls include returns and refunds policy, statutory withdrawal and consumer-guarantee rights, warranty terms, restocking and shipping-cost rules, inspection and disposition criteria, hazardous or regulated goods handling, recall procedure, supplier recovery and warranty-claim terms, and refund authorisation limits.
+
+**Information flow between external participants and process.**
+The customer provides the return request and reason, order and product identifiers, condition and fault description, evidence such as photographs, and return shipment details. The process provides the customer with eligibility decisions, return authorisation and labels, collection arrangements, receipt and inspection outcomes, refund or replacement confirmation, and credit notes.
+
+**Information flow between process and IT systems.**
+The process creates or updates return authorisations, inbound shipments, inspection results, disposition decisions, inventory adjustments, credit notes, refunds, and supplier claims. IT systems provide original order and payment details, product and warranty data, stock locations, carrier tracking, refund status, and return-reason analytics.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Retail Organisation" pool (key role in brackets), and IT systems
+are the `System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V13.01** Receive Return Request | Customer | Customer Service (customer service agent) | Customer Service / Ticketing System |
+| **V13.02** Validate Eligibility | Customer | Customer Service (customer service agent), Returns (returns coordinator) | Order Management System (OMS), Returns Management System |
+| **V13.03** Authorise Return & Issue RMA | Customer | Returns (returns coordinator) | Returns Management System |
+| **V13.04** Arrange Collection | Customer, Freight Carrier | Returns (returns coordinator), Logistics (logistics coordinator) | Transport Management System (TMS) |
+| **V13.05** Receive & Inspect Goods | Freight Carrier | Warehouse (warehouse receiver), Quality (quality inspector) | Warehouse Management System (WMS), Quality Management System |
+| **V13.06** Decide Disposition | — | Quality (disposition analyst), Repairs (repair technician) | Returns Management System, Inventory / ERP System |
+| **V13.07** Process Refund or Replacement | Customer, Payment Provider | Finance (finance officer), Customer Service (customer service agent) | Billing / ERP System, Payment Gateway |
+| **V13.08** Update Inventory & Financials | — | Warehouse (inventory controller), Finance (finance officer) | Inventory / ERP System |
+| **V13.09** Recover Cost from Supplier | Supplier | Supplier Management (supplier manager), Finance (credit controller) | Procurement / ERP System |
+| **V13.10** Analyse Return Reasons | — | Quality (quality manager), Customer Service (service manager) | Business Intelligence Platform |
+
+**Actor / Team / System roll-up** (every distinct participant across V13):
+
+- **External actors:** Customer (V13.01–V13.04, V13.07); Freight Carrier (V13.04, V13.05); Payment Provider (V13.07); Supplier (V13.09).
+- **Teams:** Customer Service (V13.01, V13.02, V13.07, V13.10); Returns (V13.02–V13.04); Logistics (V13.04); Warehouse (V13.05, V13.08); Quality (V13.05, V13.06, V13.10); Repairs (V13.06); Finance (V13.07–V13.09); Supplier Management (V13.09).
+- **IT systems:** Customer Service / Ticketing System (V13.01); Order Management System / OMS (V13.02); Returns Management System (V13.02, V13.03, V13.06); Transport Management System / TMS (V13.04); Warehouse Management System / WMS (V13.05); Quality Management System (V13.05); Inventory / ERP System (V13.06, V13.08); Billing / ERP System (V13.07); Payment Gateway (V13.07); Procurement / ERP System (V13.09); Business Intelligence Platform (V13.10).
+
+### V13.01 — Receive Return Request
+
+### V13.02 — Validate Eligibility
+
+### V13.03 — Authorise Return & Issue RMA
+
+### V13.04 — Arrange Collection
+
+### V13.05 — Receive & Inspect Goods
+
+### V13.06 — Decide Disposition
+
+### V13.07 — Process Refund or Replacement
+
+### V13.08 — Update Inventory & Financials
+
+### V13.09 — Recover Cost from Supplier
+
+### V13.10 — Analyse Return Reasons
+
+## V14 — Dock to Stock
+
+**Teams and roles involved.**
+Dock to Stock usually involves Inbound Logistics, Warehouse Operations, Goods Receipt, Quality Assurance, Inventory Control, Procurement, and Accounts Payable. Key roles include inbound coordinator, dock supervisor, goods-receipt clerk, quality inspector, putaway operator, inventory controller, buyer, and accounts payable officer.
+
+**External participants.**
+The main external participant is the Supplier, together with the Carrier delivering the goods. The process is initiated when a shipment arrives at the receiving dock against a purchase order or transfer order. Other external parties include customs brokers and freight forwarders for imported goods, third-party logistics providers, and testing or certification bodies.
+
+**High-level subprocesses.**
+Typical subprocesses are: schedule the inbound delivery, receive the shipment at the dock, verify against the purchase order and delivery documents, unload and count, inspect quality and record any damage, record the goods receipt, put stock away to its location, handle discrepancies and rejections, release stock as available to promise, and match the receipt to the supplier invoice.
+
+**Typical IT systems.**
+Supporting systems include warehouse management, ERP and inventory, purchase order and procurement systems, transport and yard management, barcode or RFID scanning, quality management, customs and trade compliance systems, and accounts payable/invoice matching.
+
+**Policies and procedures.**
+Key controls include receiving and inspection procedure, tolerance rules for over- and under-delivery, quality acceptance criteria and sampling plans, damage and discrepancy reporting, segregation of duties between ordering and receiving, dangerous-goods and cold-chain handling, customs and import compliance, stock valuation rules, and three-way matching before payment.
+
+**Information flow between external participants and process.**
+The supplier and carrier provide advance shipping notices, delivery dockets and packing lists, certificates of analysis or conformance, customs documentation, and proof of delivery. The process provides the supplier and carrier with delivery booking slots, receipt confirmations, discrepancy and damage notifications, rejection notices, and returns instructions.
+
+**Information flow between process and IT systems.**
+The process creates or updates inbound delivery records, goods receipts, inspection results, stock quantities and locations, quarantine and hold flags, discrepancy records, and accounts-payable matching entries. IT systems provide open purchase orders and expected quantities, item master and storage rules, available locations, quality specifications, and stock-availability and receipt-performance reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Receiving Organisation" pool (key role in brackets), and IT systems
+are the `System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V14.01** Schedule Inbound Delivery | Supplier, Carrier | Inbound Logistics (inbound coordinator) | Transport & Yard Management System |
+| **V14.02** Receive Shipment at Dock | Carrier | Warehouse Operations (dock supervisor) | Warehouse Management System (WMS) |
+| **V14.03** Verify Against Purchase Order | Supplier | Goods Receipt (goods-receipt clerk) | Procurement / ERP System |
+| **V14.04** Unload & Count | Carrier | Warehouse Operations (dock supervisor) | Warehouse Management System (WMS) |
+| **V14.05** Inspect Quality | — | Quality Assurance (quality inspector) | Quality Management System |
+| **V14.06** Record Goods Receipt | — | Goods Receipt (goods-receipt clerk) | Procurement / ERP System, Warehouse Management System (WMS) |
+| **V14.07** Put Stock Away | — | Warehouse Operations (putaway operator) | Warehouse Management System (WMS) |
+| **V14.08** Handle Discrepancies | Supplier, Customs Broker | Goods Receipt (goods-receipt clerk), Procurement (buyer) | Procurement / ERP System |
+| **V14.09** Release Stock as Available | — | Inventory Control (inventory controller) | Inventory / ERP System |
+| **V14.10** Match Receipt to Invoice | Supplier | Accounts Payable (accounts payable officer) | Accounts Payable / ERP System |
+
+**Actor / Team / System roll-up** (every distinct participant across V14):
+
+- **External actors:** Supplier (V14.01, V14.03, V14.08, V14.10); Carrier (V14.01, V14.02, V14.04); Customs Broker (V14.08).
+- **Teams:** Inbound Logistics (V14.01); Warehouse Operations (V14.02, V14.04, V14.07); Goods Receipt (V14.03, V14.06, V14.08); Quality Assurance (V14.05); Procurement (V14.08); Inventory Control (V14.09); Accounts Payable (V14.10).
+- **IT systems:** Transport & Yard Management System (V14.01); Warehouse Management System / WMS (V14.02, V14.04, V14.06, V14.07); Procurement / ERP System (V14.03, V14.06, V14.08); Quality Management System (V14.05); Inventory / ERP System (V14.09); Accounts Payable / ERP System (V14.10).
+
+### V14.01 — Schedule Inbound Delivery
+
+### V14.02 — Receive Shipment at Dock
+
+### V14.03 — Verify Against Purchase Order
+
+### V14.04 — Unload & Count
+
+### V14.05 — Inspect Quality
+
+### V14.06 — Record Goods Receipt
+
+### V14.07 — Put Stock Away
+
+### V14.08 — Handle Discrepancies
+
+### V14.09 — Release Stock as Available
+
+### V14.10 — Match Receipt to Invoice
+
+## V15 — Detect to Repair
+
+**Teams and roles involved.**
+Detect to Repair usually involves Maintenance, Reliability Engineering, Operations, Field Service, Planning and Scheduling, Spare Parts/Stores, Health and Safety, and Finance for cost capture. Key roles include maintenance planner, reliability engineer, condition-monitoring analyst, maintenance technician, field service engineer, scheduler, storeperson, safety officer, and asset manager.
+
+**External participants.**
+The main external participants are the Equipment Owner or Operator who reports the fault, and specialist Service Contractors or the Original Equipment Manufacturer where work is outsourced. The process is initiated by a fault report, an alarm or condition-monitoring exception, an inspection finding, or a preventive maintenance schedule falling due. Other external parties include parts suppliers, calibration and testing services, and regulators for safety-critical assets.
+
+**High-level subprocesses.**
+Typical subprocesses are: detect the fault or condition exception, raise and triage the notification, assess criticality and safety impact, diagnose the fault, plan the work and required parts, schedule the work and secure permits, execute the repair, test and return the asset to service, close the work order and capture costs, and analyse failure causes to prevent recurrence.
+
+**Typical IT systems.**
+Supporting systems include enterprise asset management or computerised maintenance management, condition-monitoring and IoT/SCADA platforms, work-order and field-service management, spare-parts inventory, permit-to-work and safety systems, document management for drawings and manuals, procurement for contracted services, and reliability analytics.
+
+**Policies and procedures.**
+Key controls include asset criticality classification, maintenance strategy and preventive schedules, permit-to-work and isolation procedures, safety and lock-out/tag-out rules, spare-parts stocking policy, contractor approval and induction, warranty claim procedure, calibration and statutory inspection requirements, and cost capitalisation versus expense rules.
+
+**Information flow between external participants and process.**
+The operator or owner provides fault reports, symptoms and operating context, access windows, and confirmation that the asset can be taken offline. Contractors provide quotes, method statements, work completion reports and certificates. The process provides fault acknowledgements, expected downtime and schedules, work instructions and permits, completion and return-to-service notifications, and warranty or claim documentation.
+
+**Information flow between process and IT systems.**
+The process creates or updates notifications, work orders, diagnoses, parts reservations and issues, labour and cost postings, permits, test results, and asset history. IT systems provide asset registers and hierarchies, condition and alarm data, maintenance history and failure codes, parts availability, technician skills and availability, and reliability and downtime reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Asset Owner Organisation" pool (key role in brackets), and IT
+systems are the `System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V15.01** Detect Fault or Condition Exception | Equipment Operator | Reliability Engineering (condition-monitoring analyst) | Condition Monitoring / SCADA Platform |
+| **V15.02** Raise & Triage Notification | Equipment Operator | Maintenance (maintenance planner) | Enterprise Asset Management (EAM) |
+| **V15.03** Assess Criticality & Safety Impact | — | Reliability Engineering (reliability engineer), Health & Safety (safety officer) | Enterprise Asset Management (EAM) |
+| **V15.04** Diagnose Fault | Original Equipment Manufacturer | Maintenance (maintenance technician), Reliability Engineering (reliability engineer) | Enterprise Asset Management (EAM), Document Management System |
+| **V15.05** Plan Work & Parts | — | Maintenance (maintenance planner), Spare Parts (storeperson) | Enterprise Asset Management (EAM), Spare Parts Inventory System |
+| **V15.06** Schedule Work & Secure Permits | Service Contractor | Planning & Scheduling (scheduler), Health & Safety (safety officer) | Permit-to-Work System, Work Order Management System |
+| **V15.07** Execute Repair | Service Contractor | Maintenance (maintenance technician), Field Service (field service engineer) | Work Order Management System |
+| **V15.08** Test & Return to Service | Equipment Operator | Maintenance (maintenance technician), Operations (operations supervisor) | Enterprise Asset Management (EAM) |
+| **V15.09** Close Work Order & Capture Costs | — | Maintenance (maintenance planner), Finance (asset accountant) | Enterprise Asset Management (EAM), Finance / ERP System |
+| **V15.10** Analyse Failure Causes | — | Reliability Engineering (reliability engineer) | Reliability Analytics Platform |
+
+**Actor / Team / System roll-up** (every distinct participant across V15):
+
+- **External actors:** Equipment Operator (V15.01, V15.02, V15.08); Original Equipment Manufacturer (V15.04); Service Contractor (V15.06, V15.07).
+- **Teams:** Reliability Engineering (V15.01, V15.03, V15.04, V15.10); Maintenance (V15.02, V15.04, V15.05, V15.07–V15.09); Health & Safety (V15.03, V15.06); Spare Parts (V15.05); Planning & Scheduling (V15.06); Field Service (V15.07); Operations (V15.08); Finance (V15.09).
+- **IT systems:** Condition Monitoring / SCADA Platform (V15.01); Enterprise Asset Management / EAM (V15.02–V15.05, V15.08, V15.09); Document Management System (V15.04); Spare Parts Inventory System (V15.05); Permit-to-Work System (V15.06); Work Order Management System (V15.06, V15.07); Finance / ERP System (V15.09); Reliability Analytics Platform (V15.10).
+
+### V15.01 — Detect Fault or Condition Exception
+
+### V15.02 — Raise & Triage Notification
+
+### V15.03 — Assess Criticality & Safety Impact
+
+### V15.04 — Diagnose Fault
+
+### V15.05 — Plan Work & Parts
+
+### V15.06 — Schedule Work & Secure Permits
+
+### V15.07 — Execute Repair
+
+### V15.08 — Test & Return to Service
+
+### V15.09 — Close Work Order & Capture Costs
+
+### V15.10 — Analyse Failure Causes
+
+## V16 — Detect to Respond
+
+**Teams and roles involved.**
+Detect to Respond usually involves Security Operations, Incident Response, IT Operations, Privacy/Data Protection, Legal, Risk and Compliance, Communications, and Executive Management, with Engineering teams drawn in for remediation. Key roles include security analyst, incident manager, threat hunter, forensic investigator, privacy officer, legal counsel, communications lead, service owner, and the executive incident sponsor.
+
+**External participants.**
+The main external participants are the Regulator and the Affected Individuals or Customers who must be notified where a breach is confirmed. The process is initiated by an alert from monitoring tooling, a report from staff or a customer, a third-party or law-enforcement notification, or a threat-intelligence advisory. Other external parties include managed security providers, forensic specialists, cyber insurers, law enforcement, and affected suppliers or partners.
+
+**High-level subprocesses.**
+Typical subprocesses are: detect the event, triage and validate it, declare and classify the incident, contain the threat, investigate and preserve evidence, assess data and privacy impact, notify regulators and affected parties, eradicate and recover, confirm service restoration, and conduct a post-incident review with remediation actions.
+
+**Typical IT systems.**
+Supporting systems include SIEM and log aggregation, endpoint and network detection and response, vulnerability management, identity and access management, case and incident management, forensic tooling, threat intelligence platforms, IT service management, secure communications and war-room tooling, and GRC/risk registers.
+
+**Policies and procedures.**
+Key controls include the incident response plan and severity matrix, breach notification obligations and statutory timeframes, evidence handling and chain-of-custody procedure, containment authority and emergency change rules, privacy impact assessment procedure, communications and disclosure policy, third-party notification obligations, insurance notification terms, and post-incident review requirements.
+
+**Information flow between external participants and process.**
+Regulators receive breach notifications, impact assessments and remediation plans, and provide directions or findings. Affected individuals receive notification of what happened, what data was involved, and what they should do. Third parties provide threat intelligence, forensic findings, and their own breach notifications. The process provides status updates to executives, customers and partners throughout.
+
+**Information flow between process and IT systems.**
+The process creates or updates incident records, timelines, evidence artefacts, containment and remediation actions, impact assessments, notifications, and risk-register entries. IT systems provide alerts and correlated events, log and telemetry evidence, asset and data classification, identity and access history, vulnerability and patch state, and incident metrics for reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Organisation" pool (key role in brackets), and IT systems are the
+`System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V16.01** Detect Event | Managed Security Provider | Security Operations (security analyst) | SIEM Platform, Endpoint Detection & Response |
+| **V16.02** Triage & Validate | — | Security Operations (security analyst) | SIEM Platform, Case Management System |
+| **V16.03** Declare & Classify Incident | — | Incident Response (incident manager), Executive Management (executive sponsor) | Case Management System |
+| **V16.04** Contain Threat | — | Incident Response (incident manager), IT Operations (service owner) | Endpoint Detection & Response, Identity & Access Management |
+| **V16.05** Investigate & Preserve Evidence | Forensic Specialist | Incident Response (forensic investigator) | Forensic Tooling, SIEM Platform |
+| **V16.06** Assess Data & Privacy Impact | — | Privacy (privacy officer), Legal (legal counsel) | Case Management System, GRC Platform |
+| **V16.07** Notify Regulators & Affected Parties | Regulator, Affected Individual | Legal (legal counsel), Communications (communications lead) | Case Management System |
+| **V16.08** Eradicate & Recover | — | IT Operations (service owner), Incident Response (incident manager) | IT Service Management, Endpoint Detection & Response |
+| **V16.09** Confirm Service Restoration | — | IT Operations (service owner), Security Operations (security analyst) | IT Service Management |
+| **V16.10** Conduct Post-Incident Review | Cyber Insurer | Risk & Compliance (risk manager), Incident Response (incident manager) | GRC Platform |
+
+**Actor / Team / System roll-up** (every distinct participant across V16):
+
+- **External actors:** Managed Security Provider (V16.01); Forensic Specialist (V16.05); Regulator (V16.07); Affected Individual (V16.07); Cyber Insurer (V16.10).
+- **Teams:** Security Operations (V16.01, V16.02, V16.09); Incident Response (V16.03–V16.05, V16.08, V16.10); Executive Management (V16.03); IT Operations (V16.04, V16.08, V16.09); Privacy (V16.06); Legal (V16.06, V16.07); Communications (V16.07); Risk & Compliance (V16.10).
+- **IT systems:** SIEM Platform (V16.01, V16.02, V16.05); Endpoint Detection & Response (V16.01, V16.04, V16.08); Case Management System (V16.02, V16.03, V16.06, V16.07); Identity & Access Management (V16.04); Forensic Tooling (V16.05); GRC Platform (V16.06, V16.10); IT Service Management (V16.08, V16.09).
+
+### V16.01 — Detect Event
+
+### V16.02 — Triage & Validate
+
+### V16.03 — Declare & Classify Incident
+
+### V16.04 — Contain Threat
+
+### V16.05 — Investigate & Preserve Evidence
+
+### V16.06 — Assess Data & Privacy Impact
+
+### V16.07 — Notify Regulators & Affected Parties
+
+### V16.08 — Eradicate & Recover
+
+### V16.09 — Confirm Service Restoration
+
+### V16.10 — Conduct Post-Incident Review
+
+## V17 — Audit to Action
+
+**Teams and roles involved.**
+Audit to Action usually involves Internal Audit, Risk and Compliance, the audited Business Units, Finance, IT, and the Audit and Risk Committee. Key roles include chief audit executive, audit manager, auditor, control owner, process owner, remediation owner, risk manager, and committee chair.
+
+**External participants.**
+The main external participants are External Auditors and Regulators, and in some sectors certification bodies. The process is initiated by the annual audit plan, a regulatory examination, a certification cycle, or a triggering event such as an incident or whistleblower report. Other external parties include co-sourced audit providers and specialist assessors.
+
+**High-level subprocesses.**
+Typical subprocesses are: plan the audit and set scope, notify the auditee and agree logistics, gather evidence and test controls, evaluate findings and rate them, draft the audit report, agree management responses and owners, issue the final report, track remediation to completion, verify and close findings, and report status to the committee.
+
+**Typical IT systems.**
+Supporting systems include audit management, GRC and risk registers, control libraries and testing workpapers, document and evidence repositories, issue and action tracking, data analytics tooling for full-population testing, and board reporting packs.
+
+**Policies and procedures.**
+Key controls include the internal audit charter and independence requirements, risk-based audit planning methodology, evidence sufficiency and workpaper standards, finding rating criteria, management response and escalation timeframes, overdue-action escalation, retest and closure evidence requirements, and committee reporting obligations.
+
+**Information flow between external participants and process.**
+External auditors and regulators provide scope requests, information requests, findings and directions; the process provides evidence, management representations, remediation plans and progress reports. Auditees provide process documentation, system access, data extracts and explanations, and receive draft findings, agreed actions and closure confirmations.
+
+**Information flow between process and IT systems.**
+The process creates or updates audit plans, engagements, test procedures and results, findings and ratings, management actions, and closure evidence. IT systems provide the control library and risk register, prior findings and their status, transaction and configuration data for testing, action due dates and overdue alerts, and assurance-coverage reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Organisation" pool (key role in brackets), and IT systems are the
+`System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V17.01** Plan Audit & Set Scope | — | Internal Audit (chief audit executive), Risk & Compliance (risk manager) | Audit Management System, GRC Platform |
+| **V17.02** Notify Auditee & Agree Logistics | — | Internal Audit (audit manager), Business Unit (process owner) | Audit Management System |
+| **V17.03** Gather Evidence & Test Controls | External Auditor | Internal Audit (auditor), Business Unit (control owner) | Audit Management System, Evidence Repository |
+| **V17.04** Evaluate & Rate Findings | — | Internal Audit (audit manager) | Audit Management System |
+| **V17.05** Draft Audit Report | — | Internal Audit (audit manager) | Audit Management System |
+| **V17.06** Agree Management Responses | — | Business Unit (process owner), Internal Audit (audit manager) | Issue & Action Tracking System |
+| **V17.07** Issue Final Report | Regulator | Internal Audit (chief audit executive) | Audit Management System |
+| **V17.08** Track Remediation | — | Risk & Compliance (risk manager), Business Unit (remediation owner) | Issue & Action Tracking System |
+| **V17.09** Verify & Close Findings | — | Internal Audit (auditor) | Audit Management System, Evidence Repository |
+| **V17.10** Report to Committee | Audit & Risk Committee | Internal Audit (chief audit executive) | Board Reporting System |
+
+**Actor / Team / System roll-up** (every distinct participant across V17):
+
+- **External actors:** External Auditor (V17.03); Regulator (V17.07); Audit & Risk Committee (V17.10).
+- **Teams:** Internal Audit (V17.01–V17.05, V17.07, V17.09, V17.10); Risk & Compliance (V17.01, V17.08); Business Unit (V17.02, V17.03, V17.06, V17.08).
+- **IT systems:** Audit Management System (V17.01–V17.05, V17.07, V17.09); GRC Platform (V17.01); Evidence Repository (V17.03, V17.09); Issue & Action Tracking System (V17.06, V17.08); Board Reporting System (V17.10).
+
+### V17.01 — Plan Audit & Set Scope
+
+### V17.02 — Notify Auditee & Agree Logistics
+
+### V17.03 — Gather Evidence & Test Controls
+
+### V17.04 — Evaluate & Rate Findings
+
+### V17.05 — Draft Audit Report
+
+### V17.06 — Agree Management Responses
+
+### V17.07 — Issue Final Report
+
+### V17.08 — Track Remediation
+
+### V17.09 — Verify & Close Findings
+
+### V17.10 — Report to Committee
+
+## V18 — Draft to Publish
+
+**Teams and roles involved.**
+Draft to Publish usually involves Policy Owners, Risk and Compliance, Legal, Subject-Matter Experts, Document Control, Communications, Learning and Development, and the approving Executive or Board Committee. Key roles include policy author, policy owner, compliance manager, legal reviewer, document controller, communications lead, training coordinator, and approving executive.
+
+**External participants.**
+The main external participants are Regulators, whose requirements drive much of the content, and where relevant Industry Bodies and external counsel. The process is initiated by a new or changed regulatory obligation, a scheduled policy review date, an audit or incident finding, or an organisational change. Other external parties include external legal advisers, standards bodies, and consultation participants.
+
+**High-level subprocesses.**
+Typical subprocesses are: identify the need or trigger, assign an owner and scope the change, draft or revise the document, consult stakeholders and subject-matter experts, obtain legal and compliance review, obtain formal approval, publish and version the document, communicate the change, deliver training and capture attestations, and schedule the next review.
+
+**Typical IT systems.**
+Supporting systems include document management with version control, policy and GRC platforms, workflow and approval tooling, intranet or knowledge portal, learning management system for training and attestation, obligations registers, and reporting on currency and attestation coverage.
+
+**Policies and procedures.**
+Key controls include the policy framework and document hierarchy, mandatory review cycles, approval authority matrix, version control and change history requirements, consultation requirements, mandatory training and attestation rules, retention of superseded versions, and communication standards for material changes.
+
+**Information flow between external participants and process.**
+Regulators and industry bodies provide obligations, guidance, consultation papers and deadlines; the process provides submissions, attestations and evidence of compliance where required. Consultation participants provide comments and objections and receive dispositions and the final published document.
+
+**Information flow between process and IT systems.**
+The process creates or updates drafts, review comments and dispositions, approval records, published versions and effective dates, superseded versions, communication records, and training and attestation records. IT systems provide the obligations register, current document inventory and review dates, approval routing and audit trails, distribution lists, and attestation completion reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Organisation" pool (key role in brackets), and IT systems are the
+`System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V18.01** Identify Need or Trigger | Regulator | Risk & Compliance (compliance manager) | Obligations Register |
+| **V18.02** Assign Owner & Scope Change | — | Risk & Compliance (compliance manager), Policy Owner (policy owner) | Policy / GRC Platform |
+| **V18.03** Draft or Revise Document | — | Policy Owner (policy author), Subject-Matter Experts (subject-matter expert) | Document Management System |
+| **V18.04** Consult Stakeholders | Industry Body | Policy Owner (policy author), Business Unit (stakeholder representative) | Document Management System |
+| **V18.05** Obtain Legal & Compliance Review | External Counsel | Legal (legal reviewer), Risk & Compliance (compliance manager) | Policy / GRC Platform |
+| **V18.06** Obtain Formal Approval | Board Committee | Executive Management (approving executive) | Workflow & Approval System |
+| **V18.07** Publish & Version | — | Document Control (document controller) | Document Management System, Intranet / Knowledge Portal |
+| **V18.08** Communicate Change | — | Communications (communications lead) | Intranet / Knowledge Portal |
+| **V18.09** Deliver Training & Capture Attestations | — | Learning & Development (training coordinator) | Learning Management System (LMS) |
+| **V18.10** Schedule Next Review | — | Document Control (document controller), Risk & Compliance (compliance manager) | Policy / GRC Platform |
+
+**Actor / Team / System roll-up** (every distinct participant across V18):
+
+- **External actors:** Regulator (V18.01); Industry Body (V18.04); External Counsel (V18.05); Board Committee (V18.06).
+- **Teams:** Risk & Compliance (V18.01, V18.02, V18.05, V18.10); Policy Owner (V18.02–V18.04); Subject-Matter Experts (V18.03); Business Unit (V18.04); Legal (V18.05); Executive Management (V18.06); Document Control (V18.07, V18.10); Communications (V18.08); Learning & Development (V18.09).
+- **IT systems:** Obligations Register (V18.01); Policy / GRC Platform (V18.02, V18.05, V18.10); Document Management System (V18.03, V18.04, V18.07); Workflow & Approval System (V18.06); Intranet / Knowledge Portal (V18.07, V18.08); Learning Management System / LMS (V18.09).
+
+### V18.01 — Identify Need or Trigger
+
+### V18.02 — Assign Owner & Scope Change
+
+### V18.03 — Draft or Revise Document
+
+### V18.04 — Consult Stakeholders
+
+### V18.05 — Obtain Legal & Compliance Review
+
+### V18.06 — Obtain Formal Approval
+
+### V18.07 — Publish & Version
+
+### V18.08 — Communicate Change
+
+### V18.09 — Deliver Training & Capture Attestations
+
+### V18.10 — Schedule Next Review
+
+## V19 — Request to Access
+
+**Teams and roles involved.**
+Request to Access usually involves IT Service Desk, Identity and Access Management, Application and System Owners, Line Managers, Security, HR, and Internal Audit for periodic review. Key roles include requester, approving line manager, application owner, access administrator, identity engineer, security officer, and access-review certifier.
+
+**External participants.**
+The main external participants are Contractors, Partners and Vendors who need access to organisational systems, and the Auditor who tests the controls. The process is initiated by a joiner, mover or leaver event, a project or engagement starting, a privileged-access request, or a scheduled access recertification. Other external parties include managed service providers and identity federation partners.
+
+**High-level subprocesses.**
+Typical subprocesses are: raise the access request, validate identity and employment or engagement status, determine the entitlements required, check for segregation-of-duties conflicts, obtain approvals, provision the access, notify and confirm with the requester, review access periodically, revoke on change or exit, and evidence the whole cycle for audit.
+
+**Typical IT systems.**
+Supporting systems include identity and access management, single sign-on and directory services, privileged access management, IT service management for requests, HR systems as the source of truth for people, application-level entitlement stores, access-review/certification tooling, and logging for audit evidence.
+
+**Policies and procedures.**
+Key controls include the access control policy, least-privilege and need-to-know principles, role definitions and entitlement catalogues, segregation-of-duties matrix, approval authority, privileged access rules and time limits, joiner/mover/leaver procedure, periodic recertification frequency, and revocation timeframes on termination.
+
+**Information flow between external participants and process.**
+Contractors and partners provide identity evidence, engagement details and acceptance of acceptable-use terms, and receive credentials, access confirmations and revocation notices. Auditors receive access registers, approval evidence, recertification results and exception reports.
+
+**Information flow between process and IT systems.**
+The process creates or updates access requests, approvals, entitlement grants and revocations, segregation-of-duties exceptions, recertification decisions, and audit evidence. IT systems provide employment and engagement status, the entitlement catalogue and role definitions, current access holdings, conflict detection results, provisioning status, and orphaned or dormant account reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Organisation" pool (key role in brackets), and IT systems are the
+`System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V19.01** Raise Access Request | Contractor | IT Service Desk (service desk agent) | IT Service Management |
+| **V19.02** Validate Identity & Status | Contractor | IT Service Desk (service desk agent), Human Resources (HR officer) | HR System, Identity & Access Management |
+| **V19.03** Determine Entitlements Required | — | Identity & Access Management (identity engineer), Application Owner (application owner) | Identity & Access Management |
+| **V19.04** Check Segregation of Duties | — | Security (security officer) | Identity & Access Management, GRC Platform |
+| **V19.05** Obtain Approvals | — | Line Management (approving line manager), Application Owner (application owner) | IT Service Management |
+| **V19.06** Provision Access | — | Identity & Access Management (access administrator) | Identity & Access Management, Directory Services |
+| **V19.07** Notify & Confirm with Requester | Contractor | IT Service Desk (service desk agent) | IT Service Management |
+| **V19.08** Review Access Periodically | — | Application Owner (access-review certifier), Security (security officer) | Access Certification Platform |
+| **V19.09** Revoke on Change or Exit | — | Human Resources (HR officer), Identity & Access Management (access administrator) | HR System, Identity & Access Management |
+| **V19.10** Evidence for Audit | Auditor | Security (security officer), Internal Audit (auditor) | Access Certification Platform, GRC Platform |
+
+**Actor / Team / System roll-up** (every distinct participant across V19):
+
+- **External actors:** Contractor (V19.01, V19.02, V19.07); Auditor (V19.10).
+- **Teams:** IT Service Desk (V19.01, V19.02, V19.07); Human Resources (V19.02, V19.09); Identity & Access Management (V19.03, V19.06, V19.09); Application Owner (V19.03, V19.05, V19.08); Security (V19.04, V19.08, V19.10); Line Management (V19.05); Internal Audit (V19.10).
+- **IT systems:** IT Service Management (V19.01, V19.05, V19.07); HR System (V19.02, V19.09); Identity & Access Management (V19.02–V19.04, V19.06, V19.09); GRC Platform (V19.04, V19.10); Directory Services (V19.06); Access Certification Platform (V19.08, V19.10).
+
+### V19.01 — Raise Access Request
+
+### V19.02 — Validate Identity & Status
+
+### V19.03 — Determine Entitlements Required
+
+### V19.04 — Check Segregation of Duties
+
+### V19.05 — Obtain Approvals
+
+### V19.06 — Provision Access
+
+### V19.07 — Notify & Confirm with Requester
+
+### V19.08 — Review Access Periodically
+
+### V19.09 — Revoke on Change or Exit
+
+### V19.10 — Evidence for Audit
+
+## V20 — Matter to Resolution
+
+**Teams and roles involved.**
+Matter to Resolution usually involves Legal, Compliance, Risk, Company Secretariat, the affected Business Unit, Finance for provisioning, and Executive Management. Key roles include general counsel, legal counsel, paralegal, compliance manager, matter owner, external counsel liaison, finance business partner, and company secretary.
+
+**External participants.**
+The main external participants are the Counterparty — a claimant, litigant, complainant or regulator — and External Counsel engaged to act. The process is initiated by a claim, dispute, complaint escalation, regulatory notice, subpoena or litigation filing. Other external parties include courts and tribunals, mediators and arbitrators, insurers, expert witnesses, and opposing counsel.
+
+**High-level subprocesses.**
+Typical subprocesses are: receive and register the matter, assess merits and exposure, assign internal and external counsel, issue legal hold and preserve evidence, develop the strategy, manage discovery and disclosure, negotiate or mediate, litigate or defend where required, settle or obtain judgment, and close the matter with lessons learned.
+
+**Typical IT systems.**
+Supporting systems include matter management, e-discovery and legal hold tooling, document management, contract repositories, spend and e-billing management for external counsel, risk registers and provisioning in finance systems, and board and committee reporting.
+
+**Policies and procedures.**
+Key controls include legal engagement and outside-counsel guidelines, delegation of authority for settlement, legal hold and document retention obligations, privilege protection procedures, conflict-of-interest checks, disclosure obligations to regulators and insurers, provisioning and materiality thresholds for financial reporting, and reporting obligations to the board.
+
+**Information flow between external participants and process.**
+The counterparty and courts provide claims, pleadings, notices, discovery requests and judgments; the process provides responses, disclosures, submissions and settlement offers. External counsel receive instructions, evidence and authority limits, and provide advice, drafts, appearances and invoices.
+
+**Information flow between process and IT systems.**
+The process creates or updates matter records, exposure assessments, legal holds, evidence collections, strategy and privilege logs, external counsel budgets and invoices, settlement records, and provisions. IT systems provide contract and transaction evidence, custodian and data-source mapping for holds, spend against budget, provision and accrual postings, and matter status and exposure reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Organisation" pool (key role in brackets), and IT systems are the
+`System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V20.01** Receive & Register Matter | Counterparty | Legal (paralegal) | Matter Management System |
+| **V20.02** Assess Merits & Exposure | — | Legal (legal counsel), Risk (risk manager) | Matter Management System |
+| **V20.03** Assign Internal & External Counsel | External Counsel | Legal (general counsel) | Matter Management System, Legal Spend Management |
+| **V20.04** Issue Legal Hold & Preserve Evidence | — | Legal (paralegal), Business Unit (matter owner) | Legal Hold & e-Discovery Platform |
+| **V20.05** Develop Strategy | External Counsel | Legal (legal counsel) | Matter Management System |
+| **V20.06** Manage Discovery & Disclosure | Counterparty, Court | Legal (paralegal), Business Unit (matter owner) | Legal Hold & e-Discovery Platform, Document Management System |
+| **V20.07** Negotiate or Mediate | Counterparty, Mediator | Legal (legal counsel), Executive Management (delegated approver) | Matter Management System |
+| **V20.08** Litigate or Defend | Court, External Counsel | Legal (legal counsel) | Matter Management System |
+| **V20.09** Settle or Obtain Judgment | Counterparty, Insurer | Legal (general counsel), Finance (finance business partner) | Matter Management System, Finance / ERP System |
+| **V20.10** Close Matter & Capture Lessons | — | Legal (legal counsel), Company Secretariat (company secretary) | Matter Management System, Board Reporting System |
+
+**Actor / Team / System roll-up** (every distinct participant across V20):
+
+- **External actors:** Counterparty (V20.01, V20.06, V20.07, V20.09); External Counsel (V20.03, V20.05, V20.08); Court (V20.06, V20.08); Mediator (V20.07); Insurer (V20.09).
+- **Teams:** Legal (V20.01–V20.10); Risk (V20.02); Business Unit (V20.04, V20.06); Executive Management (V20.07); Finance (V20.09); Company Secretariat (V20.10).
+- **IT systems:** Matter Management System (V20.01–V20.03, V20.05, V20.07–V20.10); Legal Spend Management (V20.03); Legal Hold & e-Discovery Platform (V20.04, V20.06); Document Management System (V20.06); Finance / ERP System (V20.09); Board Reporting System (V20.10).
+
+### V20.01 — Receive & Register Matter
+
+### V20.02 — Assess Merits & Exposure
+
+### V20.03 — Assign Internal & External Counsel
+
+### V20.04 — Issue Legal Hold & Preserve Evidence
+
+### V20.05 — Develop Strategy
+
+### V20.06 — Manage Discovery & Disclosure
+
+### V20.07 — Negotiate or Mediate
+
+### V20.08 — Litigate or Defend
+
+### V20.09 — Settle or Obtain Judgment
+
+### V20.10 — Close Matter & Capture Lessons
+
+## V21 — Application to Decision
+
+**Teams and roles involved.**
+Application to Decision usually involves Intake or Contact Centre, Assessment/Underwriting, Credit or Eligibility Analysis, Verification, Risk, Fraud, Compliance, and Quality Assurance, with an Appeals or Review function for disputed outcomes. Key roles include intake officer, assessor, underwriter, credit analyst, verification officer, fraud analyst, delegated approver, quality reviewer, and appeals officer.
+
+**External participants.**
+The main external participant is the Applicant. The process is initiated when the applicant submits an application for credit, insurance cover, a grant, a licence, a benefit, admission or membership. Other external parties include credit bureaux and identity verification services, employers and referees, brokers or agents acting for the applicant, and regulators setting eligibility rules.
+
+**High-level subprocesses.**
+Typical subprocesses are: receive the application, check completeness and request missing information, verify identity, gather supporting evidence and third-party data, assess eligibility against criteria, score and price the risk, refer to a delegated authority where limits are exceeded, decide approve, decline or approve with conditions, notify the applicant with reasons, and handle appeals or reviews.
+
+**Typical IT systems.**
+Supporting systems include the application or origination platform, customer portal and document upload, identity verification and credit bureau interfaces, decision engines and scorecards, fraud detection, case management, document management, correspondence generation, and reporting for decision quality and turnaround.
+
+**Policies and procedures.**
+Key controls include eligibility criteria and product rules, delegated authority and approval limits, identity verification and anti-money-laundering requirements, responsible lending or suitability obligations, adverse-action and reasons-for-decision requirements, privacy and data-minimisation rules, fraud referral procedures, quality assurance sampling, and appeal rights and timeframes.
+
+**Information flow between external participants and process.**
+The applicant provides the application, identity documents, supporting evidence, consents and declarations, and responses to requests for more information. The process provides the applicant with acknowledgement and reference, requests for further information, status updates, the decision with reasons and any conditions, and appeal rights. Third parties provide bureau reports, verification results and referee responses.
+
+**Information flow between process and IT systems.**
+The process creates or updates application records, verification outcomes, evidence documents, scores and decision rationale, referrals and approvals, correspondence, and appeal records. IT systems provide product and eligibility rules, bureau and verification responses, fraud signals, decision-engine outputs, delegated authority limits, and turnaround, approval-rate and quality reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Assessing Organisation" pool (key role in brackets), and IT systems
+are the `System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V21.01** Receive Application | Applicant, Broker | Intake (intake officer) | Application / Origination Platform, Customer Portal |
+| **V21.02** Check Completeness | Applicant | Intake (intake officer) | Application / Origination Platform |
+| **V21.03** Verify Identity | Applicant, Identity Verification Service | Verification (verification officer) | Identity Verification Service, Application / Origination Platform |
+| **V21.04** Gather Supporting Evidence | Applicant, Credit Bureau | Verification (verification officer) | Credit Bureau Interface, Document Management System |
+| **V21.05** Assess Eligibility | — | Assessment (assessor) | Decision Engine, Application / Origination Platform |
+| **V21.06** Score & Price Risk | — | Assessment (underwriter), Risk (credit analyst) | Decision Engine |
+| **V21.07** Refer to Delegated Authority | — | Assessment (delegated approver) | Case Management System |
+| **V21.08** Decide Outcome | — | Assessment (underwriter), Compliance (compliance officer) | Application / Origination Platform |
+| **V21.09** Notify Applicant with Reasons | Applicant | Intake (intake officer) | Correspondence System, Customer Portal |
+| **V21.10** Handle Appeal or Review | Applicant | Appeals (appeals officer), Quality Assurance (quality reviewer) | Case Management System |
+
+**Actor / Team / System roll-up** (every distinct participant across V21):
+
+- **External actors:** Applicant (V21.01–V21.04, V21.09, V21.10); Broker (V21.01); Identity Verification Service (V21.03); Credit Bureau (V21.04).
+- **Teams:** Intake (V21.01, V21.02, V21.09); Verification (V21.03, V21.04); Assessment (V21.05–V21.08); Risk (V21.06); Compliance (V21.08); Appeals (V21.10); Quality Assurance (V21.10).
+- **IT systems:** Application / Origination Platform (V21.01–V21.03, V21.05, V21.08); Customer Portal (V21.01, V21.09); Identity Verification Service (V21.03); Credit Bureau Interface (V21.04); Document Management System (V21.04); Decision Engine (V21.05, V21.06); Case Management System (V21.07, V21.10); Correspondence System (V21.09).
+
+### V21.01 — Receive Application
+
+### V21.02 — Check Completeness
+
+### V21.03 — Verify Identity
+
+### V21.04 — Gather Supporting Evidence
+
+### V21.05 — Assess Eligibility
+
+### V21.06 — Score & Price Risk
+
+### V21.07 — Refer to Delegated Authority
+
+### V21.08 — Decide Outcome
+
+### V21.09 — Notify Applicant with Reasons
+
+### V21.10 — Handle Appeal or Review
+
+## V22 — Claim to Settlement
+
+**Teams and roles involved.**
+Claim to Settlement usually involves Claims Intake, Claims Assessment, Investigation, Fraud, Supply Chain or Repair Networks, Finance/Payments, Recoveries, Complaints, and Actuarial or Reserving. Key roles include claims consultant, assessor, loss adjuster, investigator, fraud analyst, repairer or supplier coordinator, payments officer, recoveries officer, complaints officer, and reserving analyst.
+
+**External participants.**
+The main external participant is the Claimant — a policyholder, member, patient or beneficiary. The process is initiated when a loss or event is notified. Other external parties include loss adjusters and assessors, repairers and suppliers, medical or expert providers, third parties and their insurers, reinsurers, legal representatives, and ombudsman or dispute-resolution schemes.
+
+**High-level subprocesses.**
+Typical subprocesses are: receive notification of the claim, register it and set an initial reserve, validate cover and eligibility, triage and assign, assess the loss and quantum, investigate where indicators warrant it, approve or decline the claim, arrange repair, service or payment, pursue recoveries and reinsurance, and close the claim with reserve release.
+
+**Typical IT systems.**
+Supporting systems include the claims management platform, policy administration, customer and claims portals, fraud detection and analytics, supplier and repairer networks, payments and disbursement systems, document and image management, reserving and actuarial systems, complaints management, and reinsurance and recoveries systems.
+
+**Policies and procedures.**
+Key controls include policy wordings and cover terms, claims handling standards and service timeframes, reserving policy, delegated authority for settlement amounts, fraud referral criteria, supplier panel and pricing agreements, recoveries and subrogation procedure, complaints and external dispute-resolution obligations, and regulatory claims-handling conduct requirements.
+
+**Information flow between external participants and process.**
+The claimant provides notification, incident details, supporting evidence and quotes, bank details and declarations, and receives acknowledgement, cover decisions, assessment outcomes, settlement or repair arrangements, payment advice and complaint rights. Suppliers and experts provide assessments, quotes, reports and invoices; reinsurers and third-party insurers exchange recovery claims and settlements.
+
+**Information flow between process and IT systems.**
+The process creates or updates claim records, reserves, cover decisions, assessments and quantum, supplier work orders, payments, recovery and reinsurance claims, and complaint records. IT systems provide policy and cover data, claims history, fraud scores and rules outcomes, supplier pricing and availability, payment status, and claims ratio, leakage and cycle-time reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Insurer" pool (key role in brackets), and IT systems are the
+`System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V22.01** Receive Notification | Claimant | Claims Intake (claims consultant) | Claims Management Platform, Customer Portal |
+| **V22.02** Register Claim & Set Reserve | — | Claims Intake (claims consultant), Actuarial (reserving analyst) | Claims Management Platform, Reserving System |
+| **V22.03** Validate Cover & Eligibility | Claimant | Claims Assessment (claims consultant) | Policy Administration System |
+| **V22.04** Triage & Assign | — | Claims Assessment (claims consultant) | Claims Management Platform |
+| **V22.05** Assess Loss & Quantum | Loss Adjuster, Expert Provider | Claims Assessment (assessor) | Claims Management Platform, Document & Image Management |
+| **V22.06** Investigate Where Warranted | Third Party | Investigation (investigator), Fraud (fraud analyst) | Fraud Detection Platform |
+| **V22.07** Approve or Decline | — | Claims Assessment (assessor), Claims Management (delegated approver) | Claims Management Platform |
+| **V22.08** Arrange Repair, Service or Payment | Claimant, Repairer | Supply Chain (repairer coordinator), Finance (payments officer) | Supplier Network System, Payments System |
+| **V22.09** Pursue Recoveries & Reinsurance | Third-Party Insurer, Reinsurer | Recoveries (recoveries officer) | Recoveries & Reinsurance System |
+| **V22.10** Close Claim & Release Reserve | — | Claims Assessment (claims consultant), Actuarial (reserving analyst) | Claims Management Platform, Reserving System |
+
+**Actor / Team / System roll-up** (every distinct participant across V22):
+
+- **External actors:** Claimant (V22.01, V22.03, V22.08); Loss Adjuster (V22.05); Expert Provider (V22.05); Third Party (V22.06); Repairer (V22.08); Third-Party Insurer (V22.09); Reinsurer (V22.09).
+- **Teams:** Claims Intake (V22.01, V22.02); Actuarial (V22.02, V22.10); Claims Assessment (V22.03–V22.05, V22.07, V22.10); Investigation (V22.06); Fraud (V22.06); Claims Management (V22.07); Supply Chain (V22.08); Finance (V22.08); Recoveries (V22.09).
+- **IT systems:** Claims Management Platform (V22.01, V22.02, V22.04, V22.05, V22.07, V22.10); Customer Portal (V22.01); Reserving System (V22.02, V22.10); Policy Administration System (V22.03); Document & Image Management (V22.05); Fraud Detection Platform (V22.06); Supplier Network System (V22.08); Payments System (V22.08); Recoveries & Reinsurance System (V22.09).
+
+### V22.01 — Receive Notification
+
+### V22.02 — Register Claim & Set Reserve
+
+### V22.03 — Validate Cover & Eligibility
+
+### V22.04 — Triage & Assign
+
+### V22.05 — Assess Loss & Quantum
+
+### V22.06 — Investigate Where Warranted
+
+### V22.07 — Approve or Decline
+
+### V22.08 — Arrange Repair, Service or Payment
+
+### V22.09 — Pursue Recoveries & Reinsurance
+
+### V22.10 — Close Claim & Release Reserve
+
+## V23 — Meter to Cash
+
+**Teams and roles involved.**
+Meter to Cash usually involves Metering and Field Operations, Meter Data Management, Billing, Revenue Assurance, Customer Service, Credit and Collections, and Finance. Key roles include meter reader or field technician, meter data analyst, billing officer, revenue assurance analyst, customer service agent, credit officer, collections officer, and hardship or concessions officer.
+
+**External participants.**
+The main external participant is the Consumer or Account Holder whose consumption is measured. The process is initiated on a billing cycle, or by a meter event such as a new connection, an exchange or a suspected fault. Other external parties include metering service providers, network or distribution operators, payment providers, regulators setting tariffs and hardship obligations, and debt collection agencies.
+
+**High-level subprocesses.**
+Typical subprocesses are: acquire meter readings, validate and estimate missing or implausible data, apply tariffs and rate the consumption, generate and issue the bill, handle billing enquiries and disputes, receive and allocate payments, manage arrears and hardship arrangements, pursue collections, manage disconnection and reconnection, and perform revenue assurance and leakage analysis.
+
+**Typical IT systems.**
+Supporting systems include meter data management and head-end systems for smart meters, field workforce management, the billing engine and rating tables, customer information and CRM, payment and direct-debit processing, collections and dispute management, general ledger, and revenue assurance analytics.
+
+**Policies and procedures.**
+Key controls include metering and reading standards, validation/estimation/editing rules for missing data, tariff and pricing approval, billing accuracy and timeliness obligations, dispute and adjustment authority, hardship and payment-plan policy, disconnection rules and protected-customer exclusions, and regulatory reporting requirements.
+
+**Information flow between external participants and process.**
+The consumer provides meter access, self-reads where applicable, account and contact changes, payments, disputes and hardship applications. The process provides bills and statements, consumption and tariff information, estimated-read notices, reminders and arrears notices, payment plans, and disconnection or reconnection notifications. Network operators and metering providers exchange readings, service orders and outage data.
+
+**Information flow between process and IT systems.**
+The process creates or updates meter reads and estimates, rated consumption, invoices and adjustments, payments and allocations, arrears and payment plans, service orders, and general-ledger postings. IT systems provide meter registers and interval data, tariff and calendar rules, account and contact data, payment confirmations, ageing and collections status, and unbilled-revenue and leakage reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Utility" pool (key role in brackets), and IT systems are the
+`System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V23.01** Acquire Meter Readings | Consumer, Metering Service Provider | Metering & Field Operations (field technician) | Meter Data Management System |
+| **V23.02** Validate & Estimate Data | — | Meter Data Management (meter data analyst) | Meter Data Management System |
+| **V23.03** Apply Tariffs & Rate Consumption | — | Billing (billing officer) | Billing Engine |
+| **V23.04** Generate & Issue Bill | Consumer | Billing (billing officer) | Billing Engine, Customer Information System |
+| **V23.05** Handle Billing Enquiries & Disputes | Consumer | Customer Service (customer service agent) | Customer Information System, Dispute Management System |
+| **V23.06** Receive & Allocate Payment | Consumer, Payment Provider | Finance (finance officer) | Payment Processing System, General Ledger |
+| **V23.07** Manage Arrears & Hardship | Consumer | Credit & Collections (hardship officer) | Collections System |
+| **V23.08** Pursue Collections | Consumer, Debt Collection Agency | Credit & Collections (collections officer) | Collections System |
+| **V23.09** Manage Disconnection & Reconnection | Consumer, Network Operator | Metering & Field Operations (field technician), Credit & Collections (credit officer) | Field Workforce Management, Customer Information System |
+| **V23.10** Perform Revenue Assurance | Regulator | Revenue Assurance (revenue assurance analyst) | Revenue Assurance Analytics |
+
+**Actor / Team / System roll-up** (every distinct participant across V23):
+
+- **External actors:** Consumer (V23.01, V23.04–V23.09); Metering Service Provider (V23.01); Payment Provider (V23.06); Debt Collection Agency (V23.08); Network Operator (V23.09); Regulator (V23.10).
+- **Teams:** Metering & Field Operations (V23.01, V23.09); Meter Data Management (V23.02); Billing (V23.03, V23.04); Customer Service (V23.05); Finance (V23.06); Credit & Collections (V23.07–V23.09); Revenue Assurance (V23.10).
+- **IT systems:** Meter Data Management System (V23.01, V23.02); Billing Engine (V23.03, V23.04); Customer Information System (V23.04, V23.05, V23.09); Dispute Management System (V23.05); Payment Processing System (V23.06); General Ledger (V23.06); Collections System (V23.07, V23.08); Field Workforce Management (V23.09); Revenue Assurance Analytics (V23.10).
+
+### V23.01 — Acquire Meter Readings
+
+### V23.02 — Validate & Estimate Data
+
+### V23.03 — Apply Tariffs & Rate Consumption
+
+### V23.04 — Generate & Issue Bill
+
+### V23.05 — Handle Billing Enquiries & Disputes
+
+### V23.06 — Receive & Allocate Payment
+
+### V23.07 — Manage Arrears & Hardship
+
+### V23.08 — Pursue Collections
+
+### V23.09 — Manage Disconnection & Reconnection
+
+### V23.10 — Perform Revenue Assurance
+
+## V24 — Transaction to Return
+
+**Teams and roles involved.**
+Transaction to Return usually involves Tax, Finance/Accounting, Accounts Payable and Receivable, Treasury, Payroll, Legal, and external Tax Advisers, with Internal Audit providing assurance. Key roles include tax manager, tax accountant, financial accountant, indirect tax analyst, transfer pricing specialist, payroll manager, treasury analyst, and external tax adviser.
+
+**External participants.**
+The main external participant is the Tax Authority. The process is initiated by a statutory lodgement period ending, a transaction with tax consequences, or an authority query, ruling request or audit. Other external parties include external tax advisers and auditors, customs authorities for trade, and jurisdictions' revenue offices where the organisation operates across borders.
+
+**High-level subprocesses.**
+Typical subprocesses are: capture transactions with tax attributes, determine the correct tax treatment, calculate liabilities and credits, reconcile tax accounts to the ledger, prepare the return and supporting workpapers, review and approve, lodge the return, pay or claim the balance, respond to authority queries and audits, and monitor legislative change.
+
+**Typical IT systems.**
+Supporting systems include ERP and the general ledger, tax determination and calculation engines, indirect tax reporting tools, transfer pricing documentation systems, payroll systems, treasury and payment systems, e-filing gateways to revenue authorities, document management for workpapers, and tax provision and reporting tools.
+
+**Policies and procedures.**
+Key controls include the tax governance framework and risk appetite, tax determination rules by jurisdiction and product, lodgement calendars and deadlines, review and approval authority for returns, documentation and record-retention requirements, transfer pricing policy, voluntary disclosure procedure, and escalation of uncertain tax positions.
+
+**Information flow between external participants and process.**
+The tax authority provides legislation, rulings, assessments, queries and audit findings, and receives returns, payments, disclosures and supporting documentation. Advisers provide opinions and reviews; the process provides them with data and questions. Customers and suppliers exchange tax invoices and exemption certificates that evidence treatment.
+
+**Information flow between process and IT systems.**
+The process creates or updates tax codes and determinations on transactions, calculated liabilities, reconciliations, workpapers, lodged returns, payments, and provisions. IT systems provide transaction detail with tax attributes, ledger balances, rate and rule tables, prior-period comparatives, lodgement confirmations and receipts, and tax position and effective-rate reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Organisation" pool (key role in brackets), and IT systems are the
+`System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V24.01** Capture Transactions with Tax Attributes | Customer, Supplier | Finance / Accounting (financial accountant) | ERP / General Ledger |
+| **V24.02** Determine Tax Treatment | — | Tax (indirect tax analyst) | Tax Determination Engine |
+| **V24.03** Calculate Liabilities & Credits | — | Tax (tax accountant) | Tax Determination Engine, ERP / General Ledger |
+| **V24.04** Reconcile Tax Accounts | — | Finance / Accounting (financial accountant), Tax (tax accountant) | ERP / General Ledger |
+| **V24.05** Prepare Return & Workpapers | External Tax Adviser | Tax (tax accountant) | Tax Reporting System, Document Management System |
+| **V24.06** Review & Approve | — | Tax (tax manager) | Tax Reporting System |
+| **V24.07** Lodge Return | Tax Authority | Tax (tax manager) | E-Filing Gateway |
+| **V24.08** Pay or Claim Balance | Tax Authority | Treasury (treasury analyst) | Treasury & Payment System |
+| **V24.09** Respond to Queries & Audits | Tax Authority, External Tax Adviser | Tax (tax manager), Legal (legal counsel) | Document Management System |
+| **V24.10** Monitor Legislative Change | External Tax Adviser | Tax (tax manager) | Tax Reporting System |
+
+**Actor / Team / System roll-up** (every distinct participant across V24):
+
+- **External actors:** Customer (V24.01); Supplier (V24.01); External Tax Adviser (V24.05, V24.09, V24.10); Tax Authority (V24.07–V24.09).
+- **Teams:** Finance / Accounting (V24.01, V24.04); Tax (V24.02–V24.07, V24.09, V24.10); Treasury (V24.08); Legal (V24.09).
+- **IT systems:** ERP / General Ledger (V24.01, V24.03, V24.04); Tax Determination Engine (V24.02, V24.03); Tax Reporting System (V24.05, V24.06, V24.10); Document Management System (V24.05, V24.09); E-Filing Gateway (V24.07); Treasury & Payment System (V24.08).
+
+### V24.01 — Capture Transactions with Tax Attributes
+
+### V24.02 — Determine Tax Treatment
+
+### V24.03 — Calculate Liabilities & Credits
+
+### V24.04 — Reconcile Tax Accounts
+
+### V24.05 — Prepare Return & Workpapers
+
+### V24.06 — Review & Approve
+
+### V24.07 — Lodge Return
+
+### V24.08 — Pay or Claim Balance
+
+### V24.09 — Respond to Queries & Audits
+
+### V24.10 — Monitor Legislative Change
+
+## V25 — Data to Insight
+
+**Teams and roles involved.**
+Data to Insight usually involves Data Engineering, Data Platform/Operations, Analytics and Business Intelligence, Data Governance and Stewardship, Privacy, and the consuming Business Units. Key roles include data engineer, platform engineer, analytics engineer, data analyst, data scientist, data steward, data owner, privacy officer, and the business sponsor who acts on the result.
+
+**External participants.**
+The main external participants are Data Providers — third-party data vendors, partners and public data sources — and, where analytics affects them, the Data Subjects whose information is used. The process is initiated by a business question, a scheduled reporting cycle, a new data source becoming available, or a model requiring retraining. Other external parties include cloud and tooling vendors, and regulators where automated decision-making is in scope.
+
+**High-level subprocesses.**
+Typical subprocesses are: capture the business question and success measure, identify and assess sources, ingest data, validate quality and profile it, transform and model it, catalogue and document lineage, build the analysis, model or report, review and validate the result, publish and enable access, and monitor usage, accuracy and drift.
+
+**Typical IT systems.**
+Supporting systems include ingestion and pipeline orchestration, data lake and warehouse platforms, transformation tooling, data quality and observability, the data catalogue and lineage store, business intelligence and visualisation, machine-learning platforms and feature stores, access management, and cost and usage monitoring.
+
+**Policies and procedures.**
+Key controls include data governance framework and ownership, data classification and handling rules, privacy and consent constraints on secondary use, data quality standards and thresholds, model risk management and validation requirements, access and least-privilege rules, retention and deletion schedules, and change control for pipelines and published reports.
+
+**Information flow between external participants and process.**
+Data providers supply feeds, extracts, schemas and licence terms, and receive usage reporting or payment. Data subjects exercise access, correction and deletion rights, which the process must honour across the platform. Business sponsors provide the question, context and acceptance of results, and receive insights, dashboards and recommendations.
+
+**Information flow between process and IT systems.**
+The process creates or updates ingestion jobs, curated datasets, transformation logic, quality rules and results, catalogue entries and lineage, models and their versions, dashboards and reports, and access grants. IT systems provide source schemas and volumes, pipeline run status and failures, quality metrics, model performance and drift signals, and usage, cost and adoption reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Organisation" pool (key role in brackets), and IT systems are the
+`System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V25.01** Capture Business Question | Business Sponsor | Analytics (data analyst) | Business Intelligence Platform |
+| **V25.02** Identify & Assess Sources | Data Provider | Data Engineering (data engineer), Data Governance (data steward) | Data Catalogue |
+| **V25.03** Ingest Data | Data Provider | Data Engineering (data engineer) | Ingestion & Orchestration Platform, Data Lake |
+| **V25.04** Validate Quality & Profile | — | Data Engineering (data engineer), Data Governance (data steward) | Data Quality & Observability Platform |
+| **V25.05** Transform & Model Data | — | Analytics Engineering (analytics engineer) | Transformation Tooling, Data Warehouse |
+| **V25.06** Catalogue & Document Lineage | — | Data Governance (data steward) | Data Catalogue |
+| **V25.07** Build Analysis, Model or Report | — | Analytics (data analyst), Data Science (data scientist) | Business Intelligence Platform, Machine Learning Platform |
+| **V25.08** Review & Validate Result | Business Sponsor | Analytics (data analyst), Data Governance (data owner) | Business Intelligence Platform |
+| **V25.09** Publish & Enable Access | Data Subject | Data Platform (platform engineer), Privacy (privacy officer) | Business Intelligence Platform, Access Management System |
+| **V25.10** Monitor Usage, Accuracy & Drift | — | Data Platform (platform engineer), Data Science (data scientist) | Data Quality & Observability Platform, Machine Learning Platform |
+
+**Actor / Team / System roll-up** (every distinct participant across V25):
+
+- **External actors:** Business Sponsor (V25.01, V25.08); Data Provider (V25.02, V25.03); Data Subject (V25.09).
+- **Teams:** Analytics (V25.01, V25.07, V25.08); Data Engineering (V25.02–V25.04); Data Governance (V25.02, V25.04, V25.06, V25.08); Analytics Engineering (V25.05); Data Science (V25.07, V25.10); Data Platform (V25.09, V25.10); Privacy (V25.09).
+- **IT systems:** Business Intelligence Platform (V25.01, V25.07–V25.09); Data Catalogue (V25.02, V25.06); Ingestion & Orchestration Platform (V25.03); Data Lake (V25.03); Data Quality & Observability Platform (V25.04, V25.10); Transformation Tooling (V25.05); Data Warehouse (V25.05); Machine Learning Platform (V25.07, V25.10); Access Management System (V25.09).
+
+### V25.01 — Capture Business Question
+
+### V25.02 — Identify & Assess Sources
+
+### V25.03 — Ingest Data
+
+### V25.04 — Validate Quality & Profile
+
+### V25.05 — Transform & Model Data
+
+### V25.06 — Catalogue & Document Lineage
+
+### V25.07 — Build Analysis, Model or Report
+
+### V25.08 — Review & Validate Result
+
+### V25.09 — Publish & Enable Access
+
+### V25.10 — Monitor Usage, Accuracy & Drift
+
+## V26 — Concept to Commissioning
+
+**Teams and roles involved.**
+Concept to Commissioning usually involves Capital Planning, Project Management, Engineering and Design, Procurement, Construction or Delivery, Health and Safety, Quality, Commissioning, Operations and Maintenance, and Finance for capitalisation. Key roles include project sponsor, project manager, design engineer, cost estimator, procurement lead, construction manager, safety officer, quality inspector, commissioning engineer, operations representative, and asset accountant.
+
+**External participants.**
+The main external participants are Contractors and Consultants delivering the work, and the Regulator or Authority granting approvals and permits. The process is initiated by a capital proposal arising from growth, replacement, compliance or risk. Other external parties include equipment vendors, certifiers and testing authorities, landowners and community stakeholders, and financiers where the project is externally funded.
+
+**High-level subprocesses.**
+Typical subprocesses are: develop the concept and business case, obtain funding approval, perform detailed design, obtain permits and approvals, procure contractors and long-lead equipment, mobilise and construct or install, manage variations and progress claims, inspect and test, commission and hand over to operations, and capitalise the asset and close the project.
+
+**Typical IT systems.**
+Supporting systems include capital portfolio and project management, cost estimating and scheduling, engineering design and document control, procurement and contract management, site and safety management, quality and inspection test plans, commissioning and handover systems, enterprise asset management for the resulting asset register, and the fixed-asset ledger.
+
+**Policies and procedures.**
+Key controls include capital approval thresholds and stage gates, business case and benefits standards, design standards and review requirements, permit and environmental approval obligations, procurement and contracting policy, safety-in-design and site safety rules, variation and change control authority, inspection and test plan requirements, handover and acceptance criteria, and capitalisation versus expense rules.
+
+**Information flow between external participants and process.**
+Contractors and consultants provide tenders, designs, schedules, progress claims, variations, test results and as-built documentation, and receive scopes, drawings, instructions, approvals and payments. Regulators receive applications, impact assessments and compliance evidence, and provide permits, conditions and inspection outcomes. Community stakeholders provide submissions and receive consultation and notification.
+
+**Information flow between process and IT systems.**
+The process creates or updates business cases, approvals and stage gates, designs and drawings, contracts and purchase orders, schedules and progress, variations and claims, inspection and test records, commissioning evidence, asset records and capitalisation entries. IT systems provide budget and forecast positions, cost actuals against estimate, schedule status, document versions and approvals, permit status, and portfolio and benefits reporting.
+
+**Process ↔ Actors / Teams / IT Systems association matrix.**
+
+Each row matches the pools, lanes and roles of the corresponding BPMN process
+prompt below — external actors are the non-organisation pools, teams are the
+lanes of the "Project Organisation" pool (key role in brackets), and IT systems
+are the `System = true` black-box pools.
+
+| Process | External Actors | Teams (key role) | IT Systems |
+| --- | --- | --- | --- |
+| **V26.01** Develop Concept & Business Case | — | Capital Planning (project sponsor), Engineering (cost estimator) | Capital Portfolio Management System |
+| **V26.02** Obtain Funding Approval | Financier | Capital Planning (project sponsor), Finance (asset accountant) | Capital Portfolio Management System |
+| **V26.03** Perform Detailed Design | Consultant | Engineering (design engineer) | Engineering Design & Document Control |
+| **V26.04** Obtain Permits & Approvals | Regulator, Community Stakeholder | Project Management (project manager), Health & Safety (safety officer) | Document Management System |
+| **V26.05** Procure Contractors & Equipment | Contractor, Equipment Vendor | Procurement (procurement lead) | Procurement & Contract Management |
+| **V26.06** Mobilise & Construct | Contractor | Construction (construction manager), Health & Safety (safety officer) | Site & Safety Management System |
+| **V26.07** Manage Variations & Claims | Contractor | Project Management (project manager), Finance (cost controller) | Procurement & Contract Management, Cost & Schedule System |
+| **V26.08** Inspect & Test | Certifier | Quality (quality inspector) | Quality & Inspection Test Plan System |
+| **V26.09** Commission & Hand Over | Contractor | Commissioning (commissioning engineer), Operations (operations representative) | Commissioning & Handover System, Enterprise Asset Management (EAM) |
+| **V26.10** Capitalise Asset & Close Project | — | Finance (asset accountant), Project Management (project manager) | Fixed Asset Ledger, Capital Portfolio Management System |
+
+**Actor / Team / System roll-up** (every distinct participant across V26):
+
+- **External actors:** Financier (V26.02); Consultant (V26.03); Regulator (V26.04); Community Stakeholder (V26.04); Contractor (V26.05–V26.07, V26.09); Equipment Vendor (V26.05); Certifier (V26.08).
+- **Teams:** Capital Planning (V26.01, V26.02); Engineering (V26.01, V26.03); Finance (V26.02, V26.07, V26.10); Project Management (V26.04, V26.07, V26.10); Health & Safety (V26.04, V26.06); Procurement (V26.05); Construction (V26.06); Quality (V26.08); Commissioning (V26.09); Operations (V26.09).
+- **IT systems:** Capital Portfolio Management System (V26.01, V26.02, V26.10); Engineering Design & Document Control (V26.03); Document Management System (V26.04); Procurement & Contract Management (V26.05, V26.07); Site & Safety Management System (V26.06); Cost & Schedule System (V26.07); Quality & Inspection Test Plan System (V26.08); Commissioning & Handover System (V26.09); Enterprise Asset Management / EAM (V26.09); Fixed Asset Ledger (V26.10).
+
+### V26.01 — Develop Concept & Business Case
+
+### V26.02 — Obtain Funding Approval
+
+### V26.03 — Perform Detailed Design
+
+### V26.04 — Obtain Permits & Approvals
+
+### V26.05 — Procure Contractors & Equipment
+
+### V26.06 — Mobilise & Construct
+
+### V26.07 — Manage Variations & Claims
+
+### V26.08 — Inspect & Test
+
+### V26.09 — Commission & Hand Over
+
+### V26.10 — Capitalise Asset & Close Project
