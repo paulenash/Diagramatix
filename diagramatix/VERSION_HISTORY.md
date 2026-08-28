@@ -15,6 +15,54 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.4.2338 — 2026-08-28 — The Process Repository moves into the database
+
+The repository was a 500 KB markdown file a SuperAdmin uploaded by hand. It is a
+library now — **26 chains, 277 processes, 381 prompts** — with the `.md` kept as
+the import and export format rather than the source of truth.
+
+**A new SuperAdmin tile, "Process Repository"**, in its own configurable feature
+colour. Import a `.md` (leave existing chains alone, or replace them); edit a
+chain's title, group and narrative; add, rename, reorder and remove processes;
+regenerate any prompt or a whole chain from the master templates; publish. Export
+any chain, or the library, back to markdown.
+
+**Draft and published are separate**, following the `Feature` model's convention —
+draft fields plus a `published*` snapshot on the same row. Project generation
+reads ONLY the published snapshot, so a chain can be rewritten and regenerated
+without anything downstream seeing a half-finished state.
+
+**"Create Project Diagrams from .md" becomes "Create Project Diagrams from the
+Process Repository".** It now lists published chains by default; the `.md` upload
+remains for a chain not yet imported. Both paths feed the same runner, so
+generation, naming and the link scan are identical either way. SuperAdmin-only
+until release.
+
+**The property that had to hold is an equivalence, not a resemblance.** What comes
+out of the library must be readable by `parseValueChainMd` as exactly the same
+chains, names, types and prompts as the file it came from. The names carry more
+weight than they look: a prompt's name becomes the generated diagram's name, and
+the link scan matches subprocess labels against diagram names — so a rename during
+import would silently break cross-diagram linking for every project generated from
+the library, while every individual diagram still looked correct. `T2900` pins the
+round trip over all 381 prompts.
+
+Two things checked before trusting the import: **no duplicate key** the unique
+index would reject (which would fail an import halfway and leave a partial chain),
+and **every BPMN prompt anchored to a process its chain declares**.
+
+**Removing a process deletes its BPMN prompt**, and the remaining codes renumber.
+That is only safe to do casually because prompt cross-references are by NAME, not
+by code — the change made in 2.3.2335 for exactly this reason.
+
+The backup-coverage guard did its job: three new tables failed it until they were
+consciously accounted for. They sit with the other SuperAdmin global catalogs —
+out of the scoped org/user backups (every org sees the same library), and picked
+up automatically by the full SuperAdmin backup, which reads its table list from
+the live database.
+
+---
+
 ## 2.3.2337 — 2026-08-27 — Every chain in the repository now has its prompts
 
 **241 prompts generated for V10–V26** — all five diagram types for all seventeen

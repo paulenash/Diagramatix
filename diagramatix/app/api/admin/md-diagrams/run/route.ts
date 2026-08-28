@@ -42,17 +42,52 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json().catch(() => null)) as
-    | { md?: unknown; chainCode?: unknown; projectName?: unknown }
+    | { md?: unknown; chainCode?: unknown; projectName?: unknown; source?: unknown }
     | null;
   const md = typeof body?.md === "string" ? body.md : "";
   const chainCode = typeof body?.chainCode === "string" ? body.chainCode.trim() : "";
-  if (!md.trim() || md.length > MAX_MD_CHARS) {
+  const fromLibrary = body?.source === "library";
+  if (!chainCode) return NextResponse.json({ error: "chainCode is required" }, { status: 400 });
+  if (!fromLibrary && (!md.trim() || md.length > MAX_MD_CHARS)) {
     return NextResponse.json({ error: "A valid .md (≤ 4 MB) is required" }, { status: 400 });
   }
-  if (!chainCode) return NextResponse.json({ error: "chainCode is required" }, { status: 400 });
 
-  const chain = parseValueChainMd(md).find((c) => c.code === chainCode);
-  if (!chain) return NextResponse.json({ error: `Value chain ${chainCode} not found` }, { status: 404 });
+  /**
+   * Where the prompts come from.
+   *
+   * The library is the normal source now; the markdown upload stays for a chain
+   * that has not been imported yet. Both produce the same `{name, type, prompt}`
+   * shape, so everything downstream — generation, naming, the link scan — is
+   * identical whichever was used.
+   *
+   * The library read takes ONLY published prompts. A draft is by definition a
+   * chain someone is still working on, and generating 15 diagrams from a
+   * half-regenerated chain is exactly what the draft/published split exists to
+   * prevent.
+   */
+  let chain: { code: string; title: string; diagrams: ParsedDiagram[] } | undefined;
+  if (fromLibrary) {
+    const row = await prisma.valueChainLibrary.findUnique({
+      where: { code: chainCode },
+      include: { processes: { orderBy: { sortOrder: "asc" } }, prompts: true },
+    });
+    if (!row) return NextResponse.json({ error: `Value chain ${chainCode} is not in the library` }, { status: 404 });
+    if (!row.publishedAt) {
+      return NextResponse.json({ error: `${chainCode} has never been published — publish it in the Process Repository first` }, { status: 409 });
+    }
+    // Chain-level prompts first, then one per process in order, so the generated
+    // project reads top-down the way the chain does.
+    const order = ["value-chain", "context", "process-context", "archimate"];
+    const live = row.prompts.filter((p) => (p.publishedPrompt ?? "").trim());
+    const diagrams = [
+      ...order.flatMap((t) => live.filter((p) => p.type === t && !p.processCode)),
+      ...row.processes.flatMap((proc) => live.filter((p) => p.type === "bpmn" && p.processCode === proc.code)),
+    ].map((p) => ({ name: p.name, type: p.type as ParsedDiagram["type"], prompt: p.publishedPrompt! }));
+    chain = { code: row.code, title: row.publishedTitle ?? row.title, diagrams };
+  } else {
+    chain = parseValueChainMd(md).find((c) => c.code === chainCode);
+    if (!chain) return NextResponse.json({ error: `Value chain ${chainCode} not found` }, { status: 404 });
+  }
   if (chain.diagrams.length === 0) {
     return NextResponse.json({ error: `Value chain ${chainCode} has no diagram prompts` }, { status: 422 });
   }

@@ -8,7 +8,7 @@
  * chain — driving the normal AI Generate + Auto Layout pipeline per diagram type.
  * Progress streams live (NDJSON) into a per-diagram status table.
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -40,6 +40,15 @@ export function MdDiagramsClient() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Where the chains come from.
+   *
+   * "library" is the normal path — published chains straight out of the Process
+   * Repository, no file handling at all. "upload" stays for a chain not yet
+   * imported, and for trying a file against what is live. Both feed the same
+   * runner, so nothing downstream differs.
+   */
+  const [source, setSource] = useState<"library" | "upload">("library");
   const [fileName, setFileName] = useState<string | null>(null);
   const [md, setMd] = useState<string>("");
   const [chains, setChains] = useState<Chain[]>([]);
@@ -57,6 +66,32 @@ export function MdDiagramsClient() {
   const [finished, setFinished] = useState<{ sorted: boolean; linked: number; probable: number; error?: string } | null>(null);
 
   const selectedChain = useMemo(() => chains.find((c) => c.code === selected) ?? null, [chains, selected]);
+
+  // The published library. Only PUBLISHED chains appear: a draft is one somebody
+  // is still working on, and generating 15 diagrams from a half-regenerated chain
+  // is exactly what the draft/published split exists to prevent.
+  useEffect(() => {
+    if (source !== "library") return;
+    let live = true;
+    setParsing(true); setError(null); setChains([]); setSelected("");
+    void fetch("/api/admin/value-chain-library")
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (!live) return;
+        if (!r.ok) { setError(j.error ?? "Could not load the library"); return; }
+        type LibChain = { code: string; title: string; published: boolean; prompts: { name: string; type: DiagKind }[] };
+        const cs: Chain[] = ((j.chains ?? []) as LibChain[])
+          .filter((c) => c.published)
+          .map((c) => ({ code: c.code, title: c.title, diagrams: c.prompts.map((p) => ({ name: p.name, type: p.type })) }));
+        setChains(cs);
+        const first = cs.find((c) => c.diagrams.length > 0);
+        if (first) { setSelected(first.code); setProjectName(first.title); }
+        if (cs.length === 0) setError("No published value chains yet — publish one in the Process Repository first.");
+      })
+      .catch((e) => { if (live) setError(e instanceof Error ? e.message : "Could not load the library"); })
+      .finally(() => { if (live) setParsing(false); });
+    return () => { live = false; };
+  }, [source]);
   const doneCount = rows.filter((r) => r.status === "done").length;
   const errorCount = rows.filter((r) => r.status === "error").length;
 
@@ -102,7 +137,7 @@ export function MdDiagramsClient() {
       const res = await fetch("/api/admin/md-diagrams/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ md, chainCode: selectedChain.code, projectName: projectName.trim() || selectedChain.title }),
+        body: JSON.stringify({ source, md, chainCode: selectedChain.code, projectName: projectName.trim() || selectedChain.title }),
       });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
@@ -133,7 +168,7 @@ export function MdDiagramsClient() {
     } finally {
       setRunning(false);
     }
-  }, [selectedChain, running, md, projectName]);
+  }, [selectedChain, running, md, projectName, source]);
 
   /**
    * The two things a freshly generated project always needs, done for you.
@@ -228,26 +263,49 @@ export function MdDiagramsClient() {
         ArchiMate and each BPMN process — using AI Generate + Auto Layout per diagram type.
       </p>
 
-      {/* Step 1 — upload */}
-      <div className="mt-6 rounded-lg border border-red-200 bg-red-50/40 p-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={running}
-            className="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
-          >
-            Choose .md file
-          </button>
-          <span className="text-sm text-gray-600">{fileName ?? "No file selected"}</span>
-          {parsing && <span className="text-sm text-gray-400">Parsing…</span>}
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".md,text/markdown"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) void onPick(f); e.target.value = ""; }}
-          />
+      {/* Step 1 — where the chains come from */}
+      <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50/60 p-4">
+        <div className="flex items-center gap-1.5 mb-2">
+          {([["library", "The Process Repository"], ["upload", "A .md file"]] as const).map(([k, label]) => (
+            <button key={k} onClick={() => { setSource(k); setRows([]); setProjectId(null); setSummary(null); }}
+              disabled={running}
+              className={`rounded-md border px-3 py-1.5 text-sm transition disabled:opacity-50
+                ${source === k ? "border-red-400 bg-red-50 text-red-800 font-medium" : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"}`}>
+              {label}
+            </button>
+          ))}
+          {parsing && <span className="ml-2 text-sm text-gray-400">Loading…</span>}
         </div>
+
+        {source === "library" ? (
+          <p className="text-xs text-gray-600">
+            Published value chains from the{" "}
+            <Link href="/dashboard/admin/value-chain-library" className="text-blue-600 underline hover:text-blue-800">
+              Process Repository
+            </Link>. A chain only appears here once it has been published — a draft is one still being
+            worked on, and generating a whole project from a half-regenerated chain is what publishing
+            exists to prevent.
+          </p>
+        ) : (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={running}
+              className="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
+            >
+              Choose .md file
+            </button>
+            <span className="text-sm text-gray-600">{fileName ?? "No file selected"}</span>
+            <span className="text-xs text-gray-500">for a chain not in the library yet</span>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".md,text/markdown"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void onPick(f); e.target.value = ""; }}
+            />
+          </div>
+        )}
       </div>
 
       {error && <div className="mt-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}

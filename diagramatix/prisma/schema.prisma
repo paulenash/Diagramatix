@@ -744,6 +744,79 @@ model Prompt {
   @@index([userId, diagramType])
 }
 
+// ── The Process Repository, internalised ─────────────────────────────────────
+// The repository was a 500 KB markdown file a SuperAdmin uploaded by hand. These
+// three models make it a living library: chains, their ordered processes, and the
+// generated diagram prompts. The `.md` becomes the seed and interchange format —
+// still imported and exported, no longer the source of truth.
+//
+// DRAFT/PUBLISH follows the `Feature` convention: draft fields plus a `published*`
+// snapshot on the same row. Users read only the published snapshot, so they never
+// see a chain mid-edit or mid-regeneration.
+
+model ValueChainLibrary {
+  id        String  @id @default(cuid())
+  code      String  @unique // "V01"
+  title     String
+  groupName String  @default("")
+  sortOrder Int     @default(0)
+  hidden    Boolean @default(false)
+
+  /// The nine-part narrative the prompt generator writes from.
+  narrative          String
+  publishedNarrative String?
+  publishedTitle     String?
+  publishedAt        DateTime?
+
+  processes ValueChainProcess[]
+  prompts   ValueChainPrompt[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+}
+
+model ValueChainProcess {
+  id      String            @id @default(cuid())
+  chainId String
+  chain   ValueChainLibrary @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  /// "V01.03" — renumbered when processes are inserted or removed.
+  code      String
+  title     String
+  sortOrder Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([chainId, code])
+  @@index([chainId, sortOrder])
+}
+
+model ValueChainPrompt {
+  id      String            @id @default(cuid())
+  chainId String
+  chain   ValueChainLibrary @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  /// bpmn | value-chain | context | process-context | archimate
+  type String
+  /// "V01.03" for a BPMN prompt; EMPTY STRING for a chain-level one. Empty rather
+  /// than null because Postgres treats NULLs as distinct in a unique index, so a
+  /// nullable column would happily allow two Context prompts on one chain.
+  processCode String @default("")
+  /// "V01.03 Check Credit & Pricing" — the diagram name the batch runner uses.
+  name String
+
+  prompt          String
+  publishedPrompt String?
+  /// Which template version produced it, so a regeneration can skip what is current.
+  templateHash String?
+  /// Did it parse back through parseValueChainMd when it was generated?
+  roundTripsOk Boolean   @default(false)
+  generatedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([chainId, type, processCode])
+  @@index([chainId])
+}
+
 model DiagramRules {
   id        String   @id @default(cuid())
   category  String // "general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context"

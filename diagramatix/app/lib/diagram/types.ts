@@ -1202,8 +1202,12 @@ export const SCHEMA_VERSION = "46";
  *   moved off a per-browser localStorage key and onto the project itself, so a
  *   generated project can be handed over already sorted by type and the choice
  *   survives a change of machine. XSD unchanged.
+ * 2.4 (2026-08-28) — DB: ValueChainLibrary, ValueChainProcess, ValueChainPrompt.
+ *   The Process Repository moves out of a markdown file and into the database —
+ *   26 chains, their ordered processes, and the generated diagram prompts, with
+ *   draft/published snapshots. The .md stays as import/export. XSD unchanged.
  */
-export const PRODUCT_VERSION = "2.3";
+export const PRODUCT_VERSION = "2.4";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the
