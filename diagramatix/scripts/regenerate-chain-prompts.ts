@@ -31,9 +31,9 @@ import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import { chainCodes, chainSection, chainTitle, subprocessHeadings, chainNarrative } from "../app/lib/valueChain/chainSource";
-import { type MdPromptType, MD_PROMPT_TYPES, mdPromptCategory, buildMdPromptBriefing } from "../app/lib/valueChain/promptTemplates";
+import { type MdPromptType, MD_PROMPT_TYPES, mdPromptCategory, buildMdPromptBriefing, renderPromptBlock } from "../app/lib/valueChain/promptTemplates";
 import { generateMdPrompt, targetsFor, type PromptTarget } from "../app/lib/valueChain/generatePrompt";
-import { findBlocks, blockKey, blocksOfChain, spliceBlocks, auditPrompts, type PromptBlock } from "../app/lib/valueChain/spliceBlocks";
+import { findBlocks, blockKey, blocksOfChain, applyEdits, insertPointFor, auditPrompts, type Edit } from "../app/lib/valueChain/spliceBlocks";
 import { parseValueChainMd } from "../app/lib/valueChain/parseValueChainMd";
 
 const REPO_MD = path.join(process.cwd(), "new features", "Process Repository Final.md");
@@ -94,6 +94,9 @@ async function run() {
   if (!apiKey) { console.error("ANTHROPIC_API_KEY is not set (it is in diagramatix/.env)"); process.exit(1); }
 
   let doc = fs.readFileSync(mdPath, "utf8");
+  // Inserted blocks must match the document's own line endings, or the next
+  // findBlocks pass reads them differently from the ones already there.
+  const EOL = doc.includes("\r\n") ? "\r\n" : "\n";
   const all = chainCodes(doc);
   const chains = argv.includes("--all") ? all : (arg("--chains") ?? "").split(",").map((c) => c.trim()).filter(Boolean);
   if (chains.length === 0) {
@@ -118,16 +121,17 @@ async function run() {
     const subs = subprocessHeadings(section, chain);
     if (!narrative.trim()) { console.error(`${chain}: no narrative to generate from — skipped`); continue; }
 
-    // Only regenerate prompts the document ACTUALLY HAS. Generating one the
-    // document has no block for would be work whose result could not be stored.
+    // Every prompt of the requested types that the chain SHOULD have. A block
+    // that already exists is replaced; one that does not is inserted, so a chain
+    // whose prompts have never been generated is handled by the same run.
     const existing = blocksOfChain(findBlocks(doc), chain);
-    const have = new Set(existing.map(blockKey));
-    const wanted = targetsFor(chain, title, subs, types)
-      .filter((t) => have.has(t.type === "bpmn" ? `BPMN|${t.code}` : labelOf(t)));
-    if (wanted.length === 0) { console.log(`${chain}: nothing of those types in the document — skipped`); continue; }
+    const have = new Map(existing.map((b) => [blockKey(b), b]));
+    const wanted = targetsFor(chain, title, subs, types);
+    if (wanted.length === 0) { console.log(`${chain}: nothing to generate for those types — skipped`); continue; }
+    const newCount = wanted.filter((t) => !have.has(t.type === "bpmn" ? `BPMN|${t.code}` : labelOf(t))).length;
 
     const t0 = Date.now();
-    process.stdout.write(`${chain} ${title} — ${wanted.length} prompt(s) `);
+    process.stdout.write(`${chain} ${title} — ${wanted.length} prompt(s)${newCount ? ` (${newCount} new)` : ""} `);
     const results = await pooled(wanted, concurrency, async (target) => {
       const res = await generateMdPrompt({
         apiKey, model, briefing: brief.get(target.type)!,
@@ -148,24 +152,56 @@ async function run() {
       continue;
     }
 
-    // Match each generated prompt to the block it replaces, by the same key the
-    // splice uses. Anything unmatched is reported, never appended.
-    const byKey = new Map(existing.map((b) => [blockKey(b), b]));
-    const matched: { block: PromptBlock; text: string }[] = [];
+    // Replace where a block exists; insert where it does not. An anchor that
+    // cannot be found is REPORTED, never guessed at — a block written to the
+    // wrong offset is the failure mode this whole script is careful about.
+    const edits: Edit[] = [];
+    const written: string[] = [];
+    let anchorMissing = 0;
     for (const { target, res } of results) {
       if (!res.ok) continue;
       const key = target.type === "bpmn" ? `BPMN|${target.code}` : labelOf(target);
-      const block = byKey.get(key);
-      if (!block) { console.log(`  no block for ${key} — skipped`); continue; }
-      matched.push({ block, text: res.prompt });
+      const block = have.get(key);
+      if (block) {
+        edits.push({ start: block.start, end: block.end, text: res.prompt });
+      } else {
+        const at = insertPointFor(doc, chain, target.type === "bpmn" ? target.code : undefined);
+        if (at === null) { console.log(`  no anchor for ${key} — skipped`); anchorMissing++; continue; }
+        const body = renderPromptBlock(target.type, res.prompt).replace(/\n/g, EOL);
+        edits.push({ start: at, end: at, text: `${EOL}${EOL}${body}${EOL}` });
+      }
+      written.push(res.prompt);
+    }
+    if (anchorMissing) { console.log(`  ${chain} NOT WRITTEN — ${anchorMissing} anchor(s) missing.
+`); continue; }
+
+    const next = applyEdits(doc, edits);
+    const before = parseValueChainMd(doc), after = parseValueChainMd(next);
+
+    // No OTHER chain may change — that is the guard against an edit landing at
+    // the wrong offset. THIS chain is expected to change when blocks are being
+    // inserted, so its count is checked against what was actually written rather
+    // than against what it had.
+    const others = after.filter((c) => c.code !== chain
+      && (before.find((b) => b.code === c.code)?.diagrams.length ?? -1) !== c.diagrams.length);
+    if (others.length) {
+      console.log(`  ${chain} NOT WRITTEN — it changed the diagram count of ${others.map((d) => d.code).join(", ")}\n`);
+      continue;
+    }
+    const mineBefore = before.find((c) => c.code === chain)?.diagrams.length ?? 0;
+    const mineAfter = after.find((c) => c.code === chain)?.diagrams.length ?? 0;
+    const expected = mineBefore + edits.filter((e) => e.start === e.end).length;
+    if (mineAfter !== expected) {
+      console.log(`  ${chain} NOT WRITTEN — expected ${expected} prompts after the edit, parsed ${mineAfter}\n`);
+      continue;
+    }
+    const emptyAfter = (after.find((c) => c.code === chain)?.diagrams ?? []).filter((d) => !d.prompt.trim());
+    if (emptyAfter.length) {
+      console.log(`  ${chain} NOT WRITTEN — ${emptyAfter.length} prompt(s) parsed back empty\n`);
+      continue;
     }
 
-    const next = spliceBlocks(doc, matched);
-    const before = parseValueChainMd(doc), after = parseValueChainMd(next);
-    const drift = after.filter((c) => (before.find((b) => b.code === c.code)?.diagrams.length ?? -1) !== c.diagrams.length);
-    if (drift.length) { console.log(`  ${chain} NOT WRITTEN — diagram count changed for ${drift.map((d) => d.code).join(", ")}\n`); continue; }
-
-    const a = auditPrompts(matched.map((m) => m.text).join("\n"));
+    const a = auditPrompts(written.join("\n"));
     console.log(`  loop-backs ${a.loopBacks} · standard loops ${a.standardLoops} · merges ${a.mergeGateways}`
       + ` · waits ${a.waitEvents} · section 7 ${a.dataSections} · data objects ${a.dataObjects}`);
 
@@ -176,14 +212,14 @@ async function run() {
     // the rate that slips through a human reading 93 of them. Refusing the chain
     // costs a re-run; letting it through costs a wrong diagram nobody notices.
     if (a.loopBacks > 0) {
-      const offenders = matched.filter((m) => auditPrompts(m.text).loopBacks > 0).map((m) => blockKey(m.block));
-      console.log(`  ${chain} NOT WRITTEN — ${a.loopBacks} loop-back(s) in ${offenders.join(", ")}. Re-run this chain.\n`);
+      const offenders = written.filter((t) => auditPrompts(t).loopBacks > 0).length + " prompt(s)";
+      console.log(`  ${chain} NOT WRITTEN — ${a.loopBacks} loop-back(s) in ${offenders}. Re-run this chain.\n`);
       continue;
     }
 
     if (!dryRun) { fs.writeFileSync(mdPath, next); doc = next; }
-    totalWritten += matched.length;
-    console.log(`  ${dryRun ? "would write" : "written"} ${matched.length} prompt(s)\n`);
+    totalWritten += written.length;
+    console.log(`  ${dryRun ? "would write" : "written"} ${written.length} prompt(s)\n`);
   }
 
   console.log(`${totalCalls} AI call(s); ${totalWritten} prompt(s) ${dryRun ? "would be " : ""}written.`);

@@ -112,13 +112,51 @@ export const blockKey = (b: PromptBlock): string =>
 export const blocksOfChain = (blocks: PromptBlock[], chain: string): PromptBlock[] =>
   blocks.filter((b) => b.chain === chain);
 
-/** Replace block bodies, back to front so earlier offsets stay valid. */
-export function spliceBlocks(src: string, replacements: { block: PromptBlock; text: string }[]): string {
+/** One rewrite of a span. `start === end` is an insertion. */
+export interface Edit { start: number; end: number; text: string }
+
+/**
+ * Apply edits back to front, so earlier offsets stay valid as later ones change.
+ *
+ * The single write path for both replacing a block's body and inserting a block
+ * that does not exist yet — a chain whose prompts have never been generated has
+ * no blocks to replace, and two separate write paths over the same document is
+ * how one of them ends up subtly different from the other.
+ */
+export function applyEdits(src: string, edits: Edit[]): string {
   let out = src;
-  for (const r of [...replacements].sort((a, z) => z.block.start - a.block.start)) {
-    out = out.slice(0, r.block.start) + r.text + out.slice(r.block.end);
+  for (const e of [...edits].sort((a, z) => z.start - a.start || z.end - a.end)) {
+    out = out.slice(0, e.start) + e.text + out.slice(e.end);
   }
   return out;
+}
+
+/** Replace block bodies. */
+export function spliceBlocks(src: string, replacements: { block: PromptBlock; text: string }[]): string {
+  return applyEdits(src, replacements.map((r) => ({ start: r.block.start, end: r.block.end, text: r.text })));
+}
+
+/**
+ * Where a NEW prompt block should be inserted for a chain that has none.
+ *
+ * A BPMN prompt goes directly under its `### <code> — <title>` heading, because
+ * that heading is the only thing that identifies which subprocess it belongs to.
+ * A chain-level prompt goes immediately BEFORE the chain's first `###`, which
+ * puts it after the narrative and under no subprocess heading — exactly where
+ * `findBlocks` will read it back as chain-level.
+ *
+ * Returns null when the anchor is not present, so a caller reports it rather than
+ * guessing at an offset.
+ */
+export function insertPointFor(src: string, chain: string, subprocessCode?: string): number | null {
+  if (subprocessCode) {
+    const re = new RegExp(`^###[ \\t]+${subprocessCode.replace(".", "\\.")}[ \\t].*$`, "m");
+    const m = re.exec(src);
+    if (!m) return null;
+    return m.index + m[0].length;
+  }
+  const first = new RegExp(`^###[ \\t]+${chain}\\.\\d+[ \\t]`, "m").exec(src);
+  return first ? first.index : null;
 }
 
 /** The signals worth reporting after a regeneration — the Phase 0 evidence. */

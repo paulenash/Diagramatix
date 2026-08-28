@@ -120,7 +120,7 @@ describe("Repository prompt blocks", () => {
     const src = fs.readFileSync(REPO_MD, "utf8");
     const blocks = findBlocks(src);
     expect(blocks.length, "the real document must have prompts to check").toBeGreaterThan(100);
-    expect(new Set(blocks.map((b) => b.chain)).size).toBe(9);
+    expect(new Set(blocks.map((b) => b.chain)).size).toBe(26);
     for (const chain of new Set(blocks.map((b) => b.chain))) {
       const own = blocksOfChain(blocks, chain!);
       const same = spliceBlocks(src, own.map((b) => ({ block: b, text: b.text })));

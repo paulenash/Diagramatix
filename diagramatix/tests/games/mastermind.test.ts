@@ -377,7 +377,13 @@ describe("Mastermind — playing it out", () => {
     expect(worst, "entropy-greedy needs a sixth turn on a few codes").toBe(6);
     expect(dist.get(1), "the opening wins outright exactly once").toBe(1);
     expect([...dist.values()].reduce((a, z) => a + z, 0)).toBe(1296);
-  });
+    // Explicit timeout: this plays 1,296 complete games, each turn ranking every
+    // surviving candidate against every other. It runs in 13–16s, which sat right
+    // on Vitest's 15s default and duly failed the moment the machine was busy —
+    // a test that is correct but times out under load is worse than a slow one.
+    // Sampling the secrets would be the other fix, but the exact average over ALL
+    // 1,296 is the claim being made, so the budget moves instead.
+  }, 120_000);
 
   it("finishes the largest configuration too, from a real starting position", () => {
     const cfg: Config = { colours: 10, length: 6 };

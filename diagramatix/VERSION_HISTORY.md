@@ -15,6 +15,44 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.3.2337 — 2026-08-27 — Every chain in the repository now has its prompts
+
+**241 prompts generated for V10–V26** — all five diagram types for all seventeen
+new chains, in one headless run of about half an hour. The repository goes from
+140 prompts across 9 chains to **381 across 26**, every chain carrying its Value
+Chain, Context, Process Context and ArchiMate prompt plus one BPMN prompt per
+process.
+
+**Loop-backs across the whole document: zero.** 277 data-object sections, 1,594
+named data objects, 1,206 named merge gateways, 825 wait events, 189 standard-loop
+subprocesses. Nothing was refused by the loop-back guard this time — 241 for 241.
+
+**The regenerator learned to create blocks, not just replace them.** It could only
+rewrite prompts that already existed, and these chains had none. Three things
+went into that:
+
+- **Insertion is anchored, never guessed.** A BPMN prompt goes directly under its
+  `### Vnn.xx` heading — the only thing identifying which process it belongs to —
+  and a chain-level prompt immediately before the chain's first `###`, which is
+  what makes it read back as chain-level. A missing anchor skips the chain rather
+  than writing at a guessed offset.
+- **One write path.** Replace and insert both go through `applyEdits`, back to
+  front. Two write paths over the same document is how one of them ends up subtly
+  different from the other.
+- **The drift guard had to be re-thought.** It refused any run that changed a
+  chain's prompt count — which is exactly what inserting does, 0 to 15. It now
+  asserts no OTHER chain changed (the real guard against a misplaced edit), that
+  this chain's count equals what was written, and that nothing parses back empty.
+
+Proven on a single call before the other 240 were spent: V10's context prompt
+landed in the right place, parsed back as chain-level, and V01/V09 still spliced
+byte-identically.
+
+Verified after: 26 chains, 381 prompts, none empty, every chain carrying all five
+types, and every chain still splicing byte-identically.
+
+---
+
 ## 2.3.2336 — 2026-08-27 — The catalogue reaches 26 value chains
 
 **V10–V26 written: seventeen new chains, 173 new processes.** The repository had

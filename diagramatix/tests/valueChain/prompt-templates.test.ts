@@ -30,7 +30,12 @@ describe("Process Repository — reading a chain", () => {
   const md = fs.readFileSync(REPO_MD, "utf8");
 
   it("finds every chain the document declares", () => {
-    expect(chainCodes(md)).toEqual(["V01", "V02", "V03", "V04", "V05", "V06", "V07", "V08", "V09"]);
+    // All 26: V01-V09 described in the first pass, V10-V26 added 2026-08-27.
+    expect(chainCodes(md)).toEqual([
+      "V01", "V02", "V03", "V04", "V05", "V06", "V07", "V08", "V09",
+      "V10", "V11", "V12", "V13", "V14", "V15", "V16", "V17", "V18",
+      "V19", "V20", "V21", "V22", "V23", "V24", "V25", "V26",
+    ]);
   });
 
   it("slices a chain's own section, with its title and subprocesses", () => {
