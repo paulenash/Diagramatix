@@ -3763,6 +3763,15 @@ export function layoutBpmnDiagram(
     }
 
     // R8.18 — pull each End event left to hug its last element (pool + EP).
+    //
+    // The pull is CLAMPED by what already occupies the space it would move
+    // through. An End event's predecessor on the sequence flow is not
+    // necessarily the rightmost thing on its row: an element the model left off
+    // the chain (a stray task inside an EP, a branch that never rejoins, a
+    // second End event hanging off a mid-flow task) sits between them. Pulling
+    // the End back to `predecessor + 70` then drops it straight on top of that
+    // element — the −93px and −17px overlaps seen inside V06's Expanded
+    // Subprocesses. Hug the predecessor, but never move left past a sibling.
     for (const e of elements) {
       if (e.type !== "end-event" || e.boundaryHostId) continue;
       const ins = connectors.filter((c) => c.type === "sequence" && c.targetId === e.id);
@@ -3772,6 +3781,15 @@ export function layoutBpmnDiagram(
         if (src && src.id !== e.id) maxRight = Math.max(maxRight, src.x + src.width);
       }
       if (!isFinite(maxRight)) continue;
+      // Anything sharing the End's row, left of it, that the pull would cross.
+      for (const o of elements) {
+        if (o.id === e.id || o.parentId !== e.parentId) continue;
+        if (o.boundaryHostId) continue;
+        if (o.type === "data-object" || o.type === "data-store" || o.type === "text-annotation") continue; // inert
+        if (o.x >= e.x) continue;                        // already right of the End
+        if (!(e.y < o.y + o.height && o.y < e.y + e.height)) continue; // different row
+        maxRight = Math.max(maxRight, o.x + o.width);
+      }
       if (e.x - maxRight > MAX_CONN) e.x = maxRight + MAX_CONN;
     }
   }
