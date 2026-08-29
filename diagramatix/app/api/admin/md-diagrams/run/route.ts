@@ -220,8 +220,13 @@ export async function POST(req: Request) {
           // diagram and reported with it: a run of fifteen diagrams is unattended,
           // and a dangling reference used to come back looking like a success.
           const diagnostics: { kind: string; label: string; field?: string; detail: string }[] = [];
+          // The raw plan, kept so a bad generation can be replayed offline and
+          // exactly. See GenerateDiagramInput.onPlan for why the saved diagram is
+          // not enough.
+          let plan: unknown;
           const data = await generateDiagramData({
             onDiagnostic: (x) => diagnostics.push({ kind: x.kind, label: x.label, field: x.field, detail: x.detail }),
+            onPlan: (p) => { plan = p; },
             diagramType: d.type,
             prompt: d.prompt,
             model,
@@ -240,13 +245,17 @@ export async function POST(req: Request) {
             });
             promptId = p.id;
           } catch { /* prompt-list save is best-effort — still create the diagram */ }
-          if (promptId) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (data as any).aiGeneration = {
-              promptId, promptName, promptText: d.prompt, model,
-              generatedAt: new Date().toISOString(), autoNamed: true,
-            };
-          }
+          // The plan and the diagnostics are kept whether or not the prompt-list
+          // save succeeded — they are the record of HOW this diagram came out,
+          // and the prompt row is a convenience link.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (data as any).aiGeneration = {
+            ...(promptId ? { promptId, promptName } : {}),
+            promptText: d.prompt, model,
+            generatedAt: new Date().toISOString(), autoNamed: true,
+            ...(plan ? { plan } : {}),
+            ...(diagnostics.length ? { diagnostics } : {}),
+          };
           const savedName = uniqueName(d.name);
           const saved = await prisma.diagram.create({
             data: {

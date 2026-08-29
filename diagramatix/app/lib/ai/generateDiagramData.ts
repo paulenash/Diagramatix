@@ -32,6 +32,18 @@ export interface GenerateDiagramInput {
    * unattended should not ignore it.
    */
   onDiagnostic?: (d: LayoutDiagnostic) => void;
+  /**
+   * The RAW plan the model returned, before layout touched it.
+   *
+   * A saved diagram is the layout OUTPUT, and the input cannot be recovered from
+   * it — most sharply for the thing that goes wrong most often. When the model
+   * says `parentSubprocess: <EP>` and the layout fails to honour it, the saved
+   * element's parentId is the LANE, so reconstructing a plan from the saved
+   * diagram says "this task belongs to the lane" and the engine obliges. The
+   * defect is erased by the act of saving it. Keeping the plan makes a bad
+   * generation replayable offline, exactly, with no AI call.
+   */
+  onPlan?: (plan: unknown) => void;
 }
 
 // Auto-correct the same process-context cases the generate-diagram route fixes
@@ -58,11 +70,12 @@ function normaliseProcessContext(elements: any[]): void {
  * unparseable JSON, BPMN plan error) so the batch loop can record it per-diagram.
  */
 export async function generateDiagramData(input: GenerateDiagramInput): Promise<DiagramData> {
-  const { diagramType, prompt, model, apiKey, rules, promptLabel, onDiagnostic } = input;
+  const { diagramType, prompt, model, apiKey, rules, promptLabel, onDiagnostic, onPlan } = input;
 
   if (diagramType === "bpmn") {
     const res = await planBpmn({ apiKey, prompt, rules, model });
     if (!res.ok) throw new Error(res.error || "BPMN plan failed");
+    onPlan?.(res.plan);
     return layoutBpmnDiagram(res.plan.elements, res.plan.connections, { promptLabel, onDiagnostic });
   }
 
@@ -70,5 +83,6 @@ export async function generateDiagramData(input: GenerateDiagramInput): Promise<
   if (!Array.isArray(parsed.elements)) parsed.elements = [];
   if (!Array.isArray(parsed.connections)) parsed.connections = [];
   if (diagramType === "process-context") normaliseProcessContext(parsed.elements);
+  onPlan?.(parsed);
   return layoutGenericDiagram(parsed, diagramType, {});
 }
