@@ -903,6 +903,100 @@ export function layoutBpmnDiagram(
     fix("pool", (x) => x.type === "pool", poolRefs);
   }
 
+  // ── An Expanded Subprocess with NO children adopts an orphan internal chain ──
+  //
+  // V06.08 shipped an EP drawn as a small empty box while a chain of four tasks
+  // sat beside it in the lane:
+  //
+  //   Customer Buying Signal Received → [Repeat Until Pricing Model Validated] → Commercial Model Viable?
+  //   «start» → Analyse → Revise → Update → Review Model → «end»          (floating, connected to nothing)
+  //
+  // The model got the TOPOLOGY right — it emitted the EP in the main flow and a
+  // self-contained inner chain with the unlabelled start and end an EP's
+  // internals always have — and only the `parentSubprocess` links were missing.
+  // Nothing above can repair that, because there is no bad reference to fix:
+  // the field was simply never set.
+  //
+  // The signature is specific enough to act on. A chain that (a) is a connected
+  // component of the sequence graph on its own, (b) touches no pool-level
+  // anchor, (c) opens on a start event with no label and no incoming flow, and
+  // (d) closes on an end event, is a subprocess's insides — a process-level
+  // start carries a real label and roots the main flow. Adopt ONLY when the
+  // childless EPs and the orphan chains pair up one-to-one; anything else is a
+  // guess, and a wrong adoption is worse than an empty box.
+  {
+    const seq = new Map<string, Set<string>>();
+    const link = (a: string, b: string) => {
+      for (const [x, y] of [[a, b], [b, a]] as const) {
+        const s = seq.get(x); if (s) s.add(y); else seq.set(x, new Set([y]));
+      }
+    };
+    const DATA_TYPES = new Set(["data-object", "data-store", "text-annotation"]);
+    const isFlow = (e: AiElement | undefined) =>
+      !!e && e.type !== "pool" && e.type !== "lane" && !DATA_TYPES.has(e.type);
+    const inbound = new Map<string, number>();
+    for (const c of aiConnections) {
+      if (c.type === "message") continue;
+      const a = byAiId.get(c.sourceId), b = byAiId.get(c.targetId);
+      if (!isFlow(a) || !isFlow(b)) continue;          // data associations are not flow
+      link(c.sourceId, c.targetId);
+      inbound.set(c.targetId, (inbound.get(c.targetId) ?? 0) + 1);
+    }
+
+    const childless = aiElements.filter(
+      (e) => e.type === "subprocess-expanded"
+        && !aiElements.some((x) => x.parentSubprocess === e.id),
+    );
+
+    if (childless.length > 0) {
+      // Connected components over flow elements that are not already inside an EP.
+      const candidates = aiElements.filter((e) => isFlow(e) && !e.parentSubprocess && !e.boundaryHost);
+      const seen = new Set<string>();
+      const orphans: AiElement[][] = [];
+      for (const root of candidates) {
+        if (seen.has(root.id)) continue;
+        const comp: AiElement[] = [];
+        const stack = [root.id];
+        seen.add(root.id);
+        while (stack.length) {
+          const id = stack.pop()!;
+          const el = byAiId.get(id);
+          if (el) comp.push(el);
+          for (const n of seq.get(id) ?? []) {
+            if (seen.has(n)) continue;
+            const ne = byAiId.get(n);
+            if (!ne || ne.parentSubprocess || ne.boundaryHost) continue;
+            seen.add(n); stack.push(n);
+          }
+        }
+        const opens = comp.filter((e) => e.type === "start-event" && !(e.label ?? "").trim() && !inbound.get(e.id));
+        const closes = comp.some((e) => e.type === "end-event");
+        const hasContainer = comp.some((e) => e.type === "subprocess-expanded" || e.type === "subprocess");
+        if (comp.length >= 3 && opens.length === 1 && closes && !hasContainer) orphans.push(comp);
+      }
+
+      if (orphans.length > 0 && orphans.length === childless.length) {
+        // Pair in declaration order — the order the model wrote them is the only
+        // signal available before anything has been positioned.
+        for (let i = 0; i < childless.length; i++) {
+          const ep = childless[i];
+          for (const el of orphans[i]) el.parentSubprocess = ep.id;
+          diagnose({
+            kind: "recovered-reference", elementId: ep.id, label: ep.label ?? "",
+            field: "parentSubprocess",
+            detail: `empty subprocess adopted a floating internal chain of ${orphans[i].length} elements (the plan never set parentSubprocess on them)`,
+          });
+        }
+      } else if (orphans.length > 0) {
+        diagnose({
+          kind: "unresolved-reference", elementId: childless[0].id, label: childless[0].label ?? "",
+          field: "parentSubprocess",
+          detail: `${childless.length} empty subprocess(es) and ${orphans.length} floating chain(s) — cannot pair them safely, leaving both as they are`,
+        });
+      }
+    }
+  }
+
   // Flow elements = top-level BPMN content (exclude subprocess children and boundary events — these are placed separately)
   const flowElements = aiElements.filter(e =>
     e.type !== "pool" && e.type !== "lane" &&
@@ -2551,16 +2645,29 @@ export function layoutBpmnDiagram(
     // associationBPMN later. The AI plan can only emit "sequence" / "message"
     // types (planBpmn), so it sends data links as "sequence"; matching by
     // ENDPOINT (not by excluding those types) is what lets R8.02 find them.
-    const conn = aiConnections.find(
+    const links = aiConnections.filter(
       (c) => c.sourceId === el.id || c.targetId === el.id,
     );
+    const conn = links[0];
     if (!conn) continue;
     const isOutput = conn.sourceId !== el.id; // element → data → output
     const associatedId = isOutput ? conn.sourceId : conn.targetId;
     const associated = elMap.get(associatedId);
     if (!associated) continue;
     // Stamp the role property so rendering reflects placement.
-    el.properties = { ...el.properties, role: isOutput ? "output" : "input" };
+    //
+    // A data object that is BOTH written and read — an element → data
+    // association AND a data → element one — is neither an input nor an output,
+    // and carries NO marker (Paul, 2026-08-29; V06.08 had four wrongly showing
+    // the output marker). The role used to be read off whichever association
+    // happened to be first in the list, which for a read/write object is
+    // arbitrary.
+    const writtenTo = links.some((c) => c.targetId === el.id); // element → data
+    const readFrom = links.some((c) => c.sourceId === el.id);  // data → element
+    const role = writtenTo && readFrom ? undefined : writtenTo ? "output" : "input";
+    const props = { ...el.properties };
+    if (role) props.role = role; else delete props.role;
+    el.properties = props;
     // Inherit parentId from the associated element so the lane/pool
     // grows to fit the data object via R57.
     if (associated.parentId) el.parentId = associated.parentId;

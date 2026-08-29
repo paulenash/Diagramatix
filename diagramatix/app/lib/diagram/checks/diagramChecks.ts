@@ -1849,8 +1849,23 @@ export function checkDataObjectRole(d: DiagramLike): Violation[] {
     let expected: "input" | "output" | null = null;
     if (allOut && !allIn) expected = "input";
     else if (allIn && !allOut) expected = "output";
-    if (!expected) continue; // mixed directions — no single required role
     const role = da.properties?.role as string | undefined;
+    if (!expected) {
+      // Mixed directions: the object is both written and read, so it is neither
+      // an input nor an output and must carry NO marker. It used to be enough to
+      // skip this case, which let a wrong marker through — V06.08 had four data
+      // objects showing "output" because the role was read off whichever
+      // association happened to be first.
+      if (role) {
+        out.push({
+          rule: "data-object-role",
+          severity: "warning",
+          ids: [da.id],
+          message: `Data Object "${nameOf(da)}" has associations in BOTH directions, so it is neither an input nor an output and should carry no role marker — but it is marked "${role}" (R8.02).`,
+        });
+      }
+      continue;
+    }
     if (role !== expected) {
       out.push({
         rule: "data-object-role",
@@ -2298,7 +2313,7 @@ export const RULES: Rule[] = [
     code: "B37",
     id: "data-object-role",
     title: "Data Object input/output role doesn't match its associations",
-    description: "A Data Object with only outward associations (data → element) is an input and should carry role=\"input\"; one with only inward associations (element → data) is an output (role=\"output\"). The role marker is missing or mismatched (R8.02).",
+    description: "A Data Object with only outward associations (data → element) is an input and should carry role=\"input\"; one with only inward associations (element → data) is an output (role=\"output\"); one with associations in BOTH directions is neither and must carry NO marker. The role marker is missing, mismatched, or present when it should not be (R8.02).",
     severity: "warning",
     category: "bpmn-structure",
     check: checkDataObjectRole,
