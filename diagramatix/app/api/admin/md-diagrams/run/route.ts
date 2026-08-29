@@ -163,7 +163,12 @@ export async function POST(req: Request) {
         const t0 = Date.now();
         try {
           const rules = await rulesFor(d.type);
+          // Anything the layout could not take at face value. Collected per
+          // diagram and reported with it: a run of fifteen diagrams is unattended,
+          // and a dangling reference used to come back looking like a success.
+          const diagnostics: { kind: string; label: string; field?: string; detail: string }[] = [];
           const data = await generateDiagramData({
+            onDiagnostic: (x) => diagnostics.push({ kind: x.kind, label: x.label, field: x.field, detail: x.detail }),
             diagramType: d.type,
             prompt: d.prompt,
             model,
@@ -208,6 +213,7 @@ export async function POST(req: Request) {
             t: "diagram", index, total, name: d.name, type: d.type,
             status: "done", diagramId: saved.id, ms: Date.now() - t0,
             elements: data.elements.length, connectors: data.connectors.length,
+            diagnostics,
           });
         } catch (e) {
           failed++;

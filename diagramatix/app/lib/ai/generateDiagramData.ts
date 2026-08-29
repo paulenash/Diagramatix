@@ -11,7 +11,7 @@
  */
 import { planBpmn } from "./planBpmn";
 import { planGeneric } from "./planGeneric";
-import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
+import { layoutBpmnDiagram, type LayoutDiagnostic } from "@/app/lib/diagram/bpmnLayout";
 import { layoutGenericDiagram } from "@/app/lib/diagram/genericLayout";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
@@ -23,6 +23,15 @@ export interface GenerateDiagramInput {
   rules: string;
   /** Shown in BPMN layout tracing / used as the label when captured. */
   promptLabel?: string;
+  /**
+   * Anything the layout could not take at face value — a reference that names
+   * nothing, an empty subprocess, an element nothing placed.
+   *
+   * A caller that ignores this gets the old behaviour: a diagram that looks
+   * successful whatever went wrong. A caller generating fifteen diagrams
+   * unattended should not ignore it.
+   */
+  onDiagnostic?: (d: LayoutDiagnostic) => void;
 }
 
 // Auto-correct the same process-context cases the generate-diagram route fixes
@@ -49,12 +58,12 @@ function normaliseProcessContext(elements: any[]): void {
  * unparseable JSON, BPMN plan error) so the batch loop can record it per-diagram.
  */
 export async function generateDiagramData(input: GenerateDiagramInput): Promise<DiagramData> {
-  const { diagramType, prompt, model, apiKey, rules, promptLabel } = input;
+  const { diagramType, prompt, model, apiKey, rules, promptLabel, onDiagnostic } = input;
 
   if (diagramType === "bpmn") {
     const res = await planBpmn({ apiKey, prompt, rules, model });
     if (!res.ok) throw new Error(res.error || "BPMN plan failed");
-    return layoutBpmnDiagram(res.plan.elements, res.plan.connections, { promptLabel });
+    return layoutBpmnDiagram(res.plan.elements, res.plan.connections, { promptLabel, onDiagnostic });
   }
 
   const parsed = await planGeneric({ apiKey, model, diagramType, rules, prompt });

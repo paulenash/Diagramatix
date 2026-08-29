@@ -533,11 +533,30 @@ function snapBoundaryEventToRim(
   be.y = py - be.height / 2;
 }
 
+/**
+ * Something the layout could not take at face value.
+ *
+ * Reported rather than swallowed. The layout has always had fallbacks — a float
+ * pile for elements nothing placed, a default pool when none is declared — and
+ * they are silent, so a diagram with three stranded tasks and an empty subprocess
+ * comes back looking like a success. These make the failure visible at the moment
+ * it happens, which is the only time anyone can act on it.
+ */
+export interface LayoutDiagnostic {
+  kind: "recovered-reference" | "unresolved-reference" | "empty-subprocess" | "unplaced";
+  elementId: string;
+  label: string;
+  field?: string;
+  detail: string;
+}
+
 export function layoutBpmnDiagram(
   aiElements: AiElement[],
   aiConnections: AiConnection[],
   opts?: {
     promptLabel?: string;
+    /** Called for anything the layout could not take at face value. */
+    onDiagnostic?: (d: LayoutDiagnostic) => void;
     /** Image import: reproduce the vendor's drawn positions instead of
      *  auto-stacking. Requires usable `bounds` on pools/lanes/nodes; falls
      *  back to the normal auto-stack layout if the geometry is unusable. */
@@ -573,6 +592,16 @@ export function layoutBpmnDiagram(
     if (!el.pool) el.pool = el.parentPool;
     el.type = "lane";
     delete el.parentLane;
+  }
+
+  // A standalone lane element is matched to its pool by `pool` further down, but
+  // `parentPool` is the field the AiElement contract documents for exactly that
+  // ("for lanes — the pool they belong to"). A plan that used the documented
+  // field orphaned the lane: it belonged to no pool, so every element assigned
+  // to it fell through lane placement and was parked at arbitrary coordinates.
+  // Accept both spellings.
+  for (const el of aiElements) {
+    if (el.type === "lane" && !el.pool && el.parentPool) el.pool = el.parentPool;
   }
 
   const elements: DiagramElement[] = [];
@@ -784,8 +813,95 @@ export function layoutBpmnDiagram(
   }
 
   // Separate pools from other elements
+  /** Report something the layout could not take at face value. Never throws. */
+  const diagnose = (d: LayoutDiagnostic) => { try { opts?.onDiagnostic?.(d); } catch { /* a reporter must never break a layout */ } };
+
   const pools = aiElements.filter(e => e.type === "pool");
   const lanes = aiElements.filter(e => e.type === "lane");
+  // ── Dangling references ───────────────────────────────────────────────────
+  //
+  // The single most damaging thing a plan can contain, because of how the filter
+  // below works: an element carrying `parentSubprocess` or `boundaryHost` is
+  // EXCLUDED from flow placement, on the understanding that the subprocess-child
+  // or boundary pass will place it instead. If the id it names does not exist,
+  // NOTHING places it — it is invisible to the lane logic and invisible to the
+  // pass that was supposed to own it, so it falls through to the float fallback
+  // and lands outside every pool. The subprocess it named is left empty.
+  //
+  // That is not hypothetical: V06.08 "Validate Commercial Model" shipped with an
+  // empty Expanded Subprocess and three tasks stranded at x=50, from one bad
+  // reference (Paul, 2026-08-29 — "the worst generated diagram").
+  //
+  // So: resolve what can be resolved, drop what cannot (the element then places
+  // normally, in a lane, like any other), and REPORT every one either way. A
+  // recovered reference is still worth reporting — it means the model produced a
+  // reference the plan schema did not intend.
+  const byAiId = new Map(aiElements.map((e) => [e.id, e]));
+  const laneRefs = new Map<string, string>(); // normalised key → lane id
+  const poolRefs = new Map<string, string>();
+  /** Case, punctuation and a leading id-prefix ("l", "lane") folded away. */
+  const normRef = (s: string): string =>
+    String(s).toLowerCase().replace(/^(lane[_-]?|l(?=[a-z]{2}))/, "").replace(/[^a-z0-9]/g, "");
+  const remember = (map: Map<string, string>, key: string | undefined, id: string) => {
+    if (!key) return;
+    const k = normRef(key);
+    if (k && !map.has(k)) map.set(k, id);
+  };
+  for (const l of lanes) { remember(laneRefs, l.id, l.id); remember(laneRefs, l.label, l.id); }
+  for (const p of pools) {
+    remember(poolRefs, p.id, p.id); remember(poolRefs, p.label, p.id);
+    for (const il of (p.lanes ?? [])) { remember(laneRefs, il.id, il.id); remember(laneRefs, il.name, il.id); }
+  }
+
+  /** Resolve a reference to an element id, allowing a normalised near-match. */
+  const resolveRef = (
+    ref: string, ok: (e: AiElement) => boolean, extra?: Map<string, string>,
+  ): string | null => {
+    const direct = byAiId.get(ref);
+    if (direct && ok(direct)) return ref;
+    if (extra) {
+      const hit = extra.get(normRef(ref));
+      if (hit) return hit;
+    }
+    const k = normRef(ref);
+    for (const e of aiElements) {
+      if (!ok(e)) continue;
+      if (normRef(e.id) === k || normRef(e.label ?? "") === k) return e.id;
+    }
+    return null;
+  };
+
+  const isContainerActivity = (e: AiElement) =>
+    e.type === "subprocess-expanded" || e.type === "subprocess";
+  const isActivity = (e: AiElement) =>
+    isContainerActivity(e) || e.type === "task" || e.type === "call-activity" || e.type === "transaction";
+
+  for (const e of aiElements) {
+    if (e.type === "pool" || e.type === "lane") continue;
+    const fix = (
+      field: "parentSubprocess" | "boundaryHost" | "lane" | "pool",
+      ok: (x: AiElement) => boolean, extra?: Map<string, string>,
+    ) => {
+      const ref = e[field];
+      if (!ref) return;
+      const hit = resolveRef(String(ref), ok, extra);
+      if (hit === ref) return;
+      if (hit) {
+        diagnose({ kind: "recovered-reference", elementId: e.id, label: e.label ?? "", field, detail: `"${ref}" matched "${hit}"` });
+        (e as unknown as Record<string, unknown>)[field] = hit;
+        return;
+      }
+      // Nothing matched. Clearing the field is what makes the element placeable:
+      // it re-joins normal flow placement instead of vanishing into the float.
+      diagnose({ kind: "unresolved-reference", elementId: e.id, label: e.label ?? "", field, detail: `"${ref}" does not exist — placed as normal flow content instead` });
+      (e as unknown as Record<string, unknown>)[field] = undefined;
+    };
+    fix("parentSubprocess", isContainerActivity);
+    fix("boundaryHost", isActivity);
+    fix("lane", (x) => x.type === "lane", laneRefs);
+    fix("pool", (x) => x.type === "pool", poolRefs);
+  }
+
   // Flow elements = top-level BPMN content (exclude subprocess children and boundary events — these are placed separately)
   const flowElements = aiElements.filter(e =>
     e.type !== "pool" && e.type !== "lane" &&
@@ -1654,20 +1770,54 @@ export function layoutBpmnDiagram(
     ai.type !== "pool" && ai.type !== "lane" && !placedIds.has(ai.id)
   );
   if (unplacedEls.length > 0) {
-    let floatY = 100;
-    const floatX = 50;
+    // WHERE THESE GO, and why not a lane of their own. Dropping them at x=50
+    // outside every pool is what made V06.08 read as a rendering fault rather
+    // than a data one. A synthetic "Unplaced" LANE would be tidier on the canvas
+    // and worse everywhere else: `entityLists/buildFromBpmn` turns Lane into an
+    // OrgUnit in the organisation hierarchy, and `simulation/assemble` reads a
+    // lane as the performer of its work — so a fake lane becomes a fake
+    // department and a fake resource pool, in features nobody was looking at.
+    //
+    // So they go into a REAL container — the white-box pool's first lane, below
+    // its content — and carry an annotation saying why. Marked, not disguised.
+    const host = elements.find((e) => e.type === "lane" && whiteBoxPools.some((p) => e.parentId === p.id))
+      ?? elements.find((e) => e.type === "pool" && whiteBoxPools.some((p) => p.id === e.id));
+    const siblings = host ? elements.filter((e) => e.parentId === host.id) : [];
+    // Placed AFTER the flow, on its row — not beneath it. Anything below the last
+    // element pushes past the lane's bottom edge, and the lane hugs its content
+    // (R6.02c), so it would hang outside the very container it was put in.
+    let floatX = siblings.length ? Math.max(...siblings.map((e) => e.x + e.width)) + 90 : (host ? host.x + 90 : 50);
+    const floatY = siblings.length
+      ? Math.round(siblings.reduce((t, e) => t + e.y + e.height / 2, 0) / siblings.length)
+      : (host ? host.y + 40 : 100);
     for (const ai of unplacedEls) {
       const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
       elements.push({
         id: ai.id, type: ai.type as DiagramElement["type"],
-        x: floatX, y: floatY, width: def.defaultWidth, height: def.defaultHeight,
+        x: floatX, y: Math.round(floatY - def.defaultHeight / 2), width: def.defaultWidth, height: def.defaultHeight,
         label: ai.label, properties: buildProps(ai),
+        ...(host ? { parentId: host.id } : {}),
         ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
         ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
         ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
       });
-      floatY += def.defaultHeight + 20;
+      diagnose({
+        kind: "unplaced", elementId: ai.id, label: ai.label ?? "",
+        detail: host
+          ? `nothing placed it; parked at the end of "${host.label ?? host.type}"`
+          : "nothing placed it, and there is no white-box pool to park it in",
+      });
+      floatX += def.defaultWidth + 40;
     }
+  }
+
+  // An Expanded Subprocess with nothing in it is always a fault — either its
+  // children named it wrongly (see the dangling-reference pass) or the plan
+  // never gave it any. It draws as an empty box and reads as a bug.
+  for (const ep of elements) {
+    if (ep.type !== "subprocess-expanded") continue;
+    if (elements.some((e) => e.parentId === ep.id && !e.boundaryHostId)) continue;
+    diagnose({ kind: "empty-subprocess", elementId: ep.id, label: ep.label ?? "", detail: "no children — it will draw as an empty box" });
   }
 
   phase(`subprocess+boundary placement done (${elements.length} elements total)`);

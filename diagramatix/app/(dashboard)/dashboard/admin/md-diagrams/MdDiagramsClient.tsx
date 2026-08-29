@@ -26,6 +26,8 @@ interface Row {
   ms?: number;
   elements?: number;
   connectors?: number;
+  /** Anything the layout could not take at face value on this diagram. */
+  diagnostics?: { kind: string; label: string; field?: string; detail: string }[];
 }
 
 const TYPE_BADGE: Record<DiagKind, { label: string; cls: string }> = {
@@ -241,6 +243,7 @@ export function MdDiagramsClient() {
         ms: msg.ms as number | undefined,
         elements: msg.elements as number | undefined,
         connectors: msg.connectors as number | undefined,
+        diagnostics: msg.diagnostics as Row["diagnostics"],
       } : r));
     } else if (t === "done") {
       setSummary({ created: (msg.created as number) ?? 0, failed: (msg.failed as number) ?? 0 });
@@ -392,9 +395,39 @@ export function MdDiagramsClient() {
                   </span>
                 )}
                 {r.status === "error" && <span className="text-red-600 truncate max-w-[45%]" title={r.message}>✗ {r.message}</span>}
+                {/* Anything the layout could not take at face value. A diagram
+                    used to come back "✓ 39el / 46conn" with three activities
+                    stranded outside every pool and an empty subprocess. */}
+                {!!r.diagnostics?.length && (
+                  <span className="text-amber-700 shrink-0"
+                    title={r.diagnostics.map((d) => `${d.kind}: ${d.label}${d.field ? ` .${d.field}` : ""} — ${d.detail}`).join("\n")}>
+                    ⚠ {r.diagnostics.length}
+                  </span>
+                )}
               </div>
             ))}
           </div>
+
+          {rows.some((r) => r.diagnostics?.length) && (
+            <details className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <summary className="cursor-pointer font-medium">
+                {rows.reduce((t, r) => t + (r.diagnostics?.length ?? 0), 0)} thing(s) the layout could not take at face value
+              </summary>
+              <ul className="mt-2 space-y-1">
+                {rows.flatMap((r) => (r.diagnostics ?? []).map((d, k) => (
+                  <li key={`${r.index}-${k}`}>
+                    <span className="font-medium">{r.name}</span> — <span className="uppercase text-[10px]">{d.kind}</span>{" "}
+                    {d.label && <span className="italic">&ldquo;{d.label}&rdquo;</span>}
+                    {d.field && <span className="text-amber-700">.{d.field}</span>} — {d.detail}
+                  </li>
+                )))}
+              </ul>
+              <p className="mt-2 text-[11px] text-amber-800">
+                These do not fail the run — the diagram was still generated and saved. They are
+                the difference between a diagram that is wrong and one you know is wrong.
+              </p>
+            </details>
+          )}
 
           {summary && (
             <div className="mt-4 rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800">
