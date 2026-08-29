@@ -5,6 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateFeature } from "@/app/lib/subscription-route";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
+import { logLayoutDiagnostic } from "@/app/lib/diagram/layoutDiagnosticLog";
 import { addDescriptionAnnotation } from "@/app/lib/pcf/descAnnotation";
 
 type Params = { params: Promise<{ id: string }> };
@@ -81,7 +82,11 @@ export async function POST(req: Request, { params }: Params) {
   elements.push({ id: "end", type: "end-event", label: "" });
   connections.push({ sourceId: prev, targetId: "end", type: "sequence" });
 
-  const diagramData = addDescriptionAnnotation(layoutBpmnDiagram(elements, connections), node.description);
+  // Layout diagnostics are collected and logged rather than dropped: a plan whose
+  // references dangle produces a diagram that LOOKS fine, which is what made the
+  // V06 defects survive three regenerations (Paul, 2026-08-29). Not surfaced in
+  // this feature's UI yet — the log is the floor, not the ceiling.
+  const diagramData = addDescriptionAnnotation(layoutBpmnDiagram(elements, connections, { onDiagnostic: logLayoutDiagnostic("pcf decompose") }), node.description);
 
   return NextResponse.json({
     diagramData,

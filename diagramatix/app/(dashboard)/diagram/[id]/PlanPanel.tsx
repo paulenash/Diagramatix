@@ -317,6 +317,12 @@ export function PlanPanel({
 
   const [issues, setIssues] = useState<string[] | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  /** What the layout could not take at face value on the last apply. This is
+   *  the step that actually produces the diagram, so it is where the damage
+   *  would show (Paul, 2026-08-29). */
+  const [diagnostics, setDiagnostics] = useState<
+    { kind: string; label: string; field?: string; detail: string }[]
+  >([]);
 
   // Saved prompts (with optional persisted plan JSON — Milestone D).
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
@@ -851,6 +857,9 @@ export function PlanPanel({
         && plan.elements.some((e: { bounds?: unknown }) => e.bounds);
       // BPMN-only — flowchart apply-layout must be sent exactly as before.
       const preservePositions = !isFlowchart && preserveLayout && planHasBounds;
+      // Cleared before the call: an apply that fails early returns without
+      // reading a response, and a stale list would look like this attempt.
+      setDiagnostics([]);
       const res = await fetch(`${apiBase}/apply-layout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -862,6 +871,7 @@ export function PlanPanel({
         }),
       });
       const json = await res.json();
+      setDiagnostics(Array.isArray(json.diagnostics) ? json.diagnostics : []);
       if (!res.ok) {
         setError(json.error ?? "Layout failed");
         if (Array.isArray(json.issues)) setIssues(json.issues);
@@ -1406,6 +1416,22 @@ export function PlanPanel({
           </div>
         )}
         {status && <p className="text-[10px] text-gray-500 shrink-0 mb-1">{status}</p>}
+        {diagnostics.length > 0 && (
+          <details className="text-[10px] rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-amber-900 shrink-0 mb-2">
+            <summary className="cursor-pointer font-medium">
+              &#9888; {diagnostics.length} thing{diagnostics.length === 1 ? "" : "s"} the layout could not take at face value
+            </summary>
+            <ul className="mt-1 space-y-0.5">
+              {diagnostics.map((d, i) => (
+                <li key={i}>
+                  <span className="uppercase text-[9px] tracking-wide">{d.kind}</span>{" "}
+                  {d.label && <span className="italic">&ldquo;{d.label}&rdquo;</span>}
+                  {d.field && <span>.{d.field}</span>} &mdash; {d.detail}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
         {error && (
           <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5 shrink-0 mb-2">
             <p className="font-medium">{error}</p>

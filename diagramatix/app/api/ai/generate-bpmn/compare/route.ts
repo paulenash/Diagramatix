@@ -7,6 +7,7 @@ import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 import { groundRulesWithPcf } from "@/app/lib/pcf/promptGrounding";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
+import { logLayoutDiagnostic } from "@/app/lib/diagram/layoutDiagnosticLog";
 import {
   findConnectorConformance,
   summariseConformance,
@@ -130,8 +131,13 @@ export async function POST(req: Request) {
       // model returned per-shape bounds; otherwise the normal auto-stack layout.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const preserve = wantGeometry && res.plan.elements.some((e: any) => e.bounds);
+      // Layout diagnostics are collected and logged rather than dropped: a plan whose
+      // references dangle produces a diagram that LOOKS fine, which is what made the
+      // V06 defects survive three regenerations (Paul, 2026-08-29). Not surfaced in
+      // this feature's UI yet — the log is the floor, not the ceiling.
       const data = layoutBpmnDiagram(res.plan.elements, res.plan.connections,
-        { preservePositions: preserve, imageAspect: aspect, mode });
+        { preservePositions: preserve, imageAspect: aspect, mode,
+          onDiagnostic: logLayoutDiagnostic(`compare ${m.id}`) });
       const issues = findConnectorConformance(data);
       const flag = issues.length ? ` (!${issues.length})` : "";
       const saved = await prisma.diagram.create({

@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
-import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
+import { layoutBpmnDiagram, type AiElement, type AiConnection, type LayoutDiagnostic } from "@/app/lib/diagram/bpmnLayout";
 import { validatePlan } from "@/app/lib/ai/planSchema";
 import { normaliseAiPlan } from "@/app/lib/ai/planBpmn";
 import { isSuperuser } from "@/app/lib/superuser";
@@ -79,8 +79,12 @@ export async function POST(req: Request) {
   const t0 = Date.now();
 
   try {
+    // See generate-bpmn: the layout reports what it could not take at face
+    // value, and the Plan flow must surface it too — this is the step that
+    // actually produces the diagram, so it is where the damage would show.
+    const diagnostics: LayoutDiagnostic[] = [];
     const diagramData = layoutBpmnDiagram(normalised.elements, normalised.connections,
-      { promptLabel, preservePositions, imageAspect, mode });
+      { promptLabel, preservePositions, imageAspect, mode, onDiagnostic: (d) => diagnostics.push(d) });
     trace(`[apply-layout] ok in ${Date.now() - t0}ms: ${diagramData.elements.length} rendered elements, ${diagramData.connectors.length} connectors`);
     // "# diagrams generated using AI": the Plan-flow diagram is PRODUCED here
     // (Phase 2). No AI call happens at this step, so resolve org directly.
@@ -90,6 +94,7 @@ export async function POST(req: Request) {
       diagramData,
       elementCount: normalised.elements.length,
       connectionCount: normalised.connections.length,
+      diagnostics,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -111,6 +111,16 @@ export function AiPanel({
   useEffect(() => { onNarrativeGeneratingChange?.(narrativeGenerating); }, [narrativeGenerating, onNarrativeGeneratingChange]);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  /**
+   * Anything the layout could not take at face value on the last generation.
+   *
+   * The batch runner has reported these since 2026-08-29; a single generation
+   * here did not, so a plan with a dangling reference or an empty subprocess
+   * came back looking like a clean success (Paul, 2026-08-29).
+   */
+  const [diagnostics, setDiagnostics] = useState<
+    { kind: string; label: string; field?: string; detail: string }[]
+  >([]);
   const [audioPhase, setAudioPhase] = useState<null | "transcribing" | "reading" | "tidying">(null);
 
   // Saved prompts
@@ -315,6 +325,10 @@ export function AiPanel({
     if (!effPrompt) return;
     setGenerating(true);
     setError(null);
+    // Cleared here, not only on success: a run that fails early returns before
+    // the response is read, and the previous run's diagnostics would otherwise
+    // sit there looking like they belong to this one.
+    setDiagnostics([]);
     setStatus("Generating diagram (this may take 15-30 seconds)...");
 
     try {
@@ -338,6 +352,7 @@ export function AiPanel({
       }
 
       const result = await res.json();
+      setDiagnostics(Array.isArray(result.diagnostics) ? result.diagnostics : []);
 
       // BPMN has its own layout engine, other types use simple grid layout
       if (diagramType === "bpmn") {
@@ -791,6 +806,26 @@ export function AiPanel({
             >&times;</button>
             {status}
           </div>
+        )}
+        {diagnostics.length > 0 && (
+          <details className="text-[10px] rounded border border-amber-300 bg-amber-50 px-1.5 py-1 text-amber-900">
+            <summary className="cursor-pointer font-medium">
+              &#9888; {diagnostics.length} thing{diagnostics.length === 1 ? "" : "s"} the layout could not take at face value
+            </summary>
+            <ul className="mt-1 space-y-0.5">
+              {diagnostics.map((d, i) => (
+                <li key={i}>
+                  <span className="uppercase text-[9px] tracking-wide">{d.kind}</span>{" "}
+                  {d.label && <span className="italic">&ldquo;{d.label}&rdquo;</span>}
+                  {d.field && <span>.{d.field}</span>} &mdash; {d.detail}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-[9px]">
+              The diagram was still generated. These are the difference between a diagram
+              that is wrong and one you know is wrong.
+            </p>
+          </details>
         )}
         {error && <p className="text-[10px] text-red-600">{error}</p>}
       </div>

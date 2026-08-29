@@ -26,6 +26,7 @@ import { badgeEdgeCounts } from "@/app/lib/mining/edgeBadges";
 import { generateProcessViaAi } from "@/app/lib/mining/aiProcess";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
+import { logLayoutDiagnostic } from "@/app/lib/diagram/layoutDiagnosticLog";
 import type { Variant, MiningStats } from "@/app/lib/mining/types";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
@@ -104,7 +105,11 @@ export async function POST(req: Request, { params }: Params) {
     const { plan } = discoverProcess(dv, { edgeThreshold });
     // No promptLabel — that stamps an "AI Generated" annotation, which is wrong for
     // the deterministic (1:1-with-the-log) discovery. The AI path keeps its label.
-    data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections));
+  // Layout diagnostics are collected and logged rather than dropped: a plan whose
+  // references dangle produces a diagram that LOOKS fine, which is what made the
+  // V06 defects survive three regenerations (Paul, 2026-08-29). Not surfaced in
+  // this feature's UI yet — the log is the floor, not the ceiling.
+    data = badgeEdgeCounts(layoutBpmnDiagram(plan.elements, plan.connections, { onDiagnostic: logLayoutDiagnostic("mining discover") }));
   }
 
   const diagram = await prisma.diagram.create({

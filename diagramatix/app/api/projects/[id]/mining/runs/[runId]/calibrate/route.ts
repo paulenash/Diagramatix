@@ -15,6 +15,7 @@ import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext
 import { discoverProcess } from "@/app/lib/mining/discoverProcess";
 import { calibrateSimulation } from "@/app/lib/mining/calibrateSimulation";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
+import { logLayoutDiagnostic } from "@/app/lib/diagram/layoutDiagnosticLog";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import type { Variant, Performance, MiningStats } from "@/app/lib/mining/types";
 
@@ -56,7 +57,11 @@ export async function POST(_req: Request, { params }: Params) {
   }
   if (!bpmnId || !baseData) {
     const { plan } = discoverProcess(variants);
-    baseData = layoutBpmnDiagram(plan.elements, plan.connections, { promptLabel: run.name });
+  // Layout diagnostics are collected and logged rather than dropped: a plan whose
+  // references dangle produces a diagram that LOOKS fine, which is what made the
+  // V06 defects survive three regenerations (Paul, 2026-08-29). Not surfaced in
+  // this feature's UI yet — the log is the floor, not the ceiling.
+    baseData = layoutBpmnDiagram(plan.elements, plan.connections, { promptLabel: run.name, onDiagnostic: logLayoutDiagnostic("mining calibrate") });
     const created = await prisma.diagram.create({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: { name: `${run.name} — discovered`, type: "bpmn", data: baseData as any, userId: userId!, diagramOwnerId: userId ?? null, orgId, projectId: id },

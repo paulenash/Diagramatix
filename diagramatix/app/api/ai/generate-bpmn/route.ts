@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { prisma } from "@/app/lib/db";
-import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
+import { layoutBpmnDiagram, type LayoutDiagnostic } from "@/app/lib/diagram/bpmnLayout";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { chooseModel } from "@/app/lib/ai/modelAccess";
@@ -80,7 +80,15 @@ export async function POST(req: Request) {
     );
     if (elementBlock) return elementBlock;
 
-    const diagramData = layoutBpmnDiagram(plan.elements, plan.connections);
+    // Anything the layout could not take at face value — a reference naming
+    // nothing, a subprocess left empty, an element nothing placed. The batch
+    // runner has reported these since 2026-08-29; a single generation in the
+    // editor did not, so the same bad plan came back looking like a success
+    // (Paul, 2026-08-29). Collected here and returned with the diagram.
+    const diagnostics: LayoutDiagnostic[] = [];
+    const diagramData = layoutBpmnDiagram(plan.elements, plan.connections, {
+      onDiagnostic: (d) => diagnostics.push(d),
+    });
 
     // Record AFTER success so model errors don't burn the user's quota.
     await recordUsage(session.user.id, "aiAttempts");
@@ -90,6 +98,7 @@ export async function POST(req: Request) {
       model,
       elementCount: plan.elements.length,
       connectionCount: plan.connections.length,
+      diagnostics,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
