@@ -84,6 +84,7 @@ export function MdDiagramsClient() {
   const [targetProjectId, setTargetProjectId] = useState<string>("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [linkScope, setLinkScope] = useState<LinkScope>("generated");
+  const [copied, setCopied] = useState(false);
 
   const [running, setRunning] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
@@ -176,6 +177,24 @@ export function MdDiagramsClient() {
       .catch(() => { if (live) setError("Could not load your projects"); });
     return () => { live = false; };
   }, [target, projects.length]);
+
+  /** The whole diagnostics list as plain text, ready to paste into a bug report. */
+  const copyDiagnostics = useCallback(async () => {
+    const lines: string[] = [];
+    for (const r of rows) {
+      if (!r.diagnostics?.length) continue;
+      lines.push(`${r.name} [${r.type}] — ${r.elements ?? 0}el / ${r.connectors ?? 0}conn — ${r.diagnostics.length} diagnostic(s)`);
+      for (const d of r.diagnostics) {
+        lines.push(`  ${d.kind}${d.field ? ` .${d.field}` : ""}: "${d.label}" — ${d.detail}`);
+      }
+      lines.push("");
+    }
+    try {
+      await navigator.clipboard.writeText(lines.join("\n").trimEnd());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard blocked — the list is still on screen */ }
+  }, [rows]);
 
   const toggle = useCallback((k: string) => {
     setPicked((prev) => {
@@ -593,8 +612,19 @@ export function MdDiagramsClient() {
 
           {rows.some((r) => r.diagnostics?.length) && (
             <details className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              <summary className="cursor-pointer font-medium">
-                {rows.reduce((t, r) => t + (r.diagnostics?.length ?? 0), 0)} thing(s) the layout could not take at face value
+              <summary className="cursor-pointer font-medium flex items-center justify-between gap-3">
+                <span>
+                  {rows.reduce((t, r) => t + (r.diagnostics?.length ?? 0), 0)} thing(s) the layout could not take at face value
+                </span>
+                {/* The panel is transient — it is gone on refresh, and reading a
+                    19-line list off the screen to report it is how detail gets
+                    lost. One click puts the whole thing on the clipboard. */}
+                <button
+                  onClick={(e) => { e.preventDefault(); void copyDiagnostics(); }}
+                  className="shrink-0 rounded border border-amber-400 bg-white px-2 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-100"
+                >
+                  {copied ? "Copied ✓" : "Copy all"}
+                </button>
               </summary>
               <ul className="mt-2 space-y-1">
                 {rows.flatMap((r) => (r.diagnostics ?? []).map((d, k) => (

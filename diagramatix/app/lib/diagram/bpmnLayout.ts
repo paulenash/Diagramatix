@@ -5,6 +5,7 @@
 
 import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
+import { closeFlowVoids } from "./closeFlowVoids";
 import { computeWaypoints, recomputeAllConnectors, pickBoundaryEventSide } from "./routing";
 import { autoSizeForType, wrapText, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
 import { snapImportedBounds, type Box } from "./importGeometry";
@@ -4028,6 +4029,28 @@ export function layoutBpmnDiagram(
       if (!moved) break;
     }
   }
+  // ── R8.22: Horizontal void compaction ── the exact mirror of the vertical
+  // band compaction below, and needed for the same reason.
+  //
+  // R8.21 above only ever pushes RIGHT: it relaxes every forward edge until
+  // t.x ≥ s.x + s.width + LR_GAP, and nothing ever pulls the result back. So a
+  // single element ranked far right — by a wide EP that later shrank, by a
+  // message flow to a black-box pool, by a merge relocation — drags the whole
+  // remaining flow with it and leaves a band of nothing behind. Measured on the
+  // 2026-08-29 regenerations: 1,488px between "Review Solution Design Scope" and
+  // "Retrieve Design Specifications" (V06.06) and 1,622px between "Review
+  // Business Case Assumptions" and "Retrieve Customer Data From CRM" (V06.08),
+  // both with NOTHING in the span in any lane or pool.
+  //
+  // Sweep every top-level flow element left→right; where the gap between the
+  // running occupied-right and the next element exceeds MIN_VOID, pull that
+  // element AND everything right of it left so the gap becomes TARGET_GAP. The
+  // whole block moves by the same dx, so nothing inside it collides, and the
+  // band was empty across the WHOLE diagram so nothing to the left is disturbed.
+  // A gap with anything in it — a parallel branch in another lane, a gateway
+  // spanning a wide EP — is left alone: it is carrying content, not slack.
+  closeFlowVoids(elements);
+
   // Re-apply uniform pool width to enclose anything the L→R sweep pushed past the
   // previous right edge (keeps R5.08: all pools one width, tight to content).
   applyUniformPoolWidth();
