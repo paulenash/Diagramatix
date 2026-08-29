@@ -3740,6 +3740,16 @@ export function layoutBpmnDiagram(
       if (s.x < floor) s.x = floor;
     }
 
+    /** Is `maybeAncestorId` a container of `id`? (Containers never obstruct.) */
+    const isAncestorOf = (maybeAncestorId: string, id: string): boolean => {
+      let cur = byIdSE.get(id);
+      for (let d = 0; cur?.parentId && d < 16; d++) {
+        if (cur.parentId === maybeAncestorId) return true;
+        cur = byIdSE.get(cur.parentId);
+      }
+      return false;
+    };
+
     // R8.15 — shorten the first connector by bringing the first element to it.
     for (const s of elements) {
       if (s.type !== "start-event" || s.boundaryHostId) continue;
@@ -3756,9 +3766,48 @@ export function layoutBpmnDiagram(
         const ids = [...collectSubtreeIds(parent.id)].filter((id) => id !== s.id);
         shiftX(ids, -dx);
       } else {
-        // main pool: move just the first element (+ its own contents and any
-        // associated data objects/stores) left
-        shiftX(movableWith(t.id), -dx);
+        // Main pool: move the first element AND everything downstream of it,
+        // the way the EP branch already moves its whole inner flow.
+        //
+        // Moving the first element ALONE closes the gap after the Start and
+        // opens an identical one at the very next link — V06.06 came back with
+        // 1,524px of nothing between "Review Solution Design Scope" and
+        // "Retrieve Design Specifications", and the Start-to-first gap sitting
+        // at exactly MAX_CONN, which is this rule's fingerprint. The hole was
+        // not removed, it was relocated one link along.
+        const moved = new Set<string>();
+        {
+          const stack = [t.id];
+          while (stack.length) {
+            const id = stack.pop()!;
+            if (moved.has(id)) continue;
+            for (const m of movableWith(id)) moved.add(m);
+            // Boundary events ride their host — they hang off boundaryHostId,
+            // not parentId, so a subtree walk alone leaves them behind.
+            for (const be of elements) if (be.boundaryHostId === id) moved.add(be.id);
+            for (const c of connectors) {
+              if (c.type === "sequence" && c.sourceId === id && !moved.has(c.targetId)) stack.push(c.targetId);
+            }
+          }
+        }
+        moved.delete(s.id); // the Start is the anchor, it never moves here
+        // Clamp the slide so nothing that is moving runs into something that is
+        // not. The Start itself is one such obstacle, and on a clean flow it is
+        // the binding one — which reproduces the old distance exactly.
+        let limit = dx;
+        for (const id of moved) {
+          const m = byIdSE.get(id);
+          if (!m) continue;
+          for (const o of elements) {
+            if (moved.has(o.id) || o.id === m.id) continue;
+            if (o.type === "pool" || o.type === "lane" || o.type === "sublane") continue;
+            if (isAncestorOf(o.id, m.id)) continue;      // its own container
+            if (o.x + o.width > m.x) continue;            // not to its left
+            if (!(m.y < o.y + o.height && o.y < m.y + m.height)) continue; // different row
+            limit = Math.min(limit, m.x - (o.x + o.width) - MAX_CONN);
+          }
+        }
+        if (limit > 0) shiftX(moved, -limit);
       }
     }
 
