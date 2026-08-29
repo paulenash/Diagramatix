@@ -886,25 +886,41 @@ export function layoutBpmnDiagram(
    * placed, and everything downstream of it in the flow goes with it.
    */
   const containmentCycles = (field: "parentSubprocess" | "boundaryHost") => {
+    const clear = (e: AiElement, detail: string) => {
+      diagnose({ kind: "unresolved-reference", elementId: e.id, label: e.label ?? "", field, detail });
+      (e as unknown as Record<string, unknown>)[field] = undefined;
+    };
+
+    // FIRST, and separately: a direct self-reference. Blame is unambiguous here,
+    // and clearing it first is what keeps the element's real children intact.
+    // V06.08 shipped `sp1` naming `sp1`; walking up from each of its seven
+    // children also reaches that loop, so a single combined pass blamed the
+    // CHILDREN and emptied the subprocess it was trying to save.
     for (const e of aiElements) {
-      const seen = new Set<string>([e.id]);
+      if (e[field] && String(e[field]) === e.id) {
+        clear(e, `"${e.id}" is the element itself — cleared, or nothing would have placed it`);
+      }
+    }
+
+    // Then longer cycles. The element that CLOSES the loop is the one to clear:
+    // every other element on the path has a defensible parent.
+    for (const e of aiElements) {
+      const path: AiElement[] = [];
+      const onPath = new Set<string>();
       let cur: AiElement | undefined = e;
-      for (let d = 0; d < 32; d++) {
-        const ref = cur?.[field];
-        if (!ref) break;
-        if (seen.has(String(ref))) {
-          diagnose({
-            kind: "unresolved-reference", elementId: e.id, label: e.label ?? "", field,
-            detail: String(ref) === e.id
-              ? `"${ref}" is the element itself — cleared, or nothing would have placed it`
-              : `"${ref}" closes a containment cycle — cleared, or nothing would have placed it`,
-          });
-          (e as unknown as Record<string, unknown>)[field] = undefined;
+      for (let d = 0; d < 64 && cur; d++) {
+        if (onPath.has(cur.id)) {
+          const closer = path[path.length - 1];
+          if (closer?.[field]) {
+            clear(closer, `"${closer[field]}" closes a containment cycle — cleared, or nothing would have placed it`);
+          }
           break;
         }
-        seen.add(String(ref));
+        onPath.add(cur.id);
+        path.push(cur);
+        const ref = cur[field];
+        if (!ref) break;
         cur = byAiId.get(String(ref));
-        if (!cur) break;
       }
     }
   };
@@ -1030,6 +1046,167 @@ export function layoutBpmnDiagram(
           detail: `${childless.length} empty subprocess(es) and ${orphans.length} floating chain(s) — cannot pair them safely, leaving both as they are`,
         });
       }
+    }
+  }
+
+  // ── Re-parent boundary-crossing gateways out of expanded subprocesses ──
+  // A parallel / inclusive SPLIT or JOIN that forks to — or merges from — an
+  // expanded subprocess as ONE OF ITS BRANCHES must sit at the EP's own level
+  // (same lane), never inside it. The AI plan sometimes marks such a gateway
+  // with parentSubprocess = the EP; if the gateway connects to the EP itself
+  // or to any element outside that EP, it is boundary-crossing — strip the
+  // parentSubprocess so it lays out as a SIBLING of the EP (inheriting the
+  // EP's lane / pool, or the EP's own parent EP when nested). Genuine in-EP
+  // gateways connect only to in-EP elements and are left untouched. Without
+  // this the EP wrongly grows to swallow the outer join (user report).
+  {
+    const insideEp = new Map<string, string>(); // elId -> the EP id it's declared inside
+    for (const ai of aiElements) if (ai.parentSubprocess) insideEp.set(ai.id, ai.parentSubprocess);
+    const epById = new Map(aiElements.filter(a => a.type === "subprocess-expanded").map(a => [a.id, a]));
+    for (const ai of aiElements) {
+      if (ai.type !== "gateway" || !ai.parentSubprocess) continue;
+      const spId = ai.parentSubprocess;
+      const crosses = aiConnections.some((c) => {
+        if (c.sourceId !== ai.id && c.targetId !== ai.id) return false;
+        const other = c.sourceId === ai.id ? c.targetId : c.sourceId;
+        if (other === spId) return true;            // connects to the EP itself → EP is a branch
+        return insideEp.get(other) !== spId;        // endpoint is outside this EP
+      });
+      if (crosses) {
+        const ep = epById.get(spId);
+        if (ep?.parentSubprocess) {
+          ai.parentSubprocess = ep.parentSubprocess; // nested: hop up to the EP's own parent EP
+        } else {
+          ai.parentSubprocess = undefined;
+          if (ep) { ai.lane = ep.lane; ai.pool = ep.pool; }
+        }
+      }
+    }
+  }
+
+  /** Data artifacts are inert: they never carry flow and may sit outside their EP. */
+  const DATA_ARTIFACTS = new Set(["data-object", "data-store", "text-annotation"]);
+
+  // ── A subprocess contains what its internal Start Event reaches ──
+  //
+  // V06.08 put "Finalise commercial model and document assumptions" and "Record
+  // finalised commercial model in CRM" inside "Repeat Until Pricing Model
+  // Validated". They are post-loop steps: the viability gateway, which sits at
+  // the subprocess's own level, branches to them. The subprocess's real contents
+  // are the chain «start» → Analyse → Revise → Update → Review → «end».
+  //
+  // Declared containment and declared flow contradicted each other, and the flow
+  // is the more reliable of the two — it is what the prompt describes and what
+  // every downstream reader (simulation, the link scan, the exporter) uses. So a
+  // declared child that the internal Start Event cannot REACH is not part of the
+  // subprocess: evict it to the subprocess's own level, where the flow already
+  // says it belongs. Without an internal start there is nothing to reach from,
+  // and the rule stays out of it.
+  {
+    const kidsOf = new Map<string, AiElement[]>();
+    for (const e of aiElements) {
+      if (!e.parentSubprocess || e.boundaryHost) continue;
+      const a = kidsOf.get(String(e.parentSubprocess));
+      if (a) a.push(e); else kidsOf.set(String(e.parentSubprocess), [e]);
+    }
+    for (const [spId, kids] of kidsOf) {
+      const sp = byAiId.get(spId);
+      if (!sp || sp.type !== "subprocess-expanded") continue;
+      const ids = new Set(kids.map((k) => k.id));
+      const starts = kids.filter((k) => k.type === "start-event"
+        && !aiConnections.some((c) => c.targetId === k.id && ids.has(c.sourceId)));
+      if (starts.length !== 1) continue;   // no single entry point — nothing to reach from
+
+      const reached = new Set<string>([starts[0].id]);
+      const stack = [starts[0].id];
+      while (stack.length) {
+        const id = stack.pop()!;
+        for (const c of aiConnections) {
+          if (c.type === "message" || c.sourceId !== id) continue;
+          if (!ids.has(c.targetId) || reached.has(c.targetId)) continue;
+          const t = byAiId.get(c.targetId);
+          if (!t || DATA_ARTIFACTS.has(t.type)) continue;
+          reached.add(c.targetId); stack.push(c.targetId);
+        }
+      }
+      for (const k of kids) {
+        if (reached.has(k.id) || DATA_ARTIFACTS.has(k.type)) continue;
+        // Only flow steps are evicted. A nested subprocess that nothing reaches
+        // is more likely an authoring gap than a containment error, and moving
+        // one takes its own contents with it — too big a move for the evidence.
+        if (k.type === "subprocess-expanded" || k.type === "subprocess") continue;
+        k.parentSubprocess = sp.parentSubprocess;   // up one level (usually the lane)
+        if (!sp.parentSubprocess) { k.lane = sp.lane; k.pool = sp.pool; }
+        diagnose({
+          kind: "recovered-reference", elementId: k.id, label: k.label ?? "", field: "parentSubprocess",
+          detail: `declared inside "${sp.label ?? spId}" but its Start Event cannot reach it — moved out to the subprocess's own level, where the flow puts it`,
+        });
+      }
+    }
+  }
+
+  // ── A sequence flow may not cross an expanded subprocess boundary ──
+  //
+  // The pass above lifts a boundary-crossing GATEWAY out of the EP it was wrongly
+  // put inside. The opposite case is a flow drawn from outside straight INTO an
+  // EP's insides: V06.08 came back with "Commercial model viable?" — a gateway at
+  // the EP's own level — looping back to "Finalise commercial model and document
+  // assumptions", an activity inside it (Paul, 2026-08-29).
+  //
+  // BPMN forbids it, and `canConnect` refuses to draw it in the editor, so a
+  // generated diagram must not carry one either. The repair is the standard one:
+  // move the inner endpoint OUT to the subprocess itself, which is what the flow
+  // means — re-enter the loop, not jump into the middle of it. Only the endpoint
+  // that is inside moves; a flow already touching the EP is already legal.
+  {
+    const epIds = new Set(aiElements.filter((a) => a.type === "subprocess-expanded").map((a) => a.id));
+    /** Ancestor EPs of `id`, innermost first. */
+    const ancestors = (id: string): string[] => {
+      const out: string[] = [];
+      let cur = byAiId.get(id);
+      for (let d = 0; d < 16 && cur?.parentSubprocess; d++) {
+        const p = String(cur.parentSubprocess);
+        if (!epIds.has(p)) break;
+        out.push(p);
+        cur = byAiId.get(p);
+      }
+      return out;
+    };
+    const seen = new Set<string>();
+    for (const c of aiConnections) {
+      if (c.type === "message") continue;
+      const src = byAiId.get(c.sourceId), tgt = byAiId.get(c.targetId);
+      if (!src || !tgt) continue;
+      // A boundary event lives ON the rim: its flows legitimately leave the EP.
+      if (src.boundaryHost || tgt.boundaryHost) continue;
+      // An ASSOCIATION to a data artifact crosses the boundary quite legally —
+      // R8.02 deliberately moves a data object OUTSIDE the EP it belongs to, so
+      // re-pointing these would drag every in-subprocess task's data link onto
+      // the subprocess itself.
+      if (DATA_ARTIFACTS.has(src.type) || DATA_ARTIFACTS.has(tgt.type)) continue;
+
+      for (const end of ["sourceId", "targetId"] as const) {
+        const meId = c[end], otherId = end === "sourceId" ? c.targetId : c.sourceId;
+        const mine = ancestors(meId);
+        if (mine.length === 0) continue;
+        const theirs = new Set([otherId, ...ancestors(otherId)]);
+        // The outermost EP that contains me but not them — the boundary crossed.
+        const lift = [...mine].reverse().find((ep) => !theirs.has(ep));
+        if (!lift) continue;
+        (c as unknown as Record<string, string>)[end] = lift;
+        diagnose({
+          kind: "recovered-reference", elementId: meId, label: byAiId.get(meId)?.label ?? "",
+          field: end === "sourceId" ? "boundaryHost" : "parentSubprocess",
+          detail: `a sequence flow crossed the boundary of "${byAiId.get(lift)?.label ?? lift}" — moved that end onto the subprocess itself`,
+        });
+      }
+      // Re-pointing can collapse two flows onto the same pair.
+      const key = `${c.sourceId}->${c.targetId}`;
+      if (c.sourceId === c.targetId || seen.has(key)) c.type = "__dropped";
+      else seen.add(key);
+    }
+    for (let i = aiConnections.length - 1; i >= 0; i--) {
+      if ((aiConnections[i] as { type?: string }).type === "__dropped") aiConnections.splice(i, 1);
     }
   }
 
@@ -1517,41 +1694,6 @@ export function layoutBpmnDiagram(
   }
 
   phase(`pool/lane placement done (${elements.length} elements placed)`);
-
-  // ── Re-parent boundary-crossing gateways out of expanded subprocesses ──
-  // A parallel / inclusive SPLIT or JOIN that forks to — or merges from — an
-  // expanded subprocess as ONE OF ITS BRANCHES must sit at the EP's own level
-  // (same lane), never inside it. The AI plan sometimes marks such a gateway
-  // with parentSubprocess = the EP; if the gateway connects to the EP itself
-  // or to any element outside that EP, it is boundary-crossing — strip the
-  // parentSubprocess so it lays out as a SIBLING of the EP (inheriting the
-  // EP's lane / pool, or the EP's own parent EP when nested). Genuine in-EP
-  // gateways connect only to in-EP elements and are left untouched. Without
-  // this the EP wrongly grows to swallow the outer join (user report).
-  {
-    const insideEp = new Map<string, string>(); // elId -> the EP id it's declared inside
-    for (const ai of aiElements) if (ai.parentSubprocess) insideEp.set(ai.id, ai.parentSubprocess);
-    const epById = new Map(aiElements.filter(a => a.type === "subprocess-expanded").map(a => [a.id, a]));
-    for (const ai of aiElements) {
-      if (ai.type !== "gateway" || !ai.parentSubprocess) continue;
-      const spId = ai.parentSubprocess;
-      const crosses = aiConnections.some((c) => {
-        if (c.sourceId !== ai.id && c.targetId !== ai.id) return false;
-        const other = c.sourceId === ai.id ? c.targetId : c.sourceId;
-        if (other === spId) return true;            // connects to the EP itself → EP is a branch
-        return insideEp.get(other) !== spId;        // endpoint is outside this EP
-      });
-      if (crosses) {
-        const ep = epById.get(spId);
-        if (ep?.parentSubprocess) {
-          ai.parentSubprocess = ep.parentSubprocess; // nested: hop up to the EP's own parent EP
-        } else {
-          ai.parentSubprocess = undefined;
-          if (ep) { ai.lane = ep.lane; ai.pool = ep.pool; }
-        }
-      }
-    }
-  }
 
   // ── Handle children of expanded subprocesses and edge-mounted boundary events ──
   // Find all expanded subprocesses that have declared children

@@ -94,3 +94,54 @@ describe("containment cycles in the AI plan", () => {
     expect(out.elements.find((x) => x.id === "k2")!.parentId).toBe("ep2");
   });
 });
+
+/**
+ * V06.08, second regeneration (2026-08-29). The guard above confirmed the cause —
+ * `"sp1" is the element itself` — but blamed the wrong elements: walking up from
+ * each of sp1's seven children also reaches sp1's self-loop, so a single combined
+ * pass cleared the CHILDREN's parentSubprocess and emptied the subprocess it was
+ * meant to save. A self-reference must be cleared on its own, first.
+ */
+describe("a self-reference is cleared without disowning the real children", () => {
+  it("T2929 — the subprocess keeps its children when it names itself as parent", () => {
+    const els: AiElement[] = [
+      { id: "p1", type: "pool", label: "Product Organisation", poolType: "white-box" },
+      { id: "lFin", type: "lane", label: "Finance", parentPool: "p1" },
+      { id: "s", type: "start-event", label: "Inputs received", pool: "p1", lane: "lFin" },
+      // The defect, exactly as shipped: sp1 names sp1.
+      { id: "sp1", type: "subprocess-expanded", label: "Repeat Until Pricing Model Validated",
+        pool: "p1", lane: "lFin", parentSubprocess: "sp1" },
+      { id: "g", type: "gateway", label: "Commercial model viable?", gatewayType: "exclusive", pool: "p1", lane: "lFin" },
+      { id: "e", type: "end-event", label: "Validated", pool: "p1", lane: "lFin" },
+    ];
+    const conns: AiConnection[] = [
+      { sourceId: "s", targetId: "sp1" }, { sourceId: "sp1", targetId: "g" }, { sourceId: "g", targetId: "e" },
+    ];
+    // Seven children, all correctly naming sp1 — these must survive.
+    let prev = "";
+    for (const [i, name] of ["", "Retrieve customer and prospect data from CRM", "Develop pricing scenarios and model variants",
+      "Send commercial model to Investor", "Incorporate investor feedback into model",
+      "Send pricing and terms to Customer", ""].entries()) {
+      const id = `k${i}`;
+      const type = i === 0 ? "start-event" : i === 6 ? "end-event" : "task";
+      els.push({ id, type, label: name, parentSubprocess: "sp1" });
+      if (prev) conns.push({ sourceId: prev, targetId: id });
+      prev = id;
+    }
+
+    const { out, diagnostics } = run(els, conns);
+
+    // Exactly ONE thing was wrong, and exactly one thing is reported.
+    const cleared = diagnostics.filter((d) => d.field === "parentSubprocess");
+    expect(cleared, JSON.stringify(cleared.map((d) => `${d.label}: ${d.detail}`), null, 2)).toHaveLength(1);
+    expect(cleared[0].elementId).toBe("sp1");
+    expect(cleared[0].detail).toContain("the element itself");
+
+    // The subprocess is a real box in the lane, holding all seven children.
+    const sp = out.elements.find((x) => x.id === "sp1")!;
+    expect(sp.parentId).toBe("lFin");
+    expect(out.elements.filter((k) => k.parentId === "sp1")).toHaveLength(7);
+    expect(diagnostics.filter((d) => d.kind === "unplaced")).toHaveLength(0);
+    expect(diagnostics.filter((d) => d.kind === "empty-subprocess")).toHaveLength(0);
+  });
+});
