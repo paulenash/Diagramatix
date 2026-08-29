@@ -541,8 +541,6 @@ Data Object "Order Acknowledgement" — written by "Send order
   acknowledgement to Customer".
 Data Object "Supporting Documents" — written by "Attach supporting
   documents to order"; read by "Create order record in OMS".
-Data Store "Order Management System (OMS)" — written by "Create
-  order record in OMS"; read by "Assign order reference number".
 
 V01.01 Receive Order captures every inbound purchase request regardless
 of channel, ensures all required order details are collected from the
@@ -689,10 +687,6 @@ Data Object "Validated Order" — written by Service task "Record
   acceptance and assign order reference"
 Data Object "Order Confirmation" — written by Send task "Send
   order confirmation to customer"
-Data Store "Customer Master Data System (CRM/ERP)" — read and
-  written by Service task "Retrieve customer master record",
-  Service task "Record validated order in CRM/ERP", and User
-  task "Create new customer master record"
 
 V01.02 validates that the customer exists in the master data
 system, that all order lines, quantities, addresses, and pricing
@@ -827,9 +821,6 @@ Data Object "Customer Credit Status Report" — written by "Retrieve customer
   payment history".
 Data Object "Credit Resolution Documents" — read by "Assess customer response
   and supporting documents".
-Data Store "ERP / Credit System Master" — read by "Retrieve customer credit
-  status from ERP / Credit System"; written by "Record credit approval and
-  pricing confirmation in ERP".
 
 V01.03 Check Credit & Pricing takes the validated order from V01.02, applies
 the organisation's pricing rules, discounts, and tax treatment to produce a
@@ -956,7 +947,6 @@ System (WMS); read by Order Processing lane after intermediate message catch
 event.
 Data Object "Sourcing or Backorder Record" — written by "Assess sourcing
 or backorder options"; read by "Update expected availability date".
-Data Store "Inventory Reservation Register" — written by "Reserve inventory
 in WMS"; read by V01.05 Fulfil Goods or Services.
 Data Object "Order Confirmation Notice" — written by "Send order confirmation
 and availability update to Customer".
@@ -1079,9 +1069,6 @@ Data Object "Quality Inspection Record" — written by "Inspect
 Data Object "Defect / Exception Log" — written by "Quarantine
   defective items and log defect", written by "Raise fulfilment
   exception and notify fulfilment coordinator".
-Data Store "WMS Inventory Ledger" — updated by "Update pick status
-  in WMS", updated by "Record packed order in WMS", updated by
-  "Record quality clearance in WMS".
 
 V01.05 Fulfil Goods or Services covers all internal activity from the
 receipt of a confirmed availability signal through picking, packing,
@@ -1235,9 +1222,6 @@ Data Object "Shipment Notification" — written by send task "Send
 Data Object "Proof of Delivery" — written by service task "Record
   delivery confirmation in TMS"; read by send task "Send delivery
   confirmation to Customer".
-Data Store "Transport Management System Record Store" — written by
-  service task "Create shipment record in TMS"; updated by service
-  task "Record delivery confirmation in TMS".
 
 This subprocess takes fulfilled goods from the warehouse and manages
 their handover to the Freight Carrier, in-transit tracking, and final
@@ -1399,8 +1383,6 @@ Data Object "Final Invoice" — written by Service task "Generate and post
 Data Object "Finance Approval Record" — written by User task "Review
   invoice for compliance and accuracy"; read by Send task "Confirm approval
   to Billing".
-Data Store "Accounts Receivable Ledger" — written by Service task
-  "Confirm receivable posted in Billing / ERP System".
 
 V01.07 Issue Invoice takes the delivery confirmation from V01.06 and
 produces a tax-compliant, finance-approved invoice that is transmitted to
@@ -1516,9 +1498,6 @@ Data Object "Payment Confirmation" — written by "Retrieve payment confirmation
   invoice".
 Data Object "Partial Payment Record" — written by "Record partial payment and
   flag outstanding balance" / read by "Update accounts receivable ledger".
-Data Store "Accounts Receivable Ledger" — written by "Update accounts
-  receivable ledger" / read by "Post payment to general ledger".
-Data Store "General Ledger" — written by "Post payment to general ledger".
 Data Object "Payment Receipt" — written by "Issue payment receipt confirmation
   to customer".
 
@@ -1657,9 +1636,6 @@ Data Object "Matched Payment Register" — written by User task "Match
 Data Object "Reconciliation Approval Record" — written by User task
   "Review and approve payment reconciliation"; read by Service task
   "Post settled payments to General Ledger".
-Data Store "General Ledger" — written by Service task "Post settled
-  payments to General Ledger"; read by User task "Confirm period
-  reconciliation is complete".
 
 V01.09 Reconcile Payment matches every incoming payment transaction
 from the bank statement against open receivable items, resolves or
@@ -1818,12 +1794,6 @@ Data Object "Rejection Notice" — written by User task "Draft rejection notice
 Data Object "Resolution Recommendation" — written by User task "Submit
   resolution recommendation to Finance for approval"; read by User task
   "Review and approve resolution recommendation".
-Data Store "General Ledger" — written by User task "Post financial adjustment
-  or write-off to general ledger".
-Data Store "Case Register" — written by Service task "Create case record in
-  Case / Ticketing System"; read by User task "Investigate dispute and verify
-  against order and invoice records"; written by Service task "Update case
-  status in Case / Ticketing System".
 
 V01.10 Manage Disputes & Deductions receives dispute or deduction requests
 raised by the customer following invoicing or payment, logs and categorises
@@ -1968,10 +1938,8 @@ Data Object "Outstanding Obligations Record" — read by / written by
 Data Object "Order Closure Notification" — written by "Send order
 closure notification to Finance"; read by "Verify final revenue
 recognition and tax postings".
-Data Store "Sales Order Record (OMS)" — written by "Mark sales order
 as closed in OMS"; read by "Confirm closure and archive order
 documentation".
-Data Store "General Ledger (ERP)" — written by "Post final entries to
 General Ledger"; read by "Verify final revenue recognition and tax
 postings".
 Data Object "Archived Order Documentation" — written by "Archive
@@ -2448,9 +2416,6 @@ Data Object "Catalogue and Supplier Data" — written by ERP /
 Data Object "Need Classification Record" — written by "Classify
   need by category and spending threshold"; read by "Check budget
   availability in ERP / Catalogue System".
-Data Store "ERP / Catalogue System Master Data" — read by
-  "Check catalogue for existing items or contracts"; written by
-  "Log need in ERP / Catalogue System".
 
 V02.01 Identify Need takes an unstructured internal purchase
 impulse and turns it into a validated, classified, and
@@ -2592,7 +2557,6 @@ documents"; read by "Review requisition for policy compliance".
 Data Object "Validated Requisition" — written by "Record validated
 requisition in Purchase Requisition System"; read by "Confirm
 requisition ready for approval".
-Data Store "Purchase Requisition System Record" — written by "Submit
 requisition to Purchase Requisition System"; read by "Record
 validated requisition in Purchase Requisition System".
 
@@ -2752,9 +2716,6 @@ Data Object "Budget Check Result" — written by "Check budget
 Data Object "Approval Decision Record" — written by "Record rejection
   reason"; written by "Record finance rejection reason"; written by
   "Record approved purchase decision in ERP / Budgeting System".
-Data Store "ERP / Budgeting System Budget Ledger" — written by
-  "Record approved purchase decision in ERP / Budgeting System";
-  read by "Check budget availability in ERP / Budgeting System".
 
 V02.03 Approve Purchase takes the approved requisition produced in
 V02.02, verifies budget availability in the ERP / Budgeting System,
@@ -2907,13 +2868,6 @@ Data Object "Purchase Order (Approved)" — written by Send task
   approved PO in ERP Procurement System / Supplier Portal".
 Data Object "Supplier Acknowledgement" — written by User task
   "Record supplier acknowledgement on PO".
-Data Store "ERP Procurement System / Supplier Portal — PO
-  Register" — written by Service task "Record approved PO in ERP
-  Procurement System / Supplier Portal"; written by Service task
-  "Update PO status to Issued in ERP Procurement System / Supplier
-  Portal"; read by Service task "Retrieve contract pricing and
-  approved supplier details from ERP Procurement System / Supplier
-  Portal".
 
 V02.04 Issue Purchase Order takes an approved purchase request and
 converts it into a formally documented, contracted, and transmitted
@@ -3045,9 +2999,6 @@ Data Object "Packing Slip / Delivery Note" — read by "Check delivery
   against purchase order and packing slip".
 Data Object "Delivery Discrepancy Record" — written by "Record delivery
   discrepancy"; read by "Contact Supplier to resolve discrepancy".
-Data Store "Goods Receipt Note (GRN)" — written by "Post Goods Receipt
-  Note (GRN) in Inventory / Warehouse System"; read by "Confirm acceptance
-  of goods or services".
 Data Object "Acceptance Confirmation" — written by "Confirm acceptance
   of goods or services".
 
@@ -3213,9 +3164,6 @@ Data Object "Discrepancy Notice" — written by "Classify discrepancy
   internal team".
 Data Object "Supplier Response / Credit Note" — read by "Evaluate
   Supplier response or credit note".
-Data Store "Accounts Payable / Invoice System ledger" — written by
-  "Record matched invoice in Accounts Payable / Invoice System"; read by
-  "Retrieve open PO and GR record from system".
 
 V02.06 Match PO / GR / Invoice performs a three-way comparison of the
 approved purchase order, the goods receipt or service confirmation
@@ -3384,10 +3332,6 @@ Data Object "Budget Holder Rejection Reason" — written by "Record
 Data Object "Finance Clarification Request" — written by "Request
   clarification from Accounts Payable or supplier"; read by
   "Clarification received".
-Data Store "Accounts Payable / Invoice System" — written by "Record
-  budget holder approval in Accounts Payable / Invoice System" and
-  "Record final finance approval in Accounts Payable / Invoice
-  System"; read by both finance and budget holder review tasks.
 
 V02.07 Approve Invoice takes the three-way matched invoice package
 produced by V02.06 and subjects it to a two-stage internal approval:
@@ -3538,9 +3482,7 @@ Data Object "Payment Confirmation" — read by User task "Reconcile
 payment confirmation against payment run".
 Data Object "Remittance Advice" — written by Send task "Send remittance
 advice to supplier".
-Data Store "Supplier Master Data" — read by Service task "Validate
 payment details against supplier master".
-Data Store "ERP / General Ledger System" — written by Service task
 "Post payment accounting entries to ERP / General Ledger".
 
 V02.08 Pay Supplier takes the approved invoice from V02.07 and executes
@@ -3901,9 +3843,7 @@ Data Object "Transaction Archive Package" — written by "Archive procurement
 transaction documents".
 Data Object "Lessons Learned Record" — written by "Record lessons learned
 and update supplier performance data".
-Data Store "Supplier Master Data" — written by "Update supplier master data
 in ERP Procurement System / Supplier Portal".
-Data Store "General Ledger" — written by "Post final accounting entries to
 ERP / General Ledger System".
 
 V02.10 closes the Procure to Pay cycle by confirming that all goods and
@@ -4412,10 +4352,8 @@ controller".
 Data Object "Sub-Ledger to General Ledger Interface Report" — written by
 "Stage validated batch for general ledger interface", read by "Review
 sub-ledger to general ledger interface report".
-Data Store "Sub-Ledger Transaction Register" — written by "Stage validated
 batch for general ledger interface", read by "Confirm capture completeness
 for the cycle".
-Data Store "Fixed Asset Register" — read by "Classify transactions to
 sub-ledger and posting category".
 
 This subprocess turns raw operational activity from the sales,
@@ -4575,10 +4513,8 @@ and posting audit trail in ERP / General Ledger System", read by "Review
 posting exception listing and unposted items".
 Data Object "Chart of Accounts Change Request" — written by "Raise chart of
 accounts change request".
-Data Store "General Ledger" — written by "Post journal to general ledger in
 ERP / General Ledger System", read by "Retrieve trial balance and open period
 status from ERP / General Ledger System".
-Data Store "Journal Audit Trail" — written by "Refresh trial balance and
 posting audit trail in ERP / General Ledger System".
 
 Post Journals converts validated transactions and manual adjustments into
@@ -4711,10 +4647,8 @@ policy and financial delegation policy".
 Data Object "Account Definition Draft" — written by "Draft new account
 definition and posting rules" and "Draft amendment to account attributes", read
 by "Apply account change in ERP / General Ledger System".
-Data Store "Chart of Accounts Master" — read by "Retrieve current chart of
 accounts structure from ERP / General Ledger System", written by "Update account
 hierarchies and reporting mappings in ERP / General Ledger System".
-Data Store "Chart of Accounts Change Log" — written by "Record change in chart
 of accounts change log", read by "Record rejection rationale".
 Data Object "Published Chart of Accounts" — written by "Publish updated chart of
 accounts to finance teams".
@@ -4845,9 +4779,7 @@ Message flows:
   pack).
 
 7. Data objects
-Data Store "General Ledger Balances" — read by "Extract ledger and
 sub-ledger balances into Reconciliation System".
-Data Store "Sub-Ledger Balances" — read by "Extract ledger and
 sub-ledger balances into Reconciliation System".
 Data Object "Bank Statement" — read by "Load statements and supporting
 schedules into Reconciliation System".
@@ -4860,7 +4792,6 @@ request for V03.02".
 Data Object "Reconciliation Statement" — written by "Prepare
 reconciliation statement and break schedule", read by "Review and sign
 off reconciliation".
-Data Store "Reconciliation Register" — written by "Record completed
 reconciliation in Reconciliation System" and by "Publish signed
 reconciliation pack to Reconciliation System".
 
@@ -5008,10 +4939,8 @@ and provision journals to ERP / General Ledger System".
 Data Object "Controller Approval Record" — written by "Submit high-value
 provision for finance controller approval", read by "Prepare accrual and
 provision journal entries for posting".
-Data Store "Provisions Register" — written by "Update provisions register
 with movement, utilisation and release", read by "Identify candidate
 accruals, prepayments and provisions against accruals policy".
-Data Store "General Ledger" — written by "Post accrual and provision
 journals to ERP / General Ledger System", read by "Reconcile posted
 accruals to accruals schedule".
 
@@ -5137,10 +5066,8 @@ Data Object "Correcting Journal" — written by "Post correcting adjustment in
 the period".
 Data Object "Period-Close Certificate" — written by "Publish period-close
 certificate and archive close evidence".
-Data Store "General Ledger" — read by "Run sub-ledger to general ledger
 interface check", written by "Lock accounting period in Financial Close
 System".
-Data Store "Close Evidence Archive" — written by "Attach supporting schedule
 and sign-off evidence" and "Publish period-close certificate and archive close
 evidence".
 
@@ -5275,10 +5202,8 @@ in Consolidation System".
 Data Object "Consolidation Pack" — written by "Prepare consolidation pack and
 movement analysis", read by "Review consolidated trial balance and elimination
 entries".
-Data Store "Consolidated Ledger" — written by "Lock consolidation cycle in
 Consolidation System", read by "Generate consolidated trial balance from
 Consolidation System".
-Data Store "Group Chart of Accounts Mapping" — read by "Check entity submission
 completeness and mapping".
 
 This subprocess takes the closed ledgers of each entity, aligns them to the
@@ -5411,11 +5336,8 @@ required changes", read by "Assemble management reporting pack in
 Reporting / BI Platform".
 Data Object "Board Response Note" — written by "Prepare responses to Board
 questions", read by "Send responses to Board Members".
-Data Store "Consolidated Ledger Figures" — read by "Extract actuals by
 entity, cost centre and account".
-Data Store "Budget and Forecast Data" — read by "Compare actuals to budget
 and forecast".
-Data Store "Reporting Pack Archive" — written by "Archive pack and file
 reporting cycle record".
 
 This subprocess converts the consolidated group figures into an explained,
@@ -5559,7 +5481,6 @@ Message flows:
   statements).
 
 7. Data objects
-Data Store "Consolidated Ledger Balances" — read by "Retrieve consolidated
 trial balance and consolidation entries".
 Data Object "Draft Statutory Report Pack" — written by "Compile draft
 statutory report pack", read by "Review statements against accounting policy
@@ -5576,7 +5497,6 @@ Disclosure Management System".
 Data Object "Regulatory Filing Package" — written by "Generate final filing
 package in Disclosure Management System", read by "File statutory financial
 statements with Regulator".
-Data Store "Statutory Reporting Archive" — written by "Archive signed
 statements and supporting schedules".
 
 This subprocess converts the consolidated group position into statutory
@@ -5705,10 +5625,8 @@ Data Object "Supporting Schedules" — read by "Attach supporting schedules to
 the return".
 Data Object "Authority Query Response" — written by "Prepare response to
 authority query".
-Data Store "Filing Register" — written by "Record filing confirmations and
 payment position in Tax System" and "Log regulatory filing outcome in Tax
 System".
-Data Store "Filing Calendar" — read by "Determine returns due in the filing
 calendar".
 
 This subprocess turns the approved statutory position into the tax and
@@ -5875,13 +5793,10 @@ Auditor".
 Data Object "Management representation letter" — written by "Prepare and
 sign management representation letter", read by "Issue management
 representation letter to External Auditor".
-Data Store "Audit evidence log" — written by "Update evidence log in Audit
 Management System", read by "Escalate outstanding requests to Finance
 Controller".
-Data Store "Audit findings and actions register" — written by "Raise
 adjustment and action items in Audit Management System", read by "Record
 clean outcome on findings log".
-Data Store "Audit file archive" — written by "Archive audit file in
 Document Management System".
 
 This subprocess gives external audit a single controlled channel into the
@@ -6405,9 +6320,6 @@ Data Object "Budget Approval Record" — written by "Record budget
 Data Object "Rejection or Deferral Rationale" — written by "Document
   budget rejection or deferral rationale"; read by "Advise Hiring
   Manager of outcome and document rationale".
-Data Store "HRIS / HCM System — Workforce Data" — read by "Retrieve
-  current workforce data from HRIS / HCM System"; written by "Record
-  approved headcount in HRIS / HCM System".
 
 V04.01 Workforce Planning establishes the authorised headcount that
 drives all subsequent hiring activity. People managers surface
@@ -6542,7 +6454,6 @@ advertisement per feedback".
 Data Object "Vacancy Parameters" — written by User task "Set vacancy
 parameters (salary band, location, close date)"; read by Service task
 "Create vacancy record in ATS".
-Data Store "Applicant Tracking System Vacancy Register" — written by
 Service task "Create vacancy record in ATS".
 
 V04.02 Create Vacancy transforms an approved headcount need into a fully
@@ -6856,11 +6767,6 @@ Data Object "Reference Response" — read by User task "Review reference and
   record outcome".
 Data Object "Candidate Rejection Rationale" — written by User task "Prepare
   candidate rejection rationale".
-Data Store "Applicant Tracking System Record" — written by Service task
-  "Record assessment plan in ATS"; written by Service task "Update interview
-  schedule in ATS"; written by Service task "Record candidate outcome as
-  progressed in ATS"; written by Service task "Record candidate outcome as
-  unsuccessful in ATS".
 
 V04.04 Assess and Interview Candidates takes shortlisted applicants from the
 Attract Candidates subprocess and subjects them to a structured sequence of
@@ -7018,9 +6924,6 @@ Data Object "Employment Contract" — written by "Draft employment contract";
   to candidate".
 Data Object "Candidate Response" — written by Applicant / Candidate;
   read by "Offer accepted?" gateway.
-Data Store "HRIS / HCM System" — written by "Create employee master record
-  in HRIS / HCM System"; read by "Record accepted offer and close
-  requisition".
 
 Make Offer takes a confirmed preferred candidate through background
 screening, remuneration approval, legal review, and contract execution,
@@ -7190,7 +7093,6 @@ in benefits schemes".
 Data Object "Tax and Banking Details" — written by "Capture tax
 file details and banking information"; read by "Set up employee
 payroll record in HRIS / HCM System".
-Data Store "HRIS / HCM Employee Master Record" — written by
 "Create employee master record in HRIS / HCM System"; written by
 "Set up employee payroll record in HRIS / HCM System"; written by
 "File executed contract in HRIS / HCM System".
@@ -7342,7 +7244,6 @@ user account and access profile".
 Data Object "Access Request" — written by Service task "Create
 user account and access profile"; read by Send task "Submit
 access request to IAM System".
-Data Store "IAM System Access Record" — written by Service task
 "Record access details in IAM System".
 Data Object "Access Credentials" — written by Service task
 "Record access details in IAM System"; read by Send task "Send
@@ -7514,9 +7415,6 @@ Data Object "Benefit Deduction and Enrolment Notice" — written by Send task
 Data Object "Payment and Contribution Confirmations" — written by User task
   "Verify contribution and benefit payment confirmations"; read by Exclusive
   gateway "All confirmations received?".
-Data Store "Payroll System Records" — written by Service task "Record payroll
-  journal entries in Payroll System"; read by User task "Review payroll cost
-  report against budget".
 Data Object "Payroll Cost Report" — written by Service task "Record payroll
   journal entries in Payroll System"; read by User task "Review payroll cost
   report against budget".
@@ -7668,7 +7566,6 @@ Performance Management System".
 Data Object "Performance Improvement Plan" — written by user task
 "Initiate and manage performance improvement plan (PIP)"; read by user
 task "Assess PIP outcome".
-Data Store "Performance Management System record" — written by service
 task "Record performance outcome in Performance Management System" and
 service task "Record PIP closure in Performance Management System"; read
 by receive task "Receive performance rating and review record".
@@ -7805,7 +7702,6 @@ Data Object "Enrolment Request" — written by "Send enrolment request to
 Training Provider"; read by Training Provider.
 Data Object "Completion Certificate" — written by Training Provider
 confirmation; read by "Assess learning outcomes against objectives".
-Data Store "Training Record" — written by "Record completion and update
 training record in LMS"; read by Learning Management System across the
 employee lifecycle.
 
@@ -7945,9 +7841,6 @@ Data Object "Change Documentation" — written by User task "Prepare
 Data Object "Updated Contract or Change Letter" — written by User task
   "Issue updated contract or change letter to Employee", read by Send
   task "Issue updated contract or change letter to Employee".
-Data Store "Employee Master Data (HRIS / HCM System)" — written by
-  Service task "Submit updated payroll data to HRIS / HCM System",
-  read by User task "Update payroll and benefits records".
 Data Object "Payroll Change Record" — written by User task "Update
   payroll and benefits records", read by User task "Confirm change
   effective date and verify calculations".
@@ -8108,11 +8001,6 @@ Data Object "Absence Management Plan" — written by User task "Initiate
 Data Object "Pay Adjustment Record" — written by User task "Apply pay
   adjustment or unpaid leave coding", read by User task "Reconcile leave
   balances post-period"
-Data Store "Workforce Management System Leave Register" — read by Service
-  task "Retrieve current leave balances from Workforce Management System",
-  written by Service task "Update payroll records in Workforce Management
-  System" and Service task "Confirm leave coded correctly in Workforce
-  Management System"
 
 This subprocess receives a leave request or absence notification from the
 Employee and carries it through managerial review, optional HR advisory
@@ -8295,11 +8183,6 @@ Data Object "Deprovisioning Checklist" — written by IT / User task
   "Receive deprovisioning request and generate revocation checklist";
   read by IT / Service task "Revoke system access and deactivate
   accounts in IAM System".
-Data Store "HRIS / HCM System" — updated by Human Resources / Service
-  task "Record separation details in HRIS / HCM System"; updated by
-  Payroll / Service task "Update termination record in HRIS / HCM
-  System"; updated by IT / Service task "Record equipment return and
-  access revocation in HRIS / HCM System".
 
 V04.13 Offboard / Retire Employee manages the complete separation
 lifecycle from the moment a separation notice is received through exit
@@ -8781,11 +8664,6 @@ Data Object "Adjusted Draft Forecast" — written by Demand Planning lane
 Data Object "Forecast Review Comments" — written by Supply Planning lane
   send task "Return forecast with comments to Demand Planning"; read by
   Demand Planning lane task "Identify gaps or anomalies in forecast data".
-Data Store "Reporting / BI Tools Forecast Repository" — written by
-  Demand Planning lane service task "Publish draft forecast to Reporting
-  / BI Tools" and Supply Planning lane service task "Record validated
-  forecast in Reporting / BI Tools"; read by Demand Planning lane service
-  task "Retrieve historical demand data from Reporting / BI Tools".
 
 V05.01 Forecast Demand gathers demand signals from customers,
 distributors, and retailers, applies statistical modelling, and drives an
@@ -8931,9 +8809,7 @@ message catch event "Contract manufacturer capacity response received".
 Data Object "Agreed Supply Plan" — written by Supply Planning lane task
 "Document agreed supply plan"; read by Supply Planning lane send task
 "Publish supply plan to Production Planning".
-Data Store "Purchase Order Register" — written by Procurement lane task
 "Raise or confirm purchase orders with suppliers".
-Data Store "Procurement Commitment Record" — written by Procurement lane
 task "Record procurement commitments in MRP System".
 
 V05.02 Plan Supply transforms the validated demand forecast from V05.01
@@ -9057,9 +8933,6 @@ Data Object "Draft Production Plan" — written by User task "Draft
 Data Object "Engineering Review Feedback" — written by User task "Flag
   gaps and request BOM or routing correction"; read by User task "Revise
   production plan per engineering feedback".
-Data Store "PLM System Product Data" — read by Service task "Retrieve
-  BOM and routing data from PLM System"; written by Service task "Record
-  confirmed production plan in PLM System".
 
 V05.03 Create Production Plan takes the confirmed supply plan from V05.02
 and transforms it into a structured, engineering-validated production plan
@@ -9205,10 +9078,6 @@ Data Object "Material Shortfall Notice" — written by "Identify material
   Supplier".
 Data Object "Supplier Availability Confirmation" — read by "Assess
   supplier response and update material plan".
-Data Store "ERP Manufacturing Module — Capacity and Inventory Ledger" —
-  written by "Record material reservations in ERP Manufacturing Module";
-  read by "Retrieve capacity data from ERP Manufacturing Module" and
-  "Retrieve material requirements from ERP Manufacturing Module".
 Data Object "Capacity and Materials Check Record" — written by "Confirm
   capacity check result and document findings" and "Confirm material
   availability status"; read by "Escalate unresolved constraints to
@@ -9339,9 +9208,6 @@ Data Object "Scheduling Conflict Log" — written by User task "Identify
 Data Object "Confirmed Work Orders" — written by Service task "Release
   confirmed work orders to MES via APS System"; read by User task
   "Receive and acknowledge published schedule".
-Data Store "Production Schedule Register" — written by User task
-  "Approve and publish finalised schedule"; read by User task "Assign
-  work orders to production lines and shifts".
 
 V05.05 Schedule Production transforms the approved production plan and
 capacity check results into a time-sequenced, resource-assigned shop-
@@ -9469,9 +9335,6 @@ Data Object "Material Issue Order" — written by "Generate material
   work order in WMS".
 Data Object "Shortage Notice" — written by "Raise shortage notice to
   Production Planning".
-Data Store "WMS Inventory Ledger" — read by "Check stock availability
-  in WMS"; written by "Record material consumption against work order
-  in WMS".
 
 V05.06 Issue Materials takes the released production schedule from
 V05.05 and translates it into physical stock movements: the Warehouse
@@ -9617,9 +9480,6 @@ Data Object "Production Work Package" — written by "Send production work
   package to Contract Manufacturer"; read by Contract Manufacturer.
 Data Object "In-Process Check Record" — written by "Perform in-process
   checks against quality specification".
-Data Store "Manufacturing Execution System (MES) Production Log" — written
-  by "Record operation progress and machine data in MES"; written by "Post
-  production confirmation to MES".
 
 V05.07 Manufacture Product transforms issued materials into finished product
 by executing work orders across internal work centres under the direction of
@@ -9770,7 +9630,6 @@ Data Object "Disposition Decision" — read by "Record concession approval"
 and by "Quarantine and reject batch".
 Data Object "Rework Instruction" — written by "Send rework instruction to
 Manufacturing Operations"; read by "Perform rework on batch".
-Data Store "QMS Batch Status Register" — written by "Update batch status
 to Released in QMS" and "Record rejection in QMS" and "Update batch
 status in QMS" and "Record critical non-conformance in QMS".
 
@@ -9944,9 +9803,6 @@ Data Object "Disposition Decision" — written by User task "Issue
 Data Object "Supplier Response" — written by Intermediate message catch
   event "Supplier response received"; read by User task "Assess supplier
   response".
-Data Store "Quality Management System (QMS)" — written by User task
-  "Authorise scrap and record in QMS"; read by User task "Inspect
-  affected batch or lot".
 
 V05.09 Manage Exceptions detects and resolves production disruptions —
 equipment failures, material shortages, and quality non-conformances —
@@ -10086,7 +9942,6 @@ production confirmation to ERP Manufacturing Module"; read by User task
 Data Object "Corrected Cost Posting" — written by User task "Request
 correction from Manufacturing Operations"; read by Intermediate message
 catch event "Corrected posting received".
-Data Store "ERP Production Output Register" — written by Service task
 "Record production output and cost in ERP Manufacturing Module".
 
 V05.10 Record Production Output captures confirmed shop-floor quantities
@@ -10214,11 +10069,6 @@ Data Object "Inventory Discrepancy Record" — written by "Identify
 Data Object "Transfer Note" — written by "Issue transfer note to
   Warehouse"; read by "Close warehouse transfer task and file
   documentation".
-Data Store "Lot and Batch Traceability Register" — written by "Update
-  lot and batch traceability register".
-Data Store "Warehouse Inventory Ledger" — written by "Confirm goods
-  receipt and putaway in WMS"; read by "Verify finished goods quantity
-  and lot identification".
 
 V05.11 Move Finished Goods to Inventory takes inspected and approved
 finished goods from the production floor and physically transfers them
@@ -10344,10 +10194,8 @@ versus planned production costs"; read by "Investigate and document cost
 variances".
 Data Object "Cost Variance Report" — written by "Investigate and
 document cost variances"; read by "Post final cost to ERP".
-Data Store "ERP Production Order Register" — written by "Trigger order
 closure in ERP"; written by "Mark production order as financially closed
 in ERP".
-Data Store "Financial Ledger" — written by "Post final cost to ERP".
 Data Object "Archived Production Order Documentation" — written by
 "Archive production order documentation".
 
@@ -10814,7 +10662,6 @@ from Market Research Tools"; read by "Analyse market trends and competitive
 landscape".
 Data Object "Opportunity Statement" — written by "Document opportunity
 statement"; read by "Review and qualify opportunity".
-Data Store "Opportunity Assessment Register" — written by "Record
 opportunity assessment in Market Research Tools".
 Data Object "Opportunity Brief" — written by "Prepare opportunity brief";
 read by End event "Opportunity brief confirmed — ready for Capture Ideas
@@ -10947,7 +10794,6 @@ rationale".
 Data Object "Idea Brief" — written by User task "Assign idea owners and
 prepare idea briefs"; read by End event "Shortlisted ideas handed to
 Assess Feasibility (V06.03)".
-Data Store "Idea Management Platform Record" — written by Service task
 "Log ideas in Idea Management Platform" and Service task "Publish shortlist
 to Idea Management Platform"; read by User task "Screen ideas against
 strategic opportunity".
@@ -11083,7 +10929,6 @@ feasibility assessment report"; read by User task "Obtain internal sign-off
 on feasibility assessment".
 Data Object "Rejection Record" — written by User task "Document reasons for
 rejection and recommend revision".
-Data Store "Collaboration Tools Workspace" — written by Service task "Log
 assessment scope in Collaboration Tools" and Service task "Record
 feasibility assessment in Collaboration Tools"; read by User task "Conduct
 commercial and market feasibility review".
@@ -11237,7 +11082,6 @@ with Finance inputs".
 Data Object "Risk Register" — written by User task "Identify risks,
 assumptions, and dependencies"; updated by User task "Review and update
 risk register".
-Data Store "Project Portfolio Management System Record" — written by
 Service task "Submit business case to Project Portfolio Management System"
 and by Service task "Record approval decision in Project Portfolio
 Management System".
@@ -11384,7 +11228,6 @@ task "Finalise solution design documentation"; read by Service
 task "Record finalised design in Design / Prototyping Tools".
 Data Object "IP and Compliance Check Record" — written by User
 task "Conduct intellectual property and compliance check".
-Data Store "Design / Prototyping Tools Repository" — written by
 Service task "Upload revised design to Design / Prototyping
 Tools" and Service task "Record finalised design in Design /
 Prototyping Tools"; read by Service task "Retrieve design
@@ -11587,11 +11430,6 @@ Data Object "Prototype Assembly" — written by User task "Assemble
 Data Object "Quality Findings Report" — written by User task "Conduct
   design quality review of prototype"; read by User task "Review quality
   findings".
-Data Store "Product Lifecycle Management System Record" — written by
-  Service task "Record completed prototype in PLM System"; written by
-  Service task "Update prototype record with quality sign-off in PLM
-  System"; read by Service task "Retrieve design specifications from PLM
-  System".
 Data Object "Prototype Handover Documentation" — written by User task
   "Prepare prototype handover documentation".
 
@@ -11714,7 +11552,6 @@ consolidate feedback"; read by User task "Analyse test results against
 acceptance criteria".
 Data Object "Test Summary Report" — written by User task "Compile test
 summary report"; read by User task "Review test summary report".
-Data Store "Requirements Management Tools Repository" — written by
 Service task "Store updated requirements in Requirements Management
 Tools"; read by Product Management lane during requirements review.
 
@@ -11854,7 +11691,6 @@ pricing and commercial terms".
 Data Object "Revenue Forecast" — written by "Confirm sales approach and
 revenue forecast"; read by "Confirm commercial validation outcome to
 Finance".
-Data Store "CRM" — read by "Retrieve customer and prospect data from CRM";
 written by "Update pricing model records in CRM"; written by "Record
 finalised commercial model in CRM".
 
@@ -12000,9 +11836,6 @@ Data Object "Compliance Clearance Record" — written by "Sign off
 Data Object "Launch Readiness Checklist" — written by "Consolidate
   launch readiness checklist"; read by "Identify and remediate
   checklist gaps"; written by "Update launch readiness checklist".
-Data Store "Document Management Repository" — written by "Upload
-  draft assets to Document Management"; written by "Store approved
-  launch plan in Document Management".
 
 V06.09 Prepare Launch coordinates Marketing and Legal / Compliance
 to build a complete, approved launch package — campaign assets,
@@ -12125,7 +11958,6 @@ Data Object "Campaign Performance Report" — written by "Review campaign
 Data Object "Sales Enablement Brief" — written by "Brief sales team on product
   availability and pricing"; read by "Enable sales channels and distribution
   access".
-Data Store "CRM" — written by "Record sales activity in CRM".
 
 V06.10 Release to Market executes the coordinated go-live by confirming launch
 readiness, activating campaign assets through Marketing Automation, distributing
@@ -12245,7 +12077,6 @@ collection in Analytics / BI".
 Data Object "Usage and Feedback Data" — written by User task "Aggregate
 and cleanse adoption data"; read by User task "Analyse adoption trends
 and identify issues".
-Data Store "Performance Report" — written by Service task "Retrieve
 performance report from Analytics / BI"; read by User task "Analyse
 adoption trends and identify issues" and User task "Re-analyse adoption
 trends".
@@ -12409,7 +12240,6 @@ business case update for refinement".
 Data Object "Refinement Proposal" — written by "Prepare business case
 update for refinement"; read by "Submit refinement proposal for
 governance approval"; written by "Revise refinement proposal".
-Data Store "Product Lifecycle Management System Record" — written by
 "Record implemented changes in Product Lifecycle Management System";
 read by "Verify operational readiness of refined product".
 Data Object "Operational Readiness Report" — written by "Verify
@@ -12849,8 +12679,6 @@ Data Object "Additional Information Request" — written by "Request missing
 Data Object "Case Reference Number" — written by "Generate case reference
   number"; read by "Send acknowledgement and case number to Complainant /
   Customer / User".
-Data Store "Ticket Record" — written by "Log issue in Ticketing / Customer
-  Contact Platform"; read by "Generate case reference number".
 
 V07.01 Receive Issue captures every inbound issue from the Complainant /
 Customer / User — by phone, email, portal, or other channel — records the
@@ -12977,7 +12805,6 @@ user record".
 Data Object "Identity Details" — written by "Capture contact
 details and issue context"; read by "Review provided identity
 details".
-Data Store "CRM Customer Record" — read by "Search CRM for
 customer or user record", "Retrieve customer history and prior
 issues from CRM"; written by "Create new customer or user record
 in CRM", "Save new record to CRM", "Confirm and link customer
@@ -13109,7 +12936,6 @@ classification and issue code" and by "Apply complaints or
 regulatory issue category".
 Data Object "Complaints Handling Policy" — read by "Validate
 classification against complaints handling policy".
-Data Store "Case Management System Record" — written by "Record
 final classification in Case Management System"; written by
 "Set priority flag and SLA timer".
 
@@ -13247,9 +13073,6 @@ Data Object "Additional Information Submission" — written by
 Data Object "Severity and Entitlement Assessment Record" — written by
   "Record entitlement outcome on case" and "Assign severity rating to
   issue"; read by "Set SLA timer in Case Management System".
-Data Store "Case Management System" — written by "Set SLA timer in Case
-  Management System"; read by "Confirm severity and entitlement
-  assessment with customer service agent".
 
 This subprocess takes a classified issue from V07.03 and establishes
 two key facts: whether the customer holds valid entitlement under
@@ -13380,9 +13203,6 @@ Data Object "Customer Information Response" — read by "Review
 Data Object "Investigation Findings Report" — written by "Consolidate
   investigation findings into case record"; read by "Document
   investigation findings and resolution applied".
-Data Store "Case Management System" — read by "Review case details and
-  prior history"; written by "Consolidate investigation findings into
-  case record".
 
 V07.05 Investigate takes the classified and severity-rated case from
 V07.04, queries the Knowledge Base for known resolutions, contacts the
@@ -13517,7 +13337,6 @@ failure data".
 Data Object "Diagnostic Analysis Report" — written by "Return
 diagnostic analysis to Technical Support"; read by "Consolidate
 diagnostic findings".
-Data Store "Product Defect Record" — written by "Record root cause
 findings in Product Defect System"; read by "Analyse product design,
 defect history and failure data".
 Data Object "Root Cause Report" — written by "Document root cause and
@@ -13667,9 +13486,6 @@ Data Object "Field Job Completion Report" — written by "Capture job
 Data Object "Refund or Replacement Request" — written by "Raise
   replacement or refund request"; read by "Submit refund or
   replacement order to Field Service System".
-Data Store "Case Management Record" — written by "Record resolution
-  details and resolution code"; written by "Update case record in
-  Field Service System".
 
 V07.07 Resolve or Fulfil Request takes a diagnosed case and drives it to a
 concrete outcome — whether through remote action, a replacement or refund,
@@ -13791,7 +13607,6 @@ compliance actions and update escalation record"; updated by "Confirm escalation
 outcome and record resolution code".
 Data Object "Regulatory Notification" — written by "Prepare regulatory
 notification"; read by "Submit notification to Regulator".
-Data Store "Workflow / Escalation System Case Log" — written by "Set escalation
 SLA timer in Workflow / Escalation System"; written by "Advance to next
 escalation tier in Workflow / Escalation System"; read by "Review case for
 escalation eligibility".
@@ -13924,10 +13739,6 @@ Data Object "Customer Response to Further Information Request" —
   written by Intermediate message catch event "Customer response
   received"; read by "Confirm outcome communicated and case status
   updated".
-Data Store "Case Record" — read by "Review resolution details and
-  determine communication content"; written by "Record communication
-  details and update case" and "Confirm outcome communicated and
-  case status updated".
 
 V07.09 Communicate Outcome takes the resolved outcome from V07.07 or
 V07.08 and ensures it reaches the complainant or customer through the
@@ -14051,9 +13862,6 @@ Data Object "Customer Dispute Record" — written by "Log customer dispute
 Data Object "Revised Outcome Communication" — written by "Clarify or
   escalate dispute with customer"; read by "Send revised outcome or
   explanation to customer".
-Data Store "Customer Portal Confirmation Record" — written by "Update
-  confirmation status in Customer Portal" (all three branches and the
-  dispute loop exit path).
 
 V07.10 Obtain Confirmation seeks and records the customer's acceptance or
 rejection of the resolution communicated in V07.09. The customer service agent
@@ -14180,10 +13988,8 @@ and return case to Service Operations".
 Data Object "Action Item List" — read by "Review resolution record
 and confirm outcome is complete"; written by "Update action item
 status in Case Management System".
-Data Store "Case Management System record" — written by "Write
 closure record to Case Management System"; read by "Retrieve open
 action items from Case Management System".
-Data Store "CRM customer history" — written by "Update customer
 interaction history in CRM System".
 
 V07.11 Close Case takes a resolved, communicated case and formally
@@ -14296,9 +14102,6 @@ Message flows:
 
 7. Data objects
 
-Data Store "Case Management Record" — read by "Extract closed case and
-  resolution data"; written by "Log trend report and actions in case
-  management record".
 Data Object "Aggregated Trend Report" — written by "Aggregate issue
   categories, resolution codes, and SLA outcomes"; read by "Review
   aggregated trend report".
@@ -14781,7 +14584,6 @@ asset need request".
 Data Object "Validated Asset Need Summary" — written by User task
 "Prepare validated asset need summary"; read by Service task "Record
 validated asset need in Enterprise Asset Management System".
-Data Store "Enterprise Asset Management System Register" — read by
 Service task "Query existing asset register for alternatives"; written by
 Service task "Record validated asset need in Enterprise Asset Management
 System".
@@ -14908,7 +14710,6 @@ task "Validate budget availability and cost estimates".
 Data Object "Investment Decision Record" — written by User task
 "Record investment decision"; read by Intermediate message catch event
 "Investment decision received".
-Data Store "Finance / General Ledger" — written by Service task "Post
 approved capital request to Finance / General Ledger System"; read by
 User task "Validate budget availability and cost estimates".
 
@@ -15245,7 +15046,6 @@ warranty, delivery, and purchase documentation to asset record"; read by
 "Store documents in ERP Fixed Asset Register".
 Data Object "Insurance Cover Confirmation" — read by "Confirm asset
 registration is complete and update asset status to Active".
-Data Store "ERP Fixed Asset Register" — written by "Submit asset master
 data to ERP Fixed Asset Register", "Update depreciation rules in ERP
 Fixed Asset Register", "Store documents in ERP Fixed Asset Register";
 read by "Confirm asset registration is complete and update asset status
@@ -15392,10 +15192,6 @@ Data Object "Configuration and Test Report" — written by User task
 Data Object "Deployment Acceptance Record" — written by User task "Sign
   off deployment acceptance"; read by End event "Asset deployed and
   active — ready for Maintain Asset (V08.06)".
-Data Store "IT Asset Management System / Facilities Management System
-  Register" — written by Service task "Record deployment details in IT
-  Asset Management System / Facilities Management System"; read by User
-  task "Assign asset tag, location, and custodian".
 
 V08.05 Deploy Asset takes a registered asset from V08.04 and moves it
 through configuration, installation with external Service Provider
@@ -15551,7 +15347,6 @@ condition".
 Data Object "Rework Instructions" — written by Send task "Return work
 order with rework instructions to Maintenance Contractor"; read by
 Maintenance Contractor (external).
-Data Store "Maintenance Management System" — read by User task "Review
 maintenance schedule and asset condition"; written by Service task
 "Raise scheduled work order in Maintenance Management System"; written
 by Service task "Close work order in Maintenance Management System";
@@ -15674,7 +15469,6 @@ observations and usage readings"; read by "Submit observations to Reporting
 / BI System".
 Data Object "Inspection Report" — read by "Record operational observations
 and usage readings"; written by Maintenance Contractor (external).
-Data Store "Reporting / BI System Asset Register" — written by "Log
 utilisation data to Reporting / BI System", "Submit observations to
 Reporting / BI System"; read by "Retrieve utilisation and condition report
 from Reporting / BI System".
@@ -15821,11 +15615,6 @@ Data Object "Depreciation Journal Entry" — written by "Post depreciation
   depreciation balances to asset register".
 Data Object "Depreciation Summary Report" — written by "Prepare
   depreciation summary report for period".
-Data Store "ERP Fixed Asset Register" — read by "Retrieve asset register
-  and depreciation parameters from ERP Fixed Asset Register"; written by
-  "Save updated depreciation rules to ERP Fixed Asset Register", "Record
-  depreciation posting confirmation in ERP Fixed Asset Register", and
-  "Correct balances in ERP Fixed Asset Register".
 
 V08.08 Account for Depreciation executes the periodic depreciation cycle
 for all active assets: it retrieves and validates depreciation rules,
@@ -15970,7 +15759,6 @@ Data Object "Insurance Claim Notification" — written by Finance "Notify
 Insurer of impairment event"; read by Insurer.
 Data Object "Insurer Settlement Decision" — written by Insurer; read by
 Finance "Record insurance settlement amount".
-Data Store "Finance / General Ledger" — written by Finance "Post
 impairment write-down or transfer entry to Finance / General Ledger
 System"; written by Finance "Update asset master record in Finance /
 General Ledger System".
@@ -16121,8 +15909,6 @@ Data Object "Write-Off Justification" — written by "Document write-off
 Data Object "Disposal Approval" — written by "Document write-off
   justification and obtain disposal approval"; read by "Record sale proceeds
   or write-off amount in general ledger".
-Data Store "Document Management System" — written by "Store disposal records
-  in Document Management System".
 Data Object "Disposal Accounting Entry" — written by "Remove asset from
   financial records and post disposal entries".
 
@@ -16263,13 +16049,6 @@ Data Object "Final Depreciation and Disposal Proceeds Summary" — read
 Data Object "Closing Journal Entries" — written by Service task "Post
   closing entries to Finance / General Ledger System"; read by User
   task "Reconcile asset ledger balance to zero".
-Data Store "ERP Fixed Asset Register" — read and written by Service
-  task "Query asset master data from ERP Fixed Asset Register", Service
-  task "Mark asset as retired in ERP Fixed Asset Register", and Service
-  task "Update ERP Fixed Asset Register — status Closed".
-Data Store "Finance / General Ledger" — written by Service task "Post
-  closing entries to Finance / General Ledger System" and Service task
-  "Repost corrected entries to Finance / General Ledger System".
 
 V08.11 Close Asset Record is the final subprocess in the Acquire to
 Retire lifecycle. It ensures that every maintenance obligation is
@@ -16710,8 +16489,6 @@ Data Object "Requirements Scope and Objectives" — written by "Specify
 Data Object "Budget Confirmation" — written by "Confirm budget
   availability and procurement threshold"; read by "Assess alignment with
   sourcing policy and thresholds".
-Data Store "Sourcing Platform Record" — written by "Record approved
-  sourcing need in Sourcing Platform".
 
 V09.01 captures the internal trigger for a procurement event, guiding the
 Business Owner through need documentation, scoping, and budget confirmation
@@ -16843,7 +16620,6 @@ Data Object "Cost Baseline and Benchmark" — written by Procurement
 "Validate cost baseline and benchmark against market data"; read by
 Category Management "Identify key spend drivers, trends, and demand
 patterns".
-Data Store "Category Profile" — written by Category Management
 "Compile category profile and document findings"; read by Category
 Management "Present category profile for internal alignment".
 
@@ -16985,7 +16761,6 @@ Data Object "Market Intelligence Report" — written by User task
 "Document market intelligence and sourcing strategy
 recommendations"; read by User task "Prepare market engagement
 summary".
-Data Store "Supplier Master Data (SRM)" — read by Service task
 "Retrieve existing supplier records from SRM System"; written by
 Service task "Record finalised supplier longlist in SRM System".
 
@@ -17330,8 +17105,6 @@ Data Object "Commercial and Pricing Analysis" — written by "Perform
 Data Object "Evaluation Report" — written by "Compile overall evaluation
   summary and scores"; read by "Review evaluation results and scores";
   read by "Confirm evaluation sign-off".
-Data Store "Sourcing Platform Evaluation Record" — written by "Record
-  evaluation results in Sourcing Platform".
 
 V09.05 Evaluate Responses governs the structured scoring and review of all
 supplier submissions received in V09.04, covering commercial analysis,
@@ -17465,7 +17238,6 @@ rationale document".
 Data Object "Shortlist Approval Record" — written by "Submit shortlist for
 procurement manager sign-off"; read by "Record confirmed shortlist in
 Sourcing Platform".
-Data Store "Sourcing Platform Supplier Register" — written by "Record
 confirmed shortlist in Sourcing Platform".
 
 V09.06 Shortlist Suppliers takes the evaluated and ranked tender responses
@@ -17674,11 +17446,6 @@ Data Object "IT Security Assessment Record" — written by User task
 Data Object "Consolidated Due Diligence Report" — written by User task
   "Compile consolidated due diligence report"; read by Exclusive gateway
   "All checks cleared?".
-Data Store "Risk Management System Repository" — written by Service task
-  "Record risk assessment findings in Risk Management System"; written by
-  User task "Record IT security and data protection outcome in Risk
-  Management System"; read by Service task "Retrieve supplier history and
-  risk alerts from Risk Management System".
 
 V09.07 Conduct Due Diligence assesses each shortlisted supplier across
 three parallel dimensions — financial and operational risk, regulatory and
@@ -17816,7 +17583,6 @@ Data Object "Agreed Commercial Terms Record" — written by "Document
 agreed commercial positions and concessions"; read by "Validate pricing
 and financial terms against budget" and "Record negotiation outcome in
 Sourcing Platform".
-Data Store "Sourcing Platform Negotiation Log" — written by "Record
 negotiation outcome in Sourcing Platform".
 
 V09.08 Negotiate Commercial Terms covers the end-to-end exchange of
@@ -17968,9 +17734,6 @@ Data Object "Legal Counter-Position" — written by User task "Prepare legal
 Data Object "Contract Pack" — written by User task "Compile contract pack
   with supporting schedules and annexes"; read by Service task "Submit
   contract pack for approval in CLM system".
-Data Store "CLM Contract Repository" — written by User task "Record
-  finalised draft in CLM system"; written by User task "Confirm all
-  obligations and key dates captured in CLM system".
 
 V09.09 Draft Contract takes the agreed commercial terms produced in
 V09.08 and converts them into a legally sound, fully negotiated contract
@@ -18108,7 +17871,6 @@ written by "Submit financial rejection decision with comments to CLM".
 Data Object "Amendment Instructions" — written by "Record rejection
 reasons and required amendments"; read by "Return contract draft to
 Contract Management with amendment instructions".
-Data Store "CLM Contract Repository" — written by "Mark contract as
 approved in CLM system"; read by "Submit contract draft to CLM approval
 workflow".
 
@@ -18256,8 +18018,6 @@ Data Object "Executed Contract Document" — written by Service task
   System".
 Data Object "eSignature Certificate" — written by eSignature Platform;
   read by User task "Validate executed document integrity and certificate".
-Data Store "Contract Lifecycle Management System" — written by Service
-  task "Store executed contract in Contract Lifecycle Management System".
 
 V09.11 Execute Contract takes the approved contract produced in V09.10
 and steers it through the full bilateral signing cycle: internal
@@ -18382,10 +18142,8 @@ pack"; read by "Review handover pack".
 Data Object "Contract Obligations and Key Milestones" —
 written by "Confirm contract obligations and key milestones";
 read by "Register supplier in SRM system".
-Data Store "Supplier Master Record" — written by "Create
 supplier master record in SRM system"; read by "Enable
 supplier in Procurement / ERP system".
-Data Store "Supplier Register (SRM)" — written by "Register
 supplier in SRM system"; read by "Assign vendor manager and
 set review schedule".
 Data Object "Vendor Manager Assignment and Review Schedule"
@@ -18942,7 +18700,6 @@ Until Budget Approved".
 Data Object "Campaign Timeline and Milestones" — written by User task
 "Define campaign timeline and milestones"; read by Service task
 "Configure campaign parameters and tracking codes".
-Data Store "Marketing Automation Platform Campaign Record" — written by
 Service task "Create campaign record in Marketing Automation Platform";
 read by Service task "Configure campaign parameters and tracking codes".
 
@@ -19066,9 +18823,6 @@ Data Object "External Prospect List" — read by User task "Validate
 Data Object "Segment Profile Report" — written by User task "Produce
   segment sizing and profile report"; read by User task "Confirm
   final audience universe and segment counts".
-Data Store "Customer Data Platform audience store" — read by
-  User task "Analyse existing customer and prospect data";
-  written by Send task "Submit segments to CDP for activation".
 
 This subprocess translates the approved campaign plan into discrete,
 sized, and consent-filtered audience segments held in the Customer
@@ -19213,8 +18967,6 @@ Data Object "Draft Asset Package" — written by User task "Compile
   and organise all draft assets"; read by User task "Review compiled
   draft assets against campaign brief"; read by Service task "Upload
   approved draft assets to CMS".
-Data Store "Content Management System Asset Repository" — written by
-  Service task "Upload approved draft assets to CMS".
 
 This subprocess takes the validated campaign brief and audience
 segment definitions from V10.02 and produces the full set of reviewed,
@@ -19367,7 +19119,6 @@ Data Object "Legal and Privacy Decision" — written by "Issue
 legal and privacy approval" and "Return pack with required
 changes"; read by exclusive gateway "Legal and Privacy outcome?".
 
-Data Store "Marketing Automation Platform Approval Record" —
 written by "Record full approval in Marketing Automation
 Platform"; read by "Issue approval confirmation and authorise
 campaign for launch".
@@ -19536,10 +19287,6 @@ Data Object "Audience Segment and Suppression List" — read by User task
   Platform".
 Data Object "Launch Confirmation Record" — written by User task "Record
   launch confirmation and initial metrics".
-Data Store "Marketing Automation Platform Campaign Record" — written by
-  Service task "Trigger automated campaign send via Marketing Automation
-  Platform"; read by User task "Monitor channel delivery and flag
-  anomalies".
 
 V10.05 Launch Campaign activates the campaign across paid media and
 automated digital channels by configuring the marketing automation
@@ -19686,12 +19433,10 @@ Data Object "Consent and Suppression Status" — written by "Update consent
 status on contact record"; read by "Write completed response record to
 Marketing Automation Platform".
 
-Data Store "Marketing Automation Platform Response Log" — written by
 "Write completed response record to Marketing Automation Platform"; read by
 "Retrieve form submission data from Marketing Automation Platform" and
 "Retrieve email engagement event from Marketing Automation Platform".
 
-Data Store "Web Analytics Event Store" — written by the Web Analytics
 System; read by "Retrieve web visit data from Web Analytics System".
 
 Capture Response collects inbound prospect signals from all active campaign
@@ -19836,7 +19581,6 @@ conflicts".
 Data Object "Supplementary Data Package" — written by Data Provider
 (via message); read by "Review response record and flag missing
 fields".
-Data Store "Customer Data Platform Prospect Profile" — read by
 "Retrieve existing profile from CDP"; written by "Write scored and
 enriched record to CDP"; written by "Write below-threshold record
 to CDP".
@@ -19961,9 +19705,6 @@ Data Object "Qualification Outreach Log" — written by "Conduct
 Data Object "Prospect Response" — written by "Record prospect response
   and update lead record in CRM"; read by "Reassess lead against
   qualification criteria".
-Data Store "CRM System" — read by "Retrieve lead record and score from
-  CRM"; written by "Mark lead as qualified in CRM" and "Flag lead as
-  non-responsive and mark unqualified in CRM".
 Data Object "Qualification Notes" — written by "Assign qualification
   notes and next-step recommendation"; read by end event flow to Route
   Qualified Lead to Sales.
@@ -20125,10 +19866,6 @@ Data Object "Lead Assignment Notification" — written by "Notify account
 Data Object "Rejection or Clarification Note" — written by "Record
   reason for rejection or clarification request"; read by "Review
   rejection reason or clarification query".
-Data Store "CRM Lead and Opportunity Register" — written by "Convert
-  lead to opportunity in CRM", "Update lead status to Handed Over in
-  CRM", "Update lead record in CRM"; read by "Review qualified lead
-  record", "Review lead details and context".
 
 V10.09 Route Qualified Lead to Sales takes a scored and qualified lead
 from Sales Development and ensures it reaches the correct account manager
@@ -20256,9 +19993,6 @@ Data Object "Engagement Signal Log" — written by Intermediate message catch
   re-score contact".
 Data Object "Re-qualification Notification" — written by "Notify Sales
   Development of re-qualified lead".
-Data Store "CRM Contact Record" — read by "Review unqualified response and
-  select nurture track"; written by "Mark contact as inactive and suppress
-  from active nurturing".
 
 This subprocess keeps unqualified responses warm through structured,
 consent-compliant nurture sequences, re-scoring contacts as engagement
@@ -20392,9 +20126,7 @@ and dashboard" and "Approve and publish final campaign report".
 Data Object "Performance Gap and Recommendations Record" — written by
 "Document performance gaps and recommendations"; read by "Initiate
 campaign optimisation or future plan brief".
-Data Store "CRM System" — read by "Build attribution and conversion
 analysis" (existing lead and opportunity outcomes linked to campaign).
-Data Store "Business Intelligence Platform" — written by "Load raw
 metrics into Business Intelligence Platform"; read by "Retrieve
 enriched dataset from Business Intelligence Platform".
 
@@ -21028,7 +20760,6 @@ message catch event "Signatory clarification received from New Customer".
 Data Object "Contract Acceptance Confirmation" — written by User task
 "Prepare contract acceptance confirmation document"; read by Send task
 "Issue acceptance confirmation to New Customer".
-Data Store "Contract Lifecycle Management Record" — written by Service
 task "Record accepted contract in CLM".
 
 This subprocess captures the signed contract from the new customer,
@@ -21165,9 +20896,6 @@ Data Object "Scope and Entitlements Summary" — written by User task "Draft
 Data Object "Customer Amendment Request" — written by User task "Log
   requested amendments"; read by User task "Assess amendment against
   contract terms".
-Data Store "CRM Customer Account" — read by Service task "Pull customer
-  account record from CRM"; written by User task "Record confirmed
-  entitlements in CRM".
 
 This subprocess takes the accepted contract handed over from Accept Signed
 Contract and reaches a customer-confirmed, CRM-recorded baseline of scope
@@ -21269,8 +20997,6 @@ Data Object "Team Assignment Record" — written by "Formally assign
   onboarding manager to project"; written by "Record implementation
   consultant assignment"; read by "Publish team assignment to project
   record".
-Data Store "Onboarding Project Register" — written by "Publish team
-  assignment to project record".
 
 V11.03 Assign Onboarding Team takes the confirmed scope and entitlements
 from V11.02 and uses them to identify, check availability of, and formally
@@ -21568,7 +21294,6 @@ Data Object "Validated Requirements and Data Package" — written by User
 task "Compile finalised requirements and data package"; read by User task
 "Review and approve finalised requirements package".
 
-Data Store "Onboarding / Project Management System record" — written by
 Service task "Record validated requirements in project system"; read by
 User task "Review and approve finalised requirements package".
 
@@ -21887,8 +21612,6 @@ Data Object "Load Completion Status" — written by Product Platform via
   message; read by User task "Run post-load validation checks".
 Data Object "Migration Report" — written by User task "Compile migration
   report"; read by Send task "Send migration report to customer for review".
-Data Store "Product Platform Data Store" — written by Service task "Submit
-  transformed data load to Product Platform".
 
 Migrate Data takes the customer's source data through extraction, quality
 profiling, transformation, loading into the product platform, and
@@ -22281,10 +22004,6 @@ Data Object "Customer Acceptance Response" — read by "Record formal
 Data Object "Outstanding Issues List" — written by "Log outstanding issues
   in Onboarding / Project Management System"; read by "Coordinate issue
   resolution with Service Delivery".
-Data Store "Onboarding / Project Management System record" — written by
-  "Close onboarding milestones in Onboarding / Project Management System";
-  written by "Log outstanding issues in Onboarding / Project Management
-  System".
 
 This subprocess confirms that the service meets the customer's agreed
 acceptance criteria before billing and support handover begin. The onboarding
@@ -22418,8 +22137,6 @@ Data Object "First Invoice" — written by "Generate first invoice in Billing
   & Subscription System"; read by "Issue first invoice to New Customer".
 Data Object "Invoice Dispute Record" — written by "Log dispute and initiate
   resolution"; read by "Review disputed line items with customer".
-Data Store "Billing Ledger" — written by "Record billing activation and
-  first invoice in billing ledger".
 
 Activate Billing takes the go-live acceptance produced by Obtain Go-Live
 Acceptance and converts it into an active billing relationship. Finance /
@@ -22559,14 +22276,6 @@ Data Object "Outstanding Issues Log" — written by User task "Log
 Data Object "Go-Live Confirmation Notice" — written by Send task "Send
   go-live confirmation and support details to customer"; read by New
   Customer.
-Data Store "CRM Customer Record" — read by User task "Review customer
-  profile and onboarding summary"; written by Service task "Update customer
-  account status to active in CRM"; written by Service task "Record
-  handover completion in CRM"; written by User task "Assign customer
-  success manager as primary contact".
-Data Store "Support Account Register" — written by Service task "Create
-  support account and assign support tier"; read by User task "Brief
-  support team on customer context and SLA requirements".
 
 This subprocess transfers the newly onboarded customer from the onboarding
 team to the permanent customer success and support structure. The customer
@@ -23111,10 +22820,6 @@ Message flows:
 
 7. Data objects
 
-Data Store "Account Health Record" — written by "Calculate health score
-  for each account"; written by "Update health record and clear flag";
-  written by "Raise health alert and set risk flag on account"; read by
-  "Review flagged accounts and validate risk signals".
 Data Object "Usage and Adoption Data" — read by "Calculate health score
   for each account"; written by "Pull usage and adoption data from
   Product Usage Analytics".
@@ -23372,12 +23077,10 @@ feedback and agreed actions"; read by User task "Record completed review and
 action log in Customer Success Platform".
 Data Object "Support Summary" — written by User task "Summarise open issues and
 resolution trends"; read by User task "Prepare service review pack".
-Data Store "Customer Success Platform" — read by Service task "Retrieve health
 scores and usage data from Customer Success Platform"; written by User task
 "Record completed review and action log in Customer Success Platform"; written
 by User task "Record escalation and revised actions in Customer Success
 Platform".
-Data Store "Support / Ticketing System" — read by Service task "Retrieve case
 volumes and CSAT scores from Support / Ticketing System".
 
 V12.03 brings together usage health data, support case history, and customer
@@ -23500,7 +23203,6 @@ churn likelihood".
 Data Object "Adoption Analysis Report" — written by "Provide adoption
 analysis to customer success manager"; read by "Collate account health
 inputs".
-Data Store "CRM System" — written by "Record churn risk classification
 and recommended action".
 Data Object "Churn Risk Classification" — written by "Record churn risk
 classification and recommended action".
@@ -23640,7 +23342,6 @@ Data Object "Draft Renewal Proposal" — written by "Draft renewal proposal
 document"; read by "Review proposal against account strategy and
 relationship context"; updated by "Record requested amendments"; updated by
 "Finalise and package renewal proposal".
-Data Store "CRM System — Renewal Opportunities" — written by "Record
 approved proposal in CRM".
 
 This subprocess takes the identified renewal opportunity produced by
@@ -23804,9 +23505,6 @@ Data Object "Amended Contract Draft" — written by Service task
   "Review and approve amended draft".
 Data Object "Confirmation Status Record" — written by User task
   "Record confirmation status against each party".
-Data Store "Contract Lifecycle Management Record" — written by Service
-  task "Instruct CLM to lock final agreed terms"; read by Service task
-  "Instruct CLM to draft amended contract version".
 Data Object "Signed Terms Confirmation" — written by User task "Obtain
   authorised signatures or electronic acceptances"; read by Send task
   "Issue countersigned terms confirmation to customer".
@@ -23962,13 +23660,6 @@ Data Object "Revised Subscription Terms" — written by User task
   "Confirm revised subscription terms with customer"; read by Service
   task "Trigger subscription change or cancellation in Billing and
   Subscription System".
-Data Store "CRM System" — read by Service task "Retrieve account
-  health and usage data from CRM System"; written by User task
-  "Record revised agreement in CRM System" and Service task "Update
-  opportunity status in CRM System".
-Data Store "Billing & Subscription System" — written by Service task
-  "Trigger subscription change or cancellation in Billing and
-  Subscription System".
 
 This subprocess captures and resolves a customer-initiated cancellation
 or downgrade by logging the request, diagnosing the reason, presenting
@@ -24089,7 +23780,6 @@ Data Object "Signed Renewal Agreement" — written by Intermediate message
 catch event "Signed renewal documents received"; read by User task "Review
 signed documents for completeness"; read by User task "Countersign renewal
 agreement".
-Data Store "CLM Contract Repository" — written by Service task "Upload
 executed contract to CLM"; read by User task "Record renewal effective date
 and contract reference".
 Data Object "Renewal Confirmation Notice" — written by Send task "Send
@@ -24237,7 +23927,6 @@ revised invoice and billing schedule to Payment Provider".
 Data Object "Payment Confirmation" — read by Intermediate message catch
 event "Payment confirmation received from Payment Provider"; read by User
 task "Reconcile payment record and close billing cycle".
-Data Store "Billing & Subscription Master Record" — read by Service task
 "Retrieve current entitlement record from Billing & Subscription System";
 written by Service task "Write updated entitlements to Billing &
 Subscription System"; written by Service task "Create new billing schedule
@@ -24394,7 +24083,6 @@ customer-specific value narrative for win-back review".
 Data Object "Value Narrative" — written by "Prepare customer-specific
 value narrative for win-back review"; read by "Conduct win-back review
 and present revised offer".
-Data Store "CRM System" — read by "Retrieve lapsed account and churn
 reason from CRM" and "Submit updated health and usage data to CRM";
 written by "Record win-back success and close opportunity in CRM",
 "Update CRM with closed-lost status and decline reason", and "Update
@@ -24989,7 +24677,6 @@ evidence from customer"; read by "Review updated information" and
 Data Object "Order and Product Identifiers" — written by "Record order
 and product identifiers"; read by "Log return request in ticketing
 system".
-Data Store "Customer Service / Ticketing System Record" — written by
 "Log return request in ticketing system".
 
 This subprocess captures and structures the customer's return request in
@@ -25143,9 +24830,7 @@ System".
 Data Object "Eligibility Summary" — written by "Prepare eligibility
 summary for authorisation"; read by "Record eligibility decision in
 Returns Management System".
-Data Store "Returns Management System" — written by "Record
 eligibility decision in Returns Management System".
-Data Store "Order Management System (OMS)" — read by "Retrieve
 original order and product details from OMS".
 
 This subprocess takes the logged return request from Receive Return
@@ -25404,9 +25089,6 @@ Data Object "Carrier Booking Confirmation" — written by User task
 Data Object "Collection Instructions" — written by Send task "Send
   drop-off instructions to customer" and Send task "Send collection
   booking confirmation to customer"; read by the Customer pool.
-Data Store "Transport Management System (TMS) Shipment Register" —
-  written by User task "Raise shipment booking request in TMS";
-  read by Service task "Retrieve carrier options and rates from TMS".
 
 This subprocess takes a validated and authorised return and converts
 it into a concrete collection or drop-off arrangement. It selects
@@ -25546,9 +25228,7 @@ inspection results to Quality Management System".
 Data Object "Condition Assessment Record" — written by "Mark goods as
 inspected and passed" and "Mark goods as inspected and failed"; read
 by Quality Management System.
-Data Store "Quality Management System Record Store" — written by
 "Submit inspection results to Quality Management System".
-Data Store "WMS Inventory Register" — written by "Record inbound
 shipment in WMS".
 
 This subprocess physically receives the returned goods from the freight
@@ -25671,10 +25351,6 @@ Data Object "Repair Feasibility Report" — written by "Assess repair
 Data Object "Disposition Decision" — written by "Confirm final disposition
   decision"; read by "Write disposition decision to Returns Management
   System" and "Write disposition category to Inventory / ERP System".
-Data Store "Returns Management System record" — written by "Write disposition
-  decision to Returns Management System".
-Data Store "Inventory / ERP System record" — written by "Write disposition
-  category to Inventory / ERP System".
 
 This subprocess takes inspected goods and assigns each item a formal
 disposition — restock, repair, scrap, or return to supplier — using a
@@ -25837,10 +25513,6 @@ Data Object "Replacement Order" — written by "Raise replacement order"; read
 Data Object "Original Order and Payment Record" — read by "Retrieve original
   order and payment details from Billing / ERP System"; read by "Retrieve
   original order details from Billing / ERP System".
-Data Store "Billing / ERP System" — written by "Record credit note in Billing
-  / ERP System"; written by "Record replacement order in Billing / ERP
-  System"; read by "Retrieve original order and payment details from Billing /
-  ERP System".
 
 This subprocess takes the approved disposition decision and converts it into a
 concrete financial or logistical settlement: either a verified monetary refund
@@ -25960,7 +25632,6 @@ Data Object "Disposition Decision" — read by "Review disposition decision
 and stock adjustment requirements".
 Data Object "Inventory Adjustment Request" — written by "Submit inventory
 adjustment to Inventory / ERP System"; read by Inventory / ERP System.
-Data Store "Inventory / ERP System stock register" — written by "Assign
 restocked units to bin location", "Record write-off and remove units from
 stock register", "Mark units as pending supplier return and quarantine in
 system"; read by "Verify inventory record accuracy against physical count".
@@ -25969,7 +25640,6 @@ or replacement cost data from completed transaction".
 Data Object "Credit Note" — written by "Post credit note or cost entry to
 Billing / ERP System"; read by "File credit note and updated financial
 records".
-Data Store "Financial Ledger" — written by "Post credit note or cost entry
 to Billing / ERP System", "Correct entry in Billing / ERP System"; read by
 "Reconcile refund amount against original order value".
 
@@ -26120,10 +25790,6 @@ Data Object "Supplier Response" — written by "Intermediate message catch
   accepts claim?".
 Data Object "Negotiated Settlement Terms" — written by "Record negotiated
   outcome"; read by "Handover agreed recovery amount to Finance".
-Data Store "Procurement / ERP System Records" — written by "Log claim in
-  Procurement / ERP System"; written by "Post supplier credit or debit note
-  in Procurement / ERP System"; written by "Update financial records in
-  Procurement / ERP System".
 Data Object "Supplier Credit or Debit Note" — written by "Post supplier
   credit or debit note in Procurement / ERP System"; read by "Reconcile
   recovery against original refund cost".
@@ -26243,9 +25909,6 @@ Data Object "Escalation Notice" — written by User task "Escalate findings
   to product, quality or supplier teams".
 Data Object "Updated Customer Guidance Materials" — written by User task
   "Update returns FAQ and customer guidance materials".
-Data Store "Business Intelligence Platform" — read by Service task "Extract
-  return records from Business Intelligence Platform"; written by Send task
-  "Distribute report to Customer Service and management" (dashboard refresh).
 
 This subprocess consolidates return-reason data gathered across the entire
 Return to Refund chain and transforms it into structured insight. Quality
@@ -26838,8 +26501,6 @@ Data Object "Delivery Booking Confirmation" — written by "Send delivery
   booking confirmation to Carrier"; read by Carrier.
 Data Object "Booking Acknowledgement" — written by "Send booking
   acknowledgement to Supplier"; read by Supplier.
-Data Store "Transport & Yard Management System Booking Record" — written
-  by "Record delivery booking in Transport & Yard Management System".
 Data Object "Inbound Delivery Record" — written by "Prepare inbound
   delivery record and expected quantities".
 
@@ -26966,7 +26627,6 @@ Data Object "Inbound Delivery Record" — read by "Match delivery to open
 inbound delivery record"; read by "Request dock-door assignment from WMS".
 Data Object "Dock Receipt Confirmation" — written by "Issue dock receipt
 confirmation to carrier".
-Data Store "WMS Inbound Delivery Register" — read by "Request dock-door
 assignment from WMS"; written by "Update inbound delivery status to
 arrived in WMS".
 
@@ -27202,8 +26862,6 @@ Data Object "Physical Count Record" — written by Expanded Subprocess
   count totals with expected quantities".
 Data Object "Discrepancy Annotation" — written by User task "Flag
   discrepancy and annotate count record".
-Data Store "WMS Stock Ledger" — read and written by Service task "Submit
-  count against WMS expected quantity".
 
 V14.04 Unload & Count takes the verified shipment from the dock door and
 produces a confirmed physical count against every purchase order line. The
@@ -27326,11 +26984,6 @@ Data Object "Non-Conformance Report" — written by "Document
 Data Object "Rejection and Damage Report" — written by "Prepare
   rejection and damage report"; read by "Send notification to Handle
   Discrepancies".
-Data Store "Quality Management System Record" — written by "Log
-  inspection results in Quality Management System", "Update acceptance
-  status in Quality Management System", "Record conditional acceptance
-  in Quality Management System", "Raise quarantine and hold flag in
-  Quality Management System".
 
 V14.05 Inspect Quality takes the unloaded and counted goods handed over
 from Unload & Count and subjects them to structured sampling, physical
@@ -27454,12 +27107,9 @@ Data Object "Inspection Result" — read by User task "Confirm received
 quantities and item details against PO lines".
 Data Object "Discrepancy Note" — written by User task "Flag discrepancy
 and note variance on receipt record".
-Data Store "Purchase Order Register" — read by Service task "Pull
 goods-receipt data from Procurement / ERP System"; updated by Service
 task "Post goods receipt to Procurement / ERP System".
-Data Store "Stock Quantity and Location Ledger" — updated by Service
 task "Update stock quantities and locations in WMS".
-Data Store "Quarantine and Hold Register" — updated by Service task
 "Post quarantine flag to Procurement / ERP System".
 
 V14.06 Record Goods Receipt takes the completed inspection outcome and
@@ -27571,9 +27221,6 @@ Data Object "Putaway Instructions" — read by "Retrieve putaway
 Data Object "Inbound Delivery Record" — read by "Retrieve putaway
   instructions from WMS"; written by "Confirm putaway completion and
   close inbound delivery".
-Data Store "WMS Stock Location Register" — written by "Record stock
-  location and quantity in WMS"; read by "Scan location barcode or
-  RFID tag".
 Data Object "Putaway Task List" — read by "Retrieve putaway
   instructions from WMS"; written by "Confirm putaway completion and
   close inbound delivery".
@@ -27761,7 +27408,6 @@ credit note against discrepancy".
 Data Object "Rejection and Returns Documentation" — written by User task
 "Prepare return and rejection documentation"; read by Send task "Send
 rejection notice and returns instructions to Supplier".
-Data Store "Procurement / ERP Discrepancy Register" — written by Service
 task "Log discrepancy record in Procurement / ERP System" and User task
 "Update discrepancy record with agreed resolution" and User task "Verify
 credit note against discrepancy" and User task "Authorise inventory
@@ -27880,9 +27526,6 @@ Inventory Control lane → Inventory / ERP System (availability release
 
 7. Data objects
 
-Data Store "Stock Availability Record" — read by "Retrieve current hold
-  and quarantine flags"; written by "Update stock status to Available in
-  Inventory / ERP System".
 Data Object "Hold and Quarantine Flag Report" — read by "Review reason
   for hold"; written by "Retrieve current hold and quarantine flags".
 Data Object "Hold Resolution Record" — written by "Clear hold condition
@@ -28022,13 +27665,6 @@ Data Object "Corrected Invoice" — read by Service task "Re-run
 Data Object "Discrepancy Record" — written by User task "Identify and
   classify discrepancy — price, quantity, or tax variance"; read by
   User task "Apply tolerance adjustment and approve invoice".
-Data Store "Purchase Order Register" — read by Service task "Retrieve
-  open purchase order and goods-receipt record".
-Data Store "Goods Receipt Ledger" — read by Service task "Retrieve
-  open purchase order and goods-receipt record".
-Data Store "Accounts Payable Ledger" — written by Service task "Post
-  payment entry in Accounts Payable / ERP System"; written by Service
-  task "Post adjusted payment entry in Accounts Payable / ERP System".
 
 Match Receipt to Invoice closes the Dock to Stock value chain by
 performing a three-way match across the purchase order, the confirmed
@@ -28757,7 +28393,6 @@ notification in EAM"; read by "Record fault symptoms and operating
 context", "Validate and enrich notification with operator input",
 "Update notification record in EAM", and "Classify notification
 type and work category".
-Data Store "Asset Register" — read by "Retrieve asset register
 details from EAM".
 Data Object "Operator Symptom Statement" — written by "Validate
 and enrich notification with operator input"; read by "Assign
@@ -28905,9 +28540,6 @@ Data Object "Permit and Isolation Requirements" — written by User task
   "Identify applicable permit-to-work and isolation requirements".
 Data Object "Regulatory Notification Record" — written by User task
   "Raise regulatory notification record".
-Data Store "Enterprise Asset Register" — read by Service task "Retrieve
-  asset register and criticality classification"; written by User task
-  "Confirm assessment outcome and update work order priority".
 
 This subprocess takes the triaged notification produced by Raise & Triage
 Notification and produces a fully rated work order carrying a criticality
@@ -29060,12 +28692,6 @@ Data Object "Condition-Monitoring Data" — read by "Review
   condition-monitoring data and trends".
 Data Object "OEM Technical Guidance" — read by "Confirm final
   diagnosis and select failure code in EAM".
-Data Store "EAM Asset Register and History" — read by "Retrieve asset
-  history and maintenance records from EAM"; written by "Record
-  preliminary diagnosis and fault code in EAM" and "Confirm final
-  diagnosis and select failure code in EAM".
-Data Store "Document Repository" — read by "Retrieve technical drawings
-  and manuals from Document Management System".
 Data Object "Confirmed Diagnosis Record" — written by "Confirm final
   diagnosis and select failure code in EAM".
 
@@ -29220,10 +28846,8 @@ availability confirmation to Maintenance"; read by Maintenance lane
 Data Object "Purchase Requisition" — written by "Raise purchase
 requisition for missing parts"; read by "Submit purchase requisition to
 Spare Parts Inventory System".
-Data Store "Enterprise Asset Management (EAM)" — read by "Retrieve asset
 history and maintenance records from EAM"; written by "Update work order
 and cost estimate in EAM".
-Data Store "Spare Parts Inventory System" — read by "Check stock
 availability in Spare Parts Inventory System"; written by "Reserve parts
 against work order in Spare Parts Inventory System" and "Submit purchase
 requisition to Spare Parts Inventory System".
@@ -29391,12 +29015,6 @@ Data Object "Permit Application" — written by User task "Identify isolation
 Data Object "Permit to Work" — written by User task "Approve and issue
   permit to work"; read by Send task "Send permit and work instructions to
   Service Contractor".
-Data Store "Work Order Management System" — read by Service task "Retrieve
-  technician and contractor availability from Work Order Management System";
-  written by Service task "Update work order with confirmed schedule in Work
-  Order Management System".
-Data Store "Permit-to-Work System" — written by Service task "Record issued
-  permit in Permit-to-Work System".
 
 This subprocess takes a fully planned work order and transforms it into a
 confirmed, resourced schedule agreed with the service contractor and backed
@@ -29540,7 +29158,6 @@ Data Object "Contractor Work Completion Certificate" — read by User task
 "Obtain contractor work completion report and certificate"; written by
 Service Contractor.
 
-Data Store "Asset History (EAM)" — written by Service task "Update work
 order with completion status and close tasks".
 
 This subprocess mobilises the repair team, coordinates contractor
@@ -29668,9 +29285,6 @@ Data Object "Test Results Record" — written by User task "Record test
 Data Object "Test Completion Report" — written by User task "Compile test
   completion report"; read by User task "Review test results and accept
   return to service".
-Data Store "EAM Asset Register" — read and written by Service task "Record
-  pre-test asset status in EAM"; written by Service task "Update asset
-  status to operational in EAM".
 
 This subprocess takes the repaired asset from a completion handoff and
 subjects it to structured functional and safety testing against defined
@@ -29802,9 +29416,7 @@ materials used, and contractor charges".
 Data Object "Cost Summary Document" — written by "Confirm labour hours,
 materials used, and contractor charges"; read by "Review cost postings
 against capitalisation and expense policy".
-Data Store "Asset History (EAM)" — written by "Write failure code, repair
 code, and cause code to asset history in EAM".
-Data Store "Finance / ERP Ledger" — written by "Post finalised accounting
 entries to Finance / ERP System".
 
 This subprocess takes the verified return-to-service confirmation from
@@ -29920,7 +29532,6 @@ maintenance strategy entries)
 
 7. Data objects
 
-Data Store "Reliability Analytics Platform" — read by "Retrieve
 closed work-order data and asset history"; read by "Extract failure
 codes, downtime and cost data"; written by "Update failure codes and
 asset history in Reliability Analytics Platform".
@@ -30487,8 +30098,6 @@ Data Object "Enriched Alert Record" — written by Service task
   and context data".
 Data Object "Incident Response Severity Matrix" — read by User task
   "Assign severity indicator using incident response severity matrix".
-Data Store "Case Management System" — written by Service task
-  "Create initial event record in Case Management System".
 Data Object "Validated Event Record" — written by Expanded Subprocess
   "Repeat Until Record Complete", read by Send task "Forward validated
   event record for triage".
@@ -30621,10 +30230,6 @@ Data Object "Enrichment and Threat Intelligence Record" — written by
 Data Object "Dismissal Record" — written by "Document dismissal
   rationale"; read by "Update case record as dismissed in Case
   Management System".
-Data Store "Case Management System Record" — written by "Create
-  validated incident record in Case Management System" and "Record
-  severity and validation findings in Case Management System"; read by
-  the downstream Declare and Classify Incident subprocess.
 
 Triage & Validate takes the raw candidate event surfaced by Detect Event,
 enriches it with log evidence and threat-intelligence context, and tests
@@ -30731,7 +30336,6 @@ matrix".
 Data Object "Severity Classification" — written by "Apply severity
 classification using incident response matrix"; read by "Create incident
 record in Case Management System".
-Data Store "Incident Register (Case Management System)" — written by
 "Create incident record in Case Management System"; written by "Open
 incident timeline and communication log".
 Data Object "Response Team Assignment" — written by "Assign incident
@@ -31021,7 +30625,6 @@ investigation report".
 Data Object "Forensic Investigation Report" — written by User task "Draft
 forensic investigation report"; read by User task "Finalise and approve
 forensic investigation report".
-Data Store "Evidence Archive" — written by User task "Secure and archive
 evidence artefacts".
 
 This subprocess receives a contained incident from Contain Threat and
@@ -31168,7 +30771,6 @@ Data Object "Impact Assessment Report" — written by Privacy lane
 "Prepare impact assessment report for notification"; read by
 Privacy lane "Update incident record with impact assessment and
 notification obligations".
-Data Store "GRC Risk Register" — written by Privacy lane
 "Record privacy impact assessment in GRC Platform"; read by
 Privacy lane "Determine notification obligations and statutory
 timeframes".
@@ -31311,9 +30913,6 @@ Data Object "Regulator Response Record" — written by User task "Log regulator
 Data Object "Individual Response Log" — written by User task "Log individual
   responses and escalate concerns"; read by User task "Record all notification
   outcomes in incident record".
-Data Store "Case Management System" — read by User task "Confirm notification
-  obligations and statutory deadlines"; written by User task "Record all
-  notification outcomes in incident record".
 
 This subprocess fulfils the organisation's legal and regulatory disclosure
 obligations following a confirmed breach. Legal confirms which statutory
@@ -31459,10 +31058,6 @@ Data Object "Indicators of Compromise List" — read by User task "Verify
 Data Object "Endpoint Clean Status Report" — written by Intermediate
   message catch event "Endpoint clean status received"; read by Exclusive
   gateway "All endpoints confirmed clean?".
-Data Store "Incident Record" — written by User task "Update incident record
-  with eradication outcome"; written by User task "Log remediation step in
-  IT Service Management"; written by User task "Record restoration step in
-  IT Service Management".
 Data Object "Recovery Completion Report" — written by Send task "Confirm
   recovery completion to Incident Response"; read by User task "Review
   recovery outcome and validate service readiness".
@@ -31610,7 +31205,6 @@ security telemetry and alert baseline from IT Service Management"; read by
 "Confirm no residual indicators of compromise present".
 Data Object "Security Clearance Record" — written by "Issue security
 clearance for service restoration".
-Data Store "IT Service Management Register" — read and written by "Record
 service restoration confirmation in IT Service Management" and "Update
 incident record in IT Service Management".
 
@@ -31737,10 +31331,6 @@ Data Object "Post-Incident Report" — written by "Revise post-incident report"
 Data Object "Remediation Action List" — written by "Draft remediation and
   improvement actions"; read by "Review and prioritise remediation actions"
   and "Assign remediation actions and owners in GRC Platform".
-Data Store "Risk Register" — written by "Update risk register and
-  lessons-learned log in GRC Platform".
-Data Store "Lessons-Learned Log" — written by "Update risk register and
-  lessons-learned log in GRC Platform".
 
 V16.10 closes the Detect to Respond value chain by bringing Risk &
 Compliance and Incident Response together to reconstruct what happened,
@@ -32275,10 +31865,6 @@ Data Object "Proposed Audit Plan" — written by "Draft proposed audit plan
 Data Object "Engagement Scope Definition" — written by "Define scope,
   objectives, and criteria for each engagement"; read by "Record approved
   audit plan and scope in Audit Management System".
-Data Store "Audit Management System — Audit Plan Register" — written by
-  "Record approved audit plan and scope in Audit Management System".
-Data Store "GRC Platform — Risk Register" — read by "Retrieve risk
-  register and prior findings from GRC Platform".
 
 V17.01 takes the organisation from a planning trigger — whether an annual
 cycle, a regulatory examination, or an incident — through risk-based
@@ -32591,13 +32177,6 @@ Data Object "Preliminary Finding" — written by "Raise preliminary finding
 Data Object "External Auditor Results" — written by External Auditor
   (received via message); read by "Incorporate External Auditor results into
   workpapers".
-Data Store "Audit Management System Record" — written by "Record test result
-  in Audit Management System" and "Update consolidated test results in Audit
-  Management System"; read by "Retrieve control library, risk register, and
-  prior findings".
-Data Store "Evidence Repository Store" — written by "Store evidence in
-  Evidence Repository"; read by "Incorporate External Auditor results into
-  workpapers".
 
 This subprocess gathers all evidence needed to assess the in-scope controls,
 executes and documents test procedures for each control, incorporates
@@ -32714,8 +32293,6 @@ Data Object "Finding Rating" — written by "Apply finding rating criteria
 Data Object "Root-Cause Analysis" — written by "Document rated findings
   and root-cause analysis in workpapers"; read by "Perform quality review
   of rated findings".
-Data Store "Audit Management System Findings Register" — written by
-  "Record findings and ratings in Audit Management System".
 
 This subprocess takes the raw test results and evidence packages produced
 in Gather Evidence & Test Controls, applies the organisation's finding
@@ -32825,7 +32402,6 @@ quality review".
 Data Object "Quality Review Comments" — written by intermediate message
 catch event "Quality review comments received"; read by "Revise draft
 report per review comments".
-Data Store "Audit Management System Engagement Record" — read by
 "Retrieve rated findings and engagement record"; written by "Record
 approved draft report in Audit Management System".
 
@@ -32955,7 +32531,6 @@ and assign remediation owner"; read by "Review management responses for
 adequacy".
 Data Object "Factual Dispute Record" — written by "Raise factual dispute
 with Internal Audit"; read by "Review management responses for adequacy".
-Data Store "Issue & Action Tracking System" — written by "Transmit accepted
 responses to Issue & Action Tracking System".
 
 This subprocess takes the rated draft findings produced in Draft Audit
@@ -33071,9 +32646,6 @@ Data Object "Executive Summary and Cover Letter" — written by "Prepare
 Data Object "Chief Audit Executive Review Comments" — written by "Return
   report with review comments"; read by "Revise report in response to
   comments".
-Data Store "Audit Management System Report Register" — written by "Record
-  approved report in Audit Management System"; written by "Mark report as
-  issued in Audit Management System".
 Data Object "Regulator Acknowledgement" — written by Intermediate message
   catch event "Regulator acknowledgement received"; read by "Mark report as
   issued in Audit Management System".
@@ -33189,9 +32761,6 @@ Issue & Action Tracking System → Risk & Compliance lane, "Retrieve
 
 7. Data objects
 
-Data Store "Action Register" — read by "Load agreed actions and due
-  dates from system"; written by "Record escalation in system";
-  written by "Accept closure submission and record status".
 Data Object "Remediation Progress Update" — written by "Confirm
   remediation activities and provide progress update"; read by
   "Review action progress against due dates".
@@ -33311,13 +32880,6 @@ Organisation → Audit Management System (finding status updated to Closed or
 
 7. Data objects
 
-Data Store "Audit Management System" — read by "Retrieve open findings and
-  remediation evidence from Audit Management System"; written by "Record
-  finding as closed in Audit Management System" and "Record finding as
-  escalated in Audit Management System".
-Data Store "Evidence Repository" — read by "Pull closure evidence documents
-  from Evidence Repository"; written by "Update finding status to Closed in
-  Evidence Repository".
 Data Object "Closure Evidence Package" — read by "Review closure evidence
   against finding and retest criteria"; written by "Pull closure evidence
   documents from Evidence Repository".
@@ -33458,9 +33020,6 @@ Data Object "Committee Questions" — written by intermediate message catch even
 Data Object "Committee Resolutions and Directions" — written by intermediate
   message catch event "Committee resolution and directions received"; read by
   "Record committee resolutions and any new directions".
-Data Store "Action Register" — read by "Compile assurance coverage and
-  remediation status summary"; written by "Update action register with new
-  committee-directed actions".
 
 V17.10 brings the Audit to Action cycle to its governance conclusion. The chief
 audit executive presents the consolidated assurance picture — remediation
@@ -34011,10 +33570,6 @@ Data Object "Trigger Log" — written by "Log and categorise trigger";
   read by "Assess materiality and urgency".
 Data Object "Trigger Rationale" — written by "Confirm need and document
   trigger rationale".
-Data Store "Obligations Register" — read by "Retrieve current obligation
-  details from register" and "Retrieve document and review date from
-  register"; written by "Record confirmed trigger in Obligations
-  Register".
 
 This subprocess captures every inbound signal — regulatory obligation,
 scheduled review, audit finding, or organisational change — assesses
@@ -34135,9 +33690,6 @@ Data Object "Assignment Notification" — written by Risk & Compliance lane,
 Data Object "Scope Definition" — written by Policy Owner lane, User task
   "Define change scope and affected documents"; read by Risk & Compliance
   lane, User task "Review and confirm scope definition from policy owner".
-Data Store "Policy / GRC Platform Register" — written by Risk & Compliance
-  lane, Service task "Record assignment in Policy / GRC Platform" and
-  Service task "Record final scope in Policy / GRC Platform".
 
 This subprocess takes the confirmed trigger produced by Identify Need or
 Trigger and establishes clear accountability and boundaries for the change.
@@ -34260,10 +33812,6 @@ Data Object "Scoped Change Brief" — read by "Retrieve current
   document version and scope brief".
 Data Object "Approved Document Template" — read by "Create
   document shell from approved template".
-Data Store "Document Management System Repository" — read by
-  "Check out existing document from Document Management System";
-  written by "Save approved draft version in Document Management
-  System".
 Data Object "Working Draft" — written by "Prepare initial draft
   or revised sections"; read by "Review SME input and annotate
   draft"; written by "Incorporate accepted changes into draft".
@@ -34416,10 +33964,6 @@ Data Object "Comment Disposition Record" — written by User task "Record
 Data Object "Consultation Summary Report" — written by User task "Prepare
   consultation summary report"; read by Service task "Store consultation
   summary in Document Management System".
-Data Store "Document Management System" — read by Service task "Upload
-  draft and consultation package to Document Management System"; written
-  by Service task "Store consultation summary in Document Management
-  System".
 
 V18.04 Consult Stakeholders opens when the drafted or revised document
 arrives from the preceding subprocess and closes when every comment has
@@ -34546,12 +34090,6 @@ Data Object "Compliance Review Comments" — written by User task "Record
 Data Object "Consolidated Review Findings" — written by User task
   "Consolidate legal and compliance review findings"; read by Exclusive
   gateway "Review outcome?".
-Data Store "Policy / GRC Platform" — read by Service task "Retrieve current
-  draft and consultation record from Policy / GRC Platform"; written by
-  User task "Record legal review comments in Policy / GRC Platform";
-  written by User task "Record compliance review comments in Policy / GRC
-  Platform"; written by User task "Record clearance and close review in
-  Policy / GRC Platform".
 
 V18.05 brings the consulted draft through structured legal and compliance
 scrutiny, engaging external counsel where specialist opinion is needed and
@@ -34683,9 +34221,6 @@ Data Object "Rejection Reasons" — read by User task "Log rejection and
 Data Object "Rework Instruction" — written by User task "Log rejection
   and initiate rework instruction"; read by User task "Coordinate
   document rework with Policy Owner".
-Data Store "Approval Audit Trail" — written by Service task "Submit
-  package to Workflow & Approval System"; written by User task "Confirm
-  approval and record outcome".
 
 This subprocess receives the compliance-reviewed document from Obtain
 Legal & Compliance Review and manages all steps needed to secure a
@@ -34798,9 +34333,6 @@ Data Object "Approval Record" — read by User task "Retrieve approved
 Data Object "Version Number and Effective Date" — written by User task
   "Assign version number and set effective date"; read by Service task
   "Upload versioned document to Document Management System".
-Data Store "Document Repository" — written by Service task "Upload
-  versioned document to Document Management System"; read by User task
-  "Mark superseded version as archived".
 Data Object "Superseded Version Record" — written by User task "Mark
   superseded version as archived".
 Data Object "Published Document Record" — written by User task "Record
@@ -34941,8 +34473,6 @@ Data Object "Standard Update Notification" — written by "Prepare
 Data Object "Engagement Metrics Report" — written by "Review
   communication reach and engagement metrics"; read by "Record
   communication completion and coverage".
-Data Store "Communication Record" — written by "Record communication
-  completion and coverage".
 
 V18.08 Communicate Change takes the published policy document and
 version record from V18.07 and ensures all affected audiences are
@@ -35071,7 +34601,6 @@ target audience and assign training in LMS"; read by Service task
 Data Object "Completion and Attestation Report" — written by Service
 task "Pull updated completion report from LMS"; read by User task
 "Review attestation completion report from LMS".
-Data Store "Attestation Records" — written by User task "Archive
 attestation records and completion report"; read by User task "Review
 attestation completion report from LMS".
 
@@ -35209,10 +34738,8 @@ Data Object "Validation Response" — written by "Confirm validation
 and sign off schedule" or "Raise revision request with required
 date and reason"; read by the exclusive gateway "Review schedule
 validated?".
-Data Store "Policy / GRC Platform Review Register" — written by
 "Register confirmed review schedule in Policy / GRC Platform";
 read by "Query review schedule from Policy / GRC Platform".
-Data Store "Obligations Register" — read by "Verify review date
 against mandatory review cycle and obligations register".
 Data Object "Cycle Closure Record" — written by "Archive current
 cycle record and mark version as current".
@@ -35893,7 +35420,6 @@ engagement record from HR System".
 Data Object "Acceptable-Use Acceptance" — written by "Log identity
 evidence against request record"; read by "Record status
 confirmation".
-Data Store "HR Employment Record" — read by "Retrieve employment or
 engagement record from HR System"; written by HR System.
 Data Object "Status Confirmation" — written by "Record status
 confirmation"; read by "Mark identity and status as validated on
@@ -36041,8 +35567,6 @@ Data Object "Candidate Entitlement List" — written by "Identify
 Data Object "Amendment Notes" — written by "Return list with amendment
   notes to identity engineer"; read by "Review and revise candidate
   entitlements".
-Data Store "IAM Entitlement Record" — written by "Write entitlement
-  record to IAM system"; read by subsequent provisioning steps.
 
 V19.03 Determine Entitlements Required takes the validated identity and
 status confirmed by V19.02 and translates it into a precise, agreed and
@@ -36181,10 +35705,6 @@ Data Object "Conflict Detection Results" — written by Intermediate message
 Data Object "Exception Justification" — written by User task "Prepare
   exception justification"; read by Send task "Submit exception request
   to GRC Platform".
-Data Store "GRC Platform Exception Register" — written by User task
-  "Record approved exception in GRC Platform"; written by User task
-  "Document blocking conflict in GRC Platform"; written by User task
-  "Record clean SoD result in GRC Platform".
 
 This subprocess takes the proposed entitlement set from Determine
 Entitlements Required, uses the IAM platform to detect conflicts against
@@ -36470,8 +35990,6 @@ Data Object "Provisioning Status Report" — written by "Poll
   "Provisioning successful?".
 Data Object "Provisioning Failure Incident" — written by "Log
   provisioning failure and raise incident".
-Data Store "Access Register" — written by "Update access register in
-  IAM System"; written by "Record provisioning outcome in IAM System".
 
 This subprocess takes the approved entitlement specification from
 Obtain Approvals and translates it into concrete technical actions:
@@ -36599,11 +36117,6 @@ Data Object "Contractor Acknowledgement" — written by "Record
 Data Object "Escalation Record" — written by "Escalate non-response
   and re-send notification"; read by "Log escalation in IT Service
   Management".
-Data Store "IT Service Management Ticket" — read by "Log notification
-  sent in IT Service Management"; written by "Update request ticket
-  with confirmation in IT Service Management"; written by "Close access
-  request ticket in IT Service Management"; written by "Log escalation
-  in IT Service Management".
 
 V19.07 Notify & Confirm with Requester takes the provisioned access
 record from V19.06 and ensures the contractor is formally informed of
@@ -36709,11 +36222,6 @@ Message flows:
 
 7. Data objects
 
-Data Store "Access Certification Platform" — read by "Retrieve current
-  access holdings from Access Certification Platform"; written by
-  "Submit certification decisions to Access Certification Platform";
-  written by "Record review outcome and exceptions in Access
-  Certification Platform".
 Data Object "Certification Decision Record" — written by "Approve and
   certify entitlement"; written by "Flag entitlement for revocation";
   read by "Submit certification decisions to Access Certification
@@ -36865,12 +36373,6 @@ Data Object "Revocation Request" — written by User task "Raise
 Data Object "Entitlement Revocation Record" — written by Service task
   "Revoke entitlement in IAM system"; read by User task "Verify
   revocation status for entitlement".
-Data Store "IAM Access Register" — read by Service task "Retrieve
-  current access holdings from IAM system"; written by Service task
-  "Record revocation completion in IAM system".
-Data Store "HR Personnel Record" — read by User task "Confirm nature
-  of change or exit"; written by Send task "Confirm revocation to
-  Human Resources".
 
 V19.09 Revoke on Change or Exit removes all access entitlements held
 by an individual whose employment or engagement status has changed,
@@ -37022,7 +36524,6 @@ Data Object "Audit Response Report" — written by "Prepare audit response
 report"; read by "Transmit audit evidence and report to Auditor".
 Data Object "Auditor Query Response" — written by "Coordinate response to
 auditor queries"; read by "Send query responses to Auditor".
-Data Store "Audit Archive" — written by "Archive evidence package and
 close audit activity".
 
 V19.10 Evidence for Audit gathers access registers, recertification
@@ -37563,9 +37064,6 @@ Data Object "Conflict-of-Interest Check Record" — written by "Check for
 Data Object "Supporting Documentation Package" — written by "Gather
   supporting documentation and file reference material"; read by "Create
   matter record in Matter Management System".
-Data Store "Matter Register" — written by "Create matter record in Matter
-  Management System"; read by "Assign matter owner and notify relevant
-  business unit".
 
 This subprocess captures every inbound claim, dispute, complaint,
 regulatory notice, subpoena or litigation filing, runs a conflict-of-
@@ -37696,7 +37194,6 @@ supplementary information from matter owner".
 Data Object "Exposure and Provisioning Recommendation" — written by
 "Prepare exposure and provisioning recommendation"; read by
 "Consolidate merits opinion and exposure assessment".
-Data Store "Matter Management System Record" — written by "Record
 consolidated assessment in Matter Management System".
 
 This subprocess takes the registered matter and produces a consolidated
@@ -37821,10 +37318,8 @@ Data Object "Letter of Instruction" — written by "Prepare and issue letter of
 instruction to external counsel"; read by External Counsel.
 Data Object "Engagement Confirmation" — read by "Record external counsel
 assignment and agreed scope in matter record".
-Data Store "Matter Record" — written by "Record external counsel assignment
 and agreed scope in matter record" and "Update matter status in Matter
 Management System".
-Data Store "Counsel Budget and Rate Card" — written by "Create budget and
 engagement record in Legal Spend Management".
 
 This subprocess takes the assessed exposure report from V20.02, identifies
@@ -37962,7 +37457,6 @@ User task "Confirm hold coverage complete".
 Data Object "Evidence Inventory" — written by User task "Compile
 evidence inventory"; read by User task "Log hold record and custodian
 list".
-Data Store "Legal Hold & e-Discovery Platform Record" — written by
 Service task "Record hold status in platform"; read by User task
 "Confirm hold coverage complete".
 
@@ -38093,12 +37587,6 @@ Data Object "Approved Strategy Document" — written by "Finalise and
 Data Object "Executive Strategy Summary" — written by "Prepare strategy
   summary for executive reporting"; read by the end event flow for
   onward reporting.
-Data Store "Matter Management System Record" — read by "Retrieve matter
-  record and exposure assessment"; written by "Store strategy and
-  privilege log in Matter Management System".
-Data Store "Privilege Log" — written by "Record privilege log entry for
-  strategy document"; read by "Store strategy and privilege log in
-  Matter Management System".
 
 V20.05 Develop Strategy takes the confirmed counsel assignment from
 V20.04 and produces an approved, privilege-protected strategy document
@@ -38301,11 +37789,9 @@ Data Object "Court Submission" — written by Send task "File submission
 with court"; read by Intermediate message catch event "Court
 acknowledgement received".
 
-Data Store "Matter Management System" — written by Service task "Post
 disclosure record to Matter Management System"; read by User task "Update
 matter record with disclosure status".
 
-Data Store "Document Management System" — written by Service task "Upload
 disclosure package to Document Management System"; read by Legal —
 Paralegal lane tasks retrieving stored documents.
 
@@ -38477,7 +37963,6 @@ Data Object "Authorised Settlement Mandate" — written by User task
 Data Object "Settlement Agreement Draft" — written by User task "Draft
 settlement agreement terms"; read by the end event leading to Settle or
 Obtain Judgment.
-Data Store "Matter Management System Record" — read by Service task
 "Retrieve matter record and exposure assessment"; written by Service task
 "Record final negotiated position in matter record" and Service task
 "Update matter record with breakdown status".
@@ -38615,10 +38100,6 @@ Data Object "Witness and Evidence File" — written by User task "Prepare
 Data Object "Court Ruling or Judgment" — written by Intermediate message
   catch event "Hearing outcome or ruling received from Court"; read by
   Exclusive gateway "Outcome requires further action?".
-Data Store "Matter Management System Record" — written by Service task
-  "Update matter record with directions and key dates" and Service task
-  "Post litigation outcome to Matter Management System"; read by User
-  task "Review directions and identify filing obligations".
 
 V20.08 Litigate or Defend manages the organisation's active conduct of
 litigation from receipt of court directions through submission drafting,
@@ -38755,12 +38236,6 @@ Data Object "Judgment Terms" — written by User task "Review and record
 Data Object "Authority Approval" — written by User task "Confirm
   authority limits and obtain settlement approval"; read by User task
   "Record resolution outcome in matter record".
-Data Store "Matter Management System" — read by User task "Review and
-  record judgment terms"; written by User task "Record resolution outcome
-  in matter record".
-Data Store "Finance / ERP System" — read by User task "Review financial
-  exposure and existing provision"; written by User task "Post final
-  provision adjustment or accrual".
 
 This subprocess secures resolution of the matter either through an
 executed settlement agreement or by recording a court judgment, ensures
@@ -38886,9 +38361,6 @@ Data Object "Matter Closure Report" — written by "Submit matter
 Data Object "Board Reporting Pack" — written by "Prepare board
   reporting pack"; read by "Publish reporting pack to Board Reporting
   System".
-Data Store "Matter Management System Record" — read by "Review matter
-  outcome and final cost"; updated by "Mark matter closed in Matter
-  Management System".
 
 This subprocess closes the matter by reviewing its final outcome,
 capturing and approving a lessons-learned register entry, lifting
@@ -39417,9 +38889,6 @@ Data Object "Supporting Documents Package" — written by User task
 Data Object "Acknowledgement Notice" — written by Send task "Send
   acknowledgement and reference number to Applicant"; read by no
   further task within this subprocess.
-Data Store "Application / Origination Platform Record" — written by
-  Service task "Create application record in Application /
-  Origination Platform".
 
 V21.01 receives the incoming application from the applicant or a broker,
 assigns it a reference number, creates the authoritative record in the
@@ -39530,9 +38999,6 @@ Data Object "Request for Further Information" — written by "Issue request
   for further information to applicant" / read by Applicant pool.
 Data Object "Applicant Response" — written by Applicant pool / read by
   "Re-run completeness check against product rules".
-Data Store "Application / Origination Platform record store" — read by
-  "Retrieve application record from platform" / written by "Mark
-  application as complete in platform".
 
 Check Completeness receives the submitted application from Receive
 Application and confirms it contains every required field, document and
@@ -39680,10 +39146,6 @@ Data Object "Verification Request" — written by Service task "Submit
 Data Object "Verification Result" — written by Identity Verification
   Service (System); read by User task "Record verification outcome in
   Application / Origination Platform".
-Data Store "Application / Origination Platform Record" — written by
-  User task "Record verification outcome in Application / Origination
-  Platform"; written by User task "Record verification failure in
-  Application / Origination Platform".
 
 V21.03 Verify Identity takes the complete application accepted by Check
 Completeness and confirms that the applicant is who they claim to be.
@@ -39822,10 +39284,6 @@ Data Object "Bureau Report" — written by Intermediate message catch
 Data Object "Evidence Package" — written by User task "Compile
   evidence package for assessment"; read by the end event flow
   passed to Assess Eligibility.
-Data Store "Document Management System Repository" — written by
-  Service task "Store evidence documents in Document Management
-  System"; read by User task "Compile evidence package for
-  assessment".
 
 V21.04 Gather Supporting Evidence collects all documentary and
 third-party data needed to assess the application, running applicant
@@ -39941,10 +39399,6 @@ Data Object "Eligibility Rules Result" — written by Intermediate message
 Data Object "Manual Review Notes" — written by User task "Conduct manual
   eligibility review against product rules"; read by User task "Re-evaluate
   eligibility position".
-Data Store "Application / Origination Platform Record" — written by Service
-  task "Write eligibility outcome to Application / Origination Platform";
-  read by Service task "Submit application to Decision Engine for eligibility
-  check".
 
 V21.05 Assess Eligibility takes the verified, evidence-complete application
 and runs it through the Decision Engine's product and eligibility rules,
@@ -40074,8 +39528,6 @@ Data Object "Manual Pricing Proposal" — written by User task "Propose
 Data Object "Risk Score and Pricing Record" — written by User task
   "Record final risk score and agreed pricing terms"; read by Service
   task "Write score, pricing and risk rationale to Application Platform".
-Data Store "Application / Origination Platform" — written by Service
-  task "Write score, pricing and risk rationale to Application Platform".
 
 This subprocess receives the confirmed-eligible application from Assess
 Eligibility and produces a validated risk score and agreed pricing
@@ -40185,9 +39637,6 @@ Data Object "Delegated Authority Decision" — written by "Record
   approval and authority details" / "Record conditions of approval" /
   "Record declination with reasons"; read by "Update case file with
   delegated authority outcome".
-Data Store "Case Management System Record" — written by "Lodge
-  referral in Case Management System"; read by "Update case file
-  with delegated authority outcome".
 
 This subprocess determines whether a case requires escalation beyond
 standard approval limits and, where it does, manages the referral to
@@ -40302,8 +39751,6 @@ Data Object "Decision Record" — written by "Record approval and set
 Data Object "Decision Rationale and Adverse-Action Reasons" —
   written by "Compile decision rationale and adverse-action reasons";
   read by "Quality-check decision for regulatory compliance".
-Data Store "Application / Origination Platform Record" — written by
-  "Submit decision record to platform".
 
 V21.08 Decide Outcome is the point at which the Assessing
 Organisation converts scoring, pricing, and any delegated-authority
@@ -40435,9 +39882,6 @@ Data Object "Applicant Acknowledgement Record" — written by "Record
   acknowledgement and close notification task" / "Flag non-response for
   Intake review and log outcome"; read by "Update application record with
   notification outcome".
-Data Store "Application / Origination Platform" — updated by "Update
-  application record with notification outcome"; read by "Review decision
-  record and prepare notification content".
 
 V21.09 takes the confirmed decision from Decide Outcome, prepares a
 formatted notice carrying reasons, any conditions, adverse-action
@@ -40575,9 +40019,6 @@ Data Object "Reviewed Decision and Rationale" — written by User task
 Data Object "Adverse-Action Reasons" — written by User task "Compile
   adverse-action reasons if decision upheld"; read by Send task "Send
   reviewed decision with reasons to Applicant".
-Data Store "Case Management System record" — read by Service task "Pull
-  case file from Case Management System"; written by Service task "Update
-  appeal outcome in Case Management System".
 
 V21.10 Handle Appeal or Review receives a formal appeal or review request
 from an applicant disputing the decision issued in V21.09 and registers it
@@ -41321,9 +40762,7 @@ Data Object "Initial Reserve Estimate" — written by "Calculate initial
 reserve estimate"; read by "Record initial reserve in Reserving System".
 Data Object "Reserving Basis and Assumptions" — written by "Document
 reserving basis and assumptions".
-Data Store "Claims Management Platform Record" — written by "Update
 claim record with reserve in Claims Management Platform".
-Data Store "Reserving System Ledger" — written by "Record initial
 reserve in Reserving System".
 
 V22.02 Register Claim & Set Reserve takes the lodged notification
@@ -41739,11 +41178,9 @@ Data Object "Quantum and Settlement Range" — written by User task
 "Record assessment outcome and quantum in Claims Management Platform".
 Data Object "Referral Summary" — written by User task "Prepare referral
 summary for senior approver".
-Data Store "Claims Management Platform Record" — read by Service task
 "Retrieve policy and cover data from Claims Management Platform"; written
 by Service task "Record assessment outcome and quantum in Claims
 Management Platform".
-Data Store "Document & Image Repository" — written by Service task
 "Store supporting evidence and reports in Document and Image Management".
 
 V22.05 Assess Loss & Quantum takes the triaged and assigned claim,
@@ -41885,10 +41322,8 @@ investigation report and findings"; read by User task "Receive escalation
 and review fraud indicators".
 Data Object "Fraud Referral File" — written by User task "Prepare formal
 fraud referral file".
-Data Store "Claims Management Platform" — read and written by User task
 "Review referral and assess investigation scope" and User task "Compile
 investigation report and findings".
-Data Store "Fraud Detection Platform Record" — written by Service task
 "Record fraud referral outcome in Fraud Detection Platform".
 
 This subprocess determines whether a claim requires desk or field
@@ -42023,10 +41458,6 @@ Data Object "Decision Rationale" — written by "Document approval
 Data Object "Decision Communication" — written by "Draft decision
   communication to claimant"; read by "Record dispute flag and note
   complaints rights on decision communication".
-Data Store "Claims Management Platform Record" — written by "Record
-  decision recommendation in Claims Management Platform" and "Update claim
-  decision status in Claims Management Platform"; read by "Conduct authority
-  review and confirm or override recommendation".
 
 V22.07 Approve or Decline takes the assessed loss and quantum from V22.05
 and applies delegated authority rules to reach a binding approve or decline
@@ -42184,10 +41615,6 @@ Data Object "Payment Advice" — written by User task "Issue payment advice
 Data Object "Bank Details and Declaration" — read by User task "Prepare
   payment instruction"; written by Intermediate message catch event "Bank
   details and declaration received from claimant".
-Data Store "Supplier Network System" — read by Service task "Check
-  repairer availability and pricing in panel".
-Data Store "Claims Management Platform" — updated by User task "Authorise
-  repairer invoice" and User task "Issue payment advice to claimant".
 
 V22.08 Arrange Repair, Service or Payment takes an approved claim
 decision and fulfils it either by commissioning a panel repairer to
@@ -42362,11 +41789,6 @@ Data Object "Third-Party Recovery Response" — read by Exclusive
   gateway "Third-party recovery agreed?".
 Data Object "Reinsurance Recovery Response" — read by Exclusive
   gateway "Reinsurance recovery accepted?".
-Data Store "Recoveries & Reinsurance System" — written by Service task
-  "Update recovery record in Recoveries & Reinsurance System"; written
-  by Service task "Update reinsurance record in Recoveries &
-  Reinsurance System"; written by Service task "Post recovery receipts
-  to Recoveries & Reinsurance System".
 
 V22.09 Pursue Recoveries & Reinsurance identifies, prepares, and negotiates
 all third-party subrogation and reinsurance recovery claims that arise from
@@ -42496,13 +41918,6 @@ Data Object "Reserve Release Instruction" — written by "Calculate
 Data Object "Final Incurred Loss Record" — written by "Record final
   incurred loss and close reserve"; read by "Trigger claims ratio and
   leakage reporting".
-Data Store "Claims Management Platform Record" — read by "Review claim
-  for closure readiness"; updated by "Update claim status to Closed in
-  Claims Management Platform" and "Trigger claims ratio and leakage
-  reporting".
-Data Store "Reserve Ledger" — read by "Review reserve adequacy against
-  final settlement amount"; updated by "Record final incurred loss and
-  close reserve".
 
 V22.10 closes out the claim lifecycle by confirming all settlement and
 recovery obligations are met, updating the claim status to closed in the
@@ -43085,8 +42500,6 @@ Data Object "Consumer Self-Read Submission" — written by "Record consumer
 Data Object "Missing Read Notification" — written by "Flag missing read
   and raise substitution request"; read by the downstream Validate &
   Estimate Data subprocess.
-Data Store "Meter Register" — written by "Submit reads to Meter Data
-  Management System"; read by "Confirm read lodged in register".
 
 This subprocess acquires raw consumption data from all available read
 sources — smart meter head-end collection, third-party field visits, and
@@ -43245,9 +42658,6 @@ Data Object "Validated Consumption Dataset" — written by
   "Finalise and lock validated consumption dataset in MDM
   System"; read by "Publish validated consumption dataset to
   Billing Engine".
-Data Store "Meter Data Register" — read by "Retrieve interval
-  and register data from MDM System"; written by "Finalise and
-  lock validated consumption dataset in MDM System".
 
 This subprocess takes raw meter reads produced by Acquire Meter
 Readings and subjects them to formal validation rules, resolving
@@ -43489,10 +42899,6 @@ Data Object "Invoice" — written by "Generate invoice in Billing Engine",
   bill for dispatch".
 Data Object "Delivery Preferences" — read by "Retrieve delivery preferences
   from Customer Information System", read by "Assemble bill data".
-Data Store "Customer Information System Record" — written by "Record bill
-  issuance in Customer Information System".
-Data Store "Billing Engine Ledger" — written by "Generate invoice in Billing
-  Engine", written by "Update bill status to Issued in Billing Engine".
 
 This subprocess takes rated consumption produced by Apply Tariffs & Rate
 Consumption, assembles a complete invoice using account and contact data from
@@ -43819,12 +43225,6 @@ Data Object "Payment Authorisation Record" — written by Intermediate
   message catch event "Authorisation confirmation received"; read by
   Service task "Post payment to account in Payment Processing
   System".
-Data Store "Customer Account Ledger" — read by User task "Match
-  payment to outstanding invoice or account"; written by Service task
-  "Post payment to account in Payment Processing System".
-Data Store "General Ledger" — written by Service task "Trigger
-  general-ledger posting in General Ledger"; read by User task
-  "Reconcile daily payment run".
 
 This subprocess captures every inbound payment regardless of channel,
 matches it to the correct account, posts the allocation to the
@@ -44031,12 +43431,6 @@ Data Object "Hardship Arrangement Agreement" — written by User task
   hardship case in Collections System".
 Data Object "Instalment Outcome Record" — written by User task "Record
   instalment outcome"; read by Exclusive gateway "Plan outcome?".
-Data Store "Collections System Register" — read by Service task "Retrieve
-  arrears account details"; written by Service task "Record payment plan
-  in Collections System", Service task "Register hardship case in
-  Collections System", Service task "Update hardship record in Collections
-  System", Service task "Close arrears case in Collections System",
-  Service task "Close hardship case in Collections System".
 
 This subprocess identifies consumers with overdue balances, contacts them,
 assesses hardship eligibility, and establishes either a standard payment
@@ -44194,11 +43588,6 @@ Data Object "Recovery Update Report" — read by "Intermediate message
 Data Object "Write-off Request" — written by "Raise write-off request
   and obtain approval"; read by "Record write-off in Collections
   System".
-Data Store "Collections System" — read by "Retrieve ageing and
-  collections status from Collections System"; written by "Post
-  recovery amount to Collections System", "Record write-off in
-  Collections System", "Record payment or arrangement in Collections
-  System", "Close collections case and update account status".
 
 This subprocess pursues recovery of debts that could not be resolved
 through arrears management or hardship arrangements. It issues a final
@@ -44399,10 +43788,6 @@ Data Object "Meter Reading at Reconnection" — written by User task
   "Execute reconnection and record meter reading at reconnection";
   read by Send task "Submit reconnection completion and meter read to
   Meter Data Management System"
-Data Store "Customer Information System Account Record" — read by User
-  task "Verify disconnection eligibility and protected-customer
-  exclusions"; written by User task "Update account status to
-  disconnected in Customer Information System"
 
 This subprocess governs the full lifecycle from credit-authorised
 disconnection through to supply restoration. It enforces eligibility
@@ -44540,10 +43925,6 @@ Data Object "Reconciliation Variance Report" — written by User task
 Data Object "Leakage Investigation Findings" — written by User task
   "Investigate revenue leakage and root cause"; read by User task
   "Raise adjustment or correction action".
-Data Store "Revenue Assurance Analytics Ledger" — written by Service
-  task "Record adjustment in Revenue Assurance Analytics"; read by
-  Service task "Extract unbilled revenue and consumption data from
-  Revenue Assurance Analytics".
 Data Object "Assurance Summary Report" — written by User task
   "Prepare assurance summary report"; read by User task "Compile
   regulatory revenue report".
@@ -45078,8 +44459,6 @@ Data Object "Exemption Certificate" — written by "Log and classify
 Data Object "Transaction Record with Tax Attributes" — written by
   "Assign tax codes to transaction line items"; read by "Record
   transaction with tax attributes in ERP / General Ledger".
-Data Store "ERP / General Ledger" — written by "Record transaction with
-  tax attributes in ERP / General Ledger".
 
 This subprocess receives tax invoices and exemption certificates from
 customers and suppliers, validates their completeness, assigns the
@@ -45357,9 +44736,6 @@ Data Object "Variance Investigation Record" — written by
 Data Object "Uncertain Tax Position Note" — written by "Document
   uncertain tax position and escalate to tax manager"; read by
   "Record escalation outcome and rationale".
-Data Store "ERP / General Ledger" — written by "Post calculated
-  liabilities and credits to ERP / General Ledger"; read by
-  "Record tax provision entries and effective-rate calculation".
 Data Object "Tax Provision and Effective-Rate Schedule" — written
   by "Record tax provision entries and effective-rate calculation".
 
@@ -45481,9 +44857,6 @@ Data Object "Variance Analysis Report" — written by "Classify variance as
   adjustment" and "Document reconciliation outcome and adjustments".
 Data Object "Correcting Journal" — written by "Prepare correcting journal
   or adjustment"; read by "Post approved adjustments to ledger".
-Data Store "ERP / General Ledger" — read by "Extract ledger balances for
-  tax accounts" and "Extract sub-ledger and transaction detail"; written by
-  "Record finalised reconciliation in ERP / General Ledger".
 
 This subprocess reconciles the calculated tax liabilities and credits
 against the general ledger balances, investigating and clearing any
@@ -45627,10 +45000,6 @@ Data Object "Workpapers Package" — written by "Compile supporting
   draft and workpapers in Tax Reporting System".
 Data Object "Specialist Adviser Input" — read by "Incorporate adviser
   input into return draft and workpapers".
-Data Store "Document Management System Workpaper Repository" — written
-  by "Save finalised workpapers to Document Management System".
-Data Store "Tax Reporting System Return Register" — written by "Record
-  completed return draft status in Tax Reporting System".
 
 V24.05 transforms reconciled ledger balances into a complete, cross-
 checked return draft supported by documented workpapers. It draws in
@@ -45742,9 +45111,6 @@ Data Object "Review Findings" — written by "Document review findings
 Data Object "Legal Opinion" — read by "Apply legal opinion and update
   return position"; written by "Escalate uncertain tax position to tax
   manager and Legal".
-Data Store "Tax Reporting System" — written by "Record formal approval
-  of return in Tax Reporting System"; read by "Retrieve return package
-  from Tax Reporting System".
 
 V24.06 Review & Approve is the quality and governance gate in the
 Transaction to Return chain. The tax manager subjects the completed return
@@ -45991,9 +45357,6 @@ Data Object "Refund Claim" — written by "Prepare and lodge refund claim
 Data Object "Refund Decision Notice" — written by intermediate message
   catch event "Refund decision received from Tax Authority"; read by
   exclusive gateway "Refund approved?".
-Data Store "Payment Ledger" — written by "Record payment and update
-  payment ledger"; written by "Record refund receipt and update payment
-  ledger".
 Data Object "Dispute Response Package" — written by "Review escalated
   refund dispute and prepare response"; read by "Submit additional
   documentation to Tax Authority".
@@ -46139,9 +45502,6 @@ Data Object "Legal Risk Assessment" — written by User task "Assess legal risk
 Data Object "Authority Determination" — written by intermediate message catch
   event "Authority determination or assessment received"; read by Exclusive
   gateway "Determination acceptable?".
-Data Store "Document Management System" — read by Service task "Retrieve
-  relevant workpapers and lodged return"; written by Service task "Store
-  response and correspondence in Document Management System".
 
 This subprocess receives a query or audit notice from the Tax Authority and
 guides the Tax and Legal teams through classifying the matter, gathering
@@ -46266,16 +45626,6 @@ Data Object "Legislative Analysis Report" — written by (External Tax
 Data Object "Updated Tax Treatment Rules" — written by "Draft updated
   tax treatment rules and rate table changes"; read by "Apply updated
   rules and rate tables in Tax Reporting System".
-Data Store "Tax Policy Documentation" — written by "Update tax policy
-  documentation and governance records"; read by "Communicate changes
-  to affected teams and stakeholders".
-Data Store "Lodgement Calendar" — written by "Record legislative
-  change and update lodgement calendar if deadlines affected"; read by
-  "Record legislative change and update lodgement calendar if deadlines
-  affected".
-Data Store "Tax Reporting System Rule Repository" — written by "Apply
-  updated rules and rate tables in Tax Reporting System"; read by
-  "Validate updated rules against sample transactions".
 
 V24.10 Monitor Legislative Change scans incoming legislative and
 regulatory signals, assesses their materiality, commissions external
@@ -46881,7 +46231,6 @@ requirements".
 Data Object "Licence and Privacy Constraint Record" — written by "Assess
 licensing, consent and privacy constraints"; read by "Record approved
 source in data catalogue".
-Data Store "Data Catalogue Source Register" — written by "Record approved
 source in data catalogue".
 
 This subprocess takes the captured business question and works through
@@ -47016,8 +46365,6 @@ Data Object "Pipeline Run Log" — written by Intermediate message
   receipt in data lake".
 Data Object "Ingestion Run Metadata" — written by User task "Record
   ingestion run metadata and dataset location".
-Data Store "Data Lake Raw Storage" — written by Service task
-  "Validate raw file receipt in data lake".
 
 This subprocess takes the approved and prioritised source list from
 Identify and Assess Sources, builds or updates the necessary ingestion
@@ -47151,9 +46498,6 @@ Data Object "Remediated Dataset" — written by User task "Apply
   quality and profiling run".
 Data Object "Quality Profile Annotation" — written by User task
   "Annotate dataset with quality status and profile metadata".
-Data Store "Data Quality & Observability Platform Log" — written by
-  Service task "Trigger quality and profiling run"; written by Service
-  task "Re-trigger quality and profiling run".
 
 V25.04 Validate Quality & Profile receives the ingested dataset from
 V25.03 and subjects it to automated quality checks and statistical
@@ -47296,8 +46640,6 @@ Data Object "Transformation Job Run Log" — read by "Review
   transformed output and validate model structure".
 Data Object "Model Version Record" — written by "Document
   transformation logic and model version".
-Data Store "Data Warehouse Curated Dataset" — written by "Write
-  curated dataset to Data Warehouse".
 
 V25.05 takes the validated, profiled dataset produced by V25.04 and
 applies analytics-engineering-designed transformation logic to produce
@@ -47429,8 +46771,6 @@ Data Object "Transformation Logic Documentation" — written by User task
   "Submit lineage graph to Data Catalogue".
 Data Object "Lineage Graph" — written by User task "Map source-to-target
   lineage"; read by Service task "Submit lineage graph to Data Catalogue".
-Data Store "Data Catalogue" — written by Service task "Publish approved
-  entry to Data Catalogue".
 
 V25.06 Catalogue & Document Lineage takes the curated datasets and model
 artefacts produced by Transform & Model Data and registers them as
@@ -47571,10 +46911,6 @@ Data Object "Modelling Approach and Feature Specification" — written by "Defin
 Data Object "Model Evaluation Results" — written by "Evaluate model performance
   against success measures"; read by "Package and register model version in ML
   Platform".
-Data Store "ML Platform Model Registry" — written by "Package and register model
-  version in ML Platform".
-Data Store "Business Intelligence Platform Content Store" — written by "Build
-  report or dashboard in BI Platform".
 
 This subprocess produces the primary deliverable — a validated draft report,
 dashboard or registered model version — that directly answers the business
@@ -47695,8 +47031,6 @@ Data Object "Review Record" — written by "Compile review record and pass to
   governance policy".
 Data Object "Governance Finding" — written by "Raise governance finding and
   request remediation"; read by "Remediation confirmed by Analytics".
-Data Store "Governance Approval Register" — written by "Record governance
-  approval in Business Intelligence Platform".
 
 This subprocess acts as the final quality gate before any analysis, model or
 report reaches end users. It ensures the business sponsor is satisfied with the
@@ -47864,11 +47198,9 @@ Data Object "Data Subject Rights Request" — read by User task "Honour
 Data Subject access, correction or deletion request"; written by
 Service task "Apply data-subject rights action across platform".
 
-Data Store "Access Register" — written by Service task "Provision
 access in Access Management System"; read by User task "Notify
 requestors and record provisioning".
 
-Data Store "Data Catalogue" — read by User task "Configure asset
 metadata and access tiers"; written by User task "Notify requestors
 and record provisioning".
 
@@ -48008,19 +47340,9 @@ Message flows:
 
 7. Data objects
 
-Data Store "Pipeline and Usage Metrics" — read by "Collect
-  pipeline and usage metrics" / written by Data Quality &
-  Observability Platform.
-Data Store "Data Quality and Drift Report" — read by
-  "Retrieve data quality and drift signals" / written by
-  Data Quality & Observability Platform.
 Data Object "Drift Incident Record" — written by "Raise data
   quality or drift incident" / read by "Notify affected
   consumers" and "Analyse model degradation and root cause".
-Data Store "Model Performance and Version History" — read by
-  "Retrieve model performance and drift metrics" / written by
-  "Register updated model version in platform" (via Machine
-  Learning Platform).
 Data Object "Remediation Report" — written by "Document
   remediation actions and updated thresholds" / read by
   "Confirm remediation complete to Data Platform".
@@ -48665,7 +47987,6 @@ Data Object "Business Case Document" — written by User task "Develop
 business case document"; read by User task "Conduct business case review
 and quality check"; read by Service task "Submit business case to Capital
 Portfolio Management System".
-Data Store "Capital Portfolio Management System Register" — written by
 Service task "Submit business case to Capital Portfolio Management System";
 read by User task "Obtain stage-gate sign-off from project sponsor".
 
@@ -48803,9 +48124,6 @@ Data Object "Cost Estimate" — read by User task "Validate cost
 Data Object "Capital Approval Submission" — written by User task
   "Prepare internal capital approval submission"; read by Send task
   "Submit to capital approval authority".
-Data Store "Capital Portfolio Management System — Approvals Register"
-  — written by Service task "Update approval status in Capital
-  Portfolio Management System".
 Data Object "Approved Budget and Cost Code" — written by User task
   "Issue approved budget and cost code to project".
 
@@ -48928,10 +48246,6 @@ Data Object "Design Deliverables Package" — read by "Review design
   comments and markup".
 Data Object "Review Comments" — written by "Record review comments and
   markup"; read by "Issue review comments to Consultant".
-Data Store "Engineering Design & Document Control" — written by
-  "Register approved documents in Engineering Design & Document
-  Control"; read by "Confirm design is complete and issue for
-  construction".
 
 This subprocess takes the approved business case from Obtain Funding
 Approval and produces a fully reviewed, approved and registered set of
@@ -49070,11 +48384,6 @@ Data Object "Permit Decision Notice" — written by Intermediate message
   catch event "Permit decision received from Regulator"; read by Exclusive
   gateway "Permit granted?" and User task "Review permit conditions and
   environmental obligations".
-Data Store "Document Management System Register" — read by Project
-  Management lane tasks retrieving document versions and permit status;
-  written by Service task "Upload applications and impact assessments to
-  Document Management System" and Service task "Record permit conditions
-  and compliance evidence in Document Management System".
 Data Object "Safety-in-Design Register" — written by User task
   "Incorporate permit conditions into safety-in-design register"; read by
   User task "Confirm all required permits and approvals obtained".
@@ -49236,11 +48545,6 @@ Data Object "Tender Evaluation Report — Contractor" — written by User task
 Data Object "Tender Evaluation Report — Equipment Vendor" — written by
   User task "Evaluate equipment vendor tenders"; read by Exclusive gateway
   "Equipment vendor tender acceptable?".
-Data Store "Procurement & Contract Management" — written by Service task
-  "Record contractor contract in Procurement & Contract Management" and
-  Service task "Record equipment purchase order in Procurement & Contract
-  Management"; read by User task "Confirm procurement plan complete and
-  mobilisation ready".
 
 This subprocess takes the approved design and scope from Perform Detailed
 Design and converts it into binding contractor contracts and equipment
@@ -49409,9 +48713,6 @@ Data Object "Corrective Action Notice" — written by User task "Issue
 Data Object "Practical Completion Notice" — written by User task "Issue
   notice of practical completion"; read by downstream Inspect & Test
   subprocess.
-Data Store "Site & Safety Management System register" — written by Service
-  task "Submit safety records to Site & Safety Management System"; read by
-  User task "Complete final site safety close-out report".
 
 Mobilise & Construct takes the awarded contracts from Procure Contractors &
 Equipment and manages the full construction phase: mobilising the site,
@@ -49578,14 +48879,6 @@ Data Object "Dispute Notice" — written by "Issue dispute notice to
 Data Object "Revised Claim" — written by intermediate catch event
   "Revised claim received from Contractor"; read by "Re-assess
   revised claim".
-Data Store "Procurement & Contract Management" — read by "Verify
-  claim against progress schedule and contract"; written by "Record
-  approved variation in Procurement & Contract Management", "Update
-  contract value in Procurement & Contract Management", "Record
-  payment authorisation in Procurement & Contract Management".
-Data Store "Cost & Schedule System" — written by "Post forecast and
-  actuals to Cost & Schedule System"; read by "Review cost impact
-  and update forecast".
 
 This subprocess captures every contractor variation request and
 progress claim arising during construction, subjects each to
@@ -49737,11 +49030,6 @@ Data Object "Test Evidence Package" — written by "Compile inspection
 Data Object "Inspection Completion Certificate" — written by "Obtain
   signed inspection completion certificate"; read by "Close ITP and
   archive records in system".
-Data Store "Quality & Inspection Test Plan System record store" — read
-  by "Compile inspection and test records"; written by "Register ITP in
-  Quality & Inspection Test Plan System", "Record pass result in
-  system", "Raise non-conformance report", "Close ITP and archive
-  records in system".
 
 V26.08 Inspect & Test validates that all constructed or installed works
 meet the required quality standards by executing the Inspection and Test
@@ -49913,8 +49201,6 @@ Data Object "Handover Certificate" — written by User task "Sign handover
   certificate".
 Data Object "Asset Documentation & Operating Manuals" — read by User
   task "Transfer asset documentation and operating manuals".
-Data Store "Enterprise Asset Management Register" — written by Service
-  task "Create and activate asset record in EAM".
 
 This subprocess takes the inspected and tested asset and executes all
 commissioning test procedures, resolves punch list defects through the
@@ -50052,7 +49338,6 @@ capitalisation entry".
 Data Object "Capitalisation Entry" — written by User task "Create asset
 record and capitalisation entry"; read by Service task "Post capitalisation
 entry to Fixed Asset Ledger".
-Data Store "Fixed Asset Register" — written by Service task "Post
 capitalisation entry to Fixed Asset Ledger"; read by User task "Reconcile
 project costs to capitalised asset value".
 Data Object "Reconciliation Statement" — written by User task "Reconcile
@@ -50064,7 +49349,6 @@ sign-off on closure".
 Data Object "Benefits Realisation Baseline" — written by User task "Confirm
 benefits realisation baseline"; read by User task "Obtain project sponsor
 sign-off on closure".
-Data Store "Capital Portfolio Register" — written by Service task "Record
 asset in Capital Portfolio Management System" and Service task "Update
 project status to Closed in Capital Portfolio Management System"; read by
 User task "Confirm benefits realisation baseline".

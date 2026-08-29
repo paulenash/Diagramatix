@@ -333,3 +333,40 @@ describe("Process Repository — what a run asks for", () => {
     expect(msg).toContain("Write the ArchiMate diagram prompt for the whole chain V10 Market to Lead.");
   });
 });
+
+
+/**
+ * Paul, 2026-08-29: "Data Stores, in general, are duplicating Black-box pools. I
+ * think that we should not use them in generated diagrams."
+ *
+ * A thing that persists beyond the process IS the IT system that holds it, and
+ * that system is already a black-box pool with message flows to the tasks that
+ * use it. A Data Store beside it says the same thing twice, in two notations.
+ *
+ * Both halves are pinned: the master template must forbid it, and the 26 chains'
+ * existing prompts — which were written under the old template — must be clean,
+ * or the next generation reintroduces 321 of them.
+ */
+describe("Data Stores are not used in generated BPMN", () => {
+  it("T2938 — the BPMN master template forbids a Data Store and says why", () => {
+    const t = DEFAULT_MD_PROMPT.bpmn;
+    expect(t).toMatch(/NEVER use a Data Store/i);
+    // …and points at what to use instead, or the model has nowhere to put a
+    // system of record.
+    expect(t).toMatch(/black-box pool/i);
+    // The old instruction must be gone, not merely contradicted further down.
+    expect(t).not.toMatch(/Use Data Store for anything that persists/i);
+  });
+
+  it("T2939 — no prompt in the Process Repository asks for one", () => {
+    const md = fs.readFileSync(
+      path.join(process.cwd(), "new features", "Process Repository Final.md"), "utf8");
+    const offenders = md.split(/\r?\n/)
+      .map((l, i) => ({ l, n: i + 1 }))
+      .filter(({ l }) => /data\s*store/i.test(l));
+    expect(
+      offenders.map((o) => `line ${o.n}: ${o.l.trim().slice(0, 80)}`),
+      "these would put a Data Store back into every diagram generated from them",
+    ).toEqual([]);
+  });
+});

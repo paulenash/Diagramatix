@@ -204,9 +204,14 @@ Open with a single unnumbered line:
 7. Data objects
 - One line per business record, document or dataset the narrative names, as:
   Data Object "<name>" — read by / written by "<task name>".
-- Use Data Store for anything that persists beyond the process (a ledger, a
-  register, a master file); use Data Object for a document in flight (an order,
-  an invoice, a claim form).
+- NEVER use a Data Store. A thing that persists beyond the process — a ledger, a
+  register, a master file, a system of record — is the IT SYSTEM that holds it,
+  and that system is already a black-box pool with message flows to and from the
+  tasks that use it. A Data Store beside it says the same thing twice, in two
+  notations. Write "Data Store" nowhere in your answer.
+- Use a Data Object only for a business record in flight — an order, an invoice,
+  a claim form, a pricing scenario — something a task produces and a later task
+  consumes.
 - Every one must name at least one task it attaches to; none may attach to a
   pool or a lane.
 - Write "None." only when the narrative names no records at all.
