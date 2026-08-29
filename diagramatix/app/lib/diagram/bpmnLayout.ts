@@ -874,6 +874,40 @@ export function layoutBpmnDiagram(
 
   const isContainerActivity = (e: AiElement) =>
     e.type === "subprocess-expanded" || e.type === "subprocess";
+
+  /**
+   * Nothing may contain itself, directly or through a chain.
+   *
+   * A self-reference passes every check above — `parentSubprocess` naming an
+   * expanded subprocess IS valid when the element in question is that
+   * subprocess — and then costs the whole diagram: the subprocess is excluded
+   * from flow placement on the understanding that the subprocess-child pass will
+   * place it, that pass positions children relative to a parent that was never
+   * placed, and everything downstream of it in the flow goes with it.
+   */
+  const containmentCycles = (field: "parentSubprocess" | "boundaryHost") => {
+    for (const e of aiElements) {
+      const seen = new Set<string>([e.id]);
+      let cur: AiElement | undefined = e;
+      for (let d = 0; d < 32; d++) {
+        const ref = cur?.[field];
+        if (!ref) break;
+        if (seen.has(String(ref))) {
+          diagnose({
+            kind: "unresolved-reference", elementId: e.id, label: e.label ?? "", field,
+            detail: String(ref) === e.id
+              ? `"${ref}" is the element itself — cleared, or nothing would have placed it`
+              : `"${ref}" closes a containment cycle — cleared, or nothing would have placed it`,
+          });
+          (e as unknown as Record<string, unknown>)[field] = undefined;
+          break;
+        }
+        seen.add(String(ref));
+        cur = byAiId.get(String(ref));
+        if (!cur) break;
+      }
+    }
+  };
   const isActivity = (e: AiElement) =>
     isContainerActivity(e) || e.type === "task" || e.type === "call-activity" || e.type === "transaction";
 
@@ -902,6 +936,8 @@ export function layoutBpmnDiagram(
     fix("lane", (x) => x.type === "lane", laneRefs);
     fix("pool", (x) => x.type === "pool", poolRefs);
   }
+  containmentCycles("parentSubprocess");
+  containmentCycles("boundaryHost");
 
   // ── An Expanded Subprocess with NO children adopts an orphan internal chain ──
   //
@@ -1896,11 +1932,22 @@ export function layoutBpmnDiagram(
         ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
         ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
       });
+      // Say WHAT it was carrying, not just that it failed. "nothing placed it"
+      // is true and useless: V06.08 came back with eighteen of them and no way
+      // to tell whether the plan named a container that was fine, a container
+      // that was dropped, or no container at all. The four fields below are
+      // exactly what every placement pass keys off.
+      const carried = [
+        ai.pool ? `pool=${ai.pool}` : null,
+        ai.lane ? `lane=${ai.lane}` : null,
+        ai.parentSubprocess ? `parentSubprocess=${ai.parentSubprocess}` : null,
+        ai.boundaryHost ? `boundaryHost=${ai.boundaryHost}` : null,
+      ].filter(Boolean).join(", ") || "no pool, lane, parentSubprocess or boundaryHost";
       diagnose({
         kind: "unplaced", elementId: ai.id, label: ai.label ?? "",
         detail: host
-          ? `nothing placed it; parked at the end of "${host.label ?? host.type}"`
-          : "nothing placed it, and there is no white-box pool to park it in",
+          ? `nothing placed it (${carried}); parked at the end of "${host.label ?? host.type}"`
+          : `nothing placed it (${carried}), and there is no white-box pool to park it in`,
       });
       floatX += def.defaultWidth + 40;
     }
