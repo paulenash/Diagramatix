@@ -11,6 +11,7 @@ import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { AI_INVOCATION_POINTS, enterAiContext, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
+import { uniqueDiagramName } from "@/app/lib/valueChain/uniqueDiagramName";
 
 /**
  * SuperAdmin — "Create Project Diagrams from .md" batch runner.
@@ -42,11 +43,23 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json().catch(() => null)) as
-    | { md?: unknown; chainCode?: unknown; projectName?: unknown; source?: unknown }
+    | { md?: unknown; chainCode?: unknown; projectName?: unknown; source?: unknown;
+        projectId?: unknown; diagramKeys?: unknown }
     | null;
   const md = typeof body?.md === "string" ? body.md : "";
   const chainCode = typeof body?.chainCode === "string" ? body.chainCode.trim() : "";
   const fromLibrary = body?.source === "library";
+  /** Regenerate INTO an existing project rather than creating a new one. */
+  const targetProjectId = typeof body?.projectId === "string" && body.projectId.trim()
+    ? body.projectId.trim() : "";
+  /**
+   * Which diagrams of the chain to generate, as `${type}::${name}`. Omitted or
+   * empty means the whole chain — the original behaviour. Selecting a subset is
+   * what makes regenerating one diagram cheap: a chain is ~15 AI calls.
+   */
+  const diagramKeys = Array.isArray(body?.diagramKeys)
+    ? new Set(body.diagramKeys.filter((k): k is string => typeof k === "string"))
+    : null;
   if (!chainCode) return NextResponse.json({ error: "chainCode is required" }, { status: 400 });
   if (!fromLibrary && (!md.trim() || md.length > MAX_MD_CHARS)) {
     return NextResponse.json({ error: "A valid .md (≤ 4 MB) is required" }, { status: 400 });
@@ -90,6 +103,15 @@ export async function POST(req: Request) {
   }
   if (chain.diagrams.length === 0) {
     return NextResponse.json({ error: `Value chain ${chainCode} has no diagram prompts` }, { status: 422 });
+  }
+
+  // Narrow to the selection, keeping the chain's own order so a partial run
+  // still reads top-down the way the chain does.
+  if (diagramKeys && diagramKeys.size > 0) {
+    chain = { ...chain, diagrams: chain.diagrams.filter((d) => diagramKeys.has(`${d.type}::${d.name}`)) };
+    if (chain.diagrams.length === 0) {
+      return NextResponse.json({ error: "None of the selected diagrams are in this value chain" }, { status: 422 });
+    }
   }
 
   const projectName =
@@ -136,24 +158,55 @@ export async function POST(req: Request) {
       };
 
       let projectId: string;
+      let existingProject = false;
+      /**
+       * Names already taken in the target project. Regenerating into a project
+       * that already holds the diagram must NOT overwrite it — the point is to
+       * compare the new one against the old — so a clash gets " (2)", " (3)", …
+       * The set is seeded from the database and then updated as this run
+       * creates diagrams, so two diagrams of the same name in one selection
+       * still land as "X" and "X (2)".
+       */
+      const takenNames = new Set<string>();
       try {
-        const project = await prisma.project.create({
-          data: {
-            name: projectName.trim(),
-            userId,
-            orgId,
-            ownerName: session.user?.name ?? session.user?.email ?? "",
-          },
-          select: { id: true },
-        });
-        projectId = project.id;
-        send({ t: "project", projectId, projectName: projectName.trim(), total });
+        if (targetProjectId) {
+          const existing = await prisma.project.findFirst({
+            where: { id: targetProjectId, orgId },
+            select: { id: true, name: true },
+          });
+          if (!existing) {
+            send({ t: "error", message: "That project is not in your current organisation" });
+            controller.close();
+            return;
+          }
+          projectId = existing.id;
+          existingProject = true;
+          const had = await prisma.diagram.findMany({ where: { projectId }, select: { name: true } });
+          for (const d of had) takenNames.add(d.name);
+          send({ t: "project", projectId, projectName: existing.name, total, existing: true });
+        } else {
+          const project = await prisma.project.create({
+            data: {
+              name: projectName.trim(),
+              userId,
+              orgId,
+              ownerName: session.user?.name ?? session.user?.email ?? "",
+            },
+            select: { id: true },
+          });
+          projectId = project.id;
+          send({ t: "project", projectId, projectName: projectName.trim(), total, existing: false });
+        }
       } catch (e) {
-        send({ t: "error", message: e instanceof Error ? e.message : "Could not create the project" });
+        send({ t: "error", message: e instanceof Error ? e.message : "Could not open the project" });
         controller.close();
         return;
       }
 
+      const uniqueName = (base: string) => uniqueDiagramName(base, takenNames);
+
+      /** Ids created by THIS run — the client re-links only these by default. */
+      const createdIds: string[] = [];
       let created = 0;
       let failed = 0;
       for (let i = 0; i < diagrams.length; i++) {
@@ -194,9 +247,10 @@ export async function POST(req: Request) {
               generatedAt: new Date().toISOString(), autoNamed: true,
             };
           }
+          const savedName = uniqueName(d.name);
           const saved = await prisma.diagram.create({
             data: {
-              name: d.name,
+              name: savedName,
               type: d.type,
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               data: data as any,
@@ -209,11 +263,15 @@ export async function POST(req: Request) {
           });
           created++;
           await recordDiagramGenerated({ userId, orgId, diagramType: d.type, source: "md-batch" });
+          createdIds.push(saved.id);
           send({
             t: "diagram", index, total, name: d.name, type: d.type,
             status: "done", diagramId: saved.id, ms: Date.now() - t0,
             elements: data.elements.length, connectors: data.connectors.length,
             diagnostics,
+            // Only when it differs — the UI shows the rename so nobody wonders
+            // why the diagram they asked for is not the one they are looking at.
+            ...(savedName !== d.name ? { savedName } : {}),
           });
         } catch (e) {
           failed++;
@@ -224,7 +282,7 @@ export async function POST(req: Request) {
         }
       }
 
-      send({ t: "done", projectId, created, failed });
+      send({ t: "done", projectId, created, failed, createdIds, existing: existingProject });
       controller.close();
     },
   });
