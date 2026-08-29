@@ -6,7 +6,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
     {
       "geom": {
         "h": 2.4,
-        "w": 8.54,
+        "w": 8.35,
         "x": 5.85,
         "y": 4.14,
       },
@@ -19,7 +19,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": 0,
         "w": 0.73,
-        "x": 4.67,
+        "x": 4.76,
         "y": 3.87,
       },
       "id": "conn-is-it",
@@ -31,7 +31,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": 0,
         "w": 0.73,
-        "x": 6.46,
+        "x": 6.55,
         "y": 3.87,
       },
       "id": "conn-it-ien",
@@ -43,7 +43,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": -0.4,
         "w": 0.73,
-        "x": 3.25,
+        "x": 3.35,
         "y": 4.1,
       },
       "id": "conn-s-sp",
@@ -54,7 +54,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
     {
       "geom": {
         "h": 0,
-        "w": 1.71,
+        "w": 1.52,
         "x": 8.37,
         "y": 3.9,
       },
@@ -67,7 +67,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": null,
         "w": null,
-        "x": 9.41,
+        "x": 9.31,
         "y": 3.9,
       },
       "id": "e",
@@ -79,7 +79,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": null,
         "w": null,
-        "x": 7.01,
+        "x": 7.11,
         "y": 3.87,
       },
       "id": "ien",
@@ -91,7 +91,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": null,
         "w": null,
-        "x": 4.12,
+        "x": 4.21,
         "y": 3.87,
       },
       "id": "is",
@@ -103,7 +103,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": 0.68,
         "w": 1.06,
-        "x": 5.56,
+        "x": 5.66,
         "y": 3.87,
       },
       "id": "it",
@@ -115,7 +115,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": null,
         "w": null,
-        "x": 2.7,
+        "x": 2.79,
         "y": 4.29,
       },
       "id": "s",
@@ -127,7 +127,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": 1.36,
         "w": 3.9,
-        "x": 5.56,
+        "x": 5.66,
         "y": 3.9,
       },
       "id": "sp",

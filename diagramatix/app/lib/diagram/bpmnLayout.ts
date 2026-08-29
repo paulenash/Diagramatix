@@ -1790,8 +1790,18 @@ export function layoutBpmnDiagram(
       neededW = sz.w;
       neededH = sz.h;
     } else if (singleRowFlow) {
-      // Single-row flow: width grows with the child count; height is one row.
-      neededW = Math.max(2, normalChildren.length) * CHILD_COL_SPACING + EXPANDED_PAD_X * 2;
+      // Single-row flow: width grows with the children's REAL fitted widths,
+      // not a flat 140 per child. A three-line task name fits at 128 wide, so
+      // the flat budget left 12px of gap; a four-line one would have overlapped.
+      const rowW = normalChildren.reduce((t, c) => {
+        const d = getSymbolDefinition(c.type as DiagramElement["type"]);
+        return t + autoElementSize(c.type, c.label ?? "", c.taskType as string | undefined, d).w;
+      }, 0);
+      const rowGaps = Math.max(1, normalChildren.length - 1) * 38;
+      neededW = Math.max(
+        Math.max(2, normalChildren.length) * CHILD_COL_SPACING,
+        rowW + rowGaps,
+      ) + EXPANDED_PAD_X * 2;
       neededH = CHILD_ROW_SPACING + EXPANDED_PAD_Y * 2;
     } else {
       // Content-driven: grow with the actual child grid, with a small 2×2
@@ -1867,21 +1877,42 @@ export function layoutBpmnDiagram(
       ];
       const cyCentre = spEl.height / 2;
       const n = ordered.length;
+      // Children are sized to their TEXT, exactly as top-level flow elements
+      // already are. They used to be pushed at the catalogue default, so a name
+      // like "Assess Sales Channel Fit and Distributor Viability" (128×81 when
+      // fitted) was drawn in a 102×65 box and spilled outside it — worst inside
+      // an expanded subprocess, which is where Paul saw it (2026-08-29).
+      //
+      // Sizing them makes the EVEN-SPREAD placement unsafe: it divided the
+      // usable width by index and assumed every child was 102 wide, so a fitted
+      // child could sit only 12px from its neighbour, and a four-line label
+      // would overlap outright. So spread by ACTUAL width — the gap is what is
+      // left over, shared equally, never less than CHILD_MIN_GAP.
+      const sizes = ordered.map((ai) => {
+        const d = getSymbolDefinition(ai.type as DiagramElement["type"]);
+        return autoElementSize(ai.type, ai.label ?? "", ai.taskType as string | undefined, d);
+      });
+      const CHILD_MIN_GAP = 38;
+      const totalW = sizes.reduce((t, s) => t + s.w, 0);
       const usableW = spEl.width - EXPANDED_PAD_X * 2;
+      const gap = n <= 1 ? 0 : Math.max(CHILD_MIN_GAP, (usableW - totalW) / (n - 1));
+      // A single child is centred; otherwise the run starts at the left pad and
+      // the pen walks right by each child's own width plus the shared gap.
+      let penX = n <= 1 ? spEl.width / 2 - (sizes[0]?.w ?? 0) / 2 : EXPANDED_PAD_X;
       for (let i = 0; i < n; i++) {
         const ai = ordered[i];
-        const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
-        const cx = n <= 1 ? spEl.width / 2 : EXPANDED_PAD_X + (usableW * i) / (n - 1);
+        const size = sizes[i];
         elements.push({
           id: ai.id, type: ai.type as DiagramElement["type"],
-          x: spEl.x + cx - def.defaultWidth / 2,
-          y: spEl.y + cyCentre - def.defaultHeight / 2,
-          width: def.defaultWidth, height: def.defaultHeight,
+          x: spEl.x + penX,
+          y: spEl.y + cyCentre - size.h / 2,
+          width: size.w, height: size.h,
           label: ai.label, properties: buildProps(ai), parentId: spEl.id,
           ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
           ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
           ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
         });
+        penX += size.w + gap;
       }
     } else {
       // Normal subprocess: grid layout for regular children.
@@ -1920,18 +1951,29 @@ export function layoutBpmnDiagram(
       // Grid-place the rest, shifted down by one row when the top row is
       // reserved for Start/End events.
       const rowOffset = hasEventSubs ? 1 : 0;
+      // The widest fitted child decides the column pitch for the whole grid,
+      // so columns stay aligned and nothing overlaps its neighbour.
+      const gridColW = gridChildren.reduce((w, c) => {
+        const d = getSymbolDefinition(c.type as DiagramElement["type"]);
+        return Math.max(w, autoElementSize(c.type, c.label ?? "", c.taskType as string | undefined, d).w + 38);
+      }, 0);
       for (let i = 0; i < gridChildren.length; i++) {
         const ai = gridChildren[i];
         const col = i % CHILD_COLS;
         const row = Math.floor(i / CHILD_COLS) + rowOffset;
         const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
-        const cx = EXPANDED_PAD_X + col * CHILD_COL_SPACING + CHILD_COL_SPACING / 2;
+        // Sized to its text, like every other activity. The column PITCH stays
+        // fixed so the grid keeps its shape; a child wider than the pitch is
+        // centred in its cell and eats into the gap rather than the neighbour.
+        const size = autoElementSize(ai.type, ai.label ?? "", ai.taskType as string | undefined, def);
+        const pitch = Math.max(CHILD_COL_SPACING, gridColW);
+        const cx = EXPANDED_PAD_X + col * pitch + pitch / 2;
         const cy = EXPANDED_PAD_Y + row * CHILD_ROW_SPACING + CHILD_ROW_SPACING / 2;
         elements.push({
           id: ai.id, type: ai.type as DiagramElement["type"],
-          x: spEl.x + cx - def.defaultWidth / 2,
-          y: spEl.y + cy - def.defaultHeight / 2,
-          width: def.defaultWidth, height: def.defaultHeight,
+          x: spEl.x + cx - size.w / 2,
+          y: spEl.y + cy - size.h / 2,
+          width: size.w, height: size.h,
           label: ai.label, properties: buildProps(ai), parentId: spEl.id,
           ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
           ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
@@ -2065,9 +2107,10 @@ export function layoutBpmnDiagram(
       : (host ? host.y + 40 : 100);
     for (const ai of unplacedEls) {
       const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+      const size = autoElementSize(ai.type, ai.label ?? "", ai.taskType as string | undefined, def);
       elements.push({
         id: ai.id, type: ai.type as DiagramElement["type"],
-        x: floatX, y: Math.round(floatY - def.defaultHeight / 2), width: def.defaultWidth, height: def.defaultHeight,
+        x: floatX, y: Math.round(floatY - size.h / 2), width: size.w, height: size.h,
         label: ai.label, properties: buildProps(ai),
         ...(host ? { parentId: host.id } : {}),
         ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
@@ -4939,11 +4982,12 @@ function layoutFlat(
     const ai = aiElements.find(e => e.id === id);
     if (!ai) continue;
     const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+    const size = autoElementSize(ai.type, ai.label ?? "", ai.taskType as string | undefined, def);
     elements.push({
       id, type: ai.type as DiagramElement["type"],
-      x: 100 + pos.col * (def.defaultWidth + 60),
-      y: 200 + pos.row * (def.defaultHeight + 80),
-      width: def.defaultWidth, height: def.defaultHeight,
+      x: 100 + pos.col * (size.w + 60),
+      y: 200 + pos.row * (size.h + 80),
+      width: size.w, height: size.h,
       label: ai.label, properties: buildProps(ai),
       ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
       ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
