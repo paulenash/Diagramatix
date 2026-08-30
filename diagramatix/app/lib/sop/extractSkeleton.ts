@@ -139,6 +139,7 @@ export function extractSkeleton(data: DiagramData, opts: ExtractOptions): SopSke
     if (!elInScope(el)) continue;
     const rc = getRiskControl(el);
     steps.push({
+      id: el.id,
       globalNo: globalNo.get(el.id)!,
       label: labelOf(el),
       role: roleOf(el),

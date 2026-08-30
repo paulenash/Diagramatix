@@ -21,6 +21,10 @@ export interface SopDecisionBranch {
 }
 
 export interface SopStep {
+  /** The diagram element this step came from. Lets a consumer correlate a step
+   *  back to the shape it describes — the partner API returns it so a caller can
+   *  point at an activity, and the round-trip comparison matches on it. */
+  id: string;
   globalNo: number;             // 1-based position in the WHOLE process order
   label: string;
   role: string;                 // resolved lane (or pool) label = the responsible role

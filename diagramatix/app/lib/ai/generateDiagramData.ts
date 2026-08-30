@@ -9,7 +9,7 @@
  * over, once per prompt. Rules must already be green-filtered (loadAiRulesForType),
  * and the model + apiKey resolved by the caller — this function is deliberately dumb.
  */
-import { planBpmn } from "./planBpmn";
+import { planBpmn, type Attachment } from "./planBpmn";
 import { planGeneric } from "./planGeneric";
 import { layoutBpmnDiagram, type LayoutDiagnostic } from "@/app/lib/diagram/bpmnLayout";
 import { layoutGenericDiagram } from "@/app/lib/diagram/genericLayout";
@@ -44,6 +44,16 @@ export interface GenerateDiagramInput {
    * generation replayable offline, exactly, with no AI call.
    */
   onPlan?: (plan: unknown) => void;
+  /**
+   * A document or image to generate FROM, rather than only prose.
+   *
+   * `planBpmn` has always accepted one — a PDF as a native document block, an
+   * image through the vision path, anything else as text — but this wrapper
+   * did not forward it, so only callers reaching past it could send a
+   * document. The partner API takes an SOP as its primary input, which is
+   * what made the omission matter.
+   */
+  attachment?: Attachment;
 }
 
 // Auto-correct the same process-context cases the generate-diagram route fixes
@@ -70,16 +80,20 @@ function normaliseProcessContext(elements: any[]): void {
  * unparseable JSON, BPMN plan error) so the batch loop can record it per-diagram.
  */
 export async function generateDiagramData(input: GenerateDiagramInput): Promise<DiagramData> {
-  const { diagramType, prompt, model, apiKey, rules, promptLabel, onDiagnostic, onPlan } = input;
+  const { diagramType, prompt, model, apiKey, rules, promptLabel, onDiagnostic, onPlan, attachment } = input;
 
   if (diagramType === "bpmn") {
-    const res = await planBpmn({ apiKey, prompt, rules, model });
+    const res = await planBpmn({ apiKey, prompt, rules, model, attachment });
     if (!res.ok) throw new Error(res.error || "BPMN plan failed");
     onPlan?.(res.plan);
     return layoutBpmnDiagram(res.plan.elements, res.plan.connections, { promptLabel, onDiagnostic });
   }
 
-  const parsed = await planGeneric({ apiKey, model, diagramType, rules, prompt });
+  const parsed = await planGeneric({
+    apiKey, model, diagramType, rules, prompt,
+    // planGeneric takes pdf/text only — the vision path is BPMN-only today.
+    attachment: attachment && attachment.type !== "image" ? attachment : undefined,
+  });
   if (!Array.isArray(parsed.elements)) parsed.elements = [];
   if (!Array.isArray(parsed.connections)) parsed.connections = [];
   if (diagramType === "process-context") normaliseProcessContext(parsed.elements);
