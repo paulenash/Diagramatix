@@ -79,18 +79,24 @@ export async function POST(req: Request) {
   const { secret, rotated } = got;
 
   /**
-   * Call ourselves over 127.0.0.1, not `localhost`.
+   * Always call ourselves over PLAIN HTTP ON THE LOOPBACK, whatever the
+   * incoming request looked like.
    *
-   * Node resolves `localhost` to ::1 first, and a dev server listening only on
-   * IPv4 then refuses the connection — which surfaces as a bare fetch failure
-   * with nothing to go on. Forcing the loopback literal avoids the whole
-   * question. HARNESS_BASE_URL overrides it if this ever runs somewhere the
-   * assumption does not hold.
+   * Deriving the origin from `req.url` is wrong twice over. In a standalone
+   * build that URL is rebuilt from headers, so the host comes back as the BIND
+   * address (0.0.0.0) and the scheme as whatever a proxy declared — which on
+   * Azure is https. Fetching https://0.0.0.0:3000 then speaks TLS at a plain
+   * HTTP listener and fails with an SSL record error that says nothing about
+   * the actual mistake.
+   *
+   * The app always listens on http, on its own port, on this machine — this
+   * request is being served by it. So that is what we call. `localhost` is
+   * avoided as well: Node resolves it to ::1 first, and an IPv4-only listener
+   * refuses that.
    */
   const reqUrl = new URL(req.url);
-  const origin =
-    process.env.HARNESS_BASE_URL ||
-    (reqUrl.hostname === "localhost" ? `${reqUrl.protocol}//127.0.0.1:${reqUrl.port || "3000"}` : reqUrl.origin);
+  const port = process.env.PORT || reqUrl.port || "3000";
+  const origin = process.env.HARNESS_BASE_URL || `http://127.0.0.1:${port}`;
   const headers = { "Content-Type": "application/json", "X-Api-Key": secret };
 
   try {

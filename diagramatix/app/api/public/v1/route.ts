@@ -8,11 +8,12 @@
  * that produces a support email instead of an integration.
  */
 import { NextResponse } from "next/server";
+import { publicBaseUrl } from "@/app/lib/partner/publicUrl";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const base = `${new URL(req.url).origin}/api/public/v1`;
+  const base = `${publicBaseUrl(req)}/api/public/v1`;
 
   return NextResponse.json({
     name: "Diagramatix Process API",

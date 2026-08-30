@@ -14,6 +14,7 @@ import { partnerError, partnerServerError } from "@/app/lib/partner/errors";
 import { SCOPE_PROCESS_MAPPING } from "@/app/lib/partner/types";
 import { reapStaleJobs } from "@/app/lib/partner/jobs";
 import { rateLimit } from "@/app/lib/rateLimit";
+import { publicBaseUrl } from "@/app/lib/partner/publicUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,7 @@ export const GET = withPartnerLogging(async (req, ref) => {
       const result = (job.result ?? {}) as Record<string, unknown>;
       // Absolute, so a partner can hand the URL straight to an HTTP client
       // without knowing where we are deployed.
-      const base_ = `${new URL(req.url).origin}/api/public/v1/process-map/${job.id}/artifact`;
+      const base_ = `${publicBaseUrl(req)}/api/public/v1/process-map/${job.id}/artifact`;
       return {
         response: NextResponse.json({
           ...base,

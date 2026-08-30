@@ -19,6 +19,7 @@ import { attachmentFromFile } from "@/app/lib/ai/attachmentFromFile";
 import { createJob, redactRequest, reapStaleJobs, purgeExpiredCaptures, jobsToday } from "@/app/lib/partner/jobs";
 import { runJob } from "@/app/lib/partner/worker";
 import { rateLimit, clientIp } from "@/app/lib/rateLimit";
+import { publicBaseUrl } from "@/app/lib/partner/publicUrl";
 import { recordAudit } from "@/app/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -170,7 +171,9 @@ export const POST = withPartnerLogging(async (req, ref) => {
 
     // Deliberately NOT awaited: the caller gets its 202 now. Every path inside
     // ends in succeedJob or failJob, so a rejection cannot escape.
-    const origin = new URL(req.url).origin;
+    // The link goes to a partner and on to their customer, so it must be the
+    // address a browser can reach — not the one we bind to.
+    const origin = publicBaseUrl(req);
     void runJob({
       jobId, caller: c,
       description: description || undefined,
