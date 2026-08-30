@@ -159,6 +159,7 @@ export const POST = withPartnerLogging(async (req, ref) => {
       name: name || undefined,
       projectId: typeof body.options?.projectId === "string" ? body.options.projectId : null,
       projectName: typeof body.options?.projectName === "string" ? body.options.projectName : undefined,
+      volumetrics: (body.volumetrics ?? undefined) as never,
       baseUrl: origin,
     }).catch((e) => console.error(`[partner] job ${jobId} escaped:`, e));
 

@@ -26,6 +26,7 @@ import { uniqueDiagramName } from "@/app/lib/valueChain/uniqueDiagramName";
 import { runProcessMap, ProcessMapError } from "./runProcessMap";
 import { renderDiagramSvg } from "./renderDiagramSvg";
 import { svgToPdf } from "@/app/lib/documents/svgToPdf";
+import { applyVolumetrics, type Volumetrics } from "@/app/lib/simulation/volumetrics";
 import { advanceJob, failJob, startJob, succeedJob } from "./jobs";
 import type { PartnerCaller } from "./auth";
 
@@ -38,6 +39,8 @@ export interface WorkerInput {
   /** Where the diagram lands. A fixed project on the key, or one we create. */
   projectId?: string | null;
   projectName?: string;
+  /** Effort and frequency, written onto the diagram so it opens runnable. */
+  volumetrics?: Volumetrics;
   baseUrl: string;
 }
 
@@ -97,6 +100,13 @@ export async function runJob(input: WorkerInput): Promise<void> {
       await failJob(jobId, "element_limit", "That process produced more elements than this key's plan allows.");
       return;
     }
+
+    // Volumetrics BEFORE saving, so the stored diagram already carries them —
+    // a second write would leave a window where the diagram is half-configured.
+    const vol = input.volumetrics && (input.volumetrics.minutesPerRun || input.volumetrics.runsPerMonth)
+      ? applyVolumetrics(run.data, input.volumetrics)
+      : null;
+    if (vol) run.data = vol.data;
 
     await advanceJob(jobId, "saving");
 
@@ -192,6 +202,7 @@ export async function runJob(input: WorkerInput): Promise<void> {
           connectorCount: run.data.connectors.length,
         },
         ...run.shape,
+        ...(vol ? { volumetrics: { ...input.volumetrics, basis: vol.basis, derived: vol.derived, applied: vol.applied, notes: vol.notes } } : {}),
         diagnostics: run.diagnostics.map((d) => ({ kind: d.kind, label: d.label, detail: d.detail })),
       },
     });
