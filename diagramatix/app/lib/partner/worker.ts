@@ -24,6 +24,8 @@ import {
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import { uniqueDiagramName } from "@/app/lib/valueChain/uniqueDiagramName";
 import { runProcessMap, ProcessMapError } from "./runProcessMap";
+import { renderDiagramSvg } from "./renderDiagramSvg";
+import { svgToPdf } from "@/app/lib/documents/svgToPdf";
 import { advanceJob, failJob, startJob, succeedJob } from "./jobs";
 import type { PartnerCaller } from "./auth";
 
@@ -159,8 +161,24 @@ export async function runJob(input: WorkerInput): Promise<void> {
       userId: caller.userId, orgId: caller.orgId, diagramType: "bpmn", source: "partner-api",
     });
 
+    // Render now so an artifact GET is a read rather than a LibreOffice spawn.
+    //
+    // A MISSING PDF MUST NEVER FAIL A SUCCESSFUL PROCESS MAP. There is no
+    // soffice in local dev, and a partner who got a good model should not be
+    // told the whole thing failed because a renderer was absent — they get the
+    // SVG and a null pdfUrl instead.
+    let svg: string | null = null;
+    let pdf: Buffer | null = null;
+    try {
+      svg = renderDiagramSvg(run.data);
+      pdf = await svgToPdf(svg);
+    } catch (e) {
+      console.warn(`[partner] job ${jobId}: no PDF (${e instanceof Error ? e.message : String(e)})`);
+    }
+
     await succeedJob(jobId, {
       model: picked.model,
+      svg, pdf,
       projectId,
       diagramId: saved.id,
       result: {

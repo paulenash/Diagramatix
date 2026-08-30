@@ -107,6 +107,9 @@ export async function succeedJob(id: string, opts: {
   projectId: string;
   diagramId: string;
   model: string;
+  /** Rendered at job time so an artifact GET is a read, not a spawn. */
+  svg?: string | null;
+  pdf?: Buffer | null;
 }): Promise<void> {
   await setJson(id, "result", opts.result);
   await prisma.partnerJob.update({
@@ -114,6 +117,8 @@ export async function succeedJob(id: string, opts: {
     data: {
       status: "succeeded", stage: "done", finishedAt: new Date(),
       projectId: opts.projectId, diagramId: opts.diagramId, model: opts.model,
+      svg: opts.svg ?? null,
+      pdfBytes: opts.pdf ? new Uint8Array(opts.pdf) : null,
     },
   });
 }

@@ -62,6 +62,9 @@ export const GET = withPartnerLogging(async (req, ref) => {
 
     if (job.status === "succeeded") {
       const result = (job.result ?? {}) as Record<string, unknown>;
+      // Absolute, so a partner can hand the URL straight to an HTTP client
+      // without knowing where we are deployed.
+      const base_ = `${new URL(req.url).origin}/api/public/v1/process-map/${job.id}/artifact`;
       return {
         response: NextResponse.json({
           ...base,
@@ -69,11 +72,11 @@ export const GET = withPartnerLogging(async (req, ref) => {
           model: job.model,
           ...result,
           artifacts: {
-            // Rendered in slice 5. Named now so the shape does not change under
-            // a caller who has already written code against it.
-            pdfUrl: null,
-            svgUrl: null,
-            bpmnXmlUrl: null,
+            // null rather than a URL that would 404: a caller should not have to
+            // request something to discover it is not there.
+            pdfUrl: job.pdfBytes ? `${base_}/diagram.pdf` : null,
+            svgUrl: job.svg ? `${base_}/diagram.svg` : null,
+            bpmnXmlUrl: job.diagramId ? `${base_}/diagram.bpmn` : null,
           },
         }),
         ...tag, jobId: job.id,
