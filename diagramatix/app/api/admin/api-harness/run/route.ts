@@ -77,7 +77,20 @@ export async function POST(req: Request) {
   }
 
   const { secret, rotated } = got;
-  const origin = new URL(req.url).origin;
+
+  /**
+   * Call ourselves over 127.0.0.1, not `localhost`.
+   *
+   * Node resolves `localhost` to ::1 first, and a dev server listening only on
+   * IPv4 then refuses the connection — which surfaces as a bare fetch failure
+   * with nothing to go on. Forcing the loopback literal avoids the whole
+   * question. HARNESS_BASE_URL overrides it if this ever runs somewhere the
+   * assumption does not hold.
+   */
+  const reqUrl = new URL(req.url);
+  const origin =
+    process.env.HARNESS_BASE_URL ||
+    (reqUrl.hostname === "localhost" ? `${reqUrl.protocol}//127.0.0.1:${reqUrl.port || "3000"}` : reqUrl.origin);
   const headers = { "Content-Type": "application/json", "X-Api-Key": secret };
 
   try {
@@ -108,7 +121,14 @@ export async function POST(req: Request) {
     // be holding.
     return NextResponse.json(rotated ? { ...out, keyRotated: true } : out, { status: r.status });
   } catch (e) {
+    // SuperAdmin-only screen, so the real cause goes back rather than being
+    // swallowed: "could not reach the API" with nothing else is exactly the
+    // sort of message that costs an hour.
+    const cause = e instanceof Error ? (e.cause instanceof Error ? `${e.message}: ${e.cause.message}` : e.message) : String(e);
     console.error("[harness] proxy failed:", e);
-    return NextResponse.json({ error: "Could not reach the API from the harness." }, { status: 502 });
+    return NextResponse.json({
+      error: `Could not reach the API from the harness (${origin}). ${cause}`,
+      hint: "If the server was started before this feature was added, restart it — the public routes will not exist in an older build.",
+    }, { status: 502 });
   }
 }

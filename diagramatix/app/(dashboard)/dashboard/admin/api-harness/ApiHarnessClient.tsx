@@ -22,6 +22,8 @@ import Link from "next/link";
 import { useFileAttach, ATTACH_ACCEPT } from "@/app/lib/attachments/useFileAttach";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { highlightJson, PEACEFUL } from "@/app/lib/preview/highlight";
+import { startDictation, type DictationHandle } from "@/app/lib/dictation";
+import { MicTest } from "@/app/components/mobile/MicTest";
 
 interface KeyRow { id: string; name: string; keyPrefix: string; phase: string }
 interface CaseRow {
@@ -81,6 +83,51 @@ export function ApiHarnessClient() {
   const [scoring, setScoring] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<number | null>(null);
+
+  // Dictation, on the same shared client the editor uses. A process
+  // description is the kind of thing somebody would rather say than type,
+  // and this screen exists to make trying an input cheap.
+  const [listening, setListening] = useState(false);
+  const [dictEngine, setDictEngine] = useState<"deepgram" | "browser" | null>(null);
+  const [micTestOpen, setMicTestOpen] = useState(false);
+  const dictRef = useRef<DictationHandle | null>(null);
+  // startDictation is async (token fetch + permission prompt). A Stop pressed
+  // during that window would otherwise be a no-op against a null ref and leave
+  // an orphaned live mic when the handle finally arrives.
+  const stopRequestedRef = useRef(false);
+  const speechSupported = typeof window !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+
+  async function toggleDictation() {
+    if (listening) {
+      stopRequestedRef.current = true;
+      dictRef.current?.stop();
+      dictRef.current = null;
+      setListening(false); setDictEngine(null);
+      return;
+    }
+    stopRequestedRef.current = false;
+    setListening(true); setError(null);
+    const handle = await startDictation({
+      onText: (text) => setDescription((prev) => {
+        const base = prev && !prev.endsWith(" ") && !prev.endsWith("\n") ? prev + " " : prev;
+        return base + text;
+      }),
+      onError: (msg) => setError(msg),
+      onEngine: (e) => setDictEngine(e),
+      onEnd: () => { dictRef.current = null; setListening(false); setDictEngine(null); },
+    });
+    if (!handle) { setListening(false); setDictEngine(null); return; }
+    if (stopRequestedRef.current) {
+      stopRequestedRef.current = false;
+      handle.stop();
+      setListening(false); setDictEngine(null);
+      return;
+    }
+    dictRef.current = handle;
+  }
+
+  // Never leave a mic open behind a closed screen.
+  useEffect(() => () => { dictRef.current?.stop(); }, []);
 
   const loadKeys = useCallback(async () => {
     const r = await fetch("/api/admin/partner-keys", { cache: "no-store" });
@@ -192,7 +239,10 @@ export function ApiHarnessClient() {
       });
       const j = await r.json();
       setRaw(JSON.stringify(j));
-      if (!r.ok) { setError(j.error?.message ?? j.error ?? "That call failed"); setRunning(false); return; }
+      if (!r.ok) {
+        setError([j.error?.message ?? j.error ?? "That call failed", j.hint].filter(Boolean).join(" "));
+        setRunning(false); return;
+      }
       setResult({ status: "queued", jobId: j.jobId });
       poll(j.jobId);
     } catch (e) {
@@ -319,12 +369,44 @@ export function ApiHarnessClient() {
               </label>
             </div>
 
-            <label className="block">
-              <span className="block text-xs font-medium text-gray-600 mb-1">Process description</span>
+            <div>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="text-xs font-medium text-gray-600">Process description</span>
+                {speechSupported && (
+                  <>
+                    <button type="button" onClick={() => void toggleDictation()}
+                      className={`rounded-md border px-2 py-0.5 text-xs transition ${
+                        listening
+                          ? "border-red-400 bg-red-50 text-red-700 animate-pulse"
+                          : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                      }`}>
+                      {listening ? "■ Stop" : "🎤 Dictate"}
+                    </button>
+                    {listening && dictEngine && (
+                      <span className="text-[10px] text-gray-500">{dictEngine}</span>
+                    )}
+                    <button type="button" onClick={() => setMicTestOpen((v) => !v)}
+                      className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50">
+                      {micTestOpen ? "Hide mic test" : "Test"}
+                    </button>
+                  </>
+                )}
+                {description.trim() && (
+                  <button type="button" onClick={() => setDescription("")}
+                    className="ml-auto text-xs text-gray-500 hover:text-gray-700 hover:underline">
+                    Clear
+                  </button>
+                )}
+              </div>
+              {micTestOpen && (
+                <div className="mb-2 rounded-md border border-gray-200 bg-gray-50 p-2">
+                  <MicTest compact />
+                </div>
+              )}
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={6}
                 placeholder="The AP clerk receives the invoice, checks it against the purchase order…"
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono" />
-            </label>
+            </div>
 
             <div className="flex items-center gap-3 flex-wrap">
               <button onClick={() => fileRef.current?.click()}
