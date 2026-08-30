@@ -46,9 +46,44 @@ function shape(k: {
   };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id || !isSuperuser(session)) return forbidden();
+
+  // Nobody should have to know an internal id to mint a key. The form asks for
+  // an organisation and a service account; this is what fills those dropdowns,
+  // and it marks who is ELIGIBLE rather than letting the mint fail later:
+  // a SuperAdmin cannot be a service account at all, and an org Admin or Owner
+  // would hand the key owner access to every project in the org.
+  if (new URL(req.url).searchParams.get("lookup") === "orgs") {
+    const orgs = await prisma.org.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true, name: true,
+        members: { select: { role: true, user: { select: { id: true, email: true } } } },
+      },
+    });
+    return NextResponse.json({
+      orgs: orgs.map((o) => ({
+        id: o.id,
+        name: o.name,
+        members: o.members.map((m) => {
+          const superAdmin = isSuperuser({ user: { email: m.user.email } });
+          const elevated = m.role === "Admin" || m.role === "Owner";
+          return {
+            email: m.user.email,
+            role: m.role,
+            eligible: !superAdmin && !elevated,
+            why: superAdmin
+              ? "A SuperAdmin cannot be a service account — the key would inherit impersonation and every admin surface."
+              : elevated
+                ? `${m.role} of this org grants owner access to every project in it.`
+                : null,
+          };
+        }),
+      })),
+    });
+  }
   const keys = await prisma.apiKey.findMany({
     orderBy: { createdAt: "desc" },
     include: {
@@ -85,11 +120,101 @@ export async function POST(req: Request) {
     name?: string; orgId?: string; serviceUserEmail?: string; projectId?: string | null;
     phase?: string; captureUntil?: string | null;
     rateLimitPerMin?: number; dailyJobLimit?: number; expiresAt?: string | null;
+    /** "harness" — provision our own org and service account and mint an
+     *  internal key, in one step. */
+    preset?: string;
+    /** Create a service account in the chosen org rather than requiring one to
+     *  exist. A real partner org has exactly one member — its owner — and an
+     *  owner cannot be a service account, so without this there is nobody to
+     *  mint against. */
+    createServiceAccount?: boolean;
   } | null;
 
-  const name = body?.name?.trim();
-  const orgId = body?.orgId?.trim();
-  const email = body?.serviceUserEmail?.trim().toLowerCase();
+  let name = body?.name?.trim();
+  let orgId = body?.orgId?.trim();
+  let email = body?.serviceUserEmail?.trim().toLowerCase();
+
+  /**
+   * THE INTERNAL KEY NEEDS NO CHOICES.
+   *
+   * An org and a service account exist because everything a key does is done as
+   * a user in an org — a generated diagram has to land somewhere. For a partner
+   * that is a real decision. For OUR OWN harness key it is not: the org is ours,
+   * the account is a robot, and asking a SuperAdmin to hunt for a non-Owner
+   * member is friction with no benefit. On a fresh install there is no eligible
+   * member at all, since every member of every org tends to be its Owner.
+   *
+   * So the harness provisions its own, once, and reuses it after.
+   */
+  if (body?.preset === "harness") {
+    const ORG_NAME = "Diagramatix Harness";
+    const SERVICE_EMAIL = "harness@diagramatix.internal";
+
+    let org = await prisma.org.findFirst({ where: { name: ORG_NAME }, select: { id: true } });
+    if (!org) org = await prisma.org.create({ data: { name: ORG_NAME }, select: { id: true } });
+
+    let svc = await prisma.user.findUnique({ where: { email: SERVICE_EMAIL }, select: { id: true } });
+    if (!svc) {
+      svc = await prisma.user.create({
+        // No password: this account exists to be acted AS, never signed in as.
+        // Same reasoning as a partner service account: with no tier the key
+        // stops working after a few calls for a reason nobody would guess.
+        data: {
+          email: SERVICE_EMAIL, name: "Process API Harness", password: "",
+          subscriptionLevelId: (await prisma.subscriptionLevel.findFirst({
+            orderBy: { sortOrder: "desc" }, select: { id: true },
+          }))?.id ?? null,
+          subscriptionAssignedAt: new Date(),
+        },
+        select: { id: true },
+      });
+    }
+    const existing = await prisma.orgMember.findFirst({ where: { orgId: org.id, userId: svc.id }, select: { id: true } });
+    if (!existing) {
+      // ProcessOwner, never Admin — Admin would grant owner access to every
+      // project in the org, which is the thing this feature refuses everywhere
+      // else and should not grant itself.
+      await prisma.orgMember.create({ data: { orgId: org.id, userId: svc.id, role: "ProcessOwner" } });
+    }
+
+    orgId = org.id;
+    email = SERVICE_EMAIL;
+    name = name || "Harness (scratch)";
+  }
+
+  if (body?.createServiceAccount && orgId) {
+    // A robot account for this org. It exists to be acted AS and can never sign
+    // in: no password, and an address in a domain nobody receives mail at.
+    const org = await prisma.org.findUnique({
+      where: { id: orgId },
+      select: { id: true, name: true, subscriptionLevelId: true },
+    });
+    if (!org) return NextResponse.json({ error: "That organisation does not exist" }, { status: 404 });
+
+    const slug = org.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "org";
+    email = `api-${slug}@diagramatix.internal`;
+
+    let svc = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (!svc) {
+      // THE TIER MATTERS. Metering is keyed on the service user, and a user with
+      // no subscription level runs out after a handful of calls with a message
+      // about upgrading "your" plan — nonsense to a partner. It inherits the
+      // org's level so the key draws on the same allowance as the org it serves.
+      svc = await prisma.user.create({
+        data: {
+          email, name: `${org.name} — Process API`, password: "",
+          subscriptionLevelId: org.subscriptionLevelId ?? null,
+          subscriptionAssignedAt: org.subscriptionLevelId ? new Date() : null,
+        },
+        select: { id: true },
+      });
+    }
+    const has = await prisma.orgMember.findFirst({ where: { orgId, userId: svc.id }, select: { id: true } });
+    // ProcessOwner, never Admin — Admin grants owner access to every project in
+    // the org, which is precisely what this feature refuses everywhere else.
+    if (!has) await prisma.orgMember.create({ data: { orgId, userId: svc.id, role: "ProcessOwner" } });
+  }
+
   if (!name || !orgId || !email) {
     return NextResponse.json({ error: "name, orgId and serviceUserEmail are required" }, { status: 400 });
   }

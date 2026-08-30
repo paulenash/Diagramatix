@@ -73,6 +73,18 @@ export function PartnerKeysClient() {
   const [serviceUserEmail, setServiceUserEmail] = useState("");
   const [phase, setPhase] = useState<string>("live");
   const [captureUntil, setCaptureUntil] = useState("");
+  /** Create a robot account in the chosen org rather than requiring one to
+   *  exist. A real partner org has exactly one member — its owner — and an
+   *  owner cannot be a service account, so this is the normal path, not the
+   *  exception. */
+  const [makeAccount, setMakeAccount] = useState(true);
+  /** Orgs and their members, so nobody has to know an internal id. Each member
+   *  is marked eligible or not WITH the reason, rather than letting the mint
+   *  fail afterwards. */
+  const [orgs, setOrgs] = useState<{
+    id: string; name: string;
+    members: { email: string; role: string; eligible: boolean; why: string | null }[];
+  }[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,6 +102,29 @@ export function PartnerKeysClient() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void fetch("/api/admin/partner-keys?lookup=orgs", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { orgs: [] }))
+      .then((j) => setOrgs(j.orgs ?? []))
+      .catch(() => {});
+  }, []);
+
+  /** One click. The harness key needs no choices — see the route: it
+   *  provisions its own org and robot account and reuses them after. */
+  async function mintHarness() {
+    if (busy) return;
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch("/api/admin/partner-keys", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preset: "harness", phase: "internal", name: "Harness (scratch)" }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(j.error ?? "Could not mint the harness key"); return; }
+      setMinted({ key: j.key, prefix: j.prefix, name: "Harness (scratch)" });
+      await load();
+    } finally { setBusy(false); }
+  }
 
   async function mint() {
     if (busy) return;
@@ -99,7 +134,9 @@ export function PartnerKeysClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(), orgId: orgId.trim(), serviceUserEmail: serviceUserEmail.trim(),
+          name: name.trim(), orgId: orgId.trim(),
+          serviceUserEmail: makeAccount ? undefined : serviceUserEmail.trim(),
+          createServiceAccount: makeAccount,
           phase, captureUntil: phase === "testing" && captureUntil ? new Date(captureUntil).toISOString() : null,
         }),
       });
@@ -179,10 +216,19 @@ export function PartnerKeysClient() {
       {/* Mint */}
       <div className="mt-5">
         {!open ? (
-          <button onClick={() => setOpen(true)}
-            className="rounded-md bg-teal-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-800">
-            + Mint a key
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => void mintHarness()} disabled={busy}
+              className="rounded-md bg-teal-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-50">
+              + Key for the test harness
+            </button>
+            <button onClick={() => setOpen(true)}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+              + Key for a partner…
+            </button>
+            <span className="text-xs text-gray-500">
+              The harness key needs no choices — it uses its own organisation and a robot account.
+            </span>
+          </div>
         ) : (
           <div className="rounded-lg border border-gray-200 p-4 space-y-3">
             <div className="grid gap-3 sm:grid-cols-3">
@@ -192,14 +238,37 @@ export function PartnerKeysClient() {
                   className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
               </label>
               <label className="block">
-                <span className="block text-xs font-medium text-gray-600 mb-1">Organisation id</span>
-                <input value={orgId} onChange={(e) => setOrgId(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm font-mono" />
+                <span className="block text-xs font-medium text-gray-600 mb-1">Organisation</span>
+                <select value={orgId} onChange={(e) => { setOrgId(e.target.value); setServiceUserEmail(""); }}
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm bg-white">
+                  <option value="">Choose…</option>
+                  {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
               </label>
               <label className="block">
-                <span className="block text-xs font-medium text-gray-600 mb-1">Service account email</span>
-                <input value={serviceUserEmail} onChange={(e) => setServiceUserEmail(e.target.value)}
-                  placeholder="api@…" className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+                <span className="block text-xs font-medium text-gray-600 mb-1">Service account</span>
+                <label className="flex items-center gap-1.5 text-xs text-gray-700 mb-1">
+                  <input type="checkbox" checked={makeAccount} onChange={(e) => setMakeAccount(e.target.checked)}
+                    className="rounded border-gray-300 text-teal-700 focus:ring-teal-400" />
+                  Create one for this organisation
+                </label>
+                <select value={serviceUserEmail} onChange={(e) => setServiceUserEmail(e.target.value)}
+                  disabled={!orgId || makeAccount}
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm bg-white disabled:bg-gray-50">
+                  <option value="">Choose…</option>
+                  {(orgs.find((o) => o.id === orgId)?.members ?? []).map((m) => (
+                    <option key={m.email} value={m.email} disabled={!m.eligible}>
+                      {m.email} ({m.role}){m.eligible ? "" : " — not eligible"}
+                    </option>
+                  ))}
+                </select>
+                {!makeAccount && orgId && !(orgs.find((o) => o.id === orgId)?.members ?? []).some((m) => m.eligible) && (
+                  <span className="block text-xs text-amber-700 mt-1">
+                    Nobody in this organisation can act as a service account. Every member is an
+                    Owner or Admin, which would give the key owner access to every project in it.
+                    Add a ProcessOwner account first.
+                  </span>
+                )}
               </label>
             </div>
 
@@ -232,7 +301,7 @@ export function PartnerKeysClient() {
             )}
 
             <div className="flex gap-2 pt-1">
-              <button onClick={() => void mint()} disabled={busy || !name.trim() || !orgId.trim() || !serviceUserEmail.trim()}
+              <button onClick={() => void mint()} disabled={busy || !name.trim() || !orgId.trim() || (!makeAccount && !serviceUserEmail.trim())}
                 className="rounded-md bg-teal-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-50">
                 {busy ? "Minting…" : "Mint"}
               </button>
