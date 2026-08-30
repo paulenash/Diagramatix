@@ -51,6 +51,14 @@ next-env.d.ts
 !/new features/Process Repository Final.md
 !/new features/Process Repository v2 — Plan.md
 
+# The GETAI partner-API plan. The FOLDER has to be un-ignored before a file
+# inside it can be — git cannot re-include a file whose parent directory is
+# excluded — so: un-ignore the folder, re-ignore its contents, then except the
+# one document. The call transcript and the generated .docx stay ignored.
+!/new features/getai-api/
+/new features/getai-api/*
+!/new features/getai-api/Partner API Plan.md
+
 # Playwright e2e artifacts
 /test-results/
 /playwright-report/
