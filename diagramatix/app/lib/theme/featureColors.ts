@@ -14,6 +14,7 @@
 export type FeatureColorKey =
   | "simulator" | "mining" | "riskControl" | "apqc" | "portal" | "projectSharing"
   | "processRepository"
+  | "processApi"
   | "ai" | "entityLists" | "superAdmin" | "orgAdmin";
 
 export interface FeatureColor { bg: string; text: string }
@@ -32,6 +33,7 @@ export const FEATURE_META: { key: FeatureColorKey; label: string; group: "produc
   { key: "portal",      label: "Portal / Publishing", group: "product", note: "Process Portal & publishing surfaces" },
   { key: "projectSharing", label: "Project Sharing",  group: "product", note: "Project Sharing tiles (SuperAdmin + OrgAdmin)" },
   { key: "processRepository", label: "Process Repository", group: "product", note: "The value-chain library, its maintenance screen and project generation" },
+  { key: "processApi", label: "Process API", group: "product", note: "The partner API that turns a process description or document into BPMN — its test harness and its usage screen" },
   { key: "ai",          label: "AI Generation",       group: "accent",  note: "Toolbar AI Generate + every AI-generation trigger" },
   { key: "entityLists", label: "Entity Lists / Drift", group: "accent", note: "Entity Lists admin + the Entity-Drift ring" },
   { key: "superAdmin",  label: "SuperAdmin (fallback)", group: "role",  note: "Fallback for unmapped SuperAdmin Tools tiles" },
@@ -55,6 +57,9 @@ export const DEFAULT_FEATURE_COLORS: Record<FeatureColorKey, FeatureColor> = {
   // in the product group, and well clear of the violet AI accent the repository
   // tiles sit next to on the SuperAdmin grid.
   processRepository: { bg: "#ecfeff", text: "#155e75" },
+  // Slate-teal: adjacent to the Process Repository cyan, since the API serves
+  // the same subject, but distinct enough to tell the two apart on the grid.
+  processApi: { bg: "#e0f2f1", text: "#0f766e" },
   ai:          { bg: "#f5f3ff", text: "#6d28d9" }, // violet
   entityLists: { bg: "#fff1f2", text: "#be123c" }, // rose
   superAdmin:  { bg: "#fef2f2", text: "#b91c1c" }, // red

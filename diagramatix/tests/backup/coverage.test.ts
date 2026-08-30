@@ -83,6 +83,17 @@ const PCF_TABLES = ["PcfFramework", "PcfNode"] as const;
 // does survive a scoped backup, replayed from portable packages + a standalone
 // library (see SIMULATOR_CONFIG_TABLES above).
 const SCOPED_OMITTED = new Set<string>([
+  // Partner API. A CONSCIOUS omission from the scoped org/user backups:
+  //  • ApiKey holds a credential hash bound to one org and one service user.
+  //    Restoring it into another environment would either resurrect a
+  //    credential nobody expects to be live, or carry a hash that is useless
+  //    without the raw key. A key belongs to the environment that minted it.
+  //  • PartnerRequest is traffic telemetry, not customer content, and it is
+  //    already governed by its own retention rules — carrying it into a backup
+  //    would quietly outlive the purge those rules promise.
+  // The full SuperAdmin backup still takes both, since it reads the live schema.
+  "ApiKey", "PartnerRequest",
+
   // Grant/membership tables (like ProjectShare + the bundle audiences, and now
   // admin-managed team membership) — carried by the full SuperAdmin backup only,
   // deliberately not in the scoped org/user backups.

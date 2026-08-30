@@ -130,6 +130,7 @@ model Org {
   simulationCalendars SimulationCalendar[]
   processMiningRuns   ProcessMiningRun[]
   processDiffRuns     ProcessDiffRun[]
+  apiKeys             ApiKey[]
 }
 
 model OrgMember {
@@ -295,6 +296,7 @@ model User {
   // encrypted at rest). Decoupled from login so any web user can connect their own
   // Microsoft 365. See MicrosoftConnection.
   microsoftConnection           MicrosoftConnection?
+  apiKeysAsService              ApiKey[]                   @relation("ApiKeyServiceUser")
 }
 
 // A single web user's delegated Microsoft 365 connection for SharePoint/OneDrive.
@@ -374,6 +376,7 @@ model Project {
   miningSources     MiningSource[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  apiKeys     ApiKey[]
 
   @@index([orgId])
 }
@@ -2082,4 +2085,99 @@ model SopTemplate {
 
   @@index([orgId])
   @@index([projectId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Partner API — machine-to-machine access for an external product (GETAI).
+//
+// A key is bound to ONE org and ONE service user, and everything the key does is
+// done as that user: `authenticatePartner` synthesises a SessionLike plus a
+// cookie stub pinning the org, so orgContext, subscription metering and AI
+// telemetry all run unchanged. See `app/lib/partner/auth.ts`.
+//
+// Retention is a property of the key's PHASE, not a flag someone has to remember
+// to unset — `internal` (our harness), `testing` (a disclosed, time-boxed window
+// where a partner's documents are kept so an integration can be debugged) and
+// `live` (metadata only). Going live PURGES the testing data rather than merely
+// ceasing to collect it.
+// ────────────────────────────────────────────────────────────────────────────
+
+model ApiKey {
+  id            String    @id @default(cuid())
+  name          String // "GETAI — production"
+  /// sha256 hex of the raw key. UNIQUE so a presented key is found by an exact
+  /// hash lookup — never a prefix lookup followed by a compare. The raw key is
+  /// shown once at mint and never stored.
+  keyHash       String    @unique
+  keyPrefix     String // first 12 chars, for display
+  orgId         String
+  org           Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  /// The user every call acts as. MUST NOT be a SuperAdmin, and should hold
+  /// ProcessOwner rather than Admin — Admin grants silent owner access to every
+  /// project in the org via isAdminElevatedForOrg.
+  serviceUserId String
+  serviceUser   User      @relation("ApiKeyServiceUser", fields: [serviceUserId], references: [id], onDelete: Restrict)
+  scopes        Json      @default("[]")
+  /// Optional fixed destination project. The harness uses this to keep every
+  /// run in one place.
+  projectId     String?
+  project       Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  /// internal | testing | live. Defaults to the most restrictive: a new key
+  /// retains nothing extra until somebody deliberately says otherwise.
+  phase         String    @default("live")
+  /// REQUIRED while phase is "testing", and capped at 90 days out, so
+  /// "indefinitely" is not reachable by leaving a field blank.
+  captureUntil  DateTime?
+
+  rateLimitPerMin Int     @default(30)
+  dailyJobLimit   Int     @default(50)
+
+  createdById   String?
+  revokedAt     DateTime?
+  expiresAt     DateTime?
+  lastUsedAt    DateTime?
+  lastUsedIp    String?
+  useCount      Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  requests      PartnerRequest[]
+
+  @@index([orgId])
+}
+
+/// One row per HTTP call to /api/public/**, written by `withPartnerLogging` so a
+/// route cannot forget. Deliberately at the EDGE rather than on the job: a 401
+/// from a wrong header, a 413 from an oversized document or a poll storm hitting
+/// 429 never creates a job, and those are what an integration actually debugs.
+model PartnerRequest {
+  id             String   @id @default(cuid())
+  at             DateTime @default(now())
+  /// 8 chars, returned to the caller in the error envelope and in the
+  /// X-Diagramatix-Request-Id header. The caller quotes it; we search on it.
+  ref            String
+  apiKeyId       String?
+  apiKey         ApiKey?  @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  keyPrefix      String? // survives key deletion
+  method         String
+  path           String
+  status         Int
+  durationMs     Int
+  ip             String?
+  userAgent      String?
+  requestBytes   Int      @default(0)
+  responseBytes  Int      @default(0)
+  errorCode      String?
+  jobId          String?
+  /// Bodies are kept only while the key is in the "testing" phase, and the
+  /// request envelope is truncated — a truncated PDF is useless, so the document
+  /// itself lives whole on the job instead.
+  requestBody    String?  @db.Text
+  responseBody   String?  @db.Text
+  requestHeaders String?  @db.Text
+
+  @@index([apiKeyId, at])
+  @@index([ref])
+  @@index([at])
 }

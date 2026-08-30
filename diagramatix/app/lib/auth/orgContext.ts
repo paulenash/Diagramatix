@@ -19,12 +19,16 @@ import { getEffectiveUserId, SUPERUSER_EMAILS, isSuperuser } from "@/app/lib/sup
 
 export const ORG_COOKIE = "dgx_org";
 
-/** Minimal cookie store interface — compatible with whatever cookies() returns */
-interface CookieStore {
+/** Minimal cookie store interface — compatible with whatever cookies() returns.
+ *  EXPORTED because it is a contract, not an implementation detail: the partner
+ *  API synthesises one of these to pin a machine caller to its key’s org. */
+export interface CookieStore {
   get(name: string): { value: string } | undefined;
 }
 
-interface SessionLike {
+/** EXPORTED for the same reason as CookieStore — a machine caller is adapted to
+ *  this shape rather than every helper being forked to understand API keys. */
+export interface SessionLike {
   user?: { id?: string; email?: string | null };
 }
 
