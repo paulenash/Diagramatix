@@ -20,6 +20,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { mintIngestKey } from "@/app/lib/mining/sourceAuth";
+import { recallHarnessSecret, rememberHarnessSecret } from "@/app/lib/partner/harnessSecret";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -27,16 +28,14 @@ export const maxDuration = 300;
 const forbidden = () => NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
 /**
- * The raw key is never stored, so the harness cannot read one back to use it.
- * Instead each harness key row keeps its own freshly minted secret in memory for
- * the life of the process — and if that is unavailable (a restart), the key is
- * rotated. A harness key is ours, so rotating it costs nothing.
+ * The raw key is never stored, so the harness cannot read one back from a hash.
+ * It uses the secret remembered at mint time; only if that is gone — a restart —
+ * does it rotate, and it says so in the result rather than leaving somebody with
+ * a key that quietly stopped working.
  */
-const liveKeys = new Map<string, string>();
-
-async function secretFor(apiKeyId: string): Promise<string | null> {
-  const cached = liveKeys.get(apiKeyId);
-  if (cached) return cached;
+async function secretFor(apiKeyId: string): Promise<{ secret: string; rotated: boolean } | null> {
+  const cached = recallHarnessSecret(apiKeyId);
+  if (cached) return { secret: cached, rotated: false };
 
   const row = await prisma.apiKey.findUnique({
     where: { id: apiKeyId },
@@ -49,8 +48,8 @@ async function secretFor(apiKeyId: string): Promise<string | null> {
 
   const { key, hash, prefix } = mintIngestKey();
   await prisma.apiKey.update({ where: { id: apiKeyId }, data: { keyHash: hash, keyPrefix: prefix } });
-  liveKeys.set(apiKeyId, key);
-  return key;
+  rememberHarnessSecret(apiKeyId, key);
+  return { secret: key, rotated: true };
 }
 
 export async function POST(req: Request) {
@@ -69,14 +68,15 @@ export async function POST(req: Request) {
   const apiKeyId = body?.apiKeyId?.trim();
   if (!apiKeyId) return NextResponse.json({ error: "Choose a key" }, { status: 400 });
 
-  const secret = await secretFor(apiKeyId);
-  if (!secret) {
+  const got = await secretFor(apiKeyId);
+  if (!got) {
     return NextResponse.json(
       { error: "That key cannot be driven from the harness. Only an internal-phase key can be, because using one means rotating its secret — which would break a partner's integration." },
       { status: 400 },
     );
   }
 
+  const { secret, rotated } = got;
   const origin = new URL(req.url).origin;
   const headers = { "Content-Type": "application/json", "X-Api-Key": secret };
 
@@ -104,7 +104,9 @@ export async function POST(req: Request) {
         data: { runCount: { increment: 1 }, lastRunAt: new Date() },
       }).catch(() => {});
     }
-    return NextResponse.json(out, { status: r.status });
+    // Said out loud when it happens, because it invalidates a key somebody may
+    // be holding.
+    return NextResponse.json(rotated ? { ...out, keyRotated: true } : out, { status: r.status });
   } catch (e) {
     console.error("[harness] proxy failed:", e);
     return NextResponse.json({ error: "Could not reach the API from the harness." }, { status: 502 });

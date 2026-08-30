@@ -16,6 +16,7 @@ import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { mintIngestKey } from "@/app/lib/mining/sourceAuth";
+import { rememberHarnessSecret } from "@/app/lib/partner/harnessSecret";
 import { recordAudit, auditActor } from "@/app/lib/audit";
 import {
   isApiKeyPhase, MAX_CAPTURE_DAYS, SCOPE_PROCESS_MAPPING, type ApiKeyPhase,
@@ -279,6 +280,12 @@ export async function POST(req: Request) {
       captureUntil: captureUntil ? captureUntil.toISOString() : null,
     },
   });
+
+  // An INTERNAL key is ours, and the harness needs a secret it cannot read back
+  // from a hash. Remembering it here means the key you were just shown keeps
+  // working — the alternative was rotating it on first use, which silently
+  // invalidated the key a moment after telling somebody to copy it.
+  if (phase === "internal") rememberHarnessSecret(created.id, key);
 
   // The only moment the raw key exists outside the caller's hands.
   return NextResponse.json({ id: created.id, key, prefix, shownOnce: true });
