@@ -129,6 +129,58 @@ export function ApiHarnessClient() {
   // Never leave a mic open behind a closed screen.
   useEffect(() => () => { dictRef.current?.stop(); }, []);
 
+  /**
+   * Remember the screen across a trip to a diagram and back.
+   *
+   * Opening a result navigates away, which remounts this component with empty
+   * state — so the run you had just been reading was gone by the time you
+   * returned to it. sessionStorage is the right scope: per tab, cleared when
+   * the tab closes, and never shared with another viewer.
+   *
+   * The ATTACHMENT is the one thing that may not fit. A 10 MB document is
+   * base64 and the quota is around 5 MB, so a large one is remembered by NAME
+   * only and the screen says it needs re-attaching — which is better than a
+   * failed write silently losing everything else too.
+   */
+  const STATE_KEY = "dgx.api-harness.state";
+  const ATTACH_LIMIT = 1_500_000;
+  const restored = useRef(false);
+  const [attachmentDropped, setAttachmentDropped] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    try {
+      const raw_ = sessionStorage.getItem(STATE_KEY);
+      if (!raw_) return;
+      const v = JSON.parse(raw_);
+      if (typeof v.apiKeyId === "string") setApiKeyId(v.apiKeyId);
+      if (typeof v.name === "string") setName(v.name);
+      if (typeof v.description === "string") setDescription(v.description);
+      if (typeof v.minutesPerRun === "string") setMinutesPerRun(v.minutesPerRun);
+      if (typeof v.runsPerMonth === "string") setRunsPerMonth(v.runsPerMonth);
+      if (v.result) setResult(v.result);
+      if (typeof v.raw === "string") setRaw(v.raw);
+      if (v.score) setScore(v.score);
+      if (typeof v.sourceDiagramId === "string") setSourceDiagramId(v.sourceDiagramId);
+      if (v.attachment) setAttachment(v.attachment);
+      else if (typeof v.attachmentName === "string") setAttachmentDropped(v.attachmentName);
+    } catch { /* a corrupt or blocked store just means a fresh screen */ }
+  }, [setAttachment]);
+
+  useEffect(() => {
+    if (!restored.current) return;
+    try {
+      const big = attachment ? attachment.data.length > ATTACH_LIMIT : false;
+      sessionStorage.setItem(STATE_KEY, JSON.stringify({
+        apiKeyId, name, description, minutesPerRun, runsPerMonth,
+        result, raw, score, sourceDiagramId,
+        attachment: attachment && !big ? attachment : null,
+        attachmentName: attachment ? attachment.name : null,
+      }));
+    } catch { /* over quota or blocked — the screen still works */ }
+  }, [apiKeyId, name, description, minutesPerRun, runsPerMonth, result, raw, score, sourceDiagramId, attachment]);
+
   const loadKeys = useCallback(async () => {
     const r = await fetch("/api/admin/partner-keys", { cache: "no-store" });
     if (!r.ok) return;
@@ -136,6 +188,7 @@ export function ApiHarnessClient() {
     const internal: KeyRow[] = (j.keys ?? []).filter((k: { phase: string; revokedAt: string | null }) =>
       k.phase === "internal" && !k.revokedAt);
     setKeys(internal);
+    // Never stomp a restored selection.
     setApiKeyId((cur) => cur || internal[0]?.id || "");
   }, []);
 
@@ -394,9 +447,14 @@ export function ApiHarnessClient() {
                   </>
                 )}
                 {description.trim() && (
-                  <button type="button" onClick={() => setDescription("")}
+                  <button type="button" onClick={() => {
+                    // Clears the remembered screen too, or the next mount would
+                    // restore what was just cleared.
+                    setDescription(""); setName(""); setResult(null); setRaw(null);
+                    setScore(null); setSourceDiagramId(null); clear(); setAttachmentDropped(null);
+                  }}
                     className="ml-auto text-xs text-gray-500 hover:text-gray-700 hover:underline">
-                    Clear
+                    Clear all
                   </button>
                 )}
               </div>
@@ -421,6 +479,11 @@ export function ApiHarnessClient() {
                   if (f) { const err = await attach(f); if (err) setError(err); else setError(null); }
                   e.target.value = "";
                 }} />
+              {attachmentDropped && !attachment && (
+                <span className="text-xs text-amber-700">
+                  “{attachmentDropped}” was too large to remember — attach it again.
+                </span>
+              )}
               {attachment && (
                 <span className="text-xs text-gray-600">
                   {attachment.name} ({attachment.type})
