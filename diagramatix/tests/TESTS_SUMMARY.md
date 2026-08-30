@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-08-29  ·  **Document version:** 6.7  ·  **Suite:** 363 test files · 2,329 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3017  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-08-29  ·  **Document version:** 6.7  ·  **Suite:** 363 test files · 2,330 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3017  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -1927,6 +1927,7 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T2960 | `tests/partner/logging.test.ts` | A `testing` key stores bodies, truncated to the envelope limit, with the key redacted — asserted as the key string appearing in no column at all. |
 | T2961 | `tests/partner/logging.test.ts` | A handler that throws still produces a row and a clean 500 that tells the caller nothing about our internals. |
 | T2962 | `tests/partner/logging.test.ts` | Source-text tripwire: no route under `app/api/public/**` may skip `authenticatePartner` or `withPartnerLogging`. A route added later cannot be reachable without a key, or leave no trace of a call. |
+| T2963 | `tests/partner/logging.test.ts` | The ONE open route — the self-describing contract at `/api/public/v1` — cannot become a data leak: it reads no database and no request body. Requiring a key to read documentation produces support emails instead of integrations, so the exception exists; it is NAMED rather than pattern-matched, and widening it means editing two tests on purpose. |
 | T2963 | `tests/partner/attachment.test.ts` | A PDF becomes a `pdf` attachment and reaches the model whole. |
 | T2964 | `tests/partner/attachment.test.ts` | A DOCX becomes TEXT containing its words, and NOT its ZIP bytes. `.docx` has been in the editor's accept list while falling through to `file.text()`, so a Word SOP arrived at the model as stringified ZIP and produced a diagram built from noise — silently. |
 | T2965 | `tests/partner/attachment.test.ts` | The BYTES win over a wrong declared type: a PDF announced as `text/plain` is still read as a PDF. A machine caller mislabels things, and the old path stringified them. |

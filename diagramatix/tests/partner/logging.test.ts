@@ -157,15 +157,35 @@ describe("Partner API — every public route is guarded and logged", () => {
     return out;
   }
 
+  /**
+   * The ONE route that may be open: the self-describing contract at
+   * /api/public/v1. Requiring a key to read the documentation is the kind of
+   * friction that produces a support email instead of an integration.
+   *
+   * Named here rather than pattern-matched, and T2963 proves it cannot become a
+   * data leak — so widening the exception means editing two tests, on purpose.
+   */
+  const OPEN_ROUTES = ["/app/api/public/v1/route.ts"];
+  const rel = (p: string) => p.replace(process.cwd(), "").split("\\").join("/");
+
   it("T2962 — no route under app/api/public/** may skip authenticatePartner or withPartnerLogging", () => {
-    const routes = routesUnder(dir);
-    expect(routes.length, "there should be at least one public route by now").toBeGreaterThan(0);
+    const routes = routesUnder(dir).filter((r) => !OPEN_ROUTES.includes(rel(r)));
+    expect(routes.length, "there should be at least one guarded public route by now").toBeGreaterThan(0);
 
     const unguarded = routes.filter((r) => !/authenticatePartner\s*\(/.test(readFileSync(r, "utf8")));
     const unlogged = routes.filter((r) => !/withPartnerLogging\s*\(/.test(readFileSync(r, "utf8")));
-    const rel = (p: string) => p.replace(process.cwd(), "").replace(/\\/g, "/");
 
     expect(unguarded.map(rel), "these are reachable without a key").toEqual([]);
     expect(unlogged.map(rel), "these would leave no trace of a call").toEqual([]);
+  });
+
+  it("T2963 — the open route cannot leak: it reads no database and no request body", () => {
+    // An open route that grew a Prisma import would stop being documentation and
+    // start being an unauthenticated data endpoint, silently.
+    for (const r of OPEN_ROUTES) {
+      const src = readFileSync(join(process.cwd(), r.slice(1)), "utf8");
+      expect(src, `${r} must not touch the database`).not.toMatch(/lib\/db/);
+      expect(src, `${r} must not read a request body`).not.toMatch(/req\.(json|text|formData)\s*\(/);
+    }
   });
 });

@@ -19,6 +19,7 @@ import { attachmentFromFile } from "@/app/lib/ai/attachmentFromFile";
 import { createJob, redactRequest, reapStaleJobs, purgeExpiredCaptures, jobsToday } from "@/app/lib/partner/jobs";
 import { runJob } from "@/app/lib/partner/worker";
 import { rateLimit, clientIp } from "@/app/lib/rateLimit";
+import { recordAudit } from "@/app/lib/audit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -151,6 +152,21 @@ export const POST = withPartnerLogging(async (req, ref) => {
     });
 
     void touchKey(c.apiKeyId, clientIp(req.headers));
+
+    // Audited with the SHAPE of the request, never its content — enough to
+    // answer "what did they send us on Tuesday" without keeping what they sent.
+    void recordAudit({
+      actorUserId: null, actorEmail: null, effectiveUserId: c.userId, orgId: c.orgId,
+      action: "partner.job.created", targetType: "partnerJob", targetId: jobId,
+      meta: {
+        keyPrefix: c.keyPrefix, phase: c.phase,
+        descriptionChars: description.length,
+        hasDocument: !!docMeta,
+        documentBytes: docMeta ? docMeta.buf.length : 0,
+        mediaType: docMeta?.mediaType ?? null,
+      },
+      ip: clientIp(req.headers),
+    }).catch(() => {});
 
     // Deliberately NOT awaited: the caller gets its 202 now. Every path inside
     // ends in succeedJob or failJob, so a rejection cannot escape.
