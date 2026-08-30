@@ -184,7 +184,7 @@ export function PartnerApiClient() {
                     )}
                   </p>
                   {detail.job.diagramId ? (
-                    <Link href={`/diagram/${String(detail.job.diagramId)}`}
+                    <Link href={`/diagram/${String(detail.job.diagramId)}?from=${encodeURIComponent("/dashboard/admin/partner-api")}`}
                       className="text-xs text-teal-700 hover:underline">Open the diagram →</Link>
                   ) : null}
                 </div>

@@ -1068,6 +1068,10 @@ export function DiagramEditor({
   const backHref = backFromHref ?? (projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
   const backLabel = backHref.includes("mining=")
     ? "MINER"                                              // returned from a Process Mining console
+    : backHref.includes("api-harness")
+      ? "Test Harness"                                     // opened from the Process API harness
+    : backHref.includes("partner-api")
+      ? "API Usage"                                        // opened from the Process API traffic screen
     : backHref.includes("diff-runs")
       ? "Diff Process Runs"                                // opened from an Admin Diff Process Runs screen
     : backHref.startsWith("/notifications") || backHref.includes("notifications=1")

@@ -480,7 +480,12 @@ export function ApiHarnessClient() {
                     {result.durationMs ? ` in ${(result.durationMs / 1000).toFixed(1)}s` : ""}
                     {result.model ? ` · ${result.model}` : ""}
                     {" · "}
-                    <a href={result.diagram.deepLink} className="underline font-medium">Open the diagram →</a>
+                    {/* Our OWN link carries where it came from, so the editor's
+                        back button returns here rather than dumping you in the
+                        project. The API's deepLink stays clean — that one goes to
+                        a partner's customer, who has never seen this screen. */}
+                    <a href={`/diagram/${result.diagram.id}?from=${encodeURIComponent("/dashboard/admin/api-harness")}`}
+                      className="underline font-medium">Open the diagram →</a>
                   </>
                 )}
               </div>
