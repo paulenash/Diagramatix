@@ -36,6 +36,15 @@ interface Activity {
 }
 interface Lane { id: string; name: string; sublanes: Lane[] }
 interface Pool { id: string; name: string; external: boolean; lanes: Lane[] }
+interface SopRow {
+  id: string; title: string; diagramId: string; diagramName: string | null;
+  projectName: string | null; scopeLabel: string | null;
+}
+interface Score {
+  score: number; summary: string; orderPreserved: boolean; caveat: string;
+  matched: { name: string }[]; missing: { name: string }[]; invented: { name: string }[];
+  movedLane: { name: string; from: string | null; to: string | null }[];
+}
 interface Result {
   status: string; stage?: string; jobId: string;
   diagram?: { id: string; name: string; deepLink: string; elementCount: number; connectorCount: number };
@@ -63,6 +72,13 @@ export function ApiHarnessClient() {
   const [error, setError] = useState<string | null>(null);
   const [raw, setRaw] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<CaseRow | null>(null);
+  // The round trip: an SOP of ours goes in, and its SOURCE diagram is the
+  // ground truth the result is scored against. That is what turns this screen
+  // from a viewer into a measurement.
+  const [sops, setSops] = useState<SopRow[]>([]);
+  const [sourceDiagramId, setSourceDiagramId] = useState<string | null>(null);
+  const [score, setScore] = useState<Score | null>(null);
+  const [scoring, setScoring] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<number | null>(null);
 
@@ -81,7 +97,12 @@ export function ApiHarnessClient() {
     if (r.ok) setCases((await r.json()).cases ?? []);
   }, []);
 
-  useEffect(() => { void loadKeys(); void loadCases(); }, [loadKeys, loadCases]);
+  const loadSops = useCallback(async () => {
+    const r = await fetch("/api/admin/api-harness/sops", { cache: "no-store" });
+    if (r.ok) setSops((await r.json()).sops ?? []);
+  }, []);
+
+  useEffect(() => { void loadKeys(); void loadCases(); void loadSops(); }, [loadKeys, loadCases, loadSops]);
   useEffect(() => () => { if (pollRef.current) window.clearTimeout(pollRef.current); }, []);
 
   async function loadCase(id: string) {
@@ -106,6 +127,32 @@ export function ApiHarnessClient() {
       setAttachment({ name: c.documentName ?? "document", type: "text", data: atob(c.documentBase64) });
     }
     setResult(null); setRaw(null); setError(null);
+  }
+
+  /** Load one of our own SOPs as the input. Its prose goes in as a text
+   *  attachment — exporting to .docx and back through LibreOffice would test
+   *  our exporter, not the API, and costs a soffice spawn per run. */
+  async function useSop(sopId: string) {
+    const r = await fetch(`/api/admin/api-harness/sops?id=${encodeURIComponent(sopId)}`, { cache: "no-store" });
+    if (!r.ok) return;
+    const { sop } = await r.json();
+    setName(sop.title ?? "");
+    setDescription("");
+    setAttachment({ name: `${sop.title}.txt`, type: "text", data: sop.text });
+    setSourceDiagramId(sop.diagramId ?? null);
+    setResult(null); setRaw(null); setScore(null); setError(null);
+  }
+
+  async function runScore(resultDiagramId: string) {
+    if (!sourceDiagramId) return;
+    setScoring(true);
+    try {
+      const r = await fetch("/api/admin/api-harness/sops", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceDiagramId, resultDiagramId }),
+      });
+      if (r.ok) setScore(await r.json());
+    } finally { setScoring(false); }
   }
 
   function payload() {
@@ -165,6 +212,8 @@ export function ApiHarnessClient() {
         setRaw(JSON.stringify(j));
         setResult(j);
         if (j.status === "queued" || j.status === "running") { poll(jobId); return; }
+        // A run from one of our SOPs is scorable the moment it lands.
+        if (j.status === "succeeded" && sourceDiagramId && j.diagram?.id) void runScore(j.diagram.id);
         setRunning(false);
         void loadCases();
       } catch {
@@ -297,6 +346,28 @@ export function ApiHarnessClient() {
               <span className="text-xs text-gray-400">PDF, Word, text or an image of a process</span>
             </div>
 
+            {/* The round trip. One of OUR SOPs has a source diagram, which makes
+                the result measurable rather than merely viewable. */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <label className="text-xs font-medium text-gray-600">…or use one of our own SOPs:</label>
+              <select
+                value=""
+                onChange={(e) => { if (e.target.value) void useSop(e.target.value); }}
+                className="rounded-md border border-gray-300 px-2 py-1 text-xs bg-white max-w-md">
+                <option value="">Choose an SOP…</option>
+                {sops.map((sp) => (
+                  <option key={sp.id} value={sp.id}>
+                    {sp.title}{sp.projectName ? ` · ${sp.projectName}` : ""}
+                  </option>
+                ))}
+              </select>
+              {sourceDiagramId && (
+                <span className="text-[11px] text-teal-700">
+                  scored against its source diagram
+                </span>
+              )}
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="block">
                 <span className="block text-xs font-medium text-gray-600 mb-1">Minutes per run</span>
@@ -382,6 +453,35 @@ export function ApiHarnessClient() {
           {result && result.status === "failed" && (
             <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
               <b>{result.error?.code}</b> — {result.error?.message}
+            </div>
+          )}
+
+          {(score || scoring) && (
+            <div className="rounded-lg border border-teal-300 bg-teal-50 px-4 py-3">
+              <h3 className="text-xs font-semibold text-teal-900 mb-1">
+                Round trip — BPMN → SOP → the API → BPMN
+              </h3>
+              {scoring ? <p className="text-sm text-teal-800">Scoring…</p> : score && (
+                <>
+                  <p className="text-2xl font-semibold text-teal-900 tabular-nums">{score.score}<span className="text-sm font-normal">/100</span></p>
+                  <p className="text-sm text-teal-800">{score.summary}</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3 text-xs">
+                    <div>
+                      <div className="font-medium text-teal-900">Lost ({score.missing.length})</div>
+                      <ul className="text-teal-800">{score.missing.slice(0, 8).map((m) => <li key={m.name}>· {m.name}</li>)}</ul>
+                    </div>
+                    <div>
+                      <div className="font-medium text-teal-900">Invented ({score.invented.length})</div>
+                      <ul className="text-teal-800">{score.invented.slice(0, 8).map((m) => <li key={m.name}>· {m.name}</li>)}</ul>
+                    </div>
+                    <div>
+                      <div className="font-medium text-teal-900">Changed lane ({score.movedLane.length})</div>
+                      <ul className="text-teal-800">{score.movedLane.slice(0, 8).map((m) => <li key={m.name}>· {m.name}</li>)}</ul>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[11px] text-teal-700">{score.caveat}</p>
+                </>
+              )}
             </div>
           )}
 
