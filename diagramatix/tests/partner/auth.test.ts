@@ -206,3 +206,43 @@ describe("Partner API — authentication", () => {
     expect(JSON.stringify(row)).not.toContain(key);
   });
 });
+
+/**
+ * The brute-force guard must not become a cap on legitimate traffic.
+ *
+ * The first version consumed a token on EVERY attempt, so it caught its own
+ * harness first: polling from one loopback address burns twenty a minute without
+ * a single bad key ever being presented. A security control that fires on
+ * correct behaviour is not a security control, it is an outage.
+ */
+describe("Partner API — the auth limiter charges only for failure", () => {
+  beforeEach(async () => { await truncateAll(); });
+
+  it("T3023 — a valid key can authenticate far more often than the failure allowance", async () => {
+    const user = await createUser();
+    const org = await createOrg();
+    await addOrgMember(user.id, org.id, "ProcessOwner");
+    const { key } = await mintKey({ orgId: org.id, serviceUserId: user.id });
+
+    // Comfortably past the 20/min failure allowance.
+    for (let i = 0; i < 40; i++) {
+      const res = await authenticatePartner(request(key), SCOPE_PROCESS_MAPPING);
+      expect(res.ok, `attempt ${i + 1} should still succeed`).toBe(true);
+    }
+  });
+
+  it("T3024 — repeated BAD keys are still stopped", async () => {
+    // The guard has to keep working, or removing the false positive would have
+    // removed the control with it.
+    let limited = false;
+    for (let i = 0; i < 30; i++) {
+      const res = await authenticatePartner(
+        request("dgxk_" + String(i).padStart(64, "0")),
+        SCOPE_PROCESS_MAPPING,
+      );
+      expect(res.ok).toBe(false);
+      if (!res.ok && res.code === "rate_limited") { limited = true; break; }
+    }
+    expect(limited, "a run of bad keys must eventually be rate limited").toBe(true);
+  });
+});

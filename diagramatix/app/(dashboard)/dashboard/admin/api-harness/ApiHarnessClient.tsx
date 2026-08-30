@@ -270,7 +270,9 @@ export function ApiHarnessClient() {
         setError("Lost contact while polling.");
         setRunning(false);
       }
-    }, 2500);
+      // The interval the contract tells a partner to use — the harness should
+      // behave like the client it stands in for, not faster.
+    }, 5000);
   }
 
   async function saveCase() {

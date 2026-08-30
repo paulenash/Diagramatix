@@ -33,7 +33,10 @@ export const GET = withPartnerLogging(async (req, ref) => {
     // moment a stuck job of theirs would otherwise hang forever.
     void reapStaleJobs().catch(() => {});
 
-    const rl = rateLimit(`partner:poll:${jobId}`, 30, 60_000);
+    // Generous enough for a whole run: the contract says poll every 5s, a run
+    // takes up to 120s, and a client that retries a dropped poll should not be
+    // punished for it. This is a guard against a stuck loop, not a quota.
+    const rl = rateLimit(`partner:poll:${jobId}`, 60, 60_000);
     if (!rl.ok) {
       return {
         response: partnerError("rate_limited", "Polling too fast. Wait a few seconds between checks.", {

@@ -76,13 +76,26 @@ export async function authenticatePartner(
     return fail("invalid_key", "Supply your key in an X-Api-Key or Authorization: Bearer header.", ref);
   }
 
-  // Brute-force guard on the CALLER, not the key — an attacker guessing keys has
-  // no valid key to rate-limit against.
-  const rl = rateLimit(`partner:auth:${clientIp(req.headers)}`, 20, 60_000);
-  if (!rl.ok) {
-    return fail("rate_limited", "Too many failed authentication attempts. Try again shortly.", ref,
-      { "Retry-After": String(rl.retryAfterSec) });
-  }
+  /**
+   * Brute-force guard, charged ONLY WHEN AUTHENTICATION FAILS.
+   *
+   * The first version consumed a token on every attempt, which made it a cap on
+   * legitimate traffic wearing a security label — and it caught its own harness
+   * first, since polling every few seconds from one loopback address burns 20
+   * a minute without a single bad key. Volume from a VALID key is limited
+   * per-key at the route, where the key's own configured limit applies.
+   *
+   * Keyed on the caller rather than the key, because somebody guessing keys has
+   * no valid key to be limited against.
+   */
+  const charge = () => rateLimit(`partner:auth:${clientIp(req.headers)}`, 20, 60_000);
+  const refuse = (code: PartnerErrorCode, message: string): PartnerAuthFailure => {
+    const rl = charge();
+    return rl.ok
+      ? fail(code, message, ref)
+      : fail("rate_limited", "Too many failed authentication attempts. Try again shortly.", ref,
+          { "Retry-After": String(rl.retryAfterSec) });
+  };
 
   // EXACT-HASH lookup. Never a prefix lookup followed by a compare — the prefix
   // is for humans reading a list, not for finding a row to trust.
@@ -93,13 +106,13 @@ export async function authenticatePartner(
   // Constant-time confirmation even though the lookup already matched, so the
   // two key paths in this codebase behave identically.
   if (!row || !verifyIngestKey(presented, row.keyHash)) {
-    return fail("invalid_key", "That key is not recognised.", ref);
+    return refuse("invalid_key", "That key is not recognised.");
   }
   if (row.revokedAt) {
-    return fail("key_revoked", "That key has been revoked.", ref);
+    return refuse("key_revoked", "That key has been revoked.");
   }
   if (row.expiresAt && row.expiresAt.getTime() <= Date.now()) {
-    return fail("key_revoked", "That key has expired.", ref);
+    return refuse("key_revoked", "That key has expired.");
   }
 
   const scopes = Array.isArray(row.scopes) ? (row.scopes as unknown[]).filter((s): s is string => typeof s === "string") : [];
