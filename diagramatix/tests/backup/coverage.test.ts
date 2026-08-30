@@ -92,7 +92,11 @@ const SCOPED_OMITTED = new Set<string>([
   //    already governed by its own retention rules — carrying it into a backup
   //    would quietly outlive the purge those rules promise.
   // The full SuperAdmin backup still takes both, since it reads the live schema.
-  "ApiKey", "PartnerRequest",
+  //  • PartnerJob holds a partner run: a customer document during a testing
+  //    window, and a result that belongs with the diagram it produced. Same
+  //    reasoning — it is governed by its own retention rules, and a backup would
+  //    outlive them.
+  "ApiKey", "PartnerRequest", "PartnerJob",
 
   // Grant/membership tables (like ProjectShare + the bundle audiences, and now
   // admin-managed team membership) — carried by the full SuperAdmin backup only,

@@ -2143,6 +2143,7 @@ model ApiKey {
   updatedAt     DateTime  @updatedAt
 
   requests      PartnerRequest[]
+  jobs          PartnerJob[]
 
   @@index([orgId])
 }
@@ -2180,4 +2181,66 @@ model PartnerRequest {
   @@index([apiKeyId, at])
   @@index([ref])
   @@index([at])
+}
+
+/// One process-map request. Async because a generation is 30–120 s: the POST
+/// returns 202 with an id and the caller polls, rather than holding a
+/// connection open past whatever a proxy decides is too long.
+///
+/// There is no queue — the worker runs in the request's own process — so a
+/// container swap mid-job would otherwise leave a caller polling forever. The
+/// reaper in `app/lib/partner/jobs.ts` turns those into honest `worker_lost`
+/// failures, and the POST is idempotent so the caller can simply retry.
+model PartnerJob {
+  id       String @id @default(cuid())
+  apiKeyId String
+  apiKey   ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  orgId    String
+  /// The service user. Everything is metered against them.
+  userId   String
+
+  status String @default("queued") // queued | running | succeeded | failed
+  stage  String @default("queued") // reading | planning | shaping | saving | done
+
+  /// REDACTED by design: sizes and SHA-256 only, never the prose or the bytes.
+  /// The description lives on the diagram where the customer can delete it; the
+  /// document lives in `inputDocument` and only during a testing window.
+  request Json @default("{}")
+  /// The payload the poller returns.
+  result  Json @default("{}")
+  /// A CURATED, code-mapped error. Never a raw err.message — a Prisma or
+  /// LibreOffice failure stored here would be handed to the partner on the next
+  /// poll, which is both a leak and unactionable.
+  error   Json @default("{}")
+
+  projectId String?
+  diagramId String?
+  model     String?
+
+  /// Rendered at job time so a GET for the artifact is instant. Slice 5.
+  pdfBytes Bytes?
+  svg      String? @db.Text
+
+  /// The uploaded document. Written ONLY while the key is in the testing phase,
+  /// and cleared when it goes live. A harness run keeps its bytes on the case
+  /// instead, so this stays about a partner's content.
+  inputDocument     Bytes?
+  inputDocumentName String?
+  inputDocumentType String?
+
+  /// Set when a harness case produced this run, so a case accumulates a history.
+  harnessCaseId String?
+
+  attempts       Int       @default(0)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  idempotencyKey String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([apiKeyId, idempotencyKey])
+  @@index([apiKeyId, createdAt])
+  @@index([status])
+  @@index([harnessCaseId])
 }
