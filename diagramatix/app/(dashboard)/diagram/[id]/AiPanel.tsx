@@ -179,6 +179,24 @@ export function AiPanel({
       setPrompt(prev => prev.trim().length > 0
         ? prev
         : `Reproduce the diagram in the attached image (${file.name}) exactly — every shape, label and transition, in its original layout.`);
+    } else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+               || file.name.toLowerCase().endsWith(".docx")) {
+      // Word is a ZIP container. Reading it with file.text() sends its raw
+      // archive bytes to the model, which produces a diagram from noise
+      // without ever failing — and .docx has been in the accept list all
+      // along. mammoth is already a dependency and loads lazily, so only
+      // somebody actually attaching a Word file pays for it.
+      try {
+        const mammoth = await import("mammoth");
+        const { value } = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+        const text = value.trim();
+        if (!text) { setError("That Word document has no readable text in it."); return; }
+        setAttachment({ name: file.name, type: "text", data: text });
+        setError(null);
+        setPrompt(prev => prev.trim().length > 0 ? prev : `I have attached a document, ${file.name}`);
+      } catch {
+        setError("That Word document could not be read. Save it as a PDF and try again.");
+      }
     } else {
       // Read as text for .txt, .md, .csv, .doc, .rtf, etc.
       const text = await file.text();

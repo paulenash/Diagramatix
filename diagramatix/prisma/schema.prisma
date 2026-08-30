@@ -2244,3 +2244,36 @@ model PartnerJob {
   @@index([status])
   @@index([harnessCaseId])
 }
+
+/// A saved harness input: our OWN test material, not a customer's.
+///
+/// Deliberately outside the retention rules that govern PartnerJob.inputDocument.
+/// Those exist to time-box a partner's documents; this is a corpus authored by a
+/// SuperAdmin and it has to survive indefinitely or it is not a corpus. Two
+/// things holding similar bytes with opposite requirements — conflating them
+/// would either lose the corpus to a purge or keep customer content forever.
+model HarnessCase {
+  id      String  @id @default(cuid())
+  name    String
+  notes   String? @db.Text
+  starred Boolean @default(false)
+
+  description   String  @db.Text @default("")
+  documentBytes Bytes?
+  documentName  String?
+  documentType  String?
+  volumetrics   Json    @default("{}")
+
+  /// Set when built from one of our own SOPs — its diagram is the ground truth
+  /// the round-trip comparison scores against (slice 7).
+  sourceSopId     String?
+  sourceDiagramId String?
+
+  createdById String?
+  runCount    Int       @default(0)
+  lastRunAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([starred, updatedAt])
+}

@@ -1,0 +1,98 @@
+/**
+ * SuperAdmin — the harness proxy.
+ *
+ * The harness page does NOT hold a partner key. It posts here, and this route
+ * attaches the chosen key and calls the real public API over HTTP on the
+ * loopback, then relays the poll.
+ *
+ * That indirection is the point, not ceremony. A live partner key in page
+ * JavaScript is a burned key, and putting one there on the very screen that
+ * demonstrates the API would contradict the rule everywhere else in this
+ * feature. The proxy keeps the key server-side while still exercising the whole
+ * path — header auth, the request log, rate limits, the job table, polling — so
+ * the harness's own calls appear in the Usage screen alongside a partner's.
+ *
+ * It also refuses to hand the key back: the response is whatever the public API
+ * said, and nothing else.
+ */
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/app/lib/db";
+import { isSuperuser } from "@/app/lib/superuser";
+import { mintIngestKey } from "@/app/lib/mining/sourceAuth";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 300;
+
+const forbidden = () => NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+/**
+ * The raw key is never stored, so the harness cannot read one back to use it.
+ * Instead each harness key row keeps its own freshly minted secret in memory for
+ * the life of the process — and if that is unavailable (a restart), the key is
+ * rotated. A harness key is ours, so rotating it costs nothing.
+ */
+const liveKeys = new Map<string, string>();
+
+async function secretFor(apiKeyId: string): Promise<string | null> {
+  const cached = liveKeys.get(apiKeyId);
+  if (cached) return cached;
+
+  const row = await prisma.apiKey.findUnique({
+    where: { id: apiKeyId },
+    select: { id: true, phase: true, revokedAt: true },
+  });
+  if (!row || row.revokedAt) return null;
+  // Only a key we own may be rotated silently. Rotating a partner's key here
+  // would break their integration without telling them.
+  if (row.phase !== "internal") return null;
+
+  const { key, hash, prefix } = mintIngestKey();
+  await prisma.apiKey.update({ where: { id: apiKeyId }, data: { keyHash: hash, keyPrefix: prefix } });
+  liveKeys.set(apiKeyId, key);
+  return key;
+}
+
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id || !isSuperuser(session)) return forbidden();
+
+  const body = (await req.json().catch(() => null)) as {
+    apiKeyId?: string;
+    /** Poll an existing job instead of submitting a new one. */
+    jobId?: string;
+    payload?: Record<string, unknown>;
+  } | null;
+
+  const apiKeyId = body?.apiKeyId?.trim();
+  if (!apiKeyId) return NextResponse.json({ error: "Choose a key" }, { status: 400 });
+
+  const secret = await secretFor(apiKeyId);
+  if (!secret) {
+    return NextResponse.json(
+      { error: "That key cannot be driven from the harness. Only an internal-phase key can be, because using one means rotating its secret — which would break a partner's integration." },
+      { status: 400 },
+    );
+  }
+
+  const origin = new URL(req.url).origin;
+  const headers = { "Content-Type": "application/json", "X-Api-Key": secret };
+
+  try {
+    if (body?.jobId) {
+      const r = await fetch(`${origin}/api/public/v1/process-map/${encodeURIComponent(body.jobId)}`, {
+        headers: { "X-Api-Key": secret }, cache: "no-store",
+      });
+      // Relayed verbatim — the harness should see exactly what a partner sees.
+      return NextResponse.json(await r.json().catch(() => ({})), { status: r.status });
+    }
+
+    const r = await fetch(`${origin}/api/public/v1/process-map`, {
+      method: "POST", headers, body: JSON.stringify(body?.payload ?? {}),
+    });
+    return NextResponse.json(await r.json().catch(() => ({})), { status: r.status });
+  } catch (e) {
+    console.error("[harness] proxy failed:", e);
+    return NextResponse.json({ error: "Could not reach the API from the harness." }, { status: 502 });
+  }
+}

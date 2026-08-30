@@ -96,7 +96,11 @@ const SCOPED_OMITTED = new Set<string>([
   //    window, and a result that belongs with the diagram it produced. Same
   //    reasoning — it is governed by its own retention rules, and a backup would
   //    outlive them.
-  "ApiKey", "PartnerRequest", "PartnerJob",
+  //  • HarnessCase is the SuperAdmin test corpus — our own material, tied to no
+  //    org and to no user. It belongs to the environment, not to a tenant, and
+  //    a scoped org backup restoring somebody else’s test cases would be odd.
+  //    It exports through its own bundle instead.
+  "ApiKey", "PartnerRequest", "PartnerJob", "HarnessCase",
 
   // Grant/membership tables (like ProjectShare + the bundle audiences, and now
   // admin-managed team membership) — carried by the full SuperAdmin backup only,
