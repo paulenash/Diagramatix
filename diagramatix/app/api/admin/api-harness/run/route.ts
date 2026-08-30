@@ -61,6 +61,8 @@ export async function POST(req: Request) {
     apiKeyId?: string;
     /** Poll an existing job instead of submitting a new one. */
     jobId?: string;
+    /** The case this run replays, so its history accumulates. */
+    harnessCaseId?: string;
     payload?: Record<string, unknown>;
   } | null;
 
@@ -88,9 +90,21 @@ export async function POST(req: Request) {
     }
 
     const r = await fetch(`${origin}/api/public/v1/process-map`, {
-      method: "POST", headers, body: JSON.stringify(body?.payload ?? {}),
+      method: "POST",
+      // The case id rides in a header rather than the body: the body is the
+      // partner contract, and adding a private field to it would mean the
+      // harness was not sending what a partner sends.
+      headers: { ...headers, ...(body?.harnessCaseId ? { "X-Harness-Case": body.harnessCaseId } : {}) },
+      body: JSON.stringify(body?.payload ?? {}),
     });
-    return NextResponse.json(await r.json().catch(() => ({})), { status: r.status });
+    const out = await r.json().catch(() => ({}));
+    if (r.ok && body?.harnessCaseId) {
+      await prisma.harnessCase.update({
+        where: { id: body.harnessCaseId },
+        data: { runCount: { increment: 1 }, lastRunAt: new Date() },
+      }).catch(() => {});
+    }
+    return NextResponse.json(out, { status: r.status });
   } catch (e) {
     console.error("[harness] proxy failed:", e);
     return NextResponse.json({ error: "Could not reach the API from the harness." }, { status: 502 });

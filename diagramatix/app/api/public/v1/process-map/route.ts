@@ -141,6 +141,9 @@ export const POST = withPartnerLogging(async (req, ref) => {
       orgId: c.orgId,
       userId: c.userId,
       idempotencyKey,
+      // Set only by our own harness proxy; a partner cannot forge a link to a
+      // case because the header is meaningless without a HarnessCase row.
+      harnessCaseId: req.headers.get("x-harness-case")?.trim() || null,
       request: redactRequest({ description, name, document: docMeta, volumetrics: body.volumetrics }),
       // The document is retained only during a testing window. Outside one we
       // keep its size and hash and nothing else.
