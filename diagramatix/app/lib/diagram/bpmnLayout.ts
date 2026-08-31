@@ -2757,7 +2757,13 @@ export function layoutBpmnDiagram(
         const offset = n <= 2
           ? (i - (n - 1) / 2) * stackSpacing
           : (i - 1) * stackSpacing;
-        br.y = decCentreY + offset - br.height / 2;
+        // Move the whole element, not just the box: a task's edge-mounted
+        // events are positioned ON its rim, and setting `y` directly left them
+        // behind. They then sat 60-100px off the host, looked unattached, and
+        // sprang back to the rim the moment the editor touched them (Paul
+        // 2026-08-31, V23.01 "Visit overdue" / "Self-read deadline elapsed").
+        const dy = (decCentreY + offset - br.height / 2) - br.y;
+        if (dy !== 0) { shiftSubtree(br.id, dy); br.y += dy; }
       }
     }
   }
@@ -3100,6 +3106,63 @@ export function layoutBpmnDiagram(
     }
     // R8.03 again — pool growth may have introduced overlaps between pools.
     restackPoolsR52();
+  }
+
+  // ── R55.1: a branch HOLDS the row it was fanned onto ──
+  // R55 stacks a decision's immediate branch targets top / middle / bottom, but
+  // only those. Everything further along the branch is placed by the column
+  // engine at its lane's own centre band, so each chain drifts back toward the
+  // middle and the three paths interleave: in V23.01 the "smart meter" branch
+  // started at 569 and its next two steps sat at 664 and 635 (Paul 2026-08-31).
+  //
+  // Worse than untidy, it makes branches CROSS. The merge assigns its incoming
+  // sides by source Y (R6.28), so when the top branch's last element has drifted
+  // BELOW the bottom branch's, the two swap sides at the join and the lines
+  // cross — which is exactly what "Read obtained?" did.
+  //
+  // So each branch carries its row along its own chain, as far as the chain is
+  // unambiguously its own: a node with more than one incoming flow is shared, a
+  // node that forks is a decision of its own, and the merge belongs to nobody.
+  {
+    const rowOf = (e: DiagramElement) => e.y + e.height / 2;
+    // A data link is not flow. The AI plan can only emit "sequence"/"message",
+    // so an association arrives here typed as a sequence and is re-typed later —
+    // counting one as an inbound flow made a task look shared when its only real
+    // predecessor was the branch, and stopped the row propagating.
+    const DATA_T = new Set(["data-object", "data-store", "text-annotation"]);
+    const isData = (c: { sourceId: string; targetId: string }) =>
+      DATA_T.has(elMap.get(c.sourceId)?.type ?? "") || DATA_T.has(elMap.get(c.targetId)?.type ?? "");
+    const seqOut = (id: string) =>
+      (outgoing.get(id) ?? []).filter(c => c.type !== "message" && !isData(c));
+    const seqInCount = (id: string) =>
+      aiConnections.filter(c => c.type !== "message" && c.targetId === id && !isData(c)).length;
+    const claimed = new Set<string>();
+    for (const dec of elements) {
+      if (!isDecisionGateway(dec)) continue;
+      const mergeId = findPairedMerge(dec.id);
+      for (const b of seqOut(dec.id)) {
+        const first = elMap.get(b.targetId);
+        if (!first || first.id === mergeId || isGateway(first)) continue;
+        const row = rowOf(first);
+        let cur: DiagramElement | undefined = first;
+        const walked = new Set<string>([first.id]);
+        for (let guard = 0; guard < 24; guard++) {
+          const nexts = cur ? seqOut(cur.id) : [];
+          if (nexts.length !== 1) break;                 // a fork is its own decision
+          const nxt = elMap.get(nexts[0].targetId);
+          if (!nxt || walked.has(nxt.id)) break;
+          if (nxt.id === mergeId || isGateway(nxt)) break;
+          if (seqInCount(nxt.id) !== 1) break;           // shared with another path
+          if (nxt.parentId !== first.parentId) break;    // a different lane owns its own rows
+          if (claimed.has(nxt.id)) break;                // another branch got here first
+          const dy = row - rowOf(nxt);
+          if (Math.abs(dy) > 0.5) { shiftSubtree(nxt.id, dy); nxt.y += dy; }
+          claimed.add(nxt.id);
+          walked.add(nxt.id);
+          cur = nxt;
+        }
+      }
+    }
   }
 
   // Final lane fit — make every lane visually contain its (now-finalised)
@@ -5017,6 +5080,70 @@ export function layoutBpmnDiagram(
   });
 
   phase("waypoints computed — done");
+
+  // ── R05.10: message flows sharing a vertical line are separated ──
+  // A message flow drops from its task's centre to the pool it talks to, so two
+  // tasks stacked in the SAME COLUMN send their flows down the same x — one line
+  // drawn over another, with no way to tell which is which. In V23.01 "Interval
+  // data request" ran down x=511 while "Self-read request" ran UP the same x
+  // (Paul 2026-08-31).
+  //
+  // Only the spine moves, and only as far as the task's own edge allows: the
+  // endpoint has to stay on the shape it leaves, so a 107px-wide task can give
+  // about 40px each way and a pool effectively any amount.
+  {
+    const STEP = 26, EDGE_MARGIN = 10, TOL = 6;
+    type Run = { c: Connector; i: number; x: number; y1: number; y2: number };
+    const runs: Run[] = [];
+    for (const c of computedConnectors) {
+      if (c.type !== "messageBPMN") continue;
+      const w = c.waypoints ?? [];
+      // The spine = the longest vertical segment, which is the part that spans
+      // the gap between pools and the part that visibly collides.
+      let best: Run | null = null;
+      for (let i = 0; i < w.length - 1; i++) {
+        if (Math.abs(w[i].x - w[i + 1].x) > 1) continue;
+        const len = Math.abs(w[i].y - w[i + 1].y);
+        if (len < 20) continue;
+        if (!best || len > best.y2 - best.y1) {
+          best = { c, i, x: w[i].x, y1: Math.min(w[i].y, w[i + 1].y), y2: Math.max(w[i].y, w[i + 1].y) };
+        }
+      }
+      if (best) runs.push(best);
+    }
+    // Group spines that share an x, then keep only the groups that actually
+    // overlap vertically — two flows on the same x at different heights are not
+    // drawn on top of each other and must not be disturbed.
+    const groups: Run[][] = [];
+    for (const r of runs) {
+      const g = groups.find(g => Math.abs(g[0].x - r.x) <= TOL
+        && g.some(o => Math.min(o.y2, r.y2) - Math.max(o.y1, r.y1) > 0));
+      if (g) g.push(r); else groups.push([r]);
+    }
+    for (const g of groups) {
+      if (g.length < 2) continue;
+      g.sort((a, b) => a.y1 - b.y1 || a.c.id.localeCompare(b.c.id));   // stable
+      for (let k = 0; k < g.length; k++) {
+        const want = (k - (g.length - 1) / 2) * STEP;
+        if (want === 0) continue;
+        const c = g[k].c;
+        const w = c.waypoints ?? [];
+        if (!w.length) continue;
+        // How far may this flow slide before an endpoint leaves its element?
+        let room = Math.abs(want);
+        for (const endId of [c.sourceId, c.targetId]) {
+          const el = elMap.get(endId);
+          if (!el || el.type === "pool") continue;      // a pool is wide enough
+          const p = endId === c.sourceId ? w[0] : w[w.length - 1];
+          const lo = el.x + EDGE_MARGIN, hi = el.x + el.width - EDGE_MARGIN;
+          room = Math.min(room, want > 0 ? Math.max(0, hi - p.x) : Math.max(0, p.x - lo));
+        }
+        const dx = Math.sign(want) * room;
+        if (dx === 0) continue;
+        c.waypoints = w.map(p => ({ ...p, x: p.x + dx }));
+      }
+    }
+  }
 
   // ── R8.31: REPEAT a data artifact beside a remote consumer ──
   // A Data Object written early and read late produces one line crossing the
