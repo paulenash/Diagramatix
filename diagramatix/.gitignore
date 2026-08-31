@@ -58,6 +58,7 @@ next-env.d.ts
 !/new features/getai-api/
 /new features/getai-api/*
 !/new features/getai-api/Partner API Plan.md
+!/new features/getai-api/Process API Proposed Design.md
 
 # Playwright e2e artifacts
 /test-results/
