@@ -258,6 +258,27 @@ export function hasExternalLabel(
 }
 
 /**
+ * The SIZE an external label actually occupies, independent of where it sits.
+ *
+ * Width is the widest WRAPPED LINE, not the column: the column is a wrap budget,
+ * not an extent. Anything deciding whether a label collides must use this, or it
+ * will move a label away from a position that was perfectly clear — which is how
+ * a nudge that measured the full column pushed an end-event label off a good
+ * spot and onto a connector.
+ */
+export function externalLabelSize(
+  label: string,
+  labelWidth = EXTERNAL_LABEL_DEFAULT_W,
+  fontSize = 12,
+): { w: number; h: number } {
+  const lines = wrapText(label, labelWidth, fontSize);
+  return {
+    w: Math.min(labelWidth, Math.max(...lines.map((l) => l.length * fontSize * AVG_CHAR_W_FACTOR))),
+    h: lines.length * EXTERNAL_LABEL_LINE_H,
+  };
+}
+
+/**
  * The box an element's external label actually occupies.
  *
  * Width is the WIDEST WRAPPED LINE, not the label column. The column is a wrap
@@ -283,15 +304,11 @@ export function externalLabelBox(
   const lw = (p.labelWidth as number | undefined) ?? EXTERNAL_LABEL_DEFAULT_W;
   const ox = (p.labelOffsetX as number | undefined) ?? 0;
   const oy = (p.labelOffsetY as number | undefined) ?? EXTERNAL_LABEL_DEFAULT_OY;
-  const lines = wrapText(label, lw, fontSize);
-  const textW = Math.min(
-    lw,
-    Math.max(...lines.map((l) => l.length * fontSize * AVG_CHAR_W_FACTOR)),
-  );
+  const size = externalLabelSize(label, lw, fontSize);
   return {
-    x: el.x + el.width / 2 + ox - textW / 2,
+    x: el.x + el.width / 2 + ox - size.w / 2,
     y: el.y + el.height + oy,
-    w: textW,
-    h: lines.length * EXTERNAL_LABEL_LINE_H,
+    w: size.w,
+    h: size.h,
   };
 }

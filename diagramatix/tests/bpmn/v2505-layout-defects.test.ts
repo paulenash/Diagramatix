@@ -71,6 +71,7 @@ const overlap = (a: any, b: any) =>
   Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 1 &&
   Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 1;
 const boxOf = (e: any) => ({ x: e.x, y: e.y, w: e.width, h: e.height });
+const L = (e: any) => String(e?.label ?? e?.type ?? "").replace(/s+/g, " ").slice(0, 34);
 
 describe("V25.05 — an edge-mounted event's exit target (R7.07)", () => {
   it("T3025 — the target is placed to the RIGHT of the event and clear of the mounted edge", () => {
@@ -244,6 +245,114 @@ describe("V25.05 — message-flow labels on the same pool (R05.09)", () => {
       for (let j = i + 1; j < msgs.length; j++) {
         expect(overlap(box(msgs[i]), box(msgs[j])),
           `"${msgs[i].label}" and "${msgs[j].label}" are drawn on top of each other`).toBe(false);
+      }
+    }
+  });
+});
+
+describe("V25.05 — event labels are placed against the FINISHED diagram (R8.29)", () => {
+  const BODY = new Set(["task", "subprocess-expanded", "start-event", "end-event",
+    "intermediate-event", "gateway", "data-object", "data-store"]);
+  const labelBox = (e: any) => externalLabelBox(e);
+  const anc = (a: any, n: any) => {
+    let cur = n;
+    for (let i = 0; i < 32 && cur; i++) {
+      const nid = cur.boundaryHostId ?? cur.parentId;
+      if (!nid) return false;
+      if (nid === a.id) return true;
+      cur = out.elements.find((x) => x.id === nid);
+    }
+    return false;
+  };
+
+  it("T3060 — no event label is drawn over another element's body", () => {
+    for (const e of out.elements) {
+      if (!/event/.test(e.type)) continue;
+      const box = labelBox(e);
+      if (!box) continue;
+      for (const ob of out.elements) {
+        if (ob.id === e.id || !BODY.has(ob.type)) continue;
+        if (anc(ob, e) || anc(e, ob)) continue;
+        expect(overlap(box, boxOf(ob)),
+          `"${L(e)}" label sits on ${ob.type} "${L(ob)}"`).toBe(false);
+      }
+    }
+  });
+
+  it("T3061 — no event label is drawn across a sequence or message connector", () => {
+    // The half that was never checked: R8.16 runs before routing, so a connector
+    // could not be an obstacle to it. An end-event label sat on both a gateway
+    // and the flow feeding that gateway, and only the gateway was reported.
+    for (const e of out.elements) {
+      if (!/event/.test(e.type)) continue;
+      const box = labelBox(e);
+      if (!box) continue;
+      for (const c of out.connectors as any[]) {
+        if (c.type === "associationBPMN") continue;      // may span the diagram
+        if (c.sourceId === e.id || c.targetId === e.id) continue;
+        const w = c.waypoints ?? [];
+        for (let i = 0; i < w.length - 1; i++) {
+          const seg = {
+            x: Math.min(w[i].x, w[i + 1].x), y: Math.min(w[i].y, w[i + 1].y),
+            w: Math.max(Math.abs(w[i].x - w[i + 1].x), 1.5),
+            h: Math.max(Math.abs(w[i].y - w[i + 1].y), 1.5),
+          };
+          expect(overlap(box, seg), `"${L(e)}" label crosses a connector`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("T3062 — the exit target keeps its label on the RIGHT when the right is clear", () => {
+    // R8.29 tries the CURRENT offset first, which is what preserves R7.07(b).
+    // It must give way only when the right is genuinely occupied.
+    const tgt = at("fail");
+    expect((tgt.properties as any).labelOffsetX).toBeGreaterThan(0);
+  });
+});
+
+describe("V25.05 — a data artifact clears the connectors under its label (R8.30)", () => {
+  it("T3063 — no data-artifact label is drawn across a sequence or message connector", () => {
+    // Paul's rule 2 said "elements OR connectors below them" from the outset.
+    // Only the elements half could be done where R8.02's clearance pass sits:
+    // it runs before routing, so a connector did not yet exist to avoid. The
+    // first data object's name was landing on the flow out of the start event.
+    const PAD = 4;
+    for (const d of out.elements) {
+      if (d.type !== "data-object" && d.type !== "data-store") continue;
+      const box = externalLabelBox(d as any);
+      if (!box) continue;
+      for (const c of out.connectors as any[]) {
+        if (c.type === "associationBPMN") continue;          // may span the diagram
+        if (c.sourceId === d.id || c.targetId === d.id) continue;
+        const w = c.waypoints ?? [];
+        for (let i = 0; i < w.length - 1; i++) {
+          const seg = {
+            x: Math.min(w[i].x, w[i + 1].x) - PAD, y: Math.min(w[i].y, w[i + 1].y) - PAD,
+            w: Math.abs(w[i].x - w[i + 1].x) + PAD * 2,
+            h: Math.abs(w[i].y - w[i + 1].y) + PAD * 2,
+          };
+          expect(overlap(box, seg),
+            `"${L(d)}" label is drawn across a connector`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("T3064 — lifting an artifact keeps its own association attached to it", () => {
+    // The move happens AFTER routing, which is only safe because a data artifact
+    // is not a routing obstacle — but its OWN associations must be re-routed, or
+    // the line is left pointing at where the object used to be.
+    for (const d of out.elements) {
+      if (d.type !== "data-object") continue;
+      for (const c of (out.connectors as any[]).filter((x) => x.sourceId === d.id || x.targetId === d.id)) {
+        const w = c.waypoints ?? [];
+        if (!w.length) continue;
+        const end = c.sourceId === d.id ? w[0] : w[w.length - 1];
+        const near =
+          end.x >= d.x - 2 && end.x <= d.x + d.width + 2 &&
+          end.y >= d.y - 2 && end.y <= d.y + d.height + 2;
+        expect(near, `"${L(d)}" association ends at ${end.x.toFixed(0)},${end.y.toFixed(0)} but the object is at ${d.x.toFixed(0)},${d.y.toFixed(0)}`).toBe(true);
       }
     }
   });

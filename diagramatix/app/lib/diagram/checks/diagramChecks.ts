@@ -1671,15 +1671,11 @@ const EVENT_TYPES = new Set<string>(["start-event", "end-event", "intermediate-e
  *  (centre below the shape, offset by labelOffsetX/Y, width labelWidth). */
 function eventLabelRect(e: DiagramElement): Rect | null {
   if (!EVENT_TYPES.has(e.type)) return null;
-  const label = (e.label ?? "").trim();
-  if (!label) return null;
-  const lw = (e.properties?.labelWidth as number | undefined) ?? 80;
-  const ox = (e.properties?.labelOffsetX as number | undefined) ?? 0;
-  const oy = (e.properties?.labelOffsetY as number | undefined) ?? 7;
-  const cx = e.x + e.width / 2 + ox;
-  const topY = e.y + e.height + oy;
-  const lines = Math.max(1, wrapText(label, lw).length);
-  return { x: cx - lw / 2, y: topY, w: lw, h: lines * 14 };
+  // One measurement, shared with the layout and the renderer. This used to take
+  // the full 80px label COLUMN, which reports overlaps a reader cannot see and
+  // left the scanner and the generator disagreeing about what a collision is.
+  const b = externalLabelBox(e);
+  return b ? { x: b.x, y: b.y, w: b.w, h: b.h } : null;
 }
 
 /** B34 — no two leaf flow-nodes may be placed on top of one another. Catches
@@ -1752,6 +1748,35 @@ export function checkDataLabelOverlap(d: DiagramLike): Violation[] {
         ids: [a.id, o.id],
         message: `"${nameOf(a)}" label is drawn through "${nameOf(o)}" — a data artifact must be lifted until its whole name clears what is below it.`,
       });
+    }
+    // …and clear of the FLOW LINES below it, not only the shapes. The clearance
+    // pass in the layout runs before routing, so this half went unchecked and a
+    // data object's name sat across the flow out of the start event (Paul
+    // 2026-08-31). Its own associations are exempt — they leave the shape and
+    // run to its element — as are data associations, which can span a diagram.
+    for (const c of d.connectors) {
+      if (c.type === "associationBPMN") continue;
+      if (c.sourceId === a.id || c.targetId === a.id) continue;
+      const w = c.waypoints ?? [];
+      let clashed = false;
+      for (let i = 0; i < w.length - 1 && !clashed; i++) {
+        const PAD = 4;   // the line's visual weight; a 0-height rect never hits
+        const seg: Rect = {
+          x: Math.min(w[i].x, w[i + 1].x) - PAD,
+          y: Math.min(w[i].y, w[i + 1].y) - PAD,
+          w: Math.abs(w[i].x - w[i + 1].x) + PAD * 2,
+          h: Math.abs(w[i].y - w[i + 1].y) + PAD * 2,
+        };
+        if (rectsOverlapBy({ x: box.x, y: box.y, w: box.w, h: box.h }, seg, 2)) clashed = true;
+      }
+      if (!clashed) continue;
+      out.push({
+        rule: "data-label-overlap",
+        severity: "error",
+        ids: [a.id, c.id],
+        message: `"${nameOf(a)}" label is drawn across the connector from "${nameOf(byId.get(c.sourceId))}" to "${nameOf(byId.get(c.targetId))}" — a data artifact must clear the flow lines below it as well as the shapes.`,
+      });
+      break;
     }
   }
   return out;
@@ -1978,6 +2003,45 @@ export function checkEventLabelOverlap(d: DiagramLike): Violation[] {
         ids: [labels[i].e.id, labels[j].e.id],
         message: `Event labels "${nameOf(labels[i].e)}" and "${nameOf(labels[j].e)}" overlap.`,
       });
+    }
+  }
+  // Label-vs-CONNECTOR. A label drawn across a flow line is as unreadable as one
+  // drawn across a shape, and this half was previously unchecked — which is how
+  // an end-event label came to sit on both a gateway AND the connector feeding
+  // it, with only the gateway reported (Paul 2026-08-31).
+  //
+  // Two exemptions, both structural rather than convenient: a label sits beside
+  // its OWN flow by construction, and a data association can run the width of
+  // the diagram when an object written early is read late, crossing everything
+  // on the way — neither is a placement fault.
+  for (const { e, box } of labels) {
+    for (const c of d.connectors) {
+      if (c.type === "associationBPMN") continue;
+      if (c.sourceId === e.id || c.targetId === e.id) continue;
+      const w = c.waypoints ?? [];
+      let clashed = false;
+      for (let i = 0; i < w.length - 1 && !clashed; i++) {
+        // Inflated to the line's visual weight plus a little air. A horizontal
+        // run is a zero-height rectangle, and `rectsOverlapBy` wants more than
+        // TOL px of penetration on BOTH axes — so without this the check could
+        // never fire, whatever a label did.
+        const PAD = 4;
+        const seg: Rect = {
+          x: Math.min(w[i].x, w[i + 1].x) - PAD,
+          y: Math.min(w[i].y, w[i + 1].y) - PAD,
+          w: Math.abs(w[i].x - w[i + 1].x) + PAD * 2,
+          h: Math.abs(w[i].y - w[i + 1].y) + PAD * 2,
+        };
+        if (rectsOverlapBy(box, seg, TOL)) clashed = true;
+      }
+      if (!clashed) continue;
+      out.push({
+        rule: "event-label-overlap",
+        severity: "warning",
+        ids: [e.id, c.id],
+        message: `Event label "${nameOf(e)}" is drawn across the connector from "${nameOf(byId.get(c.sourceId))}" to "${nameOf(byId.get(c.targetId))}" — event labels must stay clear of flow lines as well as shapes.`,
+      });
+      break;
     }
   }
   return out;

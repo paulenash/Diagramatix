@@ -185,3 +185,32 @@ describe("B54 — a gateway's outgoing must not share a vertex with an incoming"
     expect(checkGatewayInOutVertexClash({ elements: [gw], connectors: busy })).toHaveLength(0);
   });
 });
+
+describe("B48 — a data artifact must clear the flow lines under its label too", () => {
+  const obj = el({ id: "do", type: "data-object", x: 100, y: 0, width: 36, height: 46,
+    label: "Transformation Logic and Model Definition" });
+
+  it("T3065 — fires when the wrapped name lands on a sequence connector", () => {
+    // The exact shape Paul found: the first data object's name across the flow
+    // out of the start event.
+    const flow = cn({ id: "f", sourceId: "s", targetId: "t",
+      waypoints: [{ x: 40, y: 90 }, { x: 400, y: 90 }] });
+    const v = checkDataLabelOverlap({ elements: [obj], connectors: [flow] });
+    expect(v).toHaveLength(1);
+    expect(v[0].message).toContain("drawn across the connector");
+  });
+
+  it("T3066 — silent when the flow runs clear below the name", () => {
+    const flow = cn({ id: "f", sourceId: "s", targetId: "t",
+      waypoints: [{ x: 40, y: 200 }, { x: 400, y: 200 }] });
+    expect(checkDataLabelOverlap({ elements: [obj], connectors: [flow] })).toHaveLength(0);
+  });
+
+  it("T3067 — the artifact's OWN association is never a violation", () => {
+    // It leaves the shape and runs to its element, so it passes the label by
+    // construction; treating that as a fault would chase the object up the page.
+    const own = cn({ id: "a", sourceId: "do", targetId: "t", type: "associationBPMN",
+      waypoints: [{ x: 118, y: 90 }, { x: 400, y: 90 }] });
+    expect(checkDataLabelOverlap({ elements: [obj], connectors: [own] })).toHaveLength(0);
+  });
+});

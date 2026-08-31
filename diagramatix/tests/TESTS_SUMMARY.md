@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-08-31  ·  **Document version:** 6.7  ·  **Suite:** 366 test files · 2,372 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3059  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-08-31  ·  **Document version:** 6.7  ·  **Suite:** 366 test files · 2,380 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3067  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3060**, the one after **T3061**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3068**, the one after **T3069**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3059`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3067`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -1992,7 +1992,7 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3024 | `tests/partner/auth.test.ts` | Repeated BAD keys are still stopped — removing the false positive must not remove the control with it. |
 
 
-### V25.05 generated-layout defects and the B48–B52 red rules (T3025-T3059)
+### V25.05 generated-layout defects and the B48–B52 red rules (T3025-T3067)
 
 > Added 2026-08-31 after Paul's review of a generated diagram. Four of the five
 > faults were the same mistake: the layout measured a SHAPE where the renderer
@@ -2019,6 +2019,14 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3038 | `tests/bpmn/v2505-layout-defects.test.ts` | No horizontal connector run passes closer than ¾ of an event height to a lane edge. |
 | T3039 | `tests/bpmn/v2505-layout-defects.test.ts` | Two message labels on one black-box pool do not overlap, measured with the renderer's own auto-sized width. |
 | T3056 | `tests/bpmn/v2505-layout-defects.test.ts` | A decision branch label does not sit ON its own horizontal segment - it must read clearly above or below the line. |
+| T3060 | `tests/bpmn/v2505-layout-defects.test.ts` | No event label is drawn over another element body, measured on the finished diagram rather than mid-layout geometry. |
+| T3061 | `tests/bpmn/v2505-layout-defects.test.ts` | No event label is drawn across a sequence or message connector - the half R8.16 could never check, because connectors do not exist when it runs. |
+| T3062 | `tests/bpmn/v2505-layout-defects.test.ts` | The edge-mounted exit target keeps its label on the RIGHT while the right is clear; R8.29 tries the current offset first. |
+| T3063 | `tests/bpmn/v2505-layout-defects.test.ts` | No data-artifact label is drawn across a sequence or message connector - the half R8.02 clearance could not check, running before routing. |
+| T3064 | `tests/bpmn/v2505-layout-defects.test.ts` | A lifted artifact keeps its OWN association attached to it. The lift happens after routing, so the association must be re-routed or the line points at where the object used to be. |
+| T3065 | `tests/bpmn/v2505-rules.test.ts` | B48 fires when a data-artifact name lands on a sequence connector. |
+| T3066 | `tests/bpmn/v2505-rules.test.ts` | B48 is silent when the flow runs clear below the name. |
+| T3067 | `tests/bpmn/v2505-rules.test.ts` | B48 never reports the artifact own association, which passes the label by construction. |
 | T3040 | `tests/bpmn/v2505-rules.test.ts` | B48 fires when a data artifact's wrapped name lands on the task underneath. |
 | T3041 | `tests/bpmn/v2505-rules.test.ts` | B48 is silent once the artifact is lifted clear. |
 | T3042 | `tests/bpmn/v2505-rules.test.ts` | B48 does not fire for a SHORT name — measuring the 80px column instead of the text would move artifacts that are visibly fine. |

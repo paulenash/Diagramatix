@@ -7,7 +7,7 @@ import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { closeFlowVoids } from "./closeFlowVoids";
 import { computeWaypoints, recomputeAllConnectors, pickBoundaryEventSide } from "./routing";
-import { autoSizeForType, wrapText, externalLabelBox, connectorLabelWidth, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
+import { autoSizeForType, wrapText, externalLabelBox, externalLabelSize, connectorLabelWidth, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
 import { snapImportedBounds, type Box } from "./importGeometry";
 import { buildTestConnectors } from "./bpmnTestConnectors";
 
@@ -5017,6 +5017,242 @@ export function layoutBpmnDiagram(
   });
 
   phase("waypoints computed — done");
+
+  // ── R8.30: lift a data artifact clear of the CONNECTORS under its label ──
+  // R8.02's clearance pass lifts an artifact off the elements below it, but it
+  // runs before routing, so it has never been able to see a connector. Paul's
+  // rule was "elements OR connectors below them" from the start (2026-08-31);
+  // only the elements half could be implemented where that pass sits. The first
+  // data object's name was landing across the flow out of the start event.
+  //
+  // Safe to do after routing because a data artifact is NOT a routing obstacle —
+  // moving one cannot change anybody else's path. Its OWN associations are
+  // re-routed below, which is all that its move affects.
+  {
+    const ARTIFACT = new Set(["data-object", "data-store"]);
+    const BODY = new Set([
+      "task", "subprocess", "subprocess-expanded", "start-event", "end-event",
+      "intermediate-event", "gateway", "data-object", "data-store",
+    ]);
+    const SEG_PAD = 4, STEP = 6, MAX_LIFT = 90, GAP = 4;
+    type Box = { x: number; y: number; w: number; h: number };
+    const clash = (a: Box, b: Box) =>
+      Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 1 &&
+      Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 1;
+    const moved: DiagramElement[] = [];
+    for (const art of elements) {
+      if (!ARTIFACT.has(art.type)) continue;
+      // Segments that could obstruct: everything except this artifact's own
+      // links and the data associations, which can span the whole diagram.
+      const segs: Box[] = [];
+      for (const c of computedConnectors) {
+        if (c.type === "associationBPMN") continue;
+        if (c.sourceId === art.id || c.targetId === art.id) continue;
+        const w = c.waypoints ?? [];
+        for (let i = 0; i < w.length - 1; i++) {
+          segs.push({
+            x: Math.min(w[i].x, w[i + 1].x) - SEG_PAD, y: Math.min(w[i].y, w[i + 1].y) - SEG_PAD,
+            w: Math.abs(w[i].x - w[i + 1].x) + SEG_PAD * 2,
+            h: Math.abs(w[i].y - w[i + 1].y) + SEG_PAD * 2,
+          });
+        }
+      }
+      const clearAt = (dy: number): boolean => {
+        const b = externalLabelBox({ ...art, y: art.y - dy } as DiagramElement);
+        if (!b) return true;
+        const shape = { x: art.x, y: art.y - dy, w: art.width, h: art.height };
+        for (const s of segs) if (clash(b, s) || clash(shape, s)) return false;
+        for (const ob of elements) {
+          if (ob.id === art.id || !BODY.has(ob.type)) continue;
+          const obBox = { x: ob.x, y: ob.y, w: ob.width, h: ob.height };
+          if (clash(b, obBox) || clash(shape, obBox)) return false;
+        }
+        return true;
+      };
+      if (clearAt(0)) continue;
+      // Step upward to the first position that clears everything. Upward only:
+      // an artifact belongs above the row it serves, and dropping it into the
+      // flow to escape a line would be the worse answer.
+      let found: number | null = null;
+      for (let dy = STEP; dy <= MAX_LIFT; dy += STEP) if (clearAt(dy)) { found = dy + GAP; break; }
+      if (found === null) continue;                     // nowhere better; leave it
+      const band = laneBandFor(art);
+      if (band && art.y - found < band.y + LANE_EDGE_PAD) {
+        growLaneBandToContain(band, art.y - found - LANE_EDGE_PAD, art.y + art.height);
+      }
+      art.y -= found;
+      moved.push(art);
+    }
+    // Re-route only what moved: the associations touching a lifted artifact.
+    if (moved.length > 0) {
+      const ids = new Set(moved.map((a) => a.id));
+      for (let i = 0; i < computedConnectors.length; i++) {
+        const c = computedConnectors[i];
+        if (!ids.has(c.sourceId) && !ids.has(c.targetId)) continue;
+        const s = elMap.get(c.sourceId), t = elMap.get(c.targetId);
+        if (!s || !t) continue;
+        try {
+          const r = computeWaypoints(s, t, elements, c.sourceSide, c.targetSide, c.routingType, 0.5, 0.5);
+          computedConnectors[i] = { ...c, waypoints: r.waypoints,
+            sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
+        } catch { /* keep the existing path rather than lose it */ }
+      }
+    }
+  }
+
+  // ── R8.29: FINAL event-label placement, against the routed diagram ──
+  // R8.16 nudges event labels clear of other elements, but it runs long before
+  // the diagram is finished: the exit-target placement, the branch-subprocess
+  // move, the lane hug and the pool restack all shift elements AFTER it, so its
+  // answer is computed against geometry that no longer exists. And it only ever
+  // treats element BODIES as obstacles — connectors do not exist when it runs,
+  // so a label could never be nudged off a connector at all.
+  //
+  // That is why the scanner reported event-label overlaps on freshly generated
+  // diagrams: the generator was not blind to the rule, it was checking against
+  // the wrong picture (Paul 2026-08-31, end-event labels sitting on a gateway
+  // and on the connector feeding it). This pass is the final word — same
+  // preference order, but everything is now in its finished position and
+  // connector segments count as obstacles.
+  //
+  // Only labelOffsetX/Y move, so nothing re-routes. A label inside an Expanded
+  // Subprocess is kept inside it: R8.27 already sized the box around the label
+  // where it was, and moving it out would trade one defect for another.
+  {
+    const LH = 14;
+    const EVT = new Set(["start-event", "end-event", "intermediate-event"]);
+    const BODY = new Set([
+      "task", "subprocess", "subprocess-expanded", "start-event", "end-event",
+      "intermediate-event", "gateway", "data-object", "data-store",
+    ]);
+    type R = { x: number; y: number; w: number; h: number };
+    const hit = (a: R, b: R, tol: number) =>
+      Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > tol &&
+      Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > tol;
+    const isAnc = (anc: DiagramElement, node: DiagramElement): boolean => {
+      let cur: DiagramElement | undefined = node;
+      for (let i = 0; i < 32 && cur; i++) {
+        const nid = cur.boundaryHostId ?? cur.parentId;
+        if (!nid) return false;
+        if (nid === anc.id) return true;
+        cur = elMap.get(nid);
+      }
+      return false;
+    };
+    /** The EP an element lives inside, if any — its label must stay within it. */
+    const epOf = (e: DiagramElement): DiagramElement | undefined => {
+      let cur: DiagramElement | undefined = e.parentId ? elMap.get(e.parentId) : undefined;
+      for (let i = 0; i < 16 && cur; i++) {
+        if (cur.type === "subprocess-expanded") return cur;
+        cur = cur.parentId ? elMap.get(cur.parentId) : undefined;
+      }
+      return undefined;
+    };
+    const bodies = elements.filter((e) => BODY.has(e.type));
+    /** Every connector segment as a thin rectangle, with its endpoints, so a
+     *  label can be tested against the lines as well as the boxes. */
+    const SEG_PAD = 4;   // half the visual weight of a line plus a little air
+    const segs: { a: string; b: string; r: R }[] = [];
+    for (const c of computedConnectors) {
+      // Data associations are excluded. One runs the full width of a diagram
+      // when an object written early is read late, and it crosses everything on
+      // the way — dodging it is neither possible nor worth it, and a label that
+      // tried would be chased somewhere worse. Sequence and message flows are
+      // what a label must stay off.
+      if (c.type === "associationBPMN") continue;
+      const w = c.waypoints ?? [];
+      for (let i = 0; i < w.length - 1; i++) {
+        const x1 = Math.min(w[i].x, w[i + 1].x), x2 = Math.max(w[i].x, w[i + 1].x);
+        const y1 = Math.min(w[i].y, w[i + 1].y), y2 = Math.max(w[i].y, w[i + 1].y);
+        // Inflate the segment to a real thickness: the line, plus the breathing
+        // room text needs beside it. Without this a horizontal run is a 0px-tall
+        // rectangle, the overlap test needs more than TOL px of penetration on
+        // BOTH axes, and a connector could never register as an obstacle at all
+        // — the collision test silently did nothing.
+        segs.push({
+          a: c.sourceId, b: c.targetId,
+          r: { x: x1 - SEG_PAD, y: y1 - SEG_PAD, w: (x2 - x1) + SEG_PAD * 2, h: (y2 - y1) + SEG_PAD * 2 },
+        });
+      }
+    }
+    const labelRect = (e: DiagramElement, ox: number, oy: number, lw: number, lh: number): R => ({
+      x: e.x + e.width / 2 + ox - lw / 2, y: e.y + e.height + oy, w: lw, h: lh,
+    });
+    const placed: R[] = [];
+    const TOL = 2;
+    for (const e of elements) {
+      const label = (e.label ?? "").trim();
+      if (!EVT.has(e.type) || !label) continue;
+      const col = (e.properties?.labelWidth as number | undefined) ?? 80;
+      // Measure the RENDERED text, the same box the scanner and the renderer
+      // use. Testing the full 80px column reports collisions a reader cannot see,
+      // and this pass would then nudge a clear label onto something real.
+      const { w: lw, h: lh } = externalLabelSize(label, col);
+      const curOx = (e.properties?.labelOffsetX as number | undefined) ?? 0;
+      const curOy = (e.properties?.labelOffsetY as number | undefined) ?? 7;
+      const bside = e.boundaryHostId ? (e.properties?.boundarySide as string | undefined) : undefined;
+      const nwX = -(e.width / 2 + lw / 2 + 6);
+      const neX = (e.width / 2 + lw / 2 + 6);
+      const upY = -(e.height + lh / 2 + 6);
+      const dnY = e.height + 10;
+      // Current first, so a label that already reads well is never moved — this
+      // is what preserves R7.07(b)'s "to the right of the exit target" while
+      // still giving it somewhere to go when the right is occupied.
+      const candidates: [number, number][] =
+        bside === "top" ? [[curOx, curOy], [nwX, upY], [0, -(e.height + lh + 6)], [neX, upY]]
+        : bside === "bottom" ? [[curOx, curOy], [nwX, dnY], [0, dnY], [neX, dnY]]
+        : bside === "left" ? [[curOx, curOy], [nwX, -6], [0, -(e.height + lh + 6)], [0, dnY]]
+        : bside === "right" ? [[curOx, curOy], [neX, -6], [0, -(e.height + lh + 6)], [0, dnY]]
+        : [
+            [curOx, curOy],
+            [neX, -(e.height / 2 + lh / 2)],   // right, vertically centred
+            [nwX, -(e.height / 2 + lh / 2)],   // left
+            [0, dnY],                          // below
+            [0, -(e.height + lh + 6)],         // above
+            [neX, dnY], [nwX, dnY],            // the diagonals, last
+            [0, e.height + lh + 18],
+          ];
+      const ep = epOf(e);
+      const clears = (ox: number, oy: number): boolean => {
+        const box = labelRect(e, ox, oy, lw, lh);
+        if (ep && (box.x < ep.x || box.y < ep.y
+          || box.x + box.w > ep.x + ep.width || box.y + box.h > ep.y + ep.height)) return false;
+        for (const ob of bodies) {
+          if (ob.id === e.id || isAnc(ob, e) || e.boundaryHostId === ob.id) continue;
+          if (hit(box, { x: ob.x, y: ob.y, w: ob.width, h: ob.height }, TOL)) return false;
+        }
+        for (const s of segs) {
+          // A label sits beside its OWN flow by construction — that is not a clash.
+          if (s.a === e.id || s.b === e.id) continue;
+          if (hit(box, s.r, TOL)) return false;
+        }
+        for (const p of placed) if (hit(box, p, TOL)) return false;
+        return true;
+      };
+      // Try the preferred position, then SLIDE it vertically in half-line steps
+      // before abandoning that side. A blocked label is usually blocked by a
+      // single line — a loop-back branch running under the row — and the gap
+      // beside the event is a few pixels short rather than absent. Nudging keeps
+      // the label beside the event it names; jumping to another side to gain 7px
+      // moves it somewhere the reader has to hunt for.
+      const NUDGE_STEP = 7, NUDGE_MAX = 56;
+      const nudges: number[] = [0];
+      for (let d = NUDGE_STEP; d <= NUDGE_MAX; d += NUDGE_STEP) nudges.push(-d, d);
+      let chosen: [number, number] | undefined;
+      for (const dy of nudges) {
+        if (clears(candidates[0][0], candidates[0][1] + dy)) {
+          chosen = [candidates[0][0], candidates[0][1] + dy];
+          break;
+        }
+      }
+      // Still blocked — the first clear alternative side, else keep the
+      // preferred one: a label with nowhere to go reads better beside its own
+      // event than flung across the diagram, and the scanner reports it.
+      if (!chosen) chosen = candidates.slice(1).find(([ox, oy]) => clears(ox, oy)) ?? candidates[0];
+      e.properties = { ...e.properties, labelOffsetX: chosen[0], labelOffsetY: chosen[1] };
+      placed.push(labelRect(e, chosen[0], chosen[1], lw, lh));
+    }
+  }
 
   // ── R05.09: message-flow label placement from FINAL routed geometry ──
   // The build-time label offsets (R05.05) are stale — the L→R sweep, lane hug and
