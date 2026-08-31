@@ -357,3 +357,62 @@ describe("V25.05 — a data artifact clears the connectors under its label (R8.3
     }
   });
 });
+
+describe("V25.05 — a data artifact is REPEATED beside a remote consumer (R8.31)", () => {
+  // do2 is written by t2 (early) and read by t3 (late), the shape that produced
+  // a 3,000px association across the whole diagram.
+  const orig = out.elements.filter((e) => e.id === "do2");
+  const copies = out.elements.filter((e) => e.id.startsWith("do2__at_"));
+
+  it("T3073 — the far consumer gets its own copy instead of a line across the diagram", () => {
+    expect(orig).toHaveLength(1);
+    expect(copies.length, "a remote reader should be served by a copy").toBeGreaterThanOrEqual(1);
+    expect(copies[0].label).toBe(orig[0].label);
+  });
+
+  it("T3074 — every association is now short", () => {
+    const dist = (a: any, b: any) =>
+      Math.hypot((b.x + b.width / 2) - (a.x + a.width / 2), (b.y + b.height / 2) - (a.y + a.height / 2));
+    for (const d of out.elements) {
+      if (d.type !== "data-object" && d.type !== "data-store") continue;
+      for (const c of (out.connectors as any[]).filter((x) => x.sourceId === d.id || x.targetId === d.id)) {
+        const other = at(c.sourceId === d.id ? c.targetId : c.sourceId);
+        expect(dist(d, other), `"${L(d)}" still reaches "${L(other)}" across the diagram`).toBeLessThan(600);
+      }
+    }
+  });
+
+  it("T3075 — the copy inherits the container of the element it serves", () => {
+    // Paul: data objects are not owned by a lane the way an activity is, but
+    // their parentage stays as it was — the copy takes the R8.02 rule.
+    for (const c of copies) {
+      const served = (out.connectors as any[])
+        .filter((x) => x.sourceId === c.id || x.targetId === c.id)
+        .map((x) => at(x.sourceId === c.id ? x.targetId : x.sourceId));
+      expect(served.length).toBeGreaterThan(0);
+      expect(c.parentId).toBe(served[0].parentId);
+    }
+  });
+
+  it("T3076 — roles are re-derived after the split, so no copy keeps a marker that is no longer true", () => {
+    for (const d of out.elements) {
+      if (d.type !== "data-object") continue;
+      const mine = (out.connectors as any[]).filter((x) => x.sourceId === d.id || x.targetId === d.id);
+      if (!mine.length) continue;
+      const written = mine.some((x) => x.targetId === d.id);
+      const read = mine.some((x) => x.sourceId === d.id);
+      const want = written && read ? undefined : written ? "output" : "input";
+      expect((d.properties as any).role, `"${L(d)}" marker`).toBe(want);
+    }
+  });
+
+  it("T3077 — the caller's plan is not mutated, so a replay cannot duplicate twice", () => {
+    // The generate route reads plan.elements.length AFTER layout; adding copies
+    // to the input arrays would corrupt the stored plan and make every replay
+    // add another copy.
+    const before = els.length;
+    layoutBpmnDiagram(els, conns);
+    expect(els.length).toBe(before);
+    expect(conns.length).toBe(conns.length);
+  });
+});

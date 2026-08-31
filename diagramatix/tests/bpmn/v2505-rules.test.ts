@@ -11,6 +11,7 @@ import { describe, it, expect } from "vitest";
 import {
   checkDataLabelOverlap, checkGatewayBranchVertices, checkConnectorLaneClearance,
   checkLabelEscapesSubprocess, checkMessageLabelOverlap, checkPoolAlignment, checkGatewayInOutVertexClash,
+  checkLongDataAssociation,
 } from "@/app/lib/diagram/checks/diagramChecks";
 import type { DiagramElement, Connector } from "@/app/lib/diagram/types";
 
@@ -212,5 +213,51 @@ describe("B48 — a data artifact must clear the flow lines under its label too"
     const own = cn({ id: "a", sourceId: "do", targetId: "t", type: "associationBPMN",
       waypoints: [{ x: 118, y: 90 }, { x: 400, y: 90 }] });
     expect(checkDataLabelOverlap({ elements: [obj], connectors: [own] })).toHaveLength(0);
+  });
+});
+
+describe("B55 — a data association must not run across the diagram", () => {
+  // A wide diagram: two tasks far apart, so the fraction test has room to differ
+  // from the absolute one.
+  const wide = (gap: number) => [
+    el({ id: "t1", type: "task", x: 0, y: 100, width: 100, height: 60, label: "Write It" }),
+    el({ id: "t2", type: "task", x: gap, y: 100, width: 100, height: 60, label: "Read It Later" }),
+    el({ id: "do", type: "data-object", x: 20, y: 0, width: 36, height: 46, label: "Model Definition" }),
+  ];
+  const link = (type: string) => cn({ id: "a", sourceId: "do", targetId: "t2", type });
+
+  it("T3068 — fires on an association crossing most of the diagram", () => {
+    const v = checkLongDataAssociation({ elements: wide(3000), connectors: [link("associationBPMN")] });
+    expect(v).toHaveLength(1);
+    expect(v[0].message).toContain("Repeat");
+    expect(v[0].message).toContain("Model Definition");
+  });
+
+  it("T3069 — silent on a short hop", () => {
+    expect(checkLongDataAssociation({ elements: wide(300), connectors: [link("associationBPMN")] })).toHaveLength(0);
+  });
+
+  it("T3070 — a long hop that is a SMALL part of a wide diagram is left alone", () => {
+    // 700px is over the absolute threshold but only ~7% of a 10,000px diagram —
+    // the reason both tests must pass, not either.
+    const els2 = [
+      el({ id: "t1", type: "task", x: 0, y: 100, width: 100, height: 60, label: "A" }),
+      el({ id: "t2", type: "task", x: 700, y: 100, width: 100, height: 60, label: "B" }),
+      el({ id: "far", type: "task", x: 10000, y: 100, width: 100, height: 60, label: "Far" }),
+      el({ id: "do", type: "data-object", x: 20, y: 0, width: 36, height: 46, label: "Doc" }),
+    ];
+    expect(checkLongDataAssociation({ elements: els2, connectors: [link("associationBPMN")] })).toHaveLength(0);
+  });
+
+  it("T3071 — a big FRACTION that is only a short distance is left alone too", () => {
+    // 90% of a 400px diagram is still only 360px: nothing to fix.
+    expect(checkLongDataAssociation({ elements: wide(360), connectors: [link("associationBPMN")] })).toHaveLength(0);
+  });
+
+  it("T3072 — matched by ENDPOINT, so a plan-typed 'sequence' data link still counts", () => {
+    // The AI plan can only emit sequence/message; data links are re-typed later.
+    // Matching on connector type alone would miss them.
+    const v = checkLongDataAssociation({ elements: wide(3000), connectors: [link("sequence")] });
+    expect(v).toHaveLength(1);
   });
 });

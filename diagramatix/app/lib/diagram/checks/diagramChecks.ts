@@ -1810,6 +1810,55 @@ export function checkGatewayBranchVertices(d: DiagramLike): Violation[] {
   return out;
 }
 
+/** B55 — a data association must not run the width of the diagram.
+ *
+ *  A Data Object written early and read late produces one enormous line that
+ *  crosses everything between the two, and no amount of label nudging or
+ *  re-routing makes it readable — the fix is to REPEAT the object beside its
+ *  far consumer, which BPMN allows precisely for this (Paul 2026-08-31).
+ *
+ *  Two thresholds, and BOTH must be met. Paul offered either "longer than say
+ *  600px" or "traversing larger sections of a diagram"; measured against the
+ *  real diagrams, the absolute test alone flags a 725px hop that is 10% of a
+ *  wide diagram and looks perfectly fine, while the proportional test alone
+ *  would flag a short link on a tiny diagram. Requiring both reports every
+ *  genuinely long association in the corpus and none of the borderline ones. */
+const LONG_ASSOC_PX = 600;        // absolute: shorter than this is never worth saying
+const LONG_ASSOC_FRACTION = 0.2;  // and it must cross a fifth of the diagram
+
+export function checkLongDataAssociation(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const ART = new Set(["data-object", "data-store", "text-annotation"]);
+  const nodes = d.elements.filter((e) => !["pool", "lane", "sublane"].includes(e.type));
+  if (nodes.length === 0) return [];
+  const diagramW =
+    Math.max(...nodes.map((e) => e.x + e.width)) - Math.min(...nodes.map((e) => e.x));
+  if (!(diagramW > 0)) return [];
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    const s = byId.get(c.sourceId), t = byId.get(c.targetId);
+    if (!s || !t) continue;
+    // Matched by ENDPOINT, not connector type: an AI plan emits data links as
+    // "sequence" and they are re-typed later, so type alone would miss them.
+    const art = ART.has(s.type) ? s : ART.has(t.type) ? t : null;
+    if (!art) continue;
+    const far = art === s ? t : s;
+    const dist = Math.hypot(
+      (t.x + t.width / 2) - (s.x + s.width / 2),
+      (t.y + t.height / 2) - (s.y + s.height / 2),
+    );
+    if (dist <= LONG_ASSOC_PX || dist < diagramW * LONG_ASSOC_FRACTION) continue;
+    const pct = Math.round((dist / diagramW) * 100);
+    out.push({
+      rule: "long-data-association",
+      severity: "warning",
+      ids: [art.id, far.id, c.id],
+      message: `"${nameOf(art)}" is associated with "${nameOf(far)}" ${Math.round(dist)}px away — ${pct}% of the diagram's width. Repeat "${nameOf(art)}" beside "${nameOf(far)}" instead: a data artifact may appear more than once, and a second copy reads better than a line crossing everything between them.`,
+    });
+  }
+  return out;
+}
+
 /** B54 — a flow must not leave a gateway by a vertex an incoming flow already
  *  arrives on. A merge's outgoing belongs on the RIGHT vertex (R6.28), and in
  *  general the outgoing takes any of right / top / bottom that is free.
@@ -2600,6 +2649,15 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkGatewayBranchVertices,
+  },
+  {
+    code: "B55",
+    id: "long-data-association",
+    title: "Data association runs across the diagram — repeat the object instead",
+    description: "A Data Object or Store is associated with an element a long way off, so one line crosses everything between them. BPMN allows the same data artifact to appear more than once: place a second copy beside the distant element and associate that. Flagged only when the link is both over 600px AND crosses at least a fifth of the diagram, so a long hop on a wide diagram is judged in proportion to it.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkLongDataAssociation,
   },
   {
     code: "B54",

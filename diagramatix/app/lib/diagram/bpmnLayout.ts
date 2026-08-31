@@ -5018,6 +5018,103 @@ export function layoutBpmnDiagram(
 
   phase("waypoints computed — done");
 
+  // ── R8.31: REPEAT a data artifact beside a remote consumer ──
+  // A Data Object written early and read late produces one line crossing the
+  // whole diagram, and nothing about routing or label placement can rescue it.
+  // BPMN allows the same artifact to appear more than once for exactly this
+  // reason, and the normal practice is either to repeat it or to park it midway
+  // in a lane of its own; Paul chose repetition for generation (2026-08-31).
+  //
+  // Parentage is unchanged in kind: each copy inherits the container of the
+  // element it serves, which is the rule R8.02 already applies. Data artifacts
+  // are not owned by a lane the way an activity is, but they still carry a
+  // parent, and this keeps that as it was.
+  //
+  // Runs after routing because it needs real distances, and it is safe there:
+  // a data artifact is not a routing obstacle, so adding one cannot change
+  // anybody else's path. Only the re-pointed association is re-routed. It sits
+  // before R8.30 so the copies are lifted clear like any other artifact.
+  {
+    const ART = new Set(["data-object", "data-store"]);
+    const LONG_PX = 600, LONG_FRACTION = 0.2;
+    const NEAR = 400;         // two consumers this close share one copy
+    const nodes = elements.filter(e => !["pool", "lane", "sublane"].includes(e.type));
+    const diagramW = nodes.length
+      ? Math.max(...nodes.map(e => e.x + e.width)) - Math.min(...nodes.map(e => e.x))
+      : 0;
+    const centre = (e: DiagramElement) => ({ x: e.x + e.width / 2, y: e.y + e.height / 2 });
+    const added: DiagramElement[] = [];
+    if (diagramW > 0) {
+      for (const art of [...elements]) {
+        if (!ART.has(art.type)) continue;
+        const links = computedConnectors.filter(c => c.sourceId === art.id || c.targetId === art.id);
+        if (links.length < 2) continue;      // a single consumer has nothing to split from
+        const ac = centre(art);
+        // Copies made for THIS artifact, so two remote consumers standing near
+        // each other share one rather than each getting their own.
+        const copies: { el: DiagramElement; at: { x: number; y: number } }[] = [];
+        let n = 0;
+        for (const c of links) {
+          const farId = c.sourceId === art.id ? c.targetId : c.sourceId;
+          const far = elMap.get(farId);
+          if (!far || ART.has(far.type)) continue;
+          const fc = centre(far);
+          const dist = Math.hypot(fc.x - ac.x, fc.y - ac.y);
+          if (dist <= LONG_PX || dist < diagramW * LONG_FRACTION) continue;
+
+          let copy = copies.find(k => Math.hypot(k.at.x - fc.x, k.at.y - fc.y) < NEAR)?.el;
+          if (!copy) {
+            // Placed by R8.02's own rule: a value READ by the element sits to
+            // its upper-left, one WRITTEN by it to the upper-right.
+            const isOutput = c.sourceId !== art.id;
+            copy = {
+              ...art,
+              id: `${art.id}__at_${++n}_${farId}`,
+              properties: { ...art.properties },
+              x: isOutput ? far.x + far.width + DATA_GAP : far.x - art.width - DATA_GAP,
+              y: far.y - art.height - DATA_VGAP,
+              parentId: far.parentId,          // the container rule, unchanged
+            };
+            elements.push(copy);
+            elMap.set(copy.id, copy);
+            added.push(copy);
+            copies.push({ el: copy, at: fc });
+          }
+          // Re-point this association at the copy and route it afresh.
+          const i = computedConnectors.indexOf(c);
+          const re = c.sourceId === art.id
+            ? { ...c, sourceId: copy.id }
+            : { ...c, targetId: copy.id };
+          const s = elMap.get(re.sourceId), t = elMap.get(re.targetId);
+          if (s && t) {
+            try {
+              const r = computeWaypoints(s, t, elements, re.sourceSide, re.targetSide, re.routingType, 0.5, 0.5);
+              computedConnectors[i] = { ...re, waypoints: r.waypoints,
+                sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
+            } catch { computedConnectors[i] = re; }
+          } else {
+            computedConnectors[i] = re;
+          }
+        }
+      }
+    }
+    // Splitting changes what each copy is: the original may now only be WRITTEN
+    // and a copy only READ. R8.02's marker rule keys off exactly that, so the
+    // role has to be re-derived or a copy keeps a marker that is no longer true.
+    if (added.length > 0) {
+      for (const a of [...added, ...elements.filter(e => ART.has(e.type))]) {
+        const mine = computedConnectors.filter(c => c.sourceId === a.id || c.targetId === a.id);
+        if (mine.length === 0) continue;
+        const writtenTo = mine.some(c => c.targetId === a.id);   // element → data
+        const readFrom = mine.some(c => c.sourceId === a.id);    // data → element
+        const role = writtenTo && readFrom ? undefined : writtenTo ? "output" : "input";
+        const props = { ...a.properties };
+        if (role) props.role = role; else delete props.role;
+        a.properties = props;
+      }
+    }
+  }
+
   // ── R8.30: lift a data artifact clear of the CONNECTORS under its label ──
   // R8.02's clearance pass lifts an artifact off the elements below it, but it
   // runs before routing, so it has never been able to see a connector. Paul's
