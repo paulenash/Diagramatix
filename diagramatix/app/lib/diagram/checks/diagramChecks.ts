@@ -1785,6 +1785,35 @@ export function checkGatewayBranchVertices(d: DiagramLike): Violation[] {
   return out;
 }
 
+/** B54 — a flow must not leave a gateway by a vertex an incoming flow already
+ *  arrives on. A merge's outgoing belongs on the RIGHT vertex (R6.28), and in
+ *  general the outgoing takes any of right / top / bottom that is free.
+ *
+ *  Only flagged while a free vertex existed: a diamond has four points, so a
+ *  gateway carrying five or more flows must double up somewhere and saying so
+ *  would be noise. */
+export function checkGatewayInOutVertexClash(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  for (const g of d.elements) {
+    if (g.type !== "gateway") continue;
+    const ins = d.connectors.filter((c) => c.targetId === g.id);
+    const outs = d.connectors.filter((c) => c.sourceId === g.id);
+    if (ins.length + outs.length > 4) continue;         // doubling up is forced
+    const inSides = new Set(ins.map((c) => String(c.targetSide ?? "?")));
+    for (const c of outs) {
+      const side = String(c.sourceSide ?? "?");
+      if (side === "?" || !inSides.has(side)) continue;
+      out.push({
+        rule: "gateway-in-out-vertex",
+        severity: "error",
+        ids: [g.id, c.id],
+        message: `The flow out of "${nameOf(g)}" leaves by the ${side} vertex, which an incoming flow already arrives on. A merge's outgoing flow takes the right vertex, or any of right / top / bottom that is free.`,
+      });
+    }
+  }
+  return out;
+}
+
 /** B50 — a horizontal connector run must not graze a lane boundary. The line
  *  reads as sitting ON the lane edge long before it actually crosses it. */
 export function checkConnectorLaneClearance(d: DiagramLike): Violation[] {
@@ -2507,6 +2536,15 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkGatewayBranchVertices,
+  },
+  {
+    code: "B54",
+    id: "gateway-in-out-vertex",
+    title: "Gateway flow leaves by a vertex an incoming flow uses",
+    description: "A flow leaves a gateway by the same connection point another flow arrives on, so the two are drawn on top of each other at the diamond. A merge gateway's outgoing flow takes the RIGHT vertex, or any of right / top / bottom not already used (R6.28). Not reported once a gateway carries more than four flows, where a diamond's four points make doubling up unavoidable.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkGatewayInOutVertexClash,
   },
   {
     code: "B50",

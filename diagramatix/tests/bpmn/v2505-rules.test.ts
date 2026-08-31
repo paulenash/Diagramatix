@@ -10,7 +10,7 @@
 import { describe, it, expect } from "vitest";
 import {
   checkDataLabelOverlap, checkGatewayBranchVertices, checkConnectorLaneClearance,
-  checkLabelEscapesSubprocess, checkMessageLabelOverlap, checkPoolAlignment,
+  checkLabelEscapesSubprocess, checkMessageLabelOverlap, checkPoolAlignment, checkGatewayInOutVertexClash,
 } from "@/app/lib/diagram/checks/diagramChecks";
 import type { DiagramElement, Connector } from "@/app/lib/diagram/types";
 
@@ -152,5 +152,36 @@ describe("B53 — pools in one diagram share a left edge", () => {
       elements: [pool("a", 50), pool("b", 50), pool("c", 50)],
       connectors: [],
     })).toHaveLength(0);
+  });
+});
+
+describe("B54 — a gateway's outgoing must not share a vertex with an incoming", () => {
+  const gw = el({ id: "g", type: "gateway", x: 0, y: 0, width: 40, height: 40, label: "OK?" });
+  const io = (outSide: string) => [
+    cn({ id: "i1", sourceId: "a", targetId: "g", targetSide: "top" as any }),
+    cn({ id: "i2", sourceId: "b", targetId: "g", targetSide: "bottom" as any }),
+    cn({ id: "o1", sourceId: "g", targetId: "c", sourceSide: outSide as any }),
+  ];
+
+  it("T3057 — fires when the outgoing leaves by a vertex an incoming arrives on", () => {
+    // The exact fault Paul found: both incomings on top/bottom, and the
+    // outgoing stapled to bottom by the loop-back rule.
+    const v = checkGatewayInOutVertexClash({ elements: [gw], connectors: io("bottom") });
+    expect(v).toHaveLength(1);
+    expect(v[0].severity).toBe("error");
+    expect(v[0].message).toContain("bottom vertex");
+  });
+
+  it("T3058 — silent when the outgoing takes the free right vertex", () => {
+    expect(checkGatewayInOutVertexClash({ elements: [gw], connectors: io("right") })).toHaveLength(0);
+  });
+
+  it("T3059 — not reported once a diamond's four points cannot go round", () => {
+    const busy = [
+      ...io("right"),
+      cn({ id: "i3", sourceId: "d", targetId: "g", targetSide: "left" as any }),
+      cn({ id: "i4", sourceId: "e", targetId: "g", targetSide: "right" as any }),
+    ];
+    expect(checkGatewayInOutVertexClash({ elements: [gw], connectors: busy })).toHaveLength(0);
   });
 });

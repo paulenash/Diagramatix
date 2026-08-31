@@ -3619,7 +3619,24 @@ export function layoutBpmnDiagram(
           // fan out from it (R6.29).
           else srcSide = (["top", "right", "bottom"] as const)[idx % 3];
         } else if (srcIsMerge) {
-          srcSide = "right";
+          // R6.28 — a merge's outgoing flow leaves by the RIGHT vertex, and in
+          // any case never by one an incoming flow already occupies. Paul
+          // (2026-08-31): "always the right-hand vertex, or any of the top,
+          // bottom, right-hand vertices that are not used."
+          //
+          // The incoming sides are assigned by this same pass, so which vertices
+          // are taken is known rather than guessed. They never claim `right`
+          // today, so this resolves to `right` — it is written as a search so a
+          // future change to the incoming rule cannot silently produce a shared
+          // vertex, which is the fault this replaces.
+          const inList = mergeIncomings.get(src.id) ?? [];
+          const usedByIncoming = new Set<string>();
+          if (inList.length <= 1) usedByIncoming.add("left");
+          else if (inList.length === 2) { usedByIncoming.add("top"); usedByIncoming.add("bottom"); }
+          else for (let k = 0; k < inList.length; k++) {
+            usedByIncoming.add((["top", "left", "bottom"] as const)[k % 3]);
+          }
+          srcSide = (["right", "top", "bottom"] as const).find(v => !usedByIncoming.has(v)) ?? "right";
         } else {
           srcSide = "right";
         }
@@ -3703,7 +3720,16 @@ export function layoutBpmnDiagram(
       if (
         connType === "sequence" &&
         _tgtCx < _srcCx - 4 &&
-        !EVENT_TYPES.has(src.type) && !EVENT_TYPES.has(tgt.type)
+        !EVENT_TYPES.has(src.type) && !EVENT_TYPES.has(tgt.type) &&
+        // A MERGE gateway's outgoing vertex belongs to R6.28, not to this rule.
+        // The staple fires on "target is to the left of source", and at this
+        // point in the layout the merge's follower often still IS to its left —
+        // later passes move it right, but the side was already stapled to
+        // bottom→bottom and is never revisited. That put the outgoing flow on a
+        // vertex an incoming flow was already using (Paul 2026-08-31). The
+        // comment on the event rules above already says gateways have their own
+        // side rules; this is that exclusion applied where it was missing.
+        !isMergeGateway(src)
       ) {
         const boundaryOn = (host: DiagramElement, want: string) =>
           elements.some((e) => e.boundaryHostId === host.id

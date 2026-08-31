@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-08-31  ·  **Document version:** 6.7  ·  **Suite:** 366 test files · 2,369 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3056  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-08-31  ·  **Document version:** 6.7  ·  **Suite:** 366 test files · 2,372 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3059  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3057**, the one after **T3058**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3060**, the one after **T3061**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3056`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3059`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -1992,7 +1992,7 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3024 | `tests/partner/auth.test.ts` | Repeated BAD keys are still stopped — removing the false positive must not remove the control with it. |
 
 
-### V25.05 generated-layout defects and the B48–B52 red rules (T3025-T3056)
+### V25.05 generated-layout defects and the B48–B52 red rules (T3025-T3059)
 
 > Added 2026-08-31 after Paul's review of a generated diagram. Four of the five
 > faults were the same mistake: the layout measured a SHAPE where the renderer
@@ -2035,6 +2035,9 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3053 | `tests/bpmn/v2505-rules.test.ts` | B52 is silent once they are staggered by a full line. |
 | T3054 | `tests/bpmn/v2505-rules.test.ts` | B53 fires on the pool that has been nudged sideways — the exact geometry Paul exported, two pools at x=50 and one at -1.43. |
 | T3055 | `tests/bpmn/v2505-rules.test.ts` | B53 is silent when every pool starts at the same x. |
+| T3057 | `tests/bpmn/v2505-rules.test.ts` | B54 fires when a gateway outgoing leaves by a vertex an incoming arrives on - the merge stapled to bottom by the loop-back rule. |
+| T3058 | `tests/bpmn/v2505-rules.test.ts` | B54 is silent when the outgoing takes the free right vertex. |
+| T3059 | `tests/bpmn/v2505-rules.test.ts` | B54 is not reported once a gateway carries more than four flows, where a diamond cannot go round. |
 
 ### Backfill - entries that existed in the tree but were never listed here (T2218-T2283, T2824-T2826)
 
