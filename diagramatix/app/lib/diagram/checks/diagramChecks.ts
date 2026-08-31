@@ -21,7 +21,7 @@
  * in-app scan, and shows up in the admin viewer automatically.
  */
 import type { DiagramElement, Connector } from "../types";
-import { wrapText } from "../textMetrics";
+import { wrapText, externalLabelBox, connectorLabelWidth } from "../textMetrics";
 import { getRiskControl } from "../riskControl";
 import { canConnect } from "../canConnect";
 
@@ -1709,6 +1709,205 @@ export function checkElementOverlap(d: DiagramLike): Violation[] {
   return out;
 }
 
+/* ── B48–B52 — the V25.05 geometry rules (Paul, 2026-08-31) ─────────────────
+ *
+ * Five faults in one generated diagram, four of them the same mistake: the
+ * layout measured a SHAPE where the renderer draws a shape PLUS a label. These
+ * rules are deliberately measured with `externalLabelBox` / `connectorLabelWidth`
+ * — the renderer's own metrics — so a violation here is something a reader can
+ * actually see, not an arithmetic artefact of a nominal label column.
+ */
+
+const ARTIFACT_TYPES = new Set<string>(["data-object", "data-store"]);
+const BODY_TYPES = new Set<string>([
+  "task", "subprocess", "subprocess-expanded", "start-event", "end-event",
+  "intermediate-event", "gateway", "data-object", "data-store",
+]);
+/** ¾ of a default event height — the "comfortable margin" Paul asked for. */
+const LANE_RUN_CLEARANCE = 27;
+
+/** The lane/sublane band a point falls in. */
+function bandAt(d: DiagramLike, x1: number, x2: number): DiagramElement[] {
+  return d.elements.filter((l) =>
+    (l.type === "lane" || l.type === "sublane") && x2 >= l.x && x1 <= l.x + l.width);
+}
+
+/** B48 — a Data Object / Store name is drawn BELOW the shape, and must not be
+ *  drawn through whatever sits under it. B33 covers events only. */
+export function checkDataLabelOverlap(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  for (const a of d.elements) {
+    if (!ARTIFACT_TYPES.has(a.type)) continue;
+    const box = externalLabelBox(a);
+    if (!box) continue;
+    for (const o of d.elements) {
+      if (o.id === a.id || !BODY_TYPES.has(o.type)) continue;
+      if (o.y <= a.y) continue;                       // only what sits BELOW it
+      if (isAncestorOf(byId, o, a) || isAncestorOf(byId, a, o)) continue;
+      if (!rectsOverlapBy({ x: box.x, y: box.y, w: box.w, h: box.h }, elRect(o), 2)) continue;
+      out.push({
+        rule: "data-label-overlap",
+        severity: "error",
+        ids: [a.id, o.id],
+        message: `"${nameOf(a)}" label is drawn through "${nameOf(o)}" — a data artifact must be lifted until its whole name clears what is below it.`,
+      });
+    }
+  }
+  return out;
+}
+
+/** B49 — two branches of the same decision gateway must not leave the diamond
+ *  from the same connection point. With four or more branches doubling up is
+ *  unavoidable and allowed. */
+export function checkGatewayBranchVertices(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  for (const g of d.elements) {
+    if (g.type !== "gateway") continue;
+    const outs = d.connectors.filter((c) =>
+      c.sourceId === g.id && (c.type === "sequence" || c.type === undefined));
+    if (outs.length < 2 || outs.length >= 4) continue;
+    const bySide = new Map<string, string[]>();
+    for (const c of outs) {
+      const side = String(c.sourceSide ?? "?");
+      bySide.set(side, [...(bySide.get(side) ?? []), c.id]);
+    }
+    for (const [side, ids] of bySide) {
+      if (ids.length < 2) continue;
+      out.push({
+        rule: "gateway-branch-vertices",
+        severity: "error",
+        ids: [g.id, ...ids],
+        message: `${ids.length} branches of "${nameOf(g)}" leave from the same ${side} point — with ${outs.length} branches they must use separate vertices (top, then bottom, then middle-right).`,
+      });
+    }
+  }
+  return out;
+}
+
+/** B50 — a horizontal connector run must not graze a lane boundary. The line
+ *  reads as sitting ON the lane edge long before it actually crosses it. */
+export function checkConnectorLaneClearance(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    const w = c.waypoints ?? [];
+    for (let i = 0; i < w.length - 1; i++) {
+      if (Math.abs(w[i].y - w[i + 1].y) > 1) continue;
+      const x1 = Math.min(w[i].x, w[i + 1].x), x2 = Math.max(w[i].x, w[i + 1].x);
+      if (x2 - x1 < 40) continue;                    // a stub, not a run
+      for (const lane of bandAt(d, x1, x2)) {
+        for (const edge of [lane.y, lane.y + lane.height]) {
+          const gap = Math.abs(w[i].y - edge);
+          if (gap <= 0.5 || gap >= LANE_RUN_CLEARANCE) continue;
+          out.push({
+            rule: "connector-lane-clearance",
+            severity: "warning",
+            ids: [c.id, lane.id],
+            message: `A horizontal run of "${nameOf(d.elements.find((e) => e.id === c.sourceId))}"'s connector passes ${Math.round(gap)}px from lane "${nameOf(lane)}" — keep at least ${LANE_RUN_CLEARANCE}px so the line does not read as sitting on the boundary.`,
+          });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** B51 — an element inside an Expanded Subprocess draws its name below itself;
+ *  that name must stay inside the box. */
+export function checkLabelEscapesSubprocess(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  for (const ep of d.elements) {
+    if (ep.type !== "subprocess-expanded") continue;
+    for (const ch of d.elements) {
+      if (ch.parentId !== ep.id) continue;
+      // An edge-mounted event is ON the rim, not inside the box, and R7.05 puts
+      // its label on the OUTWARD side deliberately. Flagging that would report
+      // every correctly-labelled boundary event as a fault.
+      if (ch.boundaryHostId) continue;
+      const box = externalLabelBox(ch);
+      if (!box) continue;
+      const over =
+        box.y + box.h > ep.y + ep.height + 2 ? "bottom" :
+        box.y < ep.y - 2 ? "top" :
+        box.x < ep.x - 2 ? "left" :
+        box.x + box.w > ep.x + ep.width + 2 ? "right" : null;
+      if (!over) continue;
+      out.push({
+        rule: "label-escapes-subprocess",
+        severity: "error",
+        ids: [ch.id, ep.id],
+        message: `"${nameOf(ch)}" label crosses the ${over} edge of "${nameOf(ep)}" — the subprocess must be sized around its children's labels, not just their shapes.`,
+      });
+    }
+  }
+  return out;
+}
+
+/** B52 — two message-flow labels drawn on top of each other. */
+export function checkMessageLabelOverlap(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  const box = (c: Connector): Rect | null => {
+    const w = c.waypoints ?? [];
+    const vs = c.sourceInvisibleLeader ? 1 : 0;
+    const ve = c.targetInvisibleLeader ? w.length - 2 : w.length - 1;
+    const vis = w.slice(vs, ve + 1);
+    if (vis.length < 2 || !String(c.label ?? "").trim()) return null;
+    const ax = (vis[0].x + vis[vis.length - 1].x) / 2;
+    const ay = (vis[0].y + vis[vis.length - 1].y) / 2;
+    const width = connectorLabelWidth(c.label ?? "");
+    const lines = String(c.label ?? "").split("\n").length;
+    return {
+      x: ax + (c.labelOffsetX ?? -(width / 2 + 6)) - width / 2,
+      y: ay + (c.labelOffsetY ?? -30),
+      w: width, h: Math.max(14, lines * 14),
+    };
+  };
+  const msgs = d.connectors.filter((c) => c.type === "messageBPMN" && String(c.label ?? "").trim());
+  for (let i = 0; i < msgs.length; i++) {
+    for (let j = i + 1; j < msgs.length; j++) {
+      const a = box(msgs[i]), b = box(msgs[j]);
+      if (!a || !b || !rectsOverlapBy(a, b, 2)) continue;
+      out.push({
+        rule: "message-label-overlap",
+        severity: "error",
+        ids: [msgs[i].id, msgs[j].id],
+        message: `Message labels "${msgs[i].label}" and "${msgs[j].label}" are drawn on top of each other — labels on the same pool stagger vertically to interleave.`,
+      });
+    }
+  }
+  return out;
+}
+
+/** B53 — top-level pools share a left edge.
+ *
+ *  The layout emits them aligned and re-syncs black-box pools to the white-box
+ *  left edge, so a misaligned pool has been moved since: nothing constrains a
+ *  pool's horizontal drag, and a sideways nudge of a black-box pool is easy to
+ *  make and almost impossible to see, because the pool is wider than the screen
+ *  and its header is off to the left. In V25.05 one pool sat 51px out and the
+ *  diagram simply looked wrong without saying why (Paul, 2026-08-31). */
+export function checkPoolAlignment(d: DiagramLike): Violation[] {
+  const pools = d.elements.filter((e) => e.type === "pool" && !e.parentId);
+  if (pools.length < 2) return [];
+  const TOL = 1;
+  // The majority left edge is the intended one; report what differs from it.
+  const counts = new Map<number, number>();
+  for (const p of pools) {
+    const k = Math.round(p.x);
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  let baseX = pools[0].x, best = -1;
+  for (const [k, n] of counts) if (n > best) { best = n; baseX = k; }
+  return pools
+    .filter((p) => Math.abs(p.x - baseX) > TOL)
+    .map((p) => ({
+      rule: "pool-alignment",
+      severity: "warning" as Severity,
+      ids: [p.id],
+      message: `Pool "${nameOf(p)}" starts at x=${Math.round(p.x)} while the others start at x=${Math.round(baseX)} — pools in one diagram share a left edge, so this one has been nudged sideways.`,
+    }));
+}
+
 /** B33 — event labels (especially edge-mounted/boundary events) must not
  *  overlap another element's body or another event's label. The event's own
  *  container ancestors are exempt (a label sitting inside its pool/lane/EP is
@@ -2290,6 +2489,60 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkElementOverlap,
+  },
+  {
+    code: "B48",
+    id: "data-label-overlap",
+    title: "Data Object / Store label drawn through another element",
+    description: "A Data Object or Data Store's name renders BELOW its shape, and a long name wraps to several lines. Where that text lands on the element underneath, the artifact must be lifted until the whole label clears it. Measured on the rendered text, so only overlaps a reader can actually see are flagged. (R8.02)",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkDataLabelOverlap,
+  },
+  {
+    code: "B49",
+    id: "gateway-branch-vertices",
+    title: "Two gateway branches leave from the same point",
+    description: "Branches of a decision gateway must leave the diamond from separate connection points — top first, then bottom, then the middle-right point. Two flows leaving the same vertex are drawn on top of each other at the fork. Only a fourth branch may double up, on the vertex nearest its target. (R6.26 / R6.27)",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkGatewayBranchVertices,
+  },
+  {
+    code: "B50",
+    id: "connector-lane-clearance",
+    title: "Connector runs along a lane boundary",
+    description: "A horizontal connector segment passes within ¾ of an event height of a lane edge, which reads as the line sitting ON the boundary. The clearance kept from elements applies to connector runs too. (R6.30)",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkConnectorLaneClearance,
+  },
+  {
+    code: "B51",
+    id: "label-escapes-subprocess",
+    title: "Element label crosses its Expanded Subprocess boundary",
+    description: "An event or gateway inside an Expanded Subprocess draws its name outside its own shape. The subprocess must be sized around its children's LABELS, not just their boxes, or a wrapped name hangs through the wall. (R8.27)",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkLabelEscapesSubprocess,
+  },
+  {
+    code: "B52",
+    id: "message-label-overlap",
+    title: "Two message-flow labels drawn on top of each other",
+    description: "Message labels attaching to the same Pool must stagger vertically so they interleave. Overlap is judged on each label's RENDERED width — a connector label auto-sizes to its text, so comparing against a nominal column width misses labels that plainly collide. (R05.09)",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkMessageLabelOverlap,
+  },
+  {
+    code: "B53",
+    id: "pool-alignment",
+    title: "Pool not aligned with the others",
+    description: "Pools in one diagram share a left edge. Layout emits them aligned and re-syncs black-box pools to the white-box left edge, so a pool that starts somewhere else has been dragged sideways since — easy to do by accident and nearly invisible, because a pool is wider than the screen and its header sits off to the left.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkPoolAlignment,
   },
   {
     code: "B35",

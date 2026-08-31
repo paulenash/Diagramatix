@@ -217,3 +217,81 @@ export function computePackageTab(
   const tabH = Math.min(Math.max(24, lines.length * lineH + PADY * 2), el.height - 12);
   return { tabW, tabH };
 }
+
+/* ── The EXTERNAL label ──────────────────────────────────────────────────────
+ * Events, gateways, data objects and data stores draw their name BELOW the
+ * shape rather than inside it. SymbolRenderer owns that geometry; layout has to
+ * measure the identical box, or it places shapes whose text then lands on
+ * something. These constants and `externalLabelBox` are that shared definition —
+ * change them here and both sides move together.
+ */
+export const EXTERNAL_LABEL_LINE_H = 14;
+export const EXTERNAL_LABEL_DEFAULT_W = 80;
+export const EXTERNAL_LABEL_DEFAULT_OY = 7;
+
+/**
+ * The width a CONNECTOR label actually renders at.
+ *
+ * ConnectorRenderer auto-sizes from the text and ignores `labelWidth`, so any
+ * layout decision made against a nominal column width is made against a number
+ * that never reaches the screen. "Job completion status and run log" is 210px
+ * wide, not 80 — which is how two message labels 132px apart were judged not to
+ * overlap and were drawn on top of each other (Paul 2026-08-31, V25.05).
+ */
+export function connectorLabelWidth(label: string, fontSize = 10): number {
+  const avgCharWidth = fontSize * 0.6;
+  return Math.max(30, ...String(label ?? " ").split("\n").map((l) => l.length * avgCharWidth + 12));
+}
+
+/** The types that draw their name OUTSIDE the shape. Mirrors the condition in
+ *  SymbolRenderer — a task's name is inside its box and must never be counted
+ *  as occupying space beside it. A merge gateway shows no label at all. */
+export function hasExternalLabel(
+  type: string,
+  properties?: Record<string, unknown>,
+): boolean {
+  if (type === "gateway") return properties?.gatewayRole !== "merge";
+  return (
+    type === "start-event" || type === "end-event" || type === "intermediate-event" ||
+    type === "data-object" || type === "data-store"
+  );
+}
+
+/**
+ * The box an element's external label actually occupies.
+ *
+ * Width is the WIDEST WRAPPED LINE, not the label column. The column is a wrap
+ * budget, not an extent: a centred two-word name uses about half of it, and
+ * treating the full 80px as occupied reports collisions a reader cannot see —
+ * which would move shapes that are visibly fine.
+ *
+ * Returns null when the type draws its label inside, or there is none to draw.
+ */
+export function externalLabelBox(
+  el: {
+    type?: string;
+    x: number; y: number; width: number; height: number;
+    label?: string;
+    properties?: Record<string, unknown>;
+  },
+  fontSize = 12,
+): { x: number; y: number; w: number; h: number } | null {
+  const label = (el.label ?? "").trim();
+  if (!label) return null;
+  if (el.type !== undefined && !hasExternalLabel(el.type, el.properties)) return null;
+  const p = el.properties ?? {};
+  const lw = (p.labelWidth as number | undefined) ?? EXTERNAL_LABEL_DEFAULT_W;
+  const ox = (p.labelOffsetX as number | undefined) ?? 0;
+  const oy = (p.labelOffsetY as number | undefined) ?? EXTERNAL_LABEL_DEFAULT_OY;
+  const lines = wrapText(label, lw, fontSize);
+  const textW = Math.min(
+    lw,
+    Math.max(...lines.map((l) => l.length * fontSize * AVG_CHAR_W_FACTOR)),
+  );
+  return {
+    x: el.x + el.width / 2 + ox - textW / 2,
+    y: el.y + el.height + oy,
+    w: textW,
+    h: lines.length * EXTERNAL_LABEL_LINE_H,
+  };
+}

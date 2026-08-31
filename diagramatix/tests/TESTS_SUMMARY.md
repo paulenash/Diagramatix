@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-08-29  ·  **Document version:** 6.7  ·  **Suite:** 364 test files · 2,337 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3024  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-08-31  ·  **Document version:** 6.7  ·  **Suite:** 366 test files · 2,369 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3056  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3025**, the one after **T3026**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3057**, the one after **T3058**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3024`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3056`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -1991,6 +1991,50 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3023 | `tests/partner/auth.test.ts` | A VALID key can authenticate far more often than the failure allowance. The brute-force guard originally charged a token on every attempt, so it caught its own harness first — polling from one loopback address burns twenty a minute without a single bad key. A control that fires on correct behaviour is not a control, it is an outage. |
 | T3024 | `tests/partner/auth.test.ts` | Repeated BAD keys are still stopped — removing the false positive must not remove the control with it. |
 
+
+### V25.05 generated-layout defects and the B48–B52 red rules (T3025-T3056)
+
+> Added 2026-08-31 after Paul's review of a generated diagram. Four of the five
+> faults were the same mistake: the layout measured a SHAPE where the renderer
+> draws a shape PLUS a label, so clearance was decided against a number that
+> never reaches the screen. `externalLabelBox` / `connectorLabelWidth` are now
+> the shared measurement, and these tests pin both the layout behaviour and the
+> five rules that catch a regression.
+
+| Ref | File | What it asserts |
+|---|---|---|
+| T3025 | `tests/bpmn/v2505-layout-defects.test.ts` | An edge-mounted event's exit target is placed to the RIGHT of the event and clear of the mounted edge, not dropped straight below it. |
+| T3026 | `tests/bpmn/v2505-layout-defects.test.ts` | That exit connector is an L — it turns exactly once. A bare vertical spike has no bend. |
+| T3027 | `tests/bpmn/v2505-layout-defects.test.ts` | The exit target sits FULLY inside the event's lane. `fitLanesToChildren` cannot rescue it (events are NON_LANE_BOUND by design), so containment is enforced at the placement. |
+| T3028 | `tests/bpmn/v2505-layout-defects.test.ts` | The exit target's label sits to the RIGHT of it — never above, which is where the subprocess it just escaped from is. |
+| T3029 | `tests/bpmn/v2505-layout-defects.test.ts` | A re-route reproduces the exit path exactly. Paul reported re-routing undoing his manual L; it did, because a target directly below made a straight drop the CORRECT route. Fixing the placement makes the L the router's own answer. |
+| T3030 | `tests/bpmn/v2505-layout-defects.test.ts` | A TOP-mounted edge event puts its target above the rim instead — the mirror of the bottom case. |
+| T3031 | `tests/bpmn/v2505-layout-defects.test.ts` | A data object's wrapped label clears every body below it. |
+| T3032 | `tests/bpmn/v2505-layout-defects.test.ts` | An event's label inside an Expanded Subprocess stays within the box — the EP is sized around children's LABELS, not just their shapes. |
+| T3033 | `tests/bpmn/v2505-layout-defects.test.ts` | `externalLabelBox` counts WRAPPED lines, not hard newlines. The bug it replaces measured a four-line generated name as one line, so the clearance pass could not see the overlap. |
+| T3034 | `tests/bpmn/v2505-layout-defects.test.ts` | A task has NO external label — its name is inside its box. Guards the opposite error: treating it as external would inflate every container holding one. |
+| T3035 | `tests/bpmn/v2505-layout-defects.test.ts` | `connectorLabelWidth` reports the RENDERED width, not the stored 80px column. |
+| T3036 | `tests/bpmn/v2505-layout-defects.test.ts` | A decision gateway's two branches leave from DIFFERENT vertices — top and bottom. |
+| T3037 | `tests/bpmn/v2505-layout-defects.test.ts` | A branch's Expanded Subprocess is placed on the side its branch leaves from, rather than level with the gateway. |
+| T3038 | `tests/bpmn/v2505-layout-defects.test.ts` | No horizontal connector run passes closer than ¾ of an event height to a lane edge. |
+| T3039 | `tests/bpmn/v2505-layout-defects.test.ts` | Two message labels on one black-box pool do not overlap, measured with the renderer's own auto-sized width. |
+| T3056 | `tests/bpmn/v2505-layout-defects.test.ts` | A decision branch label does not sit ON its own horizontal segment - it must read clearly above or below the line. |
+| T3040 | `tests/bpmn/v2505-rules.test.ts` | B48 fires when a data artifact's wrapped name lands on the task underneath. |
+| T3041 | `tests/bpmn/v2505-rules.test.ts` | B48 is silent once the artifact is lifted clear. |
+| T3042 | `tests/bpmn/v2505-rules.test.ts` | B48 does not fire for a SHORT name — measuring the 80px column instead of the text would move artifacts that are visibly fine. |
+| T3043 | `tests/bpmn/v2505-rules.test.ts` | B49 fires when both branches of a decision gateway use the same vertex. |
+| T3044 | `tests/bpmn/v2505-rules.test.ts` | B49 is silent on top + bottom. |
+| T3045 | `tests/bpmn/v2505-rules.test.ts` | B49 allows four or more branches to double up — with only three vertices it is unavoidable. |
+| T3046 | `tests/bpmn/v2505-rules.test.ts` | B50 fires when a horizontal run passes 4px from a lane boundary. |
+| T3047 | `tests/bpmn/v2505-rules.test.ts` | B50 is silent at a comfortable margin. |
+| T3048 | `tests/bpmn/v2505-rules.test.ts` | B50 ignores a short stub — a stub is not a run along the boundary. |
+| T3049 | `tests/bpmn/v2505-rules.test.ts` | B51 fires when a wrapped name hangs through a subprocess floor. |
+| T3050 | `tests/bpmn/v2505-rules.test.ts` | B51 is silent when the box is sized around the label. |
+| T3051 | `tests/bpmn/v2505-rules.test.ts` | B51 does not fire for an edge-mounted event, whose label sits outside the host deliberately (R7.05) — the false positive found by running the rule against Paul's own manual correction. |
+| T3052 | `tests/bpmn/v2505-rules.test.ts` | B52 fires when two message labels land at the same height. |
+| T3053 | `tests/bpmn/v2505-rules.test.ts` | B52 is silent once they are staggered by a full line. |
+| T3054 | `tests/bpmn/v2505-rules.test.ts` | B53 fires on the pool that has been nudged sideways — the exact geometry Paul exported, two pools at x=50 and one at -1.43. |
+| T3055 | `tests/bpmn/v2505-rules.test.ts` | B53 is silent when every pool starts at the same x. |
 
 ### Backfill - entries that existed in the tree but were never listed here (T2218-T2283, T2824-T2826)
 

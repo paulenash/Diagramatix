@@ -7,7 +7,7 @@ import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { closeFlowVoids } from "./closeFlowVoids";
 import { computeWaypoints, recomputeAllConnectors, pickBoundaryEventSide } from "./routing";
-import { autoSizeForType, wrapText, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
+import { autoSizeForType, wrapText, externalLabelBox, connectorLabelWidth, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
 import { snapImportedBounds, type Box } from "./importGeometry";
 import { buildTestConnectors } from "./bpmnTestConnectors";
 
@@ -2622,6 +2622,11 @@ export function layoutBpmnDiagram(
   // AI's ordering so wiring (R6.16/R6.17) is deterministic across re-layouts.
   const decisionOutgoings = new Map<string, AiConnection[]>();
   const mergeIncomings    = new Map<string, AiConnection[]>();
+  /** Each decision branch's position in the PLAN, kept because the list below is
+   *  re-sorted by target Y and that ordering is a mid-layout artifact: a tall
+   *  subprocess has a lower centre than a gateway on the same row purely because
+   *  it is tall. R6.26 needs the order a reader meets the branches in. */
+  const branchPlanIndex = new Map<AiConnection, number>();
   for (const c of aiConnections) {
     if (c.type === "message") continue;
     incomingCount.set(c.targetId, (incomingCount.get(c.targetId) ?? 0) + 1);
@@ -3123,6 +3128,7 @@ export function layoutBpmnDiagram(
     const tgtEl = elements.find(e => e.id === c.targetId);
     if (srcEl && isDecisionGateway(srcEl)) {
       const list = decisionOutgoings.get(srcEl.id) ?? [];
+      branchPlanIndex.set(c, list.length);
       list.push(c);
       decisionOutgoings.set(srcEl.id, list);
     }
@@ -3253,10 +3259,24 @@ export function layoutBpmnDiagram(
       const kids = elements.filter(c =>
         c.parentId === ep.id && !EP_ARTIFACT.has(c.type) && c.boundaryHostId !== ep.id);
       if (kids.length === 0) continue;
-      const minX = Math.min(...kids.map(c => c.x));
-      const minY = Math.min(...kids.map(c => c.y));
-      const maxX = Math.max(...kids.map(c => c.x + c.width));
-      const maxY = Math.max(...kids.map(c => c.y + c.height));
+      // R8.27 — the box must enclose each child's rendered LABEL too, not just
+      // its shape. An event inside an EP draws its name BELOW itself, so hugging
+      // to shapes alone left a three-line name hanging through the EP's bottom
+      // edge (Paul 2026-08-31). `externalLabelBox` returns null for a task,
+      // whose name is inside its own box, so this only extends where it should.
+      const ext = kids.map(c => {
+        const b = { l: c.x, t: c.y, r: c.x + c.width, b: c.y + c.height };
+        const lb = externalLabelBox(c);
+        if (lb) {
+          b.l = Math.min(b.l, lb.x); b.t = Math.min(b.t, lb.y);
+          b.r = Math.max(b.r, lb.x + lb.w); b.b = Math.max(b.b, lb.y + lb.h);
+        }
+        return b;
+      });
+      const minX = Math.min(...ext.map(b => b.l));
+      const minY = Math.min(...ext.map(b => b.t));
+      const maxX = Math.max(...ext.map(b => b.r));
+      const maxY = Math.max(...ext.map(b => b.b));
       const nx = minX - SIDE_PAD, ny = minY - TOP_PAD;
       const nw = (maxX + SIDE_PAD) - nx, nh = (maxY + SIDE_PAD) - ny;
       if (Math.abs(nx - ep.x) <= 0.5 && Math.abs(ny - ep.y) <= 0.5
@@ -3560,9 +3580,37 @@ export function layoutBpmnDiagram(
           const n = list.length;
           if (idx < 0 || n <= 1) srcSide = "right";
           else if (n === 2) {
-            srcSide = tgtCy < src.y - 10 ? "top"
-              : tgtCy > src.y + src.height + 10 ? "bottom"
-              : "right";
+            // R6.26 (n = 2): the two branches take TOP and BOTTOM — never the
+            // same vertex, and not "right", because Paul's order is top, then
+            // bottom, and only then the middle-right point (2026-08-31).
+            //
+            // This used to send a branch level with the gateway out to the
+            // right, on the reasoning that top/bottom would jog the route into
+            // a target sitting on the same row. Both branches were level here,
+            // so both answered the same way and the two flows left the diamond
+            // from one point, stacked on each other. R8.26 removes the original
+            // hazard from the other end: a branch's subprocess is now placed on
+            // the side its branch leaves from, so there is no body in the way.
+            //
+            // A target that CLEARS the diamond keeps its natural direction;
+            // otherwise the branches take top and bottom in the order the plan
+            // lists them, which is the order a reader meets them.
+            // Order comes from the PLAN, not from target Y: at this point the
+            // targets are still provisionally placed, and a tall subprocess has
+            // a lower centre than the gateway merely because it is tall — which
+            // is how both branches came to read as "below" and answer the same.
+            // The exception is a pair that genuinely straddles the gateway, one
+            // clearly above and one clearly below, where the geometry is real
+            // and should win.
+            const other = list[1 - idx];
+            const otherTgt = other ? elMap.get(other.targetId) : undefined;
+            const otherCy = otherTgt ? otherTgt.y + otherTgt.height / 2 : tgtCy;
+            const above = (y: number) => y < src.y - 10;
+            const below = (y: number) => y > src.y + src.height + 10;
+            const straddles = (above(tgtCy) && below(otherCy)) || (below(tgtCy) && above(otherCy));
+            srcSide = straddles
+              ? (above(tgtCy) ? "top" : "bottom")
+              : ((branchPlanIndex.get(c) ?? idx) === 0 ? "top" : "bottom");
           }
           // R6.27 (n ≥ 3): branches are sorted by target Y; assign vertices
           // round-robin in groups of three — top / right / bottom, then repeat
@@ -4189,6 +4237,47 @@ export function layoutBpmnDiagram(
   // real child now (and re-snap its boundary events onto the corrected rim).
   wrapEpsToChildren();
 
+  const LANE_EDGE_PAD = 8;
+
+  /** The lane band an element belongs to — by container chain, else by the
+   *  band its centre sits in (a boundary event has no parentId of its own). */
+  const laneBandFor = (el: DiagramElement): DiagramElement | undefined => {
+    let p: string | undefined = el.boundaryHostId ?? el.parentId;
+    for (let guard = 0; p && guard < 20; guard++) {
+      const c = elMap.get(p);
+      if (!c) break;
+      if (c.type === "lane" || c.type === "sublane") return c;
+      p = c.parentId;
+    }
+    const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+    return elements.find(l => (l.type === "lane" || l.type === "sublane")
+      && cx >= l.x && cx <= l.x + l.width && cy >= l.y && cy <= l.y + l.height);
+  };
+
+  /** Grow a lane band (with its pool, and the bands stacked after it) so the
+   *  span [top, bottom] fits. Growing upward leaves the band's own children
+   *  where they are — the band expands around them, as fitLanesToChildren does. */
+  const growLaneBandToContain = (band: DiagramElement, top: number, bottom: number) => {
+    const dTop = Math.max(0, band.y - top);
+    const dBot = Math.max(0, bottom - (band.y + band.height));
+    if (dTop === 0 && dBot === 0) return;
+    const oldY = band.y;
+    band.y -= dTop;
+    band.height += dTop + dBot;
+    const pool = band.parentId ? elMap.get(band.parentId) : undefined;
+    if (pool) {
+      for (const s of elements) {
+        if (s.type !== band.type || s.parentId !== pool.id || s.id === band.id) continue;
+        if (s.y <= oldY) continue;                       // only the bands BELOW move
+        s.y += dTop + dBot;
+        shiftSubtree(s.id, dTop + dBot);
+      }
+      pool.y -= dTop;
+      pool.height += dTop + dBot;
+      restackPoolsR52();                                 // R8.03: pools may now overlap
+    }
+  };
+
   // ── R8.16: nudge event labels clear of other elements + other event labels ──
   // Event labels (especially edge-mounted/boundary events) default to a fixed
   // offset; when that lands the label on top of a neighbouring element or another
@@ -4434,6 +4523,51 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── Decide each decision gateway's branch VERTICES, once ──
+  // Two things depend on this answer: where the branch's target sits (R8.26,
+  // just below) and which point the connector leaves the diamond from (R6.26,
+  // after the connectors are built). Deciding it in one place means they cannot
+  // disagree — and the ORDER matters, because the target's position now follows
+  // the branch, so a rule that read the target's position would be circular.
+  //
+  // Paul's preference (2026-08-31): top, then bottom, then the middle-right
+  // vertex; only a FOURTH branch may double up, on the vertex nearest its target.
+  const branchVertex = new Map<string, "top" | "bottom" | "right">();
+  for (const c of connectors) {
+    const src = elMap.get(c.sourceId);
+    if (c.type !== "sequence" || !src || !isDecisionGateway(src)) continue;
+    if (c.sourceSide === "top" || c.sourceSide === "bottom" || c.sourceSide === "right") {
+      branchVertex.set(`${c.sourceId}->${c.targetId}`, c.sourceSide);
+    }
+  }
+
+  // ── R8.26: a branch's Expanded Subprocess sits UPPER- or LOWER-right of its
+  // gateway, never level with it ──
+  // The column engine puts an EP in the next column at the row's height, so a
+  // gateway's loop-back subprocess sat directly beside it and the branch had to
+  // squeeze past the box it was heading for. Displacing the EP to the side the
+  // branch leaves from lets the connector run out, across and in — and makes the
+  // two branches visibly different shapes (Paul 2026-08-31).
+  //
+  // The EP clears the gateway's CENTRE LINE rather than the whole diamond: full
+  // separation would throw a 131px box a long way off the row and stretch the
+  // lane around it for no extra clarity.
+  {
+    for (const [key, side] of branchVertex) {
+      if (side === "right") continue;
+      const sep = key.indexOf("->");
+      const gw = elMap.get(key.slice(0, sep));
+      const ep = elMap.get(key.slice(sep + 2));
+      if (!gw || !ep || ep.type !== "subprocess-expanded") continue;
+      const gcy = gw.y + gw.height / 2;
+      const wantY = side === "top" ? gcy - ep.height : gcy;
+      const dy = wantY - ep.y;
+      if (Math.abs(dy) < 1) continue;
+      shiftSubtree(ep.id, dy);      // children and boundary events travel with it
+      ep.y += dy;                   // shiftSubtree does not move the root
+    }
+  }
+
   fitLanesToChildren(true);   // FINAL pass: hug each lane to its content (±½ Task-height)
   // The final lane hug shrinks a white-box pool, which would otherwise leave an
   // over-wide vertical gap to the black-box pool below it. Re-stack all pools to
@@ -4450,12 +4584,21 @@ export function layoutBpmnDiagram(
   // clears them without touching flow elements or lane heights. Clamp to the
   // lane's right edge so nothing is pushed out of its pool.
   {
-    const LABEL_PAD = 34;   // typical half-label overhang beyond the box each side
-    const LABEL_BELOW = 16; // label height below the box
     const arts = elements
       .filter(e => (e.type === "data-object" || e.type === "data-store"))
       .sort((a, b) => a.y - b.y || a.x - b.x);
-    const foot = (e: DiagramElement) => ({ l: e.x - LABEL_PAD, r: e.x + e.width + LABEL_PAD, t: e.y, b: e.y + e.height + LABEL_BELOW });
+    // Measured, not guessed — the same box SymbolRenderer draws. The fixed
+    // 34px-each-side / 16px-below estimate this replaces was wrong in both
+    // directions: too wide for a short name, far too shallow for a wrapped one.
+    const foot = (e: DiagramElement) => {
+      const base = { l: e.x, r: e.x + e.width, t: e.y, b: e.y + e.height };
+      const lb = externalLabelBox(e);
+      if (!lb) return base;
+      return {
+        l: Math.min(base.l, lb.x), r: Math.max(base.r, lb.x + lb.w),
+        t: base.t, b: Math.max(base.b, lb.y + lb.h),
+      };
+    };
     for (let i = 0; i < arts.length; i++) {
       for (let j = i + 1; j < arts.length; j++) {
         const a = arts[i], b = arts[j];
@@ -4469,7 +4612,10 @@ export function layoutBpmnDiagram(
         const right = b.x >= a.x ? b : a;
         const left = right === b ? a : b;
         const lane = right.parentId ? elMap.get(right.parentId) : undefined;
-        const laneRight = lane ? lane.x + lane.width - LABEL_PAD : Infinity;
+        // Keep the artifact's own label inside the lane, not just its box.
+        const rightLb = externalLabelBox(right);
+        const overhang = rightLb ? Math.max(0, rightLb.x + rightLb.w - (right.x + right.width)) : 0;
+        const laneRight = lane ? lane.x + lane.width - overhang : Infinity;
         const room = laneRight - (right.x + right.width);
         const push = Math.min(xOv, Math.max(0, room));
         right.x += push;
@@ -4524,11 +4670,25 @@ export function layoutBpmnDiagram(
   {
     const isArt2 = (t: string) => t === "data-object" || t === "data-store";
     const FLOW = new Set(["task", "subprocess", "subprocess-expanded", "start-event", "end-event", "intermediate-event", "gateway"]);
-    const LINE_H = 14, PAD = 8, SIDE = 34;
-    const labelH = (e: DiagramElement) => Math.max(1, (e.label ?? "").split("\n").length) * LINE_H + 6;
-    const foot = (e: DiagramElement) => isArt2(e.type)
-      ? { l: e.x - SIDE, r: e.x + e.width + SIDE, t: e.y, b: e.y + e.height + labelH(e) }
-      : { l: e.x, r: e.x + e.width, t: e.y, b: e.y + e.height };
+    const PAD = 8;
+    // The footprint is the shape UNION its rendered label box.
+    //
+    // This used to approximate the label as `split("\n").length` lines — which
+    // counts hard newlines, of which a generated name has none. So "Transformation
+    // Logic and Model Definition" measured as ONE line, 20px, when it renders as
+    // FOUR, 56px, and this pass cleared an overlap it could not see. That is why
+    // three labels sat across the tasks beneath them in V25.05 (Paul 2026-08-31).
+    // `externalLabelBox` wraps the text exactly as SymbolRenderer does.
+    const foot = (e: DiagramElement) => {
+      const base = { l: e.x, r: e.x + e.width, t: e.y, b: e.y + e.height };
+      if (!isArt2(e.type)) return base;
+      const lb = externalLabelBox(e);
+      if (!lb) return base;
+      return {
+        l: Math.min(base.l, lb.x), r: Math.max(base.r, lb.x + lb.w),
+        t: base.t, b: Math.max(base.b, lb.y + lb.h),
+      };
+    };
     const ov = (a: { l: number; r: number; t: number; b: number }, b: { l: number; r: number; t: number; b: number }) =>
       a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
     const poolOf2 = (e: DiagramElement): DiagramElement | undefined => { let cur: DiagramElement | undefined = e; let g = 0; while (cur && g++ < 12) { if (cur.type === "pool") return cur; cur = cur.parentId ? elMap.get(cur.parentId) : undefined; } return undefined; };
@@ -4563,6 +4723,52 @@ export function layoutBpmnDiagram(
     const seqConns = [...aiConnections, ...autoConns].filter(c => c.type !== "message");
     const hasOutgoing = (id: string) => seqConns.some(c => c.sourceId === id);
     const G = Math.round(0.6 * getSymbolDefinition("task").defaultHeight);
+    const BOUNDARY_EXIT_CLEARANCE = 0.75 * getSymbolDefinition("end-event").defaultHeight;
+    // Room to leave between the exit target and the lane edge. Not merely
+    // "inside the lane": a loop-back branch routes UNDER this target, and it
+    // needs a channel of its own plus the same ¾-event-height margin from the
+    // lane edge that R6.30 asks of every horizontal run. Eight pixels left the
+    // two fighting over the same band and the branch finished on the lane edge.
+    const LANE_EDGE_PAD = Math.round(BOUNDARY_EXIT_CLEARANCE) + 13;
+
+    /** The lane band an element belongs to — by container chain, else by the
+     *  band its centre sits in (a boundary event has no parentId of its own). */
+    const laneBandFor = (el: DiagramElement): DiagramElement | undefined => {
+      let p: string | undefined = el.boundaryHostId ?? el.parentId;
+      for (let guard = 0; p && guard < 20; guard++) {
+        const c = elMap.get(p);
+        if (!c) break;
+        if (c.type === "lane" || c.type === "sublane") return c;
+        p = c.parentId;
+      }
+      const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+      return elements.find(l => (l.type === "lane" || l.type === "sublane")
+        && cx >= l.x && cx <= l.x + l.width && cy >= l.y && cy <= l.y + l.height);
+    };
+
+    /** Grow a lane band (with its pool, and the bands stacked after it) so the
+     *  span [top, bottom] fits. Growing upward leaves the band's own children
+     *  where they are — the band expands around them, as fitLanesToChildren does. */
+    const growLaneBandToContain = (band: DiagramElement, top: number, bottom: number) => {
+      const dTop = Math.max(0, band.y - top);
+      const dBot = Math.max(0, bottom - (band.y + band.height));
+      if (dTop === 0 && dBot === 0) return;
+      const oldY = band.y;
+      band.y -= dTop;
+      band.height += dTop + dBot;
+      const pool = band.parentId ? elMap.get(band.parentId) : undefined;
+      if (pool) {
+        for (const s of elements) {
+          if (s.type !== band.type || s.parentId !== pool.id || s.id === band.id) continue;
+          if (s.y <= oldY) continue;                       // only the bands BELOW move
+          s.y += dTop + dBot;
+          shiftSubtree(s.id, dTop + dBot);
+        }
+        pool.y -= dTop;
+        pool.height += dTop + dBot;
+        restackPoolsR52();                                 // R8.03: pools may now overlap
+      }
+    };
     for (const ev of elements) {
       if (!ev.boundaryHostId || ev.type !== "intermediate-event") continue;
       const c = seqConns.find(x => x.sourceId === ev.id);
@@ -4576,11 +4782,60 @@ export function layoutBpmnDiagram(
       if (inside) continue;                              // must be an EP exit
       const side = pickBoundaryEventSide(ev, tgt, elements);
       const cy = ev.y + ev.height / 2 - tgt.height / 2;
-      const cx = ev.x + ev.width / 2 - tgt.width / 2;
       if (side === "right")       { tgt.x = ev.x + ev.width + G; tgt.y = cy; }
       else if (side === "left")   { tgt.x = ev.x - G - tgt.width; tgt.y = cy; }
-      else if (side === "bottom") { tgt.y = ev.y + ev.height + G; tgt.x = cx; }
-      else if (side === "top")    { tgt.y = ev.y - G - tgt.height; tgt.x = cx; }
+      else {
+        // R7.07 — a TOP- or BOTTOM-mounted EMIE puts its target out to the
+        // RIGHT as well as clear of the mounted edge, so the exit reads as a
+        // short "L" (out of the rim, then across) instead of a bare vertical
+        // spike dropped straight below the host (Paul 2026-08-31).
+        //
+        // Straight-down was also how the target ended up OUTSIDE the lane: it
+        // was pushed a full task-gap below an EP that already sat near the
+        // lane floor, and `fitLanesToChildren` cannot rescue it because
+        // NON_LANE_BOUND deliberately excludes events from lane fitting — a
+        // gateway riding a cross-lane midpoint depends on that exclusion. So
+        // the containment has to be enforced HERE, at the one placement that
+        // moves an event outside its band.
+        const clear = BOUNDARY_EXIT_CLEARANCE;            // ¾ of an event height
+        tgt.x = ev.x + ev.width + G;
+        const wantCy = side === "bottom" ? ev.y + ev.height + clear : ev.y - clear;
+        tgt.y = wantCy - tgt.height / 2;
+
+        // Keep it fully inside the EMIE's own lane. Clamping is enough while
+        // the band has room; when it hasn't, the lane grows rather than the
+        // target being shoved back over the host it just exited.
+        const band = laneBandFor(ev);
+        if (band) {
+          const lo = band.y + LANE_EDGE_PAD;
+          const hi = band.y + band.height - LANE_EDGE_PAD - tgt.height;
+          if (hi >= lo) tgt.y = Math.min(Math.max(tgt.y, lo), hi);
+          const minGap = 8;                                // still recognisably an L
+          const overshootsDown = side === "bottom" && tgt.y < ev.y + ev.height + minGap;
+          const overshootsUp   = side === "top"    && tgt.y + tgt.height > ev.y - minGap;
+          if (hi < lo || overshootsDown || overshootsUp) {
+            tgt.y = wantCy - tgt.height / 2;
+            growLaneBandToContain(band, tgt.y - LANE_EDGE_PAD, tgt.y + tgt.height + LANE_EDGE_PAD);
+          }
+        }
+
+        // R7.07(b) — and its label sits to the RIGHT of it. The general
+        // event-label pass (B33) prefers below/above and runs BEFORE this
+        // block, so it decided against a position this element no longer
+        // has; for an exit target "above" is the worst of the options, since
+        // that is where the host EP it just escaped from is. Set it here,
+        // after the move, where the geometry is final.
+        const lw = (tgt.properties?.labelWidth as number | undefined) ?? 80;
+        if ((tgt.label ?? "").trim()) {
+          const lh = Math.max(1, wrapText(tgt.label ?? "", lw).length) * 14;
+          tgt.properties = {
+            ...tgt.properties,
+            labelOffsetX: tgt.width / 2 + lw / 2 + 6,
+            labelOffsetY: -(tgt.height / 2 + lh / 2),
+            labelWidth: lw,
+          };
+        }
+      }
     }
   }
 
@@ -4759,7 +5014,9 @@ export function layoutBpmnDiagram(
       return undefined;
     };
     const LINE_H = 14, W = 80, HALF = LINE_H / 2;
-    const track: { bbpId: string; cx: number }[] = [];
+    // Track each placed label's RENDERED width, not the nominal column: two
+    // labels only need staggering when their real boxes would meet.
+    const track: { bbpId: string; cx: number; w: number }[] = [];
     for (const conn of computedConnectors) {
       if (conn.type !== "messageBPMN") continue;
       const wps = conn.waypoints;
@@ -4784,7 +5041,13 @@ export function layoutBpmnDiagram(
       if (bbpId) {
         const gapDir = otherEdgeY >= bbpEdgeY ? 1 : -1;
         const baseCentreY = bbpEdgeY + (POOL_GAP / 2) * gapDir;
-        const xClose = track.filter(l => l.bbpId === bbpId && Math.abs(l.cx - anchorX) < W).length;
+        // Overlap is decided on the two labels' REAL half-widths. Comparing the
+        // centre gap against a fixed 80 said these two were 132px apart and
+        // therefore safe; they are 228px and 210px wide and were drawn one on
+        // top of the other.
+        const myW = connectorLabelWidth(conn.label ?? "");
+        const xClose = track.filter(l =>
+          l.bbpId === bbpId && Math.abs(l.cx - anchorX) < (l.w + myW) / 2).length;
         const dir = xClose % 2 === 0 ? -1 : 1;
         const mag = (Math.floor(xClose / 2) + 1) * HALF;
         const edgeNear = bbpEdgeY + HALF * gapDir;
@@ -4794,7 +5057,7 @@ export function layoutBpmnDiagram(
         conn.labelOffsetX = 0;
         conn.labelOffsetY = cy - anchorY - 7;
         conn.labelWidth = W;
-        track.push({ bbpId, cx: anchorX });
+        track.push({ bbpId, cx: anchorX, w: myW });
       } else {
         const gapCentreY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
         conn.labelOffsetX = 20;

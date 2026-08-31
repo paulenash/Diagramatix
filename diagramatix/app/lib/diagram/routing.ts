@@ -640,7 +640,14 @@ function buildOrthogonalPath(
   // than needed.
   const SMALL_MARGIN = 10;
   const BIG_MARGIN = 33; // ½ × default Task height (65 px)
-  const POOL_INSET = 4;  // detour line must stay at least this far inside the pool wall
+  // Detour line must stay at least this far inside the pool wall. It was 4px —
+  // enough to prove the line was technically inside the pool, and far too little
+  // to look it: a branch looping back under the row finished 4px off the lane
+  // edge and read as sitting ON it. Paul (2026-08-31) asked for a comfortable
+  // margin of about ¾ of an event height, the same tolerance kept from elements.
+  // Raising it makes the wide detour count as crowding the wall sooner, so it
+  // falls back to the small margin and leaves the gap visible.
+  const POOL_INSET = 27; // ¾ × default event height (36)
   const xMin = Math.min(start.x, end.x);
   const xMax = Math.max(start.x, end.x);
   const yMin = Math.min(start.y, end.y);
