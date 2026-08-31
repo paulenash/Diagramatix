@@ -5170,13 +5170,23 @@ export function layoutBpmnDiagram(
       // Step upward to the first position that clears everything. Upward only:
       // an artifact belongs above the row it serves, and dropping it into the
       // flow to escape a line would be the worse answer.
-      let found: number | null = null;
-      for (let dy = STEP; dy <= MAX_LIFT; dy += STEP) if (clearAt(dy)) { found = dy + GAP; break; }
-      if (found === null) continue;                     // nowhere better; leave it
+      //
+      // The lift is capped by the room ALREADY in the band. It must never grow
+      // the lane: growing a band moves the pool and restacks the lanes, so every
+      // element in them shifts — and the connectors were routed before this pass
+      // and are not recomputed. Doing that detached 18 of 38 connectors in
+      // V23.04, which is a far worse fault than the label overlap it was
+      // trying to relieve. If the room is not there, the artifact stays where it
+      // is and the scanner reports the overlap.
       const band = laneBandFor(art);
-      if (band && art.y - found < band.y + LANE_EDGE_PAD) {
-        growLaneBandToContain(band, art.y - found - LANE_EDGE_PAD, art.y + art.height);
+      const room = band ? art.y - (band.y + LANE_EDGE_PAD) : Number.POSITIVE_INFINITY;
+      if (room <= 0) continue;
+      let found: number | null = null;
+      for (let dy = STEP; dy <= MAX_LIFT; dy += STEP) {
+        if (dy + GAP > room) break;                     // no more room above
+        if (clearAt(dy)) { found = dy + GAP; break; }
       }
+      if (found === null) continue;                     // nowhere better; leave it
       art.y -= found;
       moved.push(art);
     }

@@ -416,3 +416,36 @@ describe("V25.05 — a data artifact is REPEATED beside a remote consumer (R8.31
     expect(conns.length).toBe(conns.length);
   });
 });
+
+describe("V23.04 — every connector stays attached to the elements it joins", () => {
+  it("T3078 — no connector endpoint is left behind by a later element move", () => {
+    // The invariant that would have caught the V23.04 regression outright.
+    // R8.30's lift grew the LANE to make room, which moves the pool and restacks
+    // the lanes — so every element shifted while the connectors, routed earlier,
+    // stayed where they were. 18 of 38 came adrift. Nothing may move an element
+    // after routing without re-routing what touches it.
+    const by = new Map(out.elements.map((e) => [e.id, e] as const));
+    const near = (p: any, e: any) =>
+      p.x >= e.x - 3 && p.x <= e.x + e.width + 3 && p.y >= e.y - 3 && p.y <= e.y + e.height + 3;
+    for (const c of out.connectors as any[]) {
+      const s = by.get(c.sourceId), t = by.get(c.targetId);
+      const w = c.waypoints ?? [];
+      if (!s || !t || w.length < 2) continue;
+      expect(near(w[0], s),
+        `"${L(s)}" -> "${L(t)}" starts at ${w[0].x.toFixed(0)},${w[0].y.toFixed(0)} but its source is at ${s.x.toFixed(0)},${s.y.toFixed(0)}`).toBe(true);
+      expect(near(w[w.length - 1], t),
+        `"${L(s)}" -> "${L(t)}" ends at ${w[w.length - 1].x.toFixed(0)},${w[w.length - 1].y.toFixed(0)} but its target is at ${t.x.toFixed(0)},${t.y.toFixed(0)}`).toBe(true);
+    }
+  });
+
+  it("T3079 — an artifact is never lifted out of its lane, and never grows one", () => {
+    // The lift is capped by the room already in the band. Growing it after
+    // routing is what detached the connectors.
+    const lane = laneOf();
+    for (const d of out.elements) {
+      if (d.type !== "data-object" && d.type !== "data-store") continue;
+      if (d.parentId !== lane.id) continue;
+      expect(d.y, `"${L(d)}" was lifted above its lane`).toBeGreaterThanOrEqual(lane.y);
+    }
+  });
+});
