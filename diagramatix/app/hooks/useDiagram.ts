@@ -21,7 +21,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, fuseCollinearWaypoints } from "@/app/lib/diagram/routing";
+import { gatewayVertex, nudgeGatewayEndpoint, computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair, selfLoopWaypoints, measureSelfLoopBulge, SELF_LOOP_BULGE, fuseCollinearWaypoints } from "@/app/lib/diagram/routing";
 import { isUmlConnType } from "@/app/lib/diagram/types";
 import { autoResizeUmlElement, sizeUmlNote } from "@/app/lib/diagram/umlAutoSize";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
@@ -6787,6 +6787,20 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         if (target.type === "intermediate-event" && !target.boundaryHostId) targetOffsetAlong = 0.5;
       }
 
+      // R6.30: a gateway endpoint attaches to a VERTEX, never part-way along a
+      // diagonal edge. Applied here rather than at the call sites so it holds
+      // for a hand-drawn connector AND for every auto-connect path.
+      if (sourceId !== targetId) {
+        if (source.type === "gateway") {
+          const v = gatewayVertex(sourceSide, sourceOffsetAlong ?? 0.5);
+          sourceSide = v.side; sourceOffsetAlong = v.offset;
+        }
+        if (target.type === "gateway") {
+          const v = gatewayVertex(targetSide, targetOffsetAlong ?? 0.5);
+          targetSide = v.side; targetOffsetAlong = v.offset;
+        }
+      }
+
       // ── UML self-connector (source === target) ────────────────────────────
       // A relationship from an entity to itself renders as a squared-off
       // 3-segment loop off one side, with room for a role + multiplicity at
@@ -7326,6 +7340,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             && movedEl?.type === "intermediate-event" && !movedEl.boundaryHostId) {
           off = 0.5;
         }
+        // R6.30: dragging an endpoint onto a gateway lands it on a vertex.
+        if (movedEl?.type === "gateway" && conn.sourceId !== conn.targetId) {
+          const v = gatewayVertex(side, off);
+          side = v.side; off = v.offset;
+        }
         const updated = endpoint === "source"
           ? { ...conn, sourceId: newElementId, sourceSide: side, sourceOffsetAlong: off,
               sourceRoleOffset: undefined, sourceMultOffset: undefined,
@@ -7428,62 +7447,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const { connectorId, endpoint, dx, dy } = action.payload;
       const connectors = state.connectors.map((conn) => {
         if (conn.id !== connectorId) return conn;
-        // Returns the new (side, offset) for the endpoint. For gateways,
-        // when the nudge brings the offset into a vertex zone (≤0.05
-        // from 0, 0.5, or 1) the endpoint is normalised to the
-        // canonical cardinal side at offset 0.5 — this re-routes the
-        // connector to enter / exit the rhombus along the cardinal
-        // axis (straight in/out), instead of the diagonal-edge normal
-        // that would otherwise apply.
+        // Returns the new (side, offset) for the endpoint.
         function nudgeOffset(side: Side, offset: number, elId: string): { side: Side; offset: number } {
           const clamp = (v: number) => Math.max(0.02, Math.min(0.98, v));
           const el = state.elements.find(e => e.id === elId);
-          if (el?.type === "gateway") {
-            // Map (dx, dy) → offset delta so the visible endpoint moves
-            // in the same direction as the arrow key. Per side, increasing
-            // offset (0→1) traverses the two diamond edges:
-            //   top:    left vertex → top → right vertex (offset rises with +dx)
-            //   right:  top vertex → right → bottom vertex (offset rises with +dy)
-            //   bottom: right vertex → bottom → left vertex (offset rises with -dx)
-            //   left:   bottom vertex → left → top vertex (offset rises with -dy)
-            let delta = 0;
-            switch (side) {
-              case "top":    delta = dx; break;
-              case "right":  delta = dy; break;
-              case "bottom": delta = -dx; break;
-              case "left":   delta = -dy; break;
-            }
-            const newOffset = clamp(offset + delta * 0.02);
-            // Vertex normalisation. Each (side, end-offset) pair maps to
-            // one of the four cardinal vertices, expressed canonically as
-            // (cardinalSide, 0.5) so future re-routes use the cardinal
-            // axis-aligned normal from gatewayEdgeNormal.
-            //   side="top":    offset≈0 → LEFT vertex,  ≈0.5 → TOP,    ≈1 → RIGHT
-            //   side="right":  offset≈0 → TOP vertex,   ≈0.5 → RIGHT,  ≈1 → BOTTOM
-            //   side="bottom": offset≈0 → RIGHT vertex, ≈0.5 → BOTTOM, ≈1 → LEFT
-            //   side="left":   offset≈0 → BOTTOM vertex,≈0.5 → LEFT,   ≈1 → TOP
-            const TOL = 0.05;
-            // Were we already sitting ON this side's cardinal vertex? If so, a
-            // small nudge that lands back within TOL of 0.5 must NOT re-snap — that
-            // was the "springs back to the top" bug: you could never leave a
-            // cardinal point. Only snap to THIS vertex when ARRIVING at it.
-            const wasAtVertex = Math.abs(offset - 0.5) <= TOL;
-            let vertex: Side | null = null;
-            if (Math.abs(newOffset - 0.5) <= TOL) {
-              if (!wasAtVertex) vertex = side; // arriving at this side's cardinal vertex
-            } else if (newOffset <= TOL) {
-              vertex = side === "top" ? "left"
-                     : side === "right" ? "top"
-                     : side === "bottom" ? "right"
-                     : "bottom"; // side === "left"
-            } else if (newOffset >= 1 - TOL) {
-              vertex = side === "top" ? "right"
-                     : side === "right" ? "bottom"
-                     : side === "bottom" ? "left"
-                     : "top"; // side === "left"
-            }
-            return vertex ? { side: vertex, offset: 0.5 } : { side, offset: newOffset };
-          }
+          // R6.30: offset does not mean the same thing on every side of a
+          // diamond, so the pixel delta is projected onto the side own
+          // direction. Shared with the tests that pin the arrow directions.
+          if (el?.type === "gateway") return nudgeGatewayEndpoint(side, offset, dx, dy);
           // A3: an inline (non-boundary) intermediate event keeps its endpoints on
           // the cardinal midpoint — nudging never slides them off-centre.
           if (el?.type === "intermediate-event" && !el.boundaryHostId) {

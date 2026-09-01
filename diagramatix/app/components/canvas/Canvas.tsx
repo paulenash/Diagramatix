@@ -429,8 +429,11 @@ function pointToBoundaryOffset(p: Point, el: DiagramElement): { side: Side; offs
     }
     return { side: p.x < cx ? "left" : "right", offsetAlong: clamp((p.y - el.y) / el.height) };
   }
-  // Gateways: snap to nearest diamond vertex if within 3px.
-  // Each vertex is at offset 0.5 of its corresponding side.
+  // R6.30: a gateway endpoint lands on the NEAREST diamond vertex, always.
+  // Each vertex is offset 0.5 of its own side; every other offset is a point
+  // part-way along a slope. This used to require the drop to fall within 3px
+  // of a vertex on a 50px diamond, which a mouse never manages — so in practice
+  // every hand-drawn connector attached just off the point.
   if (el.type === "gateway") {
     const cx = el.x + el.width / 2;
     const cy = el.y + el.height / 2;
@@ -445,7 +448,7 @@ function pointToBoundaryOffset(p: Point, el: DiagramElement): { side: Side; offs
       const d = Math.hypot(p.x - v.x, p.y - v.y);
       if (d < bestDist) { bestDist = d; best = v; }
     }
-    if (bestDist <= 3) return { side: best.side, offsetAlong: 0.5 };
+    return { side: best.side, offsetAlong: 0.5 };
   }
   const distTop    = Math.abs(p.y - el.y);
   const distBottom = Math.abs(p.y - (el.y + el.height));

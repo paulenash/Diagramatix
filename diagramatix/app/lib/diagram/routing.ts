@@ -1058,6 +1058,59 @@ export function getConnectionPointBySide(el: DiagramElement, _side: Side): Point
 //   right:  top-vertex → right-vertex → bottom-vertex
 //   bottom: right-vertex → bottom-vertex → left-vertex
 //   left:   bottom-vertex → left-vertex → top-vertex
+/**
+ * R6.30 — a connector endpoint on a gateway sits ON a vertex, not part-way
+ * along a diagonal edge.
+ *
+ * Each side of a diamond spans TWO edges meeting at its cardinal vertex, so an
+ * offset of exactly 0.5 IS that vertex and every other value is a point on a
+ * slope. A mouse cannot realistically land on 0.5, so a hand-drawn connector
+ * attached a few pixels off the point every time — Paul, 2026-09-01: "the
+ * connection originates or terminates on a point near the vertex not actually
+ * on the vertex".
+ *
+ * Works from (side, offset) alone — the same triple mapping the arrow-key nudge
+ * uses — so it normalises an endpoint whatever its origin: drawn by hand,
+ * re-dragged, or auto-connected. Nudging is unaffected: it has its own action,
+ * which is how a user still separates two endpoints that share a vertex.
+ */
+export function gatewayVertex(side: Side, offset: number): { side: Side; offset: number } {
+  const start: Record<Side, Side> = { top: "left", right: "top", bottom: "right", left: "bottom" };
+  const end:   Record<Side, Side> = { top: "right", right: "bottom", bottom: "left", left: "top" };
+  if (offset < 0.25) return { side: start[side], offset: 0.5 };
+  if (offset > 0.75) return { side: end[side], offset: 0.5 };
+  return { side, offset: 0.5 };
+}
+
+/**
+ * Move a gateway endpoint by an arrow key, in the direction the arrow points.
+ *
+ * Offset does not mean the same thing on every side: it runs left-to-right
+ * across the top, top-to-bottom down the right, and BACKWARDS along the other
+ * two, because each side is traversed from its start vertex to its end vertex.
+ * So the pixel delta has to be projected onto the side own direction or the
+ * endpoint travels away from the key that was pressed.
+ *
+ * Returns the vertex when the move arrives at one, so a nudge can walk an
+ * endpoint from vertex to vertex; a nudge that merely stays NEAR the vertex it
+ * started on does not re-snap, or an endpoint could never leave a vertex.
+ */
+export function nudgeGatewayEndpoint(
+  side: Side, offset: number, dx: number, dy: number,
+): { side: Side; offset: number } {
+  //   top:    left vertex -> top -> right vertex   (offset rises with +dx)
+  //   right:  top vertex  -> right -> bottom       (offset rises with +dy)
+  //   bottom: right vertex -> bottom -> left       (offset rises with -dx)
+  //   left:   bottom vertex -> left -> top         (offset rises with -dy)
+  const delta = side === "top" ? dx : side === "right" ? dy : side === "bottom" ? -dx : -dy;
+  const next = Math.max(0.02, Math.min(0.98, offset + delta * 0.02));
+  const TOL = 0.05;
+  const wasAtVertex = Math.abs(offset - 0.5) <= TOL;
+  if (Math.abs(next - 0.5) <= TOL) return wasAtVertex ? { side, offset: next } : { side, offset: 0.5 };
+  if (next <= TOL || next >= 1 - TOL) return gatewayVertex(side, next);
+  return { side, offset: next };
+}
+
 export function sidePoint(el: DiagramElement, side: Side, offset = 0.5): Point {
   if (el.type === "gateway") {
     const cx = el.x + el.width / 2;
