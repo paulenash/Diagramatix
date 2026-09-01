@@ -3185,6 +3185,44 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R8.32: a decision and its merge sit in the MIDDLE OF THEIR PATHS ──
+  //
+  // Paul's rule (2026-09-01): "halfway between the top boundary of the highest
+  // path's initial element and the bottom boundary of the lowest path's initial
+  // element". Note it is measured on the BOUNDARIES, not the centres — with
+  // branches of different heights those are not the same point, and the boundary
+  // reading is the one that looks centred between the paths.
+  //
+  // R8.01 already computed a midpoint, but it ran BEFORE the paths were given
+  // their rows, so its answer described a diagram that no longer exists: in
+  // "Gateway Lanes generation Test 1" every gateway sat at 423 while its paths
+  // spread from 291 to 955, up to 200px adrift. R8.24 then faithfully aligned
+  // each merge to its decision's stale row. Re-deriving it here, from FINAL
+  // positions, is what makes both correct — R8.24 still does the merges.
+  //
+  // Unconditional, unlike R8.01, which only fired for a cross-lane spread. Paths
+  // now always take rows of their own, so there is always a spread to centre on.
+  {
+    for (const dec of elements) {
+      if (!isDecisionGateway(dec)) continue;
+      const targets = (outgoing.get(dec.id) ?? [])
+        .filter(c => c.type !== "message")
+        .map(c => elMap.get(c.targetId))
+        .filter((e): e is DiagramElement => !!e);
+      if (targets.length < 2) continue;
+      const top = Math.min(...targets.map(t => t.y));
+      const bottom = Math.max(...targets.map(t => t.y + t.height));
+      const centre = (top + bottom) / 2;
+      const wantY = centre - dec.height / 2;
+      if (Math.abs(dec.y - wantY) > 0.5) dec.y = wantY;
+      // The merge takes the same line. R8.24 re-asserts this later, but doing it
+      // here keeps the pair consistent for every pass in between.
+      const mergeId = findPairedMerge(dec.id);
+      const merge = mergeId ? elMap.get(mergeId) : undefined;
+      if (merge) merge.y = centre - merge.height / 2;
+    }
+  }
+
   // Final lane fit — make every lane visually contain its (now-finalised)
   // children. Cross-lane decision gateways (R8.01) and predecessor-aligned
   // decisions (R3.09) can otherwise leave their assigned lane's vertical

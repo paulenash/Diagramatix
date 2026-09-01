@@ -128,3 +128,28 @@ describe("V23.01 — message flows do not share a vertical line (R05.10)", () =>
     }
   });
 });
+
+describe("V23.01 — a decision and its merge sit in the middle of their paths (R8.32)", () => {
+  it("T3108 — the gateway centres on the path BOUNDARIES, not their centres", () => {
+    // Paul's rule (2026-09-01): halfway between the top boundary of the highest
+    // path's initial element and the bottom boundary of the lowest path's. With
+    // branches of differing heights that is NOT the midpoint of their centres,
+    // and the boundary reading is the one that looks centred.
+    const gw = at("gw");
+    const targets = (out.connectors as any[])
+      .filter((c) => c.sourceId === "gw" && c.type !== "messageBPMN" && c.type !== "associationBPMN")
+      .map((c) => at(c.targetId));
+    expect(targets.length).toBeGreaterThanOrEqual(2);
+    const top = Math.min(...targets.map((t) => t.y));
+    const bottom = Math.max(...targets.map((t) => t.y + t.height));
+    expect(gw.y + gw.height / 2).toBeCloseTo((top + bottom) / 2, 0);
+  });
+
+  it("T3109 — the paired merge is on the same line as its decision", () => {
+    // R8.01 computed a midpoint BEFORE the paths were given rows, so its answer
+    // described a diagram that no longer existed — every gateway in Paul's test
+    // sat up to 200px from where its own branches had ended up, and R8.24 then
+    // faithfully aligned each merge to that stale row.
+    expect(cy("gwm")).toBeCloseTo(cy("gw"), 0);
+  });
+});
