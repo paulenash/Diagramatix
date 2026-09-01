@@ -197,6 +197,13 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
     if (!outgoing.has(c.sourceId)) outgoing.set(c.sourceId, []);
     outgoing.get(c.sourceId)!.push(c);
   }
+  // Inbound count, so the walk can tell a MERGE from an ordinary step: a
+  // branch has to stop at the merge and say so, or the first branch to reach
+  // it swallows the whole shared tail (Paul, 2026-09-01).
+  const inboundCount = new Map<string, number>();
+  for (const c of sequences) inboundCount.set(c.targetId, (inboundCount.get(c.targetId) ?? 0) + 1);
+  const isMerge = (id: string) => (inboundCount.get(id) ?? 0) > 1;
+
   // Messages indexed by the non-pool endpoint (in either direction).
   const messagesTouching = new Map<string, Array<{ peer: DiagramElement; direction: "out" | "in"; label: string }>>();
   for (const c of messages) {
@@ -353,10 +360,36 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
     return { line: `${pad}- ${labelOf(el)}` };
   }
 
-  function walk(seedId: string, indent: number, lastLaneId?: string) {
+  /**
+   * Walk one line of flow, emitting a bullet per step.
+   *
+   * Returns HOW the line stopped, because that is the thing the reader — and
+   * the model regenerating from this text — cannot otherwise recover. A branch
+   * that rejoins a merge and a branch that simply ends both used to render as
+   * a list that stops, and the shared tail after the merge was swallowed by
+   * whichever branch happened to reach it first. Paul, 2026-09-01: "the
+   * Decisions are not terminated unambiguously ... On needs a better matching
+   * end".
+   */
+  type WalkEnd =
+    | { kind: "ended" }                    // an end event closed it
+    | { kind: "merge"; mergeId: string }   // it rejoins a converging gateway
+    | { kind: "stops" }                    // it runs out of sequence flow
+    | { kind: "seen" };                    // it reaches ground already described
+
+  function walk(seedId: string, indent: number, lastLaneId?: string): WalkEnd {
     let curId: string | undefined = seedId;
     let lastLane = lastLaneId;
-    while (curId && !renderedNodes.has(curId)) {
+    while (curId) {
+      if (renderedNodes.has(curId)) return { kind: "seen" };
+      // A merge belongs to the flow AFTER the branches, not to the branch that
+      // reached it first. Stop here and let the caller resume from it.
+      //
+      // This fires even on the seed: a resumed walk is handed the step AFTER a
+      // merge, and when THAT is itself a merge (a nested decision rejoining the
+      // outer one) the stop has to propagate, or the outer merge is swallowed
+      // by the innermost branch exactly as before.
+      if (isMerge(curId)) return { kind: "merge", mergeId: curId };
       renderedNodes.add(curId);
       const el = byId.get(curId);
       if (!el) break;
@@ -383,41 +416,67 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
         for (const is of innerStarts) walk(is.id, indent + 1);
       }
 
-      // End event terminates the walk on this branch.
-      if (el.type === "end-event") break;
-
-      // Diverging gateway: emit "On <flow label>:" sub-heading per branch
-      // and recursively walk each one. Visited tracking via renderedNodes
-      // naturally stops duplicate descriptions at the merge point. If a
-      // branch has nothing new to say (e.g. it converges immediately into
-      // a path already described) the sub-heading is replaced with a
-      // "merges back" note so the user isn't left staring at an empty bullet.
-      if (el.type === "gateway") {
-        const outConns: Connector[] = outgoing.get(curId) ?? [];
-        if (outConns.length > 1) {
-          const pad = "  ".repeat(indent + 1);
-          for (const c of outConns) {
-            const flowLabel = c.label?.trim() || "(unlabelled branch)";
-            const before = narrativeLines.length;
-            const headerIdx = narrativeLines.push(`${pad}- On **${flowLabel}**:`) - 1;
-            walk(c.targetId, indent + 2, lastLane);
-            if (narrativeLines.length === before + 1) {
-              // Walk added nothing — the target was already covered.
-              narrativeLines[headerIdx] = `${pad}- On **${flowLabel}**: (merges back into the path above)`;
-            }
-          }
-        } else if (outConns.length === 1) {
-          curId = outConns[0].targetId;
-          continue;
-        }
-        break;
-      }
+      if (el.type === "end-event") return { kind: "ended" };
 
       const outConns: Connector[] = outgoing.get(curId) ?? [];
-      curId = outConns[0]?.targetId;
+
+      // Diverging gateway: walk each branch under its own "On <label>" heading,
+      // CLOSE each one with a line saying how it finished, then resume the
+      // shared flow from the merge at the DECISION own level.
+      if (el.type === "gateway" && outConns.length > 1) {
+        const pad = "  ".repeat(indent + 1);
+        const merges = new Set<string>();
+        for (const c of outConns) {
+          const flowLabel = c.label?.trim() || "(unlabelled branch)";
+          narrativeLines.push(`${pad}- On **${flowLabel}**:`);
+          const res = walk(c.targetId, indent + 2, lastLane);
+          const inner = "  ".repeat(indent + 2);
+          if (res.kind === "merge") {
+            merges.add(res.mergeId);
+            narrativeLines.push(`${inner}- End of **${flowLabel}** — rejoins the flow at ${describeJoin(res.mergeId)}.`);
+          } else if (res.kind === "ended") {
+            narrativeLines.push(`${inner}- End of **${flowLabel}**.`);
+          } else if (res.kind === "seen") {
+            narrativeLines.push(`${inner}- End of **${flowLabel}** — rejoins a path already described above.`);
+          } else {
+            narrativeLines.push(`${inner}- End of **${flowLabel}** — the path stops here.`);
+          }
+        }
+        // Every branch that came back rejoins the same merge in a well-formed
+        // diagram; when they do not, each is resumed in turn so nothing is lost.
+        let last: WalkEnd = { kind: "stops" };
+        for (const m of merges) {
+          const mEl = byId.get(m);
+          if (mEl) {
+            // Only announce the continuation once it is known to have steps:
+            // one merge can lead straight into another, and a header with
+            // nothing under it reads as a truncation.
+            const hdr = narrativeLines.push(`${"  ".repeat(indent)}- After ${describeJoin(m)}, the flow continues:`) - 1;
+            renderedNodes.add(m);
+            const after = outgoing.get(m) ?? [];
+            last = after.length === 1
+              ? walk(after[0].targetId, indent, lastLane)
+              : { kind: "stops" };
+            if (narrativeLines.length === hdr + 1) narrativeLines.splice(hdr, 1);
+          }
+        }
+        return merges.size ? last : { kind: "stops" };
+      }
+
+      if (outConns.length === 0) return { kind: "stops" };
+      curId = outConns[0].targetId;
     }
+    return { kind: "stops" };
   }
 
+  /** Name a converging gateway so a branch can point at where it rejoins. */
+  function describeJoin(id: string): string {
+    const el = byId.get(id);
+    if (!el) return "the merge";
+    const name = labelOf(el);
+    if (el.type === "gateway") return name ? `gateway "${name}"` : "the merge gateway";
+    return name ? `**${name}**` : "the shared path";
+  }
   for (const se of startEvents) walk(se.id, 0);
 
   if (narrativeLines.length === 0) {
