@@ -24,6 +24,7 @@ import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { highlightJson, PEACEFUL } from "@/app/lib/preview/highlight";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { MicTest } from "@/app/components/mobile/MicTest";
+import { FilePreviewDialog, type PreviewPayload } from "@/app/components/preview/FilePreviewDialog";
 
 interface KeyRow { id: string; name: string; keyPrefix: string; phase: string }
 interface CaseRow {
@@ -47,6 +48,19 @@ interface Score {
   matched: { name: string }[]; missing: { name: string }[]; invented: { name: string }[];
   movedLane: { name: string; from: string | null; to: string | null }[];
 }
+interface RunRow {
+  jobId: string; status: string; model: string | null; at: string;
+  durationMs: number | null; diagramId: string | null; diagramName: string | null;
+  elements: number | null; connectors: number | null; activities: number | null;
+  warnings: number | null; diagnostics: number | null; error: string | null;
+}
+interface RunDetail {
+  jobId: string; status: string; model: string | null; at: string;
+  durationMs: number | null; diagramId: string | null;
+  request: unknown; result: unknown; error: unknown;
+  documentName: string | null;
+  case: { name: string; notes: string | null; description: string; documentName: string | null } | null;
+}
 interface Result {
   status: string; stage?: string; jobId: string;
   diagram?: { id: string; name: string; deepLink: string; elementCount: number; connectorCount: number };
@@ -57,6 +71,21 @@ interface Result {
   durationMs?: number | null; model?: string | null;
   timings?: { elapsedMs?: number | null; stages?: Record<string, number> | null } | null;
   diagnostics?: { kind: string; label: string; detail: string }[];
+}
+
+/** Pretty-printed, highlighted and scrollable — the same treatment the Usage
+ *  screen gives a payload, so a run's inputs and outputs are readable in place
+ *  rather than needing to be copied somewhere else. */
+function Json({ text }: { text: string }) {
+  let pretty = text;
+  try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch { /* show it raw */ }
+  return (
+    <pre
+      className="text-[11px] leading-relaxed whitespace-pre-wrap break-all font-mono rounded p-3 overflow-auto max-h-72"
+      style={{ background: PEACEFUL.bg, color: PEACEFUL.text }}
+      dangerouslySetInnerHTML={{ __html: highlightJson(pretty) }}
+    />
+  );
 }
 
 export function ApiHarnessClient() {
@@ -72,6 +101,33 @@ export function ApiHarnessClient() {
   // posts OUTWARD can be seen working without an endpoint on the internet.
   const [useCallback_, setUseCallback] = useState(false);
   const [callbackSeen, setCallbackSeen] = useState<{ at: string; headers: Record<string, string> } | null>(null);
+  const [preview, setPreview] = useState<PreviewPayload | null>(null);
+  // A case's past runs, and one of them opened in full. The list answers "which
+  // run was better"; the detail answers "what exactly went in and came back",
+  // which is the question you have when one went wrong.
+  const [runs, setRuns] = useState<RunRow[] | null>(null);
+  const [runsFor, setRunsFor] = useState<{ id: string; name: string } | null>(null);
+  const [runDetail, setRunDetail] = useState<RunDetail | null>(null);
+
+  async function loadRuns(caseId: string, caseName: string) {
+    setRunsFor({ id: caseId, name: caseName }); setRuns(null); setRunDetail(null);
+    try {
+      const r = await fetch(`/api/admin/api-harness/history?caseId=${encodeURIComponent(caseId)}`, { cache: "no-store" });
+      const j = await r.json();
+      setRuns(j.runs ?? []);
+    } catch { setRuns([]); }
+  }
+
+  async function openRun(jobId: string) {
+    try {
+      const r = await fetch(`/api/admin/api-harness/history?jobId=${encodeURIComponent(jobId)}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) { setError(j.error ?? "Could not load that run"); return; }
+      setRunDetail(j.run);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load that run");
+    }
+  }
   const [minutesPerRun, setMinutesPerRun] = useState("");
   const [runsPerMonth, setRunsPerMonth] = useState("");
   const { attachment, setAttachment, attach, clear } = useFileAttach();
@@ -324,7 +380,10 @@ export function ApiHarnessClient() {
   }
 
   /** Artifacts are fetched THROUGH the proxy — the key is server-side, and the
-   *  browser has no way to ask for one directly. */
+   *  browser has no way to ask for one directly — then shown in the app's own
+   *  preview dialog rather than a new tab. JSON and XML are syntax-highlighted
+   *  and scroll in place, which is what makes an artifact reviewable rather than
+   *  merely downloadable. */
   async function openArtifact(jobId: string, artifact: string) {
     try {
       const r = await fetch("/api/admin/api-harness/run", {
@@ -332,11 +391,17 @@ export function ApiHarnessClient() {
         body: JSON.stringify({ apiKeyId, jobId, artifact }),
       });
       if (!r.ok) { setError(`Could not fetch ${artifact} (${r.status})`); return; }
-      const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener");
-      // Revoked late: the new tab has to have read it first.
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+
+      if (artifact === "diagram.pdf") {
+        setPreview({ kind: "pdf", title: artifact, blob: await r.blob(),
+          downloadName: artifact, downloadMime: "application/pdf" });
+        return;
+      }
+      const text = await r.text();
+      const kind = artifact === "diagram.json" ? "json"
+        : artifact === "diagram.bpmn" ? "bpmn"
+        : "svg";
+      setPreview({ kind, title: artifact, text, downloadName: artifact });
     } catch (e) {
       setError(e instanceof Error ? e.message : `Could not fetch ${artifact}`);
     }
@@ -435,6 +500,8 @@ export function ApiHarnessClient() {
                   </div>
                 </button>
                 <div className="flex gap-2 mt-0.5">
+                  <button onClick={() => void loadRuns(c.id, c.name)}
+                    className="text-[10px] text-teal-700 hover:underline">Runs</button>
                   <button onClick={() => void fetch("/api/admin/api-harness/cases", {
                     method: "PATCH", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ id: c.id, starred: !c.starred }),
@@ -780,6 +847,90 @@ export function ApiHarnessClient() {
           )}
         </section>
       </div>
+
+      {/* A case's runs, and one of them in full. Rendered as a modal so it can be
+          reached from the case list without losing whatever is in the form. */}
+      {runsFor && (
+        <div className="fixed inset-0 bg-black/20 flex items-start justify-center z-40 p-6 overflow-y-auto"
+          onClick={() => { setRunsFor(null); setRunDetail(null); }}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl my-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <h2 className="text-sm font-semibold text-gray-900">Runs — {runsFor.name}</h2>
+              <button onClick={() => { setRunsFor(null); setRunDetail(null); }}
+                className="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              {runs === null ? <p className="text-sm text-gray-400">Loading…</p>
+                : runs.length === 0 ? <p className="text-sm text-gray-500">This case has not been run yet.</p>
+                : (
+                <div className="rounded border border-gray-200 divide-y divide-gray-100 max-h-56 overflow-y-auto">
+                  {runs.map((r) => (
+                    <button key={r.jobId} onClick={() => void openRun(r.jobId)}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-3 hover:bg-gray-50 ${runDetail?.jobId === r.jobId ? "bg-teal-50" : ""}`}>
+                      <span className="text-gray-500 tabular-nums w-36">{new Date(r.at).toLocaleString()}</span>
+                      <span className={r.status === "succeeded" ? "text-emerald-700" : "text-red-700"}>{r.status}</span>
+                      <span className="text-gray-600">{r.model ?? "—"}</span>
+                      <span className="ml-auto text-gray-500 tabular-nums">
+                        {r.elements ?? "—"}el / {r.connectors ?? "—"}conn
+                        {r.durationMs != null ? ` · ${(r.durationMs / 1000).toFixed(1)}s` : ""}
+                        {r.warnings ? ` · ${r.warnings}w` : ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {runDetail && (
+                <div className="space-y-3">
+                  <div className="rounded border border-gray-200 px-3 py-2 text-xs text-gray-700">
+                    <b>{runDetail.status}</b> · {runDetail.model ?? "—"} ·
+                    {runDetail.durationMs != null ? ` ${(runDetail.durationMs / 1000).toFixed(1)}s` : " —"}
+                    {runDetail.diagramId && (
+                      <>
+                        {" · "}
+                        <a className="underline text-teal-700"
+                          href={`/diagram/${runDetail.diagramId}?from=${encodeURIComponent("/dashboard/admin/api-harness")}`}>
+                          Open the diagram →
+                        </a>
+                      </>
+                    )}
+                    {runDetail.diagramId && (
+                      <span className="ml-3">
+                        {["diagram.bpmn", "diagram.json", "diagram.pdf", "diagram.svg"].map((f) => (
+                          <button key={f} onClick={() => void openArtifact(runDetail.jobId, f)}
+                            className="mr-2 underline text-teal-700">{f.replace("diagram.", "")}</button>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <div>
+                      <h3 className="text-xs font-semibold text-gray-800 mb-1">
+                        Inputs {runDetail.documentName ? <span className="font-normal text-gray-500">📎 {runDetail.documentName}</span> : null}
+                      </h3>
+                      {runDetail.case?.description && (
+                        <div className="mb-1 rounded bg-gray-50 border border-gray-200 p-2 text-[11px] whitespace-pre-wrap max-h-40 overflow-auto">
+                          {runDetail.case.description}
+                        </div>
+                      )}
+                      <Json text={JSON.stringify(runDetail.request ?? {})} />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-semibold text-gray-800 mb-1">Outputs</h3>
+                      <Json text={JSON.stringify(runDetail.error ?? runDetail.result ?? {})} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {preview && <FilePreviewDialog payload={preview} onClose={() => setPreview(null)} />}
+
 
       {confirmDelete && (
         <ConfirmDialog

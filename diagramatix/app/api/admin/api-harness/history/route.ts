@@ -23,8 +23,63 @@ export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id || !isSuperuser(session)) return forbidden();
 
-  const caseId = new URL(req.url).searchParams.get("caseId")?.trim();
-  if (!caseId) return NextResponse.json({ error: "caseId is required" }, { status: 400 });
+  const url = new URL(req.url);
+  const jobId = url.searchParams.get("jobId")?.trim();
+
+  /**
+   * ONE RUN, IN FULL — the inputs that produced it and the outputs it produced.
+   *
+   * The list below carries headline numbers, which answers "which run was
+   * better". This answers the other question, which is the one you have when a
+   * run went wrong: what exactly went in, and what exactly came back. Without it
+   * a saved run is a row in a table rather than something you can reopen.
+   */
+  if (jobId) {
+    const job = await prisma.partnerJob.findUnique({
+      where: { id: jobId },
+      select: {
+        id: true, status: true, stage: true, model: true, createdAt: true,
+        startedAt: true, finishedAt: true, diagramId: true, projectId: true,
+        result: true, error: true, request: true, harnessCaseId: true,
+        inputDocumentName: true, inputDocumentType: true,
+      },
+    });
+    if (!job) return NextResponse.json({ error: "No such run" }, { status: 404 });
+
+    // The case is where a harness run's own inputs live — the prose and the
+    // document belong to it, not to the job, so a re-run of the same case does
+    // not store them twice.
+    const kase = job.harnessCaseId
+      ? await prisma.harnessCase.findUnique({
+          where: { id: job.harnessCaseId },
+          select: { id: true, name: true, notes: true, description: true, documentName: true, documentType: true, volumetrics: true },
+        })
+      : null;
+
+    return NextResponse.json({
+      run: {
+        jobId: job.id,
+        status: job.status,
+        stage: job.stage,
+        model: job.model,
+        at: job.createdAt,
+        durationMs: job.startedAt && job.finishedAt ? job.finishedAt.getTime() - job.startedAt.getTime() : null,
+        diagramId: job.diagramId,
+        projectId: job.projectId,
+        // The SHAPE of what was sent: sizes and hashes always, and the caller's
+        // own instructions, which change the result and so have to be visible.
+        request: job.request,
+        documentName: job.inputDocumentName ?? kase?.documentName ?? null,
+        documentType: job.inputDocumentType ?? kase?.documentType ?? null,
+        result: job.result,
+        error: job.error,
+        case: kase,
+      },
+    });
+  }
+
+  const caseId = url.searchParams.get("caseId")?.trim();
+  if (!caseId) return NextResponse.json({ error: "caseId or jobId is required" }, { status: 400 });
 
   const jobs = await prisma.partnerJob.findMany({
     where: { harnessCaseId: caseId },

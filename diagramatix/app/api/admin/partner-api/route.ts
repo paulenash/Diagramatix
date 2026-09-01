@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
+import { recordAudit, auditActor } from "@/app/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -122,4 +123,66 @@ export async function GET(req: Request) {
       keyName: r.apiKey?.name ?? null, keyPrefix: r.keyPrefix, phase: r.apiKey?.phase ?? null,
     })),
   });
+}
+
+/**
+ * Delete traffic rows — one, or everything before a moment.
+ *
+ * The Usage list is a working surface, not a ledger: it fills with the noise of
+ * testing, and being unable to clear that noise is what makes a screen stop being
+ * looked at. So a row can go, and so can a whole session's worth.
+ *
+ * Two deliberate limits. The bulk form takes a CUT-OFF rather than a count or a
+ * "clear all", because "everything before I started this afternoon" is the thing
+ * anybody actually wants and it cannot be misread. And it reports how many rows
+ * it removed, so an accident is visible immediately rather than discovered later
+ * as an absence.
+ *
+ * PartnerJob rows are NOT touched. They carry the generated diagrams and the
+ * inputs behind them; a request log is the record of the HTTP call, and clearing
+ * that should not quietly destroy the runs it points at.
+ */
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id || !isSuperuser(session)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = (await req.json().catch(() => null)) as
+    | { id?: string; before?: string; keyId?: string | null }
+    | null;
+
+  if (body?.id) {
+    const row = await prisma.partnerRequest.findUnique({
+      where: { id: body.id }, select: { id: true, ref: true, apiKeyId: true },
+    });
+    if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    await prisma.partnerRequest.delete({ where: { id: row.id } });
+    await recordAudit({
+      ...auditActor(session, req), orgId: null,
+      action: "partner.usage.delete", targetType: "partnerRequest", targetId: row.id,
+      meta: { ref: row.ref, apiKeyId: row.apiKeyId },
+    });
+    return NextResponse.json({ ok: true, deleted: 1 });
+  }
+
+  if (body?.before) {
+    const cutoff = new Date(body.before);
+    if (Number.isNaN(cutoff.getTime())) {
+      return NextResponse.json({ error: "`before` is not a date" }, { status: 400 });
+    }
+    const where = {
+      at: { lt: cutoff },
+      ...(body.keyId ? { apiKeyId: body.keyId } : {}),
+    };
+    const { count } = await prisma.partnerRequest.deleteMany({ where });
+    await recordAudit({
+      ...auditActor(session, req), orgId: null,
+      action: "partner.usage.bulkDelete", targetType: "partnerRequest", targetId: null,
+      meta: { before: cutoff.toISOString(), apiKeyId: body.keyId ?? null, deleted: count },
+    });
+    return NextResponse.json({ ok: true, deleted: count });
+  }
+
+  return NextResponse.json({ error: "Supply an id, or a `before` cut-off" }, { status: 400 });
 }

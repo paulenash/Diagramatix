@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { highlightJson, PEACEFUL } from "@/app/lib/preview/highlight";
+import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 interface CallRow {
   id: string; ref: string; at: string; method: string; path: string; status: number;
@@ -34,7 +35,13 @@ interface Detail {
 const statusClass = (s: number) =>
   s >= 500 ? "text-red-700 bg-red-50" : s >= 400 ? "text-amber-800 bg-amber-50" : "text-emerald-700 bg-emerald-50";
 
-const time = (s: string) => new Date(s).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+/** Date AND time. A time alone is ambiguous the moment a list spans midnight —
+ *  and this one is read when somebody asks "what happened on Tuesday". */
+const stamp = (s: string) => {
+  const d = new Date(s);
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" })
+    + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+};
 
 /** Pretty-print JSON with the app's own dependency-free highlighter. */
 function Json({ text }: { text: string }) {
@@ -60,6 +67,28 @@ export function PartnerApiClient() {
   const [keyId, setKeyId] = useState("");
   const [errorsOnly, setErrorsOnly] = useState(false);
   const [detail, setDetail] = useState<Detail | null>(null);
+  // Clearing test noise is what keeps this screen worth opening.
+  const [confirming, setConfirming] = useState<{ title: string; message: string; confirmLabel: string; run: () => void } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [cutoff, setCutoff] = useState("");
+
+  async function del(body: Record<string, unknown>) {
+    try {
+      const r = await fetch("/api/admin/partner-api", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setError(j.error ?? "Could not delete"); return; }
+      // Say how many went. An accident should be visible now, not discovered
+      // later as an absence.
+      setNotice(`Deleted ${j.deleted} row${j.deleted === 1 ? "" : "s"}.`);
+      setDetail(null);
+      void load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete");
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -130,9 +159,44 @@ export function PartnerApiClient() {
         <button onClick={() => void load()} className="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
           Refresh
         </button>
+
+        <span className="ml-auto flex items-center gap-2 text-sm text-gray-600">
+          {/* A cut-off rather than "clear all": "everything before I started this
+              afternoon" is what anybody actually wants, and it cannot be misread. */}
+          <label className="flex items-center gap-1.5">
+            Delete before
+            <input type="datetime-local" value={cutoff} onChange={(e) => setCutoff(e.target.value)}
+              className="rounded-md border border-gray-300 px-2 py-1 text-sm" />
+          </label>
+          <button
+            disabled={!cutoff}
+            onClick={() => setConfirming({
+              title: "Delete traffic before this time?",
+              message: `Every request row before ${new Date(cutoff).toLocaleString()}${keyId ? " for the selected key" : ""} is removed. The RUNS themselves are untouched — this clears the HTTP log, not the generated diagrams.`,
+              confirmLabel: "Delete",
+              run: () => void del({ before: new Date(cutoff).toISOString(), keyId: keyId || null }),
+            })}
+            className="rounded-md border border-red-300 px-2.5 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-40 disabled:hover:bg-transparent">
+            Delete older
+          </button>
+        </span>
       </div>
 
       {error && <div className="mt-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {notice && (
+        <div className="mt-3 flex items-center gap-2 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {notice}
+          <button onClick={() => setNotice(null)} className="ml-auto text-emerald-700 hover:underline text-xs">Dismiss</button>
+        </div>
+      )}
+      {confirming && (
+        <ConfirmDialog
+          title={confirming.title} message={confirming.message}
+          confirmLabel={confirming.confirmLabel} destructive
+          onConfirm={() => { const r = confirming.run; setConfirming(null); r(); }}
+          onCancel={() => setConfirming(null)}
+        />
+      )}
 
       <div className="mt-4 rounded-lg border border-gray-200 divide-y divide-gray-100">
         {loading ? (
@@ -140,9 +204,10 @@ export function PartnerApiClient() {
         ) : calls.length === 0 ? (
           <p className="px-3 py-3 text-sm text-gray-500">No calls yet.</p>
         ) : calls.map((c) => (
-          <button key={c.id} onClick={() => void open(c.id)}
-            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-3">
-            <span className="text-xs text-gray-400 tabular-nums w-20">{time(c.at)}</span>
+          <div key={c.id} className="flex items-center hover:bg-gray-50">
+          <button onClick={() => void open(c.id)}
+            className="flex-1 min-w-0 text-left px-3 py-2 text-sm flex items-center gap-3">
+            <span className="text-xs text-gray-400 tabular-nums w-36">{stamp(c.at)}</span>
             <span className={`text-[10px] px-1.5 py-0.5 rounded tabular-nums ${statusClass(c.status)}`}>{c.status}</span>
             <span className="text-xs font-medium text-gray-600 w-12">{c.method}</span>
             <span className="flex-1 truncate text-gray-800 font-mono text-xs">{c.path}</span>
@@ -151,6 +216,18 @@ export function PartnerApiClient() {
             <span className="text-xs text-gray-400 tabular-nums w-16 text-right">{c.durationMs} ms</span>
             <code className="text-[10px] text-gray-400 font-mono w-16">{c.ref}</code>
           </button>
+          {/* Outside the row button — a delete nested inside a button is not a
+              button, and the click would open the drill-in instead. */}
+          <button
+            title="Delete this row"
+            onClick={() => setConfirming({
+              title: "Delete this request row?",
+              message: `Removes the log of call ${c.ref}. The run it points at is untouched.`,
+              confirmLabel: "Delete",
+              run: () => void del({ id: c.id }),
+            })}
+            className="px-2.5 text-gray-300 hover:text-red-600">&times;</button>
+          </div>
         ))}
       </div>
 
