@@ -90,7 +90,14 @@ export const POST = withPartnerLogging(async (req, ref) => {
       if (typeof body.callbackUrl !== "string") return err("bad_request", "`callbackUrl` must be a URL.");
       let u: URL;
       try { u = new URL(body.callbackUrl); } catch { return err("bad_request", "`callbackUrl` is not a valid URL."); }
-      if (u.protocol !== "https:") return err("bad_request", "`callbackUrl` must be https.");
+      // https, except to the loopback address. The carve-out exists so the
+      // callback can actually be TESTED — a local receiver has no certificate,
+      // and a feature that cannot be exercised before it ships is a feature
+      // nobody has seen work.
+      const loopback = u.hostname === "localhost" || u.hostname === "127.0.0.1" || u.hostname === "[::1]" || u.hostname === "::1";
+      if (u.protocol !== "https:" && !(u.protocol === "http:" && loopback)) {
+        return err("bad_request", "`callbackUrl` must be https (http is allowed only to localhost, for testing).");
+      }
       callbackUrl = u.toString();
     }
 
@@ -201,7 +208,9 @@ export const POST = withPartnerLogging(async (req, ref) => {
       projectId: typeof body.options?.projectId === "string" ? body.options.projectId : null,
       projectName: typeof body.options?.projectName === "string" ? body.options.projectName : undefined,
       volumetrics: (body.volumetrics ?? undefined) as never,
-      instructions: instructions || undefined,
+      // Standing instructions first, the request's own after, so a caller can
+      // ADD to the standing text but a one-off cannot silently drop it.
+      instructions: [c.standingInstructions, instructions].filter(Boolean).join("\n\n") || undefined,
       callbackUrl,
       baseUrl: origin,
     }).catch((e) => console.error(`[partner] job ${jobId} escaped:`, e));

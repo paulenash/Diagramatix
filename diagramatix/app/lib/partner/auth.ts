@@ -37,6 +37,8 @@ export interface PartnerCaller {
   userId: string;
   scopes: string[];
   projectId: string | null;
+  /** Prepended to every prompt this key sends (v2/7). */
+  standingInstructions: string | null;
   phase: ApiKeyPhase;
   /** Is this key keeping request bodies and documents right now? */
   capturing: boolean;
@@ -139,6 +141,7 @@ export async function authenticatePartner(
       userId: row.serviceUserId,
       scopes,
       projectId: row.projectId,
+      standingInstructions: row.standingInstructions ?? null,
       phase: row.phase as ApiKeyPhase,
       capturing: isCapturing(row),
       rateLimitPerMin: row.rateLimitPerMin,

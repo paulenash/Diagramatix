@@ -53,6 +53,7 @@ interface Result {
   pools?: Pool[]; activities?: Activity[]; roles?: string[];
   warnings?: { code: string; message: string }[];
   error?: { code: string; message: string };
+  artifacts?: { bpmnXmlUrl?: string | null; jsonUrl?: string | null; pdfUrl?: string | null; svgUrl?: string | null } | null;
   durationMs?: number | null; model?: string | null;
   timings?: { elapsedMs?: number | null; stages?: Record<string, number> | null } | null;
   diagnostics?: { kind: string; label: string; detail: string }[];
@@ -67,6 +68,10 @@ export function ApiHarnessClient() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
+  // Point the run's callbackUrl at our own receiver, so the one v2 feature that
+  // posts OUTWARD can be seen working without an endpoint on the internet.
+  const [useCallback_, setUseCallback] = useState(false);
+  const [callbackSeen, setCallbackSeen] = useState<{ at: string; headers: Record<string, string> } | null>(null);
   const [minutesPerRun, setMinutesPerRun] = useState("");
   const [runsPerMonth, setRunsPerMonth] = useState("");
   const { attachment, setAttachment, attach, clear } = useFileAttach();
@@ -271,6 +276,8 @@ export function ApiHarnessClient() {
       name: name.trim() || undefined,
       description: description.trim() || undefined,
       instructions: instructions.trim() || undefined,
+      // Our own origin: the worker posts from the server, so localhost reaches us.
+      callbackUrl: useCallback_ ? `${window.location.origin}/api/admin/api-harness/callback` : undefined,
       document: attachment
         ? {
             filename: attachment.name,
@@ -308,6 +315,33 @@ export function ApiHarnessClient() {
     }
   }
 
+  async function checkCallback(jobId: string) {
+    try {
+      const r = await fetch(`/api/admin/api-harness/callback?jobId=${encodeURIComponent(jobId)}`, { cache: "no-store" });
+      const j = await r.json();
+      setCallbackSeen(j.callback ? { at: j.callback.at, headers: j.callback.headers ?? {} } : null);
+    } catch { /* the run is what matters; this is only the receipt */ }
+  }
+
+  /** Artifacts are fetched THROUGH the proxy — the key is server-side, and the
+   *  browser has no way to ask for one directly. */
+  async function openArtifact(jobId: string, artifact: string) {
+    try {
+      const r = await fetch("/api/admin/api-harness/run", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKeyId, jobId, artifact }),
+      });
+      if (!r.ok) { setError(`Could not fetch ${artifact} (${r.status})`); return; }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener");
+      // Revoked late: the new tab has to have read it first.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `Could not fetch ${artifact}`);
+    }
+  }
+
   function poll(jobId: string) {
     pollRef.current = window.setTimeout(async () => {
       try {
@@ -321,6 +355,10 @@ export function ApiHarnessClient() {
         if (j.status === "queued" || j.status === "running") { poll(jobId); return; }
         // A run from one of our SOPs is scorable the moment it lands.
         if (j.status === "succeeded" && sourceDiagramId && j.diagram?.id) void runScore(j.diagram.id);
+        // Give the outbound POST a moment to land, then ask whether it did.
+        if (useCallback_ && j.status === "succeeded") {
+          window.setTimeout(() => void checkCallback(jobId), 1200);
+        }
         setRunning(false);
         void loadCases();
       } catch {
@@ -528,6 +566,16 @@ export function ApiHarnessClient() {
                 className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
             </label>
 
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={useCallback_}
+                onChange={(e) => { setUseCallback(e.target.checked); setCallbackSeen(null); }}
+                className="rounded border-gray-300 text-teal-700 focus:ring-teal-400" />
+              Ask for a completion callback
+              <span className="text-xs text-gray-400">
+                — points this run at our own receiver, so you can see the POST arrive
+              </span>
+            </label>
+
             {/* Volumetrics are NOT part of phase 1 — the arithmetic belongs in the
                 calling application. Kept here because the capability still works
                 and this is where it would be exercised if it were switched on. */}
@@ -583,6 +631,56 @@ export function ApiHarnessClient() {
                   </>
                 )}
               </div>
+
+              {result.status === "succeeded" && result.jobId && (
+                <div className="rounded-lg border border-gray-200 px-3 py-2 text-xs">
+                  <div className="font-semibold text-gray-800 mb-1.5">Artifacts</div>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      ["diagram.bpmn", "BPMN 2.0 XML", result.artifacts?.bpmnXmlUrl, "the one to score from"],
+                      ["diagram.json", "JSON", result.artifacts?.jsonUrl, "our structure, not a standard"],
+                      ["diagram.pdf", "PDF", result.artifacts?.pdfUrl, null],
+                      ["diagram.svg", "SVG", result.artifacts?.svgUrl, null],
+                    ] as [string, string, string | null | undefined, string | null][]).map(([file, label, url, note]) => (
+                      <button key={file} type="button"
+                        disabled={!url}
+                        onClick={() => void openArtifact(result.jobId!, file)}
+                        title={url ? (note ?? file) : "Not produced for this run"}
+                        className={`rounded-md border px-2.5 py-1 ${url
+                          ? "border-teal-300 bg-teal-50 text-teal-800 hover:bg-teal-100"
+                          : "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* A null URL means the artifact was not produced. Saying so beats
+                      a link that 404s, which is the whole reason the API returns null. */}
+                  <div className="mt-1 text-[11px] text-gray-400">
+                    Fetched through the proxy — the key never reaches the browser.
+                  </div>
+                </div>
+              )}
+
+              {useCallback_ && result.status === "succeeded" && (
+                <div className={`rounded-lg border px-3 py-2 text-xs ${callbackSeen
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                  : "border-amber-300 bg-amber-50 text-amber-900"}`}>
+                  {callbackSeen ? (
+                    <>
+                      <b>Callback delivered</b> at {new Date(callbackSeen.at).toLocaleTimeString()} ·
+                      job header <code className="font-mono">{callbackSeen.headers["x-diagramatix-job-id"] ?? "—"}</code>
+                    </>
+                  ) : (
+                    <>
+                      <b>No callback seen yet.</b> It is fired after the job is durable, so the
+                      result above is unaffected either way —{" "}
+                      <button type="button" className="underline" onClick={() => void checkCallback(result.jobId!)}>
+                        check again
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
 
               {!!result.warnings?.length && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">

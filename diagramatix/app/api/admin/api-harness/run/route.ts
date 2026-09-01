@@ -57,6 +57,7 @@ export async function POST(req: Request) {
   if (!session?.user?.id || !isSuperuser(session)) return forbidden();
 
   const body = (await req.json().catch(() => null)) as {
+    artifact?: string;
     apiKeyId?: string;
     /** Poll an existing job instead of submitting a new one. */
     jobId?: string;
@@ -100,6 +101,28 @@ export async function POST(req: Request) {
   const headers = { "Content-Type": "application/json", "X-Api-Key": secret };
 
   try {
+    // An artifact, fetched WITH the key and relayed as bytes. The browser cannot
+    // ask for one directly: the key is server-side, and putting it in page
+    // JavaScript to save a hop is exactly what the proxy exists to avoid.
+    if (body?.jobId && body?.artifact) {
+      const allowed = ["diagram.bpmn", "diagram.json", "diagram.pdf", "diagram.svg"];
+      if (!allowed.includes(body.artifact)) {
+        return NextResponse.json({ error: "Unknown artifact" }, { status: 400 });
+      }
+      const r = await fetch(
+        `${origin}/api/public/v1/process-map/${encodeURIComponent(body.jobId)}/artifact/${body.artifact}`,
+        { headers: { "X-Api-Key": secret }, cache: "no-store" },
+      );
+      const buf = Buffer.from(await r.arrayBuffer());
+      return new NextResponse(new Uint8Array(buf), {
+        status: r.status,
+        headers: {
+          "Content-Type": r.headers.get("content-type") ?? "application/octet-stream",
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+
     if (body?.jobId) {
       const r = await fetch(`${origin}/api/public/v1/process-map/${encodeURIComponent(body.jobId)}`, {
         headers: { "X-Api-Key": secret }, cache: "no-store",

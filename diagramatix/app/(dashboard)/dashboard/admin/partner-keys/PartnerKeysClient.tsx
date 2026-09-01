@@ -26,6 +26,7 @@ interface KeyRow {
   project: string | null;
   scopes: string[];
   phase: string;
+  standingInstructions: string | null;
   captureUntil: string | null;
   rateLimitPerMin: number;
   dailyJobLimit: number;
@@ -64,6 +65,10 @@ export function PartnerKeysClient() {
   const [confirming, setConfirming] = useState<
     { title: string; message: string; confirmLabel: string; run: () => void } | null
   >(null);
+  // Standing instructions (v2/7): prepended to every prompt this key sends, so
+  // "keep it high level" applies always instead of being resent each time.
+  const [editingInstructions, setEditingInstructions] =
+    useState<{ id: string; name: string; text: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   // Mint form
@@ -364,6 +369,11 @@ export function PartnerKeysClient() {
                           className="text-emerald-700 hover:underline">Go live</button>
                       )}
                       <button
+                        onClick={() => setEditingInstructions({ id: k.id, name: k.name, text: k.standingInstructions ?? "" })}
+                        className="text-teal-700 hover:underline">
+                        {k.standingInstructions ? "Edit instructions" : "Add instructions"}
+                      </button>
+                      <button
                         onClick={() => setConfirming({
                           title: `Revoke "${k.name}"?`,
                           message: "Calls using this key start failing immediately. It cannot be un-revoked — mint a new one instead.",
@@ -379,6 +389,73 @@ export function PartnerKeysClient() {
           </div>
         )}
       </div>
+
+      {editingInstructions && (
+
+        <div className="fixed inset-0 bg-black/20 flex items-start justify-center z-50 p-6" onClick={() => setEditingInstructions(null)}>
+
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mt-24 p-4" onClick={(e) => e.stopPropagation()}>
+
+            <h2 className="text-sm font-semibold text-gray-900">Standing instructions — {editingInstructions.name}</h2>
+
+            <p className="text-xs text-gray-600 mt-1">
+
+              Prepended to every prompt this key sends. A request&apos;s own <code className="font-mono">instructions</code> are
+
+              appended after this, so a caller can add to it but a one-off cannot silently drop it.
+
+            </p>
+
+            <textarea
+
+              value={editingInstructions.text}
+
+              onChange={(e) => setEditingInstructions({ ...editingInstructions, text: e.target.value })}
+
+              rows={4} maxLength={4000}
+
+              placeholder="e.g. Keep every process at a high level. Do not decompose to detailed-design depth."
+
+              className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+
+            <div className="mt-3 flex items-center gap-2">
+
+              <button
+
+                onClick={() => {
+
+                  const { id, text } = editingInstructions;
+
+                  setEditingInstructions(null);
+
+                  void patch(id, { action: "set-instructions", standingInstructions: text });
+
+                }}
+
+                className="rounded-md bg-teal-700 px-3 py-1.5 text-sm text-white hover:bg-teal-800">Save</button>
+
+              <button onClick={() => setEditingInstructions(null)}
+
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+
+              {editingInstructions.text && (
+
+                <button
+
+                  onClick={() => setEditingInstructions({ ...editingInstructions, text: "" })}
+
+                  className="ml-auto text-xs text-gray-500 hover:underline">Clear</button>
+
+              )}
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
 
       {confirming && (
         <ConfirmDialog

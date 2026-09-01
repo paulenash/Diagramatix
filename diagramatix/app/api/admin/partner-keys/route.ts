@@ -30,6 +30,7 @@ const forbidden = () => NextResponse.json({ error: "Forbidden" }, { status: 403 
 function shape(k: {
   id: string; name: string; keyPrefix: string; orgId: string; serviceUserId: string;
   scopes: unknown; projectId: string | null; phase: string; captureUntil: Date | null;
+  standingInstructions: string | null;
   rateLimitPerMin: number; dailyJobLimit: number; revokedAt: Date | null; expiresAt: Date | null;
   lastUsedAt: Date | null; useCount: number; createdAt: Date;
   org?: { name: string } | null; serviceUser?: { email: string } | null; project?: { name: string } | null;
@@ -41,6 +42,7 @@ function shape(k: {
     project: k.project?.name ?? null, projectId: k.projectId,
     scopes: Array.isArray(k.scopes) ? k.scopes : [],
     phase: k.phase, captureUntil: k.captureUntil,
+    standingInstructions: k.standingInstructions ?? null,
     rateLimitPerMin: k.rateLimitPerMin, dailyJobLimit: k.dailyJobLimit,
     revokedAt: k.revokedAt, expiresAt: k.expiresAt,
     lastUsedAt: k.lastUsedAt, useCount: k.useCount, createdAt: k.createdAt,
@@ -296,7 +298,7 @@ export async function PATCH(req: Request) {
   if (!session?.user?.id || !isSuperuser(session)) return forbidden();
 
   const body = (await req.json().catch(() => null)) as
-    | { id?: string; action?: string; phase?: string; captureUntil?: string | null }
+    | { id?: string; action?: string; phase?: string; captureUntil?: string | null; standingInstructions?: string | null }
     | null;
   const id = body?.id?.trim();
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
@@ -315,6 +317,26 @@ export async function PATCH(req: Request) {
       meta: { name: key.name, prefix: key.keyPrefix },
     });
     return NextResponse.json({ ok: true, revoked: true });
+  }
+
+  // Standing instructions (v2/7) — prepended to every prompt this key sends, so
+  // "keep it high level" applies always rather than being resent each time.
+  if (body?.action === "set-instructions") {
+    const text = typeof body.standingInstructions === "string"
+      ? body.standingInstructions.trim().slice(0, 4000)
+      : "";
+    await prisma.apiKey.update({
+      where: { id },
+      data: { standingInstructions: text || null },
+    });
+    await recordAudit({
+      ...auditActor(session, req), orgId: key.orgId,
+      action: "partner.key.instructions", targetType: "apiKey", targetId: id,
+      // The TEXT, not just its length: it changes every generated diagram this
+      // key produces, so "what was it set to in September" has to be answerable.
+      meta: { name: key.name, prefix: key.keyPrefix, chars: text.length, text: text || null },
+    });
+    return NextResponse.json({ ok: true, standingInstructions: text || null });
   }
 
   if (body?.action === "set-phase") {

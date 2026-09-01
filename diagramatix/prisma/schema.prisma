@@ -2118,6 +2118,11 @@ model ApiKey {
   serviceUserId String
   serviceUser   User      @relation("ApiKeyServiceUser", fields: [serviceUserId], references: [id], onDelete: Restrict)
   scopes        Json      @default("[]")
+  /// Free text prepended to EVERY prompt this key sends (v2/7). Boroon asked for
+  /// "keep it high level" to apply always rather than being resent on every
+  /// request. Per-request `instructions` are appended after this, so a caller can
+  /// add to the standing text but a one-off cannot silently lose it.
+  standingInstructions String?
   /// Optional fixed destination project. The harness uses this to keep every
   /// run in one place.
   projectId     String?
