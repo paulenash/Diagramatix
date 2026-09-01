@@ -28,6 +28,7 @@ import { renderDiagramSvg } from "./renderDiagramSvg";
 import { svgToPdf } from "@/app/lib/documents/svgToPdf";
 import { applyVolumetrics, type Volumetrics } from "@/app/lib/simulation/volumetrics";
 import { advanceJob, failJob, startJob, succeedJob } from "./jobs";
+import { deliverCallback } from "./callback";
 import type { PartnerCaller } from "./auth";
 
 export interface WorkerInput {
@@ -41,6 +42,10 @@ export interface WorkerInput {
   projectName?: string;
   /** Effort and frequency, written onto the diagram so it opens runnable. */
   volumetrics?: Volumetrics;
+  /** Free text from the caller, appended to the prompt (v2/7). */
+  instructions?: string;
+  /** Where to POST the finished result, if the caller would rather not poll (v2/5). */
+  callbackUrl?: string | null;
   baseUrl: string;
 }
 
@@ -83,13 +88,29 @@ export async function runJob(input: WorkerInput): Promise<void> {
     }
 
     let plan: unknown = null;
+    // Per-stage milliseconds (v2/6). Recorded here because this worker owns the
+    // whole run in one process, so no extra column is needed to accumulate them.
+    // Returned to the caller so their progress indicator can be built on their
+    // own measured history — the only honest basis, since nothing can predict a
+    // model's running time in advance.
+    const stageMs: Record<string, number> = {};
+    let stageAt = Date.now();
+    let stageName = "reading";
+    const markStage = (next: string) => {
+      const now = Date.now();
+      stageMs[stageName] = (stageMs[stageName] ?? 0) + (now - stageAt);
+      stageAt = now;
+      stageName = next;
+    };
+
     const run = await runProcessMap({
       description: input.description,
       attachment: input.attachment,
       name: input.name,
+      instructions: input.instructions,
       model: picked.model,
       apiKey: picked.apiKey,
-      onStage: (s) => void advanceJob(jobId, s),
+      onStage: (s) => { markStage(s); void advanceJob(jobId, s); },
       onPlan: (p) => { plan = p; },
     });
 
@@ -202,10 +223,22 @@ export async function runJob(input: WorkerInput): Promise<void> {
           connectorCount: run.data.connectors.length,
         },
         ...run.shape,
+        stageMs: (markStage("done"), stageMs),
         ...(vol ? { volumetrics: { ...input.volumetrics, basis: vol.basis, derived: vol.derived, applied: vol.applied, notes: vol.notes } } : {}),
         diagnostics: run.diagnostics.map((d) => ({ kind: d.kind, label: d.label, detail: d.detail })),
       },
     });
+
+    // Push the same body a poll would return (v2/5). Deliberately after the job
+    // is already durable: if this never lands, the result is still there to be
+    // polled, so a failed hook costs convenience and nothing else.
+    if (input.callbackUrl) {
+      void deliverCallback(input.callbackUrl, {
+        jobId,
+        status: "succeeded",
+        statusUrl: `${input.baseUrl}/api/public/v1/process-map/${jobId}`,
+      }, { jobId, ref: jobId }).catch(() => {});
+    }
   } catch (err) {
     if (err instanceof ProcessMapError) {
       await failJob(jobId, err.code, err.message).catch(() => {});

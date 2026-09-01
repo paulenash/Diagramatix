@@ -103,7 +103,16 @@ describe("Partner API — request logging", () => {
     expect(row.keyPrefix).toBe(k.prefix);
   });
 
-  it("T2960 — a TESTING key stores bodies, truncated, and never the key itself", async () => {
+  it("T2960 — a TESTING key stores bodies IN FULL, and never the key itself", async () => {
+    // Changed 2026-09-01 (v2/12). This used to assert TRUNCATION at 2 KB, and the
+    // test was right to pin it — but the policy it pinned was wrong for a test
+    // phase: 2 KB of an 8 MB request is a fingerprint, not evidence, and
+    // diagnosing a bad generation from a fingerprint wastes both sides' time.
+    //
+    // The privacy boundary is unchanged and is where the commitment actually
+    // lives: capture happens only in a bounded phase with a mandatory end date,
+    // going live purges it, and outside that phase nothing is stored at all —
+    // which T2959 pins. The cap protected nothing the phase does not.
     const user = await createUser();
     const org = await createOrg();
     await addOrgMember(user.id, org.id, "ProcessOwner");
@@ -115,10 +124,9 @@ describe("Partner API — request logging", () => {
 
     const row = await prisma.partnerRequest.findFirstOrThrow();
     expect(row.requestBody).not.toBeNull();
-    // Truncated — the envelope is a fingerprint, the document lives whole on the
-    // job instead of twice here.
-    expect(row.requestBody!.length).toBeLessThan(big.length);
-    expect(row.requestBody!).toContain("bytes total");
+    // Whole, byte for byte — that is the point of a capture window.
+    expect(row.requestBody).toBe(big);
+    expect(row.requestBody!).not.toContain("bytes total");
     expect(row.requestHeaders).not.toBeNull();
 
     // The strongest form of the redaction check: the key is in NO column.

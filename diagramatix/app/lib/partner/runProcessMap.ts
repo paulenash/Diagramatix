@@ -29,6 +29,8 @@ export interface RunProcessMapInput {
   apiKey: string;
   /** Progress, for a caller that wants to show a stage. */
   onStage?: (stage: RunStage) => void;
+  /** Free text from the caller, appended to the prompt (v2/7). */
+  instructions?: string;
   /** The raw plan, for storage — see `scripts/replay-diagram.ts`. */
   onPlan?: (plan: unknown) => void;
 }
@@ -71,7 +73,7 @@ export class ProcessMapError extends Error {
  *    are the same ones the app itself generates under; a partner should not get
  *    a different dialect of our own notation.
  */
-export function buildPrompt(input: { description?: string; name?: string; hasDocument: boolean }): string {
+export function buildPrompt(input: { description?: string; name?: string; hasDocument: boolean; instructions?: string }): string {
   const parts: string[] = [];
   parts.push(
     "Model this business process as a BPMN diagram. The result is read by an automation-readiness assessment, so be explicit about WHO performs each step and WHICH systems are touched.",
@@ -89,6 +91,13 @@ export function buildPrompt(input: { description?: string; name?: string; hasDoc
   parts.push(
     "Put each participant in their own lane, naming the role rather than a person. Where the narrative does not say who performs a step, infer the most likely role and use it consistently. Show every external party and IT system as its own pool.",
   );
+  // The caller's own instructions go LAST, so they qualify everything above
+  // rather than being qualified by it — "keep this at a high level" has to beat
+  // our own request for explicit detail, or it does nothing (v2/7).
+  if (input.instructions?.trim()) {
+    parts.push("Additional instructions from the requesting application, which take precedence over the guidance above:");
+    parts.push(input.instructions.trim());
+  }
   return parts.join("\n\n");
 }
 
@@ -105,6 +114,7 @@ export async function runProcessMap(input: RunProcessMapInput): Promise<RunProce
   const rules = await loadAiRulesForType("bpmn");
 
   const prompt = buildPrompt({
+    instructions: input.instructions,
     description,
     name: input.name,
     hasDocument: !!input.attachment,

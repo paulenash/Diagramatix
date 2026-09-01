@@ -33,6 +33,8 @@ const MAX_DESCRIPTION_CHARS = 100_000;
 interface Body {
   name?: unknown;
   description?: unknown;
+  instructions?: unknown;
+  callbackUrl?: unknown;
   document?: { filename?: unknown; mediaType?: unknown; data?: unknown } | null;
   volumetrics?: unknown;
   options?: { projectId?: unknown; projectName?: unknown } | null;
@@ -73,6 +75,23 @@ export const POST = withPartnerLogging(async (req, ref) => {
       if (body[forbidden] !== undefined) {
         return err("bad_request", `"${forbidden}" is not accepted — it is determined by your key.`);
       }
+    }
+
+    // Free text appended to the prompt (v2/7). Boroon wants to say "keep this at
+    // a high level" without it being a field we have to model. Bounded, because it
+    // reaches the model and an unbounded field would be a way to run up a bill.
+    const instructions = typeof body.instructions === "string" ? body.instructions.trim().slice(0, 4000) : "";
+
+    // Where to POST the finished result, if they would rather not poll (v2/5).
+    // https only, and validated here so a bad URL is a 400 at submit rather than a
+    // silent non-delivery twenty minutes later.
+    let callbackUrl: string | null = null;
+    if (body.callbackUrl !== undefined && body.callbackUrl !== null && body.callbackUrl !== "") {
+      if (typeof body.callbackUrl !== "string") return err("bad_request", "`callbackUrl` must be a URL.");
+      let u: URL;
+      try { u = new URL(body.callbackUrl); } catch { return err("bad_request", "`callbackUrl` is not a valid URL."); }
+      if (u.protocol !== "https:") return err("bad_request", "`callbackUrl` must be https.");
+      callbackUrl = u.toString();
     }
 
     const description = typeof body.description === "string" ? body.description.trim() : "";
@@ -146,7 +165,7 @@ export const POST = withPartnerLogging(async (req, ref) => {
       // Set only by our own harness proxy; a partner cannot forge a link to a
       // case because the header is meaningless without a HarnessCase row.
       harnessCaseId: req.headers.get("x-harness-case")?.trim() || null,
-      request: redactRequest({ description, name, document: docMeta, volumetrics: body.volumetrics }),
+      request: redactRequest({ description, name, document: docMeta, volumetrics: body.volumetrics, instructions, callbackUrl }),
       // The document is retained only during a testing window. Outside one we
       // keep its size and hash and nothing else.
       document: c.capturing ? docMeta : null,
@@ -182,6 +201,8 @@ export const POST = withPartnerLogging(async (req, ref) => {
       projectId: typeof body.options?.projectId === "string" ? body.options.projectId : null,
       projectName: typeof body.options?.projectName === "string" ? body.options.projectName : undefined,
       volumetrics: (body.volumetrics ?? undefined) as never,
+      instructions: instructions || undefined,
+      callbackUrl,
       baseUrl: origin,
     }).catch((e) => console.error(`[partner] job ${jobId} escaped:`, e));
 

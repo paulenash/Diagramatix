@@ -54,6 +54,15 @@ export const GET = withPartnerLogging(async (req, ref) => {
       return { response: partnerError("not_found", "No such job.", { ref }), errorCode: "not_found", ...tag };
     }
 
+    // elapsedMs on EVERY response, running or finished (v2/6). Boroon wants to
+    // tell his user how much longer it will take; the model gives no estimate and
+    // the same description can take 30 seconds or two minutes, so there is no
+    // honest "time remaining" to return. Measured elapsed time is what we can give,
+    // and from his own history of runs it is what a progress indicator needs.
+    const elapsedMs = job.startedAt
+      ? (job.finishedAt ?? new Date()).getTime() - job.startedAt.getTime()
+      : null;
+
     const base = {
       jobId: job.id,
       status: job.status,
@@ -61,6 +70,7 @@ export const GET = withPartnerLogging(async (req, ref) => {
       createdAt: job.createdAt,
       startedAt: job.startedAt,
       finishedAt: job.finishedAt,
+      elapsedMs,
       ref,
     };
 
@@ -72,15 +82,21 @@ export const GET = withPartnerLogging(async (req, ref) => {
       return {
         response: NextResponse.json({
           ...base,
-          durationMs: job.startedAt && job.finishedAt ? job.finishedAt.getTime() - job.startedAt.getTime() : null,
+          durationMs: elapsedMs,   // kept: v1 callers may read it
           model: job.model,
           ...result,
+          timings: {
+            elapsedMs,
+            // Per-stage milliseconds, recorded by the worker as it ran.
+            stages: (result.stageMs as Record<string, number> | undefined) ?? null,
+          },
           artifacts: {
             // null rather than a URL that would 404: a caller should not have to
             // request something to discover it is not there.
+            bpmnXmlUrl: job.diagramId ? `${base_}/diagram.bpmn` : null,
+            jsonUrl: job.diagramId ? `${base_}/diagram.json` : null,
             pdfUrl: job.pdfBytes ? `${base_}/diagram.pdf` : null,
             svgUrl: job.svg ? `${base_}/diagram.svg` : null,
-            bpmnXmlUrl: job.diagramId ? `${base_}/diagram.bpmn` : null,
           },
         }),
         ...tag, jobId: job.id,

@@ -20,7 +20,6 @@
 import { prisma } from "@/app/lib/db";
 import { clientIp } from "@/app/lib/rateLimit";
 import { newRef } from "./errors";
-import { BODY_CAPTURE_LIMIT } from "./types";
 
 /** What the wrapper needs back from a handler to log it accurately. */
 export interface PartnerHandlerResult {
@@ -48,8 +47,27 @@ function safeHeaders(h: Headers, keyPrefix?: string): string {
   return JSON.stringify(out);
 }
 
+/**
+ * While a key is CAPTURING, the body is stored whole (v2/12, Paul 2026-09-01).
+ *
+ * It used to be clipped to BODY_CAPTURE_LIMIT even in a testing phase. That was a
+ * sensible instinct for a live system and the wrong one for a test: the point of a
+ * bounded capture window is to be able to see exactly what was sent, and 2 KB of an
+ * 8 MB request is a fingerprint, not evidence. Diagnosing a bad generation from a
+ * fingerprint wastes both sides' time — which is the whole cost this feature exists
+ * to avoid.
+ *
+ * The boundary is unchanged and is where the privacy commitment actually lives:
+ * capture happens only in a bounded phase with a mandatory end date, going live
+ * purges it, and outside that phase no body is stored AT ALL. The cap protected
+ * nothing that the phase does not already protect.
+ *
+ * Kept only as a backstop against a pathological body — orders of magnitude above
+ * anything the API accepts, so it never fires on a legitimate request.
+ */
+const HARD_CEILING = 32 * 1024 * 1024;
 const clip = (s: string) =>
-  s.length <= BODY_CAPTURE_LIMIT ? s : `${s.slice(0, BODY_CAPTURE_LIMIT)}…[${s.length} bytes total]`;
+  s.length <= HARD_CEILING ? s : `${s.slice(0, HARD_CEILING)}…[${s.length} bytes total]`;
 
 /**
  * Wrap a public route handler. Always returns the handler's response — a logging

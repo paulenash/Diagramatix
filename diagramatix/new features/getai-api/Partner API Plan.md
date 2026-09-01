@@ -1,5 +1,35 @@
 # Partner API — process description / SOP in, BPMN out
 
+**Version 2 · 1 September 2026**
+
+## What changed in v2
+
+The review of 2026-09-01 changed nine things. They are folded into the sections
+below; this is the summary, and the reasoning for each sits where it belongs.
+
+| # | Change | Why |
+|---|---|---|
+| 1 | **JSON is a first-class artifact** beside BPMN XML | Boroon asked for JSON over a PDF ("it'll work better if it's a JSON"); both ship in phase 1 |
+| 2 | **BPMN XML is the recommended basis for their scoring** | It is an international standard, so their scoring carries no dependence on our document shape |
+| 3 | **The PDF steps back** from headline deliverable to one option among several | It was always the hardest part to make good; the call moved past it |
+| 4 | **Volumetrics leave phase 1** | "That math will be done in our application." The section and the code REMAIN — dormant, not deleted |
+| 5 | **Completion callback offered beside polling** | Boroon asked whether we could push; polling stays the default |
+| 6 | **Timings returned to the caller, not just logged** | So GETAI can build the expectation their spinner needs. We still cannot predict a run |
+| 7 | **`instructions` on the request, and standing instructions per key** | Boroon wants "keep it high level" to reach the model |
+| 8 | **A "what is dependable" section** in the external doc | Shapes their free-tier offer: structure is safe unattended, the rendering wants a human |
+| 11 | **Limits are provisional and soft for phase 1** | "You can't have a customer hit the day's limit" — monitored and settled commercially |
+| 12 | **Everything is stored during a testing phase** | Paul, 2026-09-01: diagnosing from a fingerprint wastes both sides' time |
+
+Also corrected: the model in use on the partner path is **Opus 5**, not Haiku —
+`ai.generate.model` on prod is set to Opus 5 (Paul, 2026-09-01). Anywhere this
+plan said otherwise was stale.
+
+Items 9, 10 and 14–16 from the review list (inferred team names, human-in-the-loop
+as a design position, licensing, multi-pass questions, simulation) were considered
+and deliberately left out of this revision.
+
+---
+
 ## Context
 
 Boroon Mahanta (GETAI) has built an **AI-readiness assessment** tool. His user
@@ -66,8 +96,12 @@ about 150 lines of glue.
 | Harness: SOP picker | `app/components/sop/ProjectSopsSection.tsx`, `GET /api/projects/:id/sop` |
 | Harness: file → base64 | `arrayBufferToBase64` (`app/lib/base64.ts`); `handleFileAttach` needs extracting — see below |
 
-**The default model is already `claude-haiku-4-5-20251001`** — Boroon's "small language
-model" is the production default, no work needed.
+**The model on the partner path is `claude-opus-5`** — that is what `ai.generate.model`
+is set to on prod (Paul, 2026-09-01). An earlier draft of this plan said Haiku, on the
+reasoning that Boroon had asked for "a small language model"; the setting in production
+is what actually runs, and this is now stated to him as Opus 5. The caller still cannot
+choose a model: `model` in a request body is a 400, so a partner can never drive us
+onto a costlier one.
 
 ---
 
@@ -112,7 +146,15 @@ middleware change.
 | `GET /whoami` | verify a key in one curl |
 | `POST /process-map` | 202 + `{jobId, statusUrl, pollAfterSeconds:5}` |
 | `GET /process-map/{id}` | poll |
-| `GET /process-map/{id}/diagram.pdf` \| `.svg` \| `.bpmn` | artifacts, same key auth |
+| `GET /process-map/{id}/artifact/diagram.bpmn` | **BPMN 2.0 XML — the recommended basis for GETAI's scoring (v2/2)** |
+| `GET /process-map/{id}/artifact/diagram.json` | **The diagram as Diagramatix JSON (v2/1)** |
+| `GET /process-map/{id}/artifact/diagram.pdf` | `.svg` | the rendering; one option among several, no longer the headline (v2/3) |
+
+**Two machine-readable forms, and they are not interchangeable.** The XML is an
+OMG standard, so anything GETAI builds on it survives us reshaping our own
+documents; the JSON is ours and can move. Boroon settled on scoring from the XML
+for exactly that reason, and the external document says so plainly rather than
+presenting the two as equals.
 
 **Request** is JSON with base64 (not multipart — `planBpmn`'s `Attachment` already wants
 base64, and one contract is callable from any language). 10 MB decoded cap, checked on
@@ -121,14 +163,35 @@ only** — two is a 400, not a silent drop.
 
 **Success payload** carries `diagram` (id, deep link, counts), `pools[]` (nested lanes/
 sublanes), `roles[]`, `activities[]` (`no`, `name`, `pool`, `lane`, `taskType`,
-`systems`, `inputs`, `outputs`), `decisions[]`, `handoffs[]`, `volumetrics.derived`,
-`artifacts` (URLs), `warnings[]`.
+`systems`, `inputs`, `outputs`), `decisions[]`, `handoffs[]`,
+`artifacts` (URLs), `warnings[]`, and **`timings`** — `elapsedMs` plus per-stage
+milliseconds (v2/6). `volumetrics.derived` is present only when volumetrics were
+sent, which phase 1 does not do.
+
+**`timings` exists because Boroon asked for it and because we cannot give him what
+he really wants.** He wants to tell his user "about 40 seconds left". The model
+gives no estimate, and the same description can take 30 seconds or two minutes, so
+there is no honest ETA field — only measured elapsed time, from which his side can
+build an expectation out of his own history. Saying that plainly is better than a
+number we would be inventing.
+
+**Request** also accepts **`instructions`** (v2/7) — free text appended to the
+prompt — and **`callbackUrl`** (v2/5). Standing instructions can be attached to
+the key so they apply to every request without being resent; per-request text is
+appended after them.
 
 Shaped by **`app/lib/partner/shapeResult.ts`** — never serialise `SopSkeleton` directly.
 It is internal and will change; the partner contract must not.
 
 **Error envelope** is `{error:{code,message}, ref}`, deliberately unlike the internal
 `{error: string}`. A foreign job is **404, not 403** — no existence oracle.
+
+**Callback (v2/5).** `callbackUrl` on the request gets one `POST` of the finished
+result. It is an ADDITION, never a replacement: the job stays pollable, so a hook
+that fails to deliver loses nothing. Polling remains the phase-1 mechanism and the
+thing we tell Rajeev to build first — the user-visible timing is identical either
+way, which is worth saying because the request came from a belief that push is
+faster for the user. It is not; it is just fewer requests.
 
 ### 3. The auth adapter — `app/lib/partner/auth.ts`
 
@@ -187,7 +250,16 @@ elements.
 **A missing PDF must never fail a successful map.** No `soffice` in local dev — if it
 throws, the job still succeeds with `pdfUrl: null`, `pdfError`, and a working `svgUrl`.
 
-### 6. Volumetrics — `app/lib/simulation/volumetrics.ts`
+### 6. Volumetrics — `app/lib/simulation/volumetrics.ts` — NOT PHASE 1 (v2/4)
+
+> **Out of scope for phase 1.** Boroon, 2026-09-01: *"no need — that math will be done
+> in our application."* The arithmetic belongs where the business context for it lives.
+>
+> **The code and this section REMAIN** (Paul, 2026-09-01) — dormant, not deleted. The
+> capability is built, tested and costs nothing to leave in place, and taking it out
+> would only have to be put back. The external document records it as available to
+> switch on rather than pretending it does not exist. Everything below still describes
+> what happens IF volumetrics are sent; phase 1 simply does not send them.
 
 The diagram already separates a *documented* value from a *simulation* value
 (`app/lib/simulation/useDiagramValues.ts`). So write both:
@@ -248,6 +320,24 @@ upsell moment.
    and the case-bundle export/import so the corpus can live in the repo. Both are
    worth having only once there is a history to compare and a corpus worth moving.
 9. **Hardening.** Daily caps, audit rows, a docs page.
+10. **v2, from the review of 2026-09-01.** Six changes reach the code; the rest are
+    documentation. In dependency order:
+    - **`diagram.json` artifact** (v2/1) — the diagram as Diagramatix JSON, beside the
+      BPMN XML. Nearly free: the document is already JSON, so this is a route and a
+      content type. Add `jsonUrl` to `artifacts`.
+    - **`timings` on the result** (v2/6) — `elapsedMs` plus per-stage milliseconds.
+      The stages are already recorded for the Usage screen; this surfaces them. Also
+      returned WHILE running, so a spinner can show elapsed.
+    - **`instructions` on the request** (v2/7), appended to the prompt, plus standing
+      instructions on the key. Both are plain text into the same place.
+    - **Full-body capture in a testing phase** (v2/12) — drop the 2 KB truncation when
+      the key is capturing.
+    - **`callbackUrl`** (v2/5) — one POST of the finished result, best-effort, job
+      stays pollable. Last because it is the only one needing outbound HTTP, retry
+      thinking and an allow-list.
+    - **Harness parity** — the harness must exercise all of it, or none of it is
+      really tested: an instructions box, the timings on screen, the JSON artifact in
+      the preview dialog, and a way to see a callback fire.
 
 ---
 
@@ -287,10 +377,25 @@ retains nothing extra until someone deliberately says otherwise. Plus
 | Who calls | The harness, us | Boroon's app, his test data | Boroon's app, real customers |
 | Input prose | Kept — on the case, and on the diagram | Kept | Diagram only |
 | Input document | **`HarnessCase`, forever** | **Kept until `captureUntil`** | Not kept |
-| Request/response bodies | Kept | Kept until `captureUntil` | Not kept |
+| Request/response bodies | Kept **IN FULL** | Kept **IN FULL** until `captureUntil` | Not kept |
 | Metadata (sizes, SHA-256, status, ms, error) | Kept | Kept | **Kept** |
 | Request rows | 30 days | 30 days | 30 days |
 | Daily rollup (calls, errors, tokens, cost) | Forever | Forever | Forever |
+
+**Store everything while testing (v2/12).** Paul, 2026-09-01: during a testing
+phase, capture is COMPLETE — full request and response bodies, not the 2 KB envelope
+truncation the first design applied. The truncation was a sensible instinct for a live
+system and the wrong one for a test: diagnosing a bad generation from a fingerprint of
+the input wastes both sides' time, and the whole purpose of a bounded testing window is
+to be able to see exactly what was sent. The 2 KB cap therefore applies to a LIVE key
+only, where bodies are not kept at all — so in practice it now protects nothing and is
+retired.
+
+What does NOT change is the boundary: capture is still a property of the key's PHASE,
+still defaults to `live`, `testing` still carries a mandatory `captureUntil`, going
+live still purges immediately, and `whoami` still reports which mode a key is in. The
+commitment was never "we keep little", it was "we keep it only while we have said we
+are, and we stop on a date" — that is intact.
 
 **The gap this fixes.** The previous design purged bodies at **7 days regardless**,
 which quietly contradicted its own `captureUntil` field: an external test phase
@@ -314,9 +419,10 @@ purge is now driven by `captureUntil`, with a hard ceiling of **90 days** so
   to see it) but requires a fresh `captureUntil` and is audited. It is a temporary
   diagnostic window, not a state to sit in.
 
-The 2 KB truncation applies to the request *envelope* only. The document itself is
-stored whole in `PartnerJob.inputDocument` — a truncated PDF is useless, and the
-envelope is where the 8 MB of base64 would otherwise land twice.
+Bodies are stored WHOLE while a key is in a capture phase (v2/12). The document is
+also stored whole in `PartnerJob.inputDocument`; the request envelope is where the
+8 MB of base64 would otherwise land a second time, so the two are kept separately
+rather than one inside the other.
 
 The Usage screen shows each key's **phase and expiry** as a badge, and says plainly
 when a body was not kept and why — a blank panel that looks like a bug is worse than a
@@ -598,7 +704,7 @@ next poll.
 
 1. `Diagram.data.aiGeneration.promptText` — the description, on the generated diagram,
    where the customer can see it and it dies with the diagram. Always.
-2. `PartnerRequest.requestBody` — the request envelope, truncated to 2 KB. `testing`
+2. `PartnerRequest.requestBody` — the request envelope, IN FULL (v2/12). `testing`
    phase only, purged at that key's `captureUntil`.
 3. `PartnerJob.inputDocument` — the uploaded document's bytes, whole. `testing` phase
    only, purged at `captureUntil` **and immediately on go-live**.
@@ -650,7 +756,7 @@ lines in `tests/TESTS_SUMMARY.md` are updated.
   stored row **never contains the raw key** — assert the full key string is absent from
   every column, the strongest form of this check; with the key in `live` phase, bodies are
   null but sizes and SHA-256 are present; past `captureUntil`, bodies are null again;
-  a document body is truncated to 2 KB with the full hash retained; and the `ref` returned
+  a body is stored IN FULL in a capture phase and not at all outside one; and the `ref` returned
   in the envelope matches the `ref` on the row and the `X-Diagramatix-Request-Id` header.
 
 - **phases** — a `live` key stores no body and no document, only metadata; a `testing`
@@ -698,7 +804,14 @@ integration is a matter of him sending the same JSON.
    expectations now. Shipping `diagram.bpmn` lets him render it properly himself.
 4. **Base64 caps out** at ~10 MB decoded; a 30-page scanned SOP exceeds it. Bigger means
    multipart or pre-signed upload in v2, not a bigger JSON.
-5. **The service user's tier silently gates the partner** — on Free, `gateLimit` 403s
+5. **Limits are provisional and soft for phase 1 (v2/11).** 30/minute and 50/day were
+   picked before either side knew the traffic. Boroon's constraint is the one that
+   matters: *"you can't have a customer hit the day's limit"* — meeting a wall mid-demo
+   is a worse failure than an unexpected invoice line. So they are monitored rather than
+   enforced to the point of spoiling a session, reported through the Usage screen, and
+   settled commercially. `whoami` returns the current values so his side never has to
+   guess, and they can be changed per key without a deploy.
+6. **The service user's tier silently gates the partner** — on Free, `gateLimit` 403s
    after a handful of calls with a message about upgrading *your* subscription, which is
    nonsense to a partner. Mint the service user onto an explicit tier and map that 403
    to `quota_exceeded`.
@@ -709,7 +822,10 @@ integration is a matter of him sending the same JSON.
    it is burned. Refuse; offer a server-side proxy.
 8. **`PartnerRequest` grows fastest of anything here** — polling means several rows per
    job. Metadata rows are small, but bodies are not: bound them by the `captureUntil` purge, the
-   2 KB truncation, and `phase` defaulting to **live**. If a key is left in `testing`
+   full-body capture being confined to a bounded phase, and `phase` defaulting to
+   **live**. Bodies are now stored whole rather than truncated (v2/12), so the table
+   grows FASTER in a capture phase than the first design assumed — which makes
+   `captureUntil` and the 90-day ceiling load-bearing rather than tidy. If a key is left in `testing`
    across a busy integration, that table is the thing that fills the disk — which is why
    `captureUntil` is mandatory in that phase and capped at 90 days.
 9. **The `testing` phase is a privacy commitment, not a debug convenience.** It stores a

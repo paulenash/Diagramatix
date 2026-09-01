@@ -35,10 +35,14 @@ export const GET = withPartnerLogging(async (req, ref) => {
   const parts = new URL(req.url).pathname.split("/").filter(Boolean);
   const file = parts[parts.length - 1] ?? "";
   const jobId = parts[parts.length - 3] ?? ""; // …/process-map/{jobId}/artifact/{file}
-  const kind = file.endsWith(".pdf") ? "pdf" : file.endsWith(".svg") ? "svg" : file.endsWith(".bpmn") ? "bpmn" : null;
+const kind = file.endsWith(".pdf") ? "pdf"
+    : file.endsWith(".svg") ? "svg"
+    : file.endsWith(".bpmn") ? "bpmn"
+    : file.endsWith(".json") ? "json"
+    : null;
 
   if (!kind) {
-    return { response: partnerError("not_found", "Ask for diagram.pdf, diagram.svg or diagram.bpmn.", { ref }), errorCode: "not_found", ...tag };
+    return { response: partnerError("not_found", "Ask for diagram.bpmn, diagram.json, diagram.pdf or diagram.svg.", { ref }), errorCode: "not_found", ...tag };
   }
 
   try {
@@ -83,10 +87,28 @@ export const GET = withPartnerLogging(async (req, ref) => {
     }
 
     // BPMN 2.0 XML, generated on demand — pure, isomorphic, and the thing a
-    // partner should use if they want to render it properly themselves.
+    // partner should score from: an OMG standard, so nothing they build on it
+    // depends on us continuing to shape our own documents as we do today.
     if (!job.diagramId) return { response: partnerError("not_found", "No diagram for that run.", { ref }), errorCode: "not_found", ...tag, jobId };
     const diagram = await prisma.diagram.findUnique({ where: { id: job.diagramId }, select: { name: true, data: true } });
     if (!diagram) return { response: partnerError("not_found", "That diagram no longer exists.", { ref }), errorCode: "not_found", ...tag, jobId };
+
+    // The diagram as JSON (v2/1). Asked for in the review of 2026-09-01 in
+    // preference to a PDF — "it'll work better if it's a JSON". It is OUR
+    // structure rather than a standard, which the documentation says plainly so
+    // nobody builds scoring on it by mistake.
+    if (kind === "json") {
+      return {
+        response: new Response(JSON.stringify({
+          name: diagram.name,
+          note: "Diagramatix document structure. For scoring, prefer diagram.bpmn — BPMN 2.0 is an international standard and does not change with our product.",
+          data: diagram.data,
+        }, null, 2), {
+          headers: { "Content-Type": "application/json; charset=utf-8", "Content-Disposition": `attachment; filename="${name}.json"` },
+        }),
+        ...tag, jobId,
+      };
+    }
 
     const xml = buildBpmnXml(diagram.data as unknown as DiagramData, diagram.name);
     return {

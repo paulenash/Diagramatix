@@ -54,6 +54,7 @@ interface Result {
   warnings?: { code: string; message: string }[];
   error?: { code: string; message: string };
   durationMs?: number | null; model?: string | null;
+  timings?: { elapsedMs?: number | null; stages?: Record<string, number> | null } | null;
   diagnostics?: { kind: string; label: string; detail: string }[];
 }
 
@@ -65,6 +66,7 @@ export function ApiHarnessClient() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [instructions, setInstructions] = useState("");
   const [minutesPerRun, setMinutesPerRun] = useState("");
   const [runsPerMonth, setRunsPerMonth] = useState("");
   const { attachment, setAttachment, attach, clear } = useFileAttach();
@@ -157,6 +159,7 @@ export function ApiHarnessClient() {
       if (typeof v.apiKeyId === "string") setApiKeyId(v.apiKeyId);
       if (typeof v.name === "string") setName(v.name);
       if (typeof v.description === "string") setDescription(v.description);
+      if (typeof v.instructions === "string") setInstructions(v.instructions);
       if (typeof v.minutesPerRun === "string") setMinutesPerRun(v.minutesPerRun);
       if (typeof v.runsPerMonth === "string") setRunsPerMonth(v.runsPerMonth);
       if (v.result) setResult(v.result);
@@ -173,13 +176,13 @@ export function ApiHarnessClient() {
     try {
       const big = attachment ? attachment.data.length > ATTACH_LIMIT : false;
       sessionStorage.setItem(STATE_KEY, JSON.stringify({
-        apiKeyId, name, description, minutesPerRun, runsPerMonth,
+        apiKeyId, name, description, instructions, minutesPerRun, runsPerMonth,
         result, raw, score, sourceDiagramId,
         attachment: attachment && !big ? attachment : null,
         attachmentName: attachment ? attachment.name : null,
       }));
     } catch { /* over quota or blocked — the screen still works */ }
-  }, [apiKeyId, name, description, minutesPerRun, runsPerMonth, result, raw, score, sourceDiagramId, attachment]);
+  }, [apiKeyId, name, description, instructions, minutesPerRun, runsPerMonth, result, raw, score, sourceDiagramId, attachment]);
 
   const loadKeys = useCallback(async () => {
     const r = await fetch("/api/admin/partner-keys", { cache: "no-store" });
@@ -267,6 +270,7 @@ export function ApiHarnessClient() {
     return {
       name: name.trim() || undefined,
       description: description.trim() || undefined,
+      instructions: instructions.trim() || undefined,
       document: attachment
         ? {
             filename: attachment.name,
@@ -450,7 +454,7 @@ export function ApiHarnessClient() {
                   <button type="button" onClick={() => {
                     // Clears the remembered screen too, or the next mount would
                     // restore what was just cleared.
-                    setDescription(""); setName(""); setResult(null); setRaw(null);
+                    setDescription(""); setInstructions(""); setName(""); setResult(null); setRaw(null);
                     setScore(null); setSourceDiagramId(null); clear(); setAttachmentDropped(null);
                   }}
                     className="ml-auto text-xs text-gray-500 hover:text-gray-700 hover:underline">
@@ -515,9 +519,21 @@ export function ApiHarnessClient() {
               )}
             </div>
 
+            <label className="block">
+              <span className="block text-xs font-medium text-gray-600 mb-1">
+                Additional instructions <span className="font-normal text-gray-400">— appended to the prompt, and they take precedence over ours</span>
+              </span>
+              <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={2}
+                placeholder="e.g. Keep this at a high level. Do not decompose to detailed-design depth."
+                className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+            </label>
+
+            {/* Volumetrics are NOT part of phase 1 — the arithmetic belongs in the
+                calling application. Kept here because the capability still works
+                and this is where it would be exercised if it were switched on. */}
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="block">
-                <span className="block text-xs font-medium text-gray-600 mb-1">Minutes per run</span>
+                <span className="block text-xs font-medium text-gray-600 mb-1">Minutes per run <span className="font-normal text-gray-400">(not phase 1)</span></span>
                 <input value={minutesPerRun} onChange={(e) => setMinutesPerRun(e.target.value)} inputMode="numeric"
                   className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
               </label>
@@ -544,6 +560,19 @@ export function ApiHarnessClient() {
                     <b>{result.diagram.elementCount}</b> elements, <b>{result.diagram.connectorCount}</b> connectors
                     {result.durationMs ? ` in ${(result.durationMs / 1000).toFixed(1)}s` : ""}
                     {result.model ? ` · ${result.model}` : ""}
+                    {/* Per-stage timings (v2/6) — the thing GETAI asked to be given
+                        back, so their own history can drive a progress indicator.
+                        Shown here because a number returned but never looked at is
+                        a number nobody notices going wrong. */}
+                    {result.timings?.stages && (
+                      <span className="text-emerald-800">
+                        {" · "}
+                        {Object.entries(result.timings.stages)
+                          .filter(([, ms]) => ms > 0)
+                          .map(([k, ms]) => `${k} ${(ms / 1000).toFixed(1)}s`)
+                          .join(", ")}
+                      </span>
+                    )}
                     {" · "}
                     {/* Our OWN link carries where it came from, so the editor's
                         back button returns here rather than dumping you in the

@@ -22,15 +22,26 @@ export interface RedactedRequest {
   document: { name: string | null; mediaType: string | null; bytes: number; sha256: string } | null;
   volumetrics: unknown;
   name: string | null;
+  instructionsChars: number;
+  instructionsSha256: string | null;
+  callbackOrigin: string | null;
 }
 
 const sha = (b: Buffer | string) => createHash("sha256").update(b).digest("hex");
+
+/** Origin only. A callback URL can carry a token in its path or query, and this
+ *  value is kept for troubleshooting rather than for calling. */
+function safeOrigin(u: string): string | null {
+  try { return new URL(u).origin; } catch { return null; }
+}
 
 export function redactRequest(input: {
   description?: string;
   name?: string;
   document?: { name?: string; mediaType?: string; buf: Buffer } | null;
   volumetrics?: unknown;
+  instructions?: string;
+  callbackUrl?: string | null;
 }): RedactedRequest {
   const d = input.description ?? "";
   return {
@@ -45,6 +56,14 @@ export function redactRequest(input: {
         }
       : null,
     volumetrics: input.volumetrics ?? null,
+    // The instructions are the caller's own words and shape the result, so the
+    // SHAPE of the request has to include them or the run cannot be explained
+    // later. Their length and hash, on the same footing as the description.
+    instructionsChars: input.instructions?.length ?? 0,
+    instructionsSha256: input.instructions ? sha(input.instructions) : null,
+    // Recorded so "why did nothing arrive at our endpoint" is answerable. The
+    // ORIGIN only — a full URL can carry a token in its path or query.
+    callbackOrigin: input.callbackUrl ? safeOrigin(input.callbackUrl) : null,
     name: input.name ?? null,
   };
 }
