@@ -7,6 +7,7 @@ import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { closeFlowVoids } from "./closeFlowVoids";
 import { computeWaypoints, recomputeAllConnectors, pickBoundaryEventSide } from "./routing";
+import { analysePaths } from "./bpmnPaths";
 import { autoSizeForType, wrapText, externalLabelBox, externalLabelSize, connectorLabelWidth, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
 import { snapImportedBounds, type Box } from "./importGeometry";
 import { buildTestConnectors } from "./bpmnTestConnectors";
@@ -3108,58 +3109,77 @@ export function layoutBpmnDiagram(
     restackPoolsR52();
   }
 
-  // ── R55.1: a branch HOLDS the row it was fanned onto ──
-  // R55 stacks a decision's immediate branch targets top / middle / bottom, but
-  // only those. Everything further along the branch is placed by the column
-  // engine at its lane's own centre band, so each chain drifts back toward the
-  // middle and the three paths interleave: in V23.01 the "smart meter" branch
-  // started at 569 and its next two steps sat at 664 and 635 (Paul 2026-08-31).
+  // ── R55.2: every path is given its own ROW, hierarchically ──
   //
-  // Worse than untidy, it makes branches CROSS. The merge assigns its incoming
-  // sides by source Y (R6.28), so when the top branch's last element has drifted
-  // BELOW the bottom branch's, the two swap sides at the join and the lines
-  // cross — which is exactly what "Read obtained?" did.
+  // R55 fans a decision's immediate targets around ITS OWN centre with a fixed
+  // spacing. That is right for one level and wrong for two: a nested decision has
+  // no idea the rows above and below are already spoken for, so its sub-paths
+  // land on their uncles. Measured on a two-level example: path 2.1 sat exactly
+  // on path 1, and 2.3 exactly on path 3.
   //
-  // So each branch carries its row along its own chain, as far as the chain is
-  // unambiguously its own: a node with more than one incoming flow is shared, a
-  // node that forks is a decision of its own, and the merge belongs to nobody.
+  // `analysePaths` builds the path tree — 1, 2, 2.1, 2.3 — and allocates rows by
+  // an in-order walk, which is the order Paul drew (2026-09-01): everything
+  // above, the trunk, everything below. The middle branch keeps the trunk so the
+  // main line runs straight through, and a path that ENDS instead of rejoining
+  // its merge owns a row like any other.
+  //
+  // Only same-container paths are moved, as R55 already restricted itself to:
+  // a branch that crosses into another lane belongs to that lane's own stacking.
   {
-    const rowOf = (e: DiagramElement) => e.y + e.height / 2;
-    // A data link is not flow. The AI plan can only emit "sequence"/"message",
-    // so an association arrives here typed as a sequence and is re-typed later —
-    // counting one as an inbound flow made a task look shared when its only real
-    // predecessor was the branch, and stopped the row propagating.
     const DATA_T = new Set(["data-object", "data-store", "text-annotation"]);
-    const isData = (c: { sourceId: string; targetId: string }) =>
-      DATA_T.has(elMap.get(c.sourceId)?.type ?? "") || DATA_T.has(elMap.get(c.targetId)?.type ?? "");
-    const seqOut = (id: string) =>
-      (outgoing.get(id) ?? []).filter(c => c.type !== "message" && !isData(c));
-    const seqInCount = (id: string) =>
-      aiConnections.filter(c => c.type !== "message" && c.targetId === id && !isData(c)).length;
-    const claimed = new Set<string>();
-    for (const dec of elements) {
-      if (!isDecisionGateway(dec)) continue;
-      const mergeId = findPairedMerge(dec.id);
-      for (const b of seqOut(dec.id)) {
-        const first = elMap.get(b.targetId);
-        if (!first || first.id === mergeId || isGateway(first)) continue;
-        const row = rowOf(first);
-        let cur: DiagramElement | undefined = first;
-        const walked = new Set<string>([first.id]);
-        for (let guard = 0; guard < 24; guard++) {
-          const nexts = cur ? seqOut(cur.id) : [];
-          if (nexts.length !== 1) break;                 // a fork is its own decision
-          const nxt = elMap.get(nexts[0].targetId);
-          if (!nxt || walked.has(nxt.id)) break;
-          if (nxt.id === mergeId || isGateway(nxt)) break;
-          if (seqInCount(nxt.id) !== 1) break;           // shared with another path
-          if (nxt.parentId !== first.parentId) break;    // a different lane owns its own rows
-          if (claimed.has(nxt.id)) break;                // another branch got here first
-          const dy = row - rowOf(nxt);
-          if (Math.abs(dy) > 0.5) { shiftSubtree(nxt.id, dy); nxt.y += dy; }
-          claimed.add(nxt.id);
-          walked.add(nxt.id);
-          cur = nxt;
+    // autoConns are built later; the plan's own flows are what define the paths.
+    const edges = [...aiConnections]
+      .filter(c => c.type !== "message"
+        && !DATA_T.has(elMap.get(c.sourceId)?.type ?? "")
+        && !DATA_T.has(elMap.get(c.targetId)?.type ?? ""))
+      .map(c => ({ sourceId: c.sourceId, targetId: c.targetId, label: c.label ?? null }));
+
+    // The trunk keeps the row the flow already has, so this re-arranges branches
+    // without dragging the main line somewhere new.
+    const firstDecision = elements.find(e => isDecisionGateway(e));
+    if (firstDecision) {
+      const analysis = analysePaths({
+        elements: elements.map(e => ({ id: e.id, height: e.height, type: e.type, parentId: e.parentId })),
+        edges,
+        isDecision: (id) => { const e = elMap.get(id); return !!e && isDecisionGateway(e); },
+        mergeFor: (id) => findPairedMerge(id),
+        trunkRow: firstDecision.y + firstDecision.height / 2,
+      });
+
+      let moved = false;
+      for (const [elId, pathId] of analysis.pathOf) {
+        const el = elMap.get(elId);
+        const row = analysis.rowOf.get(pathId);
+        if (!el || row === undefined) continue;
+        if (isGateway(el)) continue;                       // R8.01/R8.24 own gateway Y
+        if (el.parentId !== firstDecision.parentId) continue;  // another lane's business
+        const dy = row - (el.y + el.height / 2);
+        if (Math.abs(dy) < 0.5) continue;
+        shiftSubtree(el.id, dy);                           // boundary events travel too
+        el.y += dy;
+        moved = true;
+      }
+
+      // Re-grow the owning container. Spreading paths onto their own rows makes
+      // the stack TALLER than whatever the container was sized for, and the lane
+      // fit below only grows lane BANDS — a pool with no lanes of its own would
+      // otherwise be left with its top row hanging outside it.
+      if (moved && firstDecision.parentId) {
+        const owner = elMap.get(firstDecision.parentId);
+        if (owner?.type === "pool" || owner?.type === "lane") {
+          // A lane is grown by `fitLanesToChildren` immediately below, which does
+          // cover the top edge. A POOL WITHOUT LANES has nothing that does —
+          // `expandContainerToFitChildren` only ever grows right and bottom,
+          // because until now nothing pushed a child ABOVE its container. The
+          // topmost path does exactly that, so it is handled here.
+          if (owner.type === "pool" && !elements.some(e => e.type === "lane" && e.parentId === owner.id)) {
+            const kids = elements.filter(e => e.parentId === owner.id);
+            const top = Math.min(...kids.map(e => e.y));
+            const need = (owner.y + 30) - top;
+            if (need > 0) { owner.y -= need; owner.height += need; }
+          }
+          expandContainerToFitChildren(owner.id, owner.type);
+          restackPoolsR52();               // growth may have closed a pool gap
         }
       }
     }
@@ -5281,10 +5301,10 @@ export function layoutBpmnDiagram(
           });
         }
       }
-      const clearAt = (dy: number): boolean => {
-        const b = externalLabelBox({ ...art, y: art.y - dy } as DiagramElement);
+      const clearAt = (dy: number, dx = 0): boolean => {
+        const b = externalLabelBox({ ...art, x: art.x + dx, y: art.y - dy } as DiagramElement);
         if (!b) return true;
-        const shape = { x: art.x, y: art.y - dy, w: art.width, h: art.height };
+        const shape = { x: art.x + dx, y: art.y - dy, w: art.width, h: art.height };
         for (const s of segs) if (clash(b, s) || clash(shape, s)) return false;
         for (const ob of elements) {
           if (ob.id === art.id || !BODY.has(ob.type)) continue;
@@ -5309,12 +5329,26 @@ export function layoutBpmnDiagram(
       const room = band ? art.y - (band.y + LANE_EDGE_PAD) : Number.POSITIVE_INFINITY;
       if (room <= 0) continue;
       let found: number | null = null;
+      let sideways = 0;
       for (let dy = STEP; dy <= MAX_LIFT; dy += STEP) {
         if (dy + GAP > room) break;                     // no more room above
         if (clearAt(dy)) { found = dy + GAP; break; }
       }
-      if (found === null) continue;                     // nowhere better; leave it
-      art.y -= found;
+      // A vertical connector run is NARROW. When there is no room to rise above
+      // one — and paths on separate rows make such runs longer and more common —
+      // a small step sideways clears it, and keeps the artifact beside the
+      // element it serves rather than abandoning the attempt.
+      if (found === null) {
+        outer:
+        for (const dx of [-30, 30, -60, 60]) {
+          for (let dy = 0; dy <= Math.min(MAX_LIFT, Math.max(0, room)); dy += STEP) {
+            if (clearAt(dy, dx)) { found = dy > 0 ? dy + GAP : 0; sideways = dx; break outer; }
+          }
+        }
+      }
+      if (found === null && sideways === 0) continue;    // nowhere better; leave it
+      art.y -= found ?? 0;
+      art.x += sideways;
       moved.push(art);
     }
     // Re-route only what moved: the associations touching a lifted artifact.
