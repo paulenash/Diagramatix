@@ -83,7 +83,9 @@ export interface PathInput {
 
 /** One row of the finished stack. Several paths can share it — a path and the
  *  middle child that continues it are the same line on the page. */
-interface Slot { paths: PathNode[]; height: number; isOwn: boolean }
+interface Slot { paths: PathNode[]; height: number; isOwn: boolean;
+  /** An exception path row: never shares with another fork branch. */
+  exclusive?: boolean }
 
 /** The synthetic path representing the main line. Never numbered. */
 export const ROOT = "trunk";
@@ -205,7 +207,12 @@ export function analysePaths(input: PathInput): PathAnalysis {
       let ownIdx = out.findIndex((r) => r.isOwn);
       if (ownIdx < 0) ownIdx = 0;
       for (const e of exceptions) {
-        const slots = e.slots.map((s) => ({ ...s, isOwn: false }));
+        // `exclusive` travels with the slot so the rule survives being folded
+        // into a parent: sequential forks are ALIGNED there, and an alignment
+        // that maps another fork's branch onto this row undoes the insertion.
+        // V23.01 hit exactly that — the escalation path off the loop subprocess
+        // came back down onto the Consumer self-read branch, one fork earlier.
+        const slots = e.slots.map((s) => ({ ...s, isOwn: false, exclusive: true }));
         if (e.side === "top") { out.splice(ownIdx, 0, ...slots); ownIdx += slots.length; }
         else out.splice(ownIdx + 1, 0, ...slots);
       }
@@ -226,12 +233,36 @@ export function analysePaths(input: PathInput): PathAnalysis {
     const rows: Slot[] = Array.from({ length: above + 1 + below }, () => ({
       paths: [], height: 0, isOwn: false,
     }));
+    /**
+     * An exclusive row admits nothing else, and nothing else admits it.
+     *
+     * Tests the TARGET's occupancy only. Reading the incoming slot's own
+     * `paths.length` instead makes the condition true of the exception slot
+     * itself, so inserting empty rows never clears it and the loop below never
+     * terminates — a hang, not a bad layout.
+     */
+    const clash = (t: Slot, s: Slot) =>
+      (t.exclusive || s.exclusive) && t.paths.length > 0 && !s.isOwn;
     for (const { g, own } of groups) {
+      // Grow the stack rather than let an exception path share a row. The
+      // alignment exists so two SEQUENTIAL forks can reuse rows — their branches
+      // sit at different x — but an exception hangs off a step mid-path and
+      // covers the same columns as whatever is level with it.
+      for (let guard = 0; guard < 64; guard++) {
+        const hit = g.findIndex((s, i) => {
+          const t = rows[above - own + i];
+          return !!t && clash(t, s);
+        });
+        if (hit < 0) break;
+        rows.splice(above - own + hit, 0, { paths: [], height: 0, isOwn: false });
+      }
       g.forEach((s, i) => {
         const t = rows[above - own + i];
+        if (!t) return;
         t.paths.push(...s.paths);
         t.height = Math.max(t.height, s.height);
         t.isOwn = t.isOwn || s.isOwn;
+        t.exclusive = t.exclusive || s.exclusive;
       });
     }
     // The path itself rides the aligned trunk slot.

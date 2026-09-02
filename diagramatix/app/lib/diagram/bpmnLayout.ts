@@ -5190,6 +5190,14 @@ export function layoutBpmnDiagram(
       if (ins.length !== 1) continue;
       const pred = elMap.get(ins[0].sourceId);
       if (!pred || pred.id === e.id || pred.boundaryHostId) continue;
+      // NOT when the predecessor is a DECISION: the End event is then one branch
+      // of a fan, and its row belongs to the branch layout. Pulling it onto the
+      // gateway's own row drops it into the middle of the fan, on top of the
+      // sibling branch — V23.01 drew "Meter reads acquired" over "Return
+      // rejected reads", 33px apart, having been a clear 85px before this pass.
+      const predOut = [...aiConnections, ...autoConns]
+        .filter(c => c.type !== "message" && c.sourceId === pred.id);
+      if (predOut.length > 1) continue;
       // Follow the predecessor's lane, and align to its row.
       if (pred.parentId && (elMap.get(pred.parentId)?.type === "lane")) e.parentId = pred.parentId;
       e.y = pred.y + pred.height / 2 - e.height / 2;
