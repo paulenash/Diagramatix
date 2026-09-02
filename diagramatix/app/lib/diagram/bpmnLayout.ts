@@ -2748,10 +2748,24 @@ export function layoutBpmnDiagram(
       }
       branchMerges.push(merges);
     }
-    const common = [...branchMerges[0]].filter(m => branchMerges.every(s => s.has(m)));
+    // A branch that ENDS never reaches a merge, and must not veto the pairing.
+    // Paul, 2026-09-01: "some sub-paths may end before their Merge." Requiring
+    // every branch to arrive silently unpaired any decision with one terminating
+    // branch — on "gateway Lanes generation Test 3", "Complexity?" had three
+    // branches, two rejoining and one ending at "Complexes Are Too Hard End", so
+    // its merge was never levelled and sat 200px below the decision while the
+    // two-branch gateways beside it were fine.
+    const rejoining = branchMerges.filter(s => s.size > 0);
+    if (rejoining.length < 2) return undefined;          // not a join at all
+    const common = [...rejoining[0]].filter(m => rejoining.every(s => s.has(m)));
     if (common.length === 0) return undefined;
     const byCol = (a: string, b: string) => (colMap.get(a) ?? 0) - (colMap.get(b) ?? 0);
-    const matching = common.filter(m => (incomingCount.get(m) ?? 0) === outConns.length);
+    // Prefer a merge whose in-degree matches the number of branches that really
+    // arrive — which equals the branch count only when none of them end.
+    const matching = common.filter(m => {
+      const deg = incomingCount.get(m) ?? 0;
+      return deg === rejoining.length || deg === outConns.length;
+    });
     if (matching.length > 0) return matching.sort(byCol)[0];
     return common.sort(byCol)[0];
   }
@@ -3286,44 +3300,6 @@ export function layoutBpmnDiagram(
       }
     }
   }
-  // ── R8.32: a decision and its merge sit in the MIDDLE OF THEIR PATHS ──
-  //
-  // Paul's rule (2026-09-01): "halfway between the top boundary of the highest
-  // path's initial element and the bottom boundary of the lowest path's initial
-  // element". Note it is measured on the BOUNDARIES, not the centres — with
-  // branches of different heights those are not the same point, and the boundary
-  // reading is the one that looks centred between the paths.
-  //
-  // R8.01 already computed a midpoint, but it ran BEFORE the paths were given
-  // their rows, so its answer described a diagram that no longer exists: in
-  // "Gateway Lanes generation Test 1" every gateway sat at 423 while its paths
-  // spread from 291 to 955, up to 200px adrift. R8.24 then faithfully aligned
-  // each merge to its decision's stale row. Re-deriving it here, from FINAL
-  // positions, is what makes both correct — R8.24 still does the merges.
-  //
-  // Unconditional, unlike R8.01, which only fired for a cross-lane spread. Paths
-  // now always take rows of their own, so there is always a spread to centre on.
-  {
-    for (const dec of elements) {
-      if (!isDecisionGateway(dec)) continue;
-      const targets = (outgoing.get(dec.id) ?? [])
-        .filter(c => c.type !== "message")
-        .map(c => elMap.get(c.targetId))
-        .filter((e): e is DiagramElement => !!e);
-      if (targets.length < 2) continue;
-      const top = Math.min(...targets.map(t => t.y));
-      const bottom = Math.max(...targets.map(t => t.y + t.height));
-      const centre = (top + bottom) / 2;
-      const wantY = centre - dec.height / 2;
-      if (Math.abs(dec.y - wantY) > 0.5) dec.y = wantY;
-      // The merge takes the same line. R8.24 re-asserts this later, but doing it
-      // here keeps the pair consistent for every pass in between.
-      const mergeId = findPairedMerge(dec.id);
-      const merge = mergeId ? elMap.get(mergeId) : undefined;
-      if (merge) merge.y = centre - merge.height / 2;
-    }
-  }
-
   // Final lane fit — make every lane visually contain its (now-finalised)
   // children. Cross-lane decision gateways (R8.01) and predecessor-aligned
   // decisions (R3.09) can otherwise leave their assigned lane's vertical
@@ -4771,6 +4747,71 @@ export function layoutBpmnDiagram(
     }
   }
 
+  fitLanesToChildren(true);   // FINAL pass: hug each lane to its content (±½ Task-height)
+  // The final lane hug shrinks a white-box pool, which would otherwise leave an
+  // over-wide vertical gap to the black-box pool below it. Re-stack all pools to
+  // the fixed POOL_GAP now so every inter-pool gap is exactly 1.5 × Task height.
+  // (Message-flow labels are re-placed from the FINAL routed geometry below, so
+  // moving the pools here does NOT leave the labels stale.)
+  restackPoolsR52();
+
+  // ── The gateway end-game, in the one order that works ──
+  //
+  // Each of these reads a position the one before it settles, and every earlier
+  // siting of them reproduced the bug they exist to fix.
+  //
+  //   R8.32 centres a decision on its branches, so it must run after the LANE
+  //   passes stop moving those branches. Sited straight after the path rows it
+  //   saw "Type?" at 387 and computed 387 — a perfect no-op — while the drawing
+  //   ended at 630 and the rule wanted 429 (Paul, "gateway Lanes generation
+  //   Test 3"). Moved to just before the branch vertices it still read 546,
+  //   because the final lane hug had yet to run.
+  //
+  //   R8.26 then displaces a branch's subprocess RELATIVE TO the gateway, so it
+  //   has to follow. It cannot simply run first: moving the branch targets is
+  //   the very thing R8.32 measures, and reading a target that R8.26 had already
+  //   moved would be circular.
+  //
+  // Hence: lanes settle, gateways centre, then the vertices and their
+  // subprocesses follow from a gateway that has stopped moving.
+  // ── R8.32: a decision and its merge sit in the MIDDLE OF THEIR PATHS ──
+  //
+  // Paul's rule (2026-09-01): "halfway between the top boundary of the highest
+  // path's initial element and the bottom boundary of the lowest path's initial
+  // element". Note it is measured on the BOUNDARIES, not the centres — with
+  // branches of different heights those are not the same point, and the boundary
+  // reading is the one that looks centred between the paths.
+  //
+  // R8.01 already computed a midpoint, but it ran BEFORE the paths were given
+  // their rows, so its answer described a diagram that no longer exists: in
+  // "Gateway Lanes generation Test 1" every gateway sat at 423 while its paths
+  // spread from 291 to 955, up to 200px adrift. R8.24 then faithfully aligned
+  // each merge to its decision's stale row. Re-deriving it here, from FINAL
+  // positions, is what makes both correct — R8.24 still does the merges.
+  //
+  // Unconditional, unlike R8.01, which only fired for a cross-lane spread. Paths
+  // now always take rows of their own, so there is always a spread to centre on.
+  {
+    for (const dec of elements) {
+      if (!isDecisionGateway(dec)) continue;
+      const targets = (outgoing.get(dec.id) ?? [])
+        .filter(c => c.type !== "message")
+        .map(c => elMap.get(c.targetId))
+        .filter((e): e is DiagramElement => !!e);
+      if (targets.length < 2) continue;
+      const top = Math.min(...targets.map(t => t.y));
+      const bottom = Math.max(...targets.map(t => t.y + t.height));
+      const centre = (top + bottom) / 2;
+      const wantY = centre - dec.height / 2;
+      if (Math.abs(dec.y - wantY) > 0.5) dec.y = wantY;
+      // The merge takes the same line. R8.24 re-asserts this later, but doing it
+      // here keeps the pair consistent for every pass in between.
+      const mergeId = findPairedMerge(dec.id);
+      const merge = mergeId ? elMap.get(mergeId) : undefined;
+      if (merge) merge.y = centre - merge.height / 2;
+    }
+  }
+
   // ── Decide each decision gateway's branch VERTICES, once ──
   // Two things depend on this answer: where the branch's target sits (R8.26,
   // just below) and which point the connector leaves the diamond from (R6.26,
@@ -4815,14 +4856,6 @@ export function layoutBpmnDiagram(
       ep.y += dy;                   // shiftSubtree does not move the root
     }
   }
-
-  fitLanesToChildren(true);   // FINAL pass: hug each lane to its content (±½ Task-height)
-  // The final lane hug shrinks a white-box pool, which would otherwise leave an
-  // over-wide vertical gap to the black-box pool below it. Re-stack all pools to
-  // the fixed POOL_GAP now so every inter-pool gap is exactly 1.5 × Task height.
-  // (Message-flow labels are re-placed from the FINAL routed geometry below, so
-  // moving the pools here does NOT leave the labels stale.)
-  restackPoolsR52();
 
   // ── R8.23: data-artifact label de-overlap ── two data objects / stores that
   // each picked a slot relative to their OWN element can end up close enough that
@@ -5163,6 +5196,42 @@ export function layoutBpmnDiagram(
     const wantY = decCy - merge.height / 2;
     if (Math.abs(merge.y - wantY) > 0.5) merge.y = wantY;
   }
+  // ── R6.31: a merge's INBOUND vertices follow FINAL geometry ──
+  //
+  // Paul, 2026-09-02: "The Merge associated with Gateway 'Complexity?' should
+  // have Task 12 connected to the left-hand vertex when placed correctly."
+  //
+  // A diamond offers three inbound points and they mean something: TOP for a
+  // path arriving from above, LEFT for one arriving level, BOTTOM from below.
+  // The two-inbound case ignored that and split them top/bottom by list index,
+  // so a branch running straight into the merge on its own row still bent up or
+  // down to reach a corner.
+  //
+  // Late, and necessarily so: the sides are first chosen while the connectors
+  // are built, which is long before R8.32 gives the gateway its final row, and a
+  // vertex picked from a position that later changes is a guess. Three or more
+  // arrivals keep the round-robin Paul chose in R6.28.
+  for (const merge of elements) {
+    if (!isMergeGateway(merge)) continue;
+    const ins = connectors.filter(c => c.type === "sequence" && c.targetId === merge.id);
+    if (ins.length !== 2) continue;
+    const mcy = merge.y + merge.height / 2;
+    const LEVEL = merge.height / 2 + 6;                 // within the diamond's own band
+    const info = ins.map(c => {
+      const src = elMap.get(c.sourceId);
+      return { c, dy: src ? (src.y + src.height / 2) - mcy : 0 };
+    });
+    const level = info.filter(i => Math.abs(i.dy) <= LEVEL);
+    // Exactly one arrives level: it takes the left vertex and the other takes
+    // the corner it is genuinely on. Both level, or neither, has no better
+    // answer than the existing top/bottom split — leave those alone.
+    if (level.length !== 1) continue;
+    for (const i of info) {
+      i.c.targetSide = (i === level[0] ? "left" : i.dy > 0 ? "bottom" : "top") as Connector["targetSide"];
+      i.c.targetOffsetAlong = 0.5;                      // R6.30: on the vertex, not near it
+    }
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // Compute waypoints for all connectors
