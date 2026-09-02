@@ -1481,6 +1481,35 @@ export function layoutBpmnDiagram(
   }
 
   phase(`column map done (${colMap.size} elements, maxCol=${Math.max(0, ...colMap.values())}, backEdges=${backEdges.size})`);
+
+  // ── R55.4: which elements belong to an EDGE-MOUNTED EVENT's sub-path ──
+  //
+  // An exception path must not compete with the main line for the lane centre.
+  // R3.10 below stacks everything sharing a column symmetrically about that
+  // centre, and an exception step lands in the same column as the main step
+  // that follows its host — so attaching a boundary event silently pushed the
+  // MAIN path off its own row. Measured: Task 8/9 at 370 but Task 10 at 323,
+  // for no reason other than Task 16 existing beside it.
+  //
+  // Same walk as R55.3, on the plan graph: forward from the event's target
+  // while each step is the exception's alone. A step something else also feeds
+  // is where it rejoins, and belongs to the main line from there on.
+  const emieSubPathIds = new Set<string>();
+  for (const ev of aiElements) {
+    if (!ev.boundaryHost) continue;
+    const first = (outgoing.get(ev.id) ?? []).filter(c => c.type !== "message")[0];
+    let cur: string | undefined = first?.targetId;
+    let guard = 0;
+    while (cur && guard++ < 200) {
+      if (emieSubPathIds.has(cur)) break;
+      const feeds = (incoming.get(cur) ?? []).filter(c => c.type !== "message");
+      if (feeds.length > 1) break;
+      emieSubPathIds.add(cur);
+      const nx: AiConnection[] = (outgoing.get(cur) ?? []).filter(c => c.type !== "message");
+      if (nx.length !== 1) break;
+      cur = nx[0].targetId;
+    }
+  }
   const maxCol = Math.max(0, ...colMap.values());
 
   // ── Pool width: content columns + 1 task width padding for user adjustment room ──
@@ -1641,9 +1670,14 @@ export function layoutBpmnDiagram(
           list.push(el);
           elsByCol.set(col, list);
         }
-        for (const [col, list] of elsByCol) {
-          const n = list.length;
-          for (let i = 0; i < n; i++) {
+        for (const [col, list0] of elsByCol) {
+          // R55.4: the main line keeps the centre; an exception path stacks
+          // BELOW it instead of splitting it. Order is otherwise unchanged.
+          const mainEls = list0.filter(e => !emieSubPathIds.has(e.id));
+          const excEls = list0.filter(e => emieSubPathIds.has(e.id));
+          const list = mainEls.length > 0 ? [...mainEls, ...excEls] : list0;
+          const n = mainEls.length > 0 ? mainEls.length : list.length;
+          for (let i = 0; i < list.length; i++) {
             const el = list[i];
             const def = getSymbolDefinition(el.type as DiagramElement["type"]);
             const sz = autoElementSize(el.type, el.label ?? "", el.taskType as string | undefined, def);
@@ -1656,9 +1690,15 @@ export function layoutBpmnDiagram(
             // decision-gateway exit placement — index 0 above, index 1
             // level with the lane centre, index 2+ below (one row each).
             // n ≤ 2 keeps the original symmetric split.
-            const stackOffset = n <= 2
-              ? (i - (n - 1) / 2) * stackSpacing
-              : (i - 1) * stackSpacing;
+            const rowOffset = (k: number) => n <= 2
+              ? (k - (n - 1) / 2) * stackSpacing
+              : (k - 1) * stackSpacing;
+            // An exception member sits one row below the lowest main member,
+            // so it never shifts the main line. R55.3 gives it its final row
+            // once the host's own row is known.
+            const stackOffset = i < n
+              ? rowOffset(i)
+              : rowOffset(n - 1) + (i - n + 1) * stackSpacing;
             const elY = laneY + laneH / 2 - sz.h / 2 + stackOffset;
 
             elements.push({
@@ -3185,6 +3225,67 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R55.3: an edge-mounted event's sub-path takes a ROW OF ITS OWN ──
+  //
+  // Paul, 2026-09-01: "EMIEs often further divide a path and then are reunited,
+  // or not at the gateway Merge!" In his lanes drawing Event 2 hangs off Task 9
+  // and its exception path — Task 16, "Error Occurred End" — runs on its OWN
+  // line below Path 3, never on top of it.
+  //
+  // R55.2 cannot reach this. It only moves elements sharing the FIRST decision's
+  // container, so an exception path in another lane is out of scope, and that
+  // lane's own centring then drops it on the same row as the path it branches
+  // off. Measured on the lanes example before this pass: "SHARE A ROW: Path 3
+  // (Mkt) and EMIE sub-path at 719" — one line carrying two paths.
+  //
+  // The sub-path goes to the side the event is already mounted on, so the flow
+  // leaves the event in the direction it faces. A step that something else also
+  // feeds is where the exception REJOINS the main line: it belongs to that line,
+  // so the walk stops there rather than dragging the shared tail down with it.
+  {
+    const SUBPATH_GAP = 34;
+    for (const ev of elements) {
+      if (!ev.boundaryHostId) continue;
+      const host = elMap.get(ev.boundaryHostId);
+      if (!host) continue;
+      const firstOut = (outgoing.get(ev.id) ?? []).filter(c => c.type !== "message")[0];
+      if (!firstOut) continue;
+
+      const chain: DiagramElement[] = [];
+      const seen = new Set<string>();
+      let cur = elMap.get(firstOut.targetId);
+      let guard = 0;
+      while (cur && guard++ < 200) {
+        if (seen.has(cur.id)) break;
+        if (cur.parentId !== host.parentId) break;        // another lane's stacking
+        if (isGateway(cur)) break;                        // R8.01/R8.24 own gateway Y
+        const feeds = (incoming.get(cur.id) ?? []).filter(c => c.type !== "message");
+        if (feeds.length > 1) break;                      // rejoins the main line here
+        seen.add(cur.id);
+        chain.push(cur);
+        const nx = (outgoing.get(cur.id) ?? []).filter(c => c.type !== "message");
+        if (nx.length !== 1) break;
+        cur = elMap.get(nx[0].targetId);
+      }
+      if (chain.length === 0) continue;
+
+      // The stored side is authoritative (R7.02 stamps it at placement); where
+      // it is absent, the event is already sitting on the rim, so read it off
+      // the geometry rather than guessing a default.
+      const stored = ev.properties?.boundarySide as string | undefined;
+      const above = (ev.y + ev.height / 2) < (host.y + host.height / 2);
+      const side = (stored ? stored === "top" : above) ? -1 : 1;
+      const hostRow = host.y + host.height / 2;
+      const tallest = Math.max(...chain.map(e => e.height));
+      const want = hostRow + side * (host.height / 2 + SUBPATH_GAP + tallest / 2);
+      for (const el of chain) {
+        const dy = want - (el.y + el.height / 2);
+        if (Math.abs(dy) < 0.5) continue;
+        shiftSubtree(el.id, dy);                          // its own edge events travel too
+        el.y += dy;
+      }
+    }
+  }
   // ── R8.32: a decision and its merge sit in the MIDDLE OF THEIR PATHS ──
   //
   // Paul's rule (2026-09-01): "halfway between the top boundary of the highest
