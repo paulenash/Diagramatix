@@ -171,6 +171,19 @@ Open with a single unnumbered line:
   branches rejoin, written as its own line at the point they come together —
   "Exclusive merge gateway 'Order complete'" — not left implied by "continue
   to". A branch that ends in its own End event does not rejoin; say so.
+- EVERY BRANCH MUST SAY WHERE IT GOES, and a destination is an ELEMENT, never a
+  lane and never "the next task". Either the gateway is followed by its merge
+  line (which resolves all of its branches at once), or each branch ends with
+  one of these exact forms:
+      (continues to exclusive merge gateway "<name>")
+      End event "<name>"
+      (loop repeats)          — inside a standard-loop subprocess
+      (exits subprocess)      — leaves the subprocess at its end
+  "continue to next task", "continue to the Finance lane" and a branch that
+  simply stops are all REFUSED: they read as though something follows, while
+  naming nothing that can be drawn. This is the single most common defect in
+  this catalogue, it is checked automatically, and a prompt that fails is
+  reported for regeneration — so spend the extra line.
 - REPETITION IS A SUBPROCESS, NEVER A LOOP-BACK. When work repeats until a
   condition is met, write one line:
     Expanded Subprocess "<loop condition>" (standard loop) containing, in order:

@@ -8,6 +8,7 @@ import { resolveGenerateModel } from "@/app/lib/ai/aiModelSetting";
 import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
+import { checkPromptBranches } from "@/app/lib/valueChain/checkPromptBranches";
 import {
   type ImportedChain, parseLibraryFromMd, renderChainMd, renderLibraryMd, renumber,
 } from "@/app/lib/valueChain/library";
@@ -87,6 +88,10 @@ export async function GET(req: Request) {
         id: p.id, type: p.type, processCode: p.processCode, name: p.name,
         prompt: p.prompt, chars: p.prompt.length,
         roundTripsOk: p.roundTripsOk, generatedAt: p.generatedAt,
+        // Computed on read rather than stored: the check is deterministic and
+        // costs microseconds, so it needs no column and cannot go stale against
+        // a prompt someone edited by hand.
+        unterminatedBranches: checkPromptBranches(p.prompt).length,
         published: p.publishedPrompt !== null && p.publishedPrompt === p.prompt,
       })),
     })),

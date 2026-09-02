@@ -31,6 +31,8 @@ interface Process { id: string; code: string; title: string; sortOrder: number }
 interface Prompt {
   id: string; type: MdPromptType; processCode: string; name: string;
   prompt: string; chars: number; roundTripsOk: boolean; generatedAt: string | null; published: boolean;
+  /** Gateway branches that never say where they go. 0 is the healthy value. */
+  unterminatedBranches: number;
 }
 interface Chain {
   id: string; code: string; title: string; groupName: string; hidden: boolean; sortOrder: number;
@@ -487,6 +489,14 @@ function PromptRow({ label, prompt, open, setOpen, onRegenerate, busy }: {
           <>
             <span className="text-[10px] tabular-nums text-gray-400">{prompt.chars.toLocaleString()} ch</span>
             {!prompt.roundTripsOk && <span className="text-[10px] text-amber-700">does not parse</span>}
+            {prompt.unterminatedBranches > 0 && (
+              <span
+                className="text-[10px] text-amber-700"
+                title={`${prompt.unterminatedBranches} gateway branch(es) never say where they go — a regeneration has to guess, so the diagram stops matching the write-up`}
+              >
+                {prompt.unterminatedBranches} open branch{prompt.unterminatedBranches === 1 ? "" : "es"}
+              </span>
+            )}
             {!prompt.published && <span className="text-[10px] px-1 rounded bg-amber-100 text-amber-800">draft</span>}
           </>
         ) : (
