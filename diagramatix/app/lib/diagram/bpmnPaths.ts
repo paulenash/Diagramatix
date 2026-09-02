@@ -70,6 +70,13 @@ export interface PathInput {
   mergeFor: (decisionId: string) => string | undefined;
   /** Where the trunk currently sits, so the stack can be centred on it. */
   trunkRow: number;
+  /**
+   * Edge-mounted (boundary) events on an element, with the side they sit on.
+   * Each one that carries an outgoing flow opens an EXCEPTION PATH, and that
+   * path needs a row of its own like any other — see the note on `fork`.
+   */
+  boundaryEventsOn?: (elementId: string) => { id: string; side: "top" | "bottom" }[];
+
   /** Vertical gap between adjacent rows. */
   gap?: number;
 }
@@ -83,6 +90,7 @@ export const ROOT = "trunk";
 
 export function analysePaths(input: PathInput): PathAnalysis {
   const { elements, edges, isDecision, mergeFor, trunkRow } = input;
+  const boundaryEventsOn = input.boundaryEventsOn ?? (() => []);
   const GAP = input.gap ?? 34;
   const byId = new Map(elements.map((e) => [e.id, e]));
   const out = new Map<string, { sourceId: string; targetId: string; label?: string | null }[]>();
@@ -104,11 +112,12 @@ export function analysePaths(input: PathInput): PathAnalysis {
    */
   function walk(node: PathNode, startId: string, stopAt: string | undefined): Slot[] {
     const nested: Slot[][] = [];
+    const exceptions: { side: "top" | "bottom"; slots: Slot[] }[] = [];
     let cur: string | undefined = startId;
     let guard = 0;
 
     while (cur && guard++ < 200) {
-      if (cur === stopAt) { return merge(node, nested); }
+      if (cur === stopAt) { return merge(node, nested, exceptions); }
       const el = byId.get(cur);
       if (!el) break;
       if (visited.has(cur)) break;
@@ -134,12 +143,30 @@ export function analysePaths(input: PathInput): PathAnalysis {
       node.elementIds.push(cur);
       pathOf.set(cur, node.id);
 
+      // An edge-mounted event opens an EXCEPTION PATH off this step. It is a
+      // path like any other and needs a row of its own: placing it relative to
+      // its host without asking what already occupies that row is how it landed
+      // on Path 2.2 in "Gateway EIME Test 2" — Task 16 drawn over Task 6.
+      for (const be of boundaryEventsOn(cur)) {
+        const first = (out.get(be.id) ?? [])[0];
+        if (!first || visited.has(first.targetId)) continue;
+        const child: PathNode = {
+          id: node.id === ROOT ? `E${exceptions.length + 1}` : `${node.id}.E${exceptions.length + 1}`,
+          parentId: node.id,
+          depth: node.depth + 1,
+          label: first.label ?? null,
+          elementIds: [], endsWithoutMerge: false, row: 0,
+        };
+        paths.push(child);
+        exceptions.push({ side: be.side, slots: walk(child, first.targetId, stopAt) });
+      }
+
       const next: { sourceId: string; targetId: string; label?: string | null }[] = out.get(cur) ?? [];
       if (next.length === 0) { node.endsWithoutMerge = true; break; }
       if (next.length > 1) break;             // an unpaired fork: stop cleanly
       cur = next[0].targetId;
     }
-    return merge(node, nested);
+    return merge(node, nested, exceptions);
   }
 
   /**
@@ -151,19 +178,48 @@ export function analysePaths(input: PathInput): PathAnalysis {
    * Concatenating them would stack the second decision's branches below the
    * first's and drive the diagram down the page for no reason.
    */
-  function merge(node: PathNode, nested: Slot[][]): Slot[] {
+  function merge(
+    node: PathNode,
+    nested: Slot[][],
+    exceptions: { side: "top" | "bottom"; slots: Slot[] }[] = [],
+  ): Slot[] {
     const ownHeight = Math.max(
       24,
       ...node.elementIds.map((id) => byId.get(id)?.height ?? 0),
     );
+
+    /**
+     * An exception path takes rows of its OWN, immediately beside this path,
+     * pushing everything further out rather than sharing.
+     *
+     * Sibling branches may share a row because they sit at different x — but an
+     * exception hangs off a step in the MIDDLE of this path, so it occupies the
+     * same columns as whatever is level with it. In "Gateway EIME Test 2" the
+     * exception off Task 9 landed on Path 2.2 at the same x as Task 6 and Task
+     * 7, drawn straight over them. Inserting instead of aligning is what keeps
+     * the stack honest.
+     */
+    const withExceptions = (rows: Slot[]): Slot[] => {
+      if (exceptions.length === 0) return rows;
+      const out = [...rows];
+      let ownIdx = out.findIndex((r) => r.isOwn);
+      if (ownIdx < 0) ownIdx = 0;
+      for (const e of exceptions) {
+        const slots = e.slots.map((s) => ({ ...s, isOwn: false }));
+        if (e.side === "top") { out.splice(ownIdx, 0, ...slots); ownIdx += slots.length; }
+        else out.splice(ownIdx + 1, 0, ...slots);
+      }
+      return out;
+    };
+
     if (nested.length === 0) {
-      return [{ paths: [node], height: ownHeight, isOwn: true }];
+      return withExceptions([{ paths: [node], height: ownHeight, isOwn: true }]);
     }
 
     const groups = nested
       .map((g) => ({ g, own: g.findIndex((s) => s.isOwn) }))
       .filter((x) => x.own >= 0);
-    if (groups.length === 0) return [{ paths: [node], height: ownHeight, isOwn: true }];
+    if (groups.length === 0) return withExceptions([{ paths: [node], height: ownHeight, isOwn: true }]);
 
     const above = Math.max(...groups.map((x) => x.own));
     const below = Math.max(...groups.map((x) => x.g.length - 1 - x.own));
@@ -182,7 +238,7 @@ export function analysePaths(input: PathInput): PathAnalysis {
     rows[above].paths.unshift(node);
     rows[above].height = Math.max(rows[above].height, ownHeight);
     rows[above].isOwn = true;
-    return rows;
+    return withExceptions(rows);
   }
 
   /** Expand a decision's branches into ordered slots: above, trunk, below. */

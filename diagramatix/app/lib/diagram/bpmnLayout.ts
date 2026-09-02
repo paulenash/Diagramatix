@@ -3179,6 +3179,7 @@ export function layoutBpmnDiagram(
   //
   // Only same-container paths are moved, as R55 already restricted itself to:
   // a branch that crosses into another lane belongs to that lane's own stacking.
+  const pathStackOwns = new Set<string>();
   {
     const DATA_T = new Set(["data-object", "data-store", "text-annotation"]);
     // autoConns are built later; the plan's own flows are what define the paths.
@@ -3198,6 +3199,16 @@ export function layoutBpmnDiagram(
         isDecision: (id) => { const e = elMap.get(id); return !!e && isDecisionGateway(e); },
         mergeFor: (id) => findPairedMerge(id),
         trunkRow: firstDecision.y + firstDecision.height / 2,
+        // R55.3: an edge-mounted event opens an exception path, which takes a
+        // row of its own in this stack rather than being positioned relative to
+        // its host afterwards and hoping the row is free.
+        boundaryEventsOn: (id) => elements
+          .filter(e => e.boundaryHostId === id && (outgoing.get(e.id) ?? []).some(c => c.type !== "message"))
+          .map(e => ({
+            id: e.id,
+            side: ((e.properties?.boundarySide as string | undefined) ?? "bottom") === "top"
+              ? "top" as const : "bottom" as const,
+          })),
       });
 
       let moved = false;
@@ -3207,6 +3218,7 @@ export function layoutBpmnDiagram(
         if (!el || row === undefined) continue;
         if (isGateway(el)) continue;                       // R8.01/R8.24 own gateway Y
         if (el.parentId !== firstDecision.parentId) continue;  // another lane's business
+        pathStackOwns.add(el.id);                          // R55.3 must not re-place it
         const dy = row - (el.y + el.height / 2);
         if (Math.abs(dy) < 0.5) continue;
         shiftSubtree(el.id, dy);                           // boundary events travel too
@@ -3282,6 +3294,12 @@ export function layoutBpmnDiagram(
         cur = elMap.get(nx[0].targetId);
       }
       if (chain.length === 0) continue;
+      // Where the path stack already gave these elements a row, it wins: it
+      // knows what the neighbouring rows hold, and this rule does not. Placing
+      // the sub-path relative to its host without asking what occupies that row
+      // is what drew Task 16 over Task 6 in "Gateway EIME Test 2". This is now
+      // the fallback for containers the stack does not cover.
+      if (chain.every(e => pathStackOwns.has(e.id))) continue;
 
       // The stored side is authoritative (R7.02 stamps it at placement); where
       // it is absent, the event is already sitting on the rim, so read it off
