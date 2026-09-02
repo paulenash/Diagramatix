@@ -71,18 +71,55 @@ describe("a gateway states where its branches go", () => {
     expect(new Set(issues.map((i) => i.line)).size).toBe(2);
   });
 
-  it("T3130 — a nested branch's ending does not vouch for its parent", () => {
-    // Without excluding sub-branches, the inner End event would satisfy the
-    // outer branch, and the check would pass exactly where it is needed.
+  it("T3130 — a nested branch's ending does not vouch for a parent that CARRIES ON", () => {
+    // The invariant: inner End events close the inner paths, not the outer
+    // branch, when the outer branch still has steps after the nested group and
+    // never says where they lead.
     const nested = `
   Exclusive gateway "Outer?"
-  - branch "A": continue to next task
+  - branch "A":
+    Exclusive gateway "Inner?"
+    - branch "X": End event "Done"
+    - branch "Y": End event "Also done"
+    User task "Then carry on"
+  - branch "B": End event "Finished"
+`;
+    expect(checkPromptBranches(nested).map((i) => i.condition)).toEqual(["A"]);
+  });
+
+  it("T3145 — a branch whose every nested path ENDS is itself closed", () => {
+    // V23.07 "Yes — hardship eligible" is three levels of gateway with an End
+    // event on every leaf and nothing after them. It has no continuation left
+    // to state, and demanding one reported four phantom defects.
+    const allEnd = `
+  Exclusive gateway "Outer?"
+  - branch "A":
+    User task "Assess it"
     Exclusive gateway "Inner?"
     - branch "X": End event "Done"
     - branch "Y": End event "Also done"
   - branch "B": End event "Finished"
 `;
-    const issues = checkPromptBranches(nested);
-    expect(issues.map((i) => i.condition)).toEqual(["A"]);
+    expect(checkPromptBranches(allEnd)).toEqual([]);
+  });
+
+  it("T3146 — a lone surviving branch continues the main line, unless it claims otherwise", () => {
+    // V21.01 turns away an unreadable application and carries the readable one
+    // straight on: there is nothing to join, so no merge is owed.
+    const survivor = `
+  Exclusive gateway "Readable?"
+  - branch "No": Send task "Request resubmission"
+    End event "Returned for resubmission"
+  - branch "Yes": User task "Assign reference number"
+  Service task "Record the application"
+`;
+    expect(checkPromptBranches(survivor)).toEqual([]);
+
+    // But V16.06 DOES claim a destination and names a lane, not an element.
+    // A sibling ending must not wave that through — it is the whole point.
+    const laneClaim = survivor.replace(
+      '- branch "Yes": User task "Assign reference number"',
+      '- branch "Yes": (continues to Legal lane via sequence flow)');
+    expect(checkPromptBranches(laneClaim).map((i) => i.condition)).toEqual(["Yes"]);
   });
 });

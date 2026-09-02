@@ -73,6 +73,14 @@ export function checkPromptBranches(prompt: string): BranchIssue[] {
   const indentOf = (l: string) => l.match(/^\s*/)![0].length;
   const issues: BranchIssue[] = [];
 
+  /** One branch: its own text, and whatever follows a nested gateway inside it. */
+  type Branch = {
+    line: number; condition: string;
+    parts: string[];        // text up to any nested gateway group
+    after: string[];        // text after that group — a continuation still owed
+    nestedAt?: number;      // where the nested group starts, if there is one
+  };
+
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(BRANCH_RE);
     if (!m) continue;
@@ -106,8 +114,8 @@ export function checkPromptBranches(prompt: string): BranchIssue[] {
 
     // Walk the whole group, gathering each branch's own text.
     const group: { line: number; condition: string; body: string }[] = [];
-    let cur: { line: number; condition: string; parts: string[] } | null =
-      { line: i + 1, condition: m[2], parts: [lines[i].slice(m[0].length)] };
+    let cur: Branch | null =
+      { line: i + 1, condition: m[2], parts: [lines[i].slice(m[0].length)], after: [] };
     let k = i + 1;
     let nestedBelow = -1;
     let resolvedByMerge = false;
@@ -119,24 +127,72 @@ export function checkPromptBranches(prompt: string): BranchIssue[] {
       nestedBelow = -1;
       const bm = line.match(BRANCH_RE);
       if (bm && bm[1].length === base) {                     // the next sibling
-        if (cur) group.push({ line: cur.line, condition: cur.condition, parts: cur.parts } as never);
-        cur = { line: k + 1, condition: bm[2], parts: [line.slice(bm[0].length)] };
+        if (cur) group.push(cur as never);
+        cur = { line: k + 1, condition: bm[2], parts: [line.slice(bm[0].length)], after: [] };
         continue;
       }
-      if (bm) { nestedBelow = bm[1].length; continue; }      // a nested branch
-      if (ind > base) { cur?.parts.push(line); continue; }   // this branch's body
+      if (bm) {                                             // a nested branch
+        nestedBelow = bm[1].length;
+        // Track the LAST nested group, not the first. A branch may hold several
+        // — V23.07 "Accepted" runs a loop subprocess, then more steps, then a
+        // closing gateway — and it is what follows the final one that decides
+        // whether a continuation is still owed.
+        if (cur) { cur.nestedAt = k; cur.after = []; }
+        continue;
+      }
+      if (ind > base) {                                      // this branch's body
+        if (cur) (cur.nestedAt === undefined ? cur.parts : cur.after).push(line);
+        continue;
+      }
       // Back out to the gateway's own level: this is where a merge would sit.
       if (MERGE_RE.test(line)) resolvedByMerge = true;
       break;
     }
-    if (cur) group.push({ line: cur.line, condition: cur.condition, parts: cur.parts } as never);
+    if (cur) group.push(cur as never);
     if (resolvedByMerge) continue;
 
-    for (const b of group) {
-      const body = (b as unknown as { parts: string[] }).parts.join(" ").replace(/\s+/g, " ").trim();
-      if (!SELF_TERMINATED.some((re) => re.test(body))) {
-        issues.push({ line: b.line, condition: b.condition, gateway, body });
+
+    const decided = (group as unknown as Branch[]).map((b) => {
+      const body = [...b.parts, ...b.after].join(" ").replace(/\s+/g, " ").trim();
+      if (SELF_TERMINATED.some((re) => re.test(body))) return { b, body, ok: true };
+
+      // A branch whose own text says nothing may still be closed by what hangs
+      // BENEATH it. Excluding nested sub-branches (T3130) stops an inner End
+      // event vouching for a parent that carries on afterwards — but when every
+      // inner path ends AND nothing follows the nested group, the parent has no
+      // continuation left to state. V23.07 "Yes — hardship eligible" is three
+      // levels of gateway with an End event on every leaf.
+      // No recursion is needed: the main loop reaches every nested group in its
+      // own right and reports it there, so a parent only has to show it is not
+      // still owing a continuation of its own.
+      if (b.nestedAt !== undefined && !/\w/.test(b.after.join(" "))) {
+        return { b, body, ok: true };
       }
+      return { b, body, ok: false };
+    });
+
+    // A gateway needs no merge when only ONE branch survives: the others end,
+    // and the survivor simply continues the line the gateway sits on, which the
+    // layout already makes plain. V21.01 turns away an unreadable application
+    // and carries the readable one straight on — nothing to join.
+    //
+    // Only where that survivor makes NO destination claim, though. One that does
+    // and names a LANE rather than an element — "(continues to Legal lane via
+    // sequence flow)" — is the very case this check exists for, and must not be
+    // waved through merely because its sibling ended.
+    const CLAIMS_A_DESTINATION = /\b(continues?|proceeds?|passes|goes|routes?|flows?)\b/i;
+    const unresolved = decided.filter((d) => !d.ok);
+    const closed = decided.length - unresolved.length;
+    //
+    // Restricted to a SIMPLE branch, too. One carrying a gateway of its own is
+    // not quietly continuing the main line — it has structure whose ending has
+    // to be readable on its own terms.
+    if (unresolved.length === 1 && closed >= 1
+        && unresolved[0].b.nestedAt === undefined
+        && !CLAIMS_A_DESTINATION.test(unresolved[0].body)) continue;
+
+    for (const d of unresolved) {
+      issues.push({ line: d.b.line, condition: d.b.condition, gateway, body: d.body });
     }
   }
   return issues;

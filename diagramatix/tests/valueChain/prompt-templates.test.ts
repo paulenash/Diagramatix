@@ -358,15 +358,47 @@ describe("Data Stores are not used in generated BPMN", () => {
     expect(t).not.toMatch(/Use Data Store for anything that persists/i);
   });
 
+  /**
+   * A Data Store DECLARATION — the thing that becomes an element.
+   *
+   * Narrowed from "any line mentioning the words" on 2026-09-02. The V16
+   * regeneration produced `User task "Identify assets and data stores in
+   * scope"`, which is a perfectly good task name for a privacy impact
+   * assessment and creates no Data Store: the words sit inside a task label,
+   * not in front of one. The old pattern condemned the phrase itself, which is
+   * neither what Paul asked for nor something a regeneration can be relied on
+   * to avoid.
+   *
+   * A declaration puts the name straight after the type — `Data Store "X"` or
+   * `Data store: X` — so that is what is matched, plus a line that opens with
+   * it. T2941 keeps this honest by proving each of those forms is still caught.
+   */
+  const DATA_STORE_DECLARATION = /\bdata\s*stores?\s*["“:]|^\s*[-*]?\s*data\s*stores?\b/i;
+
   it("T2939 — no prompt in the Process Repository asks for one", () => {
     const md = fs.readFileSync(
       path.join(process.cwd(), "new features", "Process Repository Final.md"), "utf8");
     const offenders = md.split(/\r?\n/)
       .map((l, i) => ({ l, n: i + 1 }))
-      .filter(({ l }) => /data\s*store/i.test(l));
+      .filter(({ l }) => DATA_STORE_DECLARATION.test(l));
     expect(
       offenders.map((o) => `line ${o.n}: ${o.l.trim().slice(0, 80)}`),
       "these would put a Data Store back into every diagram generated from them",
     ).toEqual([]);
+  });
+
+  it("T2941 — the narrowed check still catches a real Data Store, and only that", () => {
+    // The control for the narrowing above: without this, T2939 could be relaxed
+    // to nothing and still pass, which is the failure mode that matters.
+    for (const bad of [
+      'Data Store "Customer master record"',
+      '  - Data store: Policy archive',
+      'Data Stores "Ledger"',
+    ]) expect(DATA_STORE_DECLARATION.test(bad), `should be caught: ${bad}`).toBe(true);
+
+    for (const ok of [
+      'User task "Identify assets and data stores in scope"',
+      'Service task "Reconcile against the data store held by Finance"',
+    ]) expect(DATA_STORE_DECLARATION.test(ok), `should be allowed: ${ok}`).toBe(false);
   });
 });
