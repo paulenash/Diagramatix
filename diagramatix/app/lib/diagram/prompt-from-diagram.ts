@@ -346,7 +346,16 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
       return { line: `${pad}- Decision (${gtTag}gateway "${labelOf(el)}"):` };
     }
     if (el.type === "subprocess-expanded" || el.type === "subprocess") {
-      return { line: `${pad}- **${labelOf(el)}** (subprocess — see steps below)`, descendIntoSub: el };
+      // Only promise inner steps when there are some. A COLLAPSED subprocess
+      // has no internal start event, so "see steps below" was followed by
+      // nothing — text that reads as truncation, and tells a regeneration to
+      // expect detail that was never there.
+      const hasInner = elements.some((e) =>
+        e.type === "start-event" && !e.boundaryHostId && isInside(e, el.id));
+      return {
+        line: `${pad}- **${labelOf(el)}** ${hasInner ? "(subprocess — see steps below)" : "(collapsed subprocess — no inner detail recorded)"}`,
+        descendIntoSub: el,
+      };
     }
     if (el.type === "task" || el.type === "intermediate-event") {
       return { line: `${pad}- ${renderAction(el)}` };
@@ -414,6 +423,44 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
           isInside(e, descendIntoSub.id),
         );
         for (const is of innerStarts) walk(is.id, indent + 1);
+      }
+
+      // Edge-mounted (boundary) events and the exception path each one opens.
+      //
+      // Nothing FLOWS INTO a boundary event, so the sequence walk never reached
+      // one and the whole exception path was simply absent from the description
+      // — Paul, 2026-09-02: "Technical Description does not pick up and include
+      // EMIEs and associated sub-path flows." Regenerating from that text lost
+      // the exception entirely, which is the most consequential kind of silence:
+      // the diagram comes back looking complete.
+      //
+      // Emitted under the host in the master template's own shape (section 5:
+      // interrupting or not, type, host, label, what happens next) and closed
+      // the same way a branch is, so the reader can tell an exception that ends
+      // from one that rejoins.
+      for (const ev of elements) {
+        if (ev.boundaryHostId !== el.id) continue;
+        const pad = "  ".repeat(indent + 1);
+        const kind = (ev.properties as Record<string, unknown> | undefined)?.interruptionType === "non-interrupting"
+          ? "non-interrupting" : "interrupting";
+        const evType = ev.eventType ? `${ev.eventType} ` : "";
+        narrativeLines.push(`${pad}- Edge-mounted ${kind} ${evType}event **${labelOf(ev)}** on **${labelOf(el)}**, and on it:`);
+        const first = (outgoing.get(ev.id) ?? [])[0];
+        const inner = "  ".repeat(indent + 2);
+        if (!first) {
+          narrativeLines.push(`${inner}- (nothing follows it)`);
+          continue;
+        }
+        const res = walk(first.targetId, indent + 2, lastLane);
+        if (res.kind === "merge") {
+          narrativeLines.push(`${inner}- End of the **${labelOf(ev)}** path — rejoins the flow at ${describeJoin(res.mergeId)}.`);
+        } else if (res.kind === "ended") {
+          narrativeLines.push(`${inner}- End of the **${labelOf(ev)}** path.`);
+        } else if (res.kind === "seen") {
+          narrativeLines.push(`${inner}- End of the **${labelOf(ev)}** path — rejoins a path already described above.`);
+        } else {
+          narrativeLines.push(`${inner}- End of the **${labelOf(ev)}** path — the path stops here.`);
+        }
       }
 
       if (el.type === "end-event") return { kind: "ended" };

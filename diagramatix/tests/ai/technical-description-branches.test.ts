@@ -113,3 +113,58 @@ describe("a Technical Description closes every branch it opens", () => {
     }
   });
 });
+
+describe("an edge-mounted event's exception path is described", () => {
+  // Paul, 2026-09-02: "Technical Description does not pick up and include EMIEs
+  // and associated sub-path flows." Nothing FLOWS INTO a boundary event, so the
+  // sequence walk never reached one and the exception path was simply absent —
+  // the most consequential kind of silence, because a diagram regenerated from
+  // the text comes back looking complete.
+  const els2: DiagramElement[] = [
+    ...elements,
+    el("ev", "intermediate-event", "Visit overdue", "lnS"),
+    el("x1", "task", "Chase the customer", "lnS"),
+    el("xEnd", "end-event", "Abandoned", "lnS"),
+  ];
+  const host = els2.find((e) => e.id === "t5")!;
+  (els2.find((e) => e.id === "ev") as unknown as Record<string, unknown>).boundaryHostId = host.id;
+  (els2.find((e) => e.id === "ev") as unknown as Record<string, unknown>).eventType = "timer";
+  const conns2: Connector[] = [...connectors, c("ev", "x1"), c("x1", "xEnd")];
+  const text2 = buildBpmnPrompt(els2, conns2);
+
+  it("T3137 — the event is named, with its host, type and whether it interrupts", () => {
+    expect(text2).toMatch(/Edge-mounted interrupting timer event \*\*Visit overdue\*\* on \*\*Task 5\*\*/);
+  });
+
+  it("T3138 — the steps it leads to are listed, and the path is closed", () => {
+    expect(text2).toContain("Chase the customer");
+    expect(text2).toContain("The process ends with **Abandoned**.");
+    expect(text2).toContain("End of the **Visit overdue** path.");
+  });
+
+  it("T3139 — the exception is nested under its host, not spliced into the main flow", () => {
+    const lines2 = text2.split("\n");
+    const hostLine = lines2.findIndex((l) => /- Task 5$/.test(l));
+    const evLine = lines2.findIndex((l) => l.includes("Edge-mounted"));
+    expect(evLine).toBeGreaterThan(hostLine);
+    const indent = (i: number) => lines2[i].match(/^\s*/)![0].length;
+    expect(indent(evLine), "the exception should sit under its host").toBeGreaterThan(indent(hostLine));
+  });
+
+  it("T3140 — a COLLAPSED subprocess does not promise steps it has none of", () => {
+    // "see steps below" followed by nothing reads as truncation, and tells a
+    // regeneration to expect detail that was never recorded.
+    // Its own minimal flow: adding a second outgoing to a task in the shared
+    // fixture would make that task a fork, and the walk would never arrive.
+    const els3: DiagramElement[] = [
+      el("p3", "pool", "Co"), el("ln3", "lane", "Ops", "p3"),
+      el("s3", "start-event", "Begin", "ln3"),
+      el("sp", "subprocess", "Check the file", "ln3"),
+      el("e3", "end-event", "Done", "ln3"),
+    ];
+    const conns3: Connector[] = [c("s3", "sp"), c("sp", "e3")];
+    const t3 = buildBpmnPrompt(els3, conns3);
+    expect(t3).toContain("**Check the file** (collapsed subprocess — no inner detail recorded)");
+    expect(t3).not.toContain("**Check the file** (subprocess — see steps below)");
+  });
+});

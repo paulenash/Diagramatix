@@ -4857,6 +4857,42 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R8.33: the flow AFTER a merge returns to the merge's line ──
+  //
+  // Paul, 2026-09-02: "Task 15 should continue in Lane's middle path i.e. level
+  // with Task 5, Gateway 'Complexity?', Task 11, Task 12, and the associated
+  // Merge." Task 15 follows the nested merge, so the path model already puts it
+  // on the trunk — and R55.2 does place it there.
+  //
+  // An earlier pass then aligns the post-merge chain to the merge's Y, which is
+  // right in intent but runs a thousand lines before R8.32 gives the merge its
+  // final row. So the chain faithfully followed a merge that later moved: Task
+  // 15 tracked the gateway from 353 to 776, R8.32 corrected the gateway to 575,
+  // and Task 15 was left behind on a row nothing else occupied.
+  //
+  // Re-assert the Y half here, where the merge has stopped moving. Y only — the
+  // X snugging belongs with the void sweep and must not be redone.
+  for (const merge of elements) {
+    if (!isMergeGateway(merge)) continue;
+    const mergeCy = merge.y + merge.height / 2;
+    const seen = new Set<string>([merge.id]);
+    const oneOut = (id: string) => {
+      const o = (outgoing.get(id) ?? []).filter(c => c.type !== "message");
+      return o.length === 1 ? o[0].targetId : undefined;
+    };
+    let curId = oneOut(merge.id);
+    while (curId && !seen.has(curId)) {
+      seen.add(curId);
+      const el = elMap.get(curId);
+      if (!el) break;
+      if ((incoming.get(curId) ?? []).filter(c => c.type !== "message").length !== 1) break;  // a join
+      if (el.parentId !== merge.parentId) break;                                              // another lane
+      if (isGateway(el)) break;                                                               // owns its own Y
+      const dy = mergeCy - (el.y + el.height / 2);
+      if (Math.abs(dy) > 0.5) { shiftSubtree(el.id, dy); el.y += dy; }
+      curId = oneOut(curId);
+    }
+  }
   // ── R8.23: data-artifact label de-overlap ── two data objects / stores that
   // each picked a slot relative to their OWN element can end up close enough that
   // their (wider-than-box) labels collide (e.g. "Credit Report" + "Assessment

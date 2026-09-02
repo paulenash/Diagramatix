@@ -124,3 +124,24 @@ describe("a merge is entered on the vertex that matches the approach", () => {
     expect(new Set(arrivals.map((c) => c.targetSide))).toEqual(new Set(["top", "left", "bottom"]));
   });
 });
+
+describe("the flow after a merge stays on the merge's line (R8.33)", () => {
+  it("T3141 — a post-merge step keeps the trunk, level with the rest of it", () => {
+    // Paul, 2026-09-02: "Task 15 should continue in Lane's middle path i.e.
+    // level with Task 5, Gateway 'Complexity?', Task 11, Task 12, and the
+    // associated Merge." An earlier pass aligns the post-merge chain to the
+    // merge, but ran a thousand lines before R8.32 gave the merge its final
+    // row — so the chain followed a merge that then moved, and was left on a
+    // row nothing else occupied.
+    const els2: AiElement[] = [...els, { id: "t15b", type: "task", label: "Task 15", pool: "p", lane: "sales" }];
+    const conns2: AiConnection[] = [
+      ...conns.filter((c) => !(c.sourceId === "m2" && c.targetId === "m1")),
+      { sourceId: "m2", targetId: "t15b" }, { sourceId: "t15b", targetId: "m1" },
+    ];
+    const o2 = layoutBpmnDiagram(els2, conns2);
+    const cy2 = (id: string) => { const e = o2.elements.find((x) => x.id === id)!; return e.y + e.height / 2; };
+    expect(cy2("t15b"), "Task 15 left the trunk").toBeCloseTo(cy2("m2"), 0);
+    expect(cy2("t15b")).toBeCloseTo(cy2("t5"), 0);
+    expect(cy2("t15b")).toBeCloseTo(cy2("t12"), 0);
+  });
+});
