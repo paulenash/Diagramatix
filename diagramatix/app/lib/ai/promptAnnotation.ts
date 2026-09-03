@@ -98,8 +98,8 @@ export function promptHeading(name: string, generatedAt: string | Date): string 
 /** Box height that fully contains the wrapped label — using the SAME wrapText the
  *  renderer uses (same width + font), so the box always sits OUTSIDE the text. No
  *  cap: the whole prompt is shown, however long. */
-function boxHeight(label: string): number {
-  const lines = wrapText(label, ANNOTATION_WIDTH - RENDER_PAD - 4, 12);
+function boxHeight(label: string, width: number = ANNOTATION_WIDTH): number {
+  const lines = wrapText(label, width - RENDER_PAD - 4, 12);
   return Math.max(70, lines.length * LINE_H + V_PAD * 2);
 }
 
@@ -114,21 +114,35 @@ export interface PromptAnnotationInput {
  * content box (from `contentBBox`); the note sits GAP px to its left, vertically
  * centred. With no bbox (empty diagram) it lands at the origin. The `label` is PLAIN
  * text — heading line, blank line, then the full prompt text (no markdown).
+ *
+ * `prev` is the annotation ALREADY on the canvas, when there is one. Every caller
+ * strips the old element and builds a fresh one, so without this the note forgets
+ * where the user put it and how wide they made it on every rebuild — Paul,
+ * 2026-09-04: "after the edit it is replaced on the diagram with different
+ * co-ordinates for its boundary. i.e. it forgets its original shape."
+ *
+ * Geometry a PERSON chose outranks geometry we computed, so `prev` wins wherever
+ * it exists. Height is the exception: it may still GROW when the text no longer
+ * fits the box they left it at, because a clipped prompt is worse than a taller
+ * note. It never shrinks, which would be just as much of a forgetting.
  */
 export function buildPromptAnnotation(
   input: PromptAnnotationInput,
   bbox: ContentBBox | null,
+  prev?: DiagramElement | null,
 ): DiagramElement {
   const label = `${promptHeading(input.name, input.generatedAt)}\n\n${input.text}`;
-  const height = boxHeight(label);
-  const x = bbox ? bbox.minX - ANNOTATION_WIDTH - GAP : 0;
-  const y = bbox ? bbox.midY - height / 2 : 0;
+  const width = prev?.width ?? ANNOTATION_WIDTH;
+  const fitted = boxHeight(label, width);
+  const height = prev ? Math.max(prev.height, fitted) : fitted;
+  const x = prev ? prev.x : bbox ? bbox.minX - ANNOTATION_WIDTH - GAP : 0;
+  const y = prev ? prev.y : bbox ? bbox.midY - height / 2 : 0;
   return {
     id: AI_PROMPT_ANNOTATION_ID,
     type: "text-annotation",
     x,
     y,
-    width: ANNOTATION_WIDTH,
+    width,
     height,
     label,
     properties: { boxed: true, annotationColor: "purple", aiPromptAnnotation: true },

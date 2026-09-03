@@ -21,7 +21,7 @@ import {
   type TemplateData,
 } from "@/app/lib/diagram/types";
 import { mergeDiagram, type MergeConflict } from "@/app/lib/diagram/mergeDiagram";
-import { buildPromptAnnotation, contentBBox, stripPromptAnnotations, stripPromptAnnotationConnectors } from "@/app/lib/ai/promptAnnotation";
+import { AI_PROMPT_ANNOTATION_ID, buildPromptAnnotation, contentBBox, stripPromptAnnotations, stripPromptAnnotationConnectors } from "@/app/lib/ai/promptAnnotation";
 import { useAllowedModels } from "./ModelSelect";
 import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { setCurrentDiagramName } from "@/app/lib/help/currentDiagram";
@@ -1484,6 +1484,7 @@ export function DiagramEditor({
         };
       }
     }
+    const prevAnnotation = data.elements.find((e) => e.id === AI_PROMPT_ANNOTATION_ID) ?? null;
     let elements = stripPromptAnnotations(aiData.elements);
     // The on-canvas prompt annotation is OFF by default now — only add it when the
     // user has explicitly ticked "Show original generation prompt".
@@ -1491,6 +1492,7 @@ export function DiagramEditor({
       elements = [buildPromptAnnotation(
         { name: aiGeneration.promptName, text: aiGeneration.promptText, generatedAt: aiGeneration.generatedAt },
         contentBBox(elements),
+        prevAnnotation,
       ), ...elements];
     }
     setData({
@@ -1526,11 +1528,16 @@ export function DiagramEditor({
   // the element; showing rebuilds it from aiGeneration, left-of-centre.
   const toggleAiPromptAnnotation = useCallback((show: boolean) => {
     const gen = data.aiGeneration;
+    // Where the note is NOW, before it is stripped. Rebuilding from the content
+    // box would move it back to the left margin and reset its width, discarding
+    // wherever the user dragged it to.
+    const prev = data.elements.find((e) => e.id === AI_PROMPT_ANNOTATION_ID) ?? null;
     let elements = stripPromptAnnotations(data.elements);
     if (show && gen) {
       elements = [buildPromptAnnotation(
         { name: gen.promptName, text: gen.promptText, generatedAt: gen.generatedAt },
         contentBBox(elements),
+        prev,
       ), ...elements];
     }
     setData({ ...data, elements, showAiPromptAnnotation: show });
