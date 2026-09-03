@@ -22,7 +22,7 @@
 import { describe, it, expect } from "vitest";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { recomputeAllConnectors } from "@/app/lib/diagram/routing";
-import { externalLabelBox, connectorLabelWidth, hasExternalLabel } from "@/app/lib/diagram/textMetrics";
+import { externalLabelBox, connectorLabelWidth, connectorLabelLines, CONNECTOR_LABEL_MAX_W, hasExternalLabel } from "@/app/lib/diagram/textMetrics";
 
 /** A retry loop guarded by a timer, the shape that produced every fault. */
 const els: AiElement[] = [
@@ -165,8 +165,27 @@ describe("V25.05 — labels are measured as the renderer draws them", () => {
   });
 
   it("T3035 — connectorLabelWidth reports the RENDERED width, not the stored column", () => {
+    // Still the point of this check: the answer must come from the TEXT, never
+    // from the nominal 80px column. The bound moved down on 2026-09-03 because
+    // a long label is now WRAPPED (Paul: "generated gateway connector labels are
+    // very long, they need to be wrapped into 2 lines to localise the overlap
+    // problem at the source"), so the rendered width is the widest wrapped line
+    // rather than the whole string laid out flat.
     const w = connectorLabelWidth("Job completion status and run log");
-    expect(w, "far wider than the nominal 80px column").toBeGreaterThan(150);
+    expect(w, "wider than the nominal 80px column").toBeGreaterThan(80);
+    expect(w, "but capped by the wrap, not the full single-line sprawl").toBeLessThanOrEqual(CONNECTOR_LABEL_MAX_W);
+  });
+
+  it("T3151 — a long label wraps to two balanced lines; a short one is left alone", () => {
+    expect(connectorLabelLines("Yes")).toEqual(["Yes"]);
+    const lines = connectorLabelLines("No — variance exceeds the agreed threshold");
+    expect(lines.length, "a long branch condition should wrap").toBe(2);
+    // Balanced, so neither line is a stub — an unbalanced split reads worse
+    // than no split at all.
+    expect(Math.abs(lines[0].length - lines[1].length)).toBeLessThan(12);
+    expect(lines.join(" ")).toBe("No — variance exceeds the agreed threshold");
+    // A single unbreakable word is left whole rather than cut mid-word.
+    expect(connectorLabelLines("Supercalifragilisticexpialidocious-and-then-some").length).toBe(1);
   });
 });
 

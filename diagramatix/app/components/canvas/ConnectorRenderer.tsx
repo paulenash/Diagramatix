@@ -8,6 +8,7 @@ import { isUmlConnType } from "@/app/lib/diagram/types";
 import { buildConstraintText } from "@/app/lib/diagram/umlConstraints";
 import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
+import { connectorLabelLines } from "@/app/lib/diagram/textMetrics";
 import { ArchimateConnectorRenderer, isArchimateConnectorType } from "./ArchimateConnectorRenderer";
 import { ShowReviewCommentsCtx } from "./SymbolRenderer";
 
@@ -410,7 +411,10 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   // Auto-size: measure text width from actual content
   const fontSize = Math.round(10 * fontScale * 10) / 10;
   const avgCharWidth = fontSize * 0.6;
-  const rawLines = (label || " ").split('\n');
+  // A long branch condition is WRAPPED rather than left to sprawl. Uses the
+  // shared helper so the width the layout reasons about, the width the checks
+  // measure, and the width actually drawn are the same number.
+  const rawLines = connectorLabelLines(label || " ");
   const measuredWidth = Math.max(30, ...rawLines.map(l => l.length * avgCharWidth + 12));
   const effectiveLWidth = measuredWidth;
   const lines   = rawLines;

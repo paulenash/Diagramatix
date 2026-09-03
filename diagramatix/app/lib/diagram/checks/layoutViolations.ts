@@ -8,7 +8,7 @@
  * surface CONFLICTS between rules as emergent failures.
  */
 import type { DiagramData, DiagramElement, Connector } from "../types";
-import { wrapText, externalLabelBox, connectorLabelWidth } from "../textMetrics";
+import { wrapText, externalLabelBox, connectorLabelWidth, connectorLabelLines } from "../textMetrics";
 
 export type Box = { x: number; y: number; w: number; h: number };
 
@@ -56,7 +56,8 @@ export function connectorLabelBox(c: Connector): Box | null {
     : { x: (vis[0].x + vis[vis.length - 1].x) / 2, y: (vis[0].y + vis[vis.length - 1].y) / 2 };
   const offsetX = c.labelOffsetX ?? (c.type === "flowline" ? 18 : 0);
   const offsetY = c.labelOffsetY ?? (c.type === "flowline" ? 16 : -30);
-  const lines = (c.label || " ").split("\n");
+  // The same wrap the renderer applies, so a wrapped label is measured as drawn.
+  const lines = connectorLabelLines(c.label || " ");
   const measuredWidth = Math.max(30, ...lines.map((l) => l.length * 6 + 12)); // fontSize 10 × 0.6
   const lHeight = Math.max(14, lines.length * 14);
   const lCx = anchor.x + offsetX, lTy = anchor.y + offsetY;

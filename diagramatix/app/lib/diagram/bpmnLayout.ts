@@ -8,7 +8,7 @@ import { getSymbolDefinition } from "./symbols/definitions";
 import { closeFlowVoids } from "./closeFlowVoids";
 import { computeWaypoints, recomputeAllConnectors, pickBoundaryEventSide } from "./routing";
 import { analysePaths } from "./bpmnPaths";
-import { autoSizeForType, wrapText, externalLabelBox, externalLabelSize, connectorLabelWidth, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
+import { autoSizeForType, wrapText, externalLabelBox, externalLabelSize, connectorLabelWidth, connectorLabelLines, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
 import { snapImportedBounds, type Box } from "./importGeometry";
 import { buildTestConnectors } from "./bpmnTestConnectors";
 

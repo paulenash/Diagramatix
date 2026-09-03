@@ -238,9 +238,53 @@ export const EXTERNAL_LABEL_DEFAULT_OY = 7;
  * wide, not 80 — which is how two message labels 132px apart were judged not to
  * overlap and were drawn on top of each other (Paul 2026-08-31, V25.05).
  */
+/**
+ * The widest a connector label may run on ONE line before it is wrapped.
+ *
+ * Paul, 2026-09-03: "Generated gateway connector labels are very long. They
+ * need to be wrapped into 2 lines to localise the overlap problem at the
+ * source." A branch condition like "No — variance exceeds threshold" is 31
+ * characters — about 200px of horizontal sprawl at 10px — and that width is
+ * what collides with the next branch's label, the task beyond it, and its own
+ * line. Wrapping halves the span instead of shuffling the collision elsewhere.
+ */
+export const CONNECTOR_LABEL_MAX_W = 120;
+
+/**
+ * A connector label split into the lines it is actually drawn on.
+ *
+ * Honours hard newlines first — an author's own break is a decision, not a
+ * suggestion — and otherwise balances a too-wide label across two lines at the
+ * word boundary nearest the middle, so neither line is a stub. A label with no
+ * usable break (one very long word) is left alone rather than cut mid-word.
+ */
+export function connectorLabelLines(
+  label: string,
+  maxW = CONNECTOR_LABEL_MAX_W,
+  fontSize = 10,
+): string[] {
+  const text = String(label ?? " ");
+  if (text.includes("\n")) return text.split("\n");
+  const cw = fontSize * 0.6;
+  if (text.length * cw + 12 <= maxW) return [text];
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return [text];
+  // Balance: choose the split whose two halves are closest in length.
+  let best = 1, bestDiff = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    const a = words.slice(0, i).join(" ").length;
+    const b = words.slice(i).join(" ").length;
+    const diff = Math.abs(a - b);
+    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  }
+  return [words.slice(0, best).join(" "), words.slice(best).join(" ")];
+}
+
+/** The RENDERED width of a connector label — the widest wrapped line. */
 export function connectorLabelWidth(label: string, fontSize = 10): number {
   const avgCharWidth = fontSize * 0.6;
-  return Math.max(30, ...String(label ?? " ").split("\n").map((l) => l.length * avgCharWidth + 12));
+  return Math.max(30, ...connectorLabelLines(label, CONNECTOR_LABEL_MAX_W, fontSize)
+    .map((l) => l.length * avgCharWidth + 12));
 }
 
 /** The types that draw their name OUTSIDE the shape. Mirrors the condition in
