@@ -1,0 +1,378 @@
+{
+  "diagrams": [
+    {
+      "name": "V22.01 V22.01 Receive Notification",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pClaimant",
+                "type": "pool",
+                "label": "Claimant",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "pInsurer",
+                "type": "pool",
+                "label": "Insurer",
+                "poolType": "white-box"
+              },
+              {
+                "id": "pCustomerPortal",
+                "type": "pool",
+                "label": "Customer\nPortal",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "pCMP",
+                "type": "pool",
+                "label": "Claims\nManagement\nPlatform",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "lClaimsIntake",
+                "type": "lane",
+                "label": "Claims Intake (Claims Consultant)",
+                "parentPool": "pInsurer",
+                "pool": "pInsurer"
+              },
+              {
+                "id": "eStart",
+                "type": "start-event",
+                "label": "Loss or event notification received from Claimant",
+                "eventType": "message",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "gChannel",
+                "type": "gateway",
+                "label": "Notification channel?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "ePortalCatch",
+                "type": "intermediate-event",
+                "label": "Portal notification retrieved from Customer Portal",
+                "eventType": "message",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "tCaptureDetails",
+                "type": "task",
+                "label": "Capture notification details\nfrom claimant",
+                "taskType": "user",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "gChannelMerge",
+                "type": "gateway",
+                "label": "Notification channel",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "tLogNotification",
+                "type": "task",
+                "label": "Log notification in\nClaims Management Platform",
+                "taskType": "service",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "tSendAck",
+                "type": "task",
+                "label": "Send acknowledgement\nto claimant",
+                "taskType": "send",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "tCheckCompleteness",
+                "type": "task",
+                "label": "Check notification\nfor completeness",
+                "taskType": "user",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "btTimer",
+                "type": "intermediate-event",
+                "label": "Maximum wait for missing information (service timeframe exceeded)",
+                "eventType": "timer",
+                "boundaryHost": "tCheckCompleteness",
+                "boundarySide": "bottom",
+                "properties": {
+                  "interruptionType": "interrupting"
+                }
+              },
+              {
+                "id": "tHoldingCorrespondence",
+                "type": "task",
+                "label": "Issue holding correspondence\nand escalate",
+                "taskType": "send",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "eTimeoutEnd",
+                "type": "end-event",
+                "label": "Notification timed out — escalated to supervisor",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "gComplete",
+                "type": "gateway",
+                "label": "Notification complete?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "tRequestMissing",
+                "type": "task",
+                "label": "Request missing information\nfrom claimant",
+                "taskType": "send",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "eMissingInfoCatch",
+                "type": "intermediate-event",
+                "label": "Missing information received from Claimant",
+                "eventType": "message",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "gCompleteMerge",
+                "type": "gateway",
+                "label": "Notification complete",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "eEnd",
+                "type": "end-event",
+                "label": "Notification complete — ready for Register Claim & Set Reserve",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "doNotificationRecord",
+                "type": "data-object",
+                "label": "Notification Record",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "doIncidentDetails",
+                "type": "data-object",
+                "label": "Incident Details",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "doAcknowledgement",
+                "type": "data-object",
+                "label": "Acknowledgement",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              },
+              {
+                "id": "doMissingInfoRequest",
+                "type": "data-object",
+                "label": "Missing Information Request",
+                "pool": "pInsurer",
+                "lane": "lClaimsIntake"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "eStart",
+                "targetId": "gChannel",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gChannel",
+                "targetId": "ePortalCatch",
+                "type": "sequence",
+                "label": "Portal submission"
+              },
+              {
+                "sourceId": "gChannel",
+                "targetId": "tCaptureDetails",
+                "type": "sequence",
+                "label": "Direct contact (phone, email, post)"
+              },
+              {
+                "sourceId": "ePortalCatch",
+                "targetId": "gChannelMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tCaptureDetails",
+                "targetId": "gChannelMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gChannelMerge",
+                "targetId": "tLogNotification",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tLogNotification",
+                "targetId": "tSendAck",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tSendAck",
+                "targetId": "tCheckCompleteness",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tCheckCompleteness",
+                "targetId": "gComplete",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "btTimer",
+                "targetId": "tHoldingCorrespondence",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tHoldingCorrespondence",
+                "targetId": "eTimeoutEnd",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gComplete",
+                "targetId": "gCompleteMerge",
+                "type": "sequence",
+                "label": "Yes — all required details present"
+              },
+              {
+                "sourceId": "gComplete",
+                "targetId": "tRequestMissing",
+                "type": "sequence",
+                "label": "No — details missing"
+              },
+              {
+                "sourceId": "tRequestMissing",
+                "targetId": "eMissingInfoCatch",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "eMissingInfoCatch",
+                "targetId": "gCompleteMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gCompleteMerge",
+                "targetId": "eEnd",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "pClaimant",
+                "targetId": "eStart",
+                "type": "message",
+                "label": "Loss or event notification (phone, email or post)"
+              },
+              {
+                "sourceId": "pClaimant",
+                "targetId": "pCustomerPortal",
+                "type": "message",
+                "label": "Online notification submission"
+              },
+              {
+                "sourceId": "pCustomerPortal",
+                "targetId": "ePortalCatch",
+                "type": "message",
+                "label": "Retrieved portal notification"
+              },
+              {
+                "sourceId": "tLogNotification",
+                "targetId": "pCMP",
+                "type": "message",
+                "label": "New notification record logged"
+              },
+              {
+                "sourceId": "tSendAck",
+                "targetId": "pClaimant",
+                "type": "message",
+                "label": "Acknowledgement of notification receipt"
+              },
+              {
+                "sourceId": "tRequestMissing",
+                "targetId": "pClaimant",
+                "type": "message",
+                "label": "Request for missing information"
+              },
+              {
+                "sourceId": "pClaimant",
+                "targetId": "eMissingInfoCatch",
+                "type": "message",
+                "label": "Missing information supplied"
+              },
+              {
+                "sourceId": "tCaptureDetails",
+                "targetId": "doIncidentDetails",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "doIncidentDetails",
+                "targetId": "tLogNotification",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tLogNotification",
+                "targetId": "doNotificationRecord",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "doNotificationRecord",
+                "targetId": "tCheckCompleteness",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tSendAck",
+                "targetId": "doAcknowledgement",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tRequestMissing",
+                "targetId": "doMissingInfoRequest",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "doMissingInfoRequest",
+                "targetId": "eMissingInfoCatch",
+                "type": "sequence"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "processCode": "V22.01",
+  "name": "V22.01 Receive Notification",
+  "chain": "V22",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:24:44.073Z"
+}

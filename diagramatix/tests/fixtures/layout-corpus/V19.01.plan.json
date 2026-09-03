@@ -1,0 +1,466 @@
+{
+  "diagrams": [
+    {
+      "name": "V19.01 V19.01 Raise Access Request",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pContractor",
+                "type": "pool",
+                "label": "Contractor",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "pOrg",
+                "type": "pool",
+                "label": "Organisation",
+                "poolType": "white-box"
+              },
+              {
+                "id": "lITSD",
+                "type": "lane",
+                "label": "IT Service Desk (Service Desk Agent)",
+                "parentPool": "pOrg",
+                "pool": "pOrg"
+              },
+              {
+                "id": "pITSM",
+                "type": "pool",
+                "label": "IT Service\nManagement",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "startEvent",
+                "type": "start-event",
+                "label": "Access request received from Contractor",
+                "eventType": "message",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "tReview",
+                "type": "task",
+                "label": "Review access\nrequest submission",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "gwSubmissionCheck",
+                "type": "gateway",
+                "label": "Request submission complete?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "tRequestMissing",
+                "type": "task",
+                "label": "Request missing information\nfrom Contractor",
+                "taskType": "send",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "ieAdditionalInfo",
+                "type": "intermediate-event",
+                "label": "Additional information received from Contractor",
+                "eventType": "message",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "gwSubmissionMerge",
+                "type": "gateway",
+                "label": "Request submission complete",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "tClassify",
+                "type": "task",
+                "label": "Classify request type\nand priority",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "tCheckIdentity",
+                "type": "task",
+                "label": "Check requester identity\nevidence provided",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "gwIdentityCheck",
+                "type": "gateway",
+                "label": "Identity evidence provided?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "tNotifyIdentity",
+                "type": "task",
+                "label": "Notify Contractor to\nsupply identity evidence",
+                "taskType": "send",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "ieIdentityEvidence",
+                "type": "intermediate-event",
+                "label": "Identity evidence received from Contractor",
+                "eventType": "message",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "gwIdentityMerge",
+                "type": "gateway",
+                "label": "Identity evidence provided",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "tLogRequest",
+                "type": "task",
+                "label": "Log access request\nin IT Service\nManagement",
+                "taskType": "service",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "tConfirmAUP",
+                "type": "task",
+                "label": "Confirm acceptable-use terms\nacknowledged by requester",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "gwAUPCheck",
+                "type": "gateway",
+                "label": "Acceptable-use terms accepted?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "tSendAUP",
+                "type": "task",
+                "label": "Send acceptable-use terms\nto Contractor for\nacceptance",
+                "taskType": "send",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "ieAUPAcceptance",
+                "type": "intermediate-event",
+                "label": "Acceptable-use acceptance received from Contractor",
+                "eventType": "message",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "gwAUPMerge",
+                "type": "gateway",
+                "label": "Acceptable-use terms accepted",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "tUpdateRecord",
+                "type": "task",
+                "label": "Update request record\nwith classification and\nevidence status in\nIT Service Management",
+                "taskType": "service",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "endEvent",
+                "type": "end-event",
+                "label": "Access request raised and logged — ready for Validate Identity and Status",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "doAccessRequestForm",
+                "type": "data-object",
+                "label": "Access Request Form",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "doIdentityEvidence",
+                "type": "data-object",
+                "label": "Identity Evidence Package",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "doAUPAck",
+                "type": "data-object",
+                "label": "Acceptable-Use Acknowledgement",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              },
+              {
+                "id": "doClassifiedRecord",
+                "type": "data-object",
+                "label": "Classified Access Request Record",
+                "pool": "pOrg",
+                "lane": "lITSD"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "startEvent",
+                "targetId": "tReview",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tReview",
+                "targetId": "gwSubmissionCheck",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwSubmissionCheck",
+                "targetId": "tRequestMissing",
+                "type": "sequence",
+                "label": "Incomplete"
+              },
+              {
+                "sourceId": "tRequestMissing",
+                "targetId": "ieAdditionalInfo",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ieAdditionalInfo",
+                "targetId": "gwSubmissionMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwSubmissionCheck",
+                "targetId": "gwSubmissionMerge",
+                "type": "sequence",
+                "label": "Complete"
+              },
+              {
+                "sourceId": "gwSubmissionMerge",
+                "targetId": "tClassify",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tClassify",
+                "targetId": "tCheckIdentity",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tCheckIdentity",
+                "targetId": "gwIdentityCheck",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwIdentityCheck",
+                "targetId": "tNotifyIdentity",
+                "type": "sequence",
+                "label": "Evidence missing"
+              },
+              {
+                "sourceId": "tNotifyIdentity",
+                "targetId": "ieIdentityEvidence",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ieIdentityEvidence",
+                "targetId": "gwIdentityMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwIdentityCheck",
+                "targetId": "gwIdentityMerge",
+                "type": "sequence",
+                "label": "Evidence present"
+              },
+              {
+                "sourceId": "gwIdentityMerge",
+                "targetId": "tLogRequest",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tLogRequest",
+                "targetId": "tConfirmAUP",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tConfirmAUP",
+                "targetId": "gwAUPCheck",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwAUPCheck",
+                "targetId": "tSendAUP",
+                "type": "sequence",
+                "label": "Not accepted"
+              },
+              {
+                "sourceId": "tSendAUP",
+                "targetId": "ieAUPAcceptance",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ieAUPAcceptance",
+                "targetId": "gwAUPMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwAUPCheck",
+                "targetId": "gwAUPMerge",
+                "type": "sequence",
+                "label": "Accepted"
+              },
+              {
+                "sourceId": "gwAUPMerge",
+                "targetId": "tUpdateRecord",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tUpdateRecord",
+                "targetId": "endEvent",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "pContractor",
+                "targetId": "startEvent",
+                "type": "message",
+                "label": "Access request submission (engagement details and purpose)"
+              },
+              {
+                "sourceId": "tRequestMissing",
+                "targetId": "pContractor",
+                "type": "message",
+                "label": "Request for missing information"
+              },
+              {
+                "sourceId": "pContractor",
+                "targetId": "ieAdditionalInfo",
+                "type": "message",
+                "label": "Additional information supplied"
+              },
+              {
+                "sourceId": "tNotifyIdentity",
+                "targetId": "pContractor",
+                "type": "message",
+                "label": "Notification to supply identity evidence"
+              },
+              {
+                "sourceId": "pContractor",
+                "targetId": "ieIdentityEvidence",
+                "type": "message",
+                "label": "Identity evidence documents"
+              },
+              {
+                "sourceId": "tSendAUP",
+                "targetId": "pContractor",
+                "type": "message",
+                "label": "Acceptable-use terms for acknowledgement"
+              },
+              {
+                "sourceId": "pContractor",
+                "targetId": "ieAUPAcceptance",
+                "type": "message",
+                "label": "Signed acceptable-use acceptance"
+              },
+              {
+                "sourceId": "tLogRequest",
+                "targetId": "pITSM",
+                "type": "message",
+                "label": "New access request record creation"
+              },
+              {
+                "sourceId": "tUpdateRecord",
+                "targetId": "pITSM",
+                "type": "message",
+                "label": "Updated request record with classification and evidence status"
+              },
+              {
+                "sourceId": "pITSM",
+                "targetId": "tLogRequest",
+                "type": "message",
+                "label": "Request reference number and current record state"
+              },
+              {
+                "sourceId": "tReview",
+                "targetId": "doAccessRequestForm",
+                "type": "sequence",
+                "label": ""
+              },
+              {
+                "sourceId": "doAccessRequestForm",
+                "targetId": "tClassify",
+                "type": "sequence",
+                "label": ""
+              },
+              {
+                "sourceId": "tCheckIdentity",
+                "targetId": "doIdentityEvidence",
+                "type": "sequence",
+                "label": ""
+              },
+              {
+                "sourceId": "doIdentityEvidence",
+                "targetId": "tUpdateRecord",
+                "type": "sequence",
+                "label": ""
+              },
+              {
+                "sourceId": "tConfirmAUP",
+                "targetId": "doAUPAck",
+                "type": "sequence",
+                "label": ""
+              },
+              {
+                "sourceId": "doAUPAck",
+                "targetId": "tUpdateRecord",
+                "type": "sequence",
+                "label": ""
+              },
+              {
+                "sourceId": "tUpdateRecord",
+                "targetId": "doClassifiedRecord",
+                "type": "sequence",
+                "label": ""
+              },
+              {
+                "sourceId": "doClassifiedRecord",
+                "targetId": "endEvent",
+                "type": "sequence",
+                "label": ""
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "processCode": "V19.01",
+  "name": "V19.01 Raise Access Request",
+  "chain": "V19",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:23:27.182Z"
+}

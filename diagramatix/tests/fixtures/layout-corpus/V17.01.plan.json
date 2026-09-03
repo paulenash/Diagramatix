@@ -1,0 +1,385 @@
+{
+  "diagrams": [
+    {
+      "name": "V17.01 V17.01 Plan Audit & Set Scope",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pAMS",
+                "type": "pool",
+                "label": "Audit Management\nSystem",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "pGRC",
+                "type": "pool",
+                "label": "GRC\nPlatform",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "pIA",
+                "type": "pool",
+                "label": "Internal Audit Organisation",
+                "poolType": "white-box"
+              },
+              {
+                "id": "lIA",
+                "type": "lane",
+                "label": "Internal Audit",
+                "parentPool": "pIA",
+                "pool": "pIA"
+              },
+              {
+                "id": "lRC",
+                "type": "lane",
+                "label": "Risk & Compliance",
+                "parentPool": "pIA",
+                "pool": "pIA"
+              },
+              {
+                "id": "e1",
+                "type": "start-event",
+                "label": "Planning cycle or triggering event",
+                "eventType": "none",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "t1",
+                "type": "task",
+                "label": "Define audit universe\nand draft scope\ncriteria",
+                "taskType": "user",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "t2",
+                "type": "task",
+                "label": "Retrieve prior findings\nand assurance coverage",
+                "taskType": "service",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "ie1",
+                "type": "intermediate-event",
+                "label": "Risk register and control library data received",
+                "eventType": "message",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "t3",
+                "type": "task",
+                "label": "Apply risk-based\nselection methodology",
+                "taskType": "user",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "t4",
+                "type": "task",
+                "label": "Submit draft audit\nplan to Risk\nand Compliance",
+                "taskType": "send",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "ie2",
+                "type": "intermediate-event",
+                "label": "Risk and Compliance review comments received",
+                "eventType": "message",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "gw1",
+                "type": "gateway",
+                "label": "Comments require material change?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "t5",
+                "type": "task",
+                "label": "Revise audit universe\nand engagement selection",
+                "taskType": "user",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "gw2",
+                "type": "gateway",
+                "label": "Comments require material change",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "t6",
+                "type": "task",
+                "label": "Finalise audit plan\nand confirm auditor\nindependence",
+                "taskType": "user",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "t7",
+                "type": "task",
+                "label": "Approve audit\nplan",
+                "taskType": "user",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "t8",
+                "type": "task",
+                "label": "Record approved audit\nplan in Audit\nManagement System",
+                "taskType": "service",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "e2",
+                "type": "end-event",
+                "label": "Approved audit plan ready",
+                "pool": "pIA",
+                "lane": "lIA"
+              },
+              {
+                "id": "ie3",
+                "type": "intermediate-event",
+                "label": "Draft audit plan received from Internal Audit",
+                "eventType": "message",
+                "pool": "pIA",
+                "lane": "lRC"
+              },
+              {
+                "id": "t9",
+                "type": "task",
+                "label": "Review draft plan\nagainst risk register",
+                "taskType": "user",
+                "pool": "pIA",
+                "lane": "lRC"
+              },
+              {
+                "id": "t10",
+                "type": "task",
+                "label": "Return review comments\nto Internal Audit",
+                "taskType": "send",
+                "pool": "pIA",
+                "lane": "lRC"
+              },
+              {
+                "id": "do1",
+                "type": "data-object",
+                "label": "Audit Universe",
+                "pool": "pIA"
+              },
+              {
+                "id": "do2",
+                "type": "data-object",
+                "label": "Draft Audit Plan",
+                "pool": "pIA"
+              },
+              {
+                "id": "do3",
+                "type": "data-object",
+                "label": "Review Comments",
+                "pool": "pIA"
+              },
+              {
+                "id": "do4",
+                "type": "data-object",
+                "label": "Approved Audit Plan",
+                "pool": "pIA"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "e1",
+                "targetId": "t1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t1",
+                "targetId": "t2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "ie1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ie1",
+                "targetId": "t3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t3",
+                "targetId": "t4",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "ie2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ie2",
+                "targetId": "gw1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw1",
+                "targetId": "t5",
+                "type": "sequence",
+                "label": "Yes — material change needed"
+              },
+              {
+                "sourceId": "t5",
+                "targetId": "gw2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw1",
+                "targetId": "gw2",
+                "type": "sequence",
+                "label": "No — minor or no changes"
+              },
+              {
+                "sourceId": "gw2",
+                "targetId": "t6",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t6",
+                "targetId": "t7",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t7",
+                "targetId": "t8",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t8",
+                "targetId": "e2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ie3",
+                "targetId": "t9",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t9",
+                "targetId": "t10",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "pAMS",
+                "type": "message",
+                "label": "Retrieval request"
+              },
+              {
+                "sourceId": "pAMS",
+                "targetId": "t2",
+                "type": "message",
+                "label": "Prior findings and assurance-coverage report"
+              },
+              {
+                "sourceId": "pGRC",
+                "targetId": "ie1",
+                "type": "message",
+                "label": "Risk register entries, control library, prior finding status"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "ie3",
+                "type": "message",
+                "label": "Draft audit plan document"
+              },
+              {
+                "sourceId": "t10",
+                "targetId": "ie2",
+                "type": "message",
+                "label": "Review comments"
+              },
+              {
+                "sourceId": "t8",
+                "targetId": "pAMS",
+                "type": "message",
+                "label": "Approved audit plan, engagement list, scope definitions"
+              },
+              {
+                "sourceId": "t1",
+                "targetId": "do1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do1",
+                "targetId": "t3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t3",
+                "targetId": "do2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do2",
+                "targetId": "t4",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do2",
+                "targetId": "t9",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t10",
+                "targetId": "do3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do3",
+                "targetId": "t5",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do3",
+                "targetId": "t6",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t7",
+                "targetId": "do4",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do4",
+                "targetId": "t8",
+                "type": "sequence"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "processCode": "V17.01",
+  "name": "V17.01 Plan Audit & Set Scope",
+  "chain": "V17",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:22:26.268Z"
+}

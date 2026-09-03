@@ -1,368 +1,377 @@
 {
+  "diagrams": [
+    {
+      "name": "V02.01 V02.01 Identify Need",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "p_erp",
+                "type": "pool",
+                "label": "ERP /\nCatalogue\nSystem",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "p_buying",
+                "type": "pool",
+                "label": "Buying Organisation",
+                "poolType": "white-box"
+              },
+              {
+                "id": "l_req",
+                "type": "lane",
+                "label": "Requesting Department",
+                "parentPool": "p_buying",
+                "pool": "p_buying"
+              },
+              {
+                "id": "l_proc",
+                "type": "lane",
+                "label": "Procurement",
+                "parentPool": "p_buying",
+                "pool": "p_buying"
+              },
+              {
+                "id": "e_start",
+                "type": "start-event",
+                "label": "Internal purchase need arises",
+                "pool": "p_buying",
+                "lane": "l_req"
+              },
+              {
+                "id": "t_describe",
+                "type": "task",
+                "label": "Describe and document\nthe need",
+                "taskType": "user",
+                "pool": "p_buying",
+                "lane": "l_req"
+              },
+              {
+                "id": "t_estimate",
+                "type": "task",
+                "label": "Estimate quantity and\nrequired delivery date",
+                "taskType": "user",
+                "pool": "p_buying",
+                "lane": "l_req"
+              },
+              {
+                "id": "t_submit",
+                "type": "task",
+                "label": "Submit need details\nto Procurement",
+                "taskType": "send",
+                "pool": "p_buying",
+                "lane": "l_req"
+              },
+              {
+                "id": "e_need_received",
+                "type": "intermediate-event",
+                "label": "Need details received from Requesting Department",
+                "eventType": "message",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "t_check_catalogue",
+                "type": "task",
+                "label": "Check catalogue for\nexisting items and\ncontracts",
+                "taskType": "service",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "t_check_budget",
+                "type": "task",
+                "label": "Check budget\navailability",
+                "taskType": "service",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "gw_valid",
+                "type": "gateway",
+                "label": "Need valid and funded?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "t_return",
+                "type": "task",
+                "label": "Return need to\nrequisitioner with comments",
+                "taskType": "user",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "be_timer",
+                "type": "intermediate-event",
+                "label": "Requisitioner non-response deadline",
+                "eventType": "timer",
+                "boundaryHost": "t_return",
+                "boundarySide": "bottom",
+                "properties": {
+                  "interruptionType": "interrupting"
+                }
+              },
+              {
+                "id": "t_escalate",
+                "type": "task",
+                "label": "Escalate unresolved need\nto Procurement manager",
+                "taskType": "user",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "e_escalation_end",
+                "type": "end-event",
+                "label": "Need identification timed out — escalated",
+                "eventType": "escalation",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "e_revised_received",
+                "type": "intermediate-event",
+                "label": "Revised need details received",
+                "eventType": "message",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "gw_valid_merge",
+                "type": "gateway",
+                "label": "Need valid and funded?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "gw_sourcing",
+                "type": "gateway",
+                "label": "Sourcing route?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "t_record_contract",
+                "type": "task",
+                "label": "Record need against\nexisting contract or\ncatalogue item",
+                "taskType": "user",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "t_classify",
+                "type": "task",
+                "label": "Classify need and\ndetermine procurement category",
+                "taskType": "user",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "gw_sourcing_merge",
+                "type": "gateway",
+                "label": "Sourcing route?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "t_confirm",
+                "type": "task",
+                "label": "Confirm need is\napproved to proceed\nto requisition",
+                "taskType": "user",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "e_end",
+                "type": "end-event",
+                "label": "Need identified and confirmed — ready for Create Requisition",
+                "pool": "p_buying",
+                "lane": "l_proc"
+              },
+              {
+                "id": "do_purchase_need",
+                "type": "data-object",
+                "label": "Purchase Need Record",
+                "pool": "p_buying"
+              },
+              {
+                "id": "do_budget_result",
+                "type": "data-object",
+                "label": "Budget Check Result",
+                "pool": "p_buying"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "e_start",
+                "targetId": "t_describe",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_describe",
+                "targetId": "t_estimate",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_estimate",
+                "targetId": "t_submit",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_submit",
+                "targetId": "e_need_received",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "e_need_received",
+                "targetId": "t_check_catalogue",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_check_catalogue",
+                "targetId": "t_check_budget",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_check_budget",
+                "targetId": "gw_valid",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_valid",
+                "targetId": "t_return",
+                "type": "sequence",
+                "label": "No — budget or scope issue"
+              },
+              {
+                "sourceId": "gw_valid",
+                "targetId": "gw_valid_merge",
+                "type": "sequence",
+                "label": "Yes"
+              },
+              {
+                "sourceId": "t_return",
+                "targetId": "e_revised_received",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "e_revised_received",
+                "targetId": "gw_valid_merge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "be_timer",
+                "targetId": "t_escalate",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_escalate",
+                "targetId": "e_escalation_end",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_valid_merge",
+                "targetId": "gw_sourcing",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_sourcing",
+                "targetId": "t_record_contract",
+                "type": "sequence",
+                "label": "Existing contract or catalogue item"
+              },
+              {
+                "sourceId": "gw_sourcing",
+                "targetId": "t_classify",
+                "type": "sequence",
+                "label": "New or spot purchase required"
+              },
+              {
+                "sourceId": "t_record_contract",
+                "targetId": "gw_sourcing_merge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_classify",
+                "targetId": "gw_sourcing_merge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw_sourcing_merge",
+                "targetId": "t_confirm",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_confirm",
+                "targetId": "e_end",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "p_erp",
+                "targetId": "t_check_catalogue",
+                "type": "message",
+                "label": "Catalogue items, approved supplier list, contract pricing"
+              },
+              {
+                "sourceId": "p_erp",
+                "targetId": "t_check_budget",
+                "type": "message",
+                "label": "Budget availability data"
+              },
+              {
+                "sourceId": "t_describe",
+                "targetId": "do_purchase_need",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do_purchase_need",
+                "targetId": "t_estimate",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do_purchase_need",
+                "targetId": "t_check_catalogue",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do_purchase_need",
+                "targetId": "t_classify",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do_purchase_need",
+                "targetId": "t_confirm",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t_check_budget",
+                "targetId": "do_budget_result",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do_budget_result",
+                "targetId": "gw_valid",
+                "type": "sequence"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
   "processCode": "V02.01",
   "name": "V02.01 Identify Need",
   "chain": "V02",
   "model": "claude-sonnet-4-6",
-  "capturedAt": "2026-09-03T03:15:12.049Z",
-  "plan": {
-    "elements": [
-      {
-        "id": "p_erp",
-        "type": "pool",
-        "label": "ERP /\nCatalogue\nSystem",
-        "poolType": "black-box",
-        "isSystem": true
-      },
-      {
-        "id": "p_buying",
-        "type": "pool",
-        "label": "Buying Organisation",
-        "poolType": "white-box"
-      },
-      {
-        "id": "l_req",
-        "type": "lane",
-        "label": "Requesting Department",
-        "parentPool": "p_buying",
-        "pool": "p_buying"
-      },
-      {
-        "id": "l_proc",
-        "type": "lane",
-        "label": "Procurement",
-        "parentPool": "p_buying",
-        "pool": "p_buying"
-      },
-      {
-        "id": "e_start",
-        "type": "start-event",
-        "label": "Internal purchase need arises",
-        "pool": "p_buying",
-        "lane": "l_req"
-      },
-      {
-        "id": "t_describe",
-        "type": "task",
-        "label": "Describe and document\nthe need",
-        "taskType": "user",
-        "pool": "p_buying",
-        "lane": "l_req"
-      },
-      {
-        "id": "t_estimate",
-        "type": "task",
-        "label": "Estimate quantity and\nrequired delivery date",
-        "taskType": "user",
-        "pool": "p_buying",
-        "lane": "l_req"
-      },
-      {
-        "id": "t_submit",
-        "type": "task",
-        "label": "Submit need details\nto Procurement",
-        "taskType": "send",
-        "pool": "p_buying",
-        "lane": "l_req"
-      },
-      {
-        "id": "e_need_received",
-        "type": "intermediate-event",
-        "label": "Need details received from Requesting Department",
-        "eventType": "message",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "t_check_catalogue",
-        "type": "task",
-        "label": "Check catalogue for\nexisting items and\ncontracts",
-        "taskType": "service",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "t_check_budget",
-        "type": "task",
-        "label": "Check budget\navailability",
-        "taskType": "service",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "gw_valid",
-        "type": "gateway",
-        "label": "Need valid and funded?",
-        "gatewayType": "exclusive",
-        "gatewayRole": "decision",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "t_return",
-        "type": "task",
-        "label": "Return need to\nrequisitioner with comments",
-        "taskType": "user",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "be_timer",
-        "type": "intermediate-event",
-        "label": "Requisitioner non-response deadline",
-        "eventType": "timer",
-        "boundaryHost": "t_return",
-        "boundarySide": "bottom",
-        "properties": {
-          "interruptionType": "interrupting"
-        }
-      },
-      {
-        "id": "t_escalate",
-        "type": "task",
-        "label": "Escalate unresolved need\nto Procurement manager",
-        "taskType": "user",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "e_escalation_end",
-        "type": "end-event",
-        "label": "Need identification timed out — escalated",
-        "eventType": "escalation",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "e_revised_received",
-        "type": "intermediate-event",
-        "label": "Revised need details received",
-        "eventType": "message",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "gw_valid_merge",
-        "type": "gateway",
-        "label": "Need valid and funded?",
-        "gatewayType": "exclusive",
-        "gatewayRole": "merge",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "gw_sourcing",
-        "type": "gateway",
-        "label": "Sourcing route?",
-        "gatewayType": "exclusive",
-        "gatewayRole": "decision",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "t_record_contract",
-        "type": "task",
-        "label": "Record need against\nexisting contract or\ncatalogue item",
-        "taskType": "user",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "t_classify",
-        "type": "task",
-        "label": "Classify need and\ndetermine procurement category",
-        "taskType": "user",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "gw_sourcing_merge",
-        "type": "gateway",
-        "label": "Sourcing route?",
-        "gatewayType": "exclusive",
-        "gatewayRole": "merge",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "t_confirm",
-        "type": "task",
-        "label": "Confirm need is\napproved to proceed\nto requisition",
-        "taskType": "user",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "e_end",
-        "type": "end-event",
-        "label": "Need identified and confirmed — ready for Create Requisition",
-        "pool": "p_buying",
-        "lane": "l_proc"
-      },
-      {
-        "id": "do_purchase_need",
-        "type": "data-object",
-        "label": "Purchase Need Record",
-        "pool": "p_buying"
-      },
-      {
-        "id": "do_budget_result",
-        "type": "data-object",
-        "label": "Budget Check Result",
-        "pool": "p_buying"
-      }
-    ],
-    "connections": [
-      {
-        "sourceId": "e_start",
-        "targetId": "t_describe",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t_describe",
-        "targetId": "t_estimate",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t_estimate",
-        "targetId": "t_submit",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t_submit",
-        "targetId": "e_need_received",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "e_need_received",
-        "targetId": "t_check_catalogue",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t_check_catalogue",
-        "targetId": "t_check_budget",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t_check_budget",
-        "targetId": "gw_valid",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gw_valid",
-        "targetId": "t_return",
-        "type": "sequence",
-        "label": "No — budget or scope issue"
-      },
-      {
-        "sourceId": "gw_valid",
-        "targetId": "gw_valid_merge",
-        "type": "sequence",
-        "label": "Yes"
-      },
-      {
-        "sourceId": "t_return",
-        "targetId": "e_revised_received",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "e_revised_received",
-        "targetId": "gw_valid_merge",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "be_timer",
-        "targetId": "t_escalate",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t_escalate",
-        "targetId": "e_escalation_end",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gw_valid_merge",
-        "targetId": "gw_sourcing",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gw_sourcing",
-        "targetId": "t_record_contract",
-        "type": "sequence",
-        "label": "Existing contract or catalogue item"
-      },
-      {
-        "sourceId": "gw_sourcing",
-        "targetId": "t_classify",
-        "type": "sequence",
-        "label": "New or spot purchase required"
-      },
-      {
-        "sourceId": "t_record_contract",
-        "targetId": "gw_sourcing_merge",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t_classify",
-        "targetId": "gw_sourcing_merge",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gw_sourcing_merge",
-        "targetId": "t_confirm",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t_confirm",
-        "targetId": "e_end",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "p_erp",
-        "targetId": "t_check_catalogue",
-        "type": "message",
-        "label": "Catalogue items, approved supplier list, contract pricing"
-      },
-      {
-        "sourceId": "p_erp",
-        "targetId": "t_check_budget",
-        "type": "message",
-        "label": "Budget availability data"
-      },
-      {
-        "sourceId": "t_describe",
-        "targetId": "do_purchase_need",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "do_purchase_need",
-        "targetId": "t_estimate",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "do_purchase_need",
-        "targetId": "t_check_catalogue",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "do_purchase_need",
-        "targetId": "t_classify",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "do_purchase_need",
-        "targetId": "t_confirm",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t_check_budget",
-        "targetId": "do_budget_result",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "do_budget_result",
-        "targetId": "gw_valid",
-        "type": "sequence"
-      }
-    ]
-  }
+  "capturedAt": "2026-09-03T03:15:12.049Z"
 }

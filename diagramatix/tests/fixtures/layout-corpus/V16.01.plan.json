@@ -1,0 +1,375 @@
+{
+  "diagrams": [
+    {
+      "name": "V16.01 V16.01 Detect Event",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pMSP",
+                "type": "pool",
+                "label": "Managed Security\nProvider",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "pOrg",
+                "type": "pool",
+                "label": "Organisation",
+                "poolType": "white-box"
+              },
+              {
+                "id": "pSIEM",
+                "type": "pool",
+                "label": "SIEM Platform",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "pEDR",
+                "type": "pool",
+                "label": "Endpoint Detection\n& Response",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "lSO",
+                "type": "lane",
+                "label": "Security Operations",
+                "parentPool": "pOrg",
+                "pool": "pOrg"
+              },
+              {
+                "id": "eStart",
+                "type": "start-event",
+                "label": "Alert or report received from external source or monitoring tooling",
+                "eventType": "multiple",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "gwSource",
+                "type": "gateway",
+                "label": "Source of signal?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "imcSIEM",
+                "type": "intermediate-event",
+                "label": "Correlated alert received from SIEM Platform",
+                "eventType": "message",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "imcEDR",
+                "type": "intermediate-event",
+                "label": "Endpoint or network alert received from Endpoint Detection & Response",
+                "eventType": "message",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "imcMSP",
+                "type": "intermediate-event",
+                "label": "Alert notification received from Managed Security Provider",
+                "eventType": "message",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "tManualReport",
+                "type": "task",
+                "label": "Receive and record\nmanual report",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "gwSourceMerge",
+                "type": "gateway",
+                "label": "Source of signal resolved",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "tReview",
+                "type": "task",
+                "label": "Review signal and\ninitial context",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "tLogSIEM",
+                "type": "task",
+                "label": "Log event in\nSIEM Platform",
+                "taskType": "service",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "gwInfo",
+                "type": "gateway",
+                "label": "Sufficient information to proceed?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "tRequestContext",
+                "type": "task",
+                "label": "Request additional context\nor log data",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "btTimeout",
+                "type": "intermediate-event",
+                "label": "Context request timeout (24 hours)",
+                "eventType": "timer",
+                "boundaryHost": "tRequestContext",
+                "boundarySide": "bottom",
+                "properties": {
+                  "interruptionType": "interrupting"
+                }
+              },
+              {
+                "id": "imcAdditional",
+                "type": "intermediate-event",
+                "label": "Additional context received",
+                "eventType": "message",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "gwInfoMerge",
+                "type": "gateway",
+                "label": "Information check resolved",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "tPriority",
+                "type": "task",
+                "label": "Assign preliminary priority\nand categorise signal",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "tCreateRecord",
+                "type": "task",
+                "label": "Create initial event\nrecord in SIEM\nPlatform",
+                "taskType": "service",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "eEndNormal",
+                "type": "end-event",
+                "label": "Event detected and recorded — ready for Triage & Validate",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "eEndTimeout",
+                "type": "end-event",
+                "label": "Event escalated without full context — ready for Triage & Validate",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "doAlert",
+                "type": "data-object",
+                "label": "Incoming Alert or Report",
+                "pool": "pOrg",
+                "lane": "lSO"
+              },
+              {
+                "id": "doRecord",
+                "type": "data-object",
+                "label": "Initial Event Record",
+                "pool": "pOrg",
+                "lane": "lSO"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "eStart",
+                "targetId": "gwSource",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwSource",
+                "targetId": "imcSIEM",
+                "type": "sequence",
+                "label": "SIEM-correlated alert"
+              },
+              {
+                "sourceId": "gwSource",
+                "targetId": "imcEDR",
+                "type": "sequence",
+                "label": "EDR alert"
+              },
+              {
+                "sourceId": "gwSource",
+                "targetId": "imcMSP",
+                "type": "sequence",
+                "label": "Managed provider notification"
+              },
+              {
+                "sourceId": "gwSource",
+                "targetId": "tManualReport",
+                "type": "sequence",
+                "label": "Staff or customer report"
+              },
+              {
+                "sourceId": "imcSIEM",
+                "targetId": "gwSourceMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "imcEDR",
+                "targetId": "gwSourceMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "imcMSP",
+                "targetId": "gwSourceMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tManualReport",
+                "targetId": "gwSourceMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwSourceMerge",
+                "targetId": "tReview",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tReview",
+                "targetId": "tLogSIEM",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tLogSIEM",
+                "targetId": "gwInfo",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwInfo",
+                "targetId": "gwInfoMerge",
+                "type": "sequence",
+                "label": "Yes"
+              },
+              {
+                "sourceId": "gwInfo",
+                "targetId": "tRequestContext",
+                "type": "sequence",
+                "label": "No"
+              },
+              {
+                "sourceId": "tRequestContext",
+                "targetId": "imcAdditional",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "imcAdditional",
+                "targetId": "gwInfoMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "btTimeout",
+                "targetId": "eEndTimeout",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gwInfoMerge",
+                "targetId": "tPriority",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tPriority",
+                "targetId": "tCreateRecord",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tCreateRecord",
+                "targetId": "eEndNormal",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "pSIEM",
+                "targetId": "imcSIEM",
+                "type": "message",
+                "label": "Correlated alert"
+              },
+              {
+                "sourceId": "pEDR",
+                "targetId": "imcEDR",
+                "type": "message",
+                "label": "Endpoint or network detection alert"
+              },
+              {
+                "sourceId": "pMSP",
+                "targetId": "imcMSP",
+                "type": "message",
+                "label": "Managed provider alert notification"
+              },
+              {
+                "sourceId": "tLogSIEM",
+                "targetId": "pSIEM",
+                "type": "message",
+                "label": "Log event"
+              },
+              {
+                "sourceId": "tCreateRecord",
+                "targetId": "pSIEM",
+                "type": "message",
+                "label": "Initial event record"
+              },
+              {
+                "sourceId": "tManualReport",
+                "targetId": "doAlert",
+                "type": "association"
+              },
+              {
+                "sourceId": "doAlert",
+                "targetId": "tReview",
+                "type": "association"
+              },
+              {
+                "sourceId": "tCreateRecord",
+                "targetId": "doRecord",
+                "type": "association"
+              },
+              {
+                "sourceId": "doRecord",
+                "targetId": "tPriority",
+                "type": "association"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "processCode": "V16.01",
+  "name": "V16.01 Detect Event",
+  "chain": "V16",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:22:03.426Z"
+}

@@ -1,234 +1,212 @@
 {
   "diagrams": [
     {
-      "name": "V01.01 V01.01 Receive Order",
+      "name": "V20.01 V20.01 Receive & Register Matter",
       "data": {
         "aiGeneration": {
           "plan": {
             "elements": [
               {
-                "id": "pCustomer",
+                "id": "pCP",
                 "type": "pool",
-                "label": "Customer",
+                "label": "Counterparty",
                 "poolType": "black-box",
                 "isSystem": false
               },
               {
-                "id": "pMain",
+                "id": "pOrg",
                 "type": "pool",
-                "label": "Sales Organisation",
+                "label": "Organisation",
                 "poolType": "white-box"
               },
               {
-                "id": "lCS",
+                "id": "lLP",
                 "type": "lane",
-                "label": "Customer Service",
-                "parentPool": "pMain",
-                "pool": "pMain"
+                "label": "Legal (Paralegal)",
+                "parentPool": "pOrg",
+                "pool": "pOrg"
               },
               {
-                "id": "lOP",
-                "type": "lane",
-                "label": "Order Processing",
-                "parentPool": "pMain",
-                "pool": "pMain"
-              },
-              {
-                "id": "pOMS",
+                "id": "pMMS",
                 "type": "pool",
-                "label": "Order Management\nSystem (OMS)",
+                "label": "Matter Management\nSystem",
                 "poolType": "black-box",
                 "isSystem": true
               },
               {
                 "id": "e1",
                 "type": "start-event",
-                "label": "Order received from Customer",
+                "label": "Claim, notice, complaint or filing received from Counterparty",
                 "eventType": "message",
-                "pool": "pMain",
-                "lane": "lCS"
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
                 "id": "t1",
                 "type": "task",
-                "label": "Log initial\norder contact",
+                "label": "Log initial\nmatter details",
                 "taskType": "user",
-                "pool": "pMain",
-                "lane": "lCS"
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
                 "id": "t2",
                 "type": "task",
-                "label": "Capture order channel\nand details",
+                "label": "Classify matter type\nand jurisdiction",
                 "taskType": "user",
-                "pool": "pMain",
-                "lane": "lCS"
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
                 "id": "gw1",
                 "type": "gateway",
-                "label": "Order information complete?",
+                "label": "Sufficient information to proceed?",
                 "gatewayType": "exclusive",
                 "gatewayRole": "decision",
-                "pool": "pMain",
-                "lane": "lCS"
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
                 "id": "sp1",
                 "type": "subprocess-expanded",
                 "label": "Repeat Until Details Complete",
                 "repeatType": "loop",
-                "pool": "pMain",
-                "lane": "lCS"
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
-                "id": "spStart",
+                "id": "sp1Start",
                 "type": "start-event",
                 "label": "",
-                "pool": "pMain",
+                "pool": "pOrg",
                 "parentSubprocess": "sp1"
               },
               {
                 "id": "t3",
                 "type": "task",
-                "label": "Request missing information\nfrom Customer",
+                "label": "Request additional information\nfrom Counterparty",
                 "taskType": "send",
-                "pool": "pMain",
+                "pool": "pOrg",
                 "parentSubprocess": "sp1"
               },
               {
                 "id": "ie1",
                 "type": "intermediate-event",
-                "label": "Customer responds",
+                "label": "Additional information received from Counterparty",
                 "eventType": "message",
-                "pool": "pMain",
+                "pool": "pOrg",
                 "parentSubprocess": "sp1"
               },
               {
                 "id": "t4",
                 "type": "task",
-                "label": "Update order\ndetails",
+                "label": "Review supplementary\ninformation",
                 "taskType": "user",
-                "pool": "pMain",
+                "pool": "pOrg",
                 "parentSubprocess": "sp1"
               },
               {
-                "id": "spEnd",
+                "id": "sp1End",
                 "type": "end-event",
                 "label": "",
-                "pool": "pMain",
+                "pool": "pOrg",
                 "parentSubprocess": "sp1"
-              },
-              {
-                "id": "bTimer",
-                "type": "intermediate-event",
-                "label": "48-hour response deadline exceeded",
-                "eventType": "timer",
-                "boundaryHost": "sp1",
-                "boundarySide": "bottom",
-                "properties": {
-                  "interruptionType": "interrupting"
-                },
-                "pool": "pMain",
-                "lane": "lCS"
-              },
-              {
-                "id": "eAbandoned",
-                "type": "end-event",
-                "label": "Order abandoned — customer unresponsive",
-                "pool": "pMain",
-                "lane": "lCS"
               },
               {
                 "id": "gw2",
                 "type": "gateway",
-                "label": "Order information complete",
+                "label": "Sufficient information to proceed",
                 "gatewayType": "exclusive",
                 "gatewayRole": "merge",
-                "pool": "pMain",
-                "lane": "lCS"
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
                 "id": "t5",
                 "type": "task",
-                "label": "Confirm order receipt\nwith Customer",
+                "label": "Conduct conflict-of-interest\ncheck",
                 "taskType": "user",
-                "pool": "pMain",
-                "lane": "lCS"
+                "pool": "pOrg",
+                "lane": "lLP"
+              },
+              {
+                "id": "gw3",
+                "type": "gateway",
+                "label": "Conflict identified?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
                 "id": "t6",
                 "type": "task",
-                "label": "Send order acknowledgement\nto Customer",
-                "taskType": "send",
-                "pool": "pMain",
-                "lane": "lCS"
+                "label": "Escalate conflict to\nGeneral Counsel",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lLP"
+              },
+              {
+                "id": "e2",
+                "type": "end-event",
+                "label": "Matter escalated — conflict requires resolution before proceeding",
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
                 "id": "t7",
                 "type": "task",
-                "label": "Review captured\norder details",
+                "label": "Assign matter reference\nand priority rating",
                 "taskType": "user",
-                "pool": "pMain",
-                "lane": "lOP"
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
                 "id": "t8",
                 "type": "task",
-                "label": "Assign order type\nand priority",
-                "taskType": "user",
-                "pool": "pMain",
-                "lane": "lOP"
+                "label": "Create matter record\nin Matter Management\nSystem",
+                "taskType": "service",
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
                 "id": "t9",
                 "type": "task",
-                "label": "Create sales order\nrecord in OMS",
-                "taskType": "service",
-                "pool": "pMain",
-                "lane": "lOP"
-              },
-              {
-                "id": "t10",
-                "type": "task",
-                "label": "Verify order\nrecord created",
+                "label": "Notify relevant internal\nstakeholders of new\nmatter",
                 "taskType": "user",
-                "pool": "pMain",
-                "lane": "lOP"
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
-                "id": "eEnd",
+                "id": "e3",
                 "type": "end-event",
-                "label": "Order record confirmed — ready for Validate Customer / Order",
-                "pool": "pMain",
-                "lane": "lOP"
+                "label": "Matter registered — ready for Assess Merits and Exposure",
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
-                "id": "doInbound",
+                "id": "do1",
                 "type": "data-object",
-                "label": "Inbound Order",
-                "pool": "pMain"
+                "label": "Incoming Matter Document",
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
-                "id": "doAck",
+                "id": "do2",
                 "type": "data-object",
-                "label": "Order Acknowledgement",
-                "pool": "pMain"
+                "label": "Conflict-of-Interest Check Result",
+                "pool": "pOrg",
+                "lane": "lLP"
               },
               {
-                "id": "doSalesOrder",
+                "id": "do3",
                 "type": "data-object",
-                "label": "Sales Order Record",
-                "pool": "pMain"
+                "label": "Matter Record",
+                "pool": "pOrg",
+                "lane": "lLP"
               }
             ],
             "connections": [
-              {
-                "sourceId": "pCustomer",
-                "targetId": "e1",
-                "type": "message",
-                "label": "Inbound order details"
-              },
               {
                 "sourceId": "e1",
                 "targetId": "t1",
@@ -254,10 +232,10 @@
                 "sourceId": "gw1",
                 "targetId": "gw2",
                 "type": "sequence",
-                "label": "Yes — details sufficient"
+                "label": "Yes — information complete"
               },
               {
-                "sourceId": "spStart",
+                "sourceId": "sp1Start",
                 "targetId": "t3",
                 "type": "sequence"
               },
@@ -273,17 +251,12 @@
               },
               {
                 "sourceId": "t4",
-                "targetId": "spEnd",
+                "targetId": "sp1End",
                 "type": "sequence"
               },
               {
                 "sourceId": "sp1",
                 "targetId": "gw2",
-                "type": "sequence"
-              },
-              {
-                "sourceId": "bTimer",
-                "targetId": "eAbandoned",
                 "type": "sequence"
               },
               {
@@ -293,12 +266,18 @@
               },
               {
                 "sourceId": "t5",
-                "targetId": "t6",
+                "targetId": "gw3",
                 "type": "sequence"
               },
               {
+                "sourceId": "gw3",
+                "targetId": "t6",
+                "type": "sequence",
+                "label": "Yes — conflict exists"
+              },
+              {
                 "sourceId": "t6",
-                "targetId": "t7",
+                "targetId": "e2",
                 "type": "sequence"
               },
               {
@@ -313,73 +292,68 @@
               },
               {
                 "sourceId": "t9",
-                "targetId": "t10",
+                "targetId": "e3",
                 "type": "sequence"
               },
               {
-                "sourceId": "t10",
-                "targetId": "eEnd",
-                "type": "sequence"
+                "sourceId": "pCP",
+                "targetId": "e1",
+                "type": "message",
+                "label": "Claim, notice, complaint or filing"
               },
               {
                 "sourceId": "t3",
-                "targetId": "pCustomer",
+                "targetId": "pCP",
                 "type": "message",
-                "label": "Request for missing order data"
+                "label": "Request for additional information"
               },
               {
-                "sourceId": "pCustomer",
+                "sourceId": "pCP",
                 "targetId": "ie1",
                 "type": "message",
-                "label": "Customer reply with missing information"
+                "label": "Additional information"
               },
               {
-                "sourceId": "t6",
-                "targetId": "pCustomer",
+                "sourceId": "t8",
+                "targetId": "pMMS",
                 "type": "message",
-                "label": "Order acknowledgement with reference number"
+                "label": "New matter record"
               },
               {
-                "sourceId": "t9",
-                "targetId": "pOMS",
-                "type": "message",
-                "label": "New sales order record"
-              },
-              {
-                "sourceId": "pOMS",
-                "targetId": "t10",
-                "type": "message",
-                "label": "Confirmation of record creation and order number"
-              },
-              {
-                "sourceId": "t2",
-                "targetId": "doInbound",
+                "sourceId": "t1",
+                "targetId": "do1",
                 "type": "association"
               },
               {
-                "sourceId": "doInbound",
-                "targetId": "t7",
+                "sourceId": "do1",
+                "targetId": "t2",
                 "type": "association"
               },
               {
                 "sourceId": "t5",
-                "targetId": "doAck",
+                "targetId": "do2",
                 "type": "association"
               },
               {
-                "sourceId": "doAck",
-                "targetId": "t6",
+                "sourceId": "do2",
+                "targetId": "gw3",
                 "type": "association"
               },
               {
-                "sourceId": "t9",
-                "targetId": "doSalesOrder",
+                "sourceId": "t8",
+                "targetId": "do3",
                 "type": "association"
               },
               {
-                "sourceId": "doSalesOrder",
-                "targetId": "t10",
+                "sourceId": "do3",
+                "targetId": "t9",
                 "type": "association"
+              },
+              {
+                "sourceId": "gw3",
+                "targetId": "t7",
+                "type": "sequence",
+                "label": "No — no conflict"
               }
             ]
           }
@@ -387,9 +361,9 @@
       }
     }
   ],
-  "processCode": "V01.01",
-  "name": "V01.01 Receive Order",
-  "chain": "V01",
+  "processCode": "V20.01",
+  "name": "V20.01 Receive & Register Matter",
+  "chain": "V20",
   "model": "claude-sonnet-4-6",
-  "capturedAt": "2026-09-03T03:14:42.023Z"
+  "capturedAt": "2026-09-03T03:23:50.255Z"
 }

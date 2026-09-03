@@ -1,0 +1,362 @@
+{
+  "diagrams": [
+    {
+      "name": "V25.01 V25.01 Capture Business Question",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pBS",
+                "type": "pool",
+                "label": "Business\nSponsor",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "p1",
+                "type": "pool",
+                "label": "Organisation",
+                "poolType": "white-box"
+              },
+              {
+                "id": "l1",
+                "type": "lane",
+                "label": "Analytics",
+                "parentPool": "p1",
+                "pool": "p1"
+              },
+              {
+                "id": "pBIP",
+                "type": "pool",
+                "label": "Business\nIntelligence\nPlatform",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "e1",
+                "type": "start-event",
+                "label": "Business question received from Business Sponsor",
+                "eventType": "message",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "t1",
+                "type": "task",
+                "label": "Review and register\nincoming question",
+                "taskType": "user",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "t2",
+                "type": "task",
+                "label": "Clarify scope, context\nand constraints with\nsponsor",
+                "taskType": "user",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "ie1",
+                "type": "intermediate-event",
+                "label": "Sponsor clarification response received",
+                "eventType": "message",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "t3",
+                "type": "task",
+                "label": "Define success measure\nand acceptance criteria",
+                "taskType": "user",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "g1",
+                "type": "gateway",
+                "label": "Question sufficiently defined?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "t4",
+                "type": "task",
+                "label": "Document gaps and\nprepare clarification request",
+                "taskType": "user",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "t5",
+                "type": "task",
+                "label": "Send clarification request\nto Business Sponsor",
+                "taskType": "send",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "g1m",
+                "type": "gateway",
+                "label": "Question sufficiently defined",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "t6",
+                "type": "task",
+                "label": "Draft business\nquestion brief",
+                "taskType": "user",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "t7",
+                "type": "task",
+                "label": "Send brief to\nBusiness Sponsor for\nconfirmation",
+                "taskType": "send",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "ie2",
+                "type": "intermediate-event",
+                "label": "Sponsor confirmation received",
+                "eventType": "message",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "g2",
+                "type": "gateway",
+                "label": "Sponsor confirms brief?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "t8",
+                "type": "task",
+                "label": "Revise brief in\nline with sponsor\nfeedback",
+                "taskType": "user",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "g2m",
+                "type": "gateway",
+                "label": "Sponsor confirms brief",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "t9",
+                "type": "task",
+                "label": "Record approved business\nquestion brief in\nBusiness Intelligence Platform",
+                "taskType": "service",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "e2",
+                "type": "end-event",
+                "label": "Business question captured — ready for Identify and Assess Sources",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "do1",
+                "type": "data-object",
+                "label": "Business Question Brief",
+                "pool": "p1",
+                "lane": "l1"
+              },
+              {
+                "id": "do2",
+                "type": "data-object",
+                "label": "Success Measure and Acceptance Criteria",
+                "pool": "p1",
+                "lane": "l1"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "e1",
+                "targetId": "t1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t1",
+                "targetId": "t2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "ie1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ie1",
+                "targetId": "t3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t3",
+                "targetId": "g1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "g1",
+                "targetId": "t4",
+                "type": "sequence",
+                "label": "No — further clarification needed"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "t5",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t5",
+                "targetId": "g1m",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "g1",
+                "targetId": "g1m",
+                "type": "sequence",
+                "label": "Yes — definition accepted"
+              },
+              {
+                "sourceId": "g1m",
+                "targetId": "t6",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t6",
+                "targetId": "t7",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t7",
+                "targetId": "ie2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ie2",
+                "targetId": "g2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "g2",
+                "targetId": "t8",
+                "type": "sequence",
+                "label": "No — revisions requested"
+              },
+              {
+                "sourceId": "t8",
+                "targetId": "g2m",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "g2",
+                "targetId": "g2m",
+                "type": "sequence",
+                "label": "Yes — brief approved"
+              },
+              {
+                "sourceId": "g2m",
+                "targetId": "t9",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t9",
+                "targetId": "e2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "pBS",
+                "targetId": "e1",
+                "type": "message",
+                "label": "Business question"
+              },
+              {
+                "sourceId": "t5",
+                "targetId": "pBS",
+                "type": "message",
+                "label": "Clarification request"
+              },
+              {
+                "sourceId": "pBS",
+                "targetId": "ie1",
+                "type": "message",
+                "label": "Clarification response"
+              },
+              {
+                "sourceId": "t7",
+                "targetId": "pBS",
+                "type": "message",
+                "label": "Business question brief for confirmation"
+              },
+              {
+                "sourceId": "pBS",
+                "targetId": "ie2",
+                "type": "message",
+                "label": "Brief confirmation"
+              },
+              {
+                "sourceId": "t9",
+                "targetId": "pBIP",
+                "type": "message",
+                "label": "Approved business question brief"
+              },
+              {
+                "sourceId": "t6",
+                "targetId": "do1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do1",
+                "targetId": "t7",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t8",
+                "targetId": "do1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do1",
+                "targetId": "t9",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t3",
+                "targetId": "do2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do2",
+                "targetId": "t6",
+                "type": "sequence"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "processCode": "V25.01",
+  "name": "V25.01 Capture Business Question",
+  "chain": "V25",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:26:07.637Z"
+}

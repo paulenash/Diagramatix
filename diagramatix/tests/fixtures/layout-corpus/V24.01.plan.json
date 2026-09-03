@@ -1,0 +1,398 @@
+{
+  "diagrams": [
+    {
+      "name": "V24.01 V24.01 Capture Transactions with Tax Attributes",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pCustomer",
+                "type": "pool",
+                "label": "Customer",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "pSupplier",
+                "type": "pool",
+                "label": "Supplier",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "pOrg",
+                "type": "pool",
+                "label": "Organisation",
+                "poolType": "white-box"
+              },
+              {
+                "id": "lFA",
+                "type": "lane",
+                "label": "Finance / Accounting",
+                "parentPool": "pOrg",
+                "pool": "pOrg"
+              },
+              {
+                "id": "pERP",
+                "type": "pool",
+                "label": "ERP /\nGeneral\nLedger",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "eStart",
+                "type": "start-event",
+                "label": "Tax invoice or exemption certificate received",
+                "eventType": "message",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "tLog",
+                "type": "task",
+                "label": "Log incoming invoice\nor certificate",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "tClassify",
+                "type": "task",
+                "label": "Classify transaction\ntype",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "tRetrieveCodes",
+                "type": "task",
+                "label": "Retrieve applicable tax\ncodes from ERP",
+                "taskType": "service",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "gDocComplete",
+                "type": "gateway",
+                "label": "Document complete and tax attributes identifiable?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "tRequestMissing",
+                "type": "task",
+                "label": "Request missing information\nor corrected document",
+                "taskType": "send",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "bTimerEscalate",
+                "type": "intermediate-event",
+                "label": "Follow-up deadline elapsed",
+                "eventType": "timer",
+                "boundaryHost": "tRequestMissing",
+                "boundarySide": "bottom",
+                "properties": {
+                  "interruptionType": "interrupting"
+                }
+              },
+              {
+                "id": "tEscalate",
+                "type": "task",
+                "label": "Escalate missing document\nto tax manager",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "eEscalateEnd",
+                "type": "end-event",
+                "label": "Transaction capture escalated — pending supplier or customer response",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "eCorrectedDoc",
+                "type": "intermediate-event",
+                "label": "Corrected document or information received",
+                "eventType": "message",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "gDocMerge",
+                "type": "gateway",
+                "label": "Document complete and tax attributes identifiable?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "tAssignCodes",
+                "type": "task",
+                "label": "Assign tax codes\nand attributes to\ntransaction",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "tPostTransaction",
+                "type": "task",
+                "label": "Post transaction with\ntax attributes to\nERP / General\nLedger",
+                "taskType": "service",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "gPostError",
+                "type": "gateway",
+                "label": "Transaction posted without errors?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "tInvestigate",
+                "type": "task",
+                "label": "Investigate and correct\nposting error",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "gPostMerge",
+                "type": "gateway",
+                "label": "Transaction posted without errors?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "tRetainDoc",
+                "type": "task",
+                "label": "Retain supporting document\nper record-retention policy",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "eEnd",
+                "type": "end-event",
+                "label": "Transaction with tax attributes captured — ready for Determine Tax Treatment",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "doInvoice",
+                "type": "data-object",
+                "label": "Tax Invoice / Exemption Certificate",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "doTxRecord",
+                "type": "data-object",
+                "label": "Transaction Record with Tax Attributes",
+                "pool": "pOrg",
+                "lane": "lFA"
+              },
+              {
+                "id": "doTaxCodes",
+                "type": "data-object",
+                "label": "Tax Code Table",
+                "pool": "pOrg",
+                "lane": "lFA"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "eStart",
+                "targetId": "tLog",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tLog",
+                "targetId": "tClassify",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tClassify",
+                "targetId": "tRetrieveCodes",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tRetrieveCodes",
+                "targetId": "gDocComplete",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gDocComplete",
+                "targetId": "gDocMerge",
+                "type": "sequence",
+                "label": "Yes"
+              },
+              {
+                "sourceId": "gDocComplete",
+                "targetId": "tRequestMissing",
+                "type": "sequence",
+                "label": "No"
+              },
+              {
+                "sourceId": "tRequestMissing",
+                "targetId": "eCorrectedDoc",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "eCorrectedDoc",
+                "targetId": "gDocMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "bTimerEscalate",
+                "targetId": "tEscalate",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tEscalate",
+                "targetId": "eEscalateEnd",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gDocMerge",
+                "targetId": "tAssignCodes",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tAssignCodes",
+                "targetId": "tPostTransaction",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tPostTransaction",
+                "targetId": "gPostError",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gPostError",
+                "targetId": "gPostMerge",
+                "type": "sequence",
+                "label": "Yes"
+              },
+              {
+                "sourceId": "gPostError",
+                "targetId": "tInvestigate",
+                "type": "sequence",
+                "label": "No"
+              },
+              {
+                "sourceId": "tInvestigate",
+                "targetId": "gPostMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gPostMerge",
+                "targetId": "tRetainDoc",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tRetainDoc",
+                "targetId": "eEnd",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "pCustomer",
+                "targetId": "eStart",
+                "type": "message",
+                "label": "Tax invoice or exemption certificate"
+              },
+              {
+                "sourceId": "pSupplier",
+                "targetId": "eStart",
+                "type": "message",
+                "label": "Tax invoice or exemption certificate"
+              },
+              {
+                "sourceId": "tRequestMissing",
+                "targetId": "pCustomer",
+                "type": "message",
+                "label": "Request for missing information or corrected document"
+              },
+              {
+                "sourceId": "tRequestMissing",
+                "targetId": "pSupplier",
+                "type": "message",
+                "label": "Request for missing information or corrected document"
+              },
+              {
+                "sourceId": "pCustomer",
+                "targetId": "eCorrectedDoc",
+                "type": "message",
+                "label": "Corrected document or information"
+              },
+              {
+                "sourceId": "pSupplier",
+                "targetId": "eCorrectedDoc",
+                "type": "message",
+                "label": "Corrected document or information"
+              },
+              {
+                "sourceId": "pERP",
+                "targetId": "tRetrieveCodes",
+                "type": "message",
+                "label": "Applicable tax codes"
+              },
+              {
+                "sourceId": "tPostTransaction",
+                "targetId": "pERP",
+                "type": "message",
+                "label": "Transaction with tax attributes"
+              },
+              {
+                "sourceId": "doInvoice",
+                "targetId": "tLog",
+                "type": "association"
+              },
+              {
+                "sourceId": "doInvoice",
+                "targetId": "tAssignCodes",
+                "type": "association"
+              },
+              {
+                "sourceId": "doTaxCodes",
+                "targetId": "tRetrieveCodes",
+                "type": "association"
+              },
+              {
+                "sourceId": "doTaxCodes",
+                "targetId": "tAssignCodes",
+                "type": "association"
+              },
+              {
+                "sourceId": "tAssignCodes",
+                "targetId": "doTxRecord",
+                "type": "association"
+              },
+              {
+                "sourceId": "doTxRecord",
+                "targetId": "tPostTransaction",
+                "type": "association"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "processCode": "V24.01",
+  "name": "V24.01 Capture Transactions with Tax Attributes",
+  "chain": "V24",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:25:46.063Z"
+}

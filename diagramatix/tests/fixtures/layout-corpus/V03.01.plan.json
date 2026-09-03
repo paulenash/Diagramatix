@@ -1,410 +1,419 @@
 {
+  "diagrams": [
+    {
+      "name": "V03.01 V03.01 Capture Financial Transactions",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pSys",
+                "type": "pool",
+                "label": "Sub-Ledger /\nSource Systems",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "pFin",
+                "type": "pool",
+                "label": "Finance Organisation",
+                "poolType": "white-box"
+              },
+              {
+                "id": "lAP",
+                "type": "lane",
+                "label": "Accounts Payable / Receivable",
+                "parentPool": "pFin",
+                "pool": "pFin"
+              },
+              {
+                "id": "lFA",
+                "type": "lane",
+                "label": "Financial Accounting",
+                "parentPool": "pFin",
+                "pool": "pFin"
+              },
+              {
+                "id": "eStart",
+                "type": "start-event",
+                "label": "Transaction source data received from operational systems",
+                "eventType": "message",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "tReview",
+                "type": "task",
+                "label": "Review incoming\ntransaction data",
+                "taskType": "user",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "gType",
+                "type": "gateway",
+                "label": "Transaction type recognised?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "tRefer",
+                "type": "task",
+                "label": "Refer transaction for\nclassification guidance",
+                "taskType": "user",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "gTypeMerge",
+                "type": "gateway",
+                "label": "Transaction type recognised",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "tCode",
+                "type": "task",
+                "label": "Code transaction to\nappropriate account",
+                "taskType": "user",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "tEnter",
+                "type": "task",
+                "label": "Enter transaction details\ninto sub-ledger",
+                "taskType": "user",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "tSubmit",
+                "type": "task",
+                "label": "Submit transaction record\nto Sub-Ledger /\nSource Systems",
+                "taskType": "service",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "eCatch",
+                "type": "intermediate-event",
+                "label": "Transaction acknowledgement received",
+                "eventType": "message",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "gAccepted",
+                "type": "gateway",
+                "label": "Transaction accepted by system?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "tCorrect",
+                "type": "task",
+                "label": "Correct transaction\ndata",
+                "taskType": "user",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "gAcceptedMerge",
+                "type": "gateway",
+                "label": "Transaction accepted by system",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "bTimerCorrect",
+                "type": "intermediate-event",
+                "label": "Correction deadline exceeded",
+                "eventType": "timer",
+                "boundaryHost": "tCorrect",
+                "boundarySide": "top",
+                "properties": {
+                  "interruptionType": "interrupting"
+                }
+              },
+              {
+                "id": "eEscalated",
+                "type": "end-event",
+                "label": "Transaction escalated to financial accountant for manual resolution",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "tFAReview",
+                "type": "task",
+                "label": "Review sub-ledger transaction\nfor completeness and\naccuracy",
+                "taskType": "user",
+                "pool": "pFin",
+                "lane": "lFA"
+              },
+              {
+                "id": "gComplete",
+                "type": "gateway",
+                "label": "Transaction complete and accurate?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pFin",
+                "lane": "lFA"
+              },
+              {
+                "id": "tReturn",
+                "type": "task",
+                "label": "Return transaction to\nAccounts Payable /\nReceivable for correction",
+                "taskType": "user",
+                "pool": "pFin",
+                "lane": "lFA"
+              },
+              {
+                "id": "eReturned",
+                "type": "end-event",
+                "label": "Transaction returned for correction — review restarts",
+                "pool": "pFin",
+                "lane": "lFA"
+              },
+              {
+                "id": "tAuthorise",
+                "type": "task",
+                "label": "Authorise transaction\nentry",
+                "taskType": "user",
+                "pool": "pFin",
+                "lane": "lFA"
+              },
+              {
+                "id": "tConfirm",
+                "type": "task",
+                "label": "Confirm transaction captured\nin sub-ledger",
+                "taskType": "user",
+                "pool": "pFin",
+                "lane": "lFA"
+              },
+              {
+                "id": "eEnd",
+                "type": "end-event",
+                "label": "Transaction captured and authorised — ready for Post Journals",
+                "pool": "pFin",
+                "lane": "lFA"
+              },
+              {
+                "id": "doIncoming",
+                "type": "data-object",
+                "label": "Incoming Transaction Data",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "doCoded",
+                "type": "data-object",
+                "label": "Coded Transaction Record",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "doEntry",
+                "type": "data-object",
+                "label": "Sub-Ledger Entry",
+                "pool": "pFin",
+                "lane": "lAP"
+              },
+              {
+                "id": "doAuth",
+                "type": "data-object",
+                "label": "Authorised Transaction Confirmation",
+                "pool": "pFin",
+                "lane": "lFA"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "pSys",
+                "targetId": "eStart",
+                "type": "message",
+                "label": "Transaction source data"
+              },
+              {
+                "sourceId": "eStart",
+                "targetId": "tReview",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tReview",
+                "targetId": "gType",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gType",
+                "targetId": "tRefer",
+                "type": "sequence",
+                "label": "No — unrecognised type"
+              },
+              {
+                "sourceId": "gType",
+                "targetId": "gTypeMerge",
+                "type": "sequence",
+                "label": "Yes — recognised type"
+              },
+              {
+                "sourceId": "tRefer",
+                "targetId": "gTypeMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gTypeMerge",
+                "targetId": "tCode",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tCode",
+                "targetId": "tEnter",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tEnter",
+                "targetId": "tSubmit",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tSubmit",
+                "targetId": "pSys",
+                "type": "message",
+                "label": "Transaction record submitted for posting"
+              },
+              {
+                "sourceId": "tSubmit",
+                "targetId": "eCatch",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "pSys",
+                "targetId": "eCatch",
+                "type": "message",
+                "label": "Transaction acknowledgement"
+              },
+              {
+                "sourceId": "eCatch",
+                "targetId": "gAccepted",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gAccepted",
+                "targetId": "tCorrect",
+                "type": "sequence",
+                "label": "No — rejected"
+              },
+              {
+                "sourceId": "gAccepted",
+                "targetId": "gAcceptedMerge",
+                "type": "sequence",
+                "label": "Yes — accepted"
+              },
+              {
+                "sourceId": "tCorrect",
+                "targetId": "gAcceptedMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gAcceptedMerge",
+                "targetId": "tFAReview",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "bTimerCorrect",
+                "targetId": "eEscalated",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tFAReview",
+                "targetId": "gComplete",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gComplete",
+                "targetId": "tReturn",
+                "type": "sequence",
+                "label": "No — incomplete or inaccurate"
+              },
+              {
+                "sourceId": "tReturn",
+                "targetId": "eReturned",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tAuthorise",
+                "targetId": "tConfirm",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tConfirm",
+                "targetId": "eEnd",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tReview",
+                "targetId": "doIncoming",
+                "type": "association"
+              },
+              {
+                "sourceId": "doIncoming",
+                "targetId": "tCode",
+                "type": "association"
+              },
+              {
+                "sourceId": "tCode",
+                "targetId": "doCoded",
+                "type": "association"
+              },
+              {
+                "sourceId": "doCoded",
+                "targetId": "tEnter",
+                "type": "association"
+              },
+              {
+                "sourceId": "tEnter",
+                "targetId": "doEntry",
+                "type": "association"
+              },
+              {
+                "sourceId": "doEntry",
+                "targetId": "tFAReview",
+                "type": "association"
+              },
+              {
+                "sourceId": "tAuthorise",
+                "targetId": "doAuth",
+                "type": "association"
+              },
+              {
+                "sourceId": "doAuth",
+                "targetId": "tConfirm",
+                "type": "association"
+              },
+              {
+                "sourceId": "gComplete",
+                "targetId": "tAuthorise",
+                "type": "sequence",
+                "label": "Yes — complete and accurate"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
   "processCode": "V03.01",
   "name": "V03.01 Capture Financial Transactions",
   "chain": "V03",
   "model": "claude-sonnet-4-6",
-  "capturedAt": "2026-09-03T03:15:41.247Z",
-  "plan": {
-    "elements": [
-      {
-        "id": "pSys",
-        "type": "pool",
-        "label": "Sub-Ledger /\nSource Systems",
-        "poolType": "black-box",
-        "isSystem": true
-      },
-      {
-        "id": "pFin",
-        "type": "pool",
-        "label": "Finance Organisation",
-        "poolType": "white-box"
-      },
-      {
-        "id": "lAP",
-        "type": "lane",
-        "label": "Accounts Payable / Receivable",
-        "parentPool": "pFin",
-        "pool": "pFin"
-      },
-      {
-        "id": "lFA",
-        "type": "lane",
-        "label": "Financial Accounting",
-        "parentPool": "pFin",
-        "pool": "pFin"
-      },
-      {
-        "id": "eStart",
-        "type": "start-event",
-        "label": "Transaction source data received from operational systems",
-        "eventType": "message",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "tReview",
-        "type": "task",
-        "label": "Review incoming\ntransaction data",
-        "taskType": "user",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "gType",
-        "type": "gateway",
-        "label": "Transaction type recognised?",
-        "gatewayType": "exclusive",
-        "gatewayRole": "decision",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "tRefer",
-        "type": "task",
-        "label": "Refer transaction for\nclassification guidance",
-        "taskType": "user",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "gTypeMerge",
-        "type": "gateway",
-        "label": "Transaction type recognised",
-        "gatewayType": "exclusive",
-        "gatewayRole": "merge",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "tCode",
-        "type": "task",
-        "label": "Code transaction to\nappropriate account",
-        "taskType": "user",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "tEnter",
-        "type": "task",
-        "label": "Enter transaction details\ninto sub-ledger",
-        "taskType": "user",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "tSubmit",
-        "type": "task",
-        "label": "Submit transaction record\nto Sub-Ledger /\nSource Systems",
-        "taskType": "service",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "eCatch",
-        "type": "intermediate-event",
-        "label": "Transaction acknowledgement received",
-        "eventType": "message",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "gAccepted",
-        "type": "gateway",
-        "label": "Transaction accepted by system?",
-        "gatewayType": "exclusive",
-        "gatewayRole": "decision",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "tCorrect",
-        "type": "task",
-        "label": "Correct transaction\ndata",
-        "taskType": "user",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "gAcceptedMerge",
-        "type": "gateway",
-        "label": "Transaction accepted by system",
-        "gatewayType": "exclusive",
-        "gatewayRole": "merge",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "bTimerCorrect",
-        "type": "intermediate-event",
-        "label": "Correction deadline exceeded",
-        "eventType": "timer",
-        "boundaryHost": "tCorrect",
-        "boundarySide": "top",
-        "properties": {
-          "interruptionType": "interrupting"
-        }
-      },
-      {
-        "id": "eEscalated",
-        "type": "end-event",
-        "label": "Transaction escalated to financial accountant for manual resolution",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "tFAReview",
-        "type": "task",
-        "label": "Review sub-ledger transaction\nfor completeness and\naccuracy",
-        "taskType": "user",
-        "pool": "pFin",
-        "lane": "lFA"
-      },
-      {
-        "id": "gComplete",
-        "type": "gateway",
-        "label": "Transaction complete and accurate?",
-        "gatewayType": "exclusive",
-        "gatewayRole": "decision",
-        "pool": "pFin",
-        "lane": "lFA"
-      },
-      {
-        "id": "tReturn",
-        "type": "task",
-        "label": "Return transaction to\nAccounts Payable /\nReceivable for correction",
-        "taskType": "user",
-        "pool": "pFin",
-        "lane": "lFA"
-      },
-      {
-        "id": "eReturned",
-        "type": "end-event",
-        "label": "Transaction returned for correction — review restarts",
-        "pool": "pFin",
-        "lane": "lFA"
-      },
-      {
-        "id": "tAuthorise",
-        "type": "task",
-        "label": "Authorise transaction\nentry",
-        "taskType": "user",
-        "pool": "pFin",
-        "lane": "lFA"
-      },
-      {
-        "id": "tConfirm",
-        "type": "task",
-        "label": "Confirm transaction captured\nin sub-ledger",
-        "taskType": "user",
-        "pool": "pFin",
-        "lane": "lFA"
-      },
-      {
-        "id": "eEnd",
-        "type": "end-event",
-        "label": "Transaction captured and authorised — ready for Post Journals",
-        "pool": "pFin",
-        "lane": "lFA"
-      },
-      {
-        "id": "doIncoming",
-        "type": "data-object",
-        "label": "Incoming Transaction Data",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "doCoded",
-        "type": "data-object",
-        "label": "Coded Transaction Record",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "doEntry",
-        "type": "data-object",
-        "label": "Sub-Ledger Entry",
-        "pool": "pFin",
-        "lane": "lAP"
-      },
-      {
-        "id": "doAuth",
-        "type": "data-object",
-        "label": "Authorised Transaction Confirmation",
-        "pool": "pFin",
-        "lane": "lFA"
-      }
-    ],
-    "connections": [
-      {
-        "sourceId": "pSys",
-        "targetId": "eStart",
-        "type": "message",
-        "label": "Transaction source data"
-      },
-      {
-        "sourceId": "eStart",
-        "targetId": "tReview",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "tReview",
-        "targetId": "gType",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gType",
-        "targetId": "tRefer",
-        "type": "sequence",
-        "label": "No — unrecognised type"
-      },
-      {
-        "sourceId": "gType",
-        "targetId": "gTypeMerge",
-        "type": "sequence",
-        "label": "Yes — recognised type"
-      },
-      {
-        "sourceId": "tRefer",
-        "targetId": "gTypeMerge",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gTypeMerge",
-        "targetId": "tCode",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "tCode",
-        "targetId": "tEnter",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "tEnter",
-        "targetId": "tSubmit",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "tSubmit",
-        "targetId": "pSys",
-        "type": "message",
-        "label": "Transaction record submitted for posting"
-      },
-      {
-        "sourceId": "tSubmit",
-        "targetId": "eCatch",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "pSys",
-        "targetId": "eCatch",
-        "type": "message",
-        "label": "Transaction acknowledgement"
-      },
-      {
-        "sourceId": "eCatch",
-        "targetId": "gAccepted",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gAccepted",
-        "targetId": "tCorrect",
-        "type": "sequence",
-        "label": "No — rejected"
-      },
-      {
-        "sourceId": "gAccepted",
-        "targetId": "gAcceptedMerge",
-        "type": "sequence",
-        "label": "Yes — accepted"
-      },
-      {
-        "sourceId": "tCorrect",
-        "targetId": "gAcceptedMerge",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gAcceptedMerge",
-        "targetId": "tFAReview",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "bTimerCorrect",
-        "targetId": "eEscalated",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "tFAReview",
-        "targetId": "gComplete",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gComplete",
-        "targetId": "tReturn",
-        "type": "sequence",
-        "label": "No — incomplete or inaccurate"
-      },
-      {
-        "sourceId": "tReturn",
-        "targetId": "eReturned",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "tAuthorise",
-        "targetId": "tConfirm",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "tConfirm",
-        "targetId": "eEnd",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "tReview",
-        "targetId": "doIncoming",
-        "type": "association"
-      },
-      {
-        "sourceId": "doIncoming",
-        "targetId": "tCode",
-        "type": "association"
-      },
-      {
-        "sourceId": "tCode",
-        "targetId": "doCoded",
-        "type": "association"
-      },
-      {
-        "sourceId": "doCoded",
-        "targetId": "tEnter",
-        "type": "association"
-      },
-      {
-        "sourceId": "tEnter",
-        "targetId": "doEntry",
-        "type": "association"
-      },
-      {
-        "sourceId": "doEntry",
-        "targetId": "tFAReview",
-        "type": "association"
-      },
-      {
-        "sourceId": "tAuthorise",
-        "targetId": "doAuth",
-        "type": "association"
-      },
-      {
-        "sourceId": "doAuth",
-        "targetId": "tConfirm",
-        "type": "association"
-      },
-      {
-        "sourceId": "gComplete",
-        "targetId": "tAuthorise",
-        "type": "sequence",
-        "label": "Yes — complete and accurate"
-      }
-    ]
-  }
+  "capturedAt": "2026-09-03T03:15:41.247Z"
 }

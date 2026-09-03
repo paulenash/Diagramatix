@@ -1,0 +1,528 @@
+{
+  "diagrams": [
+    {
+      "name": "V26.01 V26.01 Develop Concept & Business Case",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pPO",
+                "type": "pool",
+                "label": "Project Organisation",
+                "poolType": "white-box"
+              },
+              {
+                "id": "lCP",
+                "type": "lane",
+                "label": "Capital Planning",
+                "parentPool": "pPO",
+                "pool": "pPO"
+              },
+              {
+                "id": "lENG",
+                "type": "lane",
+                "label": "Engineering",
+                "parentPool": "pPO",
+                "pool": "pPO"
+              },
+              {
+                "id": "pCPMS",
+                "type": "pool",
+                "label": "Capital Portfolio\nManagement\nSystem",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "eStart",
+                "type": "start-event",
+                "label": "Capital proposal received — growth, replacement, compliance or risk trigger",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "tRegister",
+                "type": "task",
+                "label": "Register capital proposal\nand assign project\nsponsor",
+                "taskType": "user",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "tScope",
+                "type": "task",
+                "label": "Define project scope\nand strategic objectives",
+                "taskType": "user",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "tCommission",
+                "type": "task",
+                "label": "Commission feasibility\nassessment",
+                "taskType": "user",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "gParallelSplit",
+                "type": "gateway",
+                "label": "Engineering tasks begin",
+                "gatewayType": "parallel",
+                "gatewayRole": "decision",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "tCostEst",
+                "type": "task",
+                "label": "Develop preliminary cost\nestimate and schedule",
+                "taskType": "user",
+                "pool": "pPO",
+                "lane": "lENG"
+              },
+              {
+                "id": "tRisk",
+                "type": "task",
+                "label": "Identify and assess\nproject risks",
+                "taskType": "user",
+                "pool": "pPO",
+                "lane": "lENG"
+              },
+              {
+                "id": "tOptions",
+                "type": "task",
+                "label": "Prepare options analysis\nand preferred solution",
+                "taskType": "user",
+                "pool": "pPO",
+                "lane": "lENG"
+              },
+              {
+                "id": "tTechDoc",
+                "type": "task",
+                "label": "Compile supporting\ntechnical documentation",
+                "taskType": "user",
+                "pool": "pPO",
+                "lane": "lENG"
+              },
+              {
+                "id": "gParallelJoin",
+                "type": "gateway",
+                "label": "Engineering tasks complete",
+                "gatewayType": "parallel",
+                "gatewayRole": "merge",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "ieFeasibility",
+                "type": "intermediate-event",
+                "label": "Feasibility assessment results received",
+                "eventType": "message",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "gFeasSplit",
+                "type": "gateway",
+                "label": "Feasibility viable?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "eNotViable",
+                "type": "end-event",
+                "label": "Proposal rejected — concept not pursued",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "tInitBC",
+                "type": "task",
+                "label": "Initiate business\ncase development",
+                "taskType": "user",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "tReviewBC",
+                "type": "task",
+                "label": "Review and assemble\nfull business case",
+                "taskType": "user",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "gBCSplit",
+                "type": "gateway",
+                "label": "Business case complete and acceptable?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "spRevise",
+                "type": "subprocess-expanded",
+                "label": "Revise Until Business Case Acceptable",
+                "repeatType": "loop",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "spReviseStart",
+                "type": "start-event",
+                "label": "",
+                "parentSubprocess": "spRevise",
+                "pool": "pPO"
+              },
+              {
+                "id": "tDocRevisions",
+                "type": "task",
+                "label": "Document required\nrevisions",
+                "taskType": "user",
+                "parentSubprocess": "spRevise",
+                "pool": "pPO"
+              },
+              {
+                "id": "tReturnBC",
+                "type": "task",
+                "label": "Return business case\nto owning team\nfor revision",
+                "taskType": "user",
+                "parentSubprocess": "spRevise",
+                "pool": "pPO"
+              },
+              {
+                "id": "ieRevisedBC",
+                "type": "intermediate-event",
+                "label": "Revised business case received",
+                "eventType": "message",
+                "parentSubprocess": "spRevise",
+                "pool": "pPO"
+              },
+              {
+                "id": "spReviseEnd",
+                "type": "end-event",
+                "label": "",
+                "parentSubprocess": "spRevise",
+                "pool": "pPO"
+              },
+              {
+                "id": "bTimer",
+                "type": "intermediate-event",
+                "label": "Revision deadline exceeded",
+                "eventType": "timer",
+                "boundaryHost": "spRevise",
+                "boundarySide": "bottom",
+                "properties": {
+                  "interruptionType": "interrupting"
+                },
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "eAbandoned",
+                "type": "end-event",
+                "label": "Business case abandoned — revision deadline exceeded",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "gBCMerge",
+                "type": "gateway",
+                "label": "Business case complete and acceptable?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "tEndorse",
+                "type": "task",
+                "label": "Endorse business case\nand recommend for\nfunding approval",
+                "taskType": "user",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "tRecord",
+                "type": "task",
+                "label": "Record stage-gate outcome\nin Capital Portfolio\nManagement System",
+                "taskType": "service",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "eEnd",
+                "type": "end-event",
+                "label": "Business case endorsed — ready for Obtain Funding Approval",
+                "pool": "pPO",
+                "lane": "lCP"
+              },
+              {
+                "id": "doProposal",
+                "type": "data-object",
+                "label": "Capital Proposal",
+                "pool": "pPO"
+              },
+              {
+                "id": "doFeasReport",
+                "type": "data-object",
+                "label": "Feasibility Assessment Report",
+                "pool": "pPO"
+              },
+              {
+                "id": "doCostEst",
+                "type": "data-object",
+                "label": "Preliminary Cost Estimate",
+                "pool": "pPO"
+              },
+              {
+                "id": "doRiskReg",
+                "type": "data-object",
+                "label": "Risk Register",
+                "pool": "pPO"
+              },
+              {
+                "id": "doBC",
+                "type": "data-object",
+                "label": "Business Case",
+                "pool": "pPO"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "eStart",
+                "targetId": "tRegister",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tRegister",
+                "targetId": "tScope",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tScope",
+                "targetId": "tCommission",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tCommission",
+                "targetId": "gParallelSplit",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gParallelSplit",
+                "targetId": "tCostEst",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gParallelSplit",
+                "targetId": "tRisk",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gParallelSplit",
+                "targetId": "tOptions",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gParallelSplit",
+                "targetId": "tTechDoc",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tCostEst",
+                "targetId": "gParallelJoin",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tRisk",
+                "targetId": "gParallelJoin",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tOptions",
+                "targetId": "gParallelJoin",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tTechDoc",
+                "targetId": "gParallelJoin",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gParallelJoin",
+                "targetId": "ieFeasibility",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ieFeasibility",
+                "targetId": "gFeasSplit",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gFeasSplit",
+                "targetId": "eNotViable",
+                "type": "sequence",
+                "label": "Not viable"
+              },
+              {
+                "sourceId": "tInitBC",
+                "targetId": "tReviewBC",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tReviewBC",
+                "targetId": "gBCSplit",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gBCSplit",
+                "targetId": "spRevise",
+                "type": "sequence",
+                "label": "Incomplete or requires revision"
+              },
+              {
+                "sourceId": "gBCSplit",
+                "targetId": "gBCMerge",
+                "type": "sequence",
+                "label": "Complete and acceptable"
+              },
+              {
+                "sourceId": "spReviseStart",
+                "targetId": "tDocRevisions",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tDocRevisions",
+                "targetId": "tReturnBC",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tReturnBC",
+                "targetId": "ieRevisedBC",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ieRevisedBC",
+                "targetId": "spReviseEnd",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "spRevise",
+                "targetId": "gBCMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "bTimer",
+                "targetId": "eAbandoned",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gBCMerge",
+                "targetId": "tEndorse",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tEndorse",
+                "targetId": "tRecord",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tRecord",
+                "targetId": "eEnd",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "pCPMS",
+                "targetId": "tRegister",
+                "type": "message",
+                "label": "Portfolio register and proposal data"
+              },
+              {
+                "sourceId": "tRecord",
+                "targetId": "pCPMS",
+                "type": "message",
+                "label": "Stage-gate result and endorsed business case record"
+              },
+              {
+                "sourceId": "tRegister",
+                "targetId": "doProposal",
+                "type": "association"
+              },
+              {
+                "sourceId": "doProposal",
+                "targetId": "tScope",
+                "type": "association"
+              },
+              {
+                "sourceId": "tCostEst",
+                "targetId": "doFeasReport",
+                "type": "association"
+              },
+              {
+                "sourceId": "tOptions",
+                "targetId": "doFeasReport",
+                "type": "association"
+              },
+              {
+                "sourceId": "doFeasReport",
+                "targetId": "ieFeasibility",
+                "type": "association"
+              },
+              {
+                "sourceId": "tCostEst",
+                "targetId": "doCostEst",
+                "type": "association"
+              },
+              {
+                "sourceId": "doCostEst",
+                "targetId": "tReviewBC",
+                "type": "association"
+              },
+              {
+                "sourceId": "tRisk",
+                "targetId": "doRiskReg",
+                "type": "association"
+              },
+              {
+                "sourceId": "doRiskReg",
+                "targetId": "tReviewBC",
+                "type": "association"
+              },
+              {
+                "sourceId": "tInitBC",
+                "targetId": "doBC",
+                "type": "association"
+              },
+              {
+                "sourceId": "doBC",
+                "targetId": "tEndorse",
+                "type": "association"
+              },
+              {
+                "sourceId": "doBC",
+                "targetId": "tRecord",
+                "type": "association"
+              },
+              {
+                "sourceId": "gFeasSplit",
+                "targetId": "tInitBC",
+                "type": "sequence",
+                "label": "Viable"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "processCode": "V26.01",
+  "name": "V26.01 Develop Concept & Business Case",
+  "chain": "V26",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:26:44.293Z"
+}

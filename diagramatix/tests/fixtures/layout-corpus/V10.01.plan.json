@@ -1,378 +1,387 @@
 {
+  "diagrams": [
+    {
+      "name": "V10.01 V10.01 Plan Campaign",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pMAP",
+                "type": "pool",
+                "label": "Marketing\nAutomation\nPlatform",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "pMO",
+                "type": "pool",
+                "label": "Marketing Organisation",
+                "poolType": "white-box"
+              },
+              {
+                "id": "lMkt",
+                "type": "lane",
+                "label": "Marketing",
+                "parentPool": "pMO",
+                "pool": "pMO"
+              },
+              {
+                "id": "lMktOps",
+                "type": "lane",
+                "label": "Marketing Operations",
+                "parentPool": "pMO",
+                "pool": "pMO"
+              },
+              {
+                "id": "e1",
+                "type": "start-event",
+                "label": "Campaign planning triggered",
+                "pool": "pMO",
+                "lane": "lMkt"
+              },
+              {
+                "id": "t1",
+                "type": "task",
+                "label": "Define campaign objectives\nand KPIs",
+                "taskType": "user",
+                "pool": "pMO",
+                "lane": "lMkt"
+              },
+              {
+                "id": "t2",
+                "type": "task",
+                "label": "Draft campaign\nbrief",
+                "taskType": "user",
+                "pool": "pMO",
+                "lane": "lMkt"
+              },
+              {
+                "id": "t3",
+                "type": "task",
+                "label": "Propose budget and\nadvertising spend",
+                "taskType": "user",
+                "pool": "pMO",
+                "lane": "lMkt"
+              },
+              {
+                "id": "gw1",
+                "type": "gateway",
+                "label": "Budget approved?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pMO",
+                "lane": "lMkt"
+              },
+              {
+                "id": "t4",
+                "type": "task",
+                "label": "Revise budget\nproposal",
+                "taskType": "user",
+                "pool": "pMO",
+                "lane": "lMkt"
+              },
+              {
+                "id": "gw1m",
+                "type": "gateway",
+                "label": "Budget approved?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pMO",
+                "lane": "lMkt"
+              },
+              {
+                "id": "t5",
+                "type": "task",
+                "label": "Select campaign channels\nand formats",
+                "taskType": "user",
+                "pool": "pMO",
+                "lane": "lMkt"
+              },
+              {
+                "id": "t6",
+                "type": "task",
+                "label": "Set campaign timeline\nand milestones",
+                "taskType": "user",
+                "pool": "pMO",
+                "lane": "lMkt"
+              },
+              {
+                "id": "t7",
+                "type": "task",
+                "label": "Hand campaign brief\nto Marketing Operations",
+                "taskType": "send",
+                "pool": "pMO",
+                "lane": "lMkt"
+              },
+              {
+                "id": "ie1",
+                "type": "intermediate-event",
+                "label": "Campaign brief received",
+                "eventType": "message",
+                "pool": "pMO",
+                "lane": "lMktOps"
+              },
+              {
+                "id": "t8",
+                "type": "task",
+                "label": "Review brief for\noperational feasibility",
+                "taskType": "user",
+                "pool": "pMO",
+                "lane": "lMktOps"
+              },
+              {
+                "id": "gw2",
+                "type": "gateway",
+                "label": "Brief feasible?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pMO",
+                "lane": "lMktOps"
+              },
+              {
+                "id": "t9",
+                "type": "task",
+                "label": "Log feasibility issues\nand return brief\nto Marketing",
+                "taskType": "user",
+                "pool": "pMO",
+                "lane": "lMktOps"
+              },
+              {
+                "id": "t10",
+                "type": "task",
+                "label": "Return brief\nwith issues",
+                "taskType": "send",
+                "pool": "pMO",
+                "lane": "lMktOps"
+              },
+              {
+                "id": "ie2",
+                "type": "intermediate-event",
+                "label": "Revised brief received",
+                "eventType": "message",
+                "pool": "pMO",
+                "lane": "lMktOps"
+              },
+              {
+                "id": "gw2m",
+                "type": "gateway",
+                "label": "Brief feasible?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pMO",
+                "lane": "lMktOps"
+              },
+              {
+                "id": "t11",
+                "type": "task",
+                "label": "Define tracking and\nattribution requirements",
+                "taskType": "user",
+                "pool": "pMO",
+                "lane": "lMktOps"
+              },
+              {
+                "id": "t12",
+                "type": "task",
+                "label": "Confirm consent and\ndata sourcing requirements",
+                "taskType": "user",
+                "pool": "pMO",
+                "lane": "lMktOps"
+              },
+              {
+                "id": "t13",
+                "type": "task",
+                "label": "Create campaign definition\nin Marketing Automation\nPlatform",
+                "taskType": "service",
+                "pool": "pMO",
+                "lane": "lMktOps"
+              },
+              {
+                "id": "e2",
+                "type": "end-event",
+                "label": "Campaign plan confirmed — ready for Define Audience and Segments",
+                "pool": "pMO",
+                "lane": "lMktOps"
+              },
+              {
+                "id": "do1",
+                "type": "data-object",
+                "label": "Campaign Brief",
+                "pool": "pMO"
+              },
+              {
+                "id": "do2",
+                "type": "data-object",
+                "label": "Campaign Definition",
+                "pool": "pMO"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "e1",
+                "targetId": "t1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t1",
+                "targetId": "t2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "t3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t3",
+                "targetId": "gw1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw1",
+                "targetId": "gw1m",
+                "type": "sequence",
+                "label": "Yes"
+              },
+              {
+                "sourceId": "gw1",
+                "targetId": "t4",
+                "type": "sequence",
+                "label": "No"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "gw1m",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw1m",
+                "targetId": "t5",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t5",
+                "targetId": "t6",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t6",
+                "targetId": "t7",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t7",
+                "targetId": "ie1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ie1",
+                "targetId": "t8",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t8",
+                "targetId": "gw2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw2",
+                "targetId": "gw2m",
+                "type": "sequence",
+                "label": "Yes"
+              },
+              {
+                "sourceId": "gw2",
+                "targetId": "t9",
+                "type": "sequence",
+                "label": "No"
+              },
+              {
+                "sourceId": "t9",
+                "targetId": "t10",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t10",
+                "targetId": "ie2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ie2",
+                "targetId": "gw2m",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw2m",
+                "targetId": "t11",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t11",
+                "targetId": "t12",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t12",
+                "targetId": "t13",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t13",
+                "targetId": "e2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "pMAP",
+                "targetId": "t13",
+                "type": "message",
+                "label": "Campaign definition record"
+              },
+              {
+                "sourceId": "t13",
+                "targetId": "pMAP",
+                "type": "message",
+                "label": "Confirmed campaign definition stored"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "do1",
+                "type": "association"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "do1",
+                "type": "association"
+              },
+              {
+                "sourceId": "do1",
+                "targetId": "t8",
+                "type": "association"
+              },
+              {
+                "sourceId": "do1",
+                "targetId": "t9",
+                "type": "association"
+              },
+              {
+                "sourceId": "t13",
+                "targetId": "do2",
+                "type": "association"
+              },
+              {
+                "sourceId": "do2",
+                "targetId": "t11",
+                "type": "association"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
   "processCode": "V10.01",
   "name": "V10.01 Plan Campaign",
   "chain": "V10",
   "model": "claude-sonnet-4-6",
-  "capturedAt": "2026-09-03T03:19:14.295Z",
-  "plan": {
-    "elements": [
-      {
-        "id": "pMAP",
-        "type": "pool",
-        "label": "Marketing\nAutomation\nPlatform",
-        "poolType": "black-box",
-        "isSystem": true
-      },
-      {
-        "id": "pMO",
-        "type": "pool",
-        "label": "Marketing Organisation",
-        "poolType": "white-box"
-      },
-      {
-        "id": "lMkt",
-        "type": "lane",
-        "label": "Marketing",
-        "parentPool": "pMO",
-        "pool": "pMO"
-      },
-      {
-        "id": "lMktOps",
-        "type": "lane",
-        "label": "Marketing Operations",
-        "parentPool": "pMO",
-        "pool": "pMO"
-      },
-      {
-        "id": "e1",
-        "type": "start-event",
-        "label": "Campaign planning triggered",
-        "pool": "pMO",
-        "lane": "lMkt"
-      },
-      {
-        "id": "t1",
-        "type": "task",
-        "label": "Define campaign objectives\nand KPIs",
-        "taskType": "user",
-        "pool": "pMO",
-        "lane": "lMkt"
-      },
-      {
-        "id": "t2",
-        "type": "task",
-        "label": "Draft campaign\nbrief",
-        "taskType": "user",
-        "pool": "pMO",
-        "lane": "lMkt"
-      },
-      {
-        "id": "t3",
-        "type": "task",
-        "label": "Propose budget and\nadvertising spend",
-        "taskType": "user",
-        "pool": "pMO",
-        "lane": "lMkt"
-      },
-      {
-        "id": "gw1",
-        "type": "gateway",
-        "label": "Budget approved?",
-        "gatewayType": "exclusive",
-        "gatewayRole": "decision",
-        "pool": "pMO",
-        "lane": "lMkt"
-      },
-      {
-        "id": "t4",
-        "type": "task",
-        "label": "Revise budget\nproposal",
-        "taskType": "user",
-        "pool": "pMO",
-        "lane": "lMkt"
-      },
-      {
-        "id": "gw1m",
-        "type": "gateway",
-        "label": "Budget approved?",
-        "gatewayType": "exclusive",
-        "gatewayRole": "merge",
-        "pool": "pMO",
-        "lane": "lMkt"
-      },
-      {
-        "id": "t5",
-        "type": "task",
-        "label": "Select campaign channels\nand formats",
-        "taskType": "user",
-        "pool": "pMO",
-        "lane": "lMkt"
-      },
-      {
-        "id": "t6",
-        "type": "task",
-        "label": "Set campaign timeline\nand milestones",
-        "taskType": "user",
-        "pool": "pMO",
-        "lane": "lMkt"
-      },
-      {
-        "id": "t7",
-        "type": "task",
-        "label": "Hand campaign brief\nto Marketing Operations",
-        "taskType": "send",
-        "pool": "pMO",
-        "lane": "lMkt"
-      },
-      {
-        "id": "ie1",
-        "type": "intermediate-event",
-        "label": "Campaign brief received",
-        "eventType": "message",
-        "pool": "pMO",
-        "lane": "lMktOps"
-      },
-      {
-        "id": "t8",
-        "type": "task",
-        "label": "Review brief for\noperational feasibility",
-        "taskType": "user",
-        "pool": "pMO",
-        "lane": "lMktOps"
-      },
-      {
-        "id": "gw2",
-        "type": "gateway",
-        "label": "Brief feasible?",
-        "gatewayType": "exclusive",
-        "gatewayRole": "decision",
-        "pool": "pMO",
-        "lane": "lMktOps"
-      },
-      {
-        "id": "t9",
-        "type": "task",
-        "label": "Log feasibility issues\nand return brief\nto Marketing",
-        "taskType": "user",
-        "pool": "pMO",
-        "lane": "lMktOps"
-      },
-      {
-        "id": "t10",
-        "type": "task",
-        "label": "Return brief\nwith issues",
-        "taskType": "send",
-        "pool": "pMO",
-        "lane": "lMktOps"
-      },
-      {
-        "id": "ie2",
-        "type": "intermediate-event",
-        "label": "Revised brief received",
-        "eventType": "message",
-        "pool": "pMO",
-        "lane": "lMktOps"
-      },
-      {
-        "id": "gw2m",
-        "type": "gateway",
-        "label": "Brief feasible?",
-        "gatewayType": "exclusive",
-        "gatewayRole": "merge",
-        "pool": "pMO",
-        "lane": "lMktOps"
-      },
-      {
-        "id": "t11",
-        "type": "task",
-        "label": "Define tracking and\nattribution requirements",
-        "taskType": "user",
-        "pool": "pMO",
-        "lane": "lMktOps"
-      },
-      {
-        "id": "t12",
-        "type": "task",
-        "label": "Confirm consent and\ndata sourcing requirements",
-        "taskType": "user",
-        "pool": "pMO",
-        "lane": "lMktOps"
-      },
-      {
-        "id": "t13",
-        "type": "task",
-        "label": "Create campaign definition\nin Marketing Automation\nPlatform",
-        "taskType": "service",
-        "pool": "pMO",
-        "lane": "lMktOps"
-      },
-      {
-        "id": "e2",
-        "type": "end-event",
-        "label": "Campaign plan confirmed — ready for Define Audience and Segments",
-        "pool": "pMO",
-        "lane": "lMktOps"
-      },
-      {
-        "id": "do1",
-        "type": "data-object",
-        "label": "Campaign Brief",
-        "pool": "pMO"
-      },
-      {
-        "id": "do2",
-        "type": "data-object",
-        "label": "Campaign Definition",
-        "pool": "pMO"
-      }
-    ],
-    "connections": [
-      {
-        "sourceId": "e1",
-        "targetId": "t1",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t1",
-        "targetId": "t2",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t2",
-        "targetId": "t3",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t3",
-        "targetId": "gw1",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gw1",
-        "targetId": "gw1m",
-        "type": "sequence",
-        "label": "Yes"
-      },
-      {
-        "sourceId": "gw1",
-        "targetId": "t4",
-        "type": "sequence",
-        "label": "No"
-      },
-      {
-        "sourceId": "t4",
-        "targetId": "gw1m",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gw1m",
-        "targetId": "t5",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t5",
-        "targetId": "t6",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t6",
-        "targetId": "t7",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t7",
-        "targetId": "ie1",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "ie1",
-        "targetId": "t8",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t8",
-        "targetId": "gw2",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gw2",
-        "targetId": "gw2m",
-        "type": "sequence",
-        "label": "Yes"
-      },
-      {
-        "sourceId": "gw2",
-        "targetId": "t9",
-        "type": "sequence",
-        "label": "No"
-      },
-      {
-        "sourceId": "t9",
-        "targetId": "t10",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t10",
-        "targetId": "ie2",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "ie2",
-        "targetId": "gw2m",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "gw2m",
-        "targetId": "t11",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t11",
-        "targetId": "t12",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t12",
-        "targetId": "t13",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "t13",
-        "targetId": "e2",
-        "type": "sequence"
-      },
-      {
-        "sourceId": "pMAP",
-        "targetId": "t13",
-        "type": "message",
-        "label": "Campaign definition record"
-      },
-      {
-        "sourceId": "t13",
-        "targetId": "pMAP",
-        "type": "message",
-        "label": "Confirmed campaign definition stored"
-      },
-      {
-        "sourceId": "t2",
-        "targetId": "do1",
-        "type": "association"
-      },
-      {
-        "sourceId": "t4",
-        "targetId": "do1",
-        "type": "association"
-      },
-      {
-        "sourceId": "do1",
-        "targetId": "t8",
-        "type": "association"
-      },
-      {
-        "sourceId": "do1",
-        "targetId": "t9",
-        "type": "association"
-      },
-      {
-        "sourceId": "t13",
-        "targetId": "do2",
-        "type": "association"
-      },
-      {
-        "sourceId": "do2",
-        "targetId": "t11",
-        "type": "association"
-      }
-    ]
-  }
+  "capturedAt": "2026-09-03T03:19:14.295Z"
 }

@@ -1,0 +1,323 @@
+{
+  "diagrams": [
+    {
+      "name": "V18.01 V18.01 Identify Need or Trigger",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pReg",
+                "type": "pool",
+                "label": "Regulator",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "pOrg",
+                "type": "pool",
+                "label": "Organisation",
+                "poolType": "white-box"
+              },
+              {
+                "id": "lRC",
+                "type": "lane",
+                "label": "Risk & Compliance",
+                "parentPool": "pOrg",
+                "pool": "pOrg"
+              },
+              {
+                "id": "pObReg",
+                "type": "pool",
+                "label": "Obligations\nRegister",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "eStart",
+                "type": "start-event",
+                "label": "Regulatory obligation, guidance, or consultation paper received from Regulator",
+                "eventType": "message",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "t1",
+                "type": "task",
+                "label": "Log and categorise\nincoming trigger",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "t2",
+                "type": "task",
+                "label": "Retrieve current obligations\nand policy inventory",
+                "taskType": "service",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "t3",
+                "type": "task",
+                "label": "Assess trigger against\nexisting obligations inventory",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "gw1",
+                "type": "gateway",
+                "label": "Does an existing obligation or policy cover this trigger?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "t4",
+                "type": "task",
+                "label": "Record trigger as\npossible revision to\nexisting policy",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "t5",
+                "type": "task",
+                "label": "Record trigger as\nrequirement for new\npolicy or document",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "gw1m",
+                "type": "gateway",
+                "label": "Coverage determination complete",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "t6",
+                "type": "task",
+                "label": "Determine urgency and\npreliminary priority",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "gw2",
+                "type": "gateway",
+                "label": "Is the trigger urgent or deadline-driven?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "t7",
+                "type": "task",
+                "label": "Flag trigger for\nexpedited handling and\nnote deadline",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "t8",
+                "type": "task",
+                "label": "Schedule trigger for\nroutine planning cycle",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "gw2m",
+                "type": "gateway",
+                "label": "Urgency classification resolved",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "t9",
+                "type": "task",
+                "label": "Compile trigger record\nand confirm readiness\nto scope",
+                "taskType": "user",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "eEnd",
+                "type": "end-event",
+                "label": "Trigger identified and recorded — ready for Assign Owner and Scope Change",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "doTrigger",
+                "type": "data-object",
+                "label": "Trigger Record",
+                "pool": "pOrg",
+                "lane": "lRC"
+              },
+              {
+                "id": "doInventory",
+                "type": "data-object",
+                "label": "Obligations and Policy Inventory",
+                "pool": "pOrg",
+                "lane": "lRC"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "eStart",
+                "targetId": "t1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t1",
+                "targetId": "t2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "t3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t3",
+                "targetId": "gw1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw1",
+                "targetId": "t4",
+                "type": "sequence",
+                "label": "Yes — existing coverage"
+              },
+              {
+                "sourceId": "gw1",
+                "targetId": "t5",
+                "type": "sequence",
+                "label": "No — new obligation or gap"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "gw1m",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t5",
+                "targetId": "gw1m",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw1m",
+                "targetId": "t6",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t6",
+                "targetId": "gw2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw2",
+                "targetId": "t7",
+                "type": "sequence",
+                "label": "Yes — urgent"
+              },
+              {
+                "sourceId": "gw2",
+                "targetId": "t8",
+                "type": "sequence",
+                "label": "No — standard timeline"
+              },
+              {
+                "sourceId": "t7",
+                "targetId": "gw2m",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t8",
+                "targetId": "gw2m",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw2m",
+                "targetId": "t9",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t9",
+                "targetId": "eEnd",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "pReg",
+                "targetId": "eStart",
+                "type": "message",
+                "label": "Obligation notice, guidance document, or consultation paper"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "pObReg",
+                "type": "message",
+                "label": "Query for matching obligations and policy inventory"
+              },
+              {
+                "sourceId": "pObReg",
+                "targetId": "t2",
+                "type": "message",
+                "label": "Current obligations list, policy inventory, and scheduled review dates"
+              },
+              {
+                "sourceId": "t1",
+                "targetId": "doTrigger",
+                "type": "association"
+              },
+              {
+                "sourceId": "doTrigger",
+                "targetId": "t3",
+                "type": "association"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "doTrigger",
+                "type": "association"
+              },
+              {
+                "sourceId": "t5",
+                "targetId": "doTrigger",
+                "type": "association"
+              },
+              {
+                "sourceId": "doTrigger",
+                "targetId": "t9",
+                "type": "association"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "doInventory",
+                "type": "association"
+              },
+              {
+                "sourceId": "doInventory",
+                "targetId": "t3",
+                "type": "association"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "processCode": "V18.01",
+  "name": "V18.01 Identify Need or Trigger",
+  "chain": "V18",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:22:50.021Z"
+}

@@ -1,0 +1,542 @@
+{
+  "diagrams": [
+    {
+      "name": "V23.01 V23.01 Acquire Meter Readings",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pConsumer",
+                "type": "pool",
+                "label": "Consumer",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "pMSP",
+                "type": "pool",
+                "label": "Metering\nService\nProvider",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "pUtility",
+                "type": "pool",
+                "label": "Utility",
+                "poolType": "white-box"
+              },
+              {
+                "id": "lMFO",
+                "type": "lane",
+                "label": "Metering & Field Operations",
+                "parentPool": "pUtility",
+                "pool": "pUtility"
+              },
+              {
+                "id": "lMDM",
+                "type": "lane",
+                "label": "Meter Data Management",
+                "parentPool": "pUtility",
+                "pool": "pUtility"
+              },
+              {
+                "id": "pMDMS",
+                "type": "pool",
+                "label": "Meter Data\nManagement\nSystem",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "e1",
+                "type": "start-event",
+                "label": "Billing cycle or meter event triggers read acquisition",
+                "eventType": "timer",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "gw1",
+                "type": "gateway",
+                "label": "Read method?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "t1",
+                "type": "task",
+                "label": "Schedule field meter\nread in workforce\nmanagement",
+                "taskType": "user",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "t2",
+                "type": "task",
+                "label": "Dispatch field technician\nto meter site",
+                "taskType": "service",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "t3",
+                "type": "task",
+                "label": "Capture meter read\non site",
+                "taskType": "user",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "t4",
+                "type": "task",
+                "label": "Request interval and\nregister data from\nhead-end system",
+                "taskType": "service",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "ie1",
+                "type": "intermediate-event",
+                "label": "Meter data received from Metering Service Provider",
+                "eventType": "message",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "t5",
+                "type": "task",
+                "label": "Send self-read request\nto Consumer",
+                "taskType": "send",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "ie2",
+                "type": "intermediate-event",
+                "label": "Self-read submitted by Consumer",
+                "eventType": "message",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "t6",
+                "type": "task",
+                "label": "Record self-read received\nfrom Consumer",
+                "taskType": "user",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "gw2",
+                "type": "gateway",
+                "label": "Read method",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "t7",
+                "type": "task",
+                "label": "Perform initial completeness\ncheck on read\ndata",
+                "taskType": "user",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "gw3",
+                "type": "gateway",
+                "label": "Read data complete?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "sp1",
+                "type": "subprocess-expanded",
+                "label": "Repeat Until Read Data Complete",
+                "repeatType": "loop",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "sp1s1",
+                "type": "start-event",
+                "label": "",
+                "pool": "pUtility",
+                "parentSubprocess": "sp1"
+              },
+              {
+                "id": "sp1t1",
+                "type": "task",
+                "label": "Log missing read\nand escalate to\nanalyst",
+                "taskType": "user",
+                "pool": "pUtility",
+                "parentSubprocess": "sp1"
+              },
+              {
+                "id": "sp1t2",
+                "type": "task",
+                "label": "Attempt supplementary read\nor contact Metering\nService Provider",
+                "taskType": "send",
+                "pool": "pUtility",
+                "parentSubprocess": "sp1"
+              },
+              {
+                "id": "sp1e1",
+                "type": "end-event",
+                "label": "",
+                "pool": "pUtility",
+                "parentSubprocess": "sp1"
+              },
+              {
+                "id": "bTimer1",
+                "type": "intermediate-event",
+                "label": "48-hour read deadline exceeded",
+                "eventType": "timer",
+                "boundaryHost": "sp1",
+                "boundarySide": "bottom",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "t8",
+                "type": "task",
+                "label": "Raise escalation notice\nto meter data\nanalyst",
+                "taskType": "send",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "gw4",
+                "type": "gateway",
+                "label": "Read data complete",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "t9",
+                "type": "task",
+                "label": "Submit reads to\nMeter Data Management\nSystem",
+                "taskType": "user",
+                "pool": "pUtility",
+                "lane": "lMFO"
+              },
+              {
+                "id": "t10",
+                "type": "task",
+                "label": "Receive and register\nreads in Meter\nData Management System",
+                "taskType": "service",
+                "pool": "pUtility",
+                "lane": "lMDM"
+              },
+              {
+                "id": "t11",
+                "type": "task",
+                "label": "Review read register\nfor anomalies",
+                "taskType": "user",
+                "pool": "pUtility",
+                "lane": "lMDM"
+              },
+              {
+                "id": "gw5",
+                "type": "gateway",
+                "label": "Reads acceptable for downstream processing?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pUtility",
+                "lane": "lMDM"
+              },
+              {
+                "id": "e2",
+                "type": "end-event",
+                "label": "Meter reads acquired — ready for Validate and Estimate Data",
+                "pool": "pUtility",
+                "lane": "lMDM"
+              },
+              {
+                "id": "t12",
+                "type": "task",
+                "label": "Return rejected reads\nto Metering and\nField Operations for\nre-collection",
+                "taskType": "send",
+                "pool": "pUtility",
+                "lane": "lMDM"
+              },
+              {
+                "id": "e3",
+                "type": "end-event",
+                "label": "Re-collection initiated — loop back to field operations",
+                "pool": "pUtility",
+                "lane": "lMDM"
+              },
+              {
+                "id": "do1",
+                "type": "data-object",
+                "label": "Meter Read Record",
+                "pool": "pUtility"
+              },
+              {
+                "id": "do2",
+                "type": "data-object",
+                "label": "Field Dispatch Order",
+                "pool": "pUtility"
+              },
+              {
+                "id": "do3",
+                "type": "data-object",
+                "label": "Read Anomaly Log",
+                "pool": "pUtility"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "e1",
+                "targetId": "gw1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw1",
+                "targetId": "t1",
+                "type": "sequence",
+                "label": "Scheduled field read"
+              },
+              {
+                "sourceId": "t1",
+                "targetId": "t2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "t3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t3",
+                "targetId": "gw2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw1",
+                "targetId": "t4",
+                "type": "sequence",
+                "label": "Smart meter automated read"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "ie1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ie1",
+                "targetId": "gw2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw1",
+                "targetId": "t5",
+                "type": "sequence",
+                "label": "Consumer self-read"
+              },
+              {
+                "sourceId": "t5",
+                "targetId": "ie2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "ie2",
+                "targetId": "t6",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t6",
+                "targetId": "gw2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw2",
+                "targetId": "t7",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t7",
+                "targetId": "gw3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw3",
+                "targetId": "sp1",
+                "type": "sequence",
+                "label": "Incomplete — retry"
+              },
+              {
+                "sourceId": "sp1s1",
+                "targetId": "sp1t1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "sp1t1",
+                "targetId": "sp1t2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "sp1t2",
+                "targetId": "sp1e1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "sp1",
+                "targetId": "gw4",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw3",
+                "targetId": "gw4",
+                "type": "sequence",
+                "label": "Complete"
+              },
+              {
+                "sourceId": "bTimer1",
+                "targetId": "t8",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t8",
+                "targetId": "t11",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw4",
+                "targetId": "t9",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t9",
+                "targetId": "t10",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t10",
+                "targetId": "t11",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t11",
+                "targetId": "gw5",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gw5",
+                "targetId": "e2",
+                "type": "sequence",
+                "label": "Yes"
+              },
+              {
+                "sourceId": "gw5",
+                "targetId": "t12",
+                "type": "sequence",
+                "label": "No — return for investigation"
+              },
+              {
+                "sourceId": "t12",
+                "targetId": "e3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t5",
+                "targetId": "pConsumer",
+                "type": "message",
+                "label": "Self-read request notice"
+              },
+              {
+                "sourceId": "pConsumer",
+                "targetId": "ie2",
+                "type": "message",
+                "label": "Consumer self-read data"
+              },
+              {
+                "sourceId": "pMSP",
+                "targetId": "ie1",
+                "type": "message",
+                "label": "Interval and register data"
+              },
+              {
+                "sourceId": "t4",
+                "targetId": "pMDMS",
+                "type": "message",
+                "label": "Data pull request"
+              },
+              {
+                "sourceId": "pMDMS",
+                "targetId": "t10",
+                "type": "message",
+                "label": "Stored meter register and interval data"
+              },
+              {
+                "sourceId": "t9",
+                "targetId": "pMDMS",
+                "type": "message",
+                "label": "Raw read submission"
+              },
+              {
+                "sourceId": "sp1t2",
+                "targetId": "pMSP",
+                "type": "message",
+                "label": "Supplementary read request"
+              },
+              {
+                "sourceId": "t3",
+                "targetId": "do1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t6",
+                "targetId": "do1",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do1",
+                "targetId": "t7",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do1",
+                "targetId": "t9",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t2",
+                "targetId": "do2",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do2",
+                "targetId": "t3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "t11",
+                "targetId": "do3",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "do3",
+                "targetId": "gw5",
+                "type": "sequence"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "processCode": "V23.01",
+  "name": "V23.01 Acquire Meter Readings",
+  "chain": "V23",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:25:18.958Z"
+}

@@ -1,0 +1,329 @@
+{
+  "diagrams": [
+    {
+      "name": "V21.01 V21.01 Receive Application",
+      "data": {
+        "aiGeneration": {
+          "plan": {
+            "elements": [
+              {
+                "id": "pApplicant",
+                "type": "pool",
+                "label": "Applicant",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "pBroker",
+                "type": "pool",
+                "label": "Broker",
+                "poolType": "black-box",
+                "isSystem": false
+              },
+              {
+                "id": "pMain",
+                "type": "pool",
+                "label": "Assessing Organisation",
+                "poolType": "white-box"
+              },
+              {
+                "id": "lIntake",
+                "type": "lane",
+                "label": "Intake",
+                "parentPool": "pMain",
+                "pool": "pMain"
+              },
+              {
+                "id": "pPortal",
+                "type": "pool",
+                "label": "Customer\nPortal",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "pPlatform",
+                "type": "pool",
+                "label": "Application /\nOrigination\nPlatform",
+                "poolType": "black-box",
+                "isSystem": true
+              },
+              {
+                "id": "eStart",
+                "type": "start-event",
+                "label": "Application received from Applicant or Broker",
+                "eventType": "message",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "gChannel",
+                "type": "gateway",
+                "label": "Submission channel?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "tRetrievePortal",
+                "type": "task",
+                "label": "Retrieve application from\nCustomer Portal",
+                "taskType": "service",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "tLogBroker",
+                "type": "task",
+                "label": "Receive and log\nbroker-submitted application",
+                "taskType": "user",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "gChannelMerge",
+                "type": "gateway",
+                "label": "Submission channel resolved",
+                "gatewayType": "exclusive",
+                "gatewayRole": "merge",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "tValidateFormat",
+                "type": "task",
+                "label": "Validate application format\nand product type",
+                "taskType": "user",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "gReadable",
+                "type": "gateway",
+                "label": "Application readable and product recognised?",
+                "gatewayType": "exclusive",
+                "gatewayRole": "decision",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "tRequestResubmit",
+                "type": "task",
+                "label": "Request resubmission from\napplicant or broker",
+                "taskType": "send",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "eEndResubmit",
+                "type": "end-event",
+                "label": "Application returned for resubmission — process ends",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "tAssignRef",
+                "type": "task",
+                "label": "Assign reference number\nand create case",
+                "taskType": "user",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "tRecordPlatform",
+                "type": "task",
+                "label": "Record new application\nin Application /\nOrigination Platform",
+                "taskType": "service",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "tCaptureDetails",
+                "type": "task",
+                "label": "Capture applicant and\nproduct details",
+                "taskType": "user",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "tSendAck",
+                "type": "task",
+                "label": "Send acknowledgement and\nreference number to\napplicant",
+                "taskType": "user",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "eEndRegistered",
+                "type": "end-event",
+                "label": "Application registered — ready for Check Completeness",
+                "pool": "pMain",
+                "lane": "lIntake"
+              },
+              {
+                "id": "doSubmission",
+                "type": "data-object",
+                "label": "Application Submission",
+                "pool": "pMain"
+              },
+              {
+                "id": "doRecord",
+                "type": "data-object",
+                "label": "Application Record",
+                "pool": "pMain"
+              },
+              {
+                "id": "doAck",
+                "type": "data-object",
+                "label": "Acknowledgement Notice",
+                "pool": "pMain"
+              }
+            ],
+            "connections": [
+              {
+                "sourceId": "eStart",
+                "targetId": "gChannel",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gChannel",
+                "targetId": "tRetrievePortal",
+                "type": "sequence",
+                "label": "Direct from applicant via portal"
+              },
+              {
+                "sourceId": "gChannel",
+                "targetId": "tLogBroker",
+                "type": "sequence",
+                "label": "Via broker"
+              },
+              {
+                "sourceId": "tRetrievePortal",
+                "targetId": "gChannelMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tLogBroker",
+                "targetId": "gChannelMerge",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gChannelMerge",
+                "targetId": "tValidateFormat",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tValidateFormat",
+                "targetId": "gReadable",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gReadable",
+                "targetId": "tRequestResubmit",
+                "type": "sequence",
+                "label": "No — unreadable or unrecognised product"
+              },
+              {
+                "sourceId": "tRequestResubmit",
+                "targetId": "eEndResubmit",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "gReadable",
+                "targetId": "tAssignRef",
+                "type": "sequence",
+                "label": "Yes"
+              },
+              {
+                "sourceId": "tAssignRef",
+                "targetId": "tRecordPlatform",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tRecordPlatform",
+                "targetId": "tCaptureDetails",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tCaptureDetails",
+                "targetId": "tSendAck",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "tSendAck",
+                "targetId": "eEndRegistered",
+                "type": "sequence"
+              },
+              {
+                "sourceId": "pApplicant",
+                "targetId": "eStart",
+                "type": "message",
+                "label": "Application submission"
+              },
+              {
+                "sourceId": "pBroker",
+                "targetId": "eStart",
+                "type": "message",
+                "label": "Broker-submitted application"
+              },
+              {
+                "sourceId": "pPortal",
+                "targetId": "tRetrievePortal",
+                "type": "message",
+                "label": "Submitted application data"
+              },
+              {
+                "sourceId": "tRecordPlatform",
+                "targetId": "pPlatform",
+                "type": "message",
+                "label": "New application record"
+              },
+              {
+                "sourceId": "tSendAck",
+                "targetId": "pPortal",
+                "type": "message",
+                "label": "Acknowledgement message and reference number"
+              },
+              {
+                "sourceId": "pPortal",
+                "targetId": "pApplicant",
+                "type": "message",
+                "label": "Acknowledgement and reference number delivered"
+              },
+              {
+                "sourceId": "doSubmission",
+                "targetId": "tRetrievePortal",
+                "type": "association"
+              },
+              {
+                "sourceId": "doSubmission",
+                "targetId": "tLogBroker",
+                "type": "association"
+              },
+              {
+                "sourceId": "tCaptureDetails",
+                "targetId": "doRecord",
+                "type": "association"
+              },
+              {
+                "sourceId": "tRecordPlatform",
+                "targetId": "doRecord",
+                "type": "association"
+              },
+              {
+                "sourceId": "tSendAck",
+                "targetId": "doAck",
+                "type": "association"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "processCode": "V21.01",
+  "name": "V21.01 Receive Application",
+  "chain": "V21",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:24:12.635Z"
+}
