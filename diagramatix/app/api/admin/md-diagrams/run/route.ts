@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { isTransientAiError, describeAiError } from "@/app/lib/ai/aiErrors";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/app/lib/db";
@@ -214,21 +215,9 @@ export async function POST(req: Request) {
        * 5xx, so three attempts had failed; but the run is UNATTENDED and losing
        * a diagram to a passing blip means someone has to notice and re-run it.
        */
-      const isTransient = (e: unknown) => {
-        const m = (e instanceof Error ? e.message : String(e)).toLowerCase();
-        const status = (e as { status?: number })?.status;
-        return status === 429 || status === 529 || (typeof status === "number" && status >= 500)
-          || m.includes("overloaded") || m.includes("rate limit") || m.includes("529")
-          || m.includes("timeout") || m.includes("econnreset");
-      };
-      /** A readable line for the UI; the raw provider JSON is not one. */
-      const describeError = (e: unknown) => {
-        const raw = e instanceof Error ? e.message : String(e);
-        if (/overloaded|529/i.test(raw)) return "AI provider overloaded (529) — transient, try again";
-        if (/rate.?limit|429/i.test(raw)) return "AI provider rate limit (429) — transient, try again";
-        if (/timeout/i.test(raw)) return "AI call timed out — transient, try again";
-        return raw.length > 160 ? raw.slice(0, 157) + "…" : raw;
-      };
+      // Shared with every other generation entry point — see app/lib/ai/aiErrors.
+      const isTransient = isTransientAiError;
+      const describeError = describeAiError;
       /** Wait between attempts; a busy provider needs a moment, not an instant retry. */
       const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

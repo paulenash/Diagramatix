@@ -153,7 +153,12 @@ export function makeAiClient(model: string | null | undefined, fallbackApiKey?: 
   // operations" guard when the client timeout is UNSET — it lets the large-output
   // plan call (max_tokens 32000 for Opus/Sonnet, above the ~21k guard threshold)
   // stay a plain non-streaming create with telemetry intact.
-  const telemetry = { fetch: countingFetch, maxRetries: 2, timeout: 15 * 60 * 1000 };
+  // maxRetries 4, not 2. The SDK retries 408/409/429/5xx with exponential
+  // backoff and honours retry-after, and 529 (Anthropic "overloaded") is a 5xx.
+  // Paul hit a sustained overload on 2026-09-03 that three attempts could not
+  // ride out; five gives a saturated provider appreciably longer to recover
+  // without anyone re-clicking. It costs nothing when the provider is healthy.
+  const telemetry = { fetch: countingFetch, maxRetries: 4, timeout: 15 * 60 * 1000 };
 
   let client: Anthropic;
   if (provider === "moonshot" || provider === "google" || provider === "microsoft" || provider === "ollama" || provider === "deepseek") {

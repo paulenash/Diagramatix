@@ -5,6 +5,7 @@
  * can edit the plan and pass it to POST /api/ai/flowchart/apply-layout.
  */
 import { NextResponse } from "next/server";
+import { describeAiError } from "@/app/lib/ai/aiErrors";
 import { auth } from "@/auth";
 import { gateOrgPolicy } from "@/app/lib/auth/orgPolicy";
 import { prisma } from "@/app/lib/db";
@@ -78,6 +79,6 @@ export async function POST(req: Request) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[AI flowchart plan] error:", msg);
-    return NextResponse.json({ error: `AI planning failed: ${msg}` }, { status: 500 });
+    return NextResponse.json({ error: `AI planning failed: ${describeAiError(msg)}` }, { status: 500 });
   }
 }
