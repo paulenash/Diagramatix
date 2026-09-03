@@ -15,6 +15,201 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.5.2412 — 2026-09-03 — The master prompt template was drawing the bugs
+
+Six defects in `DEFAULT_MD_PROMPT_BPMN`, two of which had been manufacturing
+generated-diagram faults for a fortnight. None was fixable in the layout engine:
+the prompt was asking for shapes BPMN does not allow, and generation was
+rendering the request faithfully.
+
+**A missing legal option is as damaging as a wrong rule.** The four accepted
+branch closing forms were merge gateway / End event / loop repeats / exits
+subprocess. There was no way to say "and then the next task", so a branch that
+simply flowed onward was illegal — and the model closed it the only legal way it
+had, by inventing a merge gateway that merges ONE branch. A diamond that decides
+nothing. It read as the model being careless; it was the model obeying.
+
+**Two sections were each correct and jointly wrong.** Section 4: a wait is an
+event, never a task. Section 5: model a wait with a deadline as a receive task.
+Read in order, that yields a timer mounted on an intermediate catch event — 25
+occurrences across 21 processes, undrawable. Section 4 now carries the carve-out.
+
+The other four: the absolute "every diverging gateway is matched by a merge",
+which asked for the no-op gateways; the correction to it being the EXCLUSIVE case
+only, where a **parallel split's join is mandatory** and fixing the first naively
+would have been worse than the bug; exception paths with no required termination;
+and a "non-interrupting" flavour the layout engine silently overrides anyway.
+
+**Gate, do not inspect.** `checkPromptShapes` detects the two undrawable shapes
+deterministically and free, and the Process Repository shows an "N undrawable"
+badge per prompt. `scripts/check-chain-prompts.ts` reads the stored rows for
+whichever database `DATABASE_URL` names — prod and local drift silently
+otherwise, and running it found exactly that.
+
+Proved on **V22**, regenerated on prod: all four of its detectable defects gone,
+and the diagrams judged good. The other 25 chains follow — all of them, not just
+the 20 carrying a badge, because only two of the six defect classes are
+detectable at all.
+
+- Schema: XSD unchanged (46). **PRODUCT_VERSION 2.4 → 2.5**, recorded here for
+  the four Partner API tables that shipped in 2.4.2381 — see that entry.
+- `T3172`–`T3187`.
+
+---
+
+## 2.4.2408 — 2026-09-03 — A busy provider, and a run that lied about succeeding
+
+Batch generation is unattended by design, which makes a quiet failure the
+expensive kind.
+
+**A flow-less diagram is now a failure, not a tick.** A generation that produced
+elements but no sequence flow was reported as success, and the defect surfaced
+only when someone opened the diagram — potentially a hundred diagrams later.
+
+**A busy provider is retried rather than lost.** A 529 `overloaded_error` is
+transient and was killing a diagram outright; up to three attempts now, with the
+provider named in the message so "it failed" says which one and why. A real fault
+— a bad prompt, a refusal, a parse failure — is still not retried, because
+repeating it burns tokens to reach the same answer.
+
+Also: the redundant-gateway prune is re-asserted immediately before layout, and
+the partner suite's mock of `planBpmn` was made partial, so adding an export to
+that module can no longer break an unrelated test file.
+
+- Schema: no bump.
+
+---
+
+## 2.4.2406 — 2026-09-03 — Paths are identified, numbered, and given rows
+
+The layout engine knew about elements and connectors but had no notion of a
+**path** — so a decision's branches, an exception opened by an edge-mounted
+event, and the trunk they hang off were indistinguishable, and every rule about
+vertical placement was guessing.
+
+`analysePaths()` now identifies each path, numbers it, and assigns rows
+hierarchically. A decision and its merge sit in the middle of their own paths; a
+branch keeps its row and its boundary events travel with it; an exception path
+takes a row in the stack rather than one beside its host.
+
+**The bug worth recording is the one that hid inside this.** Path ids are not
+unique — every root is called "trunk" — so a map keyed by path id returned the
+last writer's row, and start events landed at the bottom of the lane across a
+whole chain. It looked like a placement rule misfiring and was a keying mistake.
+Rows are keyed per ELEMENT now.
+
+Also: gateways are centred, paired and entered using FINAL geometry rather than
+values computed before later passes move things — the recurring failure mode in
+this engine — and a branch running straight into its merge leaves by the right
+vertex.
+
+- Schema: no bump.
+
+---
+
+## 2.4.2400 — 2026-09-03 — Readability becomes a measured property
+
+Paul: *"I need a single pass generation to produce a pdf-able diagram that is
+readable."* Overlaps stopped being cosmetic at that point — a Partner API call
+returns a PDF to a third party who has no chance to tidy it up, so an overlap is
+a correctness defect.
+
+So it is measured. `findReadabilityViolations` scans a finished diagram for four
+kinds of collision — body/body, label/body, label/label, and a branch label
+sitting on a connector run — and a **corpus of 26 stored AI plans is replayed
+offline, free, on every test run**, with a ratchet that fails if the count rises.
+Baseline 107 violations; 17 at the close of this release, 15 of 26 diagrams
+completely clean.
+
+Getting there took two failed attempts worth naming: a greedy label placer and a
+collective one, both of which made the numbers worse and were reverted. The cause
+of both was measuring label geometry by hand instead of calling the checker's own
+`connectorLabelBox`, so each fix optimised something the checker did not score.
+
+Long connector labels now **wrap to two lines**, which localises an overlap at
+its source rather than pushing it around the diagram, and labels are placed
+against the finished diagram with connectors counted as obstacles.
+
+- Schema: no bump.
+
+---
+
+## 2.4.2392 — 2026-09-02 — Every gateway branch says where it goes
+
+A Technical Description that ends a branch with "continue to the next task" reads
+as though something follows while naming nothing that can be drawn, so a
+regeneration has to guess — and the diagram quietly stops matching the write-up.
+
+`checkPromptBranches` refuses that now, and the four accepted closing forms are
+stated in the master template. **All 277 BPMN prompts were regenerated**, taking
+the catalogue from 66 unterminated branches to none.
+
+The Technical Description generator learned the same discipline: it closes every
+branch it opens, keeps a path intact rather than letting the first branch to
+reach a merge swallow the shared tail, and describes edge-mounted events and the
+exception path each one opens — nothing flows INTO a boundary event, so the
+sequence walk never reached one and those paths were simply absent from the text.
+
+- Schema: no bump.
+
+---
+
+## 2.4.2381 — 2026-09-01 — The GETAI Process API
+
+An external partner posts a process description, or a document — an SOP, a PDF,
+an image — plus volumetrics, and gets back pools and lanes, an ordered activity
+list, and a PDF of the generated BPMN. The diagram is persisted as a **real
+project someone can open**, which is the commercial point of the integration.
+
+Nine slices: keys and request logging; the core pipeline; async jobs with a
+worker and a reaper; the SuperAdmin test harness and its case library; PDF, SVG
+and BPMN XML artifacts; volumetrics that make the diagram open runnable; the
+round trip that turns the harness from a viewer into a measurement; run history
+and two-run comparison; and the contract endpoint with audit rows.
+
+**Retention is a property of the key's phase, not a flag someone must remember to
+unset.** `internal` / `testing` / `live`, defaulting to `live`, with a mandatory
+expiry on `testing` and a purge on go-live. The harness corpus lives in its own
+table precisely so it is NOT governed by that purge — two things holding similar
+bytes with opposite requirements.
+
+Two silent bugs closed on the way past: a `.docx` was being sent to the model as
+raw ZIP bytes, and the brute-force guard was rate-limiting correct behaviour.
+
+- Schema: XSD unchanged. **DB: `ApiKey`, `PartnerRequest`, `PartnerJob`,
+  `HarnessCase`** — four operational tables, so the curated diagram-model DDL is
+  unaffected. The `PRODUCT_VERSION` bump this owed was missed at the time and is
+  recorded in **2.5.2412** rather than backdated here.
+
+---
+
+## 2.4.2353 — 2026-08-29 — A dangling reference stops scattering the diagram
+
+When the AI plan referred to an element that did not exist, the layout scattered
+everything rather than isolating the fault, and the run came back looking like a
+success. References are resolved defensively now, containment cycles are broken,
+and the engine **says WHY an element went unplaced** instead of leaving it
+somewhere arbitrary.
+
+A subprocess contains what its Start Event reaches, and no flow crosses its
+boundary; an empty one adopts its floating chain; activities inside are sized to
+their text. R8.15 slides the whole downstream flow rather than only the first
+element, R8.18's End-event hug is clamped so it cannot land on another element,
+and R8.22 closes an empty horizontal void.
+
+**The raw AI plan is now kept with the generated diagram**, so a bad generation
+can be replayed offline and exactly — `scripts/replay-diagram.ts`, no AI call. A
+saved diagram is the OUTPUT and erases the defect it was meant to explain. Layout
+diagnostics reach the editor, and no route drops them.
+
+**No Data Stores in generated BPMN.** A system of record IS the black-box IT
+system pool it lives in; a Data Store beside it says the same thing twice in two
+notations. 321 were stripped and the template forbids it.
+
+- Schema: no bump.
+
+---
+
 ## 2.4.2338 — 2026-08-28 — The Process Repository moves into the database
 
 The repository was a 500 KB markdown file a SuperAdmin uploaded by hand. It is a

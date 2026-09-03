@@ -1206,8 +1206,16 @@ export const SCHEMA_VERSION = "46";
  *   The Process Repository moves out of a markdown file and into the database —
  *   26 chains, their ordered processes, and the generated diagram prompts, with
  *   draft/published snapshots. The .md stays as import/export. XSD unchanged.
+ * 2.5 (2026-09-03) — DB: ApiKey, PartnerRequest, PartnerJob, HarnessCase.
+ *   The GETAI Process API — a partner posts a process description or document
+ *   and gets back pools, lanes, an ordered activity list and a PDF, with the
+ *   diagram persisted as a real project. Keys, a per-request traffic log, async
+ *   jobs, and the SuperAdmin harness corpus. All four are OPERATIONAL tables, so
+ *   the curated diagram-model DDL in ddlGenerate.ts is unaffected. XSD unchanged.
+ *   RECORDED LATE: the tables shipped in build 2381 (2026-09-01). The bump was
+ *   missed then and is made here, at build 2412, rather than backdated.
  */
-export const PRODUCT_VERSION = "2.4";
+export const PRODUCT_VERSION = "2.5";
 
 /**
  * The structural (XSD) schema version of an export, as a single integer, tolerant of BOTH the
