@@ -308,8 +308,21 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
       return `${marker} "${lbl}"${tagStr}`;
     }
     if (el.type === "subprocess") return `[Subprocess] ${lbl}${tagStr}`;
-    if (el.type === "subprocess-expanded") return `[Expanded Subprocess] ${lbl}${tagStr}`;
-    if (el.type === "intermediate-event") return `[Intermediate event] ${lbl}${tagStr}`;
+    // The LOOP marker. "Repeat Until Recommendation Fit For Decision" survived a
+    // round trip only because its NAME happened to say so; a standard-loop
+    // subprocess named anything else would have come back as a plain one.
+    if (el.type === "subprocess-expanded") {
+      return `[Expanded Subprocess] ${lbl}${repeatMarker(el)}${tagStr}`;
+    }
+    // The TRIGGER. Without it a timer catch and a message catch read the same,
+    // and the two mean entirely different things to the reader and to the
+    // simulator. Boundary events already state theirs; these did not, and
+    // V22.07 simply had none to expose it.
+    if (el.type === "intermediate-event") {
+      const et = el.eventType && el.eventType !== "none" ? `${el.eventType} ` : "";
+      const dir = el.flowType === "throwing" ? "throw " : el.flowType === "catching" ? "catch " : "";
+      return `Intermediate ${et}${dir}event "${lbl}"${tagStr}`;
+    }
     return `${lbl}${tagStr}`;
   }
 
@@ -359,6 +372,21 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
   const narrativeLines: string[] = [];
   const renderedNodes = new Set<string>();
 
+  /**
+   * The repeat marker, as words. "Repeat Until Recommendation Fit For Decision"
+   * survived a round trip only because its NAME happened to say so; a
+   * standard-loop subprocess called anything else came back as a plain one, and
+   * nothing in the diff could have told you (Paul, 2026-09-04).
+   */
+  function repeatMarker(el: DiagramElement): string {
+    switch (el.repeatType) {
+      case "loop": return " (standard loop)";
+      case "mi-sequential": return " (multi-instance, sequential)";
+      case "mi-parallel": return " (multi-instance, parallel)";
+      default: return "";
+    }
+  }
+
   type StepResult = { line?: string; descendIntoSub?: DiagramElement };
   function describeStep(el: DiagramElement, indent: number): StepResult {
     const pad = "  ".repeat(indent);
@@ -396,7 +424,7 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
       const hasInner = elements.some((e) =>
         e.type === "start-event" && !e.boundaryHostId && isInside(e, el.id));
       return {
-        line: `${pad}- **${labelOf(el)}** ${hasInner ? "(subprocess — see steps below)" : "(collapsed subprocess — no inner detail recorded)"}`,
+        line: `${pad}- **${labelOf(el)}**${repeatMarker(el)} ${hasInner ? "(subprocess — see steps below)" : "(collapsed subprocess — no inner detail recorded)"}`,
         descendIntoSub: el,
       };
     }

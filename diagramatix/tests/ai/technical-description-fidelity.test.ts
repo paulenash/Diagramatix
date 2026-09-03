@@ -117,3 +117,42 @@ describe("Technical Description — what must survive the round trip", () => {
     expect(section).toMatch(/Examine referral/);
   });
 });
+
+/**
+ * The same class of loss, in two places V22.07 could not expose.
+ *
+ * Its round trip came back with zero differences, which proves the description
+ * is lossless FOR THE CONSTRUCTS THAT DIAGRAM CONTAINS. It has no flow-level
+ * intermediate event, and its one loop subprocess is called "Repeat Until
+ * Recommendation Fit For Decision" — so the loop marker survived on the strength
+ * of its NAME rather than because the text recorded it. Rename it and the marker
+ * is gone, silently, exactly as taskType was.
+ */
+describe("Technical Description — markers a single diagram did not exercise", () => {
+  const flow = (over: Partial<DiagramElement>) => {
+    const elements: DiagramElement[] = [
+      el({ id: "p", type: "pool", label: "Insurer" }),
+      el({ id: "ln", type: "lane", label: "Claims", parentId: "p" }),
+      el({ id: "s", type: "start-event", label: "Referred", parentId: "ln" }),
+      el({ id: "x", ...over } as Partial<DiagramElement> & { id: string; type: string }),
+      el({ id: "e", type: "end-event", label: "Done", parentId: "ln" }),
+    ];
+    return buildBpmnPrompt(elements, [c("s", "x"), c("x", "e")]);
+  };
+
+  it("T3197 states an intermediate event's trigger, so a timer is not read as a message", () => {
+    const timer = flow({ type: "intermediate-event", label: "Cooling-off period", eventType: "timer", flowType: "catching", parentId: "ln" });
+    const msg = flow({ type: "intermediate-event", label: "Customer responds", eventType: "message", flowType: "catching", parentId: "ln" });
+    expect(timer).toMatch(/Intermediate timer catch event "Cooling-off period"/);
+    expect(msg).toMatch(/Intermediate message catch event "Customer responds"/);
+    // The two must not be indistinguishable, which is what they were.
+    expect(timer).not.toMatch(/message/);
+  });
+
+  it("T3198 states a subprocess's loop marker instead of relying on its name", () => {
+    const looped = flow({ type: "subprocess-expanded", label: "Assess Referral", repeatType: "loop", parentId: "ln" });
+    const plain = flow({ type: "subprocess-expanded", label: "Assess Referral", parentId: "ln" });
+    expect(looped).toMatch(/\(standard loop\)/);
+    expect(plain).not.toMatch(/standard loop/);
+  });
+});
