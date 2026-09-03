@@ -546,7 +546,7 @@ function snapBoundaryEventToRim(
  * it happens, which is the only time anyone can act on it.
  */
 export interface LayoutDiagnostic {
-  kind: "recovered-reference" | "unresolved-reference" | "empty-subprocess" | "unplaced";
+  kind: "recovered-reference" | "unresolved-reference" | "empty-subprocess" | "unplaced" | "no-sequence-flow";
   elementId: string;
   label: string;
   field?: string;
@@ -819,6 +819,31 @@ export function layoutBpmnDiagram(
   /** Report something the layout could not take at face value. Never throws. */
   const diagnose = (d: LayoutDiagnostic) => { try { opts?.onDiagnostic?.(d); } catch { /* a reporter must never break a layout */ } };
 
+  // ── A process with no SEQUENCE FLOW at all ──
+  //
+  // Paul, 2026-09-03, from a prod run of V01: "V01.01 Receive Order ✓ 12el /
+  // 0conn" — reported as a success. A BPMN diagram whose activities are joined
+  // by nothing is not a process, and the batch tool has no way to know that: it
+  // shows a tick for anything the layout did not throw on.
+  //
+  // Generating the SAME prompt here produced 28 elements and 30 connections, so
+  // the prompt is sound and the run was not. Whatever the cause — a truncated
+  // response, a model that answered differently — the diagram must not pass
+  // silently, because on the unattended path nobody is going to look at it.
+  {
+    const FLOWABLE = new Set(["task", "subprocess", "subprocess-expanded", "start-event",
+      "end-event", "intermediate-event", "gateway"]);
+    const flowEls = aiElements.filter(e => FLOWABLE.has(e.type));
+    const seq = aiConnections.filter(c => c.type !== "message");
+    if (flowEls.length >= 2 && seq.length === 0) {
+      diagnose({
+        kind: "no-sequence-flow",
+        elementId: flowEls[0].id,
+        label: flowEls[0].label ?? flowEls[0].id,
+        detail: `${flowEls.length} flow elements and NO sequence flow — the plan describes no process at all`,
+      });
+    }
+  }
   const pools = aiElements.filter(e => e.type === "pool");
   const lanes = aiElements.filter(e => e.type === "lane");
   // ── Dangling references ───────────────────────────────────────────────────

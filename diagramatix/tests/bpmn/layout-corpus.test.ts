@@ -18,7 +18,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
+import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { findLayoutViolations, findReadabilityViolations } from "@/app/lib/diagram/checks/layoutViolations";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
@@ -63,5 +63,48 @@ describe("layout corpus — generated diagrams stay readable", () => {
     expect(total,
       `readability regressed — was ${BUDGET}, now ${total}. Worst: ${worst.slice(0, 6).join(", ")}. `
       + `Lower BUDGET when you fix some; never raise it.`).toBeLessThanOrEqual(BUDGET);
+  });
+});
+
+describe("a plan with no sequence flow is reported, not passed", () => {
+  /**
+   * Paul, 2026-09-03, from a prod run: "V01.01 Receive Order ✓ 12el / 0conn" —
+   * a tick against a diagram whose activities are joined by nothing. The batch
+   * tool shows ✓ for anything the layout did not throw on, so a plan that
+   * describes no process at all sails through. On the unattended path nobody
+   * looks at it afterwards.
+   */
+  const els: AiElement[] = [
+    { id: "p", type: "pool", label: "Co", poolType: "white-box" },
+    { id: "s", type: "start-event", label: "Order received", pool: "p" },
+    { id: "t1", type: "task", label: "Capture order", pool: "p" },
+    { id: "t2", type: "task", label: "Acknowledge order", pool: "p" },
+    { id: "e", type: "end-event", label: "Order captured", pool: "p" },
+  ];
+
+  it("T3154 — flow elements with no sequence flow raise a diagnostic", () => {
+    const seen: string[] = [];
+    layoutBpmnDiagram(els, [], { onDiagnostic: (d) => seen.push(d.kind) });
+    expect(seen, "a process with nothing joining it must not pass silently")
+      .toContain("no-sequence-flow");
+  });
+
+  it("T3155 — a properly connected plan raises nothing (the negative control)", () => {
+    const conns: AiConnection[] = [
+      { sourceId: "s", targetId: "t1" }, { sourceId: "t1", targetId: "t2" }, { sourceId: "t2", targetId: "e" },
+    ];
+    const seen: string[] = [];
+    layoutBpmnDiagram(els, conns, { onDiagnostic: (d) => seen.push(d.kind) });
+    expect(seen).not.toContain("no-sequence-flow");
+  });
+
+  it("T3156 — message flows alone do not count as a process", () => {
+    // A plan can carry message flows to a black-box pool and still describe no
+    // sequence at all; counting any connection would miss exactly that case.
+    const withPool: AiElement[] = [...els, { id: "sys", type: "pool", label: "ERP", poolType: "black-box", isSystem: true }];
+    const msgOnly: AiConnection[] = [{ sourceId: "t1", targetId: "sys", type: "message", label: "order" }];
+    const seen: string[] = [];
+    layoutBpmnDiagram(withPool, msgOnly, { onDiagnostic: (d) => seen.push(d.kind) });
+    expect(seen).toContain("no-sequence-flow");
   });
 });

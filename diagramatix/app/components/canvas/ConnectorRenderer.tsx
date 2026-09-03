@@ -1082,7 +1082,7 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
       {/* For associationBPMN: mask out the source/target element rectangles
           so the connector hit area never covers them — clicks inside fall
           through to the element underneath. */}
-      {isAssocBPMN && (sourceBounds || targetBounds) && (() => {
+      {(isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds) && (() => {
         const maskId = `assoc-hit-mask-${connector.id}`;
         // The mask must cover the entire SVG viewport. We use a far-out
         // rectangle since masks on transformed groups follow the local
@@ -1125,7 +1125,7 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
         stroke="transparent"
         strokeWidth={12}
         style={{ cursor: isMessageBPMN && !isRectilinearMessage ? "ew-resize" : "pointer" }}
-        mask={isAssocBPMN && (sourceBounds || targetBounds) ? `url(#assoc-hit-mask-${connector.id})` : undefined}
+        mask={(isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds) ? `url(#assoc-hit-mask-${connector.id})` : undefined}
         onMouseDown={(e) => {
           if (isMessageBPMN && !isRectilinearMessage && selected) {
             handleMessageBPMNBodyMouseDown(e);

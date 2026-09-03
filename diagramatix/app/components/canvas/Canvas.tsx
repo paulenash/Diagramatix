@@ -7171,7 +7171,15 @@ export function Canvas({
           {/* Review-comment TETHERS — rendered here (just under the notes) so the
               pink association floats on top of every element in every diagram
               type, matching the notes themselves. */}
-          {data.connectors.filter(c => c.type === "review-comment-link" && c.id !== selectedConnectorId).map((conn) => (
+          {data.connectors.filter(c => c.type === "review-comment-link" && c.id !== selectedConnectorId).map((conn) => {
+            // A click inside either endpoint selects the ELEMENT, never this
+            // tether (Paul, 2026-09-03). The association renderer already masks
+            // its hit area against the endpoint boxes; a review link never
+            // received the bounds, so it stayed clickable across the whole task
+            // it points at.
+            const s0 = data.elements.find(e => e.id === conn.sourceId);
+            const t0 = data.elements.find(e => e.id === conn.targetId);
+            return (
             <ConnectorRenderer
               key={`rc-link-${conn.id}`}
               connector={conn}
@@ -7183,8 +7191,11 @@ export function Canvas({
               onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}
               debugMode={debugMode}
               relaxedLayout={data.relaxedLayout}
+              sourceBounds={s0 ? { x: s0.x, y: s0.y, width: s0.width, height: s0.height } : undefined}
+              targetBounds={t0 ? { x: t0.x, y: t0.y, width: t0.width, height: t0.height } : undefined}
             />
-          ))}
+            );
+          })}
 
           {/* Review comments — ALWAYS the final pass so they float on top of
               every other element/overlay on the canvas (items 14/15 + D). Order
