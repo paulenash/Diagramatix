@@ -46,10 +46,29 @@ export const AI_MODELS: AiModel[] = [
   { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", vision: true },
 ];
 
-/** Production default for AI Generate. Haiku 4.5 is consistently the best BPMN
- *  generator in practice (and the cheapest/fastest), so it's the default until a
- *  SuperAdmin changes it via the AI Generate Model setting. */
-export const DEFAULT_AI_MODEL = "claude-haiku-4-5-20251001";
+/**
+ * Production default for AI Generate — what an environment uses when the
+ * `ai.generate.model` setting is unset or names a model that no longer exists.
+ *
+ * Kimi K3 (Paul, 2026-09-04). It was Haiku 4.5, chosen when Haiku looked like the
+ * best BPMN generator; regenerating V22 on it measured otherwise — roughly a
+ * third of the content, with V22.07 losing about 40% of its process, and
+ * duplicate names throughout ("30 days" four times on one diagram). A SILENT
+ * fallback has to be a model whose output would be accepted, because by
+ * definition nobody chose it and nobody is told it was used.
+ */
+export const DEFAULT_AI_MODEL = "kimi-k3";
+
+/**
+ * What to use when even the default is unavailable HERE.
+ *
+ * `moonshotModels()` returns nothing without `MOONSHOT_API_KEY`, so in an
+ * environment with no Moonshot credentials `kimi-k3` is not a known model and
+ * resolving to it would hand the caller an id nothing can call — turning a
+ * quality problem into a 503. This keeps the promise the resolver's callers rely
+ * on: what comes back is always something this deployment can actually run.
+ */
+const LAST_RESORT_MODEL = AI_MODELS[0].id;
 
 /**
  * Extra models for a self-hosted / on-prem deployment, declared in the
@@ -265,6 +284,9 @@ export const modelVision = (id: string | null | undefined): boolean | undefined 
   allModels().find((m) => m.id === id)?.vision;
 
 /** Resolve a stored setting value to a usable model id: the stored value if it's
- *  a known model, otherwise the production default. Pure — unit-tested. */
+ *  a known model, else the production default, else something this deployment can
+ *  actually reach. Pure — unit-tested. */
 export const resolveAiModel = (raw: string | null | undefined): string =>
-  isKnownAiModel(raw) ? (raw as string) : DEFAULT_AI_MODEL;
+  isKnownAiModel(raw) ? (raw as string)
+    : isKnownAiModel(DEFAULT_AI_MODEL) ? DEFAULT_AI_MODEL
+    : LAST_RESORT_MODEL;

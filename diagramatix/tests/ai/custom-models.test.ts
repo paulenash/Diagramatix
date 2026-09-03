@@ -22,7 +22,10 @@ describe("custom / local AI models", () => {
     expect(customModels()).toEqual([]);
     expect(allModels()).toEqual(AI_MODELS);
     expect(isKnownAiModel("llama-3.3-70b")).toBe(false);
-    expect(resolveAiModel("llama-3.3-70b")).toBe(DEFAULT_AI_MODEL); // unknown → default
+    // Unknown → the default, or (as here, with no MOONSHOT_API_KEY in the test
+    // env) a model this deployment can actually reach. What must hold either way
+    // is that the answer is CALLABLE — see T3202.
+    expect(isKnownAiModel(resolveAiModel("llama-3.3-70b"))).toBe(true);
   });
 
   it("T0933 — a configured local model becomes known, labelled and resolvable", () => {
@@ -31,6 +34,6 @@ describe("custom / local AI models", () => {
     expect(aiModelLabel("llama-3.3-70b")).toBe("Llama 3.3 70B (local)");
     expect(resolveAiModel("llama-3.3-70b")).toBe("llama-3.3-70b"); // kept, not defaulted
     // Claude models still work alongside it.
-    expect(isKnownAiModel(DEFAULT_AI_MODEL)).toBe(true);
+    expect(isKnownAiModel("claude-opus-5")).toBe(true);
   });
 });

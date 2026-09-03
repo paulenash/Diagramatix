@@ -1,6 +1,6 @@
 /**
  * The AI-Generate default model, persisted as a global AppSetting so a SuperAdmin
- * can change it without a deploy. Reads fall back to DEFAULT_AI_MODEL (Haiku 4.5)
+ * can change it without a deploy. Reads fall back to DEFAULT_AI_MODEL (Kimi K3)
  * when unset or pointing at a since-removed model.
  */
 import { prisma } from "@/app/lib/db";
