@@ -33,6 +33,8 @@ interface Prompt {
   prompt: string; chars: number; roundTripsOk: boolean; generatedAt: string | null; published: boolean;
   /** Gateway branches that never say where they go. 0 is the healthy value. */
   unterminatedBranches: number;
+  /** Instructions BPMN cannot carry out. 0 is the healthy value. */
+  undrawableShapes: number;
 }
 interface Chain {
   id: string; code: string; title: string; groupName: string; hidden: boolean; sortOrder: number;
@@ -489,6 +491,14 @@ function PromptRow({ label, prompt, open, setOpen, onRegenerate, busy }: {
           <>
             <span className="text-[10px] tabular-nums text-gray-400">{prompt.chars.toLocaleString()} ch</span>
             {!prompt.roundTripsOk && <span className="text-[10px] text-amber-700">does not parse</span>}
+            {prompt.undrawableShapes > 0 && (
+              <span
+                className="text-[10px] text-red-700"
+                title={`${prompt.undrawableShapes} instruction(s) BPMN cannot carry out — a boundary event on something that is not an activity, or a message flow between two lanes of one pool. The diagram will be drawn faithfully and be wrong.`}
+              >
+                {prompt.undrawableShapes} undrawable
+              </span>
+            )}
             {prompt.unterminatedBranches > 0 && (
               <span
                 className="text-[10px] text-amber-700"

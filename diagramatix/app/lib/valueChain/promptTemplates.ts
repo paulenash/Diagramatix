@@ -170,12 +170,18 @@ Open with a single unnumbered line:
   follows>. Every diverging gateway is matched by a named MERGE gateway that the
   branches rejoin, written as its own line at the point they come together —
   "Exclusive merge gateway 'Order complete'" — not left implied by "continue
-  to". A branch that ends in its own End event does not rejoin; say so.
+  to". A merge is written ONLY where TWO OR MORE branches actually come back
+  together. Where a decision sends one branch onward and the others end, there
+  is nothing to merge: the surviving branch simply continues, and a merge
+  gateway there merges one thing — a gateway with one flow in and one flow out,
+  which draws as a diamond that decides nothing. Never write one. A branch that
+  ends in its own End event does not rejoin; say so.
 - EVERY BRANCH MUST SAY WHERE IT GOES, and a destination is an ELEMENT, never a
   lane and never "the next task". Either the gateway is followed by its merge
   line (which resolves all of its branches at once), or each branch ends with
   one of these exact forms:
       (continues to exclusive merge gateway "<name>")
+      (continues to <BPMN type> "<name>")   — any already-named element
       End event "<name>"
       (loop repeats)          — inside a standard-loop subprocess
       (exits subprocess)      — leaves the subprocess at its end
@@ -184,6 +190,26 @@ Open with a single unnumbered line:
   naming nothing that can be drawn. This is the single most common defect in
   this catalogue, it is checked automatically, and a prompt that fails is
   reported for regeneration — so spend the extra line.
+- WHICH GATEWAY, AND WHETHER IT MUST BE JOINED. The rule above — merge only
+  where branches truly converge — is the EXCLUSIVE case, where exactly one
+  branch runs and the others are never taken.
+    Exclusive ("Order complete?")  — one branch runs. Conditions must cover
+      every case; name the catch-all branch "otherwise" so nothing falls
+      through unrouted.
+    Parallel  ("Assess and price")  — ALL branches run, so the split MUST be
+      closed by a matching Parallel merge gateway. This one is not optional and
+      not subject to the rule above: leave it out and the branches never
+      reconvene and the process cannot finish. Every parallel split has a
+      parallel join.
+    Inclusive ("Which checks apply?") — one or MORE run, chosen independently;
+      it too must be closed by an Inclusive merge gateway.
+  Say which of the three you mean on every gateway line. An unqualified
+  "Gateway" is read as exclusive, which is wrong wherever work genuinely
+  happens at the same time.
+- A GATEWAY MUST CHANGE WHERE THE WORK GOES. If every branch names the same
+  destination, the decision decides nothing and must not be written at all —
+  drop it and let the flow run straight through. Two branches that differ only
+  in wording ("approved" / "not rejected") are one branch.
 - REPETITION IS A SUBPROCESS, NEVER A LOOP-BACK. When work repeats until a
   condition is met, write one line:
     Expanded Subprocess "<loop condition>" (standard loop) containing, in order:
@@ -200,11 +226,42 @@ Open with a single unnumbered line:
   arriving reply, document or order, signal for a broadcast, conditional for a
   data condition: Intermediate message catch event "Customer responds". Do not
   model a wait as a task called "Wait for …".
+  ONE EXCEPTION, and it is the common one: if the wait has a DEADLINE — an
+  escalation, a chase, a timeout — the catch event cannot carry it, because
+  nothing may be mounted on an event (section 5). Then, and only then, write
+  the wait as a Receive task and hang the timer on that. Decide which you need
+  before you write the line: a bare wait is an event, a wait that can time out
+  is a receive task.
 
 5. Edge-mounted (boundary) events
-- One line per boundary event: interrupting or non-interrupting, its type
-  (timer, error, message, escalation, conditional), the task it is attached to,
-  its label, and what happens next.
+- One line per boundary event: its type (timer, error, message, escalation,
+  signal, conditional), the activity it is attached to, its label, and what
+  happens next.
+- EVERY EDGE-MOUNTED EVENT IS INTERRUPTING. Do not write "non-interrupting" and
+  do not offer the choice: the work stops, the exception path takes over, and
+  the flow does not come back to the activity it left. (The one non-interrupting
+  event in BPMN that this does not govern is the START event inside an Event
+  Subprocess, which is not edge-mounted and is not written here.)
+- A BOUNDARY EVENT ATTACHES ONLY TO AN ACTIVITY — a User/Service/Send/Receive
+  task, or an Expanded Subprocess. NEVER to an intermediate event, a start or
+  end event, a gateway, or another boundary event. Those have no edge to sit on
+  and the diagram cannot be drawn from it.
+  The usual temptation is a WAIT with a deadline: "Intermediate message catch
+  event 'Approval received'" plus a timer for when it does not arrive. Do not
+  mount the timer on the catch event. Model the wait as a RECEIVE TASK — for
+  example Receive task "Await approval decision" — and mount the timer boundary
+  event on THAT. The receive task is the thing that waits, so it is the thing
+  that can time out.
+- THE EXCEPTION PATH MUST SAY WHERE IT GOES, in the same words a gateway branch
+  uses — "(continues to exclusive merge gateway '<name>')", "(continues to
+  <BPMN type> '<name>')", or "End event '<name>'". "and then it is escalated",
+  "handled by the manager" and a line that simply stops are REFUSED for the
+  same reason they are refused on a branch: they read as though something
+  follows and name nothing that can be drawn.
+- Because it interrupts, the exception path NEVER returns to the activity it
+  left. It ends in its own End event, or it rejoins the flow at a point AFTER
+  that activity — a merge gateway or a later named step. A path that loops back
+  to its own host cannot be drawn and is the commonest thing written here.
 - Write "None." if the subprocess genuinely has none. Do not invent one.
 
 6. Connectors
@@ -213,6 +270,16 @@ Open with a single unnumbered line:
 - "Message flows:" — one line per flow, as: <source> → <target> (<what is
   carried>). Every external pool and every IT system pool must appear here at
   least once, in the direction information actually travels.
+- A MESSAGE FLOW MUST CROSS A POOL BOUNDARY. Every one names a POOL at one end
+  or both — never one lane of a pool to another lane of the SAME pool. Two lanes
+  are two roles inside one organisation, and work passing between them is a
+  SEQUENCE FLOW, which section 4 already describes; a message flow there is not
+  drawable and reads as a line starting nowhere.
+  So: handing work from the Assessment lane to the Approvals lane of the same
+  pool is a sequence flow, not a message. If the other party is genuinely
+  outside the organisation — a broker, a customer, an approver in another
+  entity — give them their own POOL in section 1 and message THAT. If they do
+  not warrant a pool, they are a lane, and it is a sequence flow.
 
 7. Data objects
 - One line per business record, document or dataset the narrative names, as:

@@ -9,6 +9,7 @@
  */
 import * as fs from "fs";
 import { checkPromptBranches } from "@/app/lib/valueChain/checkPromptBranches";
+import { checkPromptShapes } from "@/app/lib/valueChain/checkPromptShapes";
 
 const path = process.argv[2] ?? "new features/Process Repository Final.md";
 const doc = fs.readFileSync(path, "utf8");
@@ -28,6 +29,22 @@ const headingFor = (line: number) => {
 };
 
 const issues = checkPromptBranches(doc);
+const shapes = checkPromptShapes(doc);
+const byShape = new Map<string, { n: number; where: Set<string>; ex: string[] }>();
+for (const s of shapes) {
+  const h = headingFor(s.line);
+  const e = byShape.get(s.kind) ?? { n: 0, where: new Set<string>(), ex: [] };
+  e.n++; e.where.add(h);
+  if (e.ex.length < 3) e.ex.push(`${h} (line ${s.line}): ${s.detail}`);
+  byShape.set(s.kind, e);
+}
+console.log("\nSHAPES THAT CANNOT BE DRAWN:");
+if (byShape.size === 0) console.log("  none");
+for (const [k, e] of [...byShape].sort((a,b)=>b[1].n-a[1].n)) {
+  console.log(`  ${k}: ${e.n} across ${e.where.size} process(es)`);
+  for (const x of e.ex) console.log(`      ${x.slice(0,140)}`);
+}
+
 const total = (doc.match(/^\s*-\s*branch\s*"/gm) ?? []).length;
 
 const byHeading = new Map<string, typeof issues>();

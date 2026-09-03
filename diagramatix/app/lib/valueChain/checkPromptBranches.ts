@@ -54,6 +54,14 @@ export interface BranchIssue {
  * that leaves a regeneration guessing.
  */
 const SELF_TERMINATED: RegExp[] = [
+  // A branch that simply flows on to an element already named above. The type
+  // word before the quoted name is what separates it from the case this check
+  // exists for: `continues to User task "Assess claim"` names something that
+  // can be drawn; `continues to the Legal lane` does not. Without this form
+  // the template offered no legal way to say "and then the next task", and
+  // the model resolved that by inventing a merge gateway with a single branch
+  // in it (Paul, 2026-09-03: "Decisions, Decisions!!").
+  /\bcontinues?\s+to\s+(?:the\s+)?(?:[A-Za-z][\w-]*\s+){0,3}(?:task|subprocess|gateway|event|activity)\s*"[^"]+"/i,
   /\bmerge\s+gateway\b/i,
   /\bgateway\s+merge\b/i,               // the same thing, other word order
   /\bEnd event\b/i,

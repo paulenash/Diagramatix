@@ -9,6 +9,7 @@ import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { checkPromptBranches } from "@/app/lib/valueChain/checkPromptBranches";
+import { checkPromptShapes } from "@/app/lib/valueChain/checkPromptShapes";
 import {
   type ImportedChain, parseLibraryFromMd, renderChainMd, renderLibraryMd, renumber,
 } from "@/app/lib/valueChain/library";
@@ -92,6 +93,11 @@ export async function GET(req: Request) {
         // costs microseconds, so it needs no column and cannot go stale against
         // a prompt someone edited by hand.
         unterminatedBranches: checkPromptBranches(p.prompt).length,
+        // Instructions BPMN cannot carry out — a boundary event on a
+        // non-activity, a message flow between two lanes of one pool. Both
+        // produce a faithful drawing of something invalid, so they have to be
+        // caught in the prompt rather than in the diagram.
+        undrawableShapes: checkPromptShapes(p.prompt).length,
         published: p.publishedPrompt !== null && p.publishedPrompt === p.prompt,
       })),
     })),
