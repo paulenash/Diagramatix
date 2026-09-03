@@ -25,8 +25,17 @@ import type { DiagramData } from "@/app/lib/diagram/types";
 const DIR = path.join(process.cwd(), "tests", "fixtures", "layout-corpus");
 const files = fs.existsSync(DIR) ? fs.readdirSync(DIR).filter((f) => f.endsWith(".plan.json")) : [];
 
-/** Measured 2026-09-03 at 72 across 26 diagrams. Ratchet DOWN only. */
-const BUDGET = 72;
+/**
+ * Measured 2026-09-03. Ratchet DOWN only, never up to make a change fit.
+ *
+ *   107  the honest starting point, once Paul narrowed the branch-label class
+ *        to what actually reads badly (72 measured + 35 that class was hiding)
+ *    36  after R5.12: a connector label is moved off an element body, and a
+ *        BRANCH label off the horizontal run it names
+ *    17  after R5.12 also treats a label ON another label as a defect in its
+ *        own right, not merely something to avoid when moving for another reason
+ */
+const BUDGET = 17;
 
 describe("layout corpus — generated diagrams stay readable", () => {
   it("T3152 — the corpus is present and every plan still lays out", () => {

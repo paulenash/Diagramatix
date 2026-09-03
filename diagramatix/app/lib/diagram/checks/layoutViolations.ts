@@ -164,6 +164,26 @@ export function findReadabilityViolations(data: DiagramData): string[] {
   // gateways and onto each other twice over, to fix something a reader never
   // saw. A label over ANOTHER element or another label is still a violation —
   // there the halo masks something the reader does need.
+  // R-C ── a BRANCH label is not drawn across the horizontal run it labels ──
+  //
+  // Paul, 2026-09-03, narrowing this himself: "It needs to specify label over
+  // horizontal segment of a connector FROM A GATEWAY. To be specific."
+  //
+  // The general form — any label over any part of its own line — was 279 of the
+  // first 412 and mostly harmless: connector labels carry a white halo, so the
+  // glyphs mask the line and it reads cleanly. What does NOT read cleanly is a
+  // branch condition sitting along the horizontal run of the branch it names,
+  // which is the case Paul reported as issue 5 ("Complete" in V23.01).
+  {
+    const byId = new Map(data.elements.map((e) => [e.id, e]));
+    for (const c of data.connectors) {
+      if (byId.get(c.sourceId)?.type !== "gateway") continue;   // a BRANCH label only
+      const box = connectorLabelBox(c, data.elements);
+      if (!box) continue;
+      const onRun = segmentsOf(c).some((sg) => sg.hy !== undefined && segHitsBox(sg, box, TOL));
+      if (onRun) v.push(`BRANCH-LABEL/RUN: "${c.label}" lies along its own horizontal segment`);
+    }
+  }
   // R-D ── a connector label is clear of external labels too ──────────────
   for (const c of data.connectors) {
     const box = connectorLabelBox(c, data.elements);

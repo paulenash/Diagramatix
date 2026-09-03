@@ -8,6 +8,7 @@ import { getSymbolDefinition } from "./symbols/definitions";
 import { closeFlowVoids } from "./closeFlowVoids";
 import { computeWaypoints, recomputeAllConnectors, pickBoundaryEventSide } from "./routing";
 import { analysePaths } from "./bpmnPaths";
+import { connectorLabelBox } from "./checks/layoutViolations";
 import { autoSizeForType, wrapText, externalLabelBox, externalLabelSize, connectorLabelWidth, connectorLabelLines, LINE_HEIGHT, PAD, type AutosizeType } from "./textMetrics";
 import { snapImportedBounds, type Box } from "./importGeometry";
 import { buildTestConnectors } from "./bpmnTestConnectors";
@@ -5966,6 +5967,105 @@ export function layoutBpmnDiagram(
   // data — nothing rewrites them, so an old diagram keeps its annotation.
   const finalConnectors: Connector[] = [...computedConnectors];
 
+  // ── R5.12 (class A): a connector label is not drawn over an ELEMENT ──
+  //
+  // Paul, 2026-09-03: one-pass generation has to be readable, and this is the
+  // most widespread breach left — 34 across 16 of the 26 corpus diagrams.
+  //
+  // It also got WORSE when connector labels gained their white halo: the halo
+  // masks whatever is behind the glyphs, which is right over the label's own
+  // line and wrong over a task, whose name it now hides.
+  //
+  // Deliberately NARROW, because two earlier attempts at general label
+  // placement each made things worse. This moves a label only when it actually
+  // covers a body, only accepts a candidate that clears EVERY body, and refuses
+  // any candidate that lands on an already-placed label — so it cannot trade
+  // class A for class B. If no candidate qualifies, the label stays put.
+  //
+  // The box comes from connectorLabelBox — the same function the checker uses.
+  // Both previous attempts measured the label themselves and got it subtly
+  // wrong (raw waypoints instead of visible ones, -20 instead of -30), which is
+  // why they optimised positions nothing was ever drawn at.
+  {
+    type R = { x: number; y: number; w: number; h: number };
+    const over = (a: R, b: R) =>
+      a.x + 2 < b.x + b.w && a.x + a.w - 2 > b.x && a.y + 2 < b.y + b.h && a.y + a.h - 2 > b.y;
+    const BODY = new Set(["task", "subprocess", "subprocess-expanded", "start-event",
+      "end-event", "intermediate-event", "gateway", "data-object", "data-store"]);
+    const bodies: R[] = elements.filter(e => BODY.has(e.type))
+      .map(e => ({ x: e.x, y: e.y, w: e.width, h: e.height }));
+
+    // An element's own external label is occupied space too. Guarding only
+    // against other CONNECTOR labels moved four of these onto element names
+    // instead — trading class A for class C rather than clearing it.
+    const extLabels: R[] = elements
+      .map(e => externalLabelBox(e))
+      .filter((b): b is { x: number; y: number; w: number; h: number } => !!b)
+      .map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h }));
+
+    // Every label's CURRENT box, so a move cannot be made into an occupied spot.
+    const boxes = new Map<string, R>();
+    for (const c of finalConnectors) {
+      const b = connectorLabelBox(c, elements);
+      if (b) boxes.set(c.id, b);
+    }
+
+    for (const c of finalConnectors) {
+      const start = boxes.get(c.id);
+      if (!start) continue;
+      // Its own horizontal runs, but only for a BRANCH connector — Paul,
+      // 2026-09-03: "label over horizontal segment of a connector from a
+      // Gateway. To be specific." A label along any other line is masked by its
+      // halo and reads fine; a branch condition lying down the run it names
+      // does not.
+      const fromGateway = elMap.get(c.sourceId)?.type === "gateway";
+      const ownRuns: R[] = [];
+      if (fromGateway) {
+        const wp = c.waypoints ?? [];
+        for (let k = 1; k < wp.length; k++) {
+          if (Math.abs(wp[k - 1].y - wp[k].y) >= 0.5) continue;      // horizontal only
+          ownRuns.push({ x: Math.min(wp[k - 1].x, wp[k].x), y: wp[k].y - 1,
+                         w: Math.abs(wp[k].x - wp[k - 1].x), h: 2 });
+        }
+      }
+      // Class B as well: a label sitting on ANOTHER label is a defect in its own
+      // right, not only something to avoid when moving for another reason. The
+      // acceptance test below is unchanged, so clearing one cannot create one.
+      const others = (r: R, selfId: string) => {
+        for (const [id, o] of boxes) if (id !== selfId && over(r, o)) return true;
+        return extLabels.some(e => over(r, e));
+      };
+      const dirty = (r: R) => bodies.some(b => over(r, b))
+        || ownRuns.some(g => over(r, g))
+        || others(r, c.id);
+      if (!dirty(start)) continue;                                   // already clear
+
+      const baseX = c.labelOffsetX, baseY = c.labelOffsetY;
+      const dx0 = baseX ?? 0;
+      // Try the other side of the line first — a label pushed off a task
+      // usually has room on the opposite side — then progressively further.
+      const cands: { x: number; y: number }[] = [];
+      for (const step of [0, 1, 2, 3, 4]) {
+        for (const dy of [22 + step * 20, -(22 + step * 20)]) {
+          for (const dx of [0, -40, 40]) cands.push({ x: dx0 + dx, y: (baseY ?? -30) + dy });
+        }
+      }
+      let chosen: { x: number; y: number } | null = null;
+      for (const cand of cands) {
+        c.labelOffsetX = cand.x; c.labelOffsetY = cand.y;
+        const box = connectorLabelBox(c, elements);
+        if (!box) continue;
+        if (dirty(box)) continue;                                     // still on a shape or its own run
+        let clash = false;
+        for (const [id, o] of boxes) { if (id !== c.id && over(box, o)) { clash = true; break; } }
+        if (clash) continue;                                            // would create a class B
+        if (extLabels.some(e => over(box, e))) continue;                 // …or a class C
+        chosen = cand; boxes.set(c.id, box); break;
+      }
+      if (chosen) { c.labelOffsetX = chosen.x; c.labelOffsetY = chosen.y; }
+      else { c.labelOffsetX = baseX; c.labelOffsetY = baseY; }         // leave it exactly as it was
+    }
+  }
   // ── R5.09: place gateway labels top-left, close, and clear of obstacles ─────
   // The label rides an ARC around the gateway centre at the nearest-clearing
   // radius. It STARTS up-and-slightly-left (≈68° above horizontal — steeper than
