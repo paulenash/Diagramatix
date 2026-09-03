@@ -290,3 +290,66 @@ describe("two plan shapes no layout can rescue", () => {
     expect(kinds(p)).not.toContain("message-within-pool");
   });
 });
+
+/**
+ * Two elements must not share a name.
+ *
+ * Paul, 2026-09-04, testing the Technical Description round trip on V22.09.
+ * The diagram carried a merge gateway AND the process end event both called
+ * "Recovery Position Finalised", and three exception paths rejoined the flow by
+ * that name. A Technical Description addresses elements BY NAME —
+ *
+ *     - ... rejoins the flow at gateway "Recovery Position Finalised".
+ *     - The process ends with **Recovery Position Finalised**.
+ *
+ * — so nothing in the text says which one a rejoin means. It happened to bind
+ * correctly, which is the kind of luck that keeps a defect invisible until it
+ * is not: bind the other way and three exception paths reconnect to the end of
+ * the process instead of to the merge, and the diff reports it as a redesign.
+ *
+ * This is the prerequisite for using a description as the stored prompt at all,
+ * so it is checked at generation rather than left to be noticed.
+ */
+describe("a generated diagram names each element once", () => {
+  const twin = (): { elements: AiElement[]; connections: AiConnection[] } => ({
+    elements: [
+      { id: "p", type: "pool", label: "Insurer", poolType: "white-box", lanes: [{ id: "l1", name: "Recoveries" }] },
+      { id: "s", type: "start-event", label: "Settled claim received", pool: "p", lane: "l1" },
+      { id: "g", type: "gateway", label: "Recovery Position Finalised", gatewayType: "exclusive", pool: "p", lane: "l1" },
+      { id: "t", type: "task", label: "Prepare summary", pool: "p", lane: "l1" },
+      { id: "e", type: "end-event", label: "Recovery Position Finalised", pool: "p", lane: "l1" },
+    ],
+    connections: [
+      { sourceId: "s", targetId: "g" }, { sourceId: "g", targetId: "t" }, { sourceId: "t", targetId: "e" },
+    ],
+  });
+  const kindsOf = (p: { elements: AiElement[]; connections: AiConnection[] }) => {
+    const seen: string[] = [];
+    layoutBpmnDiagram(p.elements, p.connections, { onDiagnostic: (d) => seen.push(d.kind) });
+    return seen;
+  };
+
+  it("T3199 reports a gateway and an end event that share a name", () => {
+    expect(kindsOf(twin())).toContain("duplicate-label");
+  });
+
+  it("T3200 is silent once they are told apart", () => {
+    const p = twin();
+    // What the master template asks for: an end event says where it goes next.
+    p.elements[4].label = "Recovery position finalised — ready for Close Claim";
+    expect(kindsOf(p)).not.toContain("duplicate-label");
+  });
+
+  it("T3201 does not report a data artifact repeated beside a remote consumer", () => {
+    // The duplicate copy is deliberate — it keeps the diagram readable, and the
+    // description already merges the two into one entry. Flagging it would
+    // report the design working as intended.
+    const p = twin();
+    p.elements[4].label = "Recovery position finalised — ready for Close Claim";
+    p.elements.push(
+      { id: "d1", type: "data-object", label: "Claim File", pool: "p", lane: "l1" },
+      { id: "d2", type: "data-object", label: "Claim File", pool: "p", lane: "l1" },
+    );
+    expect(kindsOf(p)).not.toContain("duplicate-label");
+  });
+});

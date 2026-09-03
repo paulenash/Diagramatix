@@ -546,7 +546,7 @@ function snapBoundaryEventToRim(
  * it happens, which is the only time anyone can act on it.
  */
 export interface LayoutDiagnostic {
-  kind: "recovered-reference" | "unresolved-reference" | "empty-subprocess" | "unplaced" | "no-sequence-flow" | "unreachable-event" | "message-within-pool";
+  kind: "recovered-reference" | "unresolved-reference" | "empty-subprocess" | "unplaced" | "no-sequence-flow" | "unreachable-event" | "message-within-pool" | "duplicate-label";
   elementId: string;
   label: string;
   field?: string;
@@ -892,6 +892,42 @@ export function layoutBpmnDiagram(
         label: src?.label ?? c.sourceId,
         detail: `message flow "${c.label ?? ""}" has both ends in the same pool — the participant it was meant to reach is missing`,
       });
+    }
+
+    // (c) TWO ELEMENTS MUST NOT SHARE A NAME.
+    //
+    //     A Technical Description refers to elements BY NAME — "rejoins the flow
+    //     at gateway 'X'", "the process ends with X" — so two elements called X
+    //     make the text ambiguous, and a regeneration binds whichever it likes.
+    //     V22.09 shipped a merge gateway and the end event both called "Recovery
+    //     Position Finalised", with three exception paths rejoining by that name
+    //     (Paul, 2026-09-04). It happened to bind correctly, which is exactly the
+    //     kind of luck that makes a defect invisible until it is not.
+    //
+    //     Only NAMED, addressable flow elements count. Pools and lanes are
+    //     containers referred to structurally rather than by a flow reference,
+    //     and a data artifact is deliberately REPEATED beside a remote consumer
+    //     — flagging those would report the design working as intended.
+    {
+      const ADDRESSABLE = new Set(["task", "subprocess", "subprocess-expanded", "gateway", "start-event", "end-event", "intermediate-event"]);
+      const byName = new Map<string, typeof aiElements>();
+      for (const e of aiElements) {
+        if (!ADDRESSABLE.has(e.type)) continue;
+        const key = (e.label ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+        if (!key) continue;
+        const arr = byName.get(key) ?? [];
+        arr.push(e); byName.set(key, arr);
+      }
+      for (const arr of byName.values()) {
+        if (arr.length < 2) continue;
+        const kinds = arr.map(e => e.type).join(" and ");
+        diagnose({
+          kind: "duplicate-label",
+          elementId: arr[0].id,
+          label: arr[0].label ?? arr[0].id,
+          detail: `${arr.length} elements share this name (${kinds}) — a description that refers to them by name cannot say which one it means`,
+        });
+      }
     }
   }
   const pools = aiElements.filter(e => e.type === "pool");
