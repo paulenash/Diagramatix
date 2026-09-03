@@ -5643,6 +5643,62 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R8.36: a data artifact and ITS LABEL end up clear of every element ──
+  //
+  // The clearance pass earlier already measures a data artifact as box UNION
+  // label — but R8.30 and R8.31 move artifacts AFTER it, to lift them off
+  // connectors and to repeat one beside a remote consumer, and either can put
+  // the label back over something. V23.08 finished with the label "Agency
+  // Referral Package" lying across the task "Write-off Recommendation".
+  //
+  // Re-assert it here, once the artifacts have stopped moving. Prefer UP, as
+  // the earlier pass does. Data artifacts are not routing obstacles, so moving
+  // one cannot perturb a connector.
+  {
+    const isArt = (t: string) => t === "data-object" || t === "data-store";
+    const FLOW = new Set(["task", "subprocess", "subprocess-expanded", "start-event",
+      "end-event", "intermediate-event", "gateway"]);
+    const PAD = 8;
+    const foot = (e: DiagramElement) => {
+      const base = { l: e.x, r: e.x + e.width, t: e.y, b: e.y + e.height };
+      const lb = isArt(e.type) ? externalLabelBox(e) : null;
+      return lb ? { l: Math.min(base.l, lb.x), r: Math.max(base.r, lb.x + lb.w),
+                    t: base.t, b: Math.max(base.b, lb.y + lb.h) } : base;
+    };
+    type R = { l: number; r: number; t: number; b: number };
+    const ov = (a: R, b: R) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+    // Other DATA ARTIFACTS count as obstacles too — the pair that actually
+    // collided in V23.08 were two data objects, and a list of flow types alone
+    // could never see it.
+    const bodies = elements.filter(e => (FLOW.has(e.type) || isArt(e.type)) && !e.boundaryHostId)
+      .map(e => ({ id: e.id, r: { l: e.x, r: e.x + e.width, t: e.y, b: e.y + e.height } }));
+    const allC = [...aiConnections, ...autoConns];
+    for (const art of elements) {
+      if (!isArt(art.type)) continue;
+      const linked = allC.find(c => c.sourceId === art.id || c.targetId === art.id);
+      const partner = linked ? (linked.sourceId === art.id ? linked.targetId : linked.sourceId) : undefined;
+      // An artifact may sit BESIDE the element it annotates — that is the point
+      // of it — so its box is allowed to encroach on that partner. Its LABEL is
+      // not: text drawn across the task it describes is exactly the complaint.
+      // So the partner is exempt from the footprint test but not the label test.
+      const clashes = () => bodies.some(b => {
+        if (b.id === art.id) return false;
+        if (ov(foot(art), b.r) && b.id !== partner) return true;
+        const lb = externalLabelBox(art);
+        return !!lb && ov({ l: lb.x, r: lb.x + lb.w, t: lb.y, b: lb.y + lb.h }, b.r);
+      });
+      if (!clashes()) continue;
+      const y0 = art.y;
+      let done = false;
+      for (let step = 1; step <= 8 && !done; step++) {
+        for (const dir of [-1, 1]) {
+          art.y = y0 + dir * step * (art.height + PAD);
+          if (!clashes()) { done = true; break; }
+        }
+      }
+      if (!done) art.y = y0;                       // no better spot: leave it be
+    }
+  }
   // ── R8.29: FINAL event-label placement, against the routed diagram ──
   // R8.16 nudges event labels clear of other elements, but it runs long before
   // the diagram is finished: the exit-target placement, the branch-subprocess
@@ -5969,8 +6025,21 @@ export function layoutBpmnDiagram(
         const lcx = cx + R * s, lcy = cy - R * c;
         return { lcx, lcy, box: { x: lcx - lw / 2, y: lcy - lh / 2, w: lw, h: lh } };
       };
+      // R5.09b: another element's LABEL is an obstacle too.
+      //
+      // The sweep avoided bodies and connector segments but not the text beside
+      // them, so a gateway label came to rest neatly on top of a neighbour's
+      // name — "Rating output valid?" over the data object "Rated Consumption
+      // Record" in V23.03, and "Prior formal notice issued?" under the end
+      // event "Account flagged — ineligible…" in V23.08. A label is what the
+      // reader is trying to read; it occupies space exactly as a box does.
+      const nearLabels = near
+        .map(e => externalLabelBox(e))
+        .filter((b): b is { x: number; y: number; w: number; h: number } => !!b);
       const clear = (b: { x: number; y: number; w: number; h: number }) =>
-        !near.some(e => hitsBox(b, e)) && !segs.some(s => hitsSeg(b, s));
+        !near.some(e => hitsBox(b, e)) && !segs.some(s => hitsSeg(b, s))
+        && !nearLabels.some(l => b.x < l.x + l.w && l.x < b.x + b.w
+                              && b.y < l.y + l.h && l.y < b.y + b.h);
       // Sweep the left arc at the snug radius first; if the WHOLE arc is blocked
       // (dense gateway), push the label progressively further out and re-sweep,
       // so it never falls back onto an overlapping spot when a clear one exists.
