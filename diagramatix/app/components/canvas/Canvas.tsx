@@ -6374,8 +6374,21 @@ export function Canvas({
             </g>
           )}
 
-          {/* Association connectors — rendered above all elements */}
+          {/* Association connectors — rendered above all elements.
+
+              A click INSIDE any shape selects that shape, never the line
+              crossing it (Paul, 2026-09-03: "still allows selection of
+              association connectors within an element or EP boundary"). The
+              mask used to cover only the two endpoints, so the line stayed
+              clickable over everything it passed on the way — an expanded
+              subprocess most visibly. Pools and lanes are deliberately NOT
+              masked: they are backgrounds, and masking them would leave the
+              association unclickable everywhere. */}
+
           {data.connectors.filter(c => c.type === "associationBPMN" || c.type === "messageBPMN").map((conn) => {
+            const shapeMask = data.elements
+              .filter(e => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane")
+              .map(e => ({ x: e.x, y: e.y, width: e.width, height: e.height }));
             const srcEl = data.elements.find(e => e.id === conn.sourceId);
             const tgtEl = data.elements.find(e => e.id === conn.targetId);
             const srcBounds = srcEl ? { x: srcEl.x, y: srcEl.y, width: srcEl.width, height: srcEl.height } : undefined;
@@ -6419,6 +6432,7 @@ export function Canvas({
                 onUpdateCurveHandles={onUpdateCurveHandles}
                 debugMode={debugMode}
                 onUpdateEndOffset={handleUpdateEndOffset}
+                maskBounds={shapeMask}
                 sourceBounds={srcBounds}
                 targetBounds={tgtBounds}
                 sourcePoolHeight={srcPoolH}
@@ -7191,6 +7205,9 @@ export function Canvas({
               onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}
               debugMode={debugMode}
               relaxedLayout={data.relaxedLayout}
+              maskBounds={data.elements
+                .filter(e => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane")
+                .map(e => ({ x: e.x, y: e.y, width: e.width, height: e.height }))}
               sourceBounds={s0 ? { x: s0.x, y: s0.y, width: s0.width, height: s0.height } : undefined}
               targetBounds={t0 ? { x: t0.x, y: t0.y, width: t0.width, height: t0.height } : undefined}
             />

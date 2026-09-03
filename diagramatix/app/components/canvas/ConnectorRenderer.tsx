@@ -43,6 +43,12 @@ interface Props {
   /** Source/target element bounds — used to mask out the click hit area for
    *  associationBPMN connectors so a click inside an endpoint element selects
    *  the element rather than the connector. */
+  /** Every shape a click should reach INSTEAD of this connector. Paul,
+   *  2026-09-03: "still allows selection of association connectors within an
+   *  element or EP boundary" — masking only the two endpoints left the line
+   *  clickable across everything it crossed on the way, an expanded subprocess
+   *  most visibly. */
+  maskBounds?: { x: number; y: number; width: number; height: number }[];
   sourceBounds?: { x: number; y: number; width: number; height: number };
   targetBounds?: { x: number; y: number; width: number; height: number };
   /** Height of the pool that contains the source endpoint (pool itself if source is a pool). Debug only. */
@@ -761,7 +767,7 @@ function ConstraintBox({
   );
 }
 
-function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, reviewLinkColor, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, sourceType, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
+function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, reviewLinkColor, maskBounds, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, sourceType, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded, relaxedLayout }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const showReviewMarkers = useContext(ShowReviewCommentsCtx);
@@ -1082,7 +1088,7 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
       {/* For associationBPMN: mask out the source/target element rectangles
           so the connector hit area never covers them — clicks inside fall
           through to the element underneath. */}
-      {(isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds) && (() => {
+      {(isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds || (maskBounds?.length ?? 0) > 0) && (() => {
         const maskId = `assoc-hit-mask-${connector.id}`;
         // The mask must cover the entire SVG viewport. We use a far-out
         // rectangle since masks on transformed groups follow the local
@@ -1105,6 +1111,9 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
                   fill="black"
                 />
               )}
+              {(maskBounds ?? []).map((b, i) => (
+                <rect key={i} x={b.x} y={b.y} width={b.width} height={b.height} fill="black" />
+              ))}
             </mask>
           </defs>
         );
@@ -1125,7 +1134,7 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
         stroke="transparent"
         strokeWidth={12}
         style={{ cursor: isMessageBPMN && !isRectilinearMessage ? "ew-resize" : "pointer" }}
-        mask={(isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds) ? `url(#assoc-hit-mask-${connector.id})` : undefined}
+        mask={(isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds || (maskBounds?.length ?? 0) > 0) ? `url(#assoc-hit-mask-${connector.id})` : undefined}
         onMouseDown={(e) => {
           if (isMessageBPMN && !isRectilinearMessage && selected) {
             handleMessageBPMNBodyMouseDown(e);

@@ -5741,6 +5741,7 @@ export function layoutBpmnDiagram(
     const bodies = elements.filter(e => (FLOW.has(e.type) || isArt(e.type)) && !e.boundaryHostId)
       .map(e => ({ id: e.id, r: { l: e.x, r: e.x + e.width, t: e.y, b: e.y + e.height } }));
     const allC = [...aiConnections, ...autoConns];
+    const movedArtifacts: DiagramElement[] = [];
     for (const art of elements) {
       if (!isArt(art.type)) continue;
       const linked = allC.find(c => c.sourceId === art.id || c.targetId === art.id);
@@ -5765,6 +5766,26 @@ export function layoutBpmnDiagram(
         }
       }
       if (!done) art.y = y0;                       // no better spot: leave it be
+      else movedArtifacts.push(art);
+    }
+    // Re-route what moved. This pass runs AFTER the waypoints are computed, so
+    // an artifact shifted here leaves its own associations pointing at where it
+    // used to be — drawn as a data object floating unattached, which is what
+    // Paul saw on "Escalation Summary" in V22.05. R8.30 has always re-routed
+    // for exactly this reason; this pass was added without it.
+    if (movedArtifacts.length > 0) {
+      const ids = new Set(movedArtifacts.map(a => a.id));
+      for (let i = 0; i < computedConnectors.length; i++) {
+        const c = computedConnectors[i];
+        if (!ids.has(c.sourceId) && !ids.has(c.targetId)) continue;
+        const src = elMap.get(c.sourceId), tgt = elMap.get(c.targetId);
+        if (!src || !tgt) continue;
+        try {
+          const r = computeWaypoints(src, tgt, elements, c.sourceSide, c.targetSide, c.routingType, 0.5, 0.5);
+          computedConnectors[i] = { ...c, waypoints: r.waypoints,
+            sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
+        } catch { /* keep the existing path rather than lose it */ }
+      }
     }
   }
   // ── R8.29: FINAL event-label placement, against the routed diagram ──

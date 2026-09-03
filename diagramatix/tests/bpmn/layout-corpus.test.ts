@@ -187,3 +187,40 @@ describe("a decision that decides nothing never reaches the diagram", () => {
     expect(noop.map((g) => g.label)).toEqual([]);
   });
 });
+
+describe("every connector still reaches both of its endpoints", () => {
+  /**
+   * The class that has now bitten twice, both times the same way: a pass that
+   * moves an element AFTER the waypoints are computed, without re-routing what
+   * it moved. R8.30 detached 18 of 38 connectors in V23.04 on 2026-08-31, and
+   * R8.36 — added on 2026-09-03 — left "Escalation Summary" floating in V22.05
+   * with its two associations pointing at where it used to be.
+   *
+   * The layout's own diagnostics cannot see this: the connectors exist, the
+   * plan is intact, and only the geometry disagrees. So it is measured across
+   * the whole corpus, where a pass that forgets to re-route shows up at once.
+   */
+  const near = (p: { x: number; y: number }, e: { x: number; y: number; width: number; height: number }) =>
+    p.x >= e.x - 6 && p.x <= e.x + e.width + 6 && p.y >= e.y - 6 && p.y <= e.y + e.height + 6;
+
+  it("T3162 — no connector in the corpus is left pointing at empty space", () => {
+    const detached: string[] = [];
+    for (const f of files) {
+      const j = JSON.parse(fs.readFileSync(path.join(DIR, f), "utf8"));
+      const plan = j.diagrams?.[0]?.data?.aiGeneration?.plan ?? j.plan;
+      const r = layoutBpmnDiagram(plan.elements, plan.connections);
+      const byId = new Map(r.elements.map((e) => [e.id, e]));
+      for (const c of r.connectors) {
+        const w = c.waypoints ?? [];
+        if (w.length < 2) continue;
+        const s = byId.get(c.sourceId), t = byId.get(c.targetId);
+        if (!s || !t) continue;
+        if (!near(w[0], s) || !near(w[w.length - 1], t)) {
+          detached.push(`${f}: ${c.type} ${String(s.label ?? s.id).slice(0, 24)} → ${String(t.label ?? t.id).slice(0, 24)}`);
+        }
+      }
+    }
+    expect(detached.slice(0, 8),
+      "a pass moved an element after routing and did not re-route it").toEqual([]);
+  });
+});
