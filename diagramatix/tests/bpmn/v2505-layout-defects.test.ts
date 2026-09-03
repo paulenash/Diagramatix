@@ -190,9 +190,21 @@ describe("V25.05 — labels are measured as the renderer draws them", () => {
 });
 
 describe("V25.05 — a decision gateway's two branches (R6.26 / R8.26)", () => {
-  it("T3036 — the branches leave from DIFFERENT vertices: top and bottom", () => {
+  it("T3036 — the branches leave from DIFFERENT vertices, never the same one", () => {
+    // The invariant that matters, and the defect this was written for: two
+    // branches must not leave the diamond from ONE point.
+    //
+    // The exact pair changed on 2026-09-03. Paul asked for top-then-bottom on
+    // 2026-08-31; then, of V22.01: "connector \"Yes — all required details
+    // present\" starts on wrong gateway vertex" — both gateways level, and the
+    // branch still climbing to the top corner to get there. R6.32 now sends a
+    // branch running straight into its MERGE out by the right vertex. The old
+    // hazard (both branches reading as level, so both answering "right") is
+    // guarded: R6.32 fires only when exactly ONE of the two is level.
     const a = conn("gw", "ep"), b = conn("gw", "gwm");
-    expect(new Set([a.sourceSide, b.sourceSide]), "both left the diamond from one point").toEqual(new Set(["top", "bottom"]));
+    expect(new Set([a.sourceSide, b.sourceSide]).size, "both left the diamond from one point").toBe(2);
+    expect(b.sourceSide, "the branch straight into its merge takes the right vertex").toBe("right");
+    expect(["top", "bottom"], "the fanning branch keeps a corner").toContain(a.sourceSide);
   });
 
   it("T3037 — the branch's subprocess is placed on the side its branch leaves from", () => {

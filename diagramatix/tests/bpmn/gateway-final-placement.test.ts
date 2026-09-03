@@ -145,3 +145,56 @@ describe("the flow after a merge stays on the merge's line (R8.33)", () => {
     expect(cy2("t15b")).toBeCloseTo(cy2("t12"), 0);
   });
 });
+
+describe("a decision's outbound vertex follows final geometry too (R6.32)", () => {
+  /**
+   * Paul, 2026-09-03 (V22.01): "connector 'Yes — all required details present'
+   * starts on wrong gateway vertex". Both gateways sat level at cy 527 and the
+   * branch still left by the TOP vertex and doubled back.
+   *
+   * R6.26 assigns a two-way split top/bottom by PLAN ORDER on purpose — when
+   * the connectors are built the targets are only provisionally placed, and a
+   * tall subprocess reads as "below" merely for being tall. That is right for a
+   * pair that fans apart, and wrong for a branch that ends up running straight
+   * ahead. This is the mirror of R6.31, which Paul confirmed for merges.
+   */
+  const build = (secondBranchLevel: boolean) => {
+    const e: AiElement[] = [
+      { id: "p", type: "pool", label: "Co", poolType: "white-box" },
+      { id: "s", type: "start-event", label: "Start", pool: "p" },
+      { id: "t", type: "task", label: "Check completeness", pool: "p" },
+      { id: "d", type: "gateway", label: "Complete?", gatewayType: "exclusive", pool: "p" },
+      { id: "fix", type: "task", label: "Request missing information", pool: "p" },
+      { id: "m", type: "gateway", label: "Complete", pool: "p" },
+      { id: "end", type: "end-event", label: "Done", pool: "p" },
+    ];
+    const c: AiConnection[] = [
+      { sourceId: "s", targetId: "t" }, { sourceId: "t", targetId: "d" },
+      { sourceId: "d", targetId: "m", label: "Yes — all required details present" },
+      secondBranchLevel
+        ? { sourceId: "d", targetId: "m", label: "No" }        // both level
+        : { sourceId: "d", targetId: "fix", label: "No" },
+      { sourceId: "fix", targetId: "m" },
+      { sourceId: "m", targetId: "end" },
+    ];
+    return layoutBpmnDiagram(e, c);
+  };
+
+  it("T3160 — the branch running straight ahead leaves by the RIGHT vertex", () => {
+    const o = build(false);
+    const yes = o.connectors.find((c) => /all required details/.test(String(c.label ?? "")))!;
+    const d = o.elements.find((e) => e.id === "d")!;
+    const m = o.elements.find((e) => e.id === "m")!;
+    expect(Math.abs((d.y + d.height / 2) - (m.y + m.height / 2)),
+      "the two are not level, so the case is not exercised").toBeLessThan(25);
+    expect(yes.sourceSide, "a level target must leave by the right vertex").toBe("right");
+    expect(yes.sourceOffsetAlong ?? 0.5).toBe(0.5);
+  });
+
+  it("T3161 — the other branch keeps a corner, so they never share a vertex", () => {
+    const o = build(false);
+    const outs = o.connectors.filter((c) => c.type === "sequence" && c.sourceId === "d");
+    expect(outs.length).toBe(2);
+    expect(new Set(outs.map((c) => c.sourceSide)).size, "both branches left from one point").toBe(2);
+  });
+});

@@ -5289,6 +5289,48 @@ export function layoutBpmnDiagram(
     const wantY = decCy - merge.height / 2;
     if (Math.abs(merge.y - wantY) > 0.5) merge.y = wantY;
   }
+  // ── R6.32: a decision's OUTBOUND vertices follow FINAL geometry ──
+  //
+  // The mirror of R6.31, and Paul asked for it from the other end (V22.01):
+  // "connector 'Yes — all required details present' starts on wrong gateway
+  // vertex". Both gateways sat level at cy 527, and the branch still left by
+  // the TOP vertex and doubled back.
+  //
+  // R6.26 assigns a two-way split top and bottom by PLAN ORDER, on purpose:
+  // when the connectors are built the targets are only provisionally placed,
+  // and a tall subprocess reads as "below" merely for being tall. That holds
+  // for a pair that genuinely fans apart. It is wrong for a branch that ends up
+  // running straight ahead, which should leave by the RIGHT vertex — the same
+  // reasoning that makes a level arrival enter a merge on its LEFT.
+  //
+  // Late, on final positions, and only when exactly ONE of the two is level:
+  // if both are, or neither, R6.26's answer stands.
+  for (const dec of elements) {
+    if (!isDecisionGateway(dec)) continue;
+    const outs = connectors.filter(c => c.type === "sequence" && c.sourceId === dec.id);
+    if (outs.length !== 2) continue;
+    const dcy = dec.y + dec.height / 2;
+    const LEVEL = dec.height / 2 + 6;
+    const info = outs.map(c => {
+      const t = elMap.get(c.targetId);
+      return { c, dy: t ? (t.y + t.height / 2) - dcy : 0 };
+    });
+    const level = info.filter(i => Math.abs(i.dy) <= LEVEL);
+    if (level.length !== 1) continue;
+    // ONLY when the level branch runs straight into a GATEWAY — its merge.
+    //
+    // Paul asked for top-then-bottom-then-middle-right on 2026-08-31 (T3036),
+    // and that still governs a pair that fans apart: a branch to a subprocess
+    // leaves by a corner, and R8.26 then places that subprocess on the side it
+    // left from. Overriding it everywhere broke exactly that. The case Paul
+    // reported in V22.01 is narrower — a branch going nowhere but its own merge
+    // should not climb to a corner to get there.
+    if (elMap.get(level[0].c.targetId)?.type !== "gateway") continue;
+    for (const i of info) {
+      i.c.sourceSide = (i === level[0] ? "right" : i.dy > 0 ? "bottom" : "top") as Connector["sourceSide"];
+      i.c.sourceOffsetAlong = 0.5;                      // R6.30: on the vertex
+    }
+  }
   // ── R6.31: a merge's INBOUND vertices follow FINAL geometry ──
   //
   // Paul, 2026-09-02: "The Merge associated with Gateway 'Complexity?' should
