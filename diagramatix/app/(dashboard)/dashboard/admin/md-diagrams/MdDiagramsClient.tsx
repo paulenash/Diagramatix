@@ -591,11 +591,23 @@ export function MdDiagramsClient() {
                 </span>
                 {r.status === "pending" && <span className="text-gray-400">◦ waiting</span>}
                 {r.status === "generating" && <span className="text-amber-600 animate-pulse">◴ generating…</span>}
-                {r.status === "done" && (
-                  <span className="text-green-600" title={`${r.ms ?? 0} ms`}>
-                    ✓ {r.elements ?? 0}el / {r.connectors ?? 0}conn
-                  </span>
-                )}
+                {r.status === "done" && (() => {
+                  // A BPMN diagram with elements and NO connectors is not a
+                  // process, and a green tick against it is the worst possible
+                  // report: Paul saw "✓ 12el / 0conn" and "V23.01 … 0 conn" and
+                  // had to open the diagram to find out what had happened. The
+                  // run is unattended, so the row has to say it.
+                  const flowless = r.type === "bpmn" && (r.elements ?? 0) > 1 && (r.connectors ?? 0) === 0;
+                  return (
+                    <span className={flowless ? "text-red-600 font-medium" : "text-green-600"}
+                      title={flowless
+                        ? "No connectors — this diagram has elements but no sequence flow. Regenerate it."
+                        : `${r.ms ?? 0} ms`}>
+                      {flowless ? "✗" : "✓"} {r.elements ?? 0}el / {r.connectors ?? 0}conn
+                      {flowless && " — no flow"}
+                    </span>
+                  );
+                })()}
                 {r.status === "error" && <span className="text-red-600 truncate max-w-[45%]" title={r.message}>✗ {r.message}</span>}
                 {/* Anything the layout could not take at face value. A diagram
                     used to come back "✓ 39el / 46conn" with three activities
