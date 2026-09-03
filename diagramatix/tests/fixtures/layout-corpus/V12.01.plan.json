@@ -1,0 +1,398 @@
+{
+  "processCode": "V12.01",
+  "name": "V12.01 Monitor Account Health & Usage",
+  "chain": "V12",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:20:10.419Z",
+  "plan": {
+    "elements": [
+      {
+        "id": "pCSP",
+        "type": "pool",
+        "label": "Customer Success\nPlatform",
+        "poolType": "black-box",
+        "isSystem": true
+      },
+      {
+        "id": "pSP",
+        "type": "pool",
+        "label": "Service Provider",
+        "poolType": "white-box"
+      },
+      {
+        "id": "lCS",
+        "type": "lane",
+        "label": "Customer Success (customer success manager)",
+        "parentPool": "pSP",
+        "pool": "pSP"
+      },
+      {
+        "id": "pPUA",
+        "type": "pool",
+        "label": "Product Usage\nAnalytics",
+        "poolType": "black-box",
+        "isSystem": true
+      },
+      {
+        "id": "e1",
+        "type": "start-event",
+        "label": "Scheduled monitoring cycle triggered",
+        "eventType": "timer",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "t1",
+        "type": "task",
+        "label": "Pull usage and\nadoption metrics from\nProduct Usage Analytics",
+        "taskType": "service",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "t2",
+        "type": "task",
+        "label": "Pull health scores\nand engagement data\nfrom Customer Success\nPlatform",
+        "taskType": "service",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "t3",
+        "type": "task",
+        "label": "Review combined health\nand usage data",
+        "taskType": "user",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "gw1",
+        "type": "gateway",
+        "label": "Health data complete and current?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "sp1",
+        "type": "subprocess-expanded",
+        "label": "Repeat Until Data Complete",
+        "repeatType": "loop",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "sp1s",
+        "type": "start-event",
+        "label": "",
+        "pool": "pSP",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "sp1t1",
+        "type": "task",
+        "label": "Identify missing or\nstale data sources",
+        "taskType": "user",
+        "pool": "pSP",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "sp1t2",
+        "type": "task",
+        "label": "Re-request data from\nrelevant system",
+        "taskType": "service",
+        "pool": "pSP",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "sp1e",
+        "type": "end-event",
+        "label": "",
+        "pool": "pSP",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "gw1m",
+        "type": "gateway",
+        "label": "Health data complete and current?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "merge",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "t4",
+        "type": "task",
+        "label": "Assess account health\nscore against thresholds",
+        "taskType": "user",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "gw2",
+        "type": "gateway",
+        "label": "Health threshold breached?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "t5",
+        "type": "task",
+        "label": "Flag account as\nat-risk and record\nrisk signal",
+        "taskType": "user",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "gw2m",
+        "type": "gateway",
+        "label": "Health threshold breached?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "merge",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "t6",
+        "type": "task",
+        "label": "Update account\nhealth record",
+        "taskType": "user",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "t7",
+        "type": "task",
+        "label": "Write health score\nand risk flags\nto Customer Success\nPlatform",
+        "taskType": "service",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "ie1",
+        "type": "intermediate-event",
+        "label": "Next monitoring cycle due",
+        "eventType": "timer",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "e2",
+        "type": "end-event",
+        "label": "Account health monitored — ready for Identify Renewal Opportunity",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "do1",
+        "type": "data-object",
+        "label": "Usage and Adoption Metrics",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "do2",
+        "type": "data-object",
+        "label": "Health Score and Engagement Data",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "do3",
+        "type": "data-object",
+        "label": "Account Health Record",
+        "pool": "pSP",
+        "lane": "lCS"
+      },
+      {
+        "id": "do4",
+        "type": "data-object",
+        "label": "Risk Signal",
+        "pool": "pSP",
+        "lane": "lCS"
+      }
+    ],
+    "connections": [
+      {
+        "sourceId": "e1",
+        "targetId": "t1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t1",
+        "targetId": "t2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t2",
+        "targetId": "t3",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t3",
+        "targetId": "gw1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw1",
+        "targetId": "sp1",
+        "type": "sequence",
+        "label": "No — data gaps identified"
+      },
+      {
+        "sourceId": "gw1",
+        "targetId": "gw1m",
+        "type": "sequence",
+        "label": "Yes"
+      },
+      {
+        "sourceId": "sp1s",
+        "targetId": "sp1t1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "sp1t1",
+        "targetId": "sp1t2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "sp1t2",
+        "targetId": "sp1e",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "sp1",
+        "targetId": "gw1m",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw1m",
+        "targetId": "t4",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t4",
+        "targetId": "gw2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw2",
+        "targetId": "t5",
+        "type": "sequence",
+        "label": "Yes — at risk"
+      },
+      {
+        "sourceId": "gw2",
+        "targetId": "gw2m",
+        "type": "sequence",
+        "label": "No — healthy"
+      },
+      {
+        "sourceId": "t5",
+        "targetId": "gw2m",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw2m",
+        "targetId": "t6",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t6",
+        "targetId": "t7",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t7",
+        "targetId": "ie1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "ie1",
+        "targetId": "e2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t1",
+        "targetId": "pPUA",
+        "type": "message",
+        "label": "Usage and adoption metrics request"
+      },
+      {
+        "sourceId": "pPUA",
+        "targetId": "t1",
+        "type": "message",
+        "label": "Usage and adoption metrics data"
+      },
+      {
+        "sourceId": "t2",
+        "targetId": "pCSP",
+        "type": "message",
+        "label": "Health score and engagement data request"
+      },
+      {
+        "sourceId": "pCSP",
+        "targetId": "t2",
+        "type": "message",
+        "label": "Health scores and engagement data"
+      },
+      {
+        "sourceId": "t7",
+        "targetId": "pCSP",
+        "type": "message",
+        "label": "Updated health score and risk flags"
+      },
+      {
+        "sourceId": "t1",
+        "targetId": "do1",
+        "type": "sequence",
+        "label": ""
+      },
+      {
+        "sourceId": "do1",
+        "targetId": "t3",
+        "type": "sequence",
+        "label": ""
+      },
+      {
+        "sourceId": "t2",
+        "targetId": "do2",
+        "type": "sequence",
+        "label": ""
+      },
+      {
+        "sourceId": "do2",
+        "targetId": "t3",
+        "type": "sequence",
+        "label": ""
+      },
+      {
+        "sourceId": "t5",
+        "targetId": "do4",
+        "type": "sequence",
+        "label": ""
+      },
+      {
+        "sourceId": "do4",
+        "targetId": "t6",
+        "type": "sequence",
+        "label": ""
+      },
+      {
+        "sourceId": "t6",
+        "targetId": "do3",
+        "type": "sequence",
+        "label": ""
+      },
+      {
+        "sourceId": "do3",
+        "targetId": "t7",
+        "type": "sequence",
+        "label": ""
+      }
+    ]
+  }
+}

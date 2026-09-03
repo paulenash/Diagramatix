@@ -1,0 +1,321 @@
+{
+  "processCode": "V15.01",
+  "name": "V15.01 Detect Fault or Condition Exception",
+  "chain": "V15",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:21:38.542Z",
+  "plan": {
+    "elements": [
+      {
+        "id": "pEO",
+        "type": "pool",
+        "label": "Equipment\nOperator",
+        "poolType": "black-box",
+        "isSystem": false
+      },
+      {
+        "id": "pAOO",
+        "type": "pool",
+        "label": "Asset Owner Organisation",
+        "poolType": "white-box"
+      },
+      {
+        "id": "lRE",
+        "type": "lane",
+        "label": "Reliability Engineering (Condition-Monitoring Analyst)",
+        "parentPool": "pAOO",
+        "pool": "pAOO"
+      },
+      {
+        "id": "pCMSCADA",
+        "type": "pool",
+        "label": "Condition Monitoring\n/ SCADA Platform",
+        "poolType": "black-box",
+        "isSystem": true
+      },
+      {
+        "id": "e1",
+        "type": "start-event",
+        "label": "Fault signal, alarm, inspection finding, or PM schedule received",
+        "eventType": "multiple",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "gw1",
+        "type": "gateway",
+        "label": "Detection source?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "ie1",
+        "type": "intermediate-event",
+        "label": "Operator fault report received",
+        "eventType": "message",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "ie2",
+        "type": "intermediate-event",
+        "label": "Alarm or exception data received from Condition Monitoring / SCADA Platform",
+        "eventType": "message",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "t1",
+        "type": "task",
+        "label": "Review preventive maintenance\nschedule and confirm\ntrigger",
+        "taskType": "user",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "gw2",
+        "type": "gateway",
+        "label": "Detection source resolved",
+        "gatewayType": "exclusive",
+        "gatewayRole": "merge",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "t2",
+        "type": "task",
+        "label": "Log raw detection\nsignal and initial\nsymptoms",
+        "taskType": "user",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "t3",
+        "type": "task",
+        "label": "Retrieve asset register\nentry and condition\nhistory from Condition\nMonitoring / SCADA\nPlatform",
+        "taskType": "service",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "t4",
+        "type": "task",
+        "label": "Review signal against\nasset criticality classification\nand alarm thresholds",
+        "taskType": "user",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "gw3",
+        "type": "gateway",
+        "label": "Is the signal a confirmed fault or condition exception?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "t5",
+        "type": "task",
+        "label": "Document false-alarm finding\nand close detection\nrecord",
+        "taskType": "user",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "e2",
+        "type": "end-event",
+        "label": "False alarm closed — no further action",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "t6",
+        "type": "task",
+        "label": "Capture fault description,\nobserved symptoms, and\noperating context",
+        "taskType": "user",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "t7",
+        "type": "task",
+        "label": "Record confirmed detection\nevent in Condition\nMonitoring / SCADA\nPlatform",
+        "taskType": "service",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "e3",
+        "type": "end-event",
+        "label": "Detection confirmed — ready for Raise and Triage Notification",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "do1",
+        "type": "data-object",
+        "label": "Fault Detection Record",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "do2",
+        "type": "data-object",
+        "label": "Asset Condition History",
+        "pool": "pAOO",
+        "lane": "lRE"
+      },
+      {
+        "id": "do3",
+        "type": "data-object",
+        "label": "Confirmed Fault Description",
+        "pool": "pAOO",
+        "lane": "lRE"
+      }
+    ],
+    "connections": [
+      {
+        "sourceId": "e1",
+        "targetId": "gw1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw1",
+        "targetId": "ie1",
+        "type": "sequence",
+        "label": "Operator fault report received"
+      },
+      {
+        "sourceId": "gw1",
+        "targetId": "ie2",
+        "type": "sequence",
+        "label": "Condition monitoring or SCADA alarm"
+      },
+      {
+        "sourceId": "gw1",
+        "targetId": "t1",
+        "type": "sequence",
+        "label": "Scheduled inspection or PM trigger"
+      },
+      {
+        "sourceId": "ie1",
+        "targetId": "gw2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "ie2",
+        "targetId": "gw2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t1",
+        "targetId": "gw2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw2",
+        "targetId": "t2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t2",
+        "targetId": "t3",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t3",
+        "targetId": "t4",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t4",
+        "targetId": "gw3",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw3",
+        "targetId": "t5",
+        "type": "sequence",
+        "label": "No — signal within normal limits or false alarm"
+      },
+      {
+        "sourceId": "t5",
+        "targetId": "e2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw3",
+        "targetId": "t6",
+        "type": "sequence",
+        "label": "Yes — confirmed fault or condition exception"
+      },
+      {
+        "sourceId": "t6",
+        "targetId": "t7",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t7",
+        "targetId": "e3",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "pEO",
+        "targetId": "ie1",
+        "type": "message",
+        "label": "Operator fault report containing symptoms and operating context"
+      },
+      {
+        "sourceId": "pCMSCADA",
+        "targetId": "ie2",
+        "type": "message",
+        "label": "Alarm trigger or condition-exception data"
+      },
+      {
+        "sourceId": "t7",
+        "targetId": "pCMSCADA",
+        "type": "message",
+        "label": "Confirmed detection event record written back to platform"
+      },
+      {
+        "sourceId": "t2",
+        "targetId": "do1",
+        "type": "sequence",
+        "label": "writes"
+      },
+      {
+        "sourceId": "do1",
+        "targetId": "t4",
+        "type": "sequence",
+        "label": "reads"
+      },
+      {
+        "sourceId": "t4",
+        "targetId": "do2",
+        "type": "sequence",
+        "label": "reads"
+      },
+      {
+        "sourceId": "t7",
+        "targetId": "do2",
+        "type": "sequence",
+        "label": "writes"
+      },
+      {
+        "sourceId": "t6",
+        "targetId": "do3",
+        "type": "sequence",
+        "label": "writes"
+      },
+      {
+        "sourceId": "do3",
+        "targetId": "t7",
+        "type": "sequence",
+        "label": "reads"
+      }
+    ]
+  }
+}

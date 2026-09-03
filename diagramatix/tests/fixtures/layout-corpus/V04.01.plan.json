@@ -1,0 +1,564 @@
+{
+  "processCode": "V04.01",
+  "name": "V04.01 Workforce Planning",
+  "chain": "V04",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:16:22.024Z",
+  "plan": {
+    "elements": [
+      {
+        "id": "pEO",
+        "type": "pool",
+        "label": "Employing Organisation",
+        "poolType": "white-box"
+      },
+      {
+        "id": "lHM",
+        "type": "lane",
+        "label": "Hiring Manager / People Manager",
+        "parentPool": "pEO",
+        "pool": "pEO"
+      },
+      {
+        "id": "lHR",
+        "type": "lane",
+        "label": "Human Resources",
+        "parentPool": "pEO",
+        "pool": "pEO"
+      },
+      {
+        "id": "lFI",
+        "type": "lane",
+        "label": "Finance",
+        "parentPool": "pEO",
+        "pool": "pEO"
+      },
+      {
+        "id": "pHRIS",
+        "type": "pool",
+        "label": "HRIS / HCM\nSystem",
+        "poolType": "black-box",
+        "isSystem": true
+      },
+      {
+        "id": "eStart",
+        "type": "start-event",
+        "label": "Annual planning cycle or ad-hoc trigger received",
+        "pool": "pEO",
+        "lane": "lHM"
+      },
+      {
+        "id": "tIdentify",
+        "type": "task",
+        "label": "Identify team headcount\nneeds and skill\ngaps",
+        "taskType": "user",
+        "pool": "pEO",
+        "lane": "lHM"
+      },
+      {
+        "id": "tDocument",
+        "type": "task",
+        "label": "Document headcount request\nand business justification",
+        "taskType": "user",
+        "pool": "pEO",
+        "lane": "lHM"
+      },
+      {
+        "id": "tSubmitHR",
+        "type": "task",
+        "label": "Submit headcount request\nto Human Resources",
+        "taskType": "send",
+        "pool": "pEO",
+        "lane": "lHM"
+      },
+      {
+        "id": "doHeadcountRequest",
+        "type": "data-object",
+        "label": "Headcount Request",
+        "pool": "pEO",
+        "lane": "lHM"
+      },
+      {
+        "id": "eHRReceive",
+        "type": "intermediate-event",
+        "label": "Headcount request received",
+        "eventType": "message",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "tRetrieveWF",
+        "type": "task",
+        "label": "Retrieve current workforce\ndata from HRIS\n/ HCM System",
+        "taskType": "service",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "tConsolidate",
+        "type": "task",
+        "label": "Consolidate headcount requests\nacross all business\nunits",
+        "taskType": "user",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "tAnalyse",
+        "type": "task",
+        "label": "Analyse workforce gaps\nagainst strategic plan",
+        "taskType": "user",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "doWFGapAnalysis",
+        "type": "data-object",
+        "label": "Workforce Gap Analysis",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "gwInfoSplit",
+        "type": "gateway",
+        "label": "Sufficient information to build plan?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "spLoop",
+        "type": "subprocess-expanded",
+        "label": "Repeat Until Request Details Complete",
+        "repeatType": "loop",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "spLoopStart",
+        "type": "start-event",
+        "label": "",
+        "pool": "pEO",
+        "parentSubprocess": "spLoop"
+      },
+      {
+        "id": "tClarify",
+        "type": "task",
+        "label": "Request clarification from\nHiring Manager /\nPeople Manager",
+        "taskType": "user",
+        "pool": "pEO",
+        "parentSubprocess": "spLoop"
+      },
+      {
+        "id": "eClarReceived",
+        "type": "intermediate-event",
+        "label": "Clarification received",
+        "eventType": "message",
+        "pool": "pEO",
+        "parentSubprocess": "spLoop"
+      },
+      {
+        "id": "spLoopEnd",
+        "type": "end-event",
+        "label": "",
+        "pool": "pEO",
+        "parentSubprocess": "spLoop"
+      },
+      {
+        "id": "btTimer",
+        "type": "intermediate-event",
+        "label": "Clarification overdue after 10 business days",
+        "eventType": "timer",
+        "boundaryHost": "spLoop",
+        "boundarySide": "bottom",
+        "properties": {
+          "interruptionType": "interrupting"
+        },
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "tEscalate",
+        "type": "task",
+        "label": "Escalate outstanding request\nto HR business\npartner",
+        "taskType": "user",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "eEscalateEnd",
+        "type": "end-event",
+        "label": "Request escalated — workforce planning on hold",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "gwInfoMerge",
+        "type": "gateway",
+        "label": "Sufficient information to build plan?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "merge",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "tPrepareWFPlan",
+        "type": "task",
+        "label": "Prepare workforce plan\nand headcount proposal",
+        "taskType": "user",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "tPrepareBCase",
+        "type": "task",
+        "label": "Prepare business case\nfor budget approval",
+        "taskType": "user",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "tSubmitFin",
+        "type": "task",
+        "label": "Submit business case\nto Finance for\napproval",
+        "taskType": "send",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "doWFPlan",
+        "type": "data-object",
+        "label": "Workforce Plan",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "doBizCase",
+        "type": "data-object",
+        "label": "Business Case",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "eFinReceive",
+        "type": "intermediate-event",
+        "label": "Business case received",
+        "eventType": "message",
+        "pool": "pEO",
+        "lane": "lFI"
+      },
+      {
+        "id": "tReviewBCase",
+        "type": "task",
+        "label": "Review business case\nand headcount cost\nmodel",
+        "taskType": "user",
+        "pool": "pEO",
+        "lane": "lFI"
+      },
+      {
+        "id": "gwBudgetSplit",
+        "type": "gateway",
+        "label": "Budget approved?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pEO",
+        "lane": "lFI"
+      },
+      {
+        "id": "tDocReject",
+        "type": "task",
+        "label": "Document rejection reason\nand notify Human\nResources",
+        "taskType": "user",
+        "pool": "pEO",
+        "lane": "lFI"
+      },
+      {
+        "id": "eRejectEnd",
+        "type": "end-event",
+        "label": "Headcount request rejected — no vacancy created",
+        "pool": "pEO",
+        "lane": "lFI"
+      },
+      {
+        "id": "tRecordApproval",
+        "type": "task",
+        "label": "Record budget approval\nand allocate headcount\nfunding",
+        "taskType": "user",
+        "pool": "pEO",
+        "lane": "lFI"
+      },
+      {
+        "id": "tNotifyHR",
+        "type": "task",
+        "label": "Notify Human Resources\nof approved headcount",
+        "taskType": "send",
+        "pool": "pEO",
+        "lane": "lFI"
+      },
+      {
+        "id": "doBudgetApproval",
+        "type": "data-object",
+        "label": "Budget Approval Record",
+        "pool": "pEO",
+        "lane": "lFI"
+      },
+      {
+        "id": "eHRApprovalReceive",
+        "type": "intermediate-event",
+        "label": "Budget approval notification received",
+        "eventType": "message",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "tUpdateWFPlan",
+        "type": "task",
+        "label": "Update workforce plan\nwith approved headcount\npositions",
+        "taskType": "user",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "tRecordHRIS",
+        "type": "task",
+        "label": "Record approved positions\nin HRIS /\nHCM System",
+        "taskType": "service",
+        "pool": "pEO",
+        "lane": "lHR"
+      },
+      {
+        "id": "eEnd",
+        "type": "end-event",
+        "label": "Approved workforce plan confirmed — ready for Create Vacancy",
+        "pool": "pEO",
+        "lane": "lHR"
+      }
+    ],
+    "connections": [
+      {
+        "sourceId": "eStart",
+        "targetId": "tIdentify",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tIdentify",
+        "targetId": "tDocument",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tDocument",
+        "targetId": "doHeadcountRequest",
+        "type": "association"
+      },
+      {
+        "sourceId": "tDocument",
+        "targetId": "tSubmitHR",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tSubmitHR",
+        "targetId": "eHRReceive",
+        "type": "message",
+        "label": "Headcount request"
+      },
+      {
+        "sourceId": "eHRReceive",
+        "targetId": "tRetrieveWF",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "pHRIS",
+        "targetId": "tRetrieveWF",
+        "type": "message",
+        "label": "Current employee master data and workforce reports"
+      },
+      {
+        "sourceId": "tRetrieveWF",
+        "targetId": "tConsolidate",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "doHeadcountRequest",
+        "targetId": "tConsolidate",
+        "type": "association"
+      },
+      {
+        "sourceId": "tConsolidate",
+        "targetId": "tAnalyse",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tAnalyse",
+        "targetId": "doWFGapAnalysis",
+        "type": "association"
+      },
+      {
+        "sourceId": "tAnalyse",
+        "targetId": "gwInfoSplit",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gwInfoSplit",
+        "targetId": "spLoop",
+        "type": "sequence",
+        "label": "No — information incomplete"
+      },
+      {
+        "sourceId": "gwInfoSplit",
+        "targetId": "gwInfoMerge",
+        "type": "sequence",
+        "label": "Yes — information sufficient"
+      },
+      {
+        "sourceId": "spLoopStart",
+        "targetId": "tClarify",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tClarify",
+        "targetId": "eClarReceived",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "eClarReceived",
+        "targetId": "spLoopEnd",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "btTimer",
+        "targetId": "tEscalate",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tEscalate",
+        "targetId": "eEscalateEnd",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "spLoop",
+        "targetId": "gwInfoMerge",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gwInfoMerge",
+        "targetId": "tPrepareWFPlan",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "doWFGapAnalysis",
+        "targetId": "tPrepareWFPlan",
+        "type": "association"
+      },
+      {
+        "sourceId": "tPrepareWFPlan",
+        "targetId": "doWFPlan",
+        "type": "association"
+      },
+      {
+        "sourceId": "tPrepareWFPlan",
+        "targetId": "tPrepareBCase",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "doWFPlan",
+        "targetId": "tPrepareBCase",
+        "type": "association"
+      },
+      {
+        "sourceId": "tPrepareBCase",
+        "targetId": "doBizCase",
+        "type": "association"
+      },
+      {
+        "sourceId": "tPrepareBCase",
+        "targetId": "tSubmitFin",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tSubmitFin",
+        "targetId": "eFinReceive",
+        "type": "message",
+        "label": "Business case for budget approval"
+      },
+      {
+        "sourceId": "eFinReceive",
+        "targetId": "tReviewBCase",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "doBizCase",
+        "targetId": "tReviewBCase",
+        "type": "association"
+      },
+      {
+        "sourceId": "tReviewBCase",
+        "targetId": "gwBudgetSplit",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gwBudgetSplit",
+        "targetId": "tDocReject",
+        "type": "sequence",
+        "label": "No — rejected or deferred"
+      },
+      {
+        "sourceId": "tDocReject",
+        "targetId": "eRejectEnd",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tRecordApproval",
+        "targetId": "doBudgetApproval",
+        "type": "association"
+      },
+      {
+        "sourceId": "tRecordApproval",
+        "targetId": "tNotifyHR",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tNotifyHR",
+        "targetId": "eHRApprovalReceive",
+        "type": "message",
+        "label": "Budget approval notification"
+      },
+      {
+        "sourceId": "eHRApprovalReceive",
+        "targetId": "tUpdateWFPlan",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "doWFPlan",
+        "targetId": "tUpdateWFPlan",
+        "type": "association"
+      },
+      {
+        "sourceId": "tUpdateWFPlan",
+        "targetId": "tRecordHRIS",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "doBudgetApproval",
+        "targetId": "tRecordHRIS",
+        "type": "association"
+      },
+      {
+        "sourceId": "tRecordHRIS",
+        "targetId": "pHRIS",
+        "type": "message",
+        "label": "Approved headcount positions and updated workforce plan"
+      },
+      {
+        "sourceId": "tRecordHRIS",
+        "targetId": "eEnd",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gwBudgetSplit",
+        "targetId": "tRecordApproval",
+        "type": "sequence",
+        "label": "Yes — approved"
+      }
+    ]
+  }
+}

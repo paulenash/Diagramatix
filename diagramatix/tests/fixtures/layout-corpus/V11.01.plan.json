@@ -1,0 +1,489 @@
+{
+  "processCode": "V11.01",
+  "name": "V11.01 Accept Signed Contract",
+  "chain": "V11",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:19:45.238Z",
+  "plan": {
+    "elements": [
+      {
+        "id": "pNC",
+        "type": "pool",
+        "label": "New\nCustomer",
+        "poolType": "black-box",
+        "isSystem": false
+      },
+      {
+        "id": "pSP",
+        "type": "pool",
+        "label": "Service Provider",
+        "poolType": "white-box"
+      },
+      {
+        "id": "pCLM",
+        "type": "pool",
+        "label": "Contract Lifecycle\nManagement (CLM)",
+        "poolType": "black-box",
+        "isSystem": true
+      },
+      {
+        "id": "lSales",
+        "type": "lane",
+        "label": "Sales",
+        "parentPool": "pSP",
+        "pool": "pSP"
+      },
+      {
+        "id": "lLegal",
+        "type": "lane",
+        "label": "Legal / Contracts",
+        "parentPool": "pSP",
+        "pool": "pSP"
+      },
+      {
+        "id": "e1",
+        "type": "start-event",
+        "label": "Signed contract received from New Customer",
+        "eventType": "message",
+        "pool": "pSP",
+        "lane": "lSales"
+      },
+      {
+        "id": "t1",
+        "type": "task",
+        "label": "Log contract receipt\nand assign reference\nnumber",
+        "taskType": "user",
+        "pool": "pSP",
+        "lane": "lSales"
+      },
+      {
+        "id": "t2",
+        "type": "task",
+        "label": "Perform initial\ncompleteness check",
+        "taskType": "user",
+        "pool": "pSP",
+        "lane": "lSales"
+      },
+      {
+        "id": "bt2",
+        "type": "intermediate-event",
+        "label": "Completeness check overdue (2 business days)",
+        "eventType": "timer",
+        "boundaryHost": "t2",
+        "boundarySide": "bottom",
+        "properties": {
+          "interruptionType": "interrupting"
+        }
+      },
+      {
+        "id": "t_esc1",
+        "type": "task",
+        "label": "Escalate overdue check\nto Sales manager",
+        "taskType": "send",
+        "pool": "pSP",
+        "lane": "lSales"
+      },
+      {
+        "id": "e_esc1",
+        "type": "end-event",
+        "label": "Escalation raised",
+        "pool": "pSP",
+        "lane": "lSales"
+      },
+      {
+        "id": "gw1",
+        "type": "gateway",
+        "label": "Contract complete?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pSP",
+        "lane": "lSales"
+      },
+      {
+        "id": "t3",
+        "type": "task",
+        "label": "Request missing information\nfrom customer",
+        "taskType": "send",
+        "pool": "pSP",
+        "lane": "lSales"
+      },
+      {
+        "id": "ie1",
+        "type": "intermediate-event",
+        "label": "Customer provides missing information",
+        "eventType": "message",
+        "pool": "pSP",
+        "lane": "lSales"
+      },
+      {
+        "id": "gw1m",
+        "type": "gateway",
+        "label": "Contract complete",
+        "gatewayType": "exclusive",
+        "gatewayRole": "merge",
+        "pool": "pSP",
+        "lane": "lSales"
+      },
+      {
+        "id": "t4",
+        "type": "task",
+        "label": "Record contract\nin CLM",
+        "taskType": "user",
+        "pool": "pSP",
+        "lane": "lSales"
+      },
+      {
+        "id": "ie2",
+        "type": "intermediate-event",
+        "label": "CLM confirmation received",
+        "eventType": "message",
+        "pool": "pSP",
+        "lane": "lSales"
+      },
+      {
+        "id": "t5",
+        "type": "task",
+        "label": "Notify Legal /\nContracts for review",
+        "taskType": "user",
+        "pool": "pSP",
+        "lane": "lSales"
+      },
+      {
+        "id": "t6",
+        "type": "task",
+        "label": "Review contract terms\nand authorised signatories",
+        "taskType": "user",
+        "pool": "pSP",
+        "lane": "lLegal"
+      },
+      {
+        "id": "bt6",
+        "type": "intermediate-event",
+        "label": "Legal review overdue (3 business days)",
+        "eventType": "timer",
+        "boundaryHost": "t6",
+        "boundarySide": "bottom",
+        "properties": {
+          "interruptionType": "interrupting"
+        }
+      },
+      {
+        "id": "t_esc2",
+        "type": "task",
+        "label": "Escalate overdue review\nto Legal manager",
+        "taskType": "send",
+        "pool": "pSP",
+        "lane": "lLegal"
+      },
+      {
+        "id": "e_esc2",
+        "type": "end-event",
+        "label": "Legal escalation raised",
+        "pool": "pSP",
+        "lane": "lLegal"
+      },
+      {
+        "id": "gw2",
+        "type": "gateway",
+        "label": "Contract accepted?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pSP",
+        "lane": "lLegal"
+      },
+      {
+        "id": "t7",
+        "type": "task",
+        "label": "Raise contract query\nwith Sales",
+        "taskType": "user",
+        "pool": "pSP",
+        "lane": "lLegal"
+      },
+      {
+        "id": "ie3",
+        "type": "intermediate-event",
+        "label": "Sales responds to query",
+        "eventType": "message",
+        "pool": "pSP",
+        "lane": "lLegal"
+      },
+      {
+        "id": "gw2m",
+        "type": "gateway",
+        "label": "Contract accepted",
+        "gatewayType": "exclusive",
+        "gatewayRole": "merge",
+        "pool": "pSP",
+        "lane": "lLegal"
+      },
+      {
+        "id": "t8",
+        "type": "task",
+        "label": "Record formal acceptance\nand countersignature",
+        "taskType": "user",
+        "pool": "pSP",
+        "lane": "lLegal"
+      },
+      {
+        "id": "t9",
+        "type": "task",
+        "label": "Update CLM with\naccepted status",
+        "taskType": "service",
+        "pool": "pSP",
+        "lane": "lLegal"
+      },
+      {
+        "id": "t10",
+        "type": "task",
+        "label": "Send acceptance confirmation\nto New Customer",
+        "taskType": "send",
+        "pool": "pSP",
+        "lane": "lLegal"
+      },
+      {
+        "id": "e2",
+        "type": "end-event",
+        "label": "Contract accepted — ready for Confirm Scope and Entitlements",
+        "pool": "pSP",
+        "lane": "lLegal"
+      },
+      {
+        "id": "do1",
+        "type": "data-object",
+        "label": "Signed Contract Document",
+        "pool": "pSP"
+      },
+      {
+        "id": "do2",
+        "type": "data-object",
+        "label": "Contract Receipt Record",
+        "pool": "pSP"
+      },
+      {
+        "id": "do3",
+        "type": "data-object",
+        "label": "CLM Contract Entry",
+        "pool": "pSP"
+      },
+      {
+        "id": "do4",
+        "type": "data-object",
+        "label": "Acceptance Confirmation",
+        "pool": "pSP"
+      }
+    ],
+    "connections": [
+      {
+        "sourceId": "pNC",
+        "targetId": "e1",
+        "type": "message",
+        "label": "Signed contract document"
+      },
+      {
+        "sourceId": "e1",
+        "targetId": "t1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t1",
+        "targetId": "t2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t2",
+        "targetId": "gw1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "bt2",
+        "targetId": "t_esc1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t_esc1",
+        "targetId": "e_esc1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw1",
+        "targetId": "t3",
+        "type": "sequence",
+        "label": "Incomplete"
+      },
+      {
+        "sourceId": "gw1",
+        "targetId": "gw1m",
+        "type": "sequence",
+        "label": "Complete"
+      },
+      {
+        "sourceId": "t3",
+        "targetId": "pNC",
+        "type": "message",
+        "label": "Request for missing contract information"
+      },
+      {
+        "sourceId": "t3",
+        "targetId": "ie1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "pNC",
+        "targetId": "ie1",
+        "type": "message",
+        "label": "Supplementary contract information"
+      },
+      {
+        "sourceId": "ie1",
+        "targetId": "gw1m",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw1m",
+        "targetId": "t4",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t4",
+        "targetId": "pCLM",
+        "type": "message",
+        "label": "New contract record"
+      },
+      {
+        "sourceId": "t4",
+        "targetId": "ie2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "pCLM",
+        "targetId": "ie2",
+        "type": "message",
+        "label": "Contract record confirmation and reference"
+      },
+      {
+        "sourceId": "ie2",
+        "targetId": "t5",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t5",
+        "targetId": "t6",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t6",
+        "targetId": "gw2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "bt6",
+        "targetId": "t_esc2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t_esc2",
+        "targetId": "e_esc2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw2",
+        "targetId": "t7",
+        "type": "sequence",
+        "label": "Issues found"
+      },
+      {
+        "sourceId": "gw2",
+        "targetId": "gw2m",
+        "type": "sequence",
+        "label": "Accepted"
+      },
+      {
+        "sourceId": "t7",
+        "targetId": "ie3",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "ie3",
+        "targetId": "gw2m",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw2m",
+        "targetId": "t8",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t8",
+        "targetId": "t9",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t9",
+        "targetId": "pCLM",
+        "type": "message",
+        "label": "Accepted status and countersignature record"
+      },
+      {
+        "sourceId": "t9",
+        "targetId": "t10",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t10",
+        "targetId": "pNC",
+        "type": "message",
+        "label": "Formal acceptance confirmation"
+      },
+      {
+        "sourceId": "t10",
+        "targetId": "e2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "do1",
+        "targetId": "t2",
+        "type": "association"
+      },
+      {
+        "sourceId": "do1",
+        "targetId": "t6",
+        "type": "association"
+      },
+      {
+        "sourceId": "t1",
+        "targetId": "do2",
+        "type": "association"
+      },
+      {
+        "sourceId": "do2",
+        "targetId": "t4",
+        "type": "association"
+      },
+      {
+        "sourceId": "t4",
+        "targetId": "do3",
+        "type": "association"
+      },
+      {
+        "sourceId": "t9",
+        "targetId": "do3",
+        "type": "association"
+      },
+      {
+        "sourceId": "do3",
+        "targetId": "t8",
+        "type": "association"
+      },
+      {
+        "sourceId": "t8",
+        "targetId": "do4",
+        "type": "association"
+      },
+      {
+        "sourceId": "do4",
+        "targetId": "t10",
+        "type": "association"
+      }
+    ]
+  }
+}

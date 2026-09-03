@@ -1,0 +1,294 @@
+{
+  "processCode": "V13.01",
+  "name": "V13.01 Receive Return Request",
+  "chain": "V13",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:20:34.202Z",
+  "plan": {
+    "elements": [
+      {
+        "id": "pCustomer",
+        "type": "pool",
+        "label": "Customer",
+        "poolType": "black-box",
+        "isSystem": false
+      },
+      {
+        "id": "pRetail",
+        "type": "pool",
+        "label": "Retail Organisation",
+        "poolType": "white-box"
+      },
+      {
+        "id": "lCS",
+        "type": "lane",
+        "label": "Customer Service",
+        "parentPool": "pRetail",
+        "pool": "pRetail"
+      },
+      {
+        "id": "pTicketing",
+        "type": "pool",
+        "label": "Customer Service /\nTicketing System",
+        "poolType": "black-box",
+        "isSystem": true
+      },
+      {
+        "id": "eStart",
+        "type": "start-event",
+        "label": "Return request received from Customer",
+        "eventType": "message",
+        "pool": "pRetail",
+        "lane": "lCS"
+      },
+      {
+        "id": "tAcknowledge",
+        "type": "task",
+        "label": "Acknowledge return\nrequest",
+        "taskType": "user",
+        "pool": "pRetail",
+        "lane": "lCS"
+      },
+      {
+        "id": "tCollect",
+        "type": "task",
+        "label": "Collect return details\nfrom customer",
+        "taskType": "send",
+        "pool": "pRetail",
+        "lane": "lCS"
+      },
+      {
+        "id": "gDecision",
+        "type": "gateway",
+        "label": "All required details provided?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pRetail",
+        "lane": "lCS"
+      },
+      {
+        "id": "spLoop",
+        "type": "subprocess-expanded",
+        "label": "Repeat Until Details Complete",
+        "repeatType": "loop",
+        "pool": "pRetail",
+        "lane": "lCS"
+      },
+      {
+        "id": "tRequestMissing",
+        "type": "task",
+        "label": "Request missing details\nfrom customer",
+        "taskType": "send",
+        "pool": "pRetail",
+        "lane": "lCS",
+        "parentSubprocess": "spLoop"
+      },
+      {
+        "id": "eMessageCatch",
+        "type": "intermediate-event",
+        "label": "Customer provides missing details",
+        "eventType": "message",
+        "pool": "pRetail",
+        "lane": "lCS",
+        "parentSubprocess": "spLoop"
+      },
+      {
+        "id": "tUpdateDetails",
+        "type": "task",
+        "label": "Update return\ndetails",
+        "taskType": "user",
+        "pool": "pRetail",
+        "lane": "lCS",
+        "parentSubprocess": "spLoop"
+      },
+      {
+        "id": "bTimer",
+        "type": "intermediate-event",
+        "label": "72-hour detail deadline exceeded",
+        "eventType": "timer",
+        "boundaryHost": "spLoop",
+        "boundarySide": "bottom",
+        "pool": "pRetail",
+        "lane": "lCS"
+      },
+      {
+        "id": "gMerge",
+        "type": "gateway",
+        "label": "All required details provided?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "merge",
+        "pool": "pRetail",
+        "lane": "lCS"
+      },
+      {
+        "id": "tLog",
+        "type": "task",
+        "label": "Log return request\nin Customer Service\n/ Ticketing System",
+        "taskType": "service",
+        "pool": "pRetail",
+        "lane": "lCS"
+      },
+      {
+        "id": "tAssign",
+        "type": "task",
+        "label": "Assign case reference\nto return request",
+        "taskType": "user",
+        "pool": "pRetail",
+        "lane": "lCS"
+      },
+      {
+        "id": "eEnd",
+        "type": "end-event",
+        "label": "Return request logged — ready for Validate Eligibility",
+        "pool": "pRetail",
+        "lane": "lCS"
+      },
+      {
+        "id": "eEndInsufficient",
+        "type": "end-event",
+        "label": "Return request closed — insufficient details provided",
+        "pool": "pRetail",
+        "lane": "lCS"
+      },
+      {
+        "id": "doReturnRequest",
+        "type": "data-object",
+        "label": "Return Request",
+        "pool": "pRetail",
+        "lane": "lCS"
+      },
+      {
+        "id": "doCaseRecord",
+        "type": "data-object",
+        "label": "Case Record",
+        "pool": "pRetail",
+        "lane": "lCS"
+      }
+    ],
+    "connections": [
+      {
+        "sourceId": "eStart",
+        "targetId": "tAcknowledge",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tAcknowledge",
+        "targetId": "tCollect",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tCollect",
+        "targetId": "gDecision",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gDecision",
+        "targetId": "gMerge",
+        "type": "sequence",
+        "label": "Yes"
+      },
+      {
+        "sourceId": "gDecision",
+        "targetId": "spLoop",
+        "type": "sequence",
+        "label": "No"
+      },
+      {
+        "sourceId": "tRequestMissing",
+        "targetId": "eMessageCatch",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "eMessageCatch",
+        "targetId": "tUpdateDetails",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "spLoop",
+        "targetId": "gMerge",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "bTimer",
+        "targetId": "eEndInsufficient",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gMerge",
+        "targetId": "tLog",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tLog",
+        "targetId": "tAssign",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tAssign",
+        "targetId": "eEnd",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "pCustomer",
+        "targetId": "eStart",
+        "type": "message",
+        "label": "Return request, reason, order reference, product identifier, fault description, photographic evidence"
+      },
+      {
+        "sourceId": "tCollect",
+        "targetId": "pCustomer",
+        "type": "message",
+        "label": "Request for order number, product details, fault description, supporting evidence"
+      },
+      {
+        "sourceId": "tRequestMissing",
+        "targetId": "pCustomer",
+        "type": "message",
+        "label": "Missing detail request specifying what is still needed"
+      },
+      {
+        "sourceId": "pCustomer",
+        "targetId": "eMessageCatch",
+        "type": "message",
+        "label": "Supplementary details and evidence"
+      },
+      {
+        "sourceId": "tLog",
+        "targetId": "pTicketing",
+        "type": "message",
+        "label": "Full return request record"
+      },
+      {
+        "sourceId": "pTicketing",
+        "targetId": "tAssign",
+        "type": "message",
+        "label": "Generated case or ticket reference number"
+      },
+      {
+        "sourceId": "tCollect",
+        "targetId": "doReturnRequest",
+        "type": "association"
+      },
+      {
+        "sourceId": "tUpdateDetails",
+        "targetId": "doReturnRequest",
+        "type": "association"
+      },
+      {
+        "sourceId": "doReturnRequest",
+        "targetId": "tLog",
+        "type": "association"
+      },
+      {
+        "sourceId": "tLog",
+        "targetId": "doCaseRecord",
+        "type": "association"
+      },
+      {
+        "sourceId": "doCaseRecord",
+        "targetId": "tAssign",
+        "type": "association"
+      }
+    ]
+  }
+}

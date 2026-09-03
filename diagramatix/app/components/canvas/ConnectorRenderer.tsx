@@ -570,7 +570,15 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
       })()}
       {/* Label text (hidden while editing) */}
       {!isEditing && (
-        <text textAnchor="middle" fontSize={fontSize} fill="#374151" style={{ pointerEvents: "none", userSelect: "none" }}>
+        // White halo, so the label stays legible where it crosses its own line.
+        // The server-side renderer that produces the PDF has always done this
+        // ("white halo for legibility"); the canvas did not, so the same diagram
+        // read worse on screen than in its export. Painting the stroke first
+        // masks the line behind the glyphs without moving anything — which is
+        // what two attempts at relocating labels failed to achieve.
+        <text textAnchor="middle" fontSize={fontSize} fill="#374151"
+          paintOrder="stroke" stroke="#ffffff" strokeWidth={2.5} strokeLinejoin="round"
+          style={{ pointerEvents: "none", userSelect: "none" }}>
           {lines.map((ln, i) => (
             <tspan key={i} x={lCx} y={lTy + i * lineH + lineH * 0.85}>{ln}</tspan>
           ))}

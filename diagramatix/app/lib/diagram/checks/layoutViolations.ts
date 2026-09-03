@@ -41,25 +41,56 @@ export function gatewayLabelBox(g: DiagramElement): Box | null {
   return { x: cx - lw / 2, y: topY, w: lw, h: lines * 14 };
 }
 
-/** Box for a connector's text label — mirrors how ConnectorRenderer positions
- *  it (source-anchored for flowlines / labelAnchor="source" branch labels,
- *  else the midpoint of the first+last visible waypoint). */
-export function connectorLabelBox(c: Connector): Box | null {
+/**
+ * Box for a connector's text label — mirrors how ConnectorRenderer positions it.
+ *
+ * A MESSAGE flow's label defaults to the LEFT of the spine, its right edge just
+ * clear of the line: `offsetX = -(width/2 + 6)`, `offsetY = -7`. Omitting that
+ * default made this report the label as straddling its own line — a collision
+ * nobody draws — and those false positives were the bulk of the biggest class
+ * in the 2026-09-03 scan. A check that cannot be trusted is worse than none,
+ * because it sends the fixing effort at the wrong thing.
+ *
+ * `els` is optional only so existing callers keep working; pass it whenever the
+ * elements are to hand, because a message flow touching a POOL anchors its
+ * label 60px along the spine from the pool end rather than at the midpoint.
+ */
+export function connectorLabelBox(c: Connector, els?: DiagramElement[]): Box | null {
   if (!c.label || !c.label.trim()) return null;
   let vis = c.waypoints ?? [];
   if (vis.length < 2) return null;
   if (c.sourceInvisibleLeader && vis.length > 2) vis = vis.slice(1);
   if (c.targetInvisibleLeader && vis.length > 2) vis = vis.slice(0, -1);
   const sourceAnchored = c.labelAnchor === "source" || c.type === "flowline";
-  const anchor = sourceAnchored
-    ? vis[0]
-    : { x: (vis[0].x + vis[vis.length - 1].x) / 2, y: (vis[0].y + vis[vis.length - 1].y) / 2 };
-  const offsetX = c.labelOffsetX ?? (c.type === "flowline" ? 18 : 0);
-  const offsetY = c.labelOffsetY ?? (c.type === "flowline" ? 16 : -30);
+  const isMessage = c.type === "messageBPMN";
   // The same wrap the renderer applies, so a wrapped label is measured as drawn.
   const lines = connectorLabelLines(c.label || " ");
   const measuredWidth = Math.max(30, ...lines.map((l) => l.length * 6 + 12)); // fontSize 10 × 0.6
   const lHeight = Math.max(14, lines.length * 14);
+
+  const typeOf = (id: string) => els?.find((e) => e.id === id)?.type;
+  const msgToPool = isMessage && (typeOf(c.sourceId) === "pool" || typeOf(c.targetId) === "pool");
+  const moved = c.labelOffsetX != null || c.labelOffsetY != null;
+
+  let anchor = sourceAnchored
+    ? vis[0]
+    : { x: (vis[0].x + vis[vis.length - 1].x) / 2, y: (vis[0].y + vis[vis.length - 1].y) / 2 };
+  if (!moved && msgToPool && !sourceAnchored) {
+    const p0 = vis[0], pN = vis[vis.length - 1];
+    const poolEnd = typeOf(c.targetId) === "pool" ? pN : p0;
+    const otherEnd = typeOf(c.targetId) === "pool" ? p0 : pN;
+    const dx = otherEnd.x - poolEnd.x, dy = otherEnd.y - poolEnd.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const step = Math.min(60, len - 6);
+    anchor = { x: poolEnd.x + (dx / len) * step, y: poolEnd.y + (dy / len) * step };
+  }
+
+  const offsetX = c.labelOffsetX ?? (
+    c.type === "flowline" ? 18
+    : isMessage ? -(measuredWidth / 2 + 6)
+    : 0
+  );
+  const offsetY = c.labelOffsetY ?? (c.type === "flowline" ? 16 : msgToPool ? -7 : -30);
   const lCx = anchor.x + offsetX, lTy = anchor.y + offsetY;
   return { x: lCx - measuredWidth / 2, y: lTy, w: measuredWidth, h: lHeight };
 }
@@ -121,18 +152,21 @@ export function findReadabilityViolations(data: DiagramData): string[] {
     if (boxesOverlap(labels[i].box, labels[j].box, TOL)) v.push(`LABEL/LABEL: "${L(labels[i].e)}" and "${L(labels[j].e)}"`);
   }
 
-  // R-C ── a connector's label does not lie along its OWN line ────────────
-  for (const c of data.connectors) {
-    const box = connectorLabelBox(c);
-    if (!box) continue;
-    if (segmentsOf(c).some((sg) => segHitsBox(sg, box, TOL))) {
-      v.push(`LABEL/OWN-LINE: connector label "${c.label}" lies on its own segment`);
-    }
-  }
-
+  // R-C ── a connector's label lying along its OWN line is NOT a violation ──
+  //
+  // It was, and it dominated the first scan: 279 of 412. Then the PDF renderer
+  // turned out to draw every connector label with a white halo already —
+  // `paint-order="stroke"`, commented "white halo for legibility" — so the
+  // glyphs mask the line behind them and the label reads perfectly in the very
+  // output that has to be readable. The canvas now does the same.
+  //
+  // Removed deliberately rather than left failing: chasing it moved labels onto
+  // gateways and onto each other twice over, to fix something a reader never
+  // saw. A label over ANOTHER element or another label is still a violation —
+  // there the halo masks something the reader does need.
   // R-D ── a connector label is clear of external labels too ──────────────
   for (const c of data.connectors) {
-    const box = connectorLabelBox(c);
+    const box = connectorLabelBox(c, data.elements);
     if (!box) continue;
     for (const { e, box: lb } of labels) {
       if (boxesOverlap(box, lb, TOL)) v.push(`LABEL/LABEL: connector "${c.label}" and label of "${L(e)}"`);
@@ -185,7 +219,7 @@ export function findLayoutViolations(data: DiagramData): string[] {
 
   // 4 ── connector labels stay clear of flow nodes and each other ───────────
   const labelBoxes = conns
-    .map((c) => ({ c, box: connectorLabelBox(c) }))
+    .map((c) => ({ c, box: connectorLabelBox(c, data.elements) }))
     .filter((x): x is { c: Connector; box: Box } => x.box !== null);
   for (const { c, box } of labelBoxes) {
     for (const e of els) {

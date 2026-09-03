@@ -1,0 +1,434 @@
+{
+  "processCode": "V06.01",
+  "name": "V06.01 Identify Opportunity",
+  "chain": "V06",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:17:30.849Z",
+  "plan": {
+    "elements": [
+      {
+        "id": "pCustomer",
+        "type": "pool",
+        "label": "Customer",
+        "poolType": "black-box",
+        "isSystem": false
+      },
+      {
+        "id": "pOrg",
+        "type": "pool",
+        "label": "Product Organisation",
+        "poolType": "white-box"
+      },
+      {
+        "id": "lStrategy",
+        "type": "lane",
+        "label": "Strategy",
+        "parentPool": "pOrg",
+        "pool": "pOrg"
+      },
+      {
+        "id": "lPM",
+        "type": "lane",
+        "label": "Product Management",
+        "parentPool": "pOrg",
+        "pool": "pOrg"
+      },
+      {
+        "id": "pMRT",
+        "type": "pool",
+        "label": "Market Research\nTools",
+        "poolType": "black-box",
+        "isSystem": true
+      },
+      {
+        "id": "e1",
+        "type": "start-event",
+        "label": "Market signal or customer need received",
+        "eventType": "message",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "t1",
+        "type": "task",
+        "label": "Gather and document\nmarket signals",
+        "taskType": "user",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "t2",
+        "type": "task",
+        "label": "Retrieve market insights\nfrom Market Research\nTools",
+        "taskType": "service",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "t3",
+        "type": "task",
+        "label": "Analyse market trends\nand competitive landscape",
+        "taskType": "user",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "t4",
+        "type": "task",
+        "label": "Identify and describe\ncandidate opportunities",
+        "taskType": "user",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "gw1",
+        "type": "gateway",
+        "label": "Sufficient data to assess opportunity?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "sp1",
+        "type": "subprocess-expanded",
+        "label": "Repeat Until Data Is Sufficient",
+        "repeatType": "loop",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "sp1Start",
+        "type": "start-event",
+        "label": "",
+        "pool": "pOrg",
+        "lane": "lStrategy",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "sp1t1",
+        "type": "task",
+        "label": "Request additional\nmarket research",
+        "taskType": "user",
+        "pool": "pOrg",
+        "lane": "lStrategy",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "sp1ie1",
+        "type": "intermediate-event",
+        "label": "Additional data received from Market Research Tools",
+        "eventType": "message",
+        "pool": "pOrg",
+        "lane": "lStrategy",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "sp1t2",
+        "type": "task",
+        "label": "Supplement opportunity\ndescription",
+        "taskType": "user",
+        "pool": "pOrg",
+        "lane": "lStrategy",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "sp1End",
+        "type": "end-event",
+        "label": "",
+        "pool": "pOrg",
+        "lane": "lStrategy",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "bTimer1",
+        "type": "intermediate-event",
+        "label": "Research deadline exceeded",
+        "eventType": "timer",
+        "boundaryHost": "sp1",
+        "boundarySide": "bottom",
+        "properties": {
+          "interruptionType": "interrupting"
+        },
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "eDeadline",
+        "type": "end-event",
+        "label": "Opportunity closed — insufficient data obtained",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "gw1merge",
+        "type": "gateway",
+        "label": "Sufficient data to assess opportunity",
+        "gatewayType": "exclusive",
+        "gatewayRole": "merge",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "t5",
+        "type": "task",
+        "label": "Draft opportunity\nstatement",
+        "taskType": "user",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "t6",
+        "type": "task",
+        "label": "Record opportunity statement\nin Market Research\nTools",
+        "taskType": "service",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "t7",
+        "type": "task",
+        "label": "Review opportunity\nstatement",
+        "taskType": "user",
+        "pool": "pOrg",
+        "lane": "lPM"
+      },
+      {
+        "id": "gw2",
+        "type": "gateway",
+        "label": "Opportunity validated?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pOrg",
+        "lane": "lPM"
+      },
+      {
+        "id": "t8",
+        "type": "task",
+        "label": "Document reasons for\nrejection and guidance",
+        "taskType": "user",
+        "pool": "pOrg",
+        "lane": "lPM"
+      },
+      {
+        "id": "eReject",
+        "type": "end-event",
+        "label": "Opportunity rejected — process closed",
+        "pool": "pOrg",
+        "lane": "lPM"
+      },
+      {
+        "id": "t9",
+        "type": "task",
+        "label": "Prioritise and endorse\nvalidated opportunity",
+        "taskType": "user",
+        "pool": "pOrg",
+        "lane": "lPM"
+      },
+      {
+        "id": "eEnd",
+        "type": "end-event",
+        "label": "Validated opportunity confirmed — ready for Capture Ideas",
+        "pool": "pOrg",
+        "lane": "lPM"
+      },
+      {
+        "id": "doMarketSignal",
+        "type": "data-object",
+        "label": "Market Signal Log",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "doOpStatement",
+        "type": "data-object",
+        "label": "Opportunity Statement",
+        "pool": "pOrg",
+        "lane": "lStrategy"
+      },
+      {
+        "id": "doValidation",
+        "type": "data-object",
+        "label": "Validation Decision",
+        "pool": "pOrg",
+        "lane": "lPM"
+      }
+    ],
+    "connections": [
+      {
+        "sourceId": "pCustomer",
+        "targetId": "e1",
+        "type": "message",
+        "label": "Market signals, customer needs and feedback"
+      },
+      {
+        "sourceId": "e1",
+        "targetId": "t1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t1",
+        "targetId": "t2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t2",
+        "targetId": "pMRT",
+        "type": "message",
+        "label": "Query for market and customer data"
+      },
+      {
+        "sourceId": "pMRT",
+        "targetId": "t2",
+        "type": "message",
+        "label": "Market insights and customer data"
+      },
+      {
+        "sourceId": "t2",
+        "targetId": "t3",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t3",
+        "targetId": "t4",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t4",
+        "targetId": "gw1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw1",
+        "targetId": "sp1",
+        "type": "sequence",
+        "label": "No — data gaps remain"
+      },
+      {
+        "sourceId": "gw1",
+        "targetId": "gw1merge",
+        "type": "sequence",
+        "label": "Yes — data is adequate"
+      },
+      {
+        "sourceId": "sp1Start",
+        "targetId": "sp1t1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "sp1t1",
+        "targetId": "sp1ie1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "pMRT",
+        "targetId": "sp1ie1",
+        "type": "message",
+        "label": "Supplementary research data"
+      },
+      {
+        "sourceId": "sp1ie1",
+        "targetId": "sp1t2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "sp1t2",
+        "targetId": "sp1End",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "sp1",
+        "targetId": "gw1merge",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "bTimer1",
+        "targetId": "eDeadline",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw1merge",
+        "targetId": "t5",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t5",
+        "targetId": "t6",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t6",
+        "targetId": "pMRT",
+        "type": "message",
+        "label": "Opportunity statement record"
+      },
+      {
+        "sourceId": "t6",
+        "targetId": "t7",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t7",
+        "targetId": "gw2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw2",
+        "targetId": "t8",
+        "type": "sequence",
+        "label": "No — return for rework"
+      },
+      {
+        "sourceId": "t8",
+        "targetId": "eReject",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t9",
+        "targetId": "eEnd",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t1",
+        "targetId": "doMarketSignal",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "doMarketSignal",
+        "targetId": "t3",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t5",
+        "targetId": "doOpStatement",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "doOpStatement",
+        "targetId": "t7",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t8",
+        "targetId": "doValidation",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "doValidation",
+        "targetId": "eReject",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t9",
+        "targetId": "doValidation",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw2",
+        "targetId": "t9",
+        "type": "sequence",
+        "label": "Yes — opportunity confirmed"
+      }
+    ]
+  }
+}

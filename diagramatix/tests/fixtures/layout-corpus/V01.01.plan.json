@@ -1,0 +1,386 @@
+{
+  "processCode": "V01.01",
+  "name": "V01.01 Receive Order",
+  "chain": "V01",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:14:42.023Z",
+  "plan": {
+    "elements": [
+      {
+        "id": "pCustomer",
+        "type": "pool",
+        "label": "Customer",
+        "poolType": "black-box",
+        "isSystem": false
+      },
+      {
+        "id": "pMain",
+        "type": "pool",
+        "label": "Sales Organisation",
+        "poolType": "white-box"
+      },
+      {
+        "id": "lCS",
+        "type": "lane",
+        "label": "Customer Service",
+        "parentPool": "pMain",
+        "pool": "pMain"
+      },
+      {
+        "id": "lOP",
+        "type": "lane",
+        "label": "Order Processing",
+        "parentPool": "pMain",
+        "pool": "pMain"
+      },
+      {
+        "id": "pOMS",
+        "type": "pool",
+        "label": "Order Management\nSystem (OMS)",
+        "poolType": "black-box",
+        "isSystem": true
+      },
+      {
+        "id": "e1",
+        "type": "start-event",
+        "label": "Order received from Customer",
+        "eventType": "message",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "t1",
+        "type": "task",
+        "label": "Log initial\norder contact",
+        "taskType": "user",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "t2",
+        "type": "task",
+        "label": "Capture order channel\nand details",
+        "taskType": "user",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "gw1",
+        "type": "gateway",
+        "label": "Order information complete?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "sp1",
+        "type": "subprocess-expanded",
+        "label": "Repeat Until Details Complete",
+        "repeatType": "loop",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "spStart",
+        "type": "start-event",
+        "label": "",
+        "pool": "pMain",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "t3",
+        "type": "task",
+        "label": "Request missing information\nfrom Customer",
+        "taskType": "send",
+        "pool": "pMain",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "ie1",
+        "type": "intermediate-event",
+        "label": "Customer responds",
+        "eventType": "message",
+        "pool": "pMain",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "t4",
+        "type": "task",
+        "label": "Update order\ndetails",
+        "taskType": "user",
+        "pool": "pMain",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "spEnd",
+        "type": "end-event",
+        "label": "",
+        "pool": "pMain",
+        "parentSubprocess": "sp1"
+      },
+      {
+        "id": "bTimer",
+        "type": "intermediate-event",
+        "label": "48-hour response deadline exceeded",
+        "eventType": "timer",
+        "boundaryHost": "sp1",
+        "boundarySide": "bottom",
+        "properties": {
+          "interruptionType": "interrupting"
+        },
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "eAbandoned",
+        "type": "end-event",
+        "label": "Order abandoned — customer unresponsive",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "gw2",
+        "type": "gateway",
+        "label": "Order information complete",
+        "gatewayType": "exclusive",
+        "gatewayRole": "merge",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "t5",
+        "type": "task",
+        "label": "Confirm order receipt\nwith Customer",
+        "taskType": "user",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "t6",
+        "type": "task",
+        "label": "Send order acknowledgement\nto Customer",
+        "taskType": "send",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "t7",
+        "type": "task",
+        "label": "Review captured\norder details",
+        "taskType": "user",
+        "pool": "pMain",
+        "lane": "lOP"
+      },
+      {
+        "id": "t8",
+        "type": "task",
+        "label": "Assign order type\nand priority",
+        "taskType": "user",
+        "pool": "pMain",
+        "lane": "lOP"
+      },
+      {
+        "id": "t9",
+        "type": "task",
+        "label": "Create sales order\nrecord in OMS",
+        "taskType": "service",
+        "pool": "pMain",
+        "lane": "lOP"
+      },
+      {
+        "id": "t10",
+        "type": "task",
+        "label": "Verify order\nrecord created",
+        "taskType": "user",
+        "pool": "pMain",
+        "lane": "lOP"
+      },
+      {
+        "id": "eEnd",
+        "type": "end-event",
+        "label": "Order record confirmed — ready for Validate Customer / Order",
+        "pool": "pMain",
+        "lane": "lOP"
+      },
+      {
+        "id": "doInbound",
+        "type": "data-object",
+        "label": "Inbound Order",
+        "pool": "pMain"
+      },
+      {
+        "id": "doAck",
+        "type": "data-object",
+        "label": "Order Acknowledgement",
+        "pool": "pMain"
+      },
+      {
+        "id": "doSalesOrder",
+        "type": "data-object",
+        "label": "Sales Order Record",
+        "pool": "pMain"
+      }
+    ],
+    "connections": [
+      {
+        "sourceId": "pCustomer",
+        "targetId": "e1",
+        "type": "message",
+        "label": "Inbound order details"
+      },
+      {
+        "sourceId": "e1",
+        "targetId": "t1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t1",
+        "targetId": "t2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t2",
+        "targetId": "gw1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw1",
+        "targetId": "sp1",
+        "type": "sequence",
+        "label": "No — information missing"
+      },
+      {
+        "sourceId": "gw1",
+        "targetId": "gw2",
+        "type": "sequence",
+        "label": "Yes — details sufficient"
+      },
+      {
+        "sourceId": "spStart",
+        "targetId": "t3",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t3",
+        "targetId": "ie1",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "ie1",
+        "targetId": "t4",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t4",
+        "targetId": "spEnd",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "sp1",
+        "targetId": "gw2",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "bTimer",
+        "targetId": "eAbandoned",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw2",
+        "targetId": "t5",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t5",
+        "targetId": "t6",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t6",
+        "targetId": "t7",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t7",
+        "targetId": "t8",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t8",
+        "targetId": "t9",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t9",
+        "targetId": "t10",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t10",
+        "targetId": "eEnd",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t3",
+        "targetId": "pCustomer",
+        "type": "message",
+        "label": "Request for missing order data"
+      },
+      {
+        "sourceId": "pCustomer",
+        "targetId": "ie1",
+        "type": "message",
+        "label": "Customer reply with missing information"
+      },
+      {
+        "sourceId": "t6",
+        "targetId": "pCustomer",
+        "type": "message",
+        "label": "Order acknowledgement with reference number"
+      },
+      {
+        "sourceId": "t9",
+        "targetId": "pOMS",
+        "type": "message",
+        "label": "New sales order record"
+      },
+      {
+        "sourceId": "pOMS",
+        "targetId": "t10",
+        "type": "message",
+        "label": "Confirmation of record creation and order number"
+      },
+      {
+        "sourceId": "t2",
+        "targetId": "doInbound",
+        "type": "association"
+      },
+      {
+        "sourceId": "doInbound",
+        "targetId": "t7",
+        "type": "association"
+      },
+      {
+        "sourceId": "t5",
+        "targetId": "doAck",
+        "type": "association"
+      },
+      {
+        "sourceId": "doAck",
+        "targetId": "t6",
+        "type": "association"
+      },
+      {
+        "sourceId": "t9",
+        "targetId": "doSalesOrder",
+        "type": "association"
+      },
+      {
+        "sourceId": "doSalesOrder",
+        "targetId": "t10",
+        "type": "association"
+      }
+    ]
+  }
+}

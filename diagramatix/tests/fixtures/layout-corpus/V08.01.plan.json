@@ -1,0 +1,345 @@
+{
+  "processCode": "V08.01",
+  "name": "V08.01 Identify Asset Need",
+  "chain": "V08",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:18:26.192Z",
+  "plan": {
+    "elements": [
+      {
+        "id": "p_amo",
+        "type": "pool",
+        "label": "Asset Management Organisation",
+        "poolType": "white-box"
+      },
+      {
+        "id": "l_ops",
+        "type": "lane",
+        "label": "Operations",
+        "parentPool": "p_amo",
+        "pool": "p_amo"
+      },
+      {
+        "id": "l_am",
+        "type": "lane",
+        "label": "Asset Management",
+        "parentPool": "p_amo",
+        "pool": "p_amo"
+      },
+      {
+        "id": "p_eams",
+        "type": "pool",
+        "label": "Enterprise Asset\nManagement\nSystem",
+        "poolType": "black-box",
+        "isSystem": true
+      },
+      {
+        "id": "e_start",
+        "type": "start-event",
+        "label": "Asset need identified by operations",
+        "pool": "p_amo",
+        "lane": "l_ops"
+      },
+      {
+        "id": "t_doc_req",
+        "type": "task",
+        "label": "Document asset\nrequirement",
+        "taskType": "user",
+        "pool": "p_amo",
+        "lane": "l_ops"
+      },
+      {
+        "id": "t_assess_impact",
+        "type": "task",
+        "label": "Assess operational impact\nand urgency",
+        "taskType": "user",
+        "pool": "p_amo",
+        "lane": "l_ops"
+      },
+      {
+        "id": "gw_defined",
+        "type": "gateway",
+        "label": "Is need clearly defined?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "p_amo",
+        "lane": "l_ops"
+      },
+      {
+        "id": "sp_loop",
+        "type": "subprocess-expanded",
+        "label": "Repeat Until Requirement Defined",
+        "repeatType": "loop",
+        "pool": "p_amo",
+        "lane": "l_ops"
+      },
+      {
+        "id": "sp_t_clarify",
+        "type": "task",
+        "label": "Clarify requirement\nwith stakeholders",
+        "taskType": "user",
+        "pool": "p_amo",
+        "lane": "l_ops",
+        "parentSubprocess": "sp_loop"
+      },
+      {
+        "id": "sp_t_update",
+        "type": "task",
+        "label": "Update requirement\ndocumentation",
+        "taskType": "user",
+        "pool": "p_amo",
+        "lane": "l_ops",
+        "parentSubprocess": "sp_loop"
+      },
+      {
+        "id": "gw_req_merge",
+        "type": "gateway",
+        "label": "Requirement defined",
+        "gatewayType": "exclusive",
+        "gatewayRole": "merge",
+        "pool": "p_amo",
+        "lane": "l_ops"
+      },
+      {
+        "id": "t_classify",
+        "type": "task",
+        "label": "Classify asset type\nand category",
+        "taskType": "user",
+        "pool": "p_amo",
+        "lane": "l_ops"
+      },
+      {
+        "id": "t_submit",
+        "type": "task",
+        "label": "Submit asset need\nto Asset Management",
+        "taskType": "send",
+        "pool": "p_amo",
+        "lane": "l_ops"
+      },
+      {
+        "id": "ie_msg_received",
+        "type": "intermediate-event",
+        "label": "Asset need received from Operations",
+        "eventType": "message",
+        "pool": "p_amo",
+        "lane": "l_am"
+      },
+      {
+        "id": "t_review_validate",
+        "type": "task",
+        "label": "Review and validate\nasset need",
+        "taskType": "user",
+        "pool": "p_amo",
+        "lane": "l_am"
+      },
+      {
+        "id": "t_check_register",
+        "type": "task",
+        "label": "Check existing asset\nregister for alternatives",
+        "taskType": "service",
+        "pool": "p_amo",
+        "lane": "l_am"
+      },
+      {
+        "id": "gw_existing",
+        "type": "gateway",
+        "label": "Existing asset can fulfil need?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "p_amo",
+        "lane": "l_am"
+      },
+      {
+        "id": "t_recommend_realloc",
+        "type": "task",
+        "label": "Recommend reallocation or\nreuse of existing\nasset",
+        "taskType": "user",
+        "pool": "p_amo",
+        "lane": "l_am"
+      },
+      {
+        "id": "e_end_realloc",
+        "type": "end-event",
+        "label": "Need resolved by reallocation — no capital request raised",
+        "pool": "p_amo",
+        "lane": "l_am"
+      },
+      {
+        "id": "t_strategic_align",
+        "type": "task",
+        "label": "Confirm strategic alignment\nwith asset plan",
+        "taskType": "user",
+        "pool": "p_amo",
+        "lane": "l_am"
+      },
+      {
+        "id": "t_prepare_cap_req",
+        "type": "task",
+        "label": "Prepare capital\nrequest documentation",
+        "taskType": "user",
+        "pool": "p_amo",
+        "lane": "l_am"
+      },
+      {
+        "id": "t_record_cap_req",
+        "type": "task",
+        "label": "Record capital request\nin Enterprise Asset\nManagement System",
+        "taskType": "service",
+        "pool": "p_amo",
+        "lane": "l_am"
+      },
+      {
+        "id": "e_end_cap_req",
+        "type": "end-event",
+        "label": "Capital request complete — ready for Approve Investment",
+        "pool": "p_amo",
+        "lane": "l_am"
+      },
+      {
+        "id": "do_asset_req",
+        "type": "data-object",
+        "label": "Asset Requirement Document",
+        "pool": "p_amo"
+      },
+      {
+        "id": "do_cap_req",
+        "type": "data-object",
+        "label": "Capital Request",
+        "pool": "p_amo"
+      }
+    ],
+    "connections": [
+      {
+        "sourceId": "e_start",
+        "targetId": "t_doc_req",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t_doc_req",
+        "targetId": "t_assess_impact",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t_assess_impact",
+        "targetId": "gw_defined",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw_defined",
+        "targetId": "sp_loop",
+        "type": "sequence",
+        "label": "No"
+      },
+      {
+        "sourceId": "sp_t_clarify",
+        "targetId": "sp_t_update",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "sp_loop",
+        "targetId": "gw_req_merge",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw_defined",
+        "targetId": "gw_req_merge",
+        "type": "sequence",
+        "label": "Yes"
+      },
+      {
+        "sourceId": "gw_req_merge",
+        "targetId": "t_classify",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t_classify",
+        "targetId": "t_submit",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t_submit",
+        "targetId": "ie_msg_received",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "ie_msg_received",
+        "targetId": "t_review_validate",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t_review_validate",
+        "targetId": "t_check_register",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t_check_register",
+        "targetId": "gw_existing",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw_existing",
+        "targetId": "t_recommend_realloc",
+        "type": "sequence",
+        "label": "Yes"
+      },
+      {
+        "sourceId": "t_recommend_realloc",
+        "targetId": "e_end_realloc",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t_strategic_align",
+        "targetId": "t_prepare_cap_req",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t_prepare_cap_req",
+        "targetId": "t_record_cap_req",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t_record_cap_req",
+        "targetId": "e_end_cap_req",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "p_eams",
+        "targetId": "t_check_register",
+        "type": "message",
+        "label": "Existing asset and lifecycle data"
+      },
+      {
+        "sourceId": "t_record_cap_req",
+        "targetId": "p_eams",
+        "type": "message",
+        "label": "Capital request record"
+      },
+      {
+        "sourceId": "t_doc_req",
+        "targetId": "do_asset_req",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "do_asset_req",
+        "targetId": "t_review_validate",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "t_prepare_cap_req",
+        "targetId": "do_cap_req",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "do_cap_req",
+        "targetId": "t_record_cap_req",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gw_existing",
+        "targetId": "t_strategic_align",
+        "type": "sequence",
+        "label": "No"
+      }
+    ]
+  }
+}

@@ -1,0 +1,331 @@
+{
+  "processCode": "V07.01",
+  "name": "V07.01 Receive Issue",
+  "chain": "V07",
+  "model": "claude-sonnet-4-6",
+  "capturedAt": "2026-09-03T03:17:57.676Z",
+  "plan": {
+    "elements": [
+      {
+        "id": "pCustomer",
+        "type": "pool",
+        "label": "Complainant /\nCustomer / User",
+        "poolType": "black-box",
+        "isSystem": false
+      },
+      {
+        "id": "pMain",
+        "type": "pool",
+        "label": "Service Organisation",
+        "poolType": "white-box"
+      },
+      {
+        "id": "lCS",
+        "type": "lane",
+        "label": "Customer Service",
+        "parentPool": "pMain",
+        "pool": "pMain"
+      },
+      {
+        "id": "pTicketing",
+        "type": "pool",
+        "label": "Ticketing /\nCustomer Contact\nPlatform",
+        "poolType": "black-box",
+        "isSystem": true
+      },
+      {
+        "id": "eStart",
+        "type": "start-event",
+        "label": "Issue raised by Complainant / Customer / User",
+        "eventType": "message",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "tReceive",
+        "type": "task",
+        "label": "Receive and\nacknowledge contact",
+        "taskType": "user",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "tCapture",
+        "type": "task",
+        "label": "Capture issue\ndetails",
+        "taskType": "user",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "doIssueDetails",
+        "type": "data-object",
+        "label": "Issue Details Record",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "gwDecision",
+        "type": "gateway",
+        "label": "Contact channel complete?",
+        "gatewayType": "exclusive",
+        "gatewayRole": "decision",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "spLoop",
+        "type": "subprocess-expanded",
+        "label": "Repeat Until Details Complete",
+        "repeatType": "loop",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "spStart",
+        "type": "start-event",
+        "label": "",
+        "pool": "pMain",
+        "lane": "lCS",
+        "parentSubprocess": "spLoop"
+      },
+      {
+        "id": "tRequest",
+        "type": "task",
+        "label": "Request missing information\nfrom contact",
+        "taskType": "send",
+        "pool": "pMain",
+        "lane": "lCS",
+        "parentSubprocess": "spLoop"
+      },
+      {
+        "id": "ieResponse",
+        "type": "intermediate-event",
+        "label": "Response received from contact",
+        "eventType": "message",
+        "pool": "pMain",
+        "lane": "lCS",
+        "parentSubprocess": "spLoop"
+      },
+      {
+        "id": "tUpdate",
+        "type": "task",
+        "label": "Update captured\nissue details",
+        "taskType": "user",
+        "pool": "pMain",
+        "lane": "lCS",
+        "parentSubprocess": "spLoop"
+      },
+      {
+        "id": "spEnd",
+        "type": "end-event",
+        "label": "",
+        "pool": "pMain",
+        "lane": "lCS",
+        "parentSubprocess": "spLoop"
+      },
+      {
+        "id": "btTimer",
+        "type": "intermediate-event",
+        "label": "48-hour response deadline exceeded",
+        "eventType": "timer",
+        "boundaryHost": "spLoop",
+        "boundarySide": "bottom",
+        "properties": {
+          "interruptionType": "interrupting"
+        },
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "eAbandoned",
+        "type": "end-event",
+        "label": "Issue abandoned — contact unresponsive",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "gwMerge",
+        "type": "gateway",
+        "label": "Contact channel complete",
+        "gatewayType": "exclusive",
+        "gatewayRole": "merge",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "tCreateTicket",
+        "type": "task",
+        "label": "Create issue ticket\nin Ticketing /\nCustomer Contact Platform",
+        "taskType": "service",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "tAssignRef",
+        "type": "task",
+        "label": "Assign preliminary\nreference number",
+        "taskType": "user",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "doAckNotice",
+        "type": "data-object",
+        "label": "Acknowledgement Notice",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "tSendAck",
+        "type": "task",
+        "label": "Send acknowledgement and\nreference number to\ncontact",
+        "taskType": "send",
+        "pool": "pMain",
+        "lane": "lCS"
+      },
+      {
+        "id": "eEnd",
+        "type": "end-event",
+        "label": "Issue logged — ready for Identify Customer / User",
+        "pool": "pMain",
+        "lane": "lCS"
+      }
+    ],
+    "connections": [
+      {
+        "sourceId": "eStart",
+        "targetId": "tReceive",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tReceive",
+        "targetId": "tCapture",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tCapture",
+        "targetId": "gwDecision",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gwDecision",
+        "targetId": "gwMerge",
+        "type": "sequence",
+        "label": "Details sufficient"
+      },
+      {
+        "sourceId": "gwDecision",
+        "targetId": "spLoop",
+        "type": "sequence",
+        "label": "Details missing"
+      },
+      {
+        "sourceId": "spStart",
+        "targetId": "tRequest",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tRequest",
+        "targetId": "ieResponse",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "ieResponse",
+        "targetId": "tUpdate",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tUpdate",
+        "targetId": "spEnd",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "spLoop",
+        "targetId": "gwMerge",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "btTimer",
+        "targetId": "eAbandoned",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "gwMerge",
+        "targetId": "tCreateTicket",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tCreateTicket",
+        "targetId": "tAssignRef",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tAssignRef",
+        "targetId": "tSendAck",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tSendAck",
+        "targetId": "eEnd",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tCapture",
+        "targetId": "doIssueDetails",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "doIssueDetails",
+        "targetId": "tCreateTicket",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "tAssignRef",
+        "targetId": "doAckNotice",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "doAckNotice",
+        "targetId": "tSendAck",
+        "type": "sequence"
+      },
+      {
+        "sourceId": "pCustomer",
+        "targetId": "eStart",
+        "type": "message",
+        "label": "Issue / complaint / request with supporting details"
+      },
+      {
+        "sourceId": "tRequest",
+        "targetId": "pCustomer",
+        "type": "message",
+        "label": "Request for missing information"
+      },
+      {
+        "sourceId": "pCustomer",
+        "targetId": "ieResponse",
+        "type": "message",
+        "label": "Response with additional information"
+      },
+      {
+        "sourceId": "tCreateTicket",
+        "targetId": "pTicketing",
+        "type": "message",
+        "label": "New ticket with issue details and channel metadata"
+      },
+      {
+        "sourceId": "pTicketing",
+        "targetId": "tAssignRef",
+        "type": "message",
+        "label": "Confirmed ticket record with assigned reference number"
+      },
+      {
+        "sourceId": "tSendAck",
+        "targetId": "pCustomer",
+        "type": "message",
+        "label": "Acknowledgement message and reference number"
+      }
+    ]
+  }
+}
