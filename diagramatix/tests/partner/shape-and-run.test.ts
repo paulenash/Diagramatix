@@ -120,7 +120,13 @@ vi.mock("@/app/lib/ai/loadAiRules", () => ({
   loadAiRulesForType: vi.fn(async () => "GREEN RULES"),
 }));
 const planBpmnMock = vi.fn();
-vi.mock("@/app/lib/ai/planBpmn", () => ({
+// Override ONLY planBpmn and keep the rest of the module real. Replacing the
+// whole module leaves every other export undefined, so the day production code
+// imports another one from here these tests fail with something that looks
+// nothing like the cause — which is exactly what happened when
+// generateDiagramData started calling pruneRedundantBpmnConnectors.
+vi.mock("@/app/lib/ai/planBpmn", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/app/lib/ai/planBpmn")>()),
   planBpmn: (...args: unknown[]) => planBpmnMock(...args),
 }));
 
