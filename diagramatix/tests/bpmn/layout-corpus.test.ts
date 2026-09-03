@@ -20,6 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { findLayoutViolations, findReadabilityViolations } from "@/app/lib/diagram/checks/layoutViolations";
+import { pruneRedundantBpmnConnectors } from "@/app/lib/ai/planBpmn";
 import type { DiagramData } from "@/app/lib/diagram/types";
 
 const DIR = path.join(process.cwd(), "tests", "fixtures", "layout-corpus");
@@ -106,5 +107,83 @@ describe("a plan with no sequence flow is reported, not passed", () => {
     const seen: string[] = [];
     layoutBpmnDiagram(withPool, msgOnly, { onDiagnostic: (d) => seen.push(d.kind) });
     expect(seen).toContain("no-sequence-flow");
+  });
+});
+
+describe("a decision that decides nothing never reaches the diagram", () => {
+  /**
+   * Paul, 2026-09-03, "Decisions, Decisions!!": two gateways in a row inside a
+   * loop subprocess, in V02.02, V02.03 and V02.04 alike — "It seems a
+   * systematic error?"
+   *
+   * The shape is always the same: a decision with ONE outgoing branch running
+   * straight into its own merge. Neither gateway decides or joins anything. It
+   * comes of the model half-following two rules at once — every diverging
+   * gateway needs a named merge, but a loop condition must never be tested with
+   * a gateway — so it emits the pair and omits the branch that would have been
+   * the loop-back.
+   *
+   * pruneRedundantBpmnConnectors has collapsed 1-in/1-out gateways since
+   * 2026-08-19 and does so correctly here, which is what makes the prod
+   * diagrams so odd. These pin the behaviour so a regression in the pruner
+   * cannot pass unnoticed while that is chased.
+   */
+  const loopPlan = () => ({
+    elements: [
+      { id: "p", type: "pool", label: "Co", poolType: "white-box" },
+      { id: "s", type: "start-event", label: "Requisition raised", pool: "p" },
+      { id: "ep", type: "subprocess-expanded", label: "Repeat Until Details Complete", pool: "p", repeatType: "loop" },
+      { id: "eps", type: "start-event", label: "", parentSubprocess: "ep" },
+      { id: "t1", type: "task", label: "Correct Requisition Details", parentSubprocess: "ep" },
+      { id: "gwd", type: "gateway", label: "Details Now Complete?", gatewayType: "exclusive", parentSubprocess: "ep" },
+      { id: "gwm", type: "gateway", label: "Details Checked", parentSubprocess: "ep" },
+      { id: "epe", type: "end-event", label: "", parentSubprocess: "ep" },
+      { id: "e", type: "end-event", label: "Requisition complete", pool: "p" },
+    ],
+    connections: [
+      { sourceId: "s", targetId: "ep" }, { sourceId: "ep", targetId: "e" },
+      { sourceId: "eps", targetId: "t1" },
+      { sourceId: "t1", targetId: "gwd" },
+      { sourceId: "gwd", targetId: "gwm", label: "Yes" },   // the ONLY branch
+      { sourceId: "gwm", targetId: "epe" },
+    ],
+  });
+
+  it("T3157 — a decision with one branch and its merge are both collapsed", () => {
+    const plan = loopPlan();
+    pruneRedundantBpmnConnectors(plan as never);
+    const gws = plan.elements.filter((e) => e.type === "gateway").map((e) => e.label);
+    expect(gws, `both are no-ops, yet ${gws.join(" and ")} survived`).toEqual([]);
+    // …and the flow is rejoined, not severed: the task now reaches the end.
+    expect(plan.connections.some((c) => c.sourceId === "t1" && c.targetId === "epe")).toBe(true);
+  });
+
+  it("T3158 — a REAL decision is left alone (the negative control)", () => {
+    const plan = loopPlan();
+    // The second branch must lead somewhere ELSE. Pointing it at the same end
+    // event makes the gateway a genuine no-op — both branches going to one
+    // place is not a decision — and the pruner is right to collapse it. That
+    // caught this fixture first time round.
+    plan.elements.push({ id: "t2", type: "task", label: "Escalate to buyer", parentSubprocess: "ep" } as never);
+    plan.connections.push({ sourceId: "gwd", targetId: "t2", label: "No" } as never);
+    plan.connections.push({ sourceId: "t2", targetId: "epe" } as never);
+    pruneRedundantBpmnConnectors(plan as never);
+    const gws = plan.elements.filter((e) => e.type === "gateway").map((e) => e.label);
+    expect(gws, "a two-branch decision must survive").toContain("Details Now Complete?");
+  });
+
+  it("T3159 — the guard holds at the point of generation, not only in the parser", () => {
+    // The prune is re-asserted immediately before layout, so an unpruned plan
+    // from any source still produces a clean diagram.
+    const plan = loopPlan();
+    pruneRedundantBpmnConnectors(plan as never);
+    const out = layoutBpmnDiagram(plan.elements as never, plan.connections as never);
+    const noop = out.elements.filter((el) => {
+      if (el.type !== "gateway") return false;
+      const ins = out.connectors.filter((c) => c.targetId === el.id && c.type !== "messageBPMN");
+      const outs = out.connectors.filter((c) => c.sourceId === el.id && c.type !== "messageBPMN");
+      return ins.length === 1 && outs.length === 1;
+    });
+    expect(noop.map((g) => g.label)).toEqual([]);
   });
 });

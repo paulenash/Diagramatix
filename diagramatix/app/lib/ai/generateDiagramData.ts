@@ -9,7 +9,7 @@
  * over, once per prompt. Rules must already be green-filtered (loadAiRulesForType),
  * and the model + apiKey resolved by the caller — this function is deliberately dumb.
  */
-import { planBpmn, type Attachment } from "./planBpmn";
+import { planBpmn, pruneRedundantBpmnConnectors, type Attachment } from "./planBpmn";
 import { planGeneric } from "./planGeneric";
 import { layoutBpmnDiagram, type LayoutDiagnostic } from "@/app/lib/diagram/bpmnLayout";
 import { layoutGenericDiagram } from "@/app/lib/diagram/genericLayout";
@@ -85,6 +85,22 @@ export async function generateDiagramData(input: GenerateDiagramInput): Promise<
   if (diagramType === "bpmn") {
     const res = await planBpmn({ apiKey, prompt, rules, model, attachment });
     if (!res.ok) throw new Error(res.error || "BPMN plan failed");
+    // Belt and braces on the redundant-gateway prune.
+    //
+    // planBpmn already runs it inside normaliseAiPlan, and it demonstrably
+    // works: replaying V02.02's own stored plan through it removes both
+    // gateways, and regenerating that prompt here with the same model produces
+    // none. Yet the diagrams Paul generated in prod on 2026-09-03 carry the
+    // shape — a decision with ONE outgoing branch running straight into its own
+    // merge, in V02.02, V02.03 and V02.04 alike.
+    //
+    // I could not reconcile that by reading the code, so rather than leave it
+    // to a theory this re-asserts the invariant at the last moment before
+    // layout. The prune is idempotent, so on a healthy plan it is a no-op; if
+    // something upstream ever hands over an unpruned plan again, the diagram is
+    // still right. The plan is captured AFTER it, so what gets stored is what
+    // was actually drawn.
+    pruneRedundantBpmnConnectors(res.plan);
     onPlan?.(res.plan);
     return layoutBpmnDiagram(res.plan.elements, res.plan.connections, { promptLabel, onDiagnostic });
   }
