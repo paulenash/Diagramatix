@@ -205,6 +205,34 @@ export async function POST(req: Request) {
 
       const uniqueName = (base: string) => uniqueDiagramName(base, takenNames);
 
+      /**
+       * Is this failure the provider being busy rather than anything wrong?
+       *
+       * Paul, 2026-09-03, from a run: `V02.05 ✗ 529 {"type":"error","error":
+       * {"type":"overloaded_e…`. 529 is Anthropic's overloaded_error — their
+       * servers were saturated for a moment. The SDK already retries twice on a
+       * 5xx, so three attempts had failed; but the run is UNATTENDED and losing
+       * a diagram to a passing blip means someone has to notice and re-run it.
+       */
+      const isTransient = (e: unknown) => {
+        const m = (e instanceof Error ? e.message : String(e)).toLowerCase();
+        const status = (e as { status?: number })?.status;
+        return status === 429 || status === 529 || (typeof status === "number" && status >= 500)
+          || m.includes("overloaded") || m.includes("rate limit") || m.includes("529")
+          || m.includes("timeout") || m.includes("econnreset");
+      };
+      /** A readable line for the UI; the raw provider JSON is not one. */
+      const describeError = (e: unknown) => {
+        const raw = e instanceof Error ? e.message : String(e);
+        if (/overloaded|529/i.test(raw)) return "AI provider overloaded (529) — transient, try again";
+        if (/rate.?limit|429/i.test(raw)) return "AI provider rate limit (429) — transient, try again";
+        if (/timeout/i.test(raw)) return "AI call timed out — transient, try again";
+        return raw.length > 160 ? raw.slice(0, 157) + "…" : raw;
+      };
+      /** Wait between attempts; a busy provider needs a moment, not an instant retry. */
+      const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+
       /** Ids created by THIS run — the client re-links only these by default. */
       const createdIds: string[] = [];
       let created = 0;
@@ -224,7 +252,10 @@ export async function POST(req: Request) {
           // exactly. See GenerateDiagramInput.onPlan for why the saved diagram is
           // not enough.
           let plan: unknown;
-          const data = await generateDiagramData({
+          // Up to three goes when the provider is merely busy. A real fault —
+          // a bad prompt, a refusal, a parse failure — is not retried, because
+          // repeating it just burns tokens to reach the same answer.
+          const generateOnce = () => generateDiagramData({
             onDiagnostic: (x) => diagnostics.push({ kind: x.kind, label: x.label, field: x.field, detail: x.detail }),
             onPlan: (p) => { plan = p; },
             diagramType: d.type,
@@ -234,6 +265,17 @@ export async function POST(req: Request) {
             rules,
             promptLabel: d.name,
           });
+          let data!: Awaited<ReturnType<typeof generateOnce>>;
+          for (let attempt = 1; ; attempt++) {
+            try { data = await generateOnce(); break; }
+            catch (err) {
+              if (attempt >= 3 || !isTransient(err)) throw err;
+              diagnostics.length = 0;            // a retry starts clean
+              send({ t: "diagram", index, total, name: d.name, type: d.type,
+                status: "generating", message: `${describeError(err)} — retry ${attempt} of 2` });
+              await pause(attempt * 4000);
+            }
+          }
           // Save the prompt into AI Prompt Maintenance under its diagram type, and
           // link it back on the diagram's data (the editor's "Generated from" link).
           const promptName = `${d.name} — AI prompt`;
@@ -286,7 +328,7 @@ export async function POST(req: Request) {
           failed++;
           send({
             t: "diagram", index, total, name: d.name, type: d.type,
-            status: "error", message: e instanceof Error ? e.message : String(e),
+            status: "error", message: describeError(e),
           });
         }
       }
