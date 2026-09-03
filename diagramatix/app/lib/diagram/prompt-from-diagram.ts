@@ -386,7 +386,7 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
     | { kind: "stops" }                    // it runs out of sequence flow
     | { kind: "seen" };                    // it reaches ground already described
 
-  function walk(seedId: string, indent: number, lastLaneId?: string): WalkEnd {
+  function walk(seedId: string, indent: number, lastLaneId?: string, isException = false): WalkEnd {
     let curId: string | undefined = seedId;
     let lastLane = lastLaneId;
     while (curId) {
@@ -398,7 +398,22 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
       // merge, and when THAT is itself a merge (a nested decision rejoining the
       // outer one) the stop has to propagate, or the outer merge is swallowed
       // by the innermost branch exactly as before.
-      if (isMerge(curId)) return { kind: "merge", mergeId: curId };
+      //
+      // Only a GATEWAY counts as a merge for the MAIN walk, though. A gateway
+      // merge reunites sibling branches, so what follows it belongs to the outer
+      // level; an ordinary task that an EXCEPTION happens to rejoin is still its
+      // own branch's next step. Reading any two-inbound element as a merge put
+      // Task 9 — a step on Path 3 with an exception rejoining it — at the top
+      // level, taking Path 3's whole tail with it, and skipped Task 9's own
+      // edge-mounted event entirely because a merge never reaches describeStep.
+      // A regeneration from that text lost Event 2 and drew Path 3 on the trunk.
+      //
+      // The exception walk still stops at either kind: it must not run on into
+      // the branch it is rejoining.
+      const joins = isMerge(curId);
+      if (joins && (isException || byId.get(curId)?.type === "gateway")) {
+        return { kind: "merge", mergeId: curId };
+      }
       renderedNodes.add(curId);
       const el = byId.get(curId);
       if (!el) break;
@@ -451,7 +466,7 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
           narrativeLines.push(`${inner}- (nothing follows it)`);
           continue;
         }
-        const res = walk(first.targetId, indent + 2, lastLane);
+        const res = walk(first.targetId, indent + 2, lastLane, true);   // an exception walk
         if (res.kind === "merge") {
           narrativeLines.push(`${inner}- End of the **${labelOf(ev)}** path — rejoins the flow at ${describeJoin(res.mergeId)}.`);
         } else if (res.kind === "ended") {

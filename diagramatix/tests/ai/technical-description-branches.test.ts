@@ -168,3 +168,76 @@ describe("an edge-mounted event's exception path is described", () => {
     expect(t3).not.toContain("**Check the file** (subprocess — see steps below)");
   });
 });
+
+describe("an exception rejoining a task does not hijack the branch", () => {
+  /**
+   * Paul, 2026-09-03, "Gateway EIME Test 3 — 2 EMIEs on same path": the
+   * regeneration lost the second edge-mounted event entirely and drew the
+   * branch's tail on the trunk.
+   *
+   * Task 9 has two inbound — its own predecessor, and the exception off Task 8
+   * rejoining. Reading ANY two-inbound element as a merge made it one, so the
+   * description promoted Task 9 and everything after it to the outer level,
+   * and — because a merge never reaches the step renderer — never mentioned
+   * Task 9's OWN edge-mounted event.
+   *
+   * A gateway merge reunites sibling branches, so its tail does belong to the
+   * outer level. An ordinary task that an exception rejoins is still its
+   * branch's next step.
+   */
+  const e: DiagramElement[] = [
+    el("p", "pool", "Co"), el("ln", "lane", "Ops", "p"),
+    el("s", "start-event", "Start", "ln"),
+    el("d", "gateway", "Decision 1?", "ln"),
+    el("t8", "task", "Task 8", "ln"),
+    el("ev3", "intermediate-event", "Event 3", "ln"),
+    el("t17", "task", "Task 17", "ln"),
+    el("t9", "task", "Task 9", "ln"),
+    el("ev2", "intermediate-event", "Event 2", "ln"),
+    el("t16", "task", "Task 16", "ln"),
+    el("xEnd", "end-event", "Error Path End", "ln"),
+    el("t10", "task", "Task 10", "ln"),
+    el("other", "task", "Path 2 step", "ln"),
+    el("m", "gateway", "Merge", "ln"),
+    el("fin", "end-event", "End", "ln"),
+  ];
+  (e.find((x) => x.id === "ev3") as unknown as Record<string, unknown>).boundaryHostId = "t8";
+  (e.find((x) => x.id === "ev2") as unknown as Record<string, unknown>).boundaryHostId = "t9";
+  const cx: Connector[] = [
+    c("s", "d"),
+    c("d", "t8", "Path 3"), c("d", "other", "Path 2"),
+    c("t8", "t9"), c("t9", "t10"), c("t10", "m"),
+    c("ev3", "t17"), c("t17", "t9"),          // the exception rejoins Task 9
+    c("ev2", "t16"), c("t16", "xEnd"),
+    c("other", "m"), c("m", "fin"),
+  ];
+  const txt = buildBpmnPrompt(e, cx);
+  const rows = txt.split("\n");
+
+  it("T3147 — BOTH edge-mounted events are described", () => {
+    expect(txt, "Event 3 missing").toContain("**Event 3** on **Task 8**");
+    expect(txt, "Event 2 missing — the regeneration lost it").toContain("**Event 2** on **Task 9**");
+  });
+
+  it("T3148 — the branch keeps its own tail instead of it moving to the trunk", () => {
+    const branch = rows.findIndex((l) => l.includes("- On **Path 3**"));
+    const branchIndent = rows[branch].match(/^\s*/)![0].length;
+    for (const step of ["Task 9", "Task 10"]) {
+      const i = rows.findIndex((l) => new RegExp(`- ${step}$`).test(l));
+      expect(i, `${step} is missing`).toBeGreaterThan(-1);
+      expect(rows[i].match(/^\s*/)![0].length,
+        `${step} was hoisted out of Path 3: "${rows[i]}"`).toBeGreaterThan(branchIndent);
+    }
+    expect(txt).not.toContain("After **Task 9**, the flow continues");
+  });
+
+  it("T3149 — a GATEWAY merge still moves its tail to the outer level", () => {
+    // The other half: this must not become "never promote anything".
+    expect(txt).toContain(`After gateway "Merge", the flow continues:`);
+    const i = rows.findIndex((l) => /- End$/.test(l) || l.includes("The process ends with **End**"));
+    expect(i).toBeGreaterThan(-1);
+    const branch = rows.findIndex((l) => l.includes("- On **Path 3**"));
+    expect(rows[i].match(/^\s*/)![0].length)
+      .toBeLessThanOrEqual(rows[branch].match(/^\s*/)![0].length);
+  });
+});

@@ -56,8 +56,10 @@ export interface PathAnalysis {
   paths: PathNode[];
   /** elementId → path id. */
   pathOf: Map<string, string>;
-  /** path id → assigned row. */
+  /** path id → assigned row. NOT unique: see the note by the assignment. */
   rowOf: Map<string, number>;
+  /** elementId → the row its path was given. Use THIS to place an element. */
+  rowOfElement: Map<string, number>;
 }
 
 export interface PathInput {
@@ -97,9 +99,11 @@ export function analysePaths(input: PathInput): PathAnalysis {
   const byId = new Map(elements.map((e) => [e.id, e]));
   const out = new Map<string, { sourceId: string; targetId: string; label?: string | null }[]>();
   const inCount = new Map<string, number>();
+  const inEdges = new Map<string, { sourceId: string; targetId: string; label?: string | null }[]>();
   for (const e of edges) {
     const a = out.get(e.sourceId); if (a) a.push(e); else out.set(e.sourceId, [e]);
     inCount.set(e.targetId, (inCount.get(e.targetId) ?? 0) + 1);
+    const b = inEdges.get(e.targetId); if (b) b.push(e); else inEdges.set(e.targetId, [e]);
   }
 
   const paths: PathNode[] = [];
@@ -116,6 +120,7 @@ export function analysePaths(input: PathInput): PathAnalysis {
     const nested: Slot[][] = [];
     const exceptions: { side: "top" | "bottom"; slots: Slot[] }[] = [];
     let cur: string | undefined = startId;
+    let prevId: string | undefined;
     let guard = 0;
 
     while (cur && guard++ < 200) {
@@ -138,9 +143,26 @@ export function analysePaths(input: PathInput): PathAnalysis {
         continue;
       }
 
-      // An ordinary step belongs to this path — unless something else already
-      // feeds it, which makes it shared and nobody's.
-      if ((inCount.get(cur) ?? 0) > 1 && cur !== startId) break;
+      // An ordinary step belongs to this path — unless something else that has
+      // NOT been described yet also feeds it, which makes it shared.
+      //
+      // Counting inbound edges alone is too blunt. An exception path rejoining
+      // its own branch adds an inbound, and the path then abandoned its own
+      // tail: in "Gateway EIME Test 3" the exception off Task 8 rejoined Task 9,
+      // so Path 3 stopped at Task 8 and Task 9, Task 10 and both subprocesses
+      // belonged to no path at all — left at the lane centre, on top of Task 6,
+      // Task 12 and Task 15. The exception is walked FIRST, so its elements are
+      // already visited by the time the branch reaches the join, which is
+      // exactly what distinguishes it from a sibling branch still to come.
+      //
+      // A gateway with several inbound is a merge whatever else is true, and
+      // stopping there is what lets the caller resume at the right level.
+      if (cur !== startId) {
+        const feeders = inEdges.get(cur) ?? [];
+        const isGatewayJoin = byId.get(cur)?.type === "gateway" && feeders.length > 1;
+        const awaited = feeders.some((f) => f.sourceId !== prevId && !visited.has(f.sourceId));
+        if (isGatewayJoin || awaited) break;
+      }
       visited.add(cur);
       node.elementIds.push(cur);
       pathOf.set(cur, node.id);
@@ -166,6 +188,7 @@ export function analysePaths(input: PathInput): PathAnalysis {
       const next: { sourceId: string; targetId: string; label?: string | null }[] = out.get(cur) ?? [];
       if (next.length === 0) { node.endsWithoutMerge = true; break; }
       if (next.length > 1) break;             // an unpaired fork: stop cleanly
+      prevId = cur;
       cur = next[0].targetId;
     }
     return merge(node, nested, exceptions);
@@ -340,7 +363,17 @@ export function analysePaths(input: PathInput): PathAnalysis {
   }
 
   // ── Assign rows top to bottom, then centre the stack on the trunk ────────
+  //
+  // Rows are recorded PER ELEMENT as well as per path id, and the per-element
+  // map is the one a caller should use. Path ids are not unique: every root walk
+  // is called `trunk`, and two independent forks both number their children 1,
+  // 2, 3 — so `rowOf` silently keeps whichever came last. In V23.02 a second
+  // root (an orphan fragment) claimed `trunk` at row 1035, and the real trunk —
+  // the start event and the two tasks before the first gateway — was dragged
+  // from 416 down to it, 400px below where it belonged and near the foot of the
+  // lane. That is the "start events at the bottom" Paul saw across the V23 set.
   const rowOf = new Map<string, number>();
+  const rowOfElement = new Map<string, number>();
   if (slots.length > 0) {
     let y = 0;
     const ys: number[] = [];
@@ -355,9 +388,13 @@ export function analysePaths(input: PathInput): PathAnalysis {
     const shift = trunkRow - (ys[trunkIdx >= 0 ? trunkIdx : 0] ?? 0);
     slots.forEach((s, i) => {
       const row = ys[i] + shift;
-      for (const p of s.paths) { p.row = row; rowOf.set(p.id, row); }
+      for (const p of s.paths) {
+        p.row = row;
+        rowOf.set(p.id, row);
+        for (const elId of p.elementIds) rowOfElement.set(elId, row);
+      }
     });
   }
 
-  return { paths, pathOf, rowOf };
+  return { paths, pathOf, rowOf, rowOfElement };
 }

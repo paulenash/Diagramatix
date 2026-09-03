@@ -3212,9 +3212,14 @@ export function layoutBpmnDiagram(
       });
 
       let moved = false;
-      for (const [elId, pathId] of analysis.pathOf) {
+      for (const [elId] of analysis.pathOf) {
         const el = elMap.get(elId);
-        const row = analysis.rowOf.get(pathId);
+        // Per ELEMENT, not per path id. Path ids are not unique — every root
+        // walk is called "trunk" and independent forks both number their
+        // children 1, 2, 3 — so looking a row up by id returns whichever path
+        // was written last. That is what put the start event at the bottom of
+        // the lane across the V23 diagrams.
+        const row = analysis.rowOfElement.get(elId);
         if (!el || row === undefined) continue;
         if (isGateway(el)) continue;                       // R8.01/R8.24 own gateway Y
         if (el.parentId !== firstDecision.parentId) continue;  // another lane's business
