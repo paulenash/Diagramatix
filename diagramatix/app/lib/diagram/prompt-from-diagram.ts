@@ -4,6 +4,28 @@ import { ARCHI_REL_NAME } from "./archimateConnectorStyle";
 import { laneOf as laneOfShared, poolOf as poolOfShared, isInside as isInsideShared } from "./containment";
 
 /**
+ * A label as ONE line.
+ *
+ * An element's label carries the hard line breaks the canvas wrapped it with,
+ * and `trim()` only removes the outer ones. Left alone they reach the prompt as
+ * real newlines, so a three-line task name becomes three lines of Markdown, two
+ * of which start at column 0 and read as fresh instructions. Paul, 2026-09-04,
+ * reading a real Technical Description:
+ *
+ *     - Retrieve claim file,
+ *     assessment and quantum
+ *     from claims platform (sends ...)
+ *
+ * The regeneration happened to rejoin those correctly, which is luck rather
+ * than design. It also corrupted the IT-system pool NAME — 'Claims Management
+ * Platform' — in the pools list, the systems list, and every message flow that
+ * named it, so the same participant could be read as two.
+ */
+function flat(label: string | undefined): string {
+  return (label ?? "").replace(/\s+/g, " ").trim();
+}
+
+/**
  * Router: picks the per-diagram-type prompt generator. Falls back to the
  * BPMN one for any type we haven't taught a structure to yet.
  */
@@ -50,7 +72,7 @@ const ARCHI_REL_MEANING: Record<ArchimateConnectorType, string> = {
 export function buildArchimatePrompt(elements: DiagramElement[], connectors: Connector[]): string {
   const byId = new Map(elements.map((e) => [e.id, e]));
   const labelOf = (e: DiagramElement | undefined): string =>
-    e ? (e.label?.trim() || "<unnamed>") : "<missing>";
+    e ? (flat(e.label) || "<unnamed>") : "<missing>";
 
   // Real ArchiMate nodes (skip on-canvas notes like the AI-prompt annotation).
   const nodes = elements.filter((e) => e.type === "archimate-shape");
@@ -166,7 +188,7 @@ export function buildArchimatePrompt(elements: DiagramElement[], connectors: Con
 export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connector[]): string {
   const byId = new Map(elements.map((e) => [e.id, e]));
   const labelOf = (e: DiagramElement | undefined): string =>
-    e ? (e.label?.trim() || `<unnamed ${e.type}>`) : "<missing>";
+    e ? (flat(e.label) || `<unnamed ${e.type}>`) : "<missing>";
 
   const pools = elements.filter((e) => e.type === "pool");
   if (pools.length === 0) {
@@ -272,7 +294,19 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
       tags.push(`${d.direction} ${peerKind} "${labelOf(d.peer)}"`);
     }
     const tagStr = tags.length ? ` (${tags.join("; ")})` : "";
-    if (el.type === "task") return `${lbl}${tagStr}`;
+    // The task MARKER, which the round trip used to lose entirely. Without it a
+    // regeneration re-infers the type from the wording, and infers it the same
+    // way every time: anything phrased as touching a system becomes a service
+    // task. Paul, 2026-09-04, diffing a TD round trip of V22.07 — five user
+    // tasks came back as service tasks, and the diff narrated it as an
+    // automation programme. taskType is load-bearing downstream (simulation
+    // resourcing and FTE, the Task Mining automation score, SOP generation),
+    // and every one of those moves in the direction that flatters automation.
+    if (el.type === "task") {
+      const tt = el.taskType;
+      const marker = tt && tt !== "none" ? `${cap(tt)} task` : "Task";
+      return `${marker} "${lbl}"${tagStr}`;
+    }
     if (el.type === "subprocess") return `[Subprocess] ${lbl}${tagStr}`;
     if (el.type === "subprocess-expanded") return `[Expanded Subprocess] ${lbl}${tagStr}`;
     if (el.type === "intermediate-event") return `[Intermediate event] ${lbl}${tagStr}`;
@@ -329,7 +363,16 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
   function describeStep(el: DiagramElement, indent: number): StepResult {
     const pad = "  ".repeat(indent);
     if (el.type === "end-event") {
-      return { line: `${pad}- The process ends with **${labelOf(el)}**.` };
+      // Inside a subprocess it is the SUBPROCESS that ends, not the process.
+      // Read literally, "the process ends with" inside a loop instructed a
+      // regeneration to terminate everything (Paul, 2026-09-04). An unlabelled
+      // one says only that the branch stops, because "<unnamed end-event>" is
+      // not a name a regeneration can reproduce -- it would invent a different
+      // one each time and the round trip could never settle.
+      const inner = descendsFromSubprocess(el);
+      const what = inner ? "The subprocess ends" : "The process ends";
+      const named = flat(el.label);
+      return { line: named ? `${pad}- ${what} with **${named}**.` : `${pad}- ${what} here.` };
     }
     if (el.type === "gateway") {
       const gt = el.gatewayType;
@@ -364,7 +407,8 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
       // Pool-level starts are covered by the Trigger section; don't repeat.
       // Subprocess-internal starts: still useful to anchor the inner flow.
       if (!descendsFromSubprocess(el)) return {};
-      return { line: `${pad}- (subprocess starts: ${labelOf(el)})` };
+      const named = flat(el.label);
+      return { line: named ? `${pad}- (subprocess starts: ${named})` : `${pad}- (the subprocess starts here)` };
     }
     return { line: `${pad}- ${labelOf(el)}` };
   }
@@ -587,16 +631,30 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
         refsByData.set(t.peer.id, arr);
       }
     }
+    // ONE entry per name. A data artifact is deliberately REPEATED beside a
+    // remote consumer so the diagram stays readable, and listing each copy
+    // separately told a regeneration to create two artifacts with one name --
+    // or to merge them, unpredictably. Paul, 2026-09-04: "Claim File" appeared
+    // twice in V22.07's Technical Description. The copies are one thing, so they
+    // are described as one thing with all of its readers and writers.
+    const seen = new Map<string, { kind: string; refs: Array<{ task: DiagramElement; direction: DataTouch["direction"] }> }>();
     for (const de of dataElements) {
       const kind = de.type === "data-store" ? "data store" : "data object";
-      sectionLines.push(`- ${labelOf(de)} (${kind})`);
-      const refs = refsByData.get(de.id) ?? [];
-      if (refs.length === 0) {
+      const key = `${kind}|${labelOf(de)}`;
+      const entry = seen.get(key) ?? { kind, refs: [] };
+      entry.refs.push(...(refsByData.get(de.id) ?? []));
+      seen.set(key, entry);
+    }
+    for (const [key, entry] of seen) {
+      const name = key.slice(key.indexOf("|") + 1);
+      sectionLines.push(`- ${name} (${entry.kind})`);
+      // De-duplicated again per task+direction: two copies read by the same task
+      // is one fact stated twice.
+      const lines = new Set(entry.refs.map((r) => `  - ${cap(r.direction)} by ${labelOf(r.task)}`));
+      if (lines.size === 0) {
         sectionLines.push(`  - (not referenced by any task)`);
       } else {
-        for (const r of refs) {
-          sectionLines.push(`  - ${cap(r.direction)} by ${labelOf(r.task)}`);
-        }
+        for (const l of lines) sectionLines.push(l);
       }
     }
   }
@@ -645,7 +703,7 @@ export function buildContextPrompt(
 ): string {
   const byId = new Map(elements.map((e) => [e.id, e]));
   const labelOf = (e: DiagramElement | undefined): string =>
-    e ? (e.label?.trim() || `<unnamed ${e.type}>`) : "<missing>";
+    e ? (flat(e.label) || `<unnamed ${e.type}>`) : "<missing>";
 
   const processes = elements
     .filter((e) => e.type === "process-system")

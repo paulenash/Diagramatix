@@ -144,7 +144,7 @@ describe("an edge-mounted event's exception path is described", () => {
 
   it("T3139 — the exception is nested under its host, not spliced into the main flow", () => {
     const lines2 = text2.split("\n");
-    const hostLine = lines2.findIndex((l) => /- Task 5$/.test(l));
+    const hostLine = lines2.findIndex((l) => /- Task "Task 5"$/.test(l));
     const evLine = lines2.findIndex((l) => l.includes("Edge-mounted"));
     expect(evLine).toBeGreaterThan(hostLine);
     const indent = (i: number) => lines2[i].match(/^\s*/)![0].length;
@@ -223,7 +223,7 @@ describe("an exception rejoining a task does not hijack the branch", () => {
     const branch = rows.findIndex((l) => l.includes("- On **Path 3**"));
     const branchIndent = rows[branch].match(/^\s*/)![0].length;
     for (const step of ["Task 9", "Task 10"]) {
-      const i = rows.findIndex((l) => new RegExp(`- ${step}$`).test(l));
+      const i = rows.findIndex((l) => new RegExp(`- (?:[A-Za-z]+ )?[Tt]ask "${step}"$`).test(l));
       expect(i, `${step} is missing`).toBeGreaterThan(-1);
       expect(rows[i].match(/^\s*/)![0].length,
         `${step} was hoisted out of Path 3: "${rows[i]}"`).toBeGreaterThan(branchIndent);
