@@ -5843,6 +5843,23 @@ export function layoutBpmnDiagram(
           const obBox = { x: ob.x, y: ob.y, w: ob.width, h: ob.height };
           if (clash(b, obBox) || clash(shape, obBox)) return false;
         }
+        // ...and clear of every other element's LABEL, not just its body.
+        //
+        // Two data artifacts can sit with their boxes comfortably apart and
+        // their NAMES written on top of one another — a data object's label
+        // hangs below it, so two artifacts on the same row collide in text
+        // while never touching as shapes. That is six of the ten defects left
+        // on the worklist: "Advance Shipping Notice (ASN)" over "Inbound
+        // Delivery Record", "Tax Invoice / Exemption Certificate" over "Tax
+        // Code Table", "Preliminary Cost Estimate" over "Risk Register".
+        //
+        // Read from the LIVE element, so an artifact already lifted by this
+        // same pass is avoided at its new position rather than its old one.
+        for (const ob of elements) {
+          if (ob.id === art.id) continue;
+          const ol = externalLabelBox(ob);
+          if (ol && clash(b, { x: ol.x, y: ol.y, w: ol.w, h: ol.h })) return false;
+        }
         return true;
       };
       if (clearAt(0)) continue;

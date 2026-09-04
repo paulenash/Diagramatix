@@ -9,35 +9,15 @@ worse; this says what the defects ARE so one can be picked up and finished.
 A diagram leaves this list when its count reaches zero — at which point its
 entry in `KNOWN` (tests/bpmn/layout-corpus.test.ts) is deleted.
 
-**7 diagram(s) with 10 defect(s)**, out of 26 in the corpus.
+**2 diagram(s) with 5 defect(s)**, out of 26 in the corpus.
 
 ## V04.01 V04.01 Workforce Planning  `V04.01.plan.json` — 2
 
 - LABEL/BODY: label of "Headcount request rejected — no va" over "Budget Approval Record"
 - LABEL/LABEL: "Budget Approval Record" and "Headcount request rejected — no va"
 
-## V14.01 V14.01 Schedule Inbound Delivery  `V14.01.plan.json` — 1
-
-- LABEL/LABEL: "Advance Shipping Notice (ASN)" and "Inbound Delivery Record"
-
-## V15.01 V15.01 Detect Fault or Condition Exception  `V15.01.plan.json` — 1
-
-- LABEL/LABEL: "Confirmed Fault Description" and "False alarm closed — no further ac"
-
-## V19.01 V19.01 Raise Access Request  `V19.01.plan.json` — 1
-
-- LABEL/LABEL: "Identity Evidence Package" and "Acceptable-Use Acknowledgement"
-
 ## V22.01 V22.01 Receive Notification  `V22.01.plan.json` — 3
 
 - shared attachment point pClaimant|bottom|0.500 — connectors conn-pClaimant-pCustomerPortal, conn-tSendAck-pClaimant
 - BODY/BODY: "Notification complete?" overlaps "Issue holding correspondence and e"
 - LABEL/LABEL: connector "Yes — all required details present" and label of "Notification complete?"
-
-## V24.01 V24.01 Capture Transactions with Tax Attributes  `V24.01.plan.json` — 1
-
-- LABEL/LABEL: "Tax Invoice / Exemption Certificat" and "Tax Code Table"
-
-## V26.01 V26.01 Develop Concept & Business Case  `V26.01.plan.json` — 1
-
-- LABEL/LABEL: "Preliminary Cost Estimate" and "Risk Register"
