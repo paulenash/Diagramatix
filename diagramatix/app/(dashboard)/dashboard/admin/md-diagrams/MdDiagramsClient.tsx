@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { runMessageMatchesRow, type RunMessageLike } from "@/app/lib/valueChain/runRowMatch";
 
 type DiagKind = "value-chain" | "context" | "process-context" | "archimate" | "bpmn";
 interface ChainDiagram { name: string; type: DiagKind }
@@ -338,8 +339,32 @@ export function MdDiagramsClient() {
     if (t === "project") {
       setProjectId((msg.projectId as string) ?? null);
     } else if (t === "diagram") {
-      const index = msg.index as number;
-      setRows((prev) => prev.map((r) => r.index === index ? {
+      /**
+       * Match on IDENTITY, not position.
+       *
+       * The row list and the run are built by two different code paths, and they
+       * order a chain's diagrams differently. The library GET sorts
+       * `[type asc, processCode asc]` — archimate, bpmn, context, process-context,
+       * value-chain. The run route puts the chain-level prompts first in a
+       * hand-written order and the BPMN ones last. Filtering both by the same
+       * picked keys preserves EACH ONE'S OWN order, so index N on the server and
+       * row N on the screen are different diagrams.
+       *
+       * Every count and every ⚠ was therefore attached to the wrong row. Paul,
+       * 2026-09-05: "V22.01 Receive Notification ✗ 11el / 0conn — no flow" on a
+       * diagram that had generated perfectly well — 11el/0conn being the VALUE
+       * CHAIN's numbers. Earlier, "#13 Process Context ✓ 37el / 44conn", which is
+       * a BPMN diagram's size, not a context diagram's.
+       *
+       * He suspected exactly this the first time he saw it and I talked him out
+       * of it, having checked that both sides filter the same list by the same
+       * keys — and missed that they build that list separately.
+       *
+       * The server already sends `name` and `type` on every message, so the fix
+       * is to use them. Index remains the fallback for a message that somehow
+       * carries no name.
+       */
+      setRows((prev) => prev.map((r) => runMessageMatchesRow(r, msg as RunMessageLike) ? {
         ...r,
         status: (msg.status as RowStatus) ?? r.status,
         message: msg.message as string | undefined,

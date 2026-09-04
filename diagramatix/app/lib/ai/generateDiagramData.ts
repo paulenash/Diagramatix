@@ -84,7 +84,17 @@ export async function generateDiagramData(input: GenerateDiagramInput): Promise<
 
   if (diagramType === "bpmn") {
     const res = await planBpmn({ apiKey, prompt, rules, model, attachment });
-    if (!res.ok) throw new Error(res.error || "BPMN plan failed");
+    if (!res.ok) {
+      // Carry the STATUS onto the thrown error. `isTransientAiError` reads
+      // `.status` first and only falls back to sniffing the message, so a plain
+      // `new Error(text)` threw away the one field that says "worth another go"
+      // — and the batch runner's three retries (2735304a) never fired for any
+      // plan failure, however transient. A truncated plan is exactly the case
+      // that usually succeeds on the next attempt.
+      const err = new Error(res.error || "BPMN plan failed") as Error & { status?: number };
+      err.status = res.status ?? 500;
+      throw err;
+    }
     // Belt and braces on the redundant-gateway prune.
     //
     // planBpmn already runs it inside normaliseAiPlan, and it demonstrably

@@ -683,6 +683,43 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
     return { ok: false, status: 500, error: "The AI response had no usable elements — please try again." };
   }
 
+  /**
+   * ELEMENTS WITHOUT FLOW IS NOT "PARTIAL BUT USABLE".
+   *
+   * The coercion above exists so a response cut off inside `connections` still
+   * renders what did arrive. That is right when SOME connections survived. It is
+   * wrong when NONE did: a BPMN diagram with a dozen elements and no sequence
+   * flow is not a partial process, it is a pile of boxes, and it was being
+   * returned as a success. Paul, 2026-09-05, from a prod run:
+   *
+   *     V22.01 Receive Notification   ✗ 11el / 0conn — no flow
+   *
+   * `connections` is the LAST array in the response, so it is the first thing a
+   * truncation loses — which is why this shape in particular means "cut off"
+   * rather than "the model had nothing to say".
+   *
+   * Refusing lets the batch runner RETRY it (up to three goes, 2735304a), which
+   * is the right answer for a truncation: it is not deterministic, and the next
+   * attempt usually completes. Salvaging instead spent the retry budget on
+   * nothing and saved the wreckage.
+   *
+   * Same principle Paul set for prompts: no silent truncations.
+   */
+  const FLOW_NODE = new Set([
+    "task", "subprocess", "subprocess-expanded", "start-event", "end-event",
+    "intermediate-event", "gateway",
+  ]);
+  const flowNodes = parsed.elements.filter((e) => FLOW_NODE.has(String(e.type))).length;
+  if (parsed.connections.length === 0 && flowNodes > 1) {
+    const why = (message as { stop_reason?: string }).stop_reason === "max_tokens"
+      ? "the model ran out of room mid-plan"
+      : "the response was cut off before any flow arrived";
+    return {
+      ok: false, status: 500,
+      error: `The AI returned ${flowNodes} elements and no sequence flow — ${why}. Nothing was saved; try again.`,
+    };
+  }
+
   normaliseAiPlan(parsed);
   return { ok: true, plan: parsed, model };
 }
