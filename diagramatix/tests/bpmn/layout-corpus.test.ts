@@ -35,26 +35,41 @@ const files = fs.existsSync(DIR) ? fs.readdirSync(DIR).filter((f) => f.endsWith(
  *        BRANCH label off the horizontal run it names
  *    17  after R5.12 also treats a label ON another label as a defect in its
  *        own right, not merely something to avoid when moving for another reason
- *    18  RAISED, deliberately and with Paul's decision on 2026-09-04 — the only
- *        time this number has gone up. Running the path stack once per CONTAINER
- *        instead of once for the first decision put V04.01's branches on their
- *        correct rows, which shifted a connector label onto the "Budget Approval
- *        Record" data object. R5.12 tried to move it and found no candidate that
- *        cleared every body and every other label, so it stayed.
  *
- *        The trade, stated plainly so a later reader can judge it: ONE cosmetic
- *        label overlap in ONE fixture, against a structural fix that gives every
- *        diagram with a decision outside the first lane the rows it was already
- *        computing and then discarding. V22.10 was drawing an exception path on
- *        top of a sibling branch because of it.
+ * A SINGLE TOTAL WAS THE WRONG SHAPE, and 2026-09-04 showed why. A layout fix
+ * that put one lane's branches on their correct rows nudged a label onto a data
+ * object in an unrelated fixture, and the only thing the check could say was
+ * "17 became 18". Paul, reasonably: "What is this number? Should we even be
+ * doing this at all? Is it connected to V04.01?" — and it largely wasn't. He
+ * had been asked to adjudicate a whole-corpus total over a diagram he had never
+ * looked at.
  *
- *        THIS IS A DEBT, not a new baseline. The fix is to move the DATA OBJECT
- *        clear (Paul's rule: the artifact gives way, not the label), which means
- *        re-routing its associations — the change that disconnected "Escalation
- *        Summary" once already, so it is being done carefully rather than
- *        quickly. Put this back to 17 when it lands.
+ * Three faults in a total. It cannot say whether any ONE diagram is usable,
+ * which is the actual requirement ("a PDF a third party can read" is a property
+ * of a diagram, not of a corpus). It weights two shapes drawn on top of each
+ * other the same as two labels touching. And it forces unrelated trades: a
+ * correct fix here blocked by a stray label there.
+ *
+ * So it is a PER-DIAGRAM WORKLIST now. Paul, 2026-09-04: "count per diagram, and
+ * then keep track of the diagrams with the issue. I would want to fix them all!
+ * one by one if necessary." Every entry below is a named job. A diagram that
+ * gets worse fails and is named; one that gets better ALSO fails, so the number
+ * is lowered and the list actually shrinks rather than quietly becoming headroom
+ * for the next regression.
  */
-const BUDGET = 18;
+const KNOWN: Record<string, number> = {
+  "V02.01.plan.json": 1,
+  "V04.01.plan.json": 2,
+  "V14.01.plan.json": 1,
+  "V15.01.plan.json": 1,
+  "V16.01.plan.json": 3,
+  "V19.01.plan.json": 1,
+  "V20.01.plan.json": 1,
+  "V22.01.plan.json": 3,
+  "V23.01.plan.json": 1,
+  "V24.01.plan.json": 1,
+  "V26.01.plan.json": 3,
+};
 
 describe("layout corpus — generated diagrams stay readable", () => {
   it("T3152 — the corpus is present and every plan still lays out", () => {
@@ -67,21 +82,48 @@ describe("layout corpus — generated diagrams stay readable", () => {
     }
   });
 
-  it("T3153 — total readability violations do not exceed the budget", () => {
-    let total = 0;
-    const worst: string[] = [];
+  it("T3153 — no diagram is worse than its recorded count", () => {
+    const counts = new Map<string, number>();
     for (const f of files) {
       const j = JSON.parse(fs.readFileSync(path.join(DIR, f), "utf8"));
       const plan = j.diagrams?.[0]?.data?.aiGeneration?.plan ?? j.plan;
       const r = layoutBpmnDiagram(plan.elements, plan.connections);
       const data = { elements: r.elements, connectors: r.connectors } as DiagramData;
-      const vs = [...findLayoutViolations(data), ...findReadabilityViolations(data)];
-      total += vs.length;
-      if (vs.length) worst.push(`${f}: ${vs.length}`);
+      counts.set(f, [...findLayoutViolations(data), ...findReadabilityViolations(data)].length);
     }
-    expect(total,
-      `readability regressed — was ${BUDGET}, now ${total}. Worst: ${worst.slice(0, 6).join(", ")}. `
-      + `Lower BUDGET when you fix some; never raise it.`).toBeLessThanOrEqual(BUDGET);
+
+    // A diagram that got WORSE, named. This is the regression case, and naming
+    // the file is the whole point — a total could only ever say "something,
+    // somewhere".
+    const worse: string[] = [];
+    // A diagram that got BETTER also fails, so the list stays honest and shrinks.
+    // Left un-checked, an entry silently becomes headroom for the next
+    // regression: the count says 3, the diagram is at 1, and two defects can
+    // reappear unnoticed.
+    const better: string[] = [];
+
+    for (const [f, n] of [...counts].sort()) {
+      const expected = KNOWN[f] ?? 0;
+      if (n > expected) worse.push(`${f}: ${expected} → ${n}`);
+      else if (n < expected) better.push(`${f}: ${expected} → ${n}`);
+    }
+
+    expect(worse, worse.length
+      ? `readability REGRESSED in: ${worse.join(", ")}. Fix it, or record the new count in KNOWN with a reason.`
+      : "").toEqual([]);
+
+    expect(better, better.length
+      ? `readability IMPROVED in: ${better.join(", ")} — lower these entries in KNOWN `
+      + `(delete the entry when it reaches 0). Well done.`
+      : "").toEqual([]);
+  });
+
+  it("T3227 — the worklist is accurate: every named diagram still has defects", () => {
+    // A stale entry for a diagram that is now clean is worse than no entry: it
+    // reserves headroom nobody is using and pads the apparent size of the job.
+    const stale = Object.keys(KNOWN).filter((f) => !files.includes(f));
+    expect(stale, `KNOWN names files not in the corpus: ${stale.join(", ")}`).toEqual([]);
+    for (const n of Object.values(KNOWN)) expect(n).toBeGreaterThan(0);
   });
 });
 
