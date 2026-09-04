@@ -74,7 +74,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 
 | | Item | Built | Paul |
 |---|---|---|---|
-| **Z** | The batch runner's connector counts looked wrong — *"is it reporting one diagram off?"* | `107db973` — **Paul was right**; every count and ⚠ was on the wrong row (14 of 14 positions disagreed) | |
+| **Z** | The batch runner's connector counts looked wrong — *"is it reporting one diagram off?"* | `107db973` — **Paul was right**; every count and ⚠ was on the wrong row (14 of 14 positions disagreed) | **PASS** |
 | **AA** | Update the XML schema and Version History | `4bad2308` — XSD already current at 46; PRODUCT_VERSION 2.4 → 2.5 | |
 | **AB** | Do Process Mining diagrams benefit from these refinements? | ANSWERED — **layout yes** (same `layoutBpmnDiagram`), **master template no** (mining builds its own prompt via `DiagramRules`) | |
 | **AC** | The silent fallback model should be Kimi K3, not Haiku 4.5 | `4691c5c6` | |
@@ -84,7 +84,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 
 ## Where it stands
 
-**Passed by Paul:** A, B, C, D, E, F, G, I, AD.
+**Passed by Paul:** A, B, C, D, E, F, G, I, Z, AD.
 
 **Open by Paul:** **H** — a single pass must produce a readable diagram. Built and
 measured (107 → 5 corpus defects) but not passed, and rightly: the measure is a
@@ -94,7 +94,7 @@ corpus number, the bar is a diagram Paul would send someone.
 crossing-minimisation pass, one pass with two operations: move a gateway
 attachment point, or swap a pair of endpoints or data objects.
 
-**Untested:** J, K, L, M, N, O, P, W, X, Y, Z, AA, AC. Most landed after Paul's
+**Untested:** J, K, L, M, N, O, P, X, Y, AA, AC. **W is under investigation** — three fixes, still failing; waiting on a DevTools reading of what actually receives the click. Most landed after Paul's
 last regeneration, so a fresh run is what will move them.
 
 ## How to measure
