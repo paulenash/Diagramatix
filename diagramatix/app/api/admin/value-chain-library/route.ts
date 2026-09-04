@@ -10,6 +10,7 @@ import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { checkPromptBranches } from "@/app/lib/valueChain/checkPromptBranches";
 import { checkPromptShapes } from "@/app/lib/valueChain/checkPromptShapes";
+import { looksTruncated } from "@/app/lib/valueChain/checkPromptTruncated";
 import {
   type ImportedChain, parseLibraryFromMd, renderChainMd, renderLibraryMd, renumber,
 } from "@/app/lib/valueChain/library";
@@ -98,6 +99,10 @@ export async function GET(req: Request) {
         // produce a faithful drawing of something invalid, so they have to be
         // caught in the prompt rather than in the diagram.
         undrawableShapes: checkPromptShapes(p.prompt).length,
+        // Why it looks unfinished, or null. A truncated prompt passed every
+        // other check — a dangling `- branch "` is not a malformed branch, it
+        // is no branch at all (Paul, 2026-09-04).
+        truncated: looksTruncated(p.prompt),
         published: p.publishedPrompt !== null && p.publishedPrompt === p.prompt,
       })),
     })),

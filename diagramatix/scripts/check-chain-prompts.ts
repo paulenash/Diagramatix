@@ -20,6 +20,7 @@
 import * as fs from "fs";
 import { checkPromptShapes } from "@/app/lib/valueChain/checkPromptShapes";
 import { checkPromptBranches } from "@/app/lib/valueChain/checkPromptBranches";
+import { looksTruncated } from "@/app/lib/valueChain/checkPromptTruncated";
 
 // `.env` by hand — dotenv is not a dependency, and adding one for a diagnostic
 // script would be the wrong trade.
@@ -47,16 +48,19 @@ async function main() {
       at: p.generatedAt ? new Date(p.generatedAt).toISOString().slice(0, 16).replace("T", " ") : "—",
       shapes: checkPromptShapes(p.prompt),
       branches: checkPromptBranches(p.prompt),
+      cut: looksTruncated(p.prompt),
     }));
-    const bad = found.reduce((n, f) => n + f.shapes.length + f.branches.length, 0);
+    const bad = found.reduce((n, f) => n + f.shapes.length + f.branches.length + (f.cut ? 1 : 0), 0);
     grand += bad;
 
     if (only) {
       console.log(`${chain.code} — ${chain.title}   ${bpmn.length} BPMN prompts`);
       for (const f of found) {
-        const flag = f.shapes.length + f.branches.length === 0
+        const flag = f.cut ? "TRUNCATED"
+          : f.shapes.length + f.branches.length === 0
           ? "clean" : `${f.shapes.length} undrawable, ${f.branches.length} open`;
         console.log(`  ${f.code.padEnd(7)} ${String(f.chars).padStart(6)} ch  ${f.at}  ${flag}`);
+        if (f.cut) console.log(`        ! truncated: ${f.cut}`);
         for (const s of f.shapes) console.log(`        ! ${s.kind}: ${s.detail.slice(0, 100)}`);
         for (const b of f.branches) console.log(`        ! branch "${b.condition}" -> ${b.body.slice(0, 70) || "(nothing)"}`);
       }

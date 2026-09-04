@@ -21,6 +21,7 @@
  */
 import { makeAiClient } from "@/app/lib/ai/anthropicClient";
 import { parseValueChainMd } from "./parseValueChainMd";
+import { looksTruncated } from "./checkPromptTruncated";
 import {
   type MdPromptType, MD_PROMPT_LABEL, renderPromptBlock,
 } from "./promptTemplates";
@@ -148,14 +149,29 @@ export async function generateMdPrompt(args: {
   try {
     const message = await client.messages.create({
       model,
-      max_tokens: 4096,
+      // 4096 was truncating real prompts: 7 of 35 calls in one V22 run stopped
+      // on max_tokens, and 6 of its 10 prompts were saved half-written (Paul,
+      // 2026-09-04). Headroom is cheap; a silently half-described process is not.
+      max_tokens: 8192,
       system: briefing,
       messages: [{ role: "user", content: buildUserMessage({ chainCode, chainTitle, narrative, subs, target }) }],
     });
     const textBlock = message.content.find((b) => b.type === "text");
     if (!textBlock || textBlock.type !== "text") return { ok: false, error: "No response from the model" };
+    // A response that ran out of room is HALF A PROMPT, and half a prompt reads
+    // as a whole one: V22.07 was saved and published ending on `- branch "` and
+    // every existing check passed it. Refuse it here, where the stop reason is
+    // still known, rather than discover it as a diagram missing its decline path.
+    if ((message as { stop_reason?: string }).stop_reason === "max_tokens") {
+      return { ok: false, error: "The model ran out of room and stopped mid-prompt — regenerate it (the partial text was NOT saved)" };
+    }
     const prompt = stripWrapper(textBlock.text);
     if (!prompt) return { ok: false, error: "The model returned an empty prompt" };
+    // Belt and braces: truncation also arrives without a stop reason to consult
+    // — a dropped stream, a proxy cutting the response — and the shape of the
+    // text gives it away either way.
+    const cut = looksTruncated(prompt);
+    if (cut) return { ok: false, error: `The prompt came back unfinished: ${cut}. It was NOT saved — regenerate it.` };
     const block = renderPromptBlock(target.type, prompt);
     const rt = roundTrip(chainCode, chainTitle, target.type, block);
     return { ok: true, prompt, block, roundTrips: rt.ok, parsedName: rt.name };

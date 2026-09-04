@@ -35,6 +35,7 @@ interface Prompt {
   unterminatedBranches: number;
   /** Instructions BPMN cannot carry out. 0 is the healthy value. */
   undrawableShapes: number;
+  truncated: string | null;
 }
 interface Chain {
   id: string; code: string; title: string; groupName: string; hidden: boolean; sortOrder: number;
@@ -491,6 +492,14 @@ function PromptRow({ label, prompt, open, setOpen, onRegenerate, busy }: {
           <>
             <span className="text-[10px] tabular-nums text-gray-400">{prompt.chars.toLocaleString()} ch</span>
             {!prompt.roundTripsOk && <span className="text-[10px] text-amber-700">does not parse</span>}
+            {prompt.truncated && (
+              <span
+                className="text-[10px] font-semibold text-red-700"
+                title={`This prompt stops mid-sentence — ${prompt.truncated}. It describes only part of the process, and a diagram generated from it will be missing the rest. Regenerate it.`}
+              >
+                truncated
+              </span>
+            )}
             {prompt.undrawableShapes > 0 && (
               <span
                 className="text-[10px] text-red-700"
