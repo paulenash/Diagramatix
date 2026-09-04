@@ -70,3 +70,59 @@ describe("the e2e server reports why it failed", () => {
     expect(SERVER).toMatch(/process\.exit\(r\.status \?\? 1\)/);
   });
 });
+
+/**
+ * The cost of `npx --yes` in a loop.
+ *
+ * The timings above were added to find out WHY the e2e server kept timing out,
+ * and answered it on their first CI run: the schema push took 1.7s while each
+ * `npx --yes tsx@4` took 134s, 213s and 142s. `--yes` re-resolves and
+ * re-downloads the tool every single call, so the server spent its whole budget
+ * fetching tsx four times and never reached `next build`.
+ *
+ * The deploy workflow had the identical bug in 32 places, where it turned a
+ * 3-minute seeding step into 67 minutes and expired the Azure token mid-deploy
+ * (680fc8fb). It is an easy line to write and its cost is invisible until the
+ * registry has a slow day, which is exactly the kind of thing a tripwire is for.
+ */
+describe("CI does not re-download its tools", () => {
+  const WORKFLOWS = path.join(ROOT, "..", ".github", "workflows");
+
+  /**
+   * Comment lines are removed before matching. The files that were FIXED explain
+   * the bug in prose, quoting the very string being searched for — so a naive
+   * scan fails on the fix's own documentation, and the tempting way out is to
+   * delete the explanation. Read the code, not the commentary.
+   */
+  const code = (text: string, comment: RegExp) =>
+    text.split(/\r?\n/).filter((l) => !comment.test(l)).join("\n");
+
+  const JS_COMMENT = /^\s*(\/\/|\*|\/\*)/;
+  const YAML_COMMENT = /^\s*#/;
+
+  it("T3215 the e2e server fetches tsx once, not per script", () => {
+    expect(code(SERVER, JS_COMMENT), "use the tsx from the `installing tsx once` step")
+      .not.toMatch(/npx\s+--yes\s+tsx/);
+    expect(SERVER).toMatch(/npm install --global tsx@4/);
+  });
+
+  it("T3216 no workflow invokes `npx --yes tsx` per script either", () => {
+    // Guards the fix that unblocked deployment, and any workflow added later.
+    const offenders: string[] = [];
+    for (const f of fs.readdirSync(WORKFLOWS).filter((n) => n.endsWith(".yml"))) {
+      const body = code(fs.readFileSync(path.join(WORKFLOWS, f), "utf8"), YAML_COMMENT);
+      const hits = (body.match(/npx\s+--yes\s+tsx/g) ?? []).length;
+      if (hits) offenders.push(`${f} (${hits})`);
+    }
+    expect(offenders, "install tsx once in the job, then call `tsx`").toEqual([]);
+  });
+
+  it("T3217 the scan can still fail — a real invocation is caught", () => {
+    // Without this, the two above would also pass on a file containing no tsx at
+    // all, which is how a tripwire quietly stops guarding anything.
+    expect(code('step("seed", "npx --yes tsx@4 scripts/x.ts");', JS_COMMENT))
+      .toMatch(/npx\s+--yes\s+tsx/);
+    expect(code("          npx --yes tsx@4 scripts/x.ts", YAML_COMMENT))
+      .toMatch(/npx\s+--yes\s+tsx/);
+  });
+});

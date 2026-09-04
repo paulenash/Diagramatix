@@ -39,19 +39,37 @@ function step(label, command) {
   console.log(`[e2e-server] ${label} — done in ${took}`);
 }
 
+// Fetch tsx ONCE.
+//
+// Every seed below used `npx --yes tsx@4`, and `--yes` re-resolves and
+// re-downloads tsx from the registry on each call. The per-step timings added
+// alongside this made the cost visible the first time they ran in CI:
+//
+//     applying schema to diagramatix_test — done in 1.7s
+//     seeding subscription levels        — done in 134.2s
+//     seeding mining example catalog     — done in 213.4s
+//     seeding e2e superadmin             — done in 142.3s
+//
+// The database was answering in under two seconds while each tsx fetch cost
+// two to three and a half MINUTES, and the server never reached `next build`
+// before Playwright's budget expired — three CI runs in a row, reported only as
+// "Timed out waiting from config.webServer". The deploy workflow had the same
+// bug in 32 places (680fc8fb).
+step("installing tsx once", "npm install --global tsx@4");
+
 // Schema + reference data the app needs but the unit suite truncates away
 // (it leaves diagramatix_test without the SubscriptionLevel catalog that
 // registerUser's `subscriptionLevelId: "free"` references).
 step("applying schema to diagramatix_test", `npx prisma db push --accept-data-loss --url "${env.DATABASE_URL}"`);
-step("seeding subscription levels", "npx --yes tsx@4 scripts/seed-subscriptions.ts");
+step("seeding subscription levels", "tsx scripts/seed-subscriptions.ts");
 // The DiagramatixMINER Examples gallery needs its catalog, like subscriptions.
-step("seeding mining example catalog", "npx --yes tsx@4 scripts/seed-mining-examples.ts");
+step("seeding mining example catalog", "tsx scripts/seed-mining-examples.ts");
 // A known SuperAdmin account so the admin-surface specs can sign in (test DB only).
-step("seeding e2e superadmin (test DB only)", "npx --yes tsx@4 scripts/e2e-seed-superadmin.ts");
+step("seeding e2e superadmin (test DB only)", "tsx scripts/e2e-seed-superadmin.ts");
 
 // Lift the Free-tier caps in the TEST DB ONLY so the e2e account (a Free user)
 // can create ArchiMate diagrams + many diagrams + AI attempts. Never touches prod.
-step("lifting Free-tier caps (test DB only)", "npx --yes tsx@4 scripts/e2e-lift-caps.ts");
+step("lifting Free-tier caps (test DB only)", "tsx scripts/e2e-lift-caps.ts");
 
 step("building (non-standalone)", "npx next build");
 
