@@ -35,8 +35,26 @@ const files = fs.existsSync(DIR) ? fs.readdirSync(DIR).filter((f) => f.endsWith(
  *        BRANCH label off the horizontal run it names
  *    17  after R5.12 also treats a label ON another label as a defect in its
  *        own right, not merely something to avoid when moving for another reason
+ *    18  RAISED, deliberately and with Paul's decision on 2026-09-04 — the only
+ *        time this number has gone up. Running the path stack once per CONTAINER
+ *        instead of once for the first decision put V04.01's branches on their
+ *        correct rows, which shifted a connector label onto the "Budget Approval
+ *        Record" data object. R5.12 tried to move it and found no candidate that
+ *        cleared every body and every other label, so it stayed.
+ *
+ *        The trade, stated plainly so a later reader can judge it: ONE cosmetic
+ *        label overlap in ONE fixture, against a structural fix that gives every
+ *        diagram with a decision outside the first lane the rows it was already
+ *        computing and then discarding. V22.10 was drawing an exception path on
+ *        top of a sibling branch because of it.
+ *
+ *        THIS IS A DEBT, not a new baseline. The fix is to move the DATA OBJECT
+ *        clear (Paul's rule: the artifact gives way, not the label), which means
+ *        re-routing its associations — the change that disconnected "Escalation
+ *        Summary" once already, so it is being done carefully rather than
+ *        quickly. Put this back to 17 when it lands.
  */
-const BUDGET = 17;
+const BUDGET = 18;
 
 describe("layout corpus — generated diagrams stay readable", () => {
   it("T3152 — the corpus is present and every plan still lays out", () => {

@@ -125,7 +125,7 @@ const segHitsBox = (s: Seg, r: Box, tol = 0): boolean =>
 export function findReadabilityViolations(data: DiagramData): string[] {
   const v: string[] = [];
   const els = data.elements.filter((e) => e.type !== "pool" && e.type !== "lane" && e.type !== "sublane");
-  const L = (e: DiagramElement) => (e.label ?? "").replace(/s+/g, " ").slice(0, 34) || e.type;
+  const L = (e: DiagramElement) => (e.label ?? "").replace(/\s+/g, " ").slice(0, 34) || e.type;
   const isAncestor = (a: DiagramElement, b: DiagramElement) => {
     let cur: DiagramElement | undefined = b; let g = 0;
     while (cur?.parentId && g++ < 12) { if (cur.parentId === a.id) return true; cur = data.elements.find((x) => x.id === cur!.parentId); }

@@ -71,7 +71,7 @@ const overlap = (a: any, b: any) =>
   Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 1 &&
   Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 1;
 const boxOf = (e: any) => ({ x: e.x, y: e.y, w: e.width, h: e.height });
-const L = (e: any) => String(e?.label ?? e?.type ?? "").replace(/s+/g, " ").slice(0, 34);
+const L = (e: any) => String(e?.label ?? e?.type ?? "").replace(/\s+/g, " ").slice(0, 34);
 
 describe("V25.05 — an edge-mounted event's exit target (R7.07)", () => {
   it("T3025 — the target is placed to the RIGHT of the event and clear of the mounted edge", () => {

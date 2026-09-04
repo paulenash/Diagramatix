@@ -3303,8 +3303,31 @@ export function layoutBpmnDiagram(
 
     // The trunk keeps the row the flow already has, so this re-arranges branches
     // without dragging the main line somewhere new.
-    const firstDecision = elements.find(e => isDecisionGateway(e));
-    if (firstDecision) {
+    //
+    // ONCE PER CONTAINER THAT HOLDS A DECISION, not once for the whole diagram.
+    // The comment above already says a branch crossing into another lane belongs
+    // to "that lane's own stacking" — but a single pass anchored on the FIRST
+    // decision means that other lane's stacking never runs. Its rows are computed
+    // and then dropped on the floor by the same-container filter below.
+    //
+    // Paul, 2026-09-04, on V22.10: the fork "Reserve balance remains?" lives in
+    // the Actuarial lane while the first decision is in Claims Assessment, so the
+    // exception path off its upper branch never received the row the analysis had
+    // already given it — 1048 / 1158.5 / 1269, exactly the "path 1, path 1.1,
+    // path 2" he described — and fell back to generic placement, landing on top
+    // of the LOWER branch's row. The rule was right; it was only ever applied to
+    // one lane.
+    //
+    // Each container is anchored on its OWN first decision, because `trunkRow`
+    // decides where the whole stack hangs: using another lane's gateway would
+    // move this lane's trunk somewhere it never was.
+    const decisionAnchors: DiagramElement[] = [];
+    for (const e of elements) {
+      if (!isDecisionGateway(e)) continue;
+      if (decisionAnchors.some(a => a.parentId === e.parentId)) continue;
+      decisionAnchors.push(e);
+    }
+    for (const firstDecision of decisionAnchors) {
       const analysis = analysePaths({
         elements: elements.map(e => ({ id: e.id, height: e.height, type: e.type, parentId: e.parentId })),
         edges,
