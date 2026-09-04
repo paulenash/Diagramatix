@@ -463,6 +463,28 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
     tetherPoint = bestPoint;
   }
 
+  /**
+   * A BRANCH tether leaves ONE THIRD along the outgoing run, not at the vertex.
+   *
+   * Paul, 2026-09-04: "their tether attachment points need improving. They must
+   * be 1/3 the way along the main outgoing segment. Currently some are in the
+   * middle of the outgoing connector and others are at the vertex attachment
+   * point."
+   *
+   * The nearest-point rule above is right in general and wrong at a gateway:
+   * three branches leaving one diamond all have the vertex as their nearest
+   * point, so three tethers converge on the same few pixels and none of them
+   * says anything. A third of the way out separates them, and stays on the run
+   * the label actually names.
+   *
+   * The vertex is also the busiest point on the shape — the arrowhead, the
+   * diamond edge and any other branch all meet there.
+   */
+  if (sourceType === "gateway" && visibleWaypoints.length >= 2) {
+    const a = visibleWaypoints[0], b = visibleWaypoints[1];
+    tetherPoint = { x: a.x + (b.x - a.x) / 3, y: a.y + (b.y - a.y) / 3 };
+  }
+
   const hasLabel = label.trim().length > 0;
 
   /**
@@ -555,11 +577,26 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
           which branch "otherwise" belongs to. Only when it is actually adrift,
           though: a tether under a label still sitting on its line is noise. */}
       {!isEditing && (isDraggingLabel || selected || branchLabelAdrift) && (() => {
-        // Compute intersection of tether line with label box boundary
-        const boxL = lCx - effectiveLWidth / 2 - 3;
-        const boxR = lCx + effectiveLWidth / 2 + 3;
-        const boxT = lTy - 2;
-        const boxB = lTy + lHeight + 2;
+        // Compute intersection of tether line with the label's INKED box.
+        //
+        // `effectiveLWidth` is the layout width — the longest line plus 12px of
+        // padding — and the tether then added another 3px each side. So it
+        // stopped ~9px short of the text on each end, and on a multi-line label
+        // the shorter lines are centred inside the longest line's width, opening
+        // the gap further. Paul, 2026-09-04: "the area taken by empty space on
+        // the two ends of the label text box need to be trimmed as the tether
+        // leaves from that boundary."
+        //
+        // Measured off the actual glyphs, and off the widest line ON THE SIDE
+        // the tether leaves from, so a tether departing the left edge meets the
+        // text rather than the padding. The layout width is untouched: it is
+        // what the collision rules reason about, and shrinking it there would
+        // let labels sit closer than they may.
+        const inkW = Math.max(...lines.map(l => l.length * avgCharWidth));
+        const boxL = lCx - inkW / 2;
+        const boxR = lCx + inkW / 2;
+        const boxT = lTy;
+        const boxB = lTy + lHeight;
         const boxCx = (boxL + boxR) / 2;
         const boxCy = (boxT + boxB) / 2;
         const dx = tetherPoint.x - boxCx;
