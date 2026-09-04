@@ -1114,36 +1114,40 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
         </defs>
       )}
 
-      {/* For associationBPMN: mask out the source/target element rectangles
-          so the connector hit area never covers them — clicks inside fall
-          through to the element underneath. */}
+      {/* Cut the source/target element rectangles OUT of the association's hit
+          area, so a click inside an element selects the element and not the
+          tether crossing it.
+
+          A CLIP PATH, NOT A MASK. This was a <mask> with black rectangles over
+          the elements — which renders identically and does nothing at all,
+          because Blink does not apply `mask` to hit-testing. Only `clip-path`
+          clips pointer events. So the guard looked right, tested nothing, and
+          shipped: Paul reported the same defect three times over two days —
+          "Selecting an element still selects the association virtual connector
+          under the element instead of the element itself."
+
+          Even-odd fill on one path: an outer rectangle far larger than any
+          diagram, then each element's box as its own subpath, which evenodd
+          turns into a hole. Coordinates are the local (transformed) space, the
+          same as the waypoints. */}
       {(isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds || (maskBounds?.length ?? 0) > 0) && (() => {
-        const maskId = `assoc-hit-mask-${connector.id}`;
-        // The mask must cover the entire SVG viewport. We use a far-out
-        // rectangle since masks on transformed groups follow the local
-        // coordinate space.
+        const clipId = `assoc-hit-clip-${connector.id}`;
+        const holes = [
+          ...(sourceBounds ? [sourceBounds] : []),
+          ...(targetBounds ? [targetBounds] : []),
+          ...(maskBounds ?? []),
+        ];
+        const rect = (x: number, y: number, w: number, h: number) =>
+          `M${x},${y} H${x + w} V${y + h} H${x} Z`;
+        const d = [
+          rect(-100000, -100000, 200000, 200000),
+          ...holes.map((b) => rect(b.x, b.y, b.width, b.height)),
+        ].join(" ");
         return (
           <defs>
-            <mask id={maskId} maskUnits="userSpaceOnUse">
-              <rect x={-100000} y={-100000} width={200000} height={200000} fill="white" />
-              {sourceBounds && (
-                <rect
-                  x={sourceBounds.x} y={sourceBounds.y}
-                  width={sourceBounds.width} height={sourceBounds.height}
-                  fill="black"
-                />
-              )}
-              {targetBounds && (
-                <rect
-                  x={targetBounds.x} y={targetBounds.y}
-                  width={targetBounds.width} height={targetBounds.height}
-                  fill="black"
-                />
-              )}
-              {(maskBounds ?? []).map((b, i) => (
-                <rect key={i} x={b.x} y={b.y} width={b.width} height={b.height} fill="black" />
-              ))}
-            </mask>
+            <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+              <path d={d} clipRule="evenodd" />
+            </clipPath>
           </defs>
         );
       })()}
@@ -1163,7 +1167,7 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
         stroke="transparent"
         strokeWidth={12}
         style={{ cursor: isMessageBPMN && !isRectilinearMessage ? "ew-resize" : "pointer" }}
-        mask={(isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds || (maskBounds?.length ?? 0) > 0) ? `url(#assoc-hit-mask-${connector.id})` : undefined}
+        clipPath={(isAssocBPMN || isReviewLink) && (sourceBounds || targetBounds || (maskBounds?.length ?? 0) > 0) ? `url(#assoc-hit-clip-${connector.id})` : undefined}
         onMouseDown={(e) => {
           if (isMessageBPMN && !isRectilinearMessage && selected) {
             handleMessageBPMNBodyMouseDown(e);
