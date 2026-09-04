@@ -8450,6 +8450,24 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       if (!SPLITTABLE_TYPES.has(finalEl.type)) {
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
+      // ...and never fuse an element that is ALREADY IN THE FLOW.
+      //
+      // Auto-fuse exists to drop a loose element onto a line. An element that
+      // already has sequence flow has a place in the process; splicing it into a
+      // second one does not move it there, it ADDS it there — leaving an activity
+      // with two inbound and two outbound flows, which BPMN does not allow without
+      // a gateway.
+      //
+      // Paul, 2026-09-04, on V22.10: nudging "Refer reserve discrepancy" a little
+      // left "just an attempt to slightly improve the look of the group" spliced
+      // it into the nil-balance branch, and the saved diagram was genuinely
+      // rewired — its own outgoing flow to the merge now existed TWICE. A
+      // cosmetic drag must never restructure the process.
+      const alreadyInFlow = connectors.some(c =>
+        c.type === "sequence" && (c.sourceId === finalEl.id || c.targetId === finalEl.id));
+      if (alreadyInFlow) {
+        return { ...state, elements: updatePoolTypes(elements), connectors };
+      }
       // An Expanded Subprocess is a large CONTAINER. Splitting rules for it:
       //  • never split a connector that belongs to its OWN internal flow — skip
       //    any connector touching the EP or one of its descendants;
@@ -8584,6 +8602,17 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           0.5, orig.targetOffsetAlong ?? 0.5);
 
       const filtered = connectors.filter(c => c.id !== orig.id);
+      // A split must not produce an edge the diagram already has. Belt and braces
+      // behind the already-in-flow guard above: the two halves are new connectors
+      // regardless of how the element got here, and a duplicate edge is never the
+      // intent. Bail out whole rather than half-splice — deleting `orig` and
+      // adding only one replacement would leave the flow broken, which is worse
+      // than not acting.
+      const duplicates = (from: string, to: string) =>
+        filtered.some(c => c.type === orig!.type && c.sourceId === from && c.targetId === to);
+      if (duplicates(orig.sourceId, finalEl.id) || duplicates(finalEl.id, orig.targetId)) {
+        return { ...state, elements: updatePoolTypes(elements), connectors };
+      }
       return {
         ...state,
         elements: updatePoolTypes(ensureContainersEncloseChildren(snapElements)),
