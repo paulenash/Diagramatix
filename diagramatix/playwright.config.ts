@@ -43,8 +43,22 @@ export default defineConfig({
     command: "node scripts/e2e-server.cjs",
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
-    timeout: 300_000,
-    stdout: "ignore",
+    // The server does db-push + seed + BUILD + serve before it answers, so this
+    // budget covers a full Next build. 300s fitted a fast runner with nothing to
+    // spare: on 2026-09-04 two CI runs failed here purely because GitHub's
+    // runners were at about half speed (the green run before them finished all
+    // of CI in 4m30; those took 8m30 and 6m24, and the deploy job in the same
+    // window sat queued 90 minutes until its Azure token expired). A timeout
+    // that turns runner load into a red build teaches people to ignore red
+    // builds. Doubled — still short enough that a genuine hang is caught.
+    timeout: 600_000,
+    // Pipe BOTH streams. This was "ignore", so when the server failed to come
+    // up all CI could say was "Timed out waiting 300000ms from config.webServer"
+    // -- the build output that would have named the cause was thrown away, and
+    // the log held nothing but Postgres container teardown. Same principle as
+    // refusing a truncated prompt: a failure that leaves no trace costs far
+    // more than the noise of printing it (Paul, 2026-09-04).
+    stdout: "pipe",
     stderr: "pipe",
   },
 });

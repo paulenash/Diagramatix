@@ -17,10 +17,26 @@ const env = {
   PORT: "3001",
 };
 
+// Each step announces itself and reports how long it took.
+//
+// When Playwright's webServer budget expires it says only "Timed out waiting
+// Nms" — it cannot say WHICH step ate the time, and on 2026-09-04 two CI runs
+// failed exactly that way with nothing in the log to act on. An elapsed time
+// per step turns the next one into a reading rather than an investigation:
+// "building 280s" is a slow runner, "db push 200s" is something else entirely.
+const t0 = Date.now();
+const since = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
+
 function step(label, command) {
-  console.log(`[e2e-server] ${label} …`);
+  const started = Date.now();
+  console.log(`[e2e-server] ${label} … (at ${since()})`);
   const r = spawnSync(command, { stdio: "inherit", env, shell: true });
-  if (r.status !== 0) process.exit(r.status ?? 1);
+  const took = `${((Date.now() - started) / 1000).toFixed(1)}s`;
+  if (r.status !== 0) {
+    console.error(`[e2e-server] FAILED after ${took}: ${label}`);
+    process.exit(r.status ?? 1);
+  }
+  console.log(`[e2e-server] ${label} — done in ${took}`);
 }
 
 // Schema + reference data the app needs but the unit suite truncates away
@@ -39,7 +55,7 @@ step("lifting Free-tier caps (test DB only)", "npx --yes tsx@4 scripts/e2e-lift-
 
 step("building (non-standalone)", "npx next build");
 
-console.log("[e2e-server] starting http://localhost:3001 against diagramatix_test");
+console.log(`[e2e-server] starting http://localhost:3001 against diagramatix_test (setup took ${since()})`);
 const server = spawn("npx next start -p 3001", { stdio: "inherit", env, shell: true });
 server.on("exit", (code) => process.exit(code ?? 0));
 process.on("SIGTERM", () => server.kill("SIGTERM"));
