@@ -10,6 +10,7 @@ import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { AI_INVOCATION_POINTS, enterAiContext } from "@/app/lib/ai/aiTelemetry";
 import { checkPromptBranches } from "@/app/lib/valueChain/checkPromptBranches";
 import { checkPromptShapes } from "@/app/lib/valueChain/checkPromptShapes";
+import { selectRegenerationTargets } from "@/app/lib/valueChain/regenerationTargets";
 import { looksTruncated } from "@/app/lib/valueChain/checkPromptTruncated";
 import {
   type ImportedChain, parseLibraryFromMd, renderChainMd, renderLibraryMd, renumber,
@@ -278,7 +279,16 @@ export async function POST(req: Request) {
     const code = typeof body?.code === "string" ? body.code : "";
     const requested = Array.isArray(body?.types) ? body.types : [];
     const types = MD_PROMPT_TYPES.filter((t) => requested.includes(t));
+    // WHICH processes. `processCode` (one) is what a row's own Regenerate button
+    // has always sent; `processCodes` (many) is the subset the checkboxes select.
+    // Both narrow to BPMN only — picking specific processes means you did not ask
+    // for the chain-level prompts, and silently regenerating those as well would
+    // spend AI calls nobody requested.
     const onlyProcess = typeof body?.processCode === "string" ? body.processCode : "";
+    const manyCodes = Array.isArray(body?.processCodes)
+      ? (body.processCodes as unknown[]).filter((c): c is string => typeof c === "string")
+      : [];
+    const only = new Set<string>(manyCodes.length ? manyCodes : onlyProcess ? [onlyProcess] : []);
     if (!code || types.length === 0) return NextResponse.json({ error: "code and types are required" }, { status: 400 });
 
     const chain = (await chainPayload(code))[0];
@@ -297,16 +307,13 @@ export async function POST(req: Request) {
     if (!apiKey) return NextResponse.json({ error: "AI is not configured for the selected model." }, { status: 503 });
 
     const subs = chain.processes.map((p) => ({ code: p.code, title: p.title }));
-    const targets: { type: MdPromptType; code: string; title: string }[] = [];
-    for (const t of types) {
-      if (t === "bpmn") {
-        for (const p of subs) {
-          if (onlyProcess && p.code !== onlyProcess) continue;
-          targets.push({ type: "bpmn", code: p.code, title: p.title });
-        }
-      } else if (!onlyProcess) {
-        targets.push({ type: t, code: chain.code, title: chain.title });
-      }
+    const { targets, unknown } = selectRegenerationTargets({
+      types, processes: subs, chainCode: chain.code, chainTitle: chain.title, only: [...only],
+    });
+    if (unknown.length) {
+      // Otherwise this regenerates nothing and reports success, which reads as
+      // "done" and leaves the prompt exactly as it was.
+      return NextResponse.json({ error: `${code} has no process ${unknown.join(", ")}` }, { status: 422 });
     }
     if (targets.length === 0) return NextResponse.json({ error: "Nothing to regenerate" }, { status: 422 });
 

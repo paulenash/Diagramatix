@@ -102,13 +102,13 @@ export function ValueChainLibraryClient() {
   }, [post]);
 
   /** Regenerate, streaming progress the way the other AI tools do. */
-  const regenerate = useCallback(async (code: string, types: MdPromptType[], processCode?: string) => {
+  const regenerate = useCallback(async (code: string, types: MdPromptType[], processCode?: string, processCodes?: string[]) => {
     if (busy) return;
     setBusy(true); setError(null); setNote(null); setRows([]);
     try {
       const res = await fetch("/api/admin/value-chain-library", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "regenerate", code, types, processCode }),
+        body: JSON.stringify({ action: "regenerate", code, types, processCode, processCodes }),
       });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
@@ -255,7 +255,7 @@ export function ValueChainLibraryClient() {
               />
               <PromptPanel chain={chain} busy={busy} rows={rows} tone={tone}
                 genTypes={genTypes} setGenTypes={setGenTypes}
-                onRegenerate={(types, processCode) => void regenerate(chain.code, types, processCode)}
+                onRegenerate={(types, processCode, processCodes) => void regenerate(chain.code, types, processCode, processCodes)}
               />
             </>
           )}
@@ -405,7 +405,7 @@ function ProcessEditor({ chain, busy, tone, onSave }: {
 function PromptPanel({ chain, busy, rows, tone, genTypes, setGenTypes, onRegenerate }: {
   chain: Chain; busy: boolean; rows: Row[]; tone: { bg: string; text: string };
   genTypes: MdPromptType[]; setGenTypes: (t: MdPromptType[]) => void;
-  onRegenerate: (types: MdPromptType[], processCode?: string) => void;
+  onRegenerate: (types: MdPromptType[], processCode?: string, processCodes?: string[]) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const byKey = useMemo(() => new Map(chain.prompts.map((p) => [`${p.type}|${p.processCode}`, p])), [chain.prompts]);
@@ -415,6 +415,38 @@ function PromptPanel({ chain, busy, rows, tone, genTypes, setGenTypes, onRegener
   }, [chain]);
 
   const toggle = (t: MdPromptType) => setGenTypes(genTypes.includes(t) ? genTypes.filter((x) => x !== t) : [...genTypes, t]);
+
+  // ── Picking a SUBSET of the process prompts ──────────────────────────────
+  //
+  // Regenerating a chain was all-or-one: the BPMN chip did all ten, or a row's
+  // own button did exactly one. When six of ten came back truncated there was no
+  // way to say "those six" except six separate clicks, each one an AI call you
+  // had to wait for before starting the next.
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const pick = (code: string) => setPicked((prev) => {
+    const next = new Set(prev);
+    if (next.has(code)) next.delete(code); else next.add(code);
+    return next;
+  });
+
+  /**
+   * The prompts worth regenerating without reading every row.
+   *
+   * Deliberately the union of every signal that means "this prompt is wrong",
+   * not just truncation: a half-written prompt, one that asks for a shape BPMN
+   * cannot draw, one with a branch that never says where it goes, one that no
+   * longer parses back, and one that was never generated at all. They arrive by
+   * different routes and are all fixed the same way.
+   */
+  const suspect = useMemo(() => chain.processes
+    .filter((proc) => {
+      const p = byKey.get(`bpmn|${proc.code}`);
+      return !p || !!p.truncated || p.undrawableShapes > 0
+        || p.unterminatedBranches > 0 || !p.roundTripsOk;
+    })
+    .map((proc) => proc.code), [chain.processes, byKey]);
+
+  const allCodes = chain.processes.map((p) => p.code);
 
   return (
     <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
@@ -435,10 +467,38 @@ function PromptPanel({ chain, busy, rows, tone, genTypes, setGenTypes, onRegener
             {MD_PROMPT_LABEL[t]}{t === "bpmn" && <span className="opacity-60"> ×{chain.processes.length}</span>}
           </button>
         ))}
-        <button disabled={busy || genTypes.length === 0} onClick={() => onRegenerate(genTypes)}
+        {/* Ticked rows win over the type chips: ticking specific processes is a
+            narrower, more deliberate instruction than "all the BPMN ones", and
+            quietly regenerating the chain-level prompts too would spend AI calls
+            nobody asked for. */}
+        <button
+          disabled={busy || (picked.size === 0 && genTypes.length === 0)}
+          onClick={() => picked.size > 0
+            ? onRegenerate(["bpmn"], undefined, [...picked])
+            : onRegenerate(genTypes)}
           className="ml-2 px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-gray-300">
-          {busy ? "Generating…" : "Regenerate selected"}
+          {busy ? "Generating…"
+            : picked.size > 0 ? `Regenerate ${picked.size} ticked`
+            : "Regenerate selected"}
         </button>
+      </div>
+
+      {/* Tick a subset rather than clicking through them one at a time. */}
+      <div className="flex flex-wrap items-center gap-2 mb-2 text-[11px] text-gray-500">
+        <span className="font-medium text-gray-700">Tick processes:</span>
+        <button disabled={busy} onClick={() => setPicked(new Set(allCodes))}
+          className="px-1.5 py-0.5 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40">All</button>
+        <button disabled={busy || picked.size === 0} onClick={() => setPicked(new Set())}
+          className="px-1.5 py-0.5 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40">None</button>
+        <button
+          disabled={busy || suspect.length === 0}
+          onClick={() => setPicked(new Set(suspect))}
+          title="Every prompt that is truncated, asks for something BPMN cannot draw, leaves a branch unresolved, no longer parses back, or was never generated."
+          className={"px-1.5 py-0.5 rounded border disabled:opacity-40 "
+            + (suspect.length > 0 ? "border-red-300 text-red-700 hover:bg-red-50" : "border-gray-300 hover:bg-gray-50")}>
+          Needs attention{suspect.length > 0 ? ` (${suspect.length})` : ""}
+        </button>
+        {picked.size > 0 && <span className="text-gray-600">{picked.size} of {allCodes.length} ticked</span>}
       </div>
 
       {rows.length > 0 && (
@@ -469,22 +529,31 @@ function PromptPanel({ chain, busy, rows, tone, genTypes, setGenTypes, onRegener
         ))}
         {chain.processes.map((p) => (
           <PromptRow key={p.id} label={`${p.code} ${p.title}`} prompt={byKey.get(`bpmn|${p.code}`)} open={open} setOpen={setOpen}
-            onRegenerate={() => onRegenerate(["bpmn"], p.code)} busy={busy} />
+            onRegenerate={() => onRegenerate(["bpmn"], p.code)} busy={busy}
+            ticked={picked.has(p.code)} onTick={() => pick(p.code)} />
         ))}
       </ul>
     </section>
   );
 }
 
-function PromptRow({ label, prompt, open, setOpen, onRegenerate, busy }: {
+function PromptRow({ label, prompt, open, setOpen, onRegenerate, busy, ticked, onTick }: {
   label: string; prompt?: Prompt; open: string | null; setOpen: (s: string | null) => void;
   onRegenerate: () => void; busy: boolean;
+  /** Only the per-process rows are tickable — the chain-level ones are one each,
+   *  and the type chips above already select those. */
+  ticked?: boolean; onTick?: () => void;
 }) {
   const key = prompt?.id ?? label;
   const isOpen = open === key;
   return (
     <li className="border border-gray-200 rounded">
       <div className="flex items-center gap-2 px-2.5 py-1.5">
+        {onTick && (
+          <input type="checkbox" checked={!!ticked} onChange={onTick} disabled={busy}
+            aria-label={`Select ${label} for regeneration`}
+            className="h-3 w-3 accent-blue-600 disabled:opacity-40" />
+        )}
         <button onClick={() => setOpen(isOpen ? null : key)} className="flex-1 text-left text-[11px] text-gray-800">
           {label}
         </button>
