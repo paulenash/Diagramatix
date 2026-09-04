@@ -9,11 +9,7 @@ worse; this says what the defects ARE so one can be picked up and finished.
 A diagram leaves this list when its count reaches zero — at which point its
 entry in `KNOWN` (tests/bpmn/layout-corpus.test.ts) is deleted.
 
-**11 diagram(s) with 18 defect(s)**, out of 26 in the corpus.
-
-## V02.01 V02.01 Identify Need  `V02.01.plan.json` — 1
-
-- shared attachment point gw_valid|right|0.500 — connectors conn-gw_valid-t_return, conn-gw_valid-gw_valid_merge
+**7 diagram(s) with 10 defect(s)**, out of 26 in the corpus.
 
 ## V04.01 V04.01 Workforce Planning  `V04.01.plan.json` — 2
 
@@ -28,19 +24,9 @@ entry in `KNOWN` (tests/bpmn/layout-corpus.test.ts) is deleted.
 
 - LABEL/LABEL: "Confirmed Fault Description" and "False alarm closed — no further ac"
 
-## V16.01 V16.01 Detect Event  `V16.01.plan.json` — 3
-
-- shared attachment point gwSource|top|0.500 — connectors conn-gwSource-imcSIEM, conn-gwSource-tManualReport
-- shared attachment point gwSourceMerge|top|0.500 — connectors conn-imcSIEM-gwSourceMerge, conn-tManualReport-gwSourceMerge
-- gateway "Source of signal resolved" label overlaps a connector segment
-
 ## V19.01 V19.01 Raise Access Request  `V19.01.plan.json` — 1
 
 - LABEL/LABEL: "Identity Evidence Package" and "Acceptable-Use Acknowledgement"
-
-## V20.01 V20.01 Receive & Register Matter  `V20.01.plan.json` — 1
-
-- shared attachment point gw3|right|0.500 — connectors conn-gw3-t6, conn-gw3-t7
 
 ## V22.01 V22.01 Receive Notification  `V22.01.plan.json` — 3
 
@@ -48,16 +34,10 @@ entry in `KNOWN` (tests/bpmn/layout-corpus.test.ts) is deleted.
 - BODY/BODY: "Notification complete?" overlaps "Issue holding correspondence and e"
 - LABEL/LABEL: connector "Yes — all required details present" and label of "Notification complete?"
 
-## V23.01 V23.01 Acquire Meter Readings  `V23.01.plan.json` — 1
-
-- shared attachment point gw5|right|0.500 — connectors conn-gw5-e2, conn-gw5-t12
-
 ## V24.01 V24.01 Capture Transactions with Tax Attributes  `V24.01.plan.json` — 1
 
 - LABEL/LABEL: "Tax Invoice / Exemption Certificat" and "Tax Code Table"
 
-## V26.01 V26.01 Develop Concept & Business Case  `V26.01.plan.json` — 3
+## V26.01 V26.01 Develop Concept & Business Case  `V26.01.plan.json` — 1
 
-- shared attachment point gParallelSplit|top|0.500 — connectors conn-gParallelSplit-tCostEst, conn-gParallelSplit-tTechDoc
-- shared attachment point gParallelJoin|top|0.500 — connectors conn-tCostEst-gParallelJoin, conn-tTechDoc-gParallelJoin
 - LABEL/LABEL: "Preliminary Cost Estimate" and "Risk Register"

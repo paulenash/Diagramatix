@@ -5440,6 +5440,86 @@ export function layoutBpmnDiagram(
       i.c.sourceOffsetAlong = 0.5;                      // R6.30: on the vertex
     }
   }
+
+  // ── R6.33: no two branches leave a decision by the SAME vertex ──
+  //
+  // Paul, 2026-09-04 on V22.04: at "Which handling indicators apply?" the branch
+  // to a task 170px BELOW the gateway left by the TOP vertex, while the branch
+  // running level left by the BOTTOM — "the connection points do not follow the
+  // path order as I expected ... should be connected to the bottom vertices."
+  //
+  // R6.32 above bails on `outs.length !== 2`, so a three- or four-way split is
+  // assigned by R6.26 in PLAN ORDER, which is why that gateway read top, right,
+  // bottom, top — the fourth branch got `top` because it was fourth in the list
+  // and nothing asked where its target had ended up. The same plan-order
+  // assignment is behind 8 of the 18 corpus defects, where two branches simply
+  // share a vertex.
+  //
+  // A DIAMOND HAS THREE OUTBOUND VERTICES AND NO MORE. R6.30 snaps every gateway
+  // endpoint onto a vertex, so there is no "spread along the side" available
+  // here — offsets other than 0.5 are points on a slope and get rolled back to
+  // the nearest vertex. With four branches one pair must therefore double up,
+  // which B49 already tolerates for exactly this reason.
+  //
+  // DELIBERATELY NARROW. It acts only when there are three or more branches, or
+  // when two of them collide on one vertex — a collision being unambiguously
+  // wrong however it arose. Where two branches fan apart cleanly it leaves
+  // R6.26 and R6.32 alone, because that pair is tuned (Paul's T3036 rule, and
+  // R8.26 places a subprocess on the side its branch left from).
+  //
+  // GATED ON THE CONNECTORS, NOT THE CLASSIFICATION. `isDecisionGateway` also
+  // requires at most one INBOUND flow, counted from the plan — so a gateway that
+  // both merges and splits is not a "decision" and was skipped, while its two
+  // outbound branches sat on the same vertex regardless. V02.01's `gw_valid` is
+  // exactly that, and it is the first entry on the worklist. What matters here is
+  // only "how many connectors leave this gateway", so that is what it asks.
+  for (const dec of elements) {
+    if (!isGateway(dec)) continue;
+    const outs = connectors.filter(c => c.type === "sequence" && c.sourceId === dec.id);
+    if (outs.length < 2) continue;
+
+    const dcy = dec.y + dec.height / 2;
+    const LEVEL = dec.height / 2 + 6;
+    const info = outs.map(c => {
+      const t = elMap.get(c.targetId);
+      return { c, dy: t ? (t.y + t.height / 2) - dcy : 0 };
+    });
+
+    const collides = new Set(outs.map(c => c.sourceSide)).size < outs.length;
+    if (process.env.DGX_R633_DEBUG) {
+      console.log(`[R6.33] ${dec.id} outs=${outs.length} sides=${outs.map(c => c.sourceSide).join(",")} collides=${collides} dys=${info.map(i => Math.round(i.dy)).join(",")}`);
+    }
+    if (outs.length < 3 && !collides) continue;
+
+    // Where the target actually is: above, level, or below.
+    const want = (dy: number): Connector["sourceSide"] =>
+      dy < -LEVEL ? "top" : dy > LEVEL ? "bottom" : "right";
+
+    // Strongest claim first, so a branch far above keeps `top` and a marginal
+    // one gives way. Ties break on |dy| for a stable, order-independent result:
+    // two runs of the same diagram must not disagree.
+    const order = [...info].sort((a, b) => Math.abs(b.dy) - Math.abs(a.dy));
+    const taken = new Set<Connector["sourceSide"]>();
+    for (const i of order) {
+      const first = want(i.dy);
+      let side = first;
+      if (taken.has(side)) {
+        // Next best, in the direction the target actually lies. A branch that
+        // wanted `top` and cannot have it takes `right` before `bottom` — never
+        // the vertex pointing the opposite way, which is the defect being fixed.
+        const fallback: Connector["sourceSide"][] = first === "top" ? ["right", "bottom"]
+          : first === "bottom" ? ["right", "top"]
+          : i.dy <= 0 ? ["top", "bottom"] : ["bottom", "top"];
+        const free = fallback.find(s => !taken.has(s));
+        // All three used (four or more branches): double up on the vertex the
+        // target genuinely points at, rather than on an arbitrary one.
+        side = free ?? first;
+      }
+      taken.add(side);
+      i.c.sourceSide = side;
+      i.c.sourceOffsetAlong = 0.5;                      // R6.30: on the vertex
+    }
+  }
   // ── R6.31: a merge's INBOUND vertices follow FINAL geometry ──
   //
   // Paul, 2026-09-02: "The Merge associated with Gateway 'Complexity?' should

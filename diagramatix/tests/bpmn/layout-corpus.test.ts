@@ -58,17 +58,13 @@ const files = fs.existsSync(DIR) ? fs.readdirSync(DIR).filter((f) => f.endsWith(
  * for the next regression.
  */
 const KNOWN: Record<string, number> = {
-  "V02.01.plan.json": 1,
   "V04.01.plan.json": 2,
   "V14.01.plan.json": 1,
   "V15.01.plan.json": 1,
-  "V16.01.plan.json": 3,
   "V19.01.plan.json": 1,
-  "V20.01.plan.json": 1,
   "V22.01.plan.json": 3,
-  "V23.01.plan.json": 1,
   "V24.01.plan.json": 1,
-  "V26.01.plan.json": 3,
+  "V26.01.plan.json": 1,
 };
 
 describe("layout corpus — generated diagrams stay readable", () => {

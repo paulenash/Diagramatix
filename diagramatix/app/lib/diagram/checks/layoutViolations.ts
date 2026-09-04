@@ -220,7 +220,40 @@ export function findLayoutViolations(data: DiagramData): string[] {
     add(c.sourceId, c.sourceSide, c.sourceOffsetAlong ?? 0.5, c.id);
     add(c.targetId, c.targetSide, c.targetOffsetAlong ?? 0.5, c.id);
   }
+  /**
+   * A gateway with more than three connectors on one axis MUST double up.
+   *
+   * A diamond offers three outbound vertices (top, right, bottom — left is where
+   * flow arrives) and three inbound. R6.30 snaps every gateway endpoint onto a
+   * vertex, so there is no part-way position to spread into. Four branches
+   * therefore share one vertex however they are assigned, and B49 has always
+   * said so: "allows four or more branches to double up — with only three
+   * vertices it is unavoidable."
+   *
+   * Reporting it anyway put two entries on the worklist that no amount of work
+   * could remove, which is worse than not reporting: a list with permanent
+   * residents stops being a list of things to do. R6.33 still decides WHICH pair
+   * doubles up — the innermost two, with the extremes keeping top and bottom.
+   */
+  const outCount = new Map<string, number>();
+  const inCount = new Map<string, number>();
+  for (const c of conns) {
+    if (!RULED.has(c.type)) continue;
+    outCount.set(c.sourceId, (outCount.get(c.sourceId) ?? 0) + 1);
+    inCount.set(c.targetId, (inCount.get(c.targetId) ?? 0) + 1);
+  }
+  const typeOf = new Map(data.elements.map((e) => [e.id, e.type] as const));
+  const isDiamond = (id: string) => typeOf.get(id) === "gateway";
+  const unavoidable = (key: string, ids: string[]) => {
+    const elId = key.slice(0, key.indexOf("|"));
+    if (!isDiamond(elId)) return false;
+    // Which direction this vertex serves, by whether the sharers leave or arrive.
+    const leaving = ids.every((cid) => conns.find((c) => c.id === cid)?.sourceId === elId);
+    return (leaving ? outCount.get(elId) ?? 0 : inCount.get(elId) ?? 0) > 3;
+  };
+
   for (const [key, ids] of points) {
+    if (ids.length > 1 && unavoidable(key, ids)) continue;
     if (ids.length > 1) v.push(`shared attachment point ${key} — connectors ${ids.join(", ")}`);
   }
 

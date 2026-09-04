@@ -27,15 +27,36 @@ const out = () => {
 };
 
 describe("gateway fan connection vertices (R6.26–R6.29)", () => {
-  it("T2830 — a 5-branch decision assigns outbound vertices top/right/bottom round-robin by target Y (R6.27)", () => {
+  /**
+   * SUPERSEDED, 2026-09-04. R6.27 assigned these round-robin by target Y —
+   * top, right, bottom, top, right — which put the FOURTH branch, below the
+   * gateway, on the TOP vertex. Paul reported exactly that on V22.04's "Which
+   * handling indicators apply?": "the connection points do not follow the path
+   * order as I expected ... Task 'Flag claim for specialist involvement' should
+   * be connected to the bottom vertices."
+   *
+   * R6.33 assigns by where the target actually IS — above → top, level → right,
+   * below → bottom — so no branch ever leaves by the vertex facing away from it.
+   * With five branches and three outbound vertices some must double up; they
+   * double on the side they genuinely point at, which is what B49 has always
+   * permitted for four or more.
+   */
+  it("T2830 — a 5-branch decision leaves by the vertex facing its target (R6.33)", () => {
     const o = out();
     const cy = (id: string) => { const e = o.elements.find((x) => x.id === id)!; return e.y + e.height / 2; };
-    const sides = o.connectors
+    const g = o.elements.find((x) => x.id === "g")!;
+    const gcy = g.y + g.height / 2;
+    const rows = o.connectors
       .filter((c) => c.sourceId === "g")
       .map((c) => ({ side: c.sourceSide, y: cy(c.targetId) }))
-      .sort((a, b) => a.y - b.y)
-      .map((x) => x.side);
-    expect(sides).toEqual(["top", "right", "bottom", "top", "right"]);
+      .sort((a, b) => a.y - b.y);
+    expect(rows.map((x) => x.side)).toEqual(["top", "right", "right", "bottom", "bottom"]);
+    // The property that matters, stated independently of the exact fan: nothing
+    // above the gateway leaves by `bottom`, and nothing below leaves by `top`.
+    for (const r of rows) {
+      if (r.y < gcy - 26) expect(r.side, "a branch above must not leave by the bottom").not.toBe("bottom");
+      if (r.y > gcy + 26) expect(r.side, "a branch below must not leave by the top").not.toBe("top");
+    }
   });
 
   it("T2830 — a 5-branch merge assigns inbound vertices top/left/bottom round-robin by source Y (R6.28)", () => {
