@@ -140,6 +140,16 @@ jobs:
           cache: npm
           cache-dependency-path: diagramatix/package-lock.json
 
+      - name: Install tsx once
+        # The seed steps below used `npx --yes tsx@4` -- THIRTY-TWO times. Each
+        # one re-resolves and re-downloads tsx from the registry, so the deploy
+        # was network-bound on fetching the same tool over and over. On a good
+        # day that is invisible; on 2026-09-04, with npm slow, one seed step ran
+        # 67 MINUTES (normally ~3) and another 5m07 (normally 6s), and by the
+        # time they finished the Azure token had expired and the deploy failed
+        # with AADSTS700024. Fetch it once and the whole block is seconds again.
+        run: npm install --global tsx@4
+
       - name: Install Prisma CLI
         # `npm ci` is overkill for a migration step — Prisma 7 ships its
         # CLI in the same package so a focused install + generate keeps
@@ -201,7 +211,7 @@ jobs:
         # source of truth (matches the local workflow); the prisma client was
         # generated in the Install step, so tsx resolves the imports. tsx is
         # not a project dep — fetch it pinned + non-interactive (`--yes`).
-        run: npx --yes tsx@4 scripts/seed-simulation-examples.ts
+        run: tsx scripts/seed-simulation-examples.ts
 
       - name: Seed mining example catalog
         working-directory: ./diagramatix
@@ -212,7 +222,7 @@ jobs:
         continue-on-error: true
         env:
           DATABASE_URL: ${{ steps.db.outputs.url }}
-        run: npx --yes tsx@4 scripts/seed-mining-examples.ts
+        run: tsx scripts/seed-mining-examples.ts
 
       - name: Seed simulator docs (User Guide + Features)
         working-directory: ./diagramatix
@@ -225,19 +235,19 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.db.outputs.url }}
         run: |
-          npx --yes tsx@4 scripts/add-guide-simulation-calendars.ts
-          npx --yes tsx@4 scripts/add-features-simulation-calendars.ts
-          npx --yes tsx@4 scripts/add-guide-process-mining.ts
-          npx --yes tsx@4 scripts/add-features-process-mining.ts
-          npx --yes tsx@4 scripts/add-features-mining-examples.ts
-          npx --yes tsx@4 scripts/add-guide-mining-state-machine.ts
-          npx --yes tsx@4 scripts/add-guide-mining-sample.ts
-          npx --yes tsx@4 scripts/add-features-risk-controls.ts || echo "add-features-risk-controls skipped"
-          npx --yes tsx@4 scripts/add-features-pcf.ts || echo "add-features-pcf skipped"
-          npx --yes tsx@4 scripts/add-guide-pcf.ts || echo "add-guide-pcf skipped"
-          npx --yes tsx@4 scripts/add-guide-risk-controls.ts || echo "add-guide-risk-controls skipped"
-          npx --yes tsx@4 scripts/seed-risk-controls-o2c.ts || echo "seed-risk-controls-o2c skipped"
-          npx --yes tsx@4 scripts/seed-risk-control-examples.ts || echo "seed-risk-control-examples skipped"
+          tsx scripts/add-guide-simulation-calendars.ts
+          tsx scripts/add-features-simulation-calendars.ts
+          tsx scripts/add-guide-process-mining.ts
+          tsx scripts/add-features-process-mining.ts
+          tsx scripts/add-features-mining-examples.ts
+          tsx scripts/add-guide-mining-state-machine.ts
+          tsx scripts/add-guide-mining-sample.ts
+          tsx scripts/add-features-risk-controls.ts || echo "add-features-risk-controls skipped"
+          tsx scripts/add-features-pcf.ts || echo "add-features-pcf skipped"
+          tsx scripts/add-guide-pcf.ts || echo "add-guide-pcf skipped"
+          tsx scripts/add-guide-risk-controls.ts || echo "add-guide-risk-controls skipped"
+          tsx scripts/seed-risk-controls-o2c.ts || echo "seed-risk-controls-o2c skipped"
+          tsx scripts/seed-risk-control-examples.ts || echo "seed-risk-control-examples skipped"
           # NOTE: seed-o2c-demo.ts (which pre-created the "Order-to-Cash — GRC Demo"
           # PROJECT in Paul's org on every deploy) is intentionally NOT run — it
           # re-appeared after being deleted. The same content stays available as
@@ -253,38 +263,56 @@ jobs:
           # and Test - Demo2" kept returning as example tiles that could not be
           # shared or published. A name is not evidence; sourceExampleId is the
           # real signal and the adopt paths set it at creation. Run by hand only.
-          npx --yes tsx@4 scripts/add-tech-design-notes.ts || echo "add-tech-design-notes skipped"
-          npx --yes tsx@4 scripts/add-guide-tech-design-notes.ts || echo "add-guide-tech-design-notes skipped"
-          npx --yes tsx@4 scripts/add-guide-ddl.ts || echo "add-guide-ddl skipped"
-          npx --yes tsx@4 scripts/add-features-process-portal.ts || echo "add-features-process-portal skipped"
-          npx --yes tsx@4 scripts/add-guide-process-portal.ts || echo "add-guide-process-portal skipped"
+          tsx scripts/add-tech-design-notes.ts || echo "add-tech-design-notes skipped"
+          tsx scripts/add-guide-tech-design-notes.ts || echo "add-guide-tech-design-notes skipped"
+          tsx scripts/add-guide-ddl.ts || echo "add-guide-ddl skipped"
+          tsx scripts/add-features-process-portal.ts || echo "add-features-process-portal skipped"
+          tsx scripts/add-guide-process-portal.ts || echo "add-guide-process-portal skipped"
           # Import competitor BPMN diagrams (free-form / imported layout + AI image reproduction)
-          npx --yes tsx@4 scripts/add-features-import-competitor-bpmn.ts || echo "add-features-import-competitor-bpmn skipped"
-          npx --yes tsx@4 scripts/add-guide-import-competitor-bpmn.ts || echo "add-guide-import-competitor-bpmn skipped"
-          npx --yes tsx@4 scripts/add-tech-design-import-competitor-bpmn.ts || echo "add-tech-design-import-competitor-bpmn skipped"
+          tsx scripts/add-features-import-competitor-bpmn.ts || echo "add-features-import-competitor-bpmn skipped"
+          tsx scripts/add-guide-import-competitor-bpmn.ts || echo "add-guide-import-competitor-bpmn skipped"
+          tsx scripts/add-tech-design-import-competitor-bpmn.ts || echo "add-tech-design-import-competitor-bpmn skipped"
           # Enterprise governance & security — LIVING entries (upsert-and-update on
           # every run) that track the enterprise-readiness programme (diagramatix/
           # enterprise/). The tech-design one must run AFTER add-tech-design-notes.ts
           # (its identity-access chapter). Feature lands as a DRAFT — Publish once.
-          npx --yes tsx@4 scripts/add-features-enterprise-governance.ts || echo "add-features-enterprise-governance skipped"
-          npx --yes tsx@4 scripts/add-features-flexible-ai.ts || echo "add-features-flexible-ai skipped"
-          npx --yes tsx@4 scripts/add-tech-design-enterprise-governance.ts || echo "add-tech-design-enterprise-governance skipped"
+          tsx scripts/add-features-enterprise-governance.ts || echo "add-features-enterprise-governance skipped"
+          tsx scripts/add-features-flexible-ai.ts || echo "add-features-flexible-ai skipped"
+          tsx scripts/add-tech-design-enterprise-governance.ts || echo "add-tech-design-enterprise-governance skipped"
           # Tech Notes: the CI/CD deployment walk-through (this very pipeline).
-          npx --yes tsx@4 scripts/add-tech-design-deployment.ts || echo "add-tech-design-deployment skipped"
+          tsx scripts/add-tech-design-deployment.ts || echo "add-tech-design-deployment skipped"
           # ArchiMate Icon Library + Project Re-numbering — Features (draft), User
           # Guide (Project Numbering), Tech Notes (icons + numbering). Tech-design
           # one runs after add-tech-design-notes.ts (needs the base chapters).
-          npx --yes tsx@4 scripts/add-features-icon-numbering.ts || echo "add-features-icon-numbering skipped"
-          npx --yes tsx@4 scripts/add-guide-numbering.ts || echo "add-guide-numbering skipped"
-          npx --yes tsx@4 scripts/add-tech-design-icons-numbering.ts || echo "add-tech-design-icons-numbering skipped"
+          tsx scripts/add-features-icon-numbering.ts || echo "add-features-icon-numbering skipped"
+          tsx scripts/add-guide-numbering.ts || echo "add-guide-numbering skipped"
+          tsx scripts/add-tech-design-icons-numbering.ts || echo "add-tech-design-icons-numbering skipped"
           # Populate the Portal's denormalised Diagram columns (pcf*/procedureDoc*/
           # entityRefs) for diagrams last saved before those columns existed. Idempotent.
-          npx --yes tsx@4 scripts/backfill-diagram-pcf.ts || echo "backfill-diagram-pcf skipped"
+          tsx scripts/backfill-diagram-pcf.ts || echo "backfill-diagram-pcf skipped"
           # One-off (idempotent, cutoff-bounded): relabel the historical "unknown"
           # AiInvocation rows that were the offline AI harness scripts before they
           # set a telemetry context. Only touches null-user rows before the fixed
           # cutoff, so a genuine future "unknown" stays visible.
-          npx --yes tsx@4 scripts/relabel-unknown-ai-invocations.ts || echo "relabel-unknown-ai-invocations skipped"
+          tsx scripts/relabel-unknown-ai-invocations.ts || echo "relabel-unknown-ai-invocations skipped"
+
+      - name: Re-authenticate to Azure (post-seed)
+        # The SAME reasoning as the post-build re-login above, for the same
+        # reason, at the other end of the seeding block. The OIDC assertion is
+        # good for ~5 minutes; the seeds between here and there can take far
+        # longer than the Docker build ever did, and when they do, THIS step is
+        # where it surfaced -- as a deploy failure that looks like a container
+        # or registry problem and is actually a stale credential.
+        #
+        # Installing tsx once (above) removes the cause; this removes the class.
+        # Seeding is `continue-on-error: true` precisely because it is not a
+        # release gate, so it must not be able to fail the release by running
+        # slowly either.
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Update App Service container image
         # `az webapp config container set` rewrites the container
