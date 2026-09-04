@@ -358,9 +358,12 @@ interface InteractionLabelProps {
   // (black-box) pool end rather than the spine midpoint.
   sourceIsPool?: boolean;
   targetIsPool?: boolean;
+  /** The source element's type. A label on a branch OUT OF A GATEWAY keeps a
+   *  tether to its line once R5.12 has moved it clear of the shapes. */
+  sourceType?: string;
 }
 
-function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, onUpdateLabel, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, sourceIsPool, targetIsPool }: InteractionLabelProps) {
+function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, onUpdateLabel, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, sourceIsPool, targetIsPool, sourceType }: InteractionLabelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [isLabelFocused, setIsLabelFocused] = useState(false);
@@ -461,6 +464,23 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   }
 
   const hasLabel = label.trim().length > 0;
+
+  /**
+   * A branch label that has drifted off the line it names.
+   *
+   * Scoped to connectors OUT OF A GATEWAY because those are the ones carrying a
+   * condition ("otherwise — no indicators"), the ones R5.12 moves furthest to
+   * keep them off shapes, and the ones where a reader has to know which branch
+   * is meant. A label still touching its line needs no tether — the box test
+   * below is what keeps the extra ink to the cases that earn it.
+   */
+  const branchLabelAdrift = (() => {
+    if (!hasLabel || sourceType !== "gateway") return false;
+    const padX = effectiveLWidth / 2 + 6;
+    const padY = lHeight / 2 + 6;
+    return Math.abs(tetherPoint.x - lCx) > padX || Math.abs(tetherPoint.y - lMidY) > padY;
+  })();
+
   // Show the (empty) label box when the connector is SELECTED so the user
   // can see where to click to add a label (item 4).
   if (!hasLabel && !isEditing && !selected && !isSourceAnchored) return null;
@@ -523,9 +543,18 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
 
   return (
     <g>
-      {/* Dotted tether: while dragging the label, or whenever the connector
-          is selected (item 5) so the label-to-line link is always clear. */}
-      {!isEditing && (isDraggingLabel || selected) && (() => {
+      {/* Dotted tether: while dragging the label, whenever the connector is
+          selected (item 5), and — Paul, 2026-09-04 — ALWAYS for a label on a
+          branch out of a gateway that has been moved off its own line.
+          "Labels on connectors from Gateways need to show their tethers for
+          clarity."
+
+          R5.12 moves those labels off shapes and off each other, which is what
+          makes them readable; the cost is that a moved label no longer touches
+          the line it names, and on a four-way gateway there is nothing to say
+          which branch "otherwise" belongs to. Only when it is actually adrift,
+          though: a tether under a label still sitting on its line is noise. */}
+      {!isEditing && (isDraggingLabel || selected || branchLabelAdrift) && (() => {
         // Compute intersection of tether line with label box boundary
         const boxL = lCx - effectiveLWidth / 2 - 3;
         const boxR = lCx + effectiveLWidth / 2 + 3;
@@ -1255,6 +1284,7 @@ function ConnectorRendererInner({ connector, selected, onSelect, svgToWorld, onU
           hideLabel={hideLabel}
           sourceIsPool={sourceIsPool}
           targetIsPool={targetIsPool}
+          sourceType={sourceType}
         />
       )}
 

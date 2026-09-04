@@ -4655,6 +4655,18 @@ export function Canvas({
     () => new Map(data.elements.map((e) => [e.id, getElementPoolId(e, data.elements)] as const)),
     [data.elements],
   );
+  /**
+   * Element type by id, so a connector can ask what it leaves FROM without a
+   * find() per connector per frame. A branch label needs it: a label on a
+   * connector out of a gateway is moved off its line by R5.12 to keep it off
+   * shapes, and once moved there is nothing saying which line it names — hence
+   * the tether. Paul, 2026-09-04: "Labels on connectors from Gateways need to
+   * show their tethers for clarity."
+   */
+  const elTypeById = useMemo(
+    () => new Map(data.elements.map((e) => [e.id, e.type] as const)),
+    [data.elements],
+  );
   const poolIdOf = useCallback(
     (el: DiagramElement): string | null =>
       poolIdByElement.has(el.id) ? (poolIdByElement.get(el.id) ?? null) : getElementPoolId(el, data.elements),
@@ -5804,6 +5816,7 @@ export function Canvas({
               <ConnectorRenderer
                 key={conn.id}
                 connector={conn}
+                sourceType={elTypeById.get(conn.sourceId)}
                 reviewLinkColor={reviewLinkColorFor(conn)}
                 selected={false}
                 onSelect={() => {
