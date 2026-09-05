@@ -42,7 +42,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **K** | Two data-object **labels** overlapping each other | `1087cac1` | |
 | **L** | Data Object labels must not overlap Gateway labels | `a81005ed`, `2bbd17fe` | |
 | **M** | Long connector labels wrap rather than sprawl | `e3e58f0c` | |
-| **AF** | **Merge INBOUND vertices** — V22.05 gateway "Which external assessment inputs are required?": a task BELOW the merge enters at the top vertex, one ABOVE enters at the bottom. J covered a gateway's OUTBOUND vertices; this is the mirror and was never on the list — not a mistaken pass | R6.34 — corpus facing-away arrivals 2 → 0 | **open** — retest |
+| **AF** | **Merge INBOUND vertices** — V22.05 gateway "Which external assessment inputs are required?": a task BELOW the merge enters at the top vertex, one ABOVE enters at the bottom. J covered a gateway's OUTBOUND vertices; this is the mirror and was never on the list — not a mistaken pass | R6.34 — corpus facing-away arrivals 2 → 0 | **PASS** — verified on V22.04, 2026-09-05 |
 
 ## Gateway branch labels — Paul: *"vital to reading the diagram… above all others"*
 
@@ -87,7 +87,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 
 ## Where it stands
 
-**Passed by Paul:** A, B, C, D, E, F, G, I, J, N, O, P, Z, AD — V22.04 on 2026-09-05: gateway connector labels fine, connectors to the merges fine, the sequence-connector crossing gone.
+**Passed by Paul:** A, B, C, D, E, F, G, I, J, N, O, P, Z, AD, AF — V22.04 on 2026-09-05: gateway connector labels fine, connectors to the merges fine, the sequence-connector crossing gone.
 
 **Open by Paul:** **H** — a single pass must produce a readable diagram. Built and
 measured (107 → 5 corpus defects) but not passed, and rightly: the measure is a
