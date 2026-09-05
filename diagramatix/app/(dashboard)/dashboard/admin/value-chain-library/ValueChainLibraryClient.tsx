@@ -28,6 +28,7 @@ import {
   type MdPromptType,
 } from "@/app/lib/valueChain/promptTemplates";
 import { tonesFor } from "@/app/lib/theme/featureColors";
+import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 
 interface Process { id: string; code: string; title: string; sortOrder: number }
@@ -58,6 +59,24 @@ export function ValueChainLibraryClient() {
   const [rows, setRows] = useState<Row[]>([]);
   const [genTypes, setGenTypes] = useState<MdPromptType[]>([...MD_PROMPT_TYPES]);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * The import preview. Paul, 2026-09-05: "The User should not have to click one
+   * generic button that may or may not do any or all of these. Separate Options
+   * would be best here. Make sure any changes are protected by confirmations."
+   *
+   * Choosing a file no longer imports it. It says what the file WOULD do —
+   * which chains are new, which already exist and how many prompts each of those
+   * would lose — and nothing is written until that has been read and confirmed.
+   * Replacing a regenerated chain discards hours of AI spend, which is not
+   * something to find out afterwards.
+   */
+  const [preview, setPreview] = useState<{
+    md: string; fileName: string;
+    chains: { code: string; title: string; prompts: number; exists: boolean; existingPrompts: number; published: boolean }[];
+  } | null>(null);
+  const [picked2, setPicked2] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState<null | { codes: string[]; replacing: string[] }>(null);
 
   const scheme = useFeatureColors();
   const tone = tonesFor(scheme, "processRepository");
@@ -97,12 +116,27 @@ export function ValueChainLibraryClient() {
     } finally { setBusy(false); }
   }, [load]);
 
-  const onImport = useCallback(async (file: File, replace: boolean) => {
+  /** Read the file and say what it WOULD do. Writes nothing. */
+  const onInspect = useCallback(async (file: File) => {
     const md = await file.text();
-    const j = await post({ action: "import", md, replace },
-      undefined) as { created?: number; updated?: number; prompts?: number; skipped?: number } | null;
-    if (j) setNote(`Imported — ${j.created ?? 0} new chain(s), ${j.updated ?? 0} replaced, ${j.prompts ?? 0} prompt(s)${j.skipped ? `, ${j.skipped} left alone (already present)` : ""}.`);
+    setError(null); setNote(null);
+    const j = await post({ action: "import", md, preview: true }, undefined) as
+      { chains?: { code: string; title: string; prompts: number; exists: boolean; existingPrompts: number; published: boolean }[] } | null;
+    if (!j?.chains?.length) return;
+    setPreview({ md, fileName: file.name, chains: j.chains });
+    // Default to the SAFE reading of the file: bring in what is new, touch
+    // nothing that already exists. Replacing is then a deliberate tick.
+    setPicked2(new Set(j.chains.filter((c) => !c.exists).map((c) => c.code)));
   }, [post]);
+
+  /** Apply the ticked chains. Only reached through the confirmation. */
+  const applyImport = useCallback(async (codes: string[]) => {
+    if (!preview) return;
+    const j = await post({ action: "import", md: preview.md, replace: true, codes }, undefined) as
+      { created?: number; updated?: number; prompts?: number } | null;
+    if (j) setNote(`Imported — ${j.created ?? 0} added, ${j.updated ?? 0} replaced, ${j.prompts ?? 0} prompt(s).`);
+    setPreview(null); setPicked2(new Set()); setConfirming(null);
+  }, [post, preview]);
 
   /** Regenerate, streaming progress the way the other AI tools do. */
   const regenerate = useCallback(async (code: string, types: MdPromptType[], processCode?: string, processCodes?: string[]) => {
@@ -161,6 +195,23 @@ export function ValueChainLibraryClient() {
 
   return (
     <div className="min-h-screen dgx-dashboard-bg">
+      {/* Nothing destructive happens without this. The message NAMES the chains
+          being replaced and what they lose, because "are you sure?" with no
+          subject is a button people learn to click through. */}
+      {confirming && (
+        <ConfirmDialog
+          title={confirming.replacing.length > 0 ? "Replace existing chains?" : "Import chains?"}
+          destructive={confirming.replacing.length > 0}
+          confirmLabel={confirming.replacing.length > 0 ? `Replace ${confirming.replacing.length}` : `Import ${confirming.codes.length}`}
+          message={
+            confirming.replacing.length > 0
+              ? `${confirming.replacing.join(", ")} are already in the library. Importing RESTATES them from the file: their processes and prompts are deleted and rewritten, and any regeneration work in them is lost. ${confirming.codes.length - confirming.replacing.length} other chain(s) will be added new.`
+              : `${confirming.codes.length} new chain(s) will be added. Nothing already in the library is touched.`
+          }
+          onConfirm={() => void applyImport(confirming.codes)}
+          onCancel={() => setConfirming(null)}
+        />
+      )}
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3">
         <Link href="/dashboard/admin" className="text-sm text-blue-600 hover:text-blue-800 underline">← SuperAdmin</Link>
         <h1 className="text-lg font-semibold text-gray-900">Process Repository</h1>
@@ -180,23 +231,83 @@ export function ValueChainLibraryClient() {
           <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
             <h2 className="text-sm font-semibold text-gray-900 mb-2">Import</h2>
             <p className="text-[11px] text-gray-500 mb-2">
-              Seed the library from a Process Repository markdown file. A chain already here is
-              left alone unless you choose Replace — an import restates a chain wholesale rather
-              than merging, since a half-merged chain would be worse than either version.
+              Choose a Process Repository markdown file and you will be shown, chain by chain,
+              what it contains and what is already here. You then decide per chain: <strong>add</strong> the
+              ones that are new, <strong>replace</strong> ones already in the library, or do both in
+              one go — nothing you leave unticked is touched. Replacing restates a chain
+              <em> wholesale</em> — its processes and prompts are deleted and rewritten from the file —
+              because a half-merged chain would be worse than either version.
             </p>
             <input ref={fileRef} type="file" accept=".md,text/markdown,text/plain" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) void onImport(f, (e.target as HTMLInputElement).dataset.replace === "1"); e.currentTarget.value = ""; }} />
-            <div className="flex gap-2">
-              <button disabled={busy} onClick={() => { if (fileRef.current) { fileRef.current.dataset.replace = "0"; fileRef.current.click(); } }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void onInspect(f); e.currentTarget.value = ""; }} />
+
+            {!preview && (
+              <button disabled={busy} onClick={() => fileRef.current?.click()}
                 className="px-3 py-1.5 text-xs font-medium rounded disabled:opacity-50"
                 style={{ background: tone.bg, color: tone.text }}>
-                Import new chains
+                Choose a .md file…
               </button>
-              <button disabled={busy} onClick={() => { if (fileRef.current) { fileRef.current.dataset.replace = "1"; fileRef.current.click(); } }}
-                className="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
-                Import &amp; replace
-              </button>
-            </div>
+            )}
+
+            {/* The preview. Nothing is written until a chain is ticked here and
+                the confirmation read — so "what will this do" is answered before
+                it does it, per chain, against the file's real contents. */}
+            {preview && (
+              <div className="mt-1">
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="text-xs text-gray-800">{preview.fileName}</span>
+                  <span className="text-[11px] text-gray-500">{preview.chains.length} chain(s) in this file</span>
+                  <button onClick={() => { setPreview(null); setPicked2(new Set()); }}
+                    className="ml-auto text-[11px] text-blue-600 hover:text-blue-800 underline">Choose another file</button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 mb-2 text-[11px]">
+                  <span className="font-medium text-gray-700">Tick to import:</span>
+                  <button onClick={() => setPicked2(new Set(preview.chains.filter((c) => !c.exists).map((c) => c.code)))}
+                    className="px-1.5 py-0.5 border border-gray-300 rounded hover:bg-gray-50">New only</button>
+                  <button onClick={() => setPicked2(new Set(preview.chains.map((c) => c.code)))}
+                    className="px-1.5 py-0.5 border border-red-300 text-red-700 rounded hover:bg-red-50">Everything (replaces)</button>
+                  <button disabled={picked2.size === 0} onClick={() => setPicked2(new Set())}
+                    className="px-1.5 py-0.5 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40">None</button>
+                </div>
+
+                <ul className="space-y-1 mb-3 max-h-64 overflow-y-auto">
+                  {preview.chains.map((c) => (
+                    <li key={c.code} className="flex items-center gap-2 text-[11px] border border-gray-200 rounded px-2 py-1">
+                      <input type="checkbox" checked={picked2.has(c.code)} disabled={busy}
+                        onChange={() => setPicked2((prev) => {
+                          const n = new Set(prev);
+                          if (n.has(c.code)) n.delete(c.code); else n.add(c.code);
+                          return n;
+                        })}
+                        className="h-3 w-3 accent-blue-600" />
+                      <span className="font-medium text-gray-900">{c.code}</span>
+                      <span className="text-gray-700 truncate">{c.title}</span>
+                      <span className="ml-auto shrink-0 text-gray-500">{c.prompts} prompt(s) in file</span>
+                      {c.exists ? (
+                        <span className="shrink-0 text-red-700 font-medium"
+                          title={`Already in the library with ${c.existingPrompts} prompt(s). Importing REPLACES it wholesale — those prompts are deleted and restated from the file.`}>
+                          replaces {c.existingPrompts} prompt(s){c.published ? " · published" : ""}
+                        </span>
+                      ) : (
+                        <span className="shrink-0 text-green-700">new</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  disabled={busy || picked2.size === 0}
+                  onClick={() => setConfirming({
+                    codes: [...picked2],
+                    replacing: preview.chains.filter((c) => picked2.has(c.code) && c.exists).map((c) => c.code),
+                  })}
+                  className="px-3 py-1.5 text-xs font-medium rounded disabled:opacity-50"
+                  style={{ background: tone.bg, color: tone.text }}>
+                  Import {picked2.size} chain{picked2.size === 1 ? "" : "s"}…
+                </button>
+              </div>
+            )}
           </section>
 
           <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">

@@ -12,6 +12,7 @@ import { checkPromptBranches } from "@/app/lib/valueChain/checkPromptBranches";
 import { checkPromptShapes } from "@/app/lib/valueChain/checkPromptShapes";
 import { selectRegenerationTargets } from "@/app/lib/valueChain/regenerationTargets";
 import { looksTruncated } from "@/app/lib/valueChain/checkPromptTruncated";
+import { planLibraryImport } from "@/app/lib/valueChain/importPlan";
 import {
   type ImportedChain, parseLibraryFromMd, renderChainMd, renderLibraryMd, renumber,
 } from "@/app/lib/valueChain/library";
@@ -121,6 +122,18 @@ const toImported = (c: ChainRow): ImportedChain => ({
   })),
 });
 
+/**
+ * What the library currently holds for a set of chain codes — the other half of
+ * the import decision. Kept out of the plan function so that stays pure and
+ * testable without a database.
+ */
+async function libraryStateFor(codes: string[]) {
+  const here = await prisma.valueChainLibrary.findMany({
+    where: { code: { in: codes } },
+    select: { code: true, publishedAt: true, _count: { select: { prompts: true } } },
+  });
+  return here.map((h) => ({ code: h.code, prompts: h._count.prompts, published: !!h.publishedAt }));
+}
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id || !isSuperuser(session)) {
@@ -139,10 +152,47 @@ export async function POST(req: Request) {
     const parsed = parseLibraryFromMd(md);
     if (parsed.length === 0) return NextResponse.json({ error: "No value chains found in that file" }, { status: 422 });
 
+    /**
+     * WHAT WOULD THIS FILE DO? Paul, 2026-09-05: "The User should not have to
+     * click one generic button that may or may not do any or all of these."
+     *
+     * A dry run: say which chains are new and which already exist, so the
+     * decision is made against the file's actual contents rather than its name.
+     * Replacing a chain deletes its processes and prompts, which on a
+     * regenerated chain is hours of AI spend, so it is not something to discover
+     * afterwards.
+     */
+    const existingChains = await libraryStateFor(parsed.map((c) => c.code));
+
+    if (body?.preview === true) {
+      // replace:false so the dry run reports the SAFE reading — the screen then
+      // ticks what to replace, and that tick is the consent.
+      return NextResponse.json({
+        ok: true,
+        chains: planLibraryImport({ parsed, existing: existingChains, codes: null, replace: false }),
+      });
+    }
+
+    /**
+     * WHICH chains to act on. Absent, every chain in the file — the behaviour
+     * the two original buttons had. Present, only those named, which is what
+     * makes "selectively update" possible without a second file.
+     */
+    const onlyCodes = Array.isArray(body?.codes)
+      ? (body.codes as unknown[]).filter((c): c is string => typeof c === "string")
+      : null;
+
+    // The SAME decision the preview showed, so the panel cannot promise "new"
+    // and then replace.
+    const plan = new Map(
+      planLibraryImport({ parsed, existing: existingChains, codes: onlyCodes, replace })
+        .map((r) => [r.code, r.action]),
+    );
+
     let created = 0, updated = 0, prompts = 0;
     for (const c of parsed) {
+      if (plan.get(c.code) === "skip") continue;
       const existing = await prisma.valueChainLibrary.findUnique({ where: { code: c.code } });
-      if (existing && !replace) continue;
       // Replace wholesale rather than merge: an import is a restatement of the
       // chain, and a half-merged chain (old processes, new prompts) would be
       // worse than either version on its own.

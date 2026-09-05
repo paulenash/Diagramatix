@@ -66,7 +66,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **AH** | Show the last Master Template change date/time | version + date on the master-templates card | |
 | **AI** | A tile showing when each chain's prompts were last generated, with chains RED where that predates the last template change | red `pre-vN` badge per prompt; "Needs attention" now ticks stale prompts too | |
 | **AJ** | A change history per Master Diagram Prompt Template — what and when; backfill BPMN; by diagram-type chip; master prompt templates only | `MD_PROMPT_TEMPLATE_HISTORY` — 7 BPMN versions backfilled from git, shown by chip | |
-| **AK** | Separate, confirmed options on the .md upload — replace all / selectively update / add new — not one generic button | **not built** | |
+| **AK** | Separate, confirmed options on the .md upload — replace all / selectively update / add new — not one generic button | choosing a file now PREVIEWS it: per chain, what the file holds vs what the library holds and how many prompts a replace destroys. Tick per chain (New only / Everything / None), then a `ConfirmDialog` that NAMES the chains being replaced. `planLibraryImport` is the one decision the preview and the import both make, so they cannot disagree | |
 
 ## Editing — what happens when you touch a diagram
 
