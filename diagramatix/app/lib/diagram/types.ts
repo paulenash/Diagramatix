@@ -440,6 +440,28 @@ export interface AiGeneration {
    *  regeneration updates it in place). False/absent when the user generated from
    *  their own saved Prompt (which we link to but never overwrite). */
   autoNamed?: boolean;
+  /**
+   * The Process Repository prompt this came from, when it came from one. Lets
+   * the Properties panel say "the prompt you generated this from has been
+   * regenerated since" without guessing. Absent on diagrams generated before
+   * the stamp existed — those fall back to the leading process code in the
+   * diagram name, which is how the batch runner names them.
+   */
+  source?: DiagramPromptSource;
+}
+
+/** Where a generated diagram prompt came from in the Process Repository. */
+export interface DiagramPromptSource {
+  kind: "value-chain-library";
+  /** "V22" */
+  chainCode: string;
+  /** "V22.06", or "" for a chain-level prompt. */
+  processCode: string;
+  promptType: string;
+  /** When the PROMPT was generated — the thing a later regeneration moves. */
+  promptGeneratedAt: string | null;
+  /** The master template version that prompt was written to. */
+  templateVersion: number;
 }
 
 /** Metadata a generate/regenerate panel hands back with the laid-out diagram, so

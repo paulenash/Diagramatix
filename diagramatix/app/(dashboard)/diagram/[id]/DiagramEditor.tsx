@@ -1430,6 +1430,30 @@ export function DiagramEditor({
   const usesPlanPanel = diagramType === "bpmn" || diagramType === "flowchart";
   // Regenerate prefill: when the user hits "Regenerate" in Diagram Properties we
   // open the AI/Plan panel with the linked prompt's CURRENT text + a chosen model.
+  /**
+   * Has the prompt this diagram came from moved on since?
+   *
+   * Asked once per diagram, of the server, because the answer lives in the
+   * Process Repository rather than in the diagram — the diagram only knows when
+   * IT was made. Failing quietly is right: a missing warning is a smaller harm
+   * than an editor that will not open.
+   */
+  const [aiFreshness, setAiFreshness] = useState<{ level: "warn" | "info"; text: string }[]>([]);
+  useEffect(() => {
+    if (!data.aiGeneration) { setAiFreshness([]); return; }
+    let live = true;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/diagrams/${diagramId}/freshness`, { cache: "no-store" });
+        if (!res.ok) return;
+        const j = await res.json() as { notes?: { level: "warn" | "info"; text: string }[] };
+        if (live) setAiFreshness(j.notes ?? []);
+      } catch { /* a warning we could not fetch is not worth an error */ }
+    })();
+    return () => { live = false; };
+    // Re-asked when the diagram is regenerated, which is exactly when it changes.
+  }, [diagramId, data.aiGeneration?.generatedAt, data.aiGeneration]);
+
   const [aiPrefill, setAiPrefill] = useState<{ prompt: string; model: string } | null>(null);
   // Armed by applyAiResult after a generation; the next canvas click dismisses the AI panel.
   const aiJustGeneratedRef = useRef(false);
@@ -5844,6 +5868,7 @@ export function DiagramEditor({
             sessionParentId={parentDiagram?.id}
             onNavigateToDiagram={handleDrillIntoSubprocess}
             aiGeneration={data.aiGeneration}
+            aiFreshness={aiFreshness}
             aiModels={aiModels}
             currentAiModelId={currentAiModel?.id}
             onRegenerate={handleRegenerate}

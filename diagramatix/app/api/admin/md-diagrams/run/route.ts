@@ -13,6 +13,7 @@ import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { AI_INVOCATION_POINTS, enterAiContext, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 import { uniqueDiagramName } from "@/app/lib/valueChain/uniqueDiagramName";
+import { latestTemplateVersion, MD_PROMPT_TYPES, type MdPromptType } from "@/app/lib/valueChain/promptTemplates";
 
 /**
  * SuperAdmin — "Create Project Diagrams from .md" batch runner.
@@ -96,7 +97,22 @@ export async function POST(req: Request) {
     const diagrams = [
       ...order.flatMap((t) => live.filter((p) => p.type === t && !p.processCode)),
       ...row.processes.flatMap((proc) => live.filter((p) => p.type === "bpmn" && p.processCode === proc.code)),
-    ].map((p) => ({ name: p.name, type: p.type as ParsedDiagram["type"], prompt: p.publishedPrompt! }));
+    ].map((p) => ({
+      name: p.name, type: p.type as ParsedDiagram["type"], prompt: p.publishedPrompt!,
+      // Where this prompt came from and WHEN it was written, carried onto the
+      // diagram below. Without it a diagram cannot say "the prompt I came from
+      // has moved on since", which is the question Paul asked it to answer.
+      source: {
+        kind: "value-chain-library" as const,
+        chainCode: row.code,
+        processCode: p.processCode,
+        promptType: p.type,
+        promptGeneratedAt: p.generatedAt ? p.generatedAt.toISOString() : null,
+        templateVersion: latestTemplateVersion(
+          MD_PROMPT_TYPES.includes(p.type as MdPromptType) ? (p.type as MdPromptType) : "bpmn",
+        ).version,
+      },
+    }));
     chain = { code: row.code, title: row.publishedTitle ?? row.title, diagrams };
   } else {
     chain = parseValueChainMd(md).find((c) => c.code === chainCode);
@@ -284,6 +300,7 @@ export async function POST(req: Request) {
             ...(promptId ? { promptId, promptName } : {}),
             promptText: d.prompt, model,
             generatedAt: new Date().toISOString(), autoNamed: true,
+            ...((d as { source?: unknown }).source ? { source: (d as { source?: unknown }).source } : {}),
             ...(plan ? { plan } : {}),
             ...(diagnostics.length ? { diagnostics } : {}),
           };

@@ -2,7 +2,7 @@
 
 Every item Paul raised that drove the diagram-quality work, lettered so progress
 can be reported against a stable reference. **A–Z is fixed: never renumber, never
-reuse.** A new item becomes AL, AM, …
+reuse.** A new item becomes AN, AO, …
 
 **Two columns, deliberately.** *Built* is what was done and the commit that did
 it. *Paul* is his verdict, and it is the only one that closes an item — Paul,
@@ -59,13 +59,15 @@ Kept in the repo rather than in a chat so it survives a new session.
 | | Item | Built | Paul |
 |---|---|---|---|
 | **S** | V22.04: swap the two connector endpoints on task "Record triage decision and allocation" | not needed as a pass — fixing the ATTACHMENT geometry (J, AF) removed it at source | **PASS** — "V22.04 … 3. Sequence connector crossing now gone!", 2026-09-05 |
-| **T** | V22.07: **move** one attachment point at gateway "Endorse decline and confirm reasons" (move, not swap) | **NOT fixed** — the earlier "removed at source" claim was wrong for T. Replaying V22.07's stored plan through today's layout (`scripts/report-crossings.ts`) still finds it, and only it: gateway `gw_approver` "Delegated approver outcome?" leaves for "Endorse decline…" from its CENTRE (1844,1073) and routes LEFT to x=1787 — outside its own left edge at 1824 — before dropping, straight through the boundary timer's run to "Escalate approval…" at y=1075 | **open** |
+| **T** | V22.07: **move** one attachment point at gateway "Endorse decline and confirm reasons" (move, not swap) | **R55.7** — the crossing was the symptom: the boundary timer's exception task "Escalate approval…" was drawn ON TOP of the gateway (both at x=1824, y=1034 vs 1053), so the decline branch squeezed out past its own left edge. R55.6 could not reach it — it fires only for a boundary event on a SUBPROCESS and clears only its own host. R55.7 gives the exception path a row clear of everything on the main line, iterating because clearing the gateway lands it on the decline task. Plus: a boundary event's connector now enters a diagonally-placed target from the SIDE, so its sideways leg runs below the traffic. **V22.07 now: 0 defects, 0 crossings** (was 1 body overlap + 1 crossing). V22.01 also improved 3 → 1 | |
 | **U** | Swap **Data Objects** to remove association crossings | R8.37 — corpus crossings 16 → 12, no readability cost | **PASS** — no crossings left on V22.04, 2026-09-05 |
 | **V** | V22.06 gateway "Investigation warranted?" — the simple swap case | **unknown** — the V22.06 export in Downloads is from 2026-09-04 18:46, minutes before plan storage shipped, so it carries no plan and cannot be replayed. Regenerate V22.06 and it becomes measurable | **open** — needs a regeneration first |
 | **AG** | **V22.05**: the connector to "Record provisional quantum on best available evidence" is not in its proper path, and renders ABOVE the EMIE it connects to, crossing it | R55.6 — the exception path is re-asserted clear of its host before the connectors are built | **PASS** — V22.05 regenerated 2026-09-05: task 21px clear of its host, connector drops straight down, diagram at zero diagnostics |
 | **AH** | Show the last Master Template change date/time | version + date on the master-templates card | |
 | **AI** | A tile showing when each chain's prompts were last generated, with chains RED where that predates the last template change | red `pre-vN` badge per prompt; "Needs attention" now ticks stale prompts too | |
 | **AJ** | A change history per Master Diagram Prompt Template — what and when; backfill BPMN; by diagram-type chip; master prompt templates only | `MD_PROMPT_TEMPLATE_HISTORY` — 7 BPMN versions backfilled from git, shown by chip | |
+| **AL** | Mark value chains whose prompts predate a master template change, and when a chain is chosen, name **which diagrams** need new prompts | `chainStaleness` — a red count on each chain in the list, and on the selected chain a panel naming every process, "no prompt at all" called out separately from "written to an older template", with a **Tick these N** button that feeds the regenerate selection | |
+| **AM** | A diagram generated **before** its prompt was regenerated must say so in its Properties panel | `diagramFreshness` + `GET /api/diagrams/[id]/freshness`. Three separate notes, because the remedies differ: the prompt moved (regenerate the diagram), the master template moved (regenerate the prompt FIRST), and no AI plan was stored (it cannot be replayed offline — the V22.04 / V22.06 case). Silent when the diagram is current. Works on diagrams generated before the stamp existed, by reading the process code off the diagram's name | |
 | **AK** | Separate, confirmed options on the .md upload — replace all / selectively update / add new — not one generic button | `7d3d75c4` — choosing a file now PREVIEWS it: per chain, what the file holds vs what the library holds and how many prompts a replace destroys. Tick per chain (New only / Everything / None), then a `ConfirmDialog` that NAMES the chains being replaced. `planLibraryImport` is the one decision the preview and the import both make, so they cannot disagree | **PASS** — "AK is fine", 2026-09-05 |
 
 ## Editing — what happens when you touch a diagram
@@ -99,15 +101,15 @@ corpus number, the bar is a diagram Paul would send someone.
 
 **Open, with work still to do:**
 
-- **T** — measured on 2026-09-05 and still present. A gateway branch leaves from
-  the gateway's CENTRE and routes backwards past its own left edge. Mine to fix.
 - **V** — cannot be measured: the V22.06 export predates plan storage by minutes,
-  so there is no plan to replay. One regeneration makes it testable.
+  so there is no plan to replay. One regeneration makes it testable — and the
+  Repository and Properties panels now SAY so rather than leaving it to a
+  comparison of file timestamps against a deploy log.
 - **W** — three fixes, still failing. Waiting on a DevTools reading of what
   actually receives the click; a fourth theory without that would be a guess.
 - **H** — the umbrella. Closes when the rest do.
 
-**Untested — waiting on Paul:** K, L, M, R, X, Y, AA, AC, AH, AI, AJ. All are
+**Untested — waiting on Paul:** K, L, M, R, T, X, Y, AA, AC, AH, AI, AJ, AL, AM. All are
 built and deployed. K, L, M and R need a regenerated diagram to show up on; X and
 Y need an editing session; AH, AI and AJ are on the SuperAdmin screens and need
 no regeneration at all.

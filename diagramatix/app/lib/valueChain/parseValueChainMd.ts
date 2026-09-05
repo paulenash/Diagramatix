@@ -40,6 +40,27 @@ export interface ParsedDiagram {
   type: ParsedDiagramType;
   /** The verbatim prompt text (inside the ```text fence) handed to AI Generate. */
   prompt: string;
+  /**
+   * Where this prompt came from, when the run reads the LIBRARY rather than a
+   * markdown file. Stamped onto the generated diagram so it can later answer
+   * "has the prompt I came from moved on since?" — which nothing could, before.
+   * Absent for a run from a .md, which has no regeneration history to compare to.
+   */
+  source?: DiagramPromptSource;
+}
+
+/** The library identity of the prompt a diagram was generated from. */
+export interface DiagramPromptSource {
+  kind: "value-chain-library";
+  /** "V22" */
+  chainCode: string;
+  /** "V22.06", or "" for a chain-level prompt. */
+  processCode: string;
+  promptType: string;
+  /** When the PROMPT was generated — the thing a later regeneration moves. */
+  promptGeneratedAt: string | null;
+  /** The master template version that prompt was written to. */
+  templateVersion: number;
 }
 
 export interface ParsedValueChain {

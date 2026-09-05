@@ -152,6 +152,9 @@ interface Props {
   /** Link + snapshot of the AI Prompt that last generated this diagram (Diagram
    *  Properties shows the prompt name link + a Regenerate control). */
   aiGeneration?: AiGeneration;
+  /** Whether this diagram still matches the prompt it came from — see
+   *  `GET /api/diagrams/[id]/freshness`. Empty when it is current. */
+  aiFreshness?: { level: "warn" | "info"; text: string }[];
   /** Cost-gated generate models the user may pick for a regeneration. */
   aiModels?: AllowedModel[];
   currentAiModelId?: string;
@@ -813,6 +816,7 @@ export function PropertiesPanel({
   sessionParentId,
   onNavigateToDiagram,
   aiGeneration,
+  aiFreshness,
   aiModels = [],
   currentAiModelId,
   onRegenerate,
@@ -1105,6 +1109,19 @@ export function PropertiesPanel({
         })()}
         {aiGeneration && (
           <div className="mb-1 border-t border-gray-100 pt-1">
+            {/* The diagram is a picture of an instruction. When that instruction
+                has since changed, the picture is wrong in a way nothing about
+                looking at it reveals — so it is said here, above the actions,
+                where the person deciding whether to regenerate will read it. */}
+            {(aiFreshness ?? []).map((n, i) => (
+              <div key={i}
+                className={"mb-1 rounded px-1.5 py-1 text-[9px] leading-snug border "
+                  + (n.level === "warn"
+                    ? "border-red-200 bg-red-50 text-red-800"
+                    : "border-gray-200 bg-gray-50 text-gray-600")}>
+                {n.level === "warn" ? "⚠ " : "ⓘ "}{n.text}
+              </div>
+            ))}
             <div className="flex items-start gap-1">
               <span className="text-[9px] text-gray-500 w-12 shrink-0 pt-0.5">AI Prompt</span>
               <div className="flex-1 min-w-0">

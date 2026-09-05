@@ -5680,6 +5680,70 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R55.7: an exception path clears whatever is already on its row ──
+  //
+  // Paul's item T, on V22.07: "move one attachment point at gateway 'Endorse
+  // decline and confirm reasons'". The crossing he could see was the symptom.
+  // Underneath, "Escalate approval to the next authority level" — the exception
+  // task hanging off the boundary timer — had been placed at y=1034 x=1824,
+  // directly ON TOP of the gateway "Delegated approver outcome?" at y=1053
+  // x=1824. Two bodies drawn over each other; the gateway's branch then had to
+  // squeeze out sideways past its own left edge, and that detour is what crossed
+  // the escalation flow.
+  //
+  // R55.6 could not reach it twice over: it only fires for a boundary event on a
+  // SUBPROCESS, and it only clears the event's own HOST. Here the host is a task,
+  // and the thing in the way is an unrelated gateway further down the main line —
+  // which had itself descended, into the row the exception path had been given.
+  //
+  // So the relationship to re-assert is the general one: an exception path's
+  // first step belongs on a row of its own, clear of everything that is not part
+  // of that path. Iterated, because clearing one obstacle can reveal the next —
+  // in V22.07, clearing the gateway lands it on the decline task.
+  //
+  // Before the connectors are built, for the same reason R55.6 is: nothing is
+  // routed yet, so the move costs nothing and can break no waypoints.
+  for (const ev of elements) {
+    if (ev.type !== "intermediate-event" || !ev.boundaryHostId) continue;
+    const host = elMap.get(ev.boundaryHostId);
+    if (!host) continue;
+    const out = connectors.filter(c => c.type === "sequence" && c.sourceId === ev.id);
+    if (out.length !== 1) continue;
+    const first = elMap.get(out[0].targetId);
+    if (!first || first.parentId !== host.parentId) continue; // another lane's business
+    if (first.parentId === host.id) continue;                 // genuinely one of its children
+
+    // Down when the event hangs off the host's lower half, up when the upper —
+    // the same reading R55.6 takes, so the two rules never fight over direction.
+    const down = (ev.y + ev.height / 2) > (host.y + host.height / 2);
+    // The path's own members cannot be obstacles to themselves, and neither can
+    // the host it hangs off (that is R55.6's job, with its own smaller gap).
+    const mine = new Set<string>([first.id, ev.id, host.id]);
+    for (const e of elements) if (emieSubPathIds.has(e.id)) mine.add(e.id);
+
+    const GAP = 24;
+    let moved = 0;
+    for (let pass = 0; pass < 6; pass++) {
+      const blockers = elements.filter(e =>
+        !mine.has(e.id) && e.parentId === first.parentId
+        && e.type !== "pool" && e.type !== "lane"
+        && e.x < first.x + first.width && e.x + e.width > first.x
+        && e.y < first.y + first.height && e.y + e.height > first.y);
+      if (blockers.length === 0) break;
+      const dy = down
+        ? Math.max(...blockers.map(b => b.y + b.height)) + GAP - first.y
+        : Math.min(...blockers.map(b => b.y)) - GAP - (first.y + first.height);
+      if (Math.abs(dy) < 0.5) break;
+      shiftSubtree(first.id, dy);
+      first.y += dy;
+      moved += dy;
+    }
+    if (moved !== 0 && host.parentId) {
+      const owner = elMap.get(host.parentId);
+      if (owner?.type === "pool" || owner?.type === "lane") expandContainerToFitChildren(owner.id, owner.type);
+    }
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // Compute waypoints for all connectors
@@ -5702,7 +5766,17 @@ export function layoutBpmnDiagram(
       const tcx = tgt.x + tgt.width / 2, tcy = tgt.y + tgt.height / 2;
       const dx = ecx - tcx, dy = ecy - tcy;
       const nx = Math.abs(dx) / (tgt.width / 2 || 1), ny = Math.abs(dy) / (tgt.height / 2 || 1);
-      conn.targetSide = (nx >= ny ? (dx >= 0 ? "right" : "left") : (dy >= 0 ? "bottom" : "top")) as Connector["targetSide"];
+      // A target that is BOTH clearly below/above AND clearly to one side is
+      // entered from the SIDE, not the end. Reaching a diagonal target vertically
+      // forces the route to travel sideways at some middle height, straight
+      // through whatever occupies the corridor between - on V22.07 that was the
+      // gateway decline branch dropping at x=1844, and the escalation flow cut
+      // across it. Coming in from the side puts the sideways leg at the target own
+      // centre line, below the traffic.
+      const diagonal = Math.abs(dx) > tgt.width && Math.abs(dy) > tgt.height;
+      conn.targetSide = ((diagonal || nx >= ny)
+        ? (dx >= 0 ? "right" : "left")
+        : (dy >= 0 ? "bottom" : "top")) as Connector["targetSide"];
     }
     const logSlow = () => {
       const dur = Date.now() - tConn;

@@ -27,6 +27,7 @@ import {
   MD_PROMPT_TYPES, MD_PROMPT_LABEL, latestTemplateVersion, promptIsStale,
   type MdPromptType,
 } from "@/app/lib/valueChain/promptTemplates";
+import { chainStaleness } from "@/app/lib/valueChain/staleness";
 import { tonesFor } from "@/app/lib/theme/featureColors";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
@@ -339,6 +340,21 @@ export function ValueChainLibraryClient() {
                           {c.processes.length} processes · {c.prompts.length} prompts
                           {c.groupName && ` · ${c.groupName}`}
                         </span>
+                        {/* A chain whose prompts predate the current master template.
+                            RED because the remedy costs AI spend and the consequence
+                            of ignoring it is a diagram that looks fine and is wrong —
+                            which is exactly how V22 came back twice with the same
+                            thirteen diagnostics. */}
+                        {(() => {
+                          const st = chainStaleness(c.processes, c.prompts);
+                          if (st.count === 0) return null;
+                          return (
+                            <span className="block text-[10px] font-medium text-red-700"
+                              title={`Prompts written to an older master template (current: v${st.currentVersion}, ${st.currentVersionAt}). Select the chain to see which.`}>
+                              ⚠ {st.count} prompt{st.count === 1 ? "" : "s"} older than template v{st.currentVersion}
+                            </span>
+                          );
+                        })()}
                       </button>
                     </li>
                   ))}
@@ -566,6 +582,17 @@ function PromptPanel({ chain, busy, rows, tone, genTypes, setGenTypes, onRegener
 
   const allCodes = chain.processes.map((p) => p.code);
 
+  /**
+   * Which of THIS chain's diagrams need new prompts, by name.
+   *
+   * Paul, 2026-09-06: "if a Value Chain is Chosen be more specific about which
+   * Diagram are in need of new Prompts." A count says do something; the names
+   * say what — and one prompt's name is one diagram's name, so this list reads
+   * as the diagrams that are about to be wrong.
+   */
+  const stale = useMemo(() => chainStaleness(chain.processes, chain.prompts),
+    [chain.processes, chain.prompts]);
+
   return (
     <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
       <div className="flex items-baseline justify-between mb-2">
@@ -575,6 +602,44 @@ function PromptPanel({ chain, busy, rows, tone, genTypes, setGenTypes, onRegener
           {missing > 0 && <span className="text-amber-700"> · {missing} missing</span>}
         </span>
       </div>
+
+      {stale.count > 0 && (
+        <div className="mb-3 rounded border border-red-200 bg-red-50 px-2.5 py-2">
+          <p className="text-[11px] font-medium text-red-800">
+            {stale.count} prompt{stale.count === 1 ? "" : "s"} predate{stale.count === 1 ? "s" : ""} master
+            template v{stale.currentVersion} ({stale.currentVersionAt})
+          </p>
+          <p className="text-[10px] text-red-700 mt-0.5 mb-1.5">
+            These diagrams will be generated from an instruction that has since changed.
+            Tick them below, or use <strong>Needs attention</strong>, and regenerate.
+          </p>
+          <ul className="space-y-0.5 max-h-40 overflow-y-auto">
+            {stale.missing.map((proc) => (
+              <li key={proc.code} className="text-[10px] text-red-800">
+                <span className="font-medium">{proc.code}</span> {proc.title}
+                <span className="ml-1 text-red-600">— no prompt at all</span>
+              </li>
+            ))}
+            {stale.stale.map((proc) => (
+              <li key={proc.code} className="text-[10px] text-red-800">
+                <span className="font-medium">{proc.code}</span> {proc.title}
+              </li>
+            ))}
+            {stale.staleChainPrompts.map((t) => (
+              <li key={t} className="text-[10px] text-red-800">
+                <span className="font-medium">{MD_PROMPT_LABEL[t]}</span>
+                <span className="ml-1 text-red-600">— chain-level prompt</span>
+              </li>
+            ))}
+          </ul>
+          <button
+            disabled={busy || stale.stale.length + stale.missing.length === 0}
+            onClick={() => setPicked(new Set([...stale.missing, ...stale.stale].map((x) => x.code)))}
+            className="mt-1.5 px-1.5 py-0.5 text-[10px] border border-red-300 text-red-700 rounded hover:bg-red-100 disabled:opacity-40">
+            Tick these {stale.stale.length + stale.missing.length}
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-1.5 mb-3">
         {MD_PROMPT_TYPES.map((t) => (

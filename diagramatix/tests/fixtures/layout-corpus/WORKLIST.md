@@ -9,29 +9,13 @@ worse; this says what the defects ARE so one can be picked up and finished.
 A diagram leaves this list when its count reaches zero — at which point its
 entry in `KNOWN` (tests/bpmn/layout-corpus.test.ts) is deleted.
 
-**5 diagram(s) with 10 defect(s)**, out of 26 in the corpus.
-
-## V02.01 V02.01 Identify Need  `V02.01.plan.json` — 1
-
-- BRANCH-LABEL/RUN: "Yes" lies along its own horizontal segment
+**2 diagram(s) with 3 defect(s)**, out of 26 in the corpus.
 
 ## V04.01 V04.01 Workforce Planning  `V04.01.plan.json` — 2
 
 - LABEL/BODY: label of "Headcount request rejected — no va" over "Budget Approval Record"
 - LABEL/LABEL: "Budget Approval Record" and "Headcount request rejected — no va"
 
-## V12.01 V12.01 Monitor Account Health & Usage  `V12.01.plan.json` — 2
-
-- connector label "No — data gaps identified" overlaps subprocess-expanded sp1
-- BRANCH-LABEL/RUN: "Yes" lies along its own horizontal segment
-
-## V17.01 V17.01 Plan Audit & Set Scope  `V17.01.plan.json` — 2
-
-- connector label "Yes — material change needed" overlaps task t5
-- connector label "Yes — material change needed" overlaps gateway gw2
-
-## V22.01 V22.01 Receive Notification  `V22.01.plan.json` — 3
+## V22.01 V22.01 Receive Notification  `V22.01.plan.json` — 1
 
 - shared attachment point pClaimant|bottom|0.500 — connectors conn-pClaimant-pCustomerPortal, conn-tSendAck-pClaimant
-- BODY/BODY: "Notification complete?" overlaps "Issue holding correspondence and e"
-- LABEL/LABEL: connector "Yes — all required details present" and label of "Notification complete?"

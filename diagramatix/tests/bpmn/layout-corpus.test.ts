@@ -59,7 +59,8 @@ const files = fs.existsSync(DIR) ? fs.readdirSync(DIR).filter((f) => f.endsWith(
  */
 const KNOWN: Record<string, number> = {
   "V04.01.plan.json": 2,
-  "V22.01.plan.json": 3,
+  // 3 -> 1 when R55.7 gave the exception path a row clear of the main line.
+  "V22.01.plan.json": 1,
 };
 
 describe("layout corpus — generated diagrams stay readable", () => {
