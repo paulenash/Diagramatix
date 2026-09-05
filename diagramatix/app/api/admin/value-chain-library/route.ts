@@ -96,11 +96,20 @@ export async function GET(req: Request) {
         // costs microseconds, so it needs no column and cannot go stale against
         // a prompt someone edited by hand.
         unterminatedBranches: checkPromptBranches(p.prompt).length,
+        /**
+         * ...and WHAT they are. Paul, 2026-09-06: "What does '1 undrawable'
+         * message mean?" A count names a quantity of something unnamed, and the
+         * answer was only in a hover title. These lines say which instruction,
+         * on which line, so the prompt can be read straight to it.
+         */
+        unterminatedDetail: checkPromptBranches(p.prompt).map(
+          (b) => `line ${b.line}: gateway "${b.gateway}" branch "${b.condition}" never says where it goes`),
         // Instructions BPMN cannot carry out — a boundary event on a
         // non-activity, a message flow between two lanes of one pool. Both
         // produce a faithful drawing of something invalid, so they have to be
         // caught in the prompt rather than in the diagram.
         undrawableShapes: checkPromptShapes(p.prompt).length,
+        undrawableDetail: checkPromptShapes(p.prompt).map((i) => `line ${i.line}: ${i.detail}`),
         // Why it looks unfinished, or null. A truncated prompt passed every
         // other check — a dangling `- branch "` is not a malformed branch, it
         // is no branch at all (Paul, 2026-09-04).

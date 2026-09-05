@@ -91,6 +91,7 @@ import { checkDiagram, rulesMetadata, type Violation } from "@/app/lib/diagram/c
 import { HistoryPanel } from "./HistoryPanel";
 import { ProcessDiffDialog } from "./ProcessDiffDialog";
 import { FilePreviewDialog, type PreviewPayload } from "@/app/components/preview/FilePreviewDialog";
+import { diagramFreshness } from "@/app/lib/valueChain/staleness";
 
 interface VisioImportResult {
   // Which importer produced this result — drives the result modal's wording
@@ -1438,21 +1439,56 @@ export function DiagramEditor({
    * IT was made. Failing quietly is right: a missing warning is a smaller harm
    * than an editor that will not open.
    */
-  const [aiFreshness, setAiFreshness] = useState<{ level: "warn" | "info"; text: string }[]>([]);
+  const [promptFacts, setPromptFacts] = useState<{
+    promptRegeneratedAt: string | null; currentTemplateVersion: number | null;
+    checkedPromptId: string | null; checkedPromptHasPlan: boolean;
+  } | null>(null);
   useEffect(() => {
-    if (!data.aiGeneration) { setAiFreshness([]); return; }
+    if (!data.aiGeneration) { setPromptFacts(null); return; }
     let live = true;
     void (async () => {
       try {
         const res = await fetch(`/api/diagrams/${diagramId}/freshness`, { cache: "no-store" });
         if (!res.ok) return;
-        const j = await res.json() as { notes?: { level: "warn" | "info"; text: string }[] };
-        if (live) setAiFreshness(j.notes ?? []);
+        const j = await res.json();
+        if (live) setPromptFacts(j);
       } catch { /* a warning we could not fetch is not worth an error */ }
     })();
     return () => { live = false; };
-    // Re-asked when the diagram is regenerated, which is exactly when it changes.
-  }, [diagramId, data.aiGeneration?.generatedAt, data.aiGeneration]);
+    // Only the library's side is fetched, so this need not re-run on every edit.
+  }, [diagramId, data.aiGeneration?.promptId]);
+
+  /**
+   * Paul, 2026-09-06: "This does not go away after diagram is regenerated, it
+   * does go away after leaving and re-entering the diagram. Clear it immediately
+   * on regeneration."
+   *
+   * It was computed entirely on the server, which reads the diagram from the
+   * DATABASE — and after an in-editor regeneration the new timestamp is in local
+   * state, not yet auto-saved. So the server truthfully answered a question
+   * about the previous version, and kept doing so until the save landed.
+   *
+   * Split by who knows what: the server supplies the library's side (when the
+   * prompt was last regenerated, which version is current), and the diagram's
+   * own side is read from LIVE state. Regenerating then clears it on the same
+   * render, with no round trip at all.
+   */
+  const aiFreshness = useMemo(() => {
+    const gen = data.aiGeneration;
+    if (!gen || !promptFacts) return [];
+    return diagramFreshness({
+      diagramGeneratedAt: gen.generatedAt,
+      promptRegeneratedAt: promptFacts.promptRegeneratedAt,
+      templateVersionAtGeneration: gen.source?.templateVersion ?? null,
+      currentTemplateVersion: promptFacts.currentTemplateVersion,
+      // A plan on the diagram is the answer. Failing that, one on the linked
+      // Prompt still counts — that is where the editor used to put it, so most
+      // existing diagrams have it there and nothing is wrong with them. Only
+      // trusted while the diagram still points at the prompt the server checked.
+      hasPlan: !!gen.plan
+        || (promptFacts.checkedPromptHasPlan && promptFacts.checkedPromptId === gen.promptId),
+    });
+  }, [data.aiGeneration, promptFacts]);
 
   const [aiPrefill, setAiPrefill] = useState<{ prompt: string; model: string } | null>(null);
   // Armed by applyAiResult after a generation; the next canvas click dismisses the AI panel.
@@ -1505,6 +1541,16 @@ export function DiagramEditor({
         aiGeneration = {
           promptId: linked.id, promptName: linked.name, promptText: meta.promptText,
           model: meta.model, generatedAt: new Date().toISOString(), autoNamed: linked.autoNamed,
+          // Keep the plan ON THE DIAGRAM. It was only ever written to the linked
+          // Prompt, so regenerating in the editor silently dropped the diagram's
+          // own copy — and the Properties panel then said, correctly by its own
+          // reading and uselessly to anyone looking at it, that the diagram it
+          // had just regenerated had no plan.
+          ...(meta.planJson ? { plan: meta.planJson } : {}),
+          // A regeneration does not change WHICH repository prompt this diagram
+          // came from. Dropping the stamp lost the template-version warning for
+          // good the first time anyone regenerated.
+          ...(data.aiGeneration?.source ? { source: data.aiGeneration.source } : {}),
         };
       }
     }

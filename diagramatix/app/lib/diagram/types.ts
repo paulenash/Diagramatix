@@ -448,6 +448,16 @@ export interface AiGeneration {
    * diagram name, which is how the batch runner names them.
    */
   source?: DiagramPromptSource;
+  /**
+   * The raw pre-layout plan this diagram was drawn from.
+   *
+   * Kept on the DIAGRAM, not only on the linked Prompt, because it is the
+   * diagram that gets re-laid-out: scripts/replay-diagram.ts replays this to
+   * test a layout change offline for nothing. A diagram without it can only be
+   * retested by spending an AI call, which is what made V22.04 and V22.06
+   * unmeasurable.
+   */
+  plan?: { elements: unknown[]; connections: unknown[] };
 }
 
 /** Where a generated diagram prompt came from in the Process Repository. */

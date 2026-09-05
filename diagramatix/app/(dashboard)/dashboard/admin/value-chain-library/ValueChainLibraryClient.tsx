@@ -40,6 +40,9 @@ interface Prompt {
   unterminatedBranches: number;
   /** Instructions BPMN cannot carry out. 0 is the healthy value. */
   undrawableShapes: number;
+  /** What those two counts actually ARE — one readable line each. */
+  unterminatedDetail?: string[];
+  undrawableDetail?: string[];
   truncated: string | null;
 }
 interface Chain {
@@ -769,7 +772,7 @@ function PromptRow({ label, prompt, open, setOpen, onRegenerate, busy, ticked, o
                 className="text-[10px] text-red-700"
                 title={`${prompt.undrawableShapes} instruction(s) BPMN cannot carry out — a boundary event on something that is not an activity, or a message flow between two lanes of one pool. The diagram will be drawn faithfully and be wrong.`}
               >
-                {prompt.undrawableShapes} undrawable
+                {prompt.undrawableShapes} instruction{prompt.undrawableShapes === 1 ? "" : "s"} BPMN cannot draw
               </span>
             )}
             {prompt.unterminatedBranches > 0 && (
@@ -790,6 +793,20 @@ function PromptRow({ label, prompt, open, setOpen, onRegenerate, busy, ticked, o
           {prompt ? "Regenerate" : "Generate"}
         </button>
       </div>
+      {prompt && ((prompt.undrawableDetail?.length ?? 0) > 0 || (prompt.unterminatedDetail?.length ?? 0) > 0) && (
+        <ul className="border-t border-gray-200 bg-red-50/60 px-2.5 py-1.5 space-y-0.5">
+          {(prompt.undrawableDetail ?? []).map((d, i) => (
+            <li key={`u${i}`} className="text-[10px] text-red-800">
+              <span className="font-medium">BPMN cannot draw this</span> — {d}
+            </li>
+          ))}
+          {(prompt.unterminatedDetail ?? []).map((d, i) => (
+            <li key={`b${i}`} className="text-[10px] text-amber-800">
+              <span className="font-medium">Branch never says where it goes</span> — {d}
+            </li>
+          ))}
+        </ul>
+      )}
       {isOpen && prompt && (
         <pre className="text-[10px] font-mono whitespace-pre-wrap border-t border-gray-200 bg-gray-50 p-2.5 max-h-80 overflow-y-auto text-gray-800">
           {prompt.prompt}
