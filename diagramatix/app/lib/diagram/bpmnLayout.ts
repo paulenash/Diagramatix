@@ -5573,6 +5573,62 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R6.34: no two branches ARRIVE at a merge by the same vertex ──
+  //
+  // The mirror of R6.33, and Paul asked for it from the other end. V22.05, the
+  // merge paired with "Which external assessment inputs are required?": "the
+  // connectors on its merge are not optimal. A task lower than the merge is
+  // connected to the top merge vertex, and a task above the merge is connected
+  // to the bottom vertex."
+  //
+  // R6.31 above is as narrow as R6.32 was before J: it bails unless there are
+  // exactly TWO inbound flows and exactly one of them is level. An inclusive
+  // split with three or four branches therefore reaches its merge on whatever
+  // sides were chosen when the connectors were built, long before the branches
+  // had their final rows — which is how a task below ends up entering at the
+  // top.
+  //
+  // Same three vertices, same arithmetic: a diamond offers top, LEFT and bottom
+  // for arrivals (right is where the flow leaves), R6.30 snaps every endpoint
+  // onto one of them, so four branches must double up. They double on the
+  // vertex the source genuinely points at rather than an arbitrary one.
+  for (const merge of elements) {
+    if (!isGateway(merge)) continue;                    // not isMergeGateway: a
+    // gateway that both merges and splits is neither, and its arrivals still
+    // need sorting — the same lesson that made R6.33 gate on the connectors.
+    const ins = connectors.filter(c => c.type === "sequence" && c.targetId === merge.id);
+    if (ins.length < 2) continue;
+
+    const mcy = merge.y + merge.height / 2;
+    const LEVEL = merge.height / 2 + 6;
+    const info = ins.map(c => {
+      const s = elMap.get(c.sourceId);
+      return { c, dy: s ? (s.y + s.height / 2) - mcy : 0 };
+    });
+
+    const collides = new Set(ins.map(c => c.targetSide)).size < ins.length;
+    if (ins.length < 3 && !collides) continue;
+
+    const want = (dy: number): Connector["targetSide"] =>
+      dy < -LEVEL ? "top" : dy > LEVEL ? "bottom" : "left";
+
+    const order = [...info].sort((a, b) => Math.abs(b.dy) - Math.abs(a.dy));
+    const taken = new Set<Connector["targetSide"]>();
+    for (const i of order) {
+      const first = want(i.dy);
+      let side = first;
+      if (taken.has(side)) {
+        const fallback: Connector["targetSide"][] = first === "top" ? ["left", "bottom"]
+          : first === "bottom" ? ["left", "top"]
+          : i.dy <= 0 ? ["top", "bottom"] : ["bottom", "top"];
+        side = fallback.find(s => !taken.has(s)) ?? first;
+      }
+      taken.add(side);
+      i.c.targetSide = side;
+      i.c.targetOffsetAlong = 0.5;                      // R6.30: on the vertex
+    }
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // Compute waypoints for all connectors

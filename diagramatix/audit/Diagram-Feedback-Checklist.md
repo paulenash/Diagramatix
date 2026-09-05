@@ -42,7 +42,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **K** | Two data-object **labels** overlapping each other | `1087cac1` | |
 | **L** | Data Object labels must not overlap Gateway labels | `a81005ed`, `2bbd17fe` | |
 | **M** | Long connector labels wrap rather than sprawl | `e3e58f0c` | |
-| **AF** | **Merge INBOUND vertices** — V22.05 gateway "Which external assessment inputs are required?": a task BELOW the merge enters at the top vertex, one ABOVE enters at the bottom. J covered a gateway's OUTBOUND vertices; this is the mirror (R6.31) and was never on the list — not a mistaken pass | **not built** | **open** |
+| **AF** | **Merge INBOUND vertices** — V22.05 gateway "Which external assessment inputs are required?": a task BELOW the merge enters at the top vertex, one ABOVE enters at the bottom. J covered a gateway's OUTBOUND vertices; this is the mirror and was never on the list — not a mistaken pass | R6.34 — corpus facing-away arrivals 2 → 0 | **open** — retest |
 
 ## Gateway branch labels — Paul: *"vital to reading the diagram… above all others"*
 
@@ -62,7 +62,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **T** | V22.07: **move** one attachment point at gateway "Endorse decline and confirm reasons" (move, not swap) | **not built** | |
 | **U** | Swap **Data Objects** to remove association crossings | R8.37 — corpus crossings 16 → 12, no readability cost | **open** — retest |
 | **V** | V22.06 gateway "Investigation warranted?" — the simple swap case | **not built** | |
-| **AG** | **V22.05**: the connector to "Record provisional quantum on best available evidence" is not in its proper path, and renders ABOVE the EMIE it connects to, crossing it | **not built** | **open** |
+| **AG** | **V22.05**: the connector to "Record provisional quantum on best available evidence" is not in its proper path, and renders ABOVE the EMIE it connects to, crossing it | **not built** — REPRODUCED and localised: the exception task lands at cy 1086, INSIDE its host subprocess's own 151px span (y 959–1110), so the connector dives below and climbs back | **open** |
 
 ## Editing — what happens when you touch a diagram
 

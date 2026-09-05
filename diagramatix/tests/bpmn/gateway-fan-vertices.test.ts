@@ -59,14 +59,32 @@ describe("gateway fan connection vertices (R6.26–R6.29)", () => {
     }
   });
 
-  it("T2830 — a 5-branch merge assigns inbound vertices top/left/bottom round-robin by source Y (R6.28)", () => {
+  /**
+   * SUPERSEDED, 2026-09-05, for the same reason as its outbound twin above.
+   * R6.28 assigned these round-robin by source Y — top, left, bottom, top, left
+   * — which brought the FOURTH branch, arriving from below, in at the TOP vertex.
+   * Paul reported exactly that on V22.05's merge: "a task lower than the merge is
+   * connected to the top merge vertex, and a task above the merge is connected to
+   * the bottom vertex."
+   *
+   * R6.34 assigns by where the source actually IS — above → top, level → left,
+   * below → bottom — so nothing arrives by the vertex facing away from it.
+   */
+  it("T2830 — a 5-branch merge is entered by the vertex facing its source (R6.34)", () => {
     const o = out();
     const cy = (id: string) => { const e = o.elements.find((x) => x.id === id)!; return e.y + e.height / 2; };
-    const sides = o.connectors
+    const m = o.elements.find((x) => x.id === "m")!;
+    const mcy = m.y + m.height / 2;
+    const rows = o.connectors
       .filter((c) => c.targetId === "m")
       .map((c) => ({ side: c.targetSide, y: cy(c.sourceId) }))
-      .sort((a, b) => a.y - b.y)
-      .map((x) => x.side);
-    expect(sides).toEqual(["top", "left", "bottom", "top", "left"]);
+      .sort((a, b) => a.y - b.y);
+    expect(rows.map((x) => x.side)).toEqual(["top", "left", "left", "bottom", "bottom"]);
+    // The property that survives any fan: nothing from above enters at the
+    // bottom, nothing from below enters at the top.
+    for (const r of rows) {
+      if (r.y < mcy - 26) expect(r.side, "an arrival from above must not enter at the bottom").not.toBe("bottom");
+      if (r.y > mcy + 26) expect(r.side, "an arrival from below must not enter at the top").not.toBe("top");
+    }
   });
 });
