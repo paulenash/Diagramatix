@@ -2,7 +2,7 @@
 
 Every item Paul raised that drove the diagram-quality work, lettered so progress
 can be reported against a stable reference. **A–Z is fixed: never renumber, never
-reuse.** A new item becomes AH, AI, …
+reuse.** A new item becomes AL, AM, …
 
 **Two columns, deliberately.** *Built* is what was done and the commit that did
 it. *Paul* is his verdict, and it is the only one that closes an item — Paul,
@@ -51,18 +51,22 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **N** | Branch labels need a **tether** so you can tell which flow is which | `dc1b5059` |**PASS** |
 | **O** | The tether must leave **1/3 along the main outgoing segment**, not at the vertex or mid-connector | `713a8686` |**PASS** |
 | **P** | Trim the label box's empty ends — the tether leaves from that boundary | `713a8686` |**PASS** |
-| **Q** | Labels **in the same vertical order as their attachment points**, and not overlapping. Ties break on the target's vertical position; **order wins** over shape clearance | **not built** | |
+| **Q** | Labels **in the same vertical order as their attachment points**, and not overlapping. Ties break on the target's vertical position; **order wins** over shape clearance | R5.13 — swaps labels between vetted positions. Fixes 1 of the 4 misordered gateways; the other 3 are refused because reordering them creates overlaps | **open** — see note |
 | **R** | Home positions: right of the gateway — top-right, just above centre, bottom-right | mostly already true; completed by **Q** | |
 
 ## Crossings — Paul's move/swap examples
 
 | | Item | Built | Paul |
 |---|---|---|---|
-| **S** | V22.04: swap the two connector endpoints on task "Record triage decision and allocation" | **not built** | |
-| **T** | V22.07: **move** one attachment point at gateway "Endorse decline and confirm reasons" (move, not swap) | **not built** | |
+| **S** | V22.04: swap the two connector endpoints on task "Record triage decision and allocation" | not needed as a pass — fixing the ATTACHMENT geometry (J, AF) removed these at source; 3 sequence crossings remain in the whole corpus | **open** — retest |
+| **T** | V22.07: **move** one attachment point at gateway "Endorse decline and confirm reasons" (move, not swap) | not needed as a pass — fixing the ATTACHMENT geometry (J, AF) removed these at source; 3 sequence crossings remain in the whole corpus | **open** — retest |
 | **U** | Swap **Data Objects** to remove association crossings | R8.37 — corpus crossings 16 → 12, no readability cost | **PASS** — no crossings left on V22.04, 2026-09-05 |
-| **V** | V22.06 gateway "Investigation warranted?" — the simple swap case | **not built** | |
+| **V** | V22.06 gateway "Investigation warranted?" — the simple swap case | not needed as a pass — fixing the ATTACHMENT geometry (J, AF) removed these at source; 3 sequence crossings remain in the whole corpus | **open** — retest |
 | **AG** | **V22.05**: the connector to "Record provisional quantum on best available evidence" is not in its proper path, and renders ABOVE the EMIE it connects to, crossing it | R55.6 — the exception path is re-asserted clear of its host before the connectors are built | **PASS** — V22.05 regenerated 2026-09-05: task 21px clear of its host, connector drops straight down, diagram at zero diagnostics |
+| **AH** | Show the last Master Template change date/time | **not built** | |
+| **AI** | A tile showing when each chain's prompts were last generated, with chains RED where that predates the last template change | **not built** | |
+| **AJ** | A change history per Master Diagram Prompt Template — what and when; backfill BPMN; by diagram-type chip; master prompt templates only | **not built** | |
+| **AK** | Separate, confirmed options on the .md upload — replace all / selectively update / add new — not one generic button | **not built** | |
 
 ## Editing — what happens when you touch a diagram
 

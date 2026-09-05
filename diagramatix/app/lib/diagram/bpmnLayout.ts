@@ -6605,6 +6605,140 @@ export function layoutBpmnDiagram(
       else { c.labelOffsetX = baseX; c.labelOffsetY = baseY; }         // leave it exactly as it was
     }
   }
+
+  // ── R5.13: a gateway's branch labels read in the order their branches leave ──
+  //
+  // Paul, 2026-09-04, having called this the priority: "The labels must at least
+  // be in the same vertical order as the connector attachment points they are
+  // associated with." And on the home positions: "to the right of the Gateway in
+  // vertical order (top right, just above the centre for the middle connector/s,
+  // and bottom right for the bottom connector/s)."
+  //
+  // Everything above places each label on its own merits — off shapes, off other
+  // labels, nearest first — and none of it knows the labels form a SET. Three
+  // conditions individually well placed can still read top-to-bottom in an order
+  // that has nothing to do with which branch is which, and then the tether is
+  // the only thing telling you, one label at a time.
+  //
+  // HIS TWO RULINGS, both asked and answered before this was written:
+  //  • ties — two branches sharing a vertex, which four branches must — order by
+  //    the TARGET's vertical position, so the labels follow the flow even where
+  //    the vertices cannot distinguish them;
+  //  • precedence — ORDER WINS over clearing a shape. A label pushed off a task
+  //    into the wrong position is worse than one that overlaps, because the
+  //    overlap is visible and the mis-ordering is not. Where the ordered position
+  //    lands on a body, the label moves RIGHT rather than up or down.
+  {
+    const rank: Record<string, number> = { top: 0, right: 1, bottom: 2 };
+    // Its own body set: R5.12 declares one inside its block, and reaching for it
+    // here threw on five corpus diagrams — a layout that throws is worse than any
+    // label it was trying to order.
+    const BODIES = new Set(["task", "subprocess", "subprocess-expanded", "start-event",
+      "end-event", "intermediate-event", "gateway", "data-object", "data-store"]);
+    for (const g of elements) {
+      if (!isGateway(g)) continue;
+      // finalConnectors, not `connectors`: R5.12 above works on the copy, and the
+      // copy is what gets returned — mutating the earlier array changes nothing
+      // that is ever drawn.
+      const outs = finalConnectors.filter(c =>
+        c.type === "sequence" && c.sourceId === g.id && (c.label ?? "").trim());
+      if (outs.length < 2) continue;
+
+      const rows = outs.map(c => {
+        const t = elMap.get(c.targetId);
+        return {
+          c,
+          key: (rank[String(c.sourceSide)] ?? 1) * 1e6 + (t ? t.y + t.height / 2 : 0),
+          box: connectorLabelBox(c, elements),
+        };
+      }).filter((r): r is typeof r & { box: NonNullable<typeof r.box> } => !!r.box);
+      if (rows.length < 2) continue;
+
+      const wanted = [...rows].sort((a, b) => a.key - b.key);
+      const byY = [...rows].sort((a, b) => a.box.y - b.box.y);
+      if (wanted.every((r, i) => r.c.id === byY[i].c.id)) continue;  // already reads correctly
+
+      /**
+       * SWAP the labels between existing positions; do not re-stack them.
+       *
+       * The first version laid all of a gateway's labels out afresh — evenly
+       * spaced down the band they occupied — and cost five new readability
+       * defects across three diagrams: two labels dropped onto shapes, and two
+       * left lying along their own horizontal run, which R5.12 had specifically
+       * moved them off.
+       *
+       * Every current position has already been vetted: R5.12 accepted it only
+       * after checking it cleared every body, every element label and every
+       * other connector label. Re-stacking discards all of that work and
+       * re-derives positions nothing has approved. Exchanging labels BETWEEN
+       * those positions keeps the whole vetted set and changes only which label
+       * sits in which — which is precisely, and only, what Paul asked for:
+       * "the labels must at least be in the same vertical order as the connector
+       * attachment points they are associated with."
+       *
+       * The Y offset moves and the X offset stays, so each label keeps its own
+       * horizontal relationship to the line it names.
+       */
+      /**
+       * ...and only if it does not make the page worse.
+       *
+       * "Order wins" settles a tie between order and clearance; it is not a
+       * licence to create overlaps that were not there. Swapping moves a label's
+       * width to a Y that was vetted for a DIFFERENT label, so it can land on
+       * something the previous occupant cleared — measured, that cost five new
+       * defects across three diagrams.
+       *
+       * So: count what these labels overlap, swap, count again, and keep the
+       * swap only if the count did not rise. Same two-measure guard as R8.37,
+       * for the same reason — a pass this late has nothing downstream to catch
+       * it, and trading one defect class for another is the thing Paul has been
+       * consistent about refusing.
+       *
+       * Where a gateway cannot be ordered without cost, it keeps the order it
+       * had. That is a real limit and worth stating rather than hiding: the
+       * labels are individually well placed and collectively still misread.
+       */
+      const cost = () => {
+        let n = 0;
+        for (const r of rows) {
+          const b = connectorLabelBox(r.c, elements);
+          if (!b) continue;
+          for (const e of elements) {
+            if (!BODIES.has(e.type)) continue;
+            if (b.x + 2 < e.x + e.width && b.x + b.w - 2 > e.x
+              && b.y + 2 < e.y + e.height && b.y + b.h - 2 > e.y) n++;
+          }
+          for (const o of rows) {
+            if (o.c.id === r.c.id) continue;
+            const ob = connectorLabelBox(o.c, elements);
+            if (ob && b.x < ob.x + ob.w && b.x + b.w > ob.x && b.y < ob.y + ob.h && b.y + b.h > ob.y) n++;
+          }
+          // ...and a branch label lying along ITS OWN horizontal run, which is a
+          // defect in its own right and the one R5.12 moved it off. Without this
+          // the guard waved through a swap that put "Yes" back on its own line.
+          const wp = r.c.waypoints ?? [];
+          for (let k = 1; k < wp.length; k++) {
+            if (Math.abs(wp[k - 1].y - wp[k].y) >= 0.5) continue;   // horizontal only
+            const x0 = Math.min(wp[k - 1].x, wp[k].x), x1 = Math.max(wp[k - 1].x, wp[k].x);
+            if (b.x < x1 && b.x + b.w > x0 && b.y < wp[k].y + 1 && b.y + b.h > wp[k].y - 1) { n++; break; }
+          }
+        }
+        return n;
+      };
+
+      const before = cost();
+      const undo = rows.map(r => ({ c: r.c, y: r.c.labelOffsetY }));
+      const slots = byY.map(r => r.box.y);
+      for (let i = 0; i < wanted.length; i++) {
+        const r = wanted[i];
+        const dy = slots[i] - r.box.y;
+        if (Math.abs(dy) < 0.5) continue;
+        r.c.labelOffsetY = (r.c.labelOffsetY ?? -30) + dy;
+      }
+      if (cost() > before) for (const u of undo) u.c.labelOffsetY = u.y;
+    }
+  }
+
   // ── R5.09: place gateway labels top-left, close, and clear of obstacles ─────
   // The label rides an ARC around the gateway centre at the nearest-clearing
   // radius. It STARTS up-and-slightly-left (≈68° above horizontal — steeper than
