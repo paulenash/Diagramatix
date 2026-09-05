@@ -920,6 +920,23 @@ export function layoutBpmnDiagram(
       }
       for (const arr of byName.values()) {
         if (arr.length < 2) continue;
+        /**
+         * END EVENTS MAY SHARE A NAME. Paul, 2026-09-05: "allow end events to
+         * have the same label. It is not an issue for end events."
+         *
+         * He is right, and the reason is worth keeping: an end event is
+         * TERMINAL — nothing ever has to find it. The branch closing forms name
+         * a merge gateway or an element as a DESTINATION, and those must be
+         * unambiguous; `End event "<name>"` is written inline in the branch it
+         * closes and is never referred to from anywhere else. So two branches
+         * handing off to the same next subprocess legitimately end the same way,
+         * and the master template's own instruction — name the end for where the
+         * work goes next — produces that on purpose.
+         *
+         * Only when they are ALL end events. An end event sharing a name with a
+         * gateway or a task is still reported: that one IS addressed by name.
+         */
+        if (arr.every(e => e.type === "end-event")) continue;
         const kinds = arr.map(e => e.type).join(" and ");
         diagnose({
           kind: "duplicate-label",

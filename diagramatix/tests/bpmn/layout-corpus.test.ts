@@ -404,3 +404,65 @@ describe("a generated diagram names each element once", () => {
     expect(kindsOf(p)).not.toContain("duplicate-label");
   });
 });
+
+/**
+ * End events may share a name.
+ *
+ * Paul, 2026-09-05, on V22.04 reporting two end events both called "Claim
+ * triaged and assigned": "allow end events to have the same label. It is not an
+ * issue for end events." He is right, and the reason is the one that matters
+ * here: an end event is TERMINAL. Nothing has to find it.
+ *
+ * The check exists because a Technical Description addresses elements BY NAME —
+ * "rejoins the flow at gateway X" has to identify one gateway. But a branch
+ * closing form writes `End event "<name>"` inline, and nothing ever refers back
+ * to it. Two branches handing off to the same next subprocess legitimately end
+ * the same way, and the master template's own instruction — name the end for
+ * where the work goes next — produces that deliberately.
+ */
+describe("duplicate labels: end events are exempt, nothing else is", () => {
+  const shape = (labels: { id: string; type: string; label: string }[]) => ({
+    elements: [
+      { id: "p", type: "pool", label: "Org", poolType: "white-box", lanes: [{ id: "l", name: "Lane" }] },
+      { id: "s", type: "start-event", label: "Start", pool: "p", lane: "l" },
+      { id: "g", type: "gateway", label: "Which?", gatewayType: "exclusive", pool: "p", lane: "l" },
+      ...labels.map((x) => ({ ...x, pool: "p", lane: "l" })),
+    ] as AiElement[],
+    connections: [
+      { sourceId: "s", targetId: "g" },
+      ...labels.map((x) => ({ sourceId: "g", targetId: x.id })),
+    ] as AiConnection[],
+  });
+  const kindsOf = (p: { elements: AiElement[]; connections: AiConnection[] }) => {
+    const seen: string[] = [];
+    layoutBpmnDiagram(p.elements, p.connections, { onDiagnostic: (d) => seen.push(d.kind) });
+    return seen;
+  };
+
+  it("T3239 two END EVENTS sharing a name are NOT reported", () => {
+    const p = shape([
+      { id: "e1", type: "end-event", label: "Claim triaged and assigned" },
+      { id: "e2", type: "end-event", label: "Claim triaged and assigned" },
+    ]);
+    expect(kindsOf(p)).not.toContain("duplicate-label");
+  });
+
+  it("T3240 an end event sharing a name with a GATEWAY is still reported", () => {
+    // That one IS addressed by name — "rejoins the flow at gateway X".
+    const p = shape([
+      { id: "e1", type: "end-event", label: "Recovery position finalised" },
+      { id: "t1", type: "task", label: "Do something" },
+    ]);
+    p.elements.push({ id: "g2", type: "gateway", label: "Recovery position finalised", gatewayType: "exclusive", pool: "p", lane: "l" } as AiElement);
+    p.connections.push({ sourceId: "t1", targetId: "g2" } as AiConnection);
+    expect(kindsOf(p)).toContain("duplicate-label");
+  });
+
+  it("T3241 two TASKS sharing a name are still reported", () => {
+    const p = shape([
+      { id: "t1", type: "task", label: "Instruct loss adjuster" },
+      { id: "t2", type: "task", label: "Instruct loss adjuster" },
+    ]);
+    expect(kindsOf(p)).toContain("duplicate-label");
+  });
+});
