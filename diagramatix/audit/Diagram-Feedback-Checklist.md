@@ -38,7 +38,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **G** | An EMIE's sub-path needs a row of its own | `b49b30fa`, `df05353b` | **PASS** |
 | **H** | Single-pass generation must produce a **PDF-able, readable** diagram | corpus 107 → 5, 24 of 26 clean | **open** |
 | **I** | V22.10: connector confusion after gateway "Reserve balance remains?" — path 1, **1.1**, 2, with path 2 pushed down | `7c976621` | **PASS** |
-| **J** | V22.04: gateway connection points do not follow path order — a task below leaving by the **top** vertex | `ef82e806` | |
+| **J** | V22.04: gateway connection points do not follow path order — a task below leaving by the **top** vertex | `ef82e806` |**PASS** |
 | **K** | Two data-object **labels** overlapping each other | `1087cac1` | |
 | **L** | Data Object labels must not overlap Gateway labels | `a81005ed`, `2bbd17fe` | |
 | **M** | Long connector labels wrap rather than sprawl | `e3e58f0c` | |
@@ -47,9 +47,9 @@ Kept in the repo rather than in a chat so it survives a new session.
 
 | | Item | Built | Paul |
 |---|---|---|---|
-| **N** | Branch labels need a **tether** so you can tell which flow is which | `dc1b5059` | |
-| **O** | The tether must leave **1/3 along the main outgoing segment**, not at the vertex or mid-connector | `713a8686` | |
-| **P** | Trim the label box's empty ends — the tether leaves from that boundary | `713a8686` | |
+| **N** | Branch labels need a **tether** so you can tell which flow is which | `dc1b5059` |**PASS** |
+| **O** | The tether must leave **1/3 along the main outgoing segment**, not at the vertex or mid-connector | `713a8686` |**PASS** |
+| **P** | Trim the label box's empty ends — the tether leaves from that boundary | `713a8686` |**PASS** |
 | **Q** | Labels **in the same vertical order as their attachment points**, and not overlapping. Ties break on the target's vertical position; **order wins** over shape clearance | **not built** | |
 | **R** | Home positions: right of the gateway — top-right, just above centre, bottom-right | mostly already true; completed by **Q** | |
 
@@ -59,7 +59,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 |---|---|---|---|
 | **S** | V22.04: swap the two connector endpoints on task "Record triage decision and allocation" | **not built** | |
 | **T** | V22.07: **move** one attachment point at gateway "Endorse decline and confirm reasons" (move, not swap) | **not built** | |
-| **U** | Swap **Data Objects** to remove association crossings | **not built** | |
+| **U** | Swap **Data Objects** to remove association crossings | **not built** | **open** — still present on V22.04, 2026-09-05 |
 | **V** | V22.06 gateway "Investigation warranted?" — the simple swap case | **not built** | |
 
 ## Editing — what happens when you touch a diagram
@@ -85,7 +85,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 
 ## Where it stands
 
-**Passed by Paul:** A, B, C, D, E, F, G, I, Z, AD.
+**Passed by Paul:** A, B, C, D, E, F, G, I, J, N, O, P, Z, AD — V22.04 on 2026-09-05: gateway connector labels fine, connectors to the merges fine, the sequence-connector crossing gone.
 
 **Open by Paul:** **H** — a single pass must produce a readable diagram. Built and
 measured (107 → 5 corpus defects) but not passed, and rightly: the measure is a
@@ -95,7 +95,7 @@ corpus number, the bar is a diagram Paul would send someone.
 crossing-minimisation pass, one pass with two operations: move a gateway
 attachment point, or swap a pair of endpoints or data objects.
 
-**Untested:** J, K, L, M, N, O, P, X, Y, AA, AC. **W is under investigation** — three fixes, still failing; waiting on a DevTools reading of what actually receives the click. Most landed after Paul's
+**Untested:** K, L, M, X, Y, AA, AC. **W is under investigation** — three fixes, still failing; waiting on a DevTools reading of what actually receives the click. Most landed after Paul's
 last regeneration, so a fresh run is what will move them.
 
 ## How to measure
