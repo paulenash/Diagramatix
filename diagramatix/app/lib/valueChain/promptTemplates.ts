@@ -51,6 +51,21 @@ export interface TemplateVersion {
   description: string;
   /** The commit, so the exact diff is one command away. */
   commit: string;
+  /**
+   * The exact instant it shipped — the commit's own timestamp, in UTC.
+   *
+   * `at` is a DATE, and a date is not a moment. Comparing a prompt's timestamp
+   * against a date means guessing which instant within that day the change
+   * landed, and the first version of this guessed "the end of it, in UTC". At
+   * UTC+10 that put the whole of the following local morning before the
+   * cut-off: Paul regenerated every V22 prompt on the morning of 2026-09-06,
+   * published them, and the screen still called all of them stale — v7 had
+   * actually shipped 23½ hours before the instant it was being compared to.
+   *
+   * An exact instant needs no guess and no timezone. Take it from git:
+   * `git show -s --format=%cI <commit>`.
+   */
+  shippedAt: string;
 }
 
 /**
@@ -79,32 +94,32 @@ export interface TemplateVersion {
  */
 export const MD_PROMPT_TEMPLATE_HISTORY: Record<MdPromptType, TemplateVersion[]> = {
   bpmn: [
-    { version: 1, at: "2026-08-26", commit: "542a7141",
+    { version: 1, at: "2026-08-26", commit: "542a7141", shippedAt: "2026-08-26T12:52:13Z",
       description: "The master templates become editable: a built-in house standard per diagram type, plus your own additions." },
-    { version: 2, at: "2026-08-27", commit: "2f13e2ed",
+    { version: 2, at: "2026-08-27", commit: "2f13e2ed", shippedAt: "2026-08-27T01:16:54Z",
       description: "Stopped asking for a shape the layout strips out again." },
-    { version: 3, at: "2026-08-27", commit: "a0e091b3",
+    { version: 3, at: "2026-08-27", commit: "a0e091b3", shippedAt: "2026-08-27T12:02:55Z",
       description: "Cross-references name the process, never its code — a code goes stale the moment a process is inserted or removed." },
-    { version: 4, at: "2026-08-29", commit: "96693337",
+    { version: 4, at: "2026-08-29", commit: "96693337", shippedAt: "2026-08-29T06:48:41Z",
       description: "No Data Stores. A system of record IS the black-box IT system pool, and a Data Store beside it says the same thing twice." },
-    { version: 5, at: "2026-09-02", commit: "23ad8d9d",
+    { version: 5, at: "2026-09-02", commit: "23ad8d9d", shippedAt: "2026-09-02T07:51:41Z",
       description: "Every gateway branch must say where it goes, in one of four accepted closing forms." },
-    { version: 6, at: "2026-09-03", commit: "71f1d3bb",
+    { version: 6, at: "2026-09-03", commit: "71f1d3bb", shippedAt: "2026-09-03T11:55:50Z",
       description: "Six defects that were manufacturing diagram bugs: the missing \"continues to <element>\" closing form; the wait rule contradicting the boundary-event rule; merges only where two or more branches converge; a parallel split's join made mandatory; exception paths must terminate; and the non-interrupting flavour withdrawn." },
-    { version: 7, at: "2026-09-05", commit: "2df08f65",
+    { version: 7, at: "2026-09-05", commit: "2df08f65", shippedAt: "2026-09-05T00:27:52Z",
       description: "A loop subprocess holds only the steps that repeat — not the whole process. Its condition is about the repeating work, not the outcome the subprocess exists to produce." },
   ],
   "value-chain": [
-    { version: 1, at: "2026-08-26", commit: "542a7141", description: "The master templates become editable." },
+    { version: 1, at: "2026-08-26", commit: "542a7141", shippedAt: "2026-08-26T12:52:13Z", description: "The master templates become editable." },
   ],
   context: [
-    { version: 1, at: "2026-08-26", commit: "542a7141", description: "The master templates become editable." },
+    { version: 1, at: "2026-08-26", commit: "542a7141", shippedAt: "2026-08-26T12:52:13Z", description: "The master templates become editable." },
   ],
   "process-context": [
-    { version: 1, at: "2026-08-26", commit: "542a7141", description: "The master templates become editable." },
+    { version: 1, at: "2026-08-26", commit: "542a7141", shippedAt: "2026-08-26T12:52:13Z", description: "The master templates become editable." },
   ],
   archimate: [
-    { version: 1, at: "2026-08-26", commit: "542a7141", description: "The master templates become editable." },
+    { version: 1, at: "2026-08-26", commit: "542a7141", shippedAt: "2026-08-26T12:52:13Z", description: "The master templates become editable." },
   ],
 };
 
@@ -124,16 +139,36 @@ export function latestTemplateVersion(type: MdPromptType): TemplateVersion {
  * A missing date counts as stale: a prompt nobody can date is a prompt nobody
  * can vouch for.
  */
+/**
+ * Which template version was in force at a given instant.
+ *
+ * Not the same question as "what is the version now", and stamping the wrong one
+ * makes the diagram's own warning lie: a diagram generated today from a prompt
+ * written to v5 would claim v7 and look current. 0 when the instant predates
+ * the first version, or is unusable.
+ */
+export function templateVersionAt(type: MdPromptType, when: Date | string | null | undefined): number {
+  if (!when) return 0;
+  const at = new Date(when);
+  if (Number.isNaN(at.getTime())) return 0;
+  let v = 0;
+  for (const entry of MD_PROMPT_TEMPLATE_HISTORY[type]) {
+    const shipped = new Date(entry.shippedAt);
+    if (!Number.isNaN(shipped.getTime()) && shipped.getTime() <= at.getTime()) v = entry.version;
+  }
+  return v;
+}
+
 export function promptIsStale(type: MdPromptType, generatedAt: Date | string | null | undefined): boolean {
   if (!generatedAt) return true;
   const at = new Date(generatedAt);
   if (Number.isNaN(at.getTime())) return true;
-  // End of the day the change shipped. The history carries a date, not a time,
-  // and a deploy lands partway through a day — so a prompt generated THAT day
-  // most likely predates it and is flagged. The asymmetry is deliberate: a false
-  // "stale" costs one regeneration, a false "current" costs a silently wrong
-  // diagram, which is the failure this exists to prevent.
-  const shipped = new Date(`${latestTemplateVersion(type).at}T23:59:59.999Z`);
+  // Two instants, compared exactly. No end-of-day rounding, because rounding a
+  // date to an instant is a guess, and the guess was wrong by 23½ hours in the
+  // direction that makes freshly regenerated prompts look stale — see
+  // TemplateVersion.shippedAt.
+  const shipped = new Date(latestTemplateVersion(type).shippedAt);
+  if (Number.isNaN(shipped.getTime())) return true;   // a malformed entry errs towards regenerating
   return at.getTime() < shipped.getTime();
 }
 

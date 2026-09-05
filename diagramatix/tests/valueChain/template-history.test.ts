@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   MD_PROMPT_TYPES, MD_PROMPT_TEMPLATE_HISTORY, latestTemplateVersion, promptIsStale,
+  templateVersionAt,
 } from "@/app/lib/valueChain/promptTemplates";
 
 /**
@@ -41,6 +42,12 @@ describe("master template history", () => {
         expect(v.version).toBeGreaterThan(0);
         expect(v.description.trim().length, `${t} v${v.version} has no description`).toBeGreaterThan(20);
         expect(v.commit, `${t} v${v.version} has no commit`).toMatch(/^[0-9a-f]{7,}$/);
+        // The exact instant, and it must AGREE with the date beside it.
+        // Without this a future entry can carry a shippedAt from the wrong day
+        // and the staleness cut-off silently moves — the failure this replaced.
+        const shipped = new Date(v.shippedAt);
+        expect(Number.isNaN(shipped.getTime()), `${t} v${v.version} shippedAt unusable`).toBe(false);
+        expect(v.shippedAt.slice(0, 10), `${t} v${v.version} shippedAt disagrees with at`).toBe(v.at);
       }
     }
   });
@@ -54,13 +61,45 @@ describe("master template history", () => {
     expect(latestTemplateVersion("bpmn").version).toBe(h.length);
   });
 
-  it("T3245 a prompt generated before the newest change is stale", () => {
-    const at = latestTemplateVersion("bpmn").at;
-    // Same day counts as STALE: a deploy lands partway through the day, so a
-    // prompt generated that morning predates it. Erring towards regenerating.
-    expect(promptIsStale("bpmn", new Date(`${at}T00:00:00.000Z`))).toBe(true);
+  it("T3245 staleness is decided on the exact instant, not the day", () => {
+    const shipped = new Date(latestTemplateVersion("bpmn").shippedAt).getTime();
+    expect(promptIsStale("bpmn", new Date(shipped - 1))).toBe(true);
+    expect(promptIsStale("bpmn", new Date(shipped))).toBe(false);
+    expect(promptIsStale("bpmn", new Date(shipped + 1))).toBe(false);
     expect(promptIsStale("bpmn", new Date("2020-01-01T00:00:00.000Z"))).toBe(true);
     expect(promptIsStale("bpmn", new Date("2099-01-01T00:00:00.000Z"))).toBe(false);
+  });
+
+  it("T3267 a prompt regenerated the morning AFTER the change is not stale at UTC+10", () => {
+    /**
+     * The bug this replaced, in Paul's own words: "I regenerated prompts for V22
+     * and published BUT red messages remained."
+     *
+     * The rule used to compare against the END of the day the change shipped, in
+     * UTC, because the history carried a date and a date is not a moment. v7
+     * shipped 2026-09-05T00:27:52Z; the cut-off was 2026-09-05T23:59:59.999Z,
+     * 23½ hours later. Paul regenerated on the morning of 2026-09-06 in Sydney —
+     * 2026-09-05T21:xx:00Z — which fell before that cut-off, so every freshly
+     * written prompt was still called stale.
+     *
+     * An instant needs no rounding and knows nothing about timezones.
+     */
+    const sydneyMorningAfter = new Date("2026-09-06T07:30:00+10:00"); // = 2026-09-05T21:30Z
+    expect(promptIsStale("bpmn", sydneyMorningAfter)).toBe(false);
+  });
+
+  it("T3268 templateVersionAt reports the version in force at an instant, not the newest", () => {
+    // Stamping the newest onto a diagram built from an OLD prompt would make it
+    // claim to be current — the exact reassurance the warning exists to withhold.
+    const h = MD_PROMPT_TEMPLATE_HISTORY.bpmn;
+    const v6 = h.find((v) => v.version === 6)!;
+    const v7 = h.find((v) => v.version === 7)!;
+    expect(templateVersionAt("bpmn", v6.shippedAt)).toBe(6);
+    expect(templateVersionAt("bpmn", new Date(new Date(v7.shippedAt).getTime() - 1))).toBe(6);
+    expect(templateVersionAt("bpmn", v7.shippedAt)).toBe(7);
+    // Before anything shipped, and for an undated prompt: unknown, not v1.
+    expect(templateVersionAt("bpmn", "2020-01-01T00:00:00.000Z")).toBe(0);
+    expect(templateVersionAt("bpmn", null)).toBe(0);
   });
 
   it("T3246 a prompt with no date at all counts as stale", () => {

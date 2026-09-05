@@ -13,7 +13,7 @@ import { chooseModel } from "@/app/lib/ai/modelAccess";
 import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { AI_INVOCATION_POINTS, enterAiContext, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 import { uniqueDiagramName } from "@/app/lib/valueChain/uniqueDiagramName";
-import { latestTemplateVersion, MD_PROMPT_TYPES, type MdPromptType } from "@/app/lib/valueChain/promptTemplates";
+import { templateVersionAt, MD_PROMPT_TYPES, type MdPromptType } from "@/app/lib/valueChain/promptTemplates";
 
 /**
  * SuperAdmin — "Create Project Diagrams from .md" batch runner.
@@ -108,9 +108,14 @@ export async function POST(req: Request) {
         processCode: p.processCode,
         promptType: p.type,
         promptGeneratedAt: p.generatedAt ? p.generatedAt.toISOString() : null,
-        templateVersion: latestTemplateVersion(
+        // The version the PROMPT was written to, not the version current at
+        // generation time. Stamping the latter would make a diagram built today
+        // from a v5 prompt claim v7 and look current — the exact reassurance
+        // this is meant to withhold.
+        templateVersion: templateVersionAt(
           MD_PROMPT_TYPES.includes(p.type as MdPromptType) ? (p.type as MdPromptType) : "bpmn",
-        ).version,
+          p.generatedAt,
+        ),
       },
     }));
     chain = { code: row.code, title: row.publishedTitle ?? row.title, diagrams };

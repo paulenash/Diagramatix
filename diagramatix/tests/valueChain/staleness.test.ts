@@ -151,3 +151,91 @@ describe("linking a diagram back to its repository process", () => {
     }
   });
 });
+
+/**
+ * THE ROUND TRIP. Paul, 2026-09-06: "I regenerated prompts for V22 and published
+ * BUT red messages remained. Check the round trip behaviour of these warning
+ * messages everywhere."
+ *
+ * A warning that will not clear is worse than no warning: it teaches the reader
+ * that the colour means nothing. Every message here must go away when the thing
+ * it complains about is actually fixed — so each case below flags, then fixes,
+ * then asserts silence.
+ */
+describe("round trip — every warning clears when the fault is fixed", () => {
+  const shipped = new Date(latestTemplateVersion("bpmn").shippedAt).getTime();
+  const before = new Date(shipped - 60_000).toISOString();
+  const after = new Date(shipped + 60_000).toISOString();
+
+  it("T3269 regenerating a chain's prompts clears the chain badge and the named list", () => {
+    const staleRun = chainStaleness(PROCS, PROCS.map((p) => ({
+      type: "bpmn" as const, processCode: p.code, generatedAt: before,
+    })));
+    expect(staleRun.count).toBe(PROCS.length);
+
+    // The regeneration: same prompts, new timestamps. Nothing else changes.
+    const afterRun = chainStaleness(PROCS, PROCS.map((p) => ({
+      type: "bpmn" as const, processCode: p.code, generatedAt: after,
+    })));
+    expect(afterRun.count).toBe(0);
+    expect(afterRun.stale).toEqual([]);
+    expect(afterRun.missing).toEqual([]);
+    expect(afterRun.staleChainPrompts).toEqual([]);
+  });
+
+  it("T3270 a prompt written one minute after the change is current, one minute before is not", () => {
+    // The boundary, stated once. This is where the original bug lived: the
+    // cut-off was the END of the day rather than the instant, so an entire
+    // local morning's work landed on the wrong side of it.
+    const one = (generatedAt: string) => chainStaleness(
+      [PROCS[0]], [{ type: "bpmn" as const, processCode: PROCS[0].code, generatedAt }],
+    ).count;
+    expect(one(before)).toBe(1);
+    expect(one(after)).toBe(0);
+  });
+
+  it("T3271 regenerating the DIAGRAM clears the prompt-moved warning", () => {
+    const promptAt = "2026-09-06T00:00:00.000Z";
+    expect(diagramFreshness({
+      diagramGeneratedAt: "2026-09-04T00:00:00.000Z", promptRegeneratedAt: promptAt, hasPlan: true,
+    })).toHaveLength(1);
+    // Regenerated after the prompt moved — the warning has nothing left to say.
+    expect(diagramFreshness({
+      diagramGeneratedAt: "2026-09-06T00:00:01.000Z", promptRegeneratedAt: promptAt, hasPlan: true,
+    })).toEqual([]);
+  });
+
+  it("T3272 regenerating the PROMPT first, then the diagram, clears both warnings", () => {
+    // The two-step remedy the messages describe. Doing only the second step
+    // leaves the template warning standing, which is the point of separating
+    // them — and is what cost Paul two V22 passes.
+    const halfWay = diagramFreshness({
+      diagramGeneratedAt: "2026-09-06T00:00:01.000Z",
+      promptRegeneratedAt: "2026-09-06T00:00:00.000Z",
+      templateVersionAtGeneration: 5, currentTemplateVersion: 7, hasPlan: true,
+    });
+    expect(halfWay).toHaveLength(1);
+    expect(halfWay[0].text).toContain("v5");
+
+    expect(diagramFreshness({
+      diagramGeneratedAt: "2026-09-06T00:00:01.000Z",
+      promptRegeneratedAt: "2026-09-06T00:00:00.000Z",
+      templateVersionAtGeneration: 7, currentTemplateVersion: 7, hasPlan: true,
+    })).toEqual([]);
+  });
+
+  it("T3273 regenerating stores a plan, which clears the not-replayable note", () => {
+    expect(diagramFreshness({ diagramGeneratedAt: "2026-09-04T00:00:00.000Z", hasPlan: false })).toHaveLength(1);
+    expect(diagramFreshness({ diagramGeneratedAt: "2026-09-04T00:00:00.000Z", hasPlan: true })).toEqual([]);
+  });
+
+  it("T3274 an unknown template version says nothing rather than claiming v0", () => {
+    // A prompt with no date has no knowable version. "Generated from master
+    // template v0" is worse than silence, and the prompt-level badge already
+    // flags an undated prompt.
+    expect(diagramFreshness({
+      diagramGeneratedAt: "2026-09-06T00:00:00.000Z",
+      templateVersionAtGeneration: 0, currentTemplateVersion: 7, hasPlan: true,
+    })).toEqual([]);
+  });
+});

@@ -144,7 +144,10 @@ export function diagramFreshness(input: DiagramFreshnessInput): FreshnessNote[] 
   // PROMPT first, then the diagram.
   const vAt = input.templateVersionAtGeneration;
   const vNow = input.currentTemplateVersion;
-  if (typeof vAt === "number" && typeof vNow === "number" && vNow > vAt) {
+  // vAt of 0 means the prompt carried no date, so which version it was written
+  // to is unknown. Saying "generated from master template v0" would be worse
+  // than silence; the prompt-level badge already flags an undated prompt.
+  if (typeof vAt === "number" && vAt > 0 && typeof vNow === "number" && vNow > vAt) {
     notes.push({
       level: "warn",
       text: `Generated from master template v${vAt}; the current template is v${vNow}. `
