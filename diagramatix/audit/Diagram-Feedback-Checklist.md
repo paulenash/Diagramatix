@@ -58,15 +58,15 @@ Kept in the repo rather than in a chat so it survives a new session.
 
 | | Item | Built | Paul |
 |---|---|---|---|
-| **S** | V22.04: swap the two connector endpoints on task "Record triage decision and allocation" | not needed as a pass — fixing the ATTACHMENT geometry (J, AF) removed these at source; 3 sequence crossings remain in the whole corpus | **open** — retest |
-| **T** | V22.07: **move** one attachment point at gateway "Endorse decline and confirm reasons" (move, not swap) | not needed as a pass — fixing the ATTACHMENT geometry (J, AF) removed these at source; 3 sequence crossings remain in the whole corpus | **open** — retest |
+| **S** | V22.04: swap the two connector endpoints on task "Record triage decision and allocation" | not needed as a pass — fixing the ATTACHMENT geometry (J, AF) removed it at source | **PASS** — "V22.04 … 3. Sequence connector crossing now gone!", 2026-09-05 |
+| **T** | V22.07: **move** one attachment point at gateway "Endorse decline and confirm reasons" (move, not swap) | **NOT fixed** — the earlier "removed at source" claim was wrong for T. Replaying V22.07's stored plan through today's layout (`scripts/report-crossings.ts`) still finds it, and only it: gateway `gw_approver` "Delegated approver outcome?" leaves for "Endorse decline…" from its CENTRE (1844,1073) and routes LEFT to x=1787 — outside its own left edge at 1824 — before dropping, straight through the boundary timer's run to "Escalate approval…" at y=1075 | **open** |
 | **U** | Swap **Data Objects** to remove association crossings | R8.37 — corpus crossings 16 → 12, no readability cost | **PASS** — no crossings left on V22.04, 2026-09-05 |
-| **V** | V22.06 gateway "Investigation warranted?" — the simple swap case | not needed as a pass — fixing the ATTACHMENT geometry (J, AF) removed these at source; 3 sequence crossings remain in the whole corpus | **open** — retest |
+| **V** | V22.06 gateway "Investigation warranted?" — the simple swap case | **unknown** — the V22.06 export in Downloads is from 2026-09-04 18:46, minutes before plan storage shipped, so it carries no plan and cannot be replayed. Regenerate V22.06 and it becomes measurable | **open** — needs a regeneration first |
 | **AG** | **V22.05**: the connector to "Record provisional quantum on best available evidence" is not in its proper path, and renders ABOVE the EMIE it connects to, crossing it | R55.6 — the exception path is re-asserted clear of its host before the connectors are built | **PASS** — V22.05 regenerated 2026-09-05: task 21px clear of its host, connector drops straight down, diagram at zero diagnostics |
 | **AH** | Show the last Master Template change date/time | version + date on the master-templates card | |
 | **AI** | A tile showing when each chain's prompts were last generated, with chains RED where that predates the last template change | red `pre-vN` badge per prompt; "Needs attention" now ticks stale prompts too | |
 | **AJ** | A change history per Master Diagram Prompt Template — what and when; backfill BPMN; by diagram-type chip; master prompt templates only | `MD_PROMPT_TEMPLATE_HISTORY` — 7 BPMN versions backfilled from git, shown by chip | |
-| **AK** | Separate, confirmed options on the .md upload — replace all / selectively update / add new — not one generic button | choosing a file now PREVIEWS it: per chain, what the file holds vs what the library holds and how many prompts a replace destroys. Tick per chain (New only / Everything / None), then a `ConfirmDialog` that NAMES the chains being replaced. `planLibraryImport` is the one decision the preview and the import both make, so they cannot disagree | |
+| **AK** | Separate, confirmed options on the .md upload — replace all / selectively update / add new — not one generic button | `7d3d75c4` — choosing a file now PREVIEWS it: per chain, what the file holds vs what the library holds and how many prompts a replace destroys. Tick per chain (New only / Everything / None), then a `ConfirmDialog` that NAMES the chains being replaced. `planLibraryImport` is the one decision the preview and the import both make, so they cannot disagree | **PASS** — "AK is fine", 2026-09-05 |
 
 ## Editing — what happens when you touch a diagram
 
@@ -91,7 +91,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 
 ## Where it stands
 
-**Passed by Paul:** A, B, C, D, E, F, G, I, J, N, O, P, Q, U, Z, AD, AE, AF, AG — V22.04 on 2026-09-05: gateway connector labels fine, connectors to the merges fine, the sequence-connector crossing gone.
+**Passed by Paul:** A, B, C, D, E, F, G, I, J, N, O, P, Q, S, U, Z, AD, AE, AF, AG, AK — V22.04 on 2026-09-05: gateway connector labels fine, connectors to the merges fine, the sequence-connector crossing gone.
 
 **Open by Paul:** **H** — a single pass must produce a readable diagram. Built and
 measured (107 → 5 corpus defects) but not passed, and rightly: the measure is a
