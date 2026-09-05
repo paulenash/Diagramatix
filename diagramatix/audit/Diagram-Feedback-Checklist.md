@@ -62,7 +62,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **T** | V22.07: **move** one attachment point at gateway "Endorse decline and confirm reasons" (move, not swap) | **not built** | |
 | **U** | Swap **Data Objects** to remove association crossings | R8.37 — corpus crossings 16 → 12, no readability cost | **PASS** — no crossings left on V22.04, 2026-09-05 |
 | **V** | V22.06 gateway "Investigation warranted?" — the simple swap case | **not built** | |
-| **AG** | **V22.05**: the connector to "Record provisional quantum on best available evidence" is not in its proper path, and renders ABOVE the EMIE it connects to, crossing it | R55.6 — the exception path is re-asserted clear of its host before the connectors are built | **open** — retest |
+| **AG** | **V22.05**: the connector to "Record provisional quantum on best available evidence" is not in its proper path, and renders ABOVE the EMIE it connects to, crossing it | R55.6 — the exception path is re-asserted clear of its host before the connectors are built | **PASS** — V22.05 regenerated 2026-09-05: task 21px clear of its host, connector drops straight down, diagram at zero diagnostics |
 
 ## Editing — what happens when you touch a diagram
 
@@ -81,13 +81,13 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **AB** | Do Process Mining diagrams benefit from these refinements? | ANSWERED — **layout yes** (same `layoutBpmnDiagram`), **master template no** (mining builds its own prompt via `DiagramRules`) | |
 | **AC** | The silent fallback model should be Kimi K3, not Haiku 4.5 | `4691c5c6` | |
 | **AD** | Is a small model good enough? (Haiku 4.5 vs Opus 5) | ANSWERED — Haiku gives ~⅓ the content and prolific duplicate names | **PASS** — Opus 5 set for both |
-| **AE** | A standard-loop subprocess swallowed the whole process — V22.04 asked for "Repeat Until Handler Assigned", which is what the subprocess ACHIEVES, so all twelve steps fell inside it | template rule added: a loop holds only the repeating steps | |
+| **AE** | A standard-loop subprocess swallowed the whole process — V22.04 asked for "Repeat Until Handler Assigned", which is what the subprocess ACHIEVES, so all twelve steps fell inside it | `2df08f65` — template rule: a loop holds only the repeating steps | **PASS** — V22.04 went 13 diagnostics to 1 on regeneration; V22.05 came back at zero |
 
 ---
 
 ## Where it stands
 
-**Passed by Paul:** A, B, C, D, E, F, G, I, J, N, O, P, U, Z, AD, AF — V22.04 on 2026-09-05: gateway connector labels fine, connectors to the merges fine, the sequence-connector crossing gone.
+**Passed by Paul:** A, B, C, D, E, F, G, I, J, N, O, P, U, Z, AD, AE, AF, AG — V22.04 on 2026-09-05: gateway connector labels fine, connectors to the merges fine, the sequence-connector crossing gone.
 
 **Open by Paul:** **H** — a single pass must produce a readable diagram. Built and
 measured (107 → 5 corpus defects) but not passed, and rightly: the measure is a
