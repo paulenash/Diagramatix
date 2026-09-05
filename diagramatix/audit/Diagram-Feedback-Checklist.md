@@ -97,12 +97,20 @@ Kept in the repo rather than in a chat so it survives a new session.
 measured (107 → 5 corpus defects) but not passed, and rightly: the measure is a
 corpus number, the bar is a diagram Paul would send someone.
 
-**Not built:** **Q** (his stated priority), **AF**, **AG**, and **S, T, V** — the
-crossing-minimisation pass, one pass with two operations: move a gateway
-attachment point, or swap a pair of endpoints or data objects.
+**Open, with work still to do:**
 
-**Untested:** K, L, M, X, Y, AA, AC. **W is under investigation** — three fixes, still failing; waiting on a DevTools reading of what actually receives the click. Most landed after Paul's
-last regeneration, so a fresh run is what will move them.
+- **T** — measured on 2026-09-05 and still present. A gateway branch leaves from
+  the gateway's CENTRE and routes backwards past its own left edge. Mine to fix.
+- **V** — cannot be measured: the V22.06 export predates plan storage by minutes,
+  so there is no plan to replay. One regeneration makes it testable.
+- **W** — three fixes, still failing. Waiting on a DevTools reading of what
+  actually receives the click; a fourth theory without that would be a guess.
+- **H** — the umbrella. Closes when the rest do.
+
+**Untested — waiting on Paul:** K, L, M, R, X, Y, AA, AC, AH, AI, AJ. All are
+built and deployed. K, L, M and R need a regenerated diagram to show up on; X and
+Y need an editing session; AH, AI and AJ are on the SuperAdmin screens and need
+no regeneration at all.
 
 ## How to measure
 
@@ -111,3 +119,10 @@ with what is actually left, per diagram, by replaying stored AI plans — no AI
 call, no cost. Current: **2 diagrams, 5 defects**, from 11 / 18.
 
 That number supports **H** but does not settle it. Only Paul does.
+
+`npx tsx scripts/report-crossings.ts "<export>.json"` replays one exported
+diagram and names the connectors that cross — sequence and association reported
+separately, message flows to black-box pools excluded because those cross by
+design. Corpus baseline 2026-09-05: **12 sequence, 12 association** crossings
+across 26 diagrams. An export made before plan storage shipped (before roughly
+19:15 on 2026-09-04) says so rather than measuring its stale coordinates.
