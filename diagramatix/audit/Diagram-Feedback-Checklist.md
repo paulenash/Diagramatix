@@ -2,7 +2,7 @@
 
 Every item Paul raised that drove the diagram-quality work, lettered so progress
 can be reported against a stable reference. **A–Z is fixed: never renumber, never
-reuse.** A new item becomes AE, AF, …
+reuse.** A new item becomes AF, AG, …
 
 **Two columns, deliberately.** *Built* is what was done and the commit that did
 it. *Paul* is his verdict, and it is the only one that closes an item — Paul,
@@ -79,6 +79,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **AB** | Do Process Mining diagrams benefit from these refinements? | ANSWERED — **layout yes** (same `layoutBpmnDiagram`), **master template no** (mining builds its own prompt via `DiagramRules`) | |
 | **AC** | The silent fallback model should be Kimi K3, not Haiku 4.5 | `4691c5c6` | |
 | **AD** | Is a small model good enough? (Haiku 4.5 vs Opus 5) | ANSWERED — Haiku gives ~⅓ the content and prolific duplicate names | **PASS** — Opus 5 set for both |
+| **AE** | A standard-loop subprocess swallowed the whole process — V22.04 asked for "Repeat Until Handler Assigned", which is what the subprocess ACHIEVES, so all twelve steps fell inside it | template rule added: a loop holds only the repeating steps | |
 
 ---
 

@@ -220,6 +220,20 @@ Open with a single unnumbered line:
   condition. Where the loop has a deadline, mount a timer boundary event on the
   subprocess labelled with the limit; for cancellation or failure, a cancel or
   error boundary event.
+- A LOOP HOLDS ONLY THE STEPS THAT REPEAT — usually two to four tasks, and
+  never the whole subprocess. Its condition is about the REPEATING WORK, not
+  about the outcome the subprocess exists to produce. "Repeat Until Triage
+  Inputs Complete" is a loop: chase the missing input, record it, check again.
+  "Repeat Until Handler Assigned" is not — assigning a handler is what the whole
+  subprocess achieves, so naming the loop that way swallows every step into it.
+  Three tests, and the loop is wrong if it fails any:
+    • the steps inside it genuinely run more than once;
+    • it does NOT contain the subprocess's End event, nor the task that records
+      the outcome;
+    • it does NOT contain a gateway that routes the MAIN flow — a decision
+      choosing between paths belongs after the loop, not inside it.
+  What follows the loop — the merge, the decision, the outcome — is written
+  AFTER it, at the subprocess's own level.
 - WAITING IS AN EVENT ON THE FLOW, NOT A TASK. When the process pauses between
   two steps, put an intermediate catch event between them carrying the trigger
   the narrative implies — timer for a duration or clock time, message for an

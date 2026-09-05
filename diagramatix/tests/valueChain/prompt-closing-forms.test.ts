@@ -104,3 +104,43 @@ describe("BPMN master template -- rules that must not be dropped", () => {
     expect(t).not.toMatch(/interrupting or non-interrupting/);
   });
 });
+
+/**
+ * A loop subprocess must not swallow the process.
+ *
+ * Paul, 2026-09-05, from V22.04's thirteen diagnostics — one cause, not
+ * thirteen. The prompt asked for a standard-loop subprocess called "Repeat Until
+ * Handler Assigned", and handler assignment is what the WHOLE subprocess
+ * achieves. So the model put everything inside it: both gateways, every handling
+ * -path task, and the final "Record triage outcome and handler assignment". It
+ * even declared the subprocess as its own parent. The layout found the inner
+ * Start Event could reach none of them and pulled all twelve back out.
+ *
+ * The template said how to NAME a loop and never how much to PUT IN it — "Repeat
+ * Until Handler Assigned" satisfies "name it with the condition itself" perfectly.
+ * The same shape as the six defects in the audit of 2026-09-03: a rule that is
+ * correct, incomplete, and resolved badly by the model in the silence.
+ *
+ * The local prompt for the same process got it right — "Repeat Until Triage
+ * Inputs Complete", covering only the input-gathering — which is what says this
+ * is a scope question rather than a model failure.
+ */
+describe("BPMN master template — a loop contains only what repeats", () => {
+  const t = DEFAULT_MD_PROMPT.bpmn;
+
+  it("T3236 says a loop holds only the repeating steps, not the whole subprocess", () => {
+    expect(t).toMatch(/A LOOP HOLDS ONLY THE STEPS THAT REPEAT/);
+    expect(t).toMatch(/never the whole subprocess/);
+  });
+
+  it("T3237 contrasts a real loop condition with the subprocess's own outcome", () => {
+    // The naming trap, by example, because the abstract rule did not land.
+    expect(t).toMatch(/Repeat Until Triage\s+Inputs Complete/);
+    expect(t).toMatch(/Repeat Until Handler Assigned/);
+  });
+
+  it("T3238 excludes the End event, the outcome task and a main-flow gateway", () => {
+    expect(t).toMatch(/does NOT contain the subprocess's End event/);
+    expect(t).toMatch(/does NOT contain a gateway that routes the MAIN flow/);
+  });
+});
