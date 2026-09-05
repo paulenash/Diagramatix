@@ -3372,6 +3372,9 @@ export function layoutBpmnDiagram(
         // was written last. That is what put the start event at the bottom of
         // the lane across the V23 diagrams.
         const row = analysis.rowOfElement.get(elId);
+        if (process.env.DGX_PATHROW_DEBUG && el) {
+          console.log(`[rows] ${String(el.label ?? el.id).replace(/\s+/g, " ").slice(0, 40).padEnd(42)} h=${String(el.height).padStart(4)} cy=${Math.round(el.y + el.height / 2)} -> row ${row === undefined ? "—" : Math.round(row)}`);
+        }
         if (!el || row === undefined) continue;
         if (isGateway(el)) continue;                       // R8.01/R8.24 own gateway Y
         if (el.parentId !== firstDecision.parentId) continue;  // another lane's business
@@ -5626,6 +5629,54 @@ export function layoutBpmnDiagram(
       taken.add(side);
       i.c.targetSide = side;
       i.c.targetOffsetAlong = 0.5;                      // R6.30: on the vertex
+    }
+  }
+
+  // ── R55.6: an exception path clears the box it hangs off ──
+  //
+  // Paul, 2026-09-05 on V22.05: the connector to "Record provisional quantum on
+  // best available evidence" is "not in its proper path. and rendered above the
+  // EMIE it is connected to causing a connector crossing."
+  //
+  // The ROWS were right. analysePaths put the host subprocess at 874 and the
+  // exception task at 1025 — 151px below it, clear. What broke it is later: the
+  // host both GREW (143 -> 151) and moved down 160px as its lane was fitted and
+  // its container re-tightened, while the exception task moved only 61. The gap
+  // closed from 151 to 51 and the task ended up INSIDE the host's span, above
+  // the very event it hangs off, so its connector had to dive under the host and
+  // climb back — the crossing.
+  //
+  // This is the failure mode this engine keeps having: a correct answer computed
+  // before later passes move the things it was about. Rather than chase every
+  // mover, the relationship is re-asserted once, at the end.
+  //
+  // BEFORE THE CONNECTORS ARE BUILT, deliberately. Moving an element after the
+  // waypoints exist means re-routing, which is what detached "Escalation
+  // Summary" and 18 of 38 connectors in V23.04. Here nothing is routed yet, so
+  // the move costs nothing and can break nothing.
+  for (const ev of elements) {
+    if (ev.type !== "intermediate-event" || !ev.boundaryHostId) continue;
+    const host = elMap.get(ev.boundaryHostId);
+    if (!host || (host.type !== "subprocess-expanded" && host.type !== "subprocess")) continue;
+    const out = connectors.filter(c => c.type === "sequence" && c.sourceId === ev.id);
+    if (out.length !== 1) continue;
+    const first = elMap.get(out[0].targetId);
+    if (!first || first.parentId !== host.parentId) continue; // another lane's business
+    if (first.parentId === host.id) continue;                 // genuinely one of its children
+
+    const hostBottom = host.y + host.height;
+    const hostTop = host.y;
+    const evBelow = (ev.y + ev.height / 2) > (host.y + host.height / 2);
+    // Only when it actually overlaps the host's band — a task already clear of
+    // it is where the row analysis put it and must not be nudged.
+    if (first.y >= hostBottom || first.y + first.height <= hostTop) continue;
+    const dy = evBelow ? (hostBottom + 24) - first.y : (hostTop - 24) - (first.y + first.height);
+    if (Math.abs(dy) < 0.5) continue;
+    shiftSubtree(first.id, dy);
+    first.y += dy;
+    if (host.parentId) {
+      const owner = elMap.get(host.parentId);
+      if (owner?.type === "pool" || owner?.type === "lane") expandContainerToFitChildren(owner.id, owner.type);
     }
   }
 

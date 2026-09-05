@@ -62,7 +62,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **T** | V22.07: **move** one attachment point at gateway "Endorse decline and confirm reasons" (move, not swap) | **not built** | |
 | **U** | Swap **Data Objects** to remove association crossings | R8.37 — corpus crossings 16 → 12, no readability cost | **PASS** — no crossings left on V22.04, 2026-09-05 |
 | **V** | V22.06 gateway "Investigation warranted?" — the simple swap case | **not built** | |
-| **AG** | **V22.05**: the connector to "Record provisional quantum on best available evidence" is not in its proper path, and renders ABOVE the EMIE it connects to, crossing it | **not built** — REPRODUCED and localised: the exception task lands at cy 1086, INSIDE its host subprocess's own 151px span (y 959–1110), so the connector dives below and climbs back | **open** |
+| **AG** | **V22.05**: the connector to "Record provisional quantum on best available evidence" is not in its proper path, and renders ABOVE the EMIE it connects to, crossing it | R55.6 — the exception path is re-asserted clear of its host before the connectors are built | **open** — retest |
 
 ## Editing — what happens when you touch a diagram
 
