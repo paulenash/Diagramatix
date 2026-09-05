@@ -51,7 +51,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **N** | Branch labels need a **tether** so you can tell which flow is which | `dc1b5059` |**PASS** |
 | **O** | The tether must leave **1/3 along the main outgoing segment**, not at the vertex or mid-connector | `713a8686` |**PASS** |
 | **P** | Trim the label box's empty ends — the tether leaves from that boundary | `713a8686` |**PASS** |
-| **Q** | Labels **in the same vertical order as their attachment points**, and not overlapping. Ties break on the target's vertical position; **order wins** over shape clearance | R5.13 — swaps labels between vetted positions. Fixes 1 of the 4 misordered gateways; the other 3 are refused because reordering them creates overlaps | **open** — see note |
+| **Q** | Labels **in the same vertical order as their attachment points**, and not overlapping. Ties break on the target's vertical position; **order wins** over shape clearance | R5.13 — swaps labels between vetted positions. Fixes 1 of the 4 misordered gateways; the other 3 are refused because reordering them creates overlaps | **PASS** — "Gateway connector labels are fine", 2026-09-05 |
 | **R** | Home positions: right of the gateway — top-right, just above centre, bottom-right | mostly already true; completed by **Q** | |
 
 ## Crossings — Paul's move/swap examples
@@ -63,9 +63,9 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **U** | Swap **Data Objects** to remove association crossings | R8.37 — corpus crossings 16 → 12, no readability cost | **PASS** — no crossings left on V22.04, 2026-09-05 |
 | **V** | V22.06 gateway "Investigation warranted?" — the simple swap case | not needed as a pass — fixing the ATTACHMENT geometry (J, AF) removed these at source; 3 sequence crossings remain in the whole corpus | **open** — retest |
 | **AG** | **V22.05**: the connector to "Record provisional quantum on best available evidence" is not in its proper path, and renders ABOVE the EMIE it connects to, crossing it | R55.6 — the exception path is re-asserted clear of its host before the connectors are built | **PASS** — V22.05 regenerated 2026-09-05: task 21px clear of its host, connector drops straight down, diagram at zero diagnostics |
-| **AH** | Show the last Master Template change date/time | **not built** | |
-| **AI** | A tile showing when each chain's prompts were last generated, with chains RED where that predates the last template change | **not built** | |
-| **AJ** | A change history per Master Diagram Prompt Template — what and when; backfill BPMN; by diagram-type chip; master prompt templates only | **not built** | |
+| **AH** | Show the last Master Template change date/time | version + date on the master-templates card | |
+| **AI** | A tile showing when each chain's prompts were last generated, with chains RED where that predates the last template change | red `pre-vN` badge per prompt; "Needs attention" now ticks stale prompts too | |
+| **AJ** | A change history per Master Diagram Prompt Template — what and when; backfill BPMN; by diagram-type chip; master prompt templates only | `MD_PROMPT_TEMPLATE_HISTORY` — 7 BPMN versions backfilled from git, shown by chip | |
 | **AK** | Separate, confirmed options on the .md upload — replace all / selectively update / add new — not one generic button | **not built** | |
 
 ## Editing — what happens when you touch a diagram
@@ -91,7 +91,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 
 ## Where it stands
 
-**Passed by Paul:** A, B, C, D, E, F, G, I, J, N, O, P, U, Z, AD, AE, AF, AG — V22.04 on 2026-09-05: gateway connector labels fine, connectors to the merges fine, the sequence-connector crossing gone.
+**Passed by Paul:** A, B, C, D, E, F, G, I, J, N, O, P, Q, U, Z, AD, AE, AF, AG — V22.04 on 2026-09-05: gateway connector labels fine, connectors to the merges fine, the sequence-connector crossing gone.
 
 **Open by Paul:** **H** — a single pass must produce a readable diagram. Built and
 measured (107 → 5 corpus defects) but not passed, and rightly: the measure is a

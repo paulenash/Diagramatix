@@ -23,7 +23,10 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { MD_PROMPT_TYPES, MD_PROMPT_LABEL, type MdPromptType } from "@/app/lib/valueChain/promptTemplates";
+import {
+  MD_PROMPT_TYPES, MD_PROMPT_LABEL, MD_PROMPT_TEMPLATE_HISTORY,
+  latestTemplateVersion, mdPromptCategory, type MdPromptType,
+} from "@/app/lib/valueChain/promptTemplates";
 
 interface ChainInfo { code: string; title: string; subprocesses: number; narrativeChars: number }
 
@@ -51,6 +54,8 @@ export function MdPromptsClient() {
   const [summary, setSummary] = useState<{ written: number; failed: number; roundTripFailures: number } | null>(null);
   const [copied, setCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  /** Which template's change history is on show. */
+  const [historyType, setHistoryType] = useState<MdPromptType>("bpmn");
 
   const chain = useMemo(() => chains.find((c) => c.code === selected) ?? null, [chains, selected]);
 
@@ -192,10 +197,50 @@ export function MdPromptsClient() {
             One per diagram type — the house standard every generated prompt is written to.
             A change here reaches every prompt regenerated afterwards, and nothing before it.
           </p>
-          <Link href="/dashboard/rules?category=md-prompt-bpmn"
-            className="inline-block px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700">
-            Edit the master templates →
-          </Link>
+
+          {/* Which type's history is on show. Master prompt templates only —
+              the Rules editor carries other categories, and mixing them here
+              would make "when did the template change" unanswerable. */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-3">
+            {MD_PROMPT_TYPES.map((t) => (
+              <button key={t} onClick={() => setHistoryType(t)}
+                className={"px-2 py-1 rounded border text-[11px] "
+                  + (historyType === t
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50")}>
+                {MD_PROMPT_LABEL[t]}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-baseline gap-3 mb-2">
+            <span className="text-xs text-gray-800">
+              <b>v{latestTemplateVersion(historyType).version}</b>
+              <span className="text-gray-500"> · last changed {latestTemplateVersion(historyType).at}</span>
+            </span>
+            <Link href={`/dashboard/rules?category=${mdPromptCategory(historyType)}`}
+              className="ml-auto px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700">
+              Edit the master templates →
+            </Link>
+          </div>
+
+          {/* The history. Newest first, because "what changed most recently" is
+              the question being asked — a prompt generated before that date is
+              working to a standard that has moved. */}
+          <details className="rounded border border-gray-200 bg-gray-50 px-3 py-2">
+            <summary className="cursor-pointer text-[11px] font-medium text-gray-700">
+              {MD_PROMPT_TEMPLATE_HISTORY[historyType].length} change{MD_PROMPT_TEMPLATE_HISTORY[historyType].length === 1 ? "" : "s"} to the {MD_PROMPT_LABEL[historyType]} template
+            </summary>
+            <ol className="mt-2 space-y-1.5">
+              {[...MD_PROMPT_TEMPLATE_HISTORY[historyType]].reverse().map((v) => (
+                <li key={v.version} className="text-[11px] text-gray-700">
+                  <span className="font-medium text-gray-900">v{v.version}</span>
+                  <span className="text-gray-500"> · {v.at} · {v.commit}</span>
+                  <div className="text-gray-600">{v.description}</div>
+                </li>
+              ))}
+            </ol>
+          </details>
         </section>
 
         <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">

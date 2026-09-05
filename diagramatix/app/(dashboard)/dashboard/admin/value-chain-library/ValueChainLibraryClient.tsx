@@ -23,7 +23,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { MD_PROMPT_TYPES, MD_PROMPT_LABEL, type MdPromptType } from "@/app/lib/valueChain/promptTemplates";
+import {
+  MD_PROMPT_TYPES, MD_PROMPT_LABEL, latestTemplateVersion, promptIsStale,
+  type MdPromptType,
+} from "@/app/lib/valueChain/promptTemplates";
 import { tonesFor } from "@/app/lib/theme/featureColors";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 
@@ -442,7 +445,11 @@ function PromptPanel({ chain, busy, rows, tone, genTypes, setGenTypes, onRegener
     .filter((proc) => {
       const p = byKey.get(`bpmn|${proc.code}`);
       return !p || !!p.truncated || p.undrawableShapes > 0
-        || p.unterminatedBranches > 0 || !p.roundTripsOk;
+        || p.unterminatedBranches > 0 || !p.roundTripsOk
+        // ...and one written to a master template that has since moved. Not a
+        // fault in the prompt, but the same remedy, and the reason Paul
+        // regenerated V22 twice for the same thirteen diagnostics.
+        || promptIsStale("bpmn", p.generatedAt);
     })
     .map((proc) => proc.code), [chain.processes, byKey]);
 
@@ -561,6 +568,18 @@ function PromptRow({ label, prompt, open, setOpen, onRegenerate, busy, ticked, o
           <>
             <span className="text-[10px] tabular-nums text-gray-400">{prompt.chars.toLocaleString()} ch</span>
             {!prompt.roundTripsOk && <span className="text-[10px] text-amber-700">does not parse</span>}
+            {/* Generated BEFORE the template it claims to follow. Paul hit this
+                twice in one week: the loop-scope fix was live, V22.04's prompts
+                predated it, the diagnostics were identical, and nothing on the
+                screen said why. */}
+            {promptIsStale(prompt.type, prompt.generatedAt) && (
+              <span
+                className="text-[10px] font-semibold text-red-700"
+                title={`This prompt was generated before the current master template (v${latestTemplateVersion(prompt.type).version}, ${latestTemplateVersion(prompt.type).at}). It is written to a standard that has since moved — regenerate it.`}
+              >
+                pre-v{latestTemplateVersion(prompt.type).version}
+              </span>
+            )}
             {prompt.truncated && (
               <span
                 className="text-[10px] font-semibold text-red-700"

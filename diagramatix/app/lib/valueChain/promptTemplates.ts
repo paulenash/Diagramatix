@@ -41,6 +41,102 @@ export const MD_PROMPT_TYPES: MdPromptType[] = [
 /** `DiagramRules.category` for each type's editable additions. */
 export const mdPromptCategory = (type: MdPromptType): string => `md-prompt-${type}`;
 
+/** One recorded change to a built-in master template. */
+export interface TemplateVersion {
+  /** Increments per diagram type. v1 is the template as first shipped. */
+  version: number;
+  /** ISO date the change shipped. */
+  at: string;
+  /** What changed, in terms a reader can act on — not a commit subject. */
+  description: string;
+  /** The commit, so the exact diff is one command away. */
+  commit: string;
+}
+
+/**
+ * THE MASTER TEMPLATE CHANGE HISTORY.
+ *
+ * Paul, 2026-09-05: "Add a History for each Master Diagram Prompt Template that
+ * shows the changes, what they were and when they occurred… it must have at
+ * least a DateTime Stamp, Version#, Version Description so the User knows what
+ * happened."
+ *
+ * WHY IT LIVES IN CODE. A master template is two halves: this built-in house
+ * standard, and an organisation's editable additions in a `DiagramRules` row.
+ * Every change of the last fortnight was to the BUILT-IN half — so a history
+ * table in the database would have recorded none of them, and the question the
+ * history exists to answer is exactly "did my prompts predate this change?".
+ * Declared here, it ships with the change it describes and cannot drift from it.
+ * Additions are a separate, per-organisation history and are not this.
+ *
+ * Backfilled from git rather than written from memory: `git log` on this file
+ * gives the seven changes below, and each description says what a prompt author
+ * would notice rather than restating the commit subject.
+ *
+ * APPEND ONLY, and add an entry in the same commit as the change. A version the
+ * history does not mention is worse than no history, because the screen that
+ * flags stale prompts will quietly say everything is current.
+ */
+export const MD_PROMPT_TEMPLATE_HISTORY: Record<MdPromptType, TemplateVersion[]> = {
+  bpmn: [
+    { version: 1, at: "2026-08-26", commit: "542a7141",
+      description: "The master templates become editable: a built-in house standard per diagram type, plus your own additions." },
+    { version: 2, at: "2026-08-27", commit: "2f13e2ed",
+      description: "Stopped asking for a shape the layout strips out again." },
+    { version: 3, at: "2026-08-27", commit: "a0e091b3",
+      description: "Cross-references name the process, never its code — a code goes stale the moment a process is inserted or removed." },
+    { version: 4, at: "2026-08-29", commit: "96693337",
+      description: "No Data Stores. A system of record IS the black-box IT system pool, and a Data Store beside it says the same thing twice." },
+    { version: 5, at: "2026-09-02", commit: "23ad8d9d",
+      description: "Every gateway branch must say where it goes, in one of four accepted closing forms." },
+    { version: 6, at: "2026-09-03", commit: "71f1d3bb",
+      description: "Six defects that were manufacturing diagram bugs: the missing \"continues to <element>\" closing form; the wait rule contradicting the boundary-event rule; merges only where two or more branches converge; a parallel split's join made mandatory; exception paths must terminate; and the non-interrupting flavour withdrawn." },
+    { version: 7, at: "2026-09-05", commit: "2df08f65",
+      description: "A loop subprocess holds only the steps that repeat — not the whole process. Its condition is about the repeating work, not the outcome the subprocess exists to produce." },
+  ],
+  "value-chain": [
+    { version: 1, at: "2026-08-26", commit: "542a7141", description: "The master templates become editable." },
+  ],
+  context: [
+    { version: 1, at: "2026-08-26", commit: "542a7141", description: "The master templates become editable." },
+  ],
+  "process-context": [
+    { version: 1, at: "2026-08-26", commit: "542a7141", description: "The master templates become editable." },
+  ],
+  archimate: [
+    { version: 1, at: "2026-08-26", commit: "542a7141", description: "The master templates become editable." },
+  ],
+};
+
+/** The newest recorded change to a type's built-in template. */
+export function latestTemplateVersion(type: MdPromptType): TemplateVersion {
+  const h = MD_PROMPT_TEMPLATE_HISTORY[type];
+  return h[h.length - 1];
+}
+
+/**
+ * Was a prompt generated BEFORE the template it claims to follow?
+ *
+ * The question behind the whole feature. Paul regenerated V22 with the loop fix
+ * live and got the same thirteen diagnostics, because the prompts predated it
+ * and nothing on the screen said so — twice in one week.
+ *
+ * A missing date counts as stale: a prompt nobody can date is a prompt nobody
+ * can vouch for.
+ */
+export function promptIsStale(type: MdPromptType, generatedAt: Date | string | null | undefined): boolean {
+  if (!generatedAt) return true;
+  const at = new Date(generatedAt);
+  if (Number.isNaN(at.getTime())) return true;
+  // End of the day the change shipped. The history carries a date, not a time,
+  // and a deploy lands partway through a day — so a prompt generated THAT day
+  // most likely predates it and is flagged. The asymmetry is deliberate: a false
+  // "stale" costs one regeneration, a false "current" costs a silently wrong
+  // diagram, which is the failure this exists to prevent.
+  const shipped = new Date(`${latestTemplateVersion(type).at}T23:59:59.999Z`);
+  return at.getTime() < shipped.getTime();
+}
+
 /** The five categories, for the rules editor's list. */
 export const MD_PROMPT_CATEGORIES: string[] = MD_PROMPT_TYPES.map(mdPromptCategory);
 
