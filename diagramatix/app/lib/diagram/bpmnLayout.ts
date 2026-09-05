@@ -5994,6 +5994,127 @@ export function layoutBpmnDiagram(
       }
     }
   }
+  // ── R8.37: swap two data artifacts when it removes a crossing ──
+  //
+  // Paul, 2026-09-05, on a regenerated V22.04 once the gateway work had cleared
+  // the sequence-flow crossings: "Now Data Object association crossings on this
+  // diagram." And earlier, the shape of the fix: "the Data Objects can be
+  // swapped to remove association cross-overs as well!!"
+  //
+  // Artifacts are placed by clearance — each is lifted until it is clear of
+  // bodies, labels and connector runs — and nothing in that asks which TASK each
+  // one serves. Two artifacts sitting in the order opposite to their consumers
+  // therefore cross, permanently, however much room they are given. Exchanging
+  // their positions is the whole fix, and it is available because an artifact's
+  // position carries no meaning beyond being near the task it belongs to.
+  //
+  // ONLY WHEN IT STRICTLY IMPROVES. Every candidate swap is measured: route the
+  // affected associations at the proposed positions, count the crossings, and
+  // keep the swap only if the count DROPPED. A swap that merely moves a crossing
+  // elsewhere is refused, so this pass cannot make a diagram worse — which
+  // matters more than usual here, because it runs last and nothing downstream
+  // will catch it. Measured across the corpus before building it: 16 crossings
+  // in 4 of the 26 diagrams.
+  {
+    const DATA_T = new Set(["data-object", "data-store"]);
+    const arts = elements.filter(e => DATA_T.has(e.type));
+    if (arts.length >= 2) {
+      const isAssoc = (c: Connector) => c.type === "associationBPMN";
+      type R = { x: number; y: number; w: number; h: number };
+      const clash = (u: R, v: R) =>
+        u.x + 2 < v.x + v.w && u.x + u.w - 2 > v.x && u.y + 2 < v.y + v.h && u.y + u.h - 2 > v.y;
+      const touches = (c: Connector, id: string) => c.sourceId === id || c.targetId === id;
+
+      /** Do two polylines properly cross? Shared endpoints do not count. */
+      const crosses = (a: Connector, b: Connector): boolean => {
+        if (touches(a, b.sourceId) || touches(a, b.targetId)) return false;
+        const A = a.waypoints ?? [], B = b.waypoints ?? [];
+        const side = (p: Point, q: Point, r: Point) =>
+          Math.sign((q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y));
+        for (let i = 0; i < A.length - 1; i++) for (let k = 0; k < B.length - 1; k++) {
+          const o1 = side(A[i], A[i + 1], B[k]), o2 = side(A[i], A[i + 1], B[k + 1]);
+          const o3 = side(B[k], B[k + 1], A[i]), o4 = side(B[k], B[k + 1], A[i + 1]);
+          if (o1 !== o2 && o3 !== o4 && o1 !== 0 && o2 !== 0 && o3 !== 0 && o4 !== 0) return true;
+        }
+        return false;
+      };
+      const countCrossings = (conns: Connector[]): number => {
+        let n = 0;
+        for (let i = 0; i < conns.length; i++) for (let k = i + 1; k < conns.length; k++) {
+          if (crosses(conns[i], conns[k])) n++;
+        }
+        return n;
+      };
+      /** Re-route every association touching either id, at the CURRENT positions. */
+      const rerouteFor = (ids: Set<string>) => {
+        for (let i = 0; i < computedConnectors.length; i++) {
+          const c = computedConnectors[i];
+          if (!isAssoc(c) || (!ids.has(c.sourceId) && !ids.has(c.targetId))) continue;
+          const src = elMap.get(c.sourceId), tgt = elMap.get(c.targetId);
+          if (!src || !tgt) continue;
+          try {
+            const r = computeWaypoints(src, tgt, elements, c.sourceSide, c.targetSide, c.routingType, 0.5, 0.5);
+            computedConnectors[i] = { ...c, waypoints: r.waypoints,
+              sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
+          } catch { /* keep the existing path rather than lose it */ }
+        }
+      };
+
+      const assocs = () => computedConnectors.filter(isAssoc);
+      let best = countCrossings(assocs());
+      // Bounded: a handful of artifacts, and each accepted swap restarts the
+      // sweep so a second improvement is found without an open-ended loop.
+      for (let round = 0; round < 4 && best > 0; round++) {
+        let improved = false;
+        for (let i = 0; i < arts.length && !improved; i++) {
+          for (let k = i + 1; k < arts.length && !improved; k++) {
+            const a = arts[i], b = arts[k];
+            // Same container only: swapping across lanes would move an artifact
+            // away from the work it documents, which is a worse fault than a
+            // crossing.
+            if (a.parentId !== b.parentId) continue;
+            const ax = a.x, ay = a.y, bx = b.x, by = b.y;
+            const ids = new Set([a.id, b.id]);
+            const before = computedConnectors.filter(isAssoc).map(c => ({ ...c }));
+            a.x = bx; a.y = by; b.x = ax; b.y = ay;
+            rerouteFor(ids);
+            const after = countCrossings(assocs());
+            // ...and it must not trade a crossing for an overlap. The first cut
+            // counted only crossings, and the corpus ratchet caught it at once:
+            // V18.01 and V26.01 went from clean to one readability defect each,
+            // because a swap can land an artifact where its NAME collides even
+            // though its box does not. Two measures, both of which must improve
+            // or hold — a pass that runs last has nothing downstream to catch it.
+            const clean = (() => {
+              for (const el of [a, b]) {
+                const lb = externalLabelBox(el);
+                if (!lb) continue;
+                for (const o of elements) {
+                  if (o.id === el.id || o.type === "pool" || o.type === "lane" || o.type === "sublane") continue;
+                  const ob = { x: o.x, y: o.y, w: o.width, h: o.height };
+                  if (clash({ x: lb.x, y: lb.y, w: lb.w, h: lb.h }, ob)) return false;
+                  const ol = externalLabelBox(o);
+                  if (ol && clash({ x: lb.x, y: lb.y, w: lb.w, h: lb.h }, { x: ol.x, y: ol.y, w: ol.w, h: ol.h })) return false;
+                }
+              }
+              return true;
+            })();
+            if (after < best && clean) { best = after; improved = true; continue; }
+            // Put it back, waypoints included — a rejected trial must leave no
+            // trace, or the next trial measures against a diagram nobody chose.
+            a.x = ax; a.y = ay; b.x = bx; b.y = by;
+            const byId = new Map(before.map(c => [c.id, c]));
+            for (let n = 0; n < computedConnectors.length; n++) {
+              const prev = byId.get(computedConnectors[n].id);
+              if (prev) computedConnectors[n] = prev;
+            }
+          }
+        }
+        if (!improved) break;
+      }
+    }
+  }
+
   // ── R8.29: FINAL event-label placement, against the routed diagram ──
   // R8.16 nudges event labels clear of other elements, but it runs long before
   // the diagram is finished: the exit-target placement, the branch-subprocess

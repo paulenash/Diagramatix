@@ -2,7 +2,7 @@
 
 Every item Paul raised that drove the diagram-quality work, lettered so progress
 can be reported against a stable reference. **A–Z is fixed: never renumber, never
-reuse.** A new item becomes AF, AG, …
+reuse.** A new item becomes AH, AI, …
 
 **Two columns, deliberately.** *Built* is what was done and the commit that did
 it. *Paul* is his verdict, and it is the only one that closes an item — Paul,
@@ -42,6 +42,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **K** | Two data-object **labels** overlapping each other | `1087cac1` | |
 | **L** | Data Object labels must not overlap Gateway labels | `a81005ed`, `2bbd17fe` | |
 | **M** | Long connector labels wrap rather than sprawl | `e3e58f0c` | |
+| **AF** | **Merge INBOUND vertices** — V22.05 gateway "Which external assessment inputs are required?": a task BELOW the merge enters at the top vertex, one ABOVE enters at the bottom. J covered a gateway's OUTBOUND vertices; this is the mirror (R6.31) and was never on the list — not a mistaken pass | **not built** | **open** |
 
 ## Gateway branch labels — Paul: *"vital to reading the diagram… above all others"*
 
@@ -59,8 +60,9 @@ Kept in the repo rather than in a chat so it survives a new session.
 |---|---|---|---|
 | **S** | V22.04: swap the two connector endpoints on task "Record triage decision and allocation" | **not built** | |
 | **T** | V22.07: **move** one attachment point at gateway "Endorse decline and confirm reasons" (move, not swap) | **not built** | |
-| **U** | Swap **Data Objects** to remove association crossings | **not built** | **open** — still present on V22.04, 2026-09-05 |
+| **U** | Swap **Data Objects** to remove association crossings | R8.37 — corpus crossings 16 → 12, no readability cost | **open** — retest |
 | **V** | V22.06 gateway "Investigation warranted?" — the simple swap case | **not built** | |
+| **AG** | **V22.05**: the connector to "Record provisional quantum on best available evidence" is not in its proper path, and renders ABOVE the EMIE it connects to, crossing it | **not built** | **open** |
 
 ## Editing — what happens when you touch a diagram
 
@@ -91,7 +93,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 measured (107 → 5 corpus defects) but not passed, and rightly: the measure is a
 corpus number, the bar is a diagram Paul would send someone.
 
-**Not built:** **Q** (his stated priority), and **S, T, U, V** — the
+**Not built:** **Q** (his stated priority), **AF**, **AG**, and **S, T, V** — the
 crossing-minimisation pass, one pass with two operations: move a gateway
 attachment point, or swap a pair of endpoints or data objects.
 
