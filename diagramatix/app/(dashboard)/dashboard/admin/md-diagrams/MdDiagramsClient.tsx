@@ -648,7 +648,7 @@ export function MdDiagramsClient() {
           </div>
 
           {rows.some((r) => r.diagnostics?.length) && (
-            <details className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <details open className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               <summary className="cursor-pointer font-medium flex items-center justify-between gap-3">
                 <span>
                   {rows.reduce((t, r) => t + (r.diagnostics?.length ?? 0), 0)} thing(s) the layout could not take at face value

@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Generate Repository Prompts — the other end of "Create Project Diagrams from .md".
+ * Repository Master Template and .md Upload — the other end of "Create Project
+ * Diagrams from .md": edit the master templates, and write prompts INTO a chain.
  *
  * That tool CONSUMES the prompt blocks inside a Process Repository document; this
  * one WRITES them, from the chain's narrative and an editable master template per
@@ -175,15 +176,30 @@ export function MdPromptsClient() {
     <div className="min-h-screen dgx-dashboard-bg">
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3">
         <Link href="/dashboard/admin" className="text-sm text-blue-600 hover:text-blue-800 underline">← SuperAdmin</Link>
-        <h1 className="text-lg font-semibold text-gray-900">Generate Repository Prompts</h1>
-        <Link href="/dashboard/rules?category=md-prompt-bpmn" className="ml-auto text-xs text-blue-600 hover:text-blue-800 underline">
-          Edit the master templates →
-        </Link>
+        <h1 className="text-lg font-semibold text-gray-900">Repository Master Template and .md Upload</h1>
       </header>
 
       <main className="max-w-6xl mx-auto p-6 space-y-4">
+        {/* The master templates are the more consequential half of this screen —
+            they decide what EVERY generated prompt says — and they were a small
+            underlined link in the header, easy to miss entirely. Paul,
+            2026-09-05: "improve the visibility of Edit the Master Templates to a
+            tile". Given its own card, above the upload, because editing the
+            template is what you come here to do most often. */}
         <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
-          <h2 className="text-sm font-semibold text-gray-900 mb-1">The document</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-1">The master templates</h2>
+          <p className="text-[11px] text-gray-500 mb-3">
+            One per diagram type — the house standard every generated prompt is written to.
+            A change here reaches every prompt regenerated afterwards, and nothing before it.
+          </p>
+          <Link href="/dashboard/rules?category=md-prompt-bpmn"
+            className="inline-block px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700">
+            Edit the master templates →
+          </Link>
+        </section>
+
+        <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+          <h2 className="text-sm font-semibold text-gray-900 mb-1">Upload Value Chain .md File</h2>
           <p className="text-[11px] text-gray-500 mb-3">
             A Process Repository markdown. The chain&rsquo;s seven-part narrative is what the prompts are
             written from — any prompt blocks already in the file are stripped out first, so a template

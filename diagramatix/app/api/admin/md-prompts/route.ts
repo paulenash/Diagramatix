@@ -15,7 +15,7 @@ import {
 import { generateMdPrompt, targetsFor } from "@/app/lib/valueChain/generatePrompt";
 
 /**
- * SuperAdmin — "Generate Repository Prompts".
+ * SuperAdmin — "Repository Master Template and .md Upload".
  *
  * The other end of "Create Project Diagrams from .md". That tool CONSUMES the
  * prompt blocks in a Process Repository document; this one WRITES them, from the
