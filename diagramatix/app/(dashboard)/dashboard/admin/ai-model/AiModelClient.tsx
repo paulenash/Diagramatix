@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { AiModel } from "@/app/lib/ai/models";
 import { pricingFor, typicalCost, TYPICAL_GEN, PRICING_SNAPSHOT_DATE } from "@/app/lib/ai/pricing";
@@ -20,6 +20,29 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const dirty = model !== savedModel || visionModel !== savedVision;
+
+  /**
+   * Paul, 2026-09-06: "Not on Kimi K3 forgot to Save!!!"
+   *
+   * He picked Kimi after hitting an Anthropic spend cap, left the screen, and
+   * every subsequent run still used Anthropic — because the selection had never
+   * been saved. Worse, the screen had AGREED with him: the cost table put its
+   * green "● default" marker against whatever was SELECTED, so the moment he
+   * chose Kimi the page said Kimi was the default. The only sign otherwise was
+   * the absence of a "✓ Saved" tick at the very bottom, below a long table.
+   *
+   * So: the browser asks before the page is abandoned mid-change. It is the one
+   * moment the mistake is still recoverable.
+   */
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const inForce = models.find((m) => m.id === savedModel);
+  const chosen = models.find((m) => m.id === model);
 
   // The default model can't read images, and there's no vision override → image
   // → diagram will fail. Surface it so the admin sets a vision model.
@@ -67,7 +90,27 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
         these to run head-to-head, each on its own provider&rsquo;s key.
       </p>
 
-      <div className="mt-5 bg-white border border-gray-200 rounded-lg p-4">
+      {/* What is ACTUALLY in force, stated before anything editable. A screen
+          that only shows a selection lets a selection be mistaken for a setting,
+          which is exactly what happened. */}
+      <div className={"mt-5 rounded-lg px-4 py-2.5 border "
+        + (dirty ? "border-amber-300 bg-amber-50" : "border-gray-200 bg-white")}>
+        <p className="text-xs text-gray-700">
+          Generating with <strong className="text-gray-900">{inForce?.label ?? savedModel}</strong>
+          {savedVision && <> · images with <strong className="text-gray-900">{models.find((m) => m.id === savedVision)?.label ?? savedVision}</strong></>}
+        </p>
+        {dirty && (
+          <p className="text-xs text-amber-800 mt-1">
+            <strong>Not saved.</strong> You have selected{" "}
+            <strong>{chosen?.label ?? model}</strong>
+            {visionModel !== savedVision && <> and a different vision model</>}
+            . Until you press <strong>Save</strong>, every generation still uses{" "}
+            <strong>{inForce?.label ?? savedModel}</strong>.
+          </p>
+        )}
+      </div>
+
+      <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4">
         <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Default model</label>
         <select
           value={model}
@@ -78,7 +121,9 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
             <option key={m.id} value={m.id}>{m.label}{m.provider === "moonshot" ? " — slow (~4 min)" : ""}{m.vision === false ? " — text only" : ""}</option>
           ))}
         </select>
-        <p className="text-[11px] text-gray-400 mt-2">Model id: <code>{model}</code></p>
+        <p className="text-[11px] text-gray-400 mt-2">
+          {dirty ? "Selected" : "In force"} model id: <code>{model}</code>
+        </p>
         {defaultIsMoonshot && (
           <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-2">
             ⚠ Kimi (Moonshot) models take <strong>~3–4 minutes per generation</strong> and exceed
@@ -130,11 +175,18 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
           </thead>
           <tbody>
             {priced.map(({ m, p }) => (
-              <tr key={m.id} className={`border-b border-gray-50 ${m.id === model ? "bg-green-50/60" : ""}`}>
+              // The green row is the model actually generating. It used to follow
+              // the SELECTION, so choosing a model made the table assert it was
+              // already the default — the screen agreeing with a change that had
+              // not happened.
+              <tr key={m.id} className={`border-b border-gray-50 ${m.id === savedModel ? "bg-green-50/60" : ""}`}>
                 <td className="py-1.5 pr-2 font-medium text-gray-800 whitespace-nowrap">
                   {m.label}
                   {m.provider === "moonshot" && <span className="ml-1 text-[9px] text-purple-600 bg-purple-50 border border-purple-200 rounded px-1" title="Kimi/Moonshot: ~3–4 min per generation; times out on Azure (~230s limit). Best for local single generations.">Kimi · slow</span>}
-                  {m.id === model && <span className="ml-1 text-[9px] text-green-700">● default</span>}
+                  {m.id === savedModel && <span className="ml-1 text-[9px] text-green-700">● in force</span>}
+                  {m.id === model && m.id !== savedModel && (
+                    <span className="ml-1 text-[9px] text-amber-700">● selected, not saved</span>
+                  )}
                 </td>
                 {p ? (
                   <>
@@ -174,7 +226,9 @@ export function AiModelClient({ models, initialModel, initialVisionModel }: {
         >
           {busy ? "Saving…" : "Save"}
         </button>
-        {!dirty && <span className="text-xs text-green-700">✓ Saved</span>}
+        {dirty
+          ? <span className="text-xs text-amber-800">Nothing changes until you press Save.</span>
+          : <span className="text-xs text-green-700">✓ Saved</span>}
         {err && <span className="text-xs text-red-600">{err}</span>}
       </div>
     </div>
