@@ -15,6 +15,7 @@ export type FeatureColorKey =
   | "simulator" | "mining" | "riskControl" | "apqc" | "portal" | "projectSharing"
   | "processRepository"
   | "processApi"
+  | "funExtensions"
   | "ai" | "entityLists" | "superAdmin" | "orgAdmin";
 
 export interface FeatureColor { bg: string; text: string }
@@ -34,6 +35,7 @@ export const FEATURE_META: { key: FeatureColorKey; label: string; group: "produc
   { key: "projectSharing", label: "Project Sharing",  group: "product", note: "Project Sharing tiles (SuperAdmin + OrgAdmin)" },
   { key: "processRepository", label: "Process Repository", group: "product", note: "The value-chain library, its maintenance screen and project generation" },
   { key: "processApi", label: "Process API", group: "product", note: "The partner API that turns a process description or document into BPMN — its test harness and its usage screen" },
+  { key: "funExtensions", label: "Fun Extensions", group: "product", note: "The playgrounds that are not process tools: Life, Orbit Simulator, n x n Nimb, Mastermind" },
   { key: "ai",          label: "AI Generation",       group: "accent",  note: "Toolbar AI Generate + every AI-generation trigger" },
   { key: "entityLists", label: "Entity Lists / Drift", group: "accent", note: "Entity Lists admin + the Entity-Drift ring" },
   { key: "superAdmin",  label: "SuperAdmin (fallback)", group: "role",  note: "Fallback for unmapped SuperAdmin Tools tiles" },
@@ -57,6 +59,10 @@ export const DEFAULT_FEATURE_COLORS: Record<FeatureColorKey, FeatureColor> = {
   // in the product group, and well clear of the violet AI accent the repository
   // tiles sit next to on the SuperAdmin grid.
   processRepository: { bg: "#ecfeff", text: "#155e75" },
+  // Violet: deliberately unlike every product colour, because these are not
+  // product. A tile that looks like the Process Repository invites someone to
+  // read it as part of the toolchain.
+  funExtensions: { bg: "#f5f3ff", text: "#5b21b6" },
   // Slate-teal: adjacent to the Process Repository cyan, since the API serves
   // the same subject, but distinct enough to tell the two apart on the grid.
   processApi: { bg: "#e0f2f1", text: "#0f766e" },
