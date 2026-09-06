@@ -437,7 +437,7 @@ export function MdDiagramsClient() {
               disabled={running}
               className="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
             >
-              Choose .md file
+              Generate diagrams from a .md file
             </button>
             <span className="text-sm text-gray-600">{fileName ?? "No file selected"}</span>
             <span className="text-xs text-gray-500">for a chain not in the library yet</span>

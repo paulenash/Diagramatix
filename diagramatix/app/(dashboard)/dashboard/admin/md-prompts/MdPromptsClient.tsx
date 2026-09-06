@@ -255,7 +255,7 @@ export function MdPromptsClient() {
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); }} />
             <button onClick={() => fileRef.current?.click()}
               className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700">
-              Choose a .md file
+              Write prompts from a .md file
             </button>
             {fileName && (
               <span className="text-xs text-gray-700">

@@ -259,7 +259,7 @@ export function ValueChainLibraryClient() {
               <button disabled={busy} onClick={() => fileRef.current?.click()}
                 className="px-3 py-1.5 text-xs font-medium rounded disabled:opacity-50"
                 style={{ background: tone.bg, color: tone.text }}>
-                Choose a .md file…
+                Import a .md into the library…
               </button>
             )}
 
