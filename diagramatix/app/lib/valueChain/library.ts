@@ -15,7 +15,7 @@
  * against the real document rather than against a copy of the rule.
  */
 import { chainCodes, chainSection, chainTitle, chainNarrative, subprocessHeadings } from "./chainSource";
-import { findBlocks, blocksOfChain } from "./spliceBlocks";
+import { findBlocks, blocksOfChain, insertPointFor } from "./spliceBlocks";
 import { type MdPromptType, MD_PROMPT_LABEL, renderPromptBlock, parseProvenance } from "./promptTemplates";
 
 /** label → type, matching `parseValueChainMd`'s `LABEL_TO_TYPE`. */
@@ -138,29 +138,59 @@ export function tidyHeading(text: string): string {
 }
 
 /**
- * A chain rendered back as markdown, in the document's own shape.
+ * One chain as markdown, in the shape the document already has.
  *
- * Narrative, then the chain-level prompts, then a `### code — title` section per
- * process carrying its BPMN prompt. Not a byte-identical reproduction of the
- * original file — the original interleaves the matrix between prompts, and
- * chains differ from each other in that ordering — but a document that
- * `parseValueChainMd` reads back to exactly the same chains, names, types and
- * prompts. That equivalence is what `T2900` checks, and it is the property that
- * actually matters.
+ * The prompts are SPLICED INTO the narrative, not appended after it. A chain's
+ * narrative already carries its own `### V01.03 — Check Credit & Pricing`
+ * headings — that is where a process's write-up lives — so emitting a second set
+ * underneath duplicated every process. Paul, 2026-09-06, asked how to move the
+ * whole Process Repository from prod to local through this file; measuring it
+ * first found 277 processes coming back as 554, each chain's prompts hanging off
+ * the second copy. A transfer route nobody has measured is a hope, not a
+ * procedure.
+ *
+ * Anything the narrative does NOT mention is still appended with a heading of
+ * its own — a process added in the library after the narrative was written is
+ * better carried in the wrong place than dropped.
  */
 export function renderChainMd(chain: ImportedChain, eol = "\n"): string {
-  const parts: string[] = [`## ${chain.code} — ${chain.title}`, "", chain.narrative.replace(/^##[^\n]*\n+/, "").trim(), ""];
+  const body = chain.narrative.replace(/^##[^\n]*\n+/, "").trim();
+  let src = `## ${chain.code} — ${chain.title}\n\n${body}\n`;
+
   const chainLevel: MdPromptType[] = ["value-chain", "context", "process-context", "archimate"];
-  for (const type of chainLevel) {
-    const p = chain.prompts.find((x) => x.type === type && !x.processCode);
-    if (p) parts.push(renderPromptBlock(type, p.prompt, p), "");
+  const edits: { at: number; text: string }[] = [];
+  const appended: string[] = [];
+
+  // Chain-level prompts sit after the narrative and under no `###`, which is
+  // where findBlocks reads them back as chain-level. All four go in at the same
+  // point, so they are inserted as one block to keep their order.
+  const cl = chainLevel
+    .map((type) => {
+      const p = chain.prompts.find((x) => x.type === type && !x.processCode);
+      return p ? renderPromptBlock(type, p.prompt, p) : null;
+    })
+    .filter((s): s is string => !!s);
+  if (cl.length) {
+    const at = insertPointFor(src, chain.code);
+    if (at === null) appended.push(...cl);
+    else edits.push({ at, text: `\n${cl.join("\n\n")}\n\n` });
   }
+
   for (const proc of [...chain.processes].sort((a, z) => a.sortOrder - z.sortOrder)) {
-    parts.push(`### ${proc.code} — ${proc.title}`, "");
     const p = chain.prompts.find((x) => x.type === "bpmn" && x.processCode === proc.code);
-    if (p) parts.push(renderPromptBlock("bpmn", p.prompt, p), "");
+    if (!p) continue;
+    const at = insertPointFor(src, chain.code, proc.code);
+    const block = renderPromptBlock("bpmn", p.prompt, p);
+    if (at === null) appended.push(`### ${proc.code} — ${proc.title}`, block);
+    else edits.push({ at, text: `\n\n${block}\n` });
   }
-  return parts.join("\n").replace(/\n{3,}/g, "\n\n").replace(/\n/g, eol);
+
+  // Back to front, so an earlier insertion cannot move a later offset.
+  for (const e of edits.sort((a, z) => z.at - a.at)) {
+    src = src.slice(0, e.at) + e.text + src.slice(e.at);
+  }
+  if (appended.length) src += `\n${appended.join("\n\n")}\n`;
+  return src.replace(/\n{3,}/g, "\n\n").replace(/\n/g, eol);
 }
 
 /** The whole library as one document, ready to download. */

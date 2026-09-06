@@ -110,3 +110,85 @@ describe("provenance survives the .md round trip", () => {
     expect(renderProvenance({ model: "claude-opus-5" })).toBe("<!-- diagramatix: model=claude-opus-5 -->");
   });
 });
+
+/**
+ * The whole library through a file and back — the shape that matters when an
+ * environment is moved.
+ *
+ * Paul, 2026-09-06: "How do I transfer the whole Process Repository from prod to
+ * local. Intact and not requiring re generation…"
+ *
+ * Measuring the answer found the export doubling every process. A chain's
+ * narrative already carries its own `### V01.03 — …` headings — that is where a
+ * process's write-up lives — and the renderer emitted a second set underneath,
+ * so 277 processes came back as 554 with the prompts hanging off the copies.
+ * Nothing had ever measured DATABASE → md → back; the existing test measures
+ * FILE → parse, which cannot see this.
+ */
+describe("the whole library survives export and re-import", () => {
+  const LIB: ImportedChain[] = [{
+    code: "V01", title: "Order to Cash", groupName: "Operate", sortOrder: 0,
+    // A narrative in the real shape: chain intro, then a section per process.
+    narrative: [
+      "The order-to-cash chain, end to end.",
+      "",
+      "### V01.01 — Receive Order",
+      "",
+      "How an order arrives.",
+      "",
+      "### V01.02 — Check Credit",
+      "",
+      "How credit is checked.",
+    ].join("\n"),
+    processes: [
+      { code: "V01.01", title: "Receive Order", sortOrder: 0 },
+      { code: "V01.02", title: "Check Credit", sortOrder: 1 },
+    ],
+    prompts: [
+      { type: "value-chain", processCode: "", name: "V01 Order to Cash — Value Chain", prompt: "Draw the chain.", model: "claude-opus-5", generatedAt: "2026-09-06T02:00:00.000Z" },
+      { type: "bpmn", processCode: "V01.01", name: "V01.01 Receive Order", prompt: "Draw receiving.", model: "claude-opus-5", generatedAt: "2026-09-06T02:01:00.000Z" },
+      { type: "bpmn", processCode: "V01.02", name: "V01.02 Check Credit", prompt: "Draw the credit check.", model: "claude-opus-5", generatedAt: "2026-09-06T02:02:00.000Z" },
+    ],
+  }];
+
+  const back = parseLibraryFromMd(renderLibraryMd(LIB));
+
+  it("T3297 processes are not duplicated by the headings the narrative already has", () => {
+    // The defect: 2 processes came back as 4.
+    expect(back[0].processes.map((p) => p.code)).toEqual(["V01.01", "V01.02"]);
+  });
+
+  it("T3298 every prompt comes back attached to the right process", () => {
+    expect(back[0].prompts).toHaveLength(3);
+    for (const src of LIB[0].prompts) {
+      const got = back[0].prompts.find((p) => p.type === src.type && p.processCode === src.processCode)!;
+      expect(got, `${src.type} ${src.processCode}`).toBeTruthy();
+      expect(got.prompt.trim()).toBe(src.prompt.trim());
+      expect(got.model).toBe(src.model);
+      expect(got.generatedAt).toBe(src.generatedAt);
+    }
+  });
+
+  it("T3299 the per-process write-up in the narrative is kept, not thrown away", () => {
+    // The prompts are spliced INTO the narrative, so each process's own prose
+    // stays under its own heading where a reader expects it.
+    expect(back[0].narrative).toContain("How an order arrives.");
+    expect(back[0].narrative).toContain("How credit is checked.");
+  });
+
+  it("T3300 a process the narrative never mentions is still carried", () => {
+    // Added in the library after the narrative was written. Better in the wrong
+    // place than silently dropped.
+    const extra: ImportedChain[] = [{
+      ...LIB[0],
+      processes: [...LIB[0].processes, { code: "V01.03", title: "Ship Goods", sortOrder: 2 }],
+      prompts: [...LIB[0].prompts, {
+        type: "bpmn" as const, processCode: "V01.03", name: "V01.03 Ship Goods",
+        prompt: "Draw shipping.", model: null, generatedAt: null,
+      }],
+    }];
+    const r = parseLibraryFromMd(renderLibraryMd(extra));
+    expect(r[0].processes.map((p) => p.code)).toEqual(["V01.01", "V01.02", "V01.03"]);
+    expect(r[0].prompts.find((p) => p.processCode === "V01.03")?.prompt.trim()).toBe("Draw shipping.");
+  });
+});
