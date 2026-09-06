@@ -2,7 +2,7 @@
 
 Every item Paul raised that drove the diagram-quality work, lettered so progress
 can be reported against a stable reference. **A–Z is fixed: never renumber, never
-reuse.** A new item becomes AN, AO, …
+reuse.** A new item becomes AW, AX, …
 
 **Two columns, deliberately.** *Built* is what was done and the commit that did
 it. *Paul* is his verdict, and it is the only one that closes an item — Paul,
@@ -69,6 +69,15 @@ Kept in the repo rather than in a chat so it survives a new session.
 | **AL** | Mark value chains whose prompts predate a master template change, and when a chain is chosen, name **which diagrams** need new prompts | `chainStaleness` — a red count on each chain in the list, and on the selected chain a panel naming every process, "no prompt at all" called out separately from "written to an older template", with a **Tick these N** button that feeds the regenerate selection | |
 | **AM** | A diagram generated **before** its prompt was regenerated must say so in its Properties panel | `diagramFreshness` + `GET /api/diagrams/[id]/freshness`. Three separate notes, because the remedies differ: the prompt moved (regenerate the diagram), the master template moved (regenerate the prompt FIRST), and no AI plan was stored (it cannot be replayed offline — the V22.04 / V22.06 case). Silent when the diagram is current. Works on diagrams generated before the stamp existed, by reading the process code off the diagram's name | |
 | **AK** | Separate, confirmed options on the .md upload — replace all / selectively update / add new — not one generic button | `7d3d75c4` — choosing a file now PREVIEWS it: per chain, what the file holds vs what the library holds and how many prompts a replace destroys. Tick per chain (New only / Everything / None), then a `ConfirmDialog` that NAMES the chains being replaced. `planLibraryImport` is the one decision the preview and the import both make, so they cannot disagree | **PASS** — "AK is fine", 2026-09-05 |
+| **AN** | Regenerated and published V22's prompts, and **the red messages stayed** | `978ce74a` — the cut-off was the END of the day the template shipped, in UTC. v7 actually shipped 00:27Z; the cut-off was 23:59Z, 23½ hours later, so a Sydney morning's work fell on the wrong side of it every time. Each history entry now carries `shippedAt`, the commit's own instant — two instants, compared exactly | |
+| **AO** | The Properties warning does not clear on regeneration — only after leaving and re-entering | `9f01c059` — it was judged on the server, which reads the diagram from the DATABASE, so after an in-editor regeneration it truthfully answered about the PREVIOUS version until the debounced save landed. The library's side is fetched; the diagram's own side is read from live state | |
+| **AP** | "No AI plan was stored" shown on diagrams that were just regenerated | `9f01c059` — regenerating in the editor was DELETING the plan: `applyAiResult` rebuilt `aiGeneration` and wrote the plan only to the linked Prompt row. It now keeps it on the diagram, carries the repository source stamp forward, and recognises a plan held on the Prompt | |
+| **AQ** | *"What does '1 undrawable' message mean?"* | `9f01c059` — it meant one instruction BPMN cannot carry out, explained only in a hover title while the count named a quantity of something unnamed. The API now returns WHAT each one is and the row lists them: which line, which instruction. 38 of 277 prompts have one | |
+| **AR** | Show the **AI model** used to regenerate each prompt — and it may be unknown for an imported chain | `17a26e01` — `ValueChainPrompt.model`, on each prompt row and in the diagram's Properties ("Prompt written by Opus 5 · drawn by Opus 5"). An import sets null explicitly rather than stamping the current default. `d2e149a7` carries it through the .md so export-then-import no longer launders it | |
+| **AS** | A spend cap failed every remaining prompt one at a time | `24d6358a` — every remaining call was going to fail identically, so both runners now stop and say it once with how many were written. Rate limits deliberately excluded: those are a pause | |
+| **AT** | Chose Kimi K3 and it kept using Anthropic — *"forgot to Save!!!"* | `a8b0a07d` — the cost table put its green "default" marker against what was SELECTED, so the page asserted the change had happened. It now states what is in force before anything editable, names both when they differ, and the browser asks before you leave mid-change | |
+| **AU** | V16.09 — *"appears to be ok despite errors / warnings"*: 8 diagnostics against a clean plan | `5b2db50b` — the containment walk excluded message flows but not ASSOCIATIONS, and a data object is attached at both ends, so it stepped out of the loop and swallowed seven ordinary tasks. A later pass put them back, so the drawing was right and only the warnings were wrong | |
+| **AV** | V16.06 — EMIE "GRC submission rejected" misplaced far from its boundary | `7b15ad13` — R8.14. Placed correctly, then moved 504px by container expansion while its host stayed put; a later pass fixed only the X. Re-asserted once at the end, on a side that is not walled in, off-centre toward its target | **PASS** — "Fixed!", 2026-09-06 |
 
 ## Editing — what happens when you touch a diagram
 
@@ -93,7 +102,7 @@ Kept in the repo rather than in a chat so it survives a new session.
 
 ## Where it stands
 
-**Passed by Paul:** A, B, C, D, E, F, G, I, J, N, O, P, Q, S, U, Z, AD, AE, AF, AG, AK — V22.04 on 2026-09-05: gateway connector labels fine, connectors to the merges fine, the sequence-connector crossing gone.
+**Passed by Paul:** A, B, C, D, E, F, G, I, J, N, O, P, Q, S, U, Z, AD, AE, AF, AG, AK, AV — V22.04 on 2026-09-05: gateway connector labels fine, connectors to the merges fine, the sequence-connector crossing gone.
 
 **Open by Paul:** **H** — a single pass must produce a readable diagram. Built and
 measured (107 → 5 corpus defects) but not passed, and rightly: the measure is a
@@ -109,7 +118,7 @@ corpus number, the bar is a diagram Paul would send someone.
   actually receives the click; a fourth theory without that would be a guess.
 - **H** — the umbrella. Closes when the rest do.
 
-**Untested — waiting on Paul:** K, L, M, R, T, X, Y, AA, AC, AH, AI, AJ, AL, AM. All are
+**Untested — waiting on Paul:** K, L, M, R, T, X, Y, AA, AC, AH, AI, AJ, AL, AM, AN, AO, AP, AQ, AR, AS, AT, AU. All are
 built and deployed. K, L, M and R need a regenerated diagram to show up on; X and
 Y need an editing session; AH, AI and AJ are on the SuperAdmin screens and need
 no regeneration at all.
