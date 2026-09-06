@@ -130,7 +130,7 @@ export function ScreencastStudio({ enabled }: { enabled: boolean }) {
 
   // Draggable launcher — sits just RIGHT of the camera button (which defaults to
   // left 64) and remembers where the user drags it. Smaller (32px) than the camera.
-  const { pos, handlers, didDrag } = useDraggable("diagramatix.video.btnPos", () => ({ left: 112, bottom: 16 }), 44);
+  const { pos, handlers, didDrag } = useDraggable("diagramatix.video.btnPos", () => ({ left: 64, bottom: 16 }), 44);
   const matrixRunning = useMatrixRunning();
   // Also detect the SuperAdmin from the CLIENT session (like the camera button) so
   // the launcher appears even if the server-rendered `enabled` prop was stale/cached

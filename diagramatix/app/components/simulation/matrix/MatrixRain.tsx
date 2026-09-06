@@ -1,14 +1,22 @@
 "use client";
 
 /**
- * Reusable Matrix katakana-rain canvas — the digital-rain effect, lifted from
- * the standalone /matrix page so the Simulator can reuse it for the entry
- * burst and as ambient chrome. Fills its positioned parent. Optional
- * `durationMs` fires `onDone` once (for the entry burst). Honours
- * prefers-reduced-motion by skipping straight to onDone.
+ * The cascade — a canvas of glyphs falling down the screen, used for the
+ * Simulator's and the Miner's entry bursts and as ambient chrome.
+ *
+ * WHAT falls is a parameter, not a constant. Paul, 2026-09-07: the Simulator's
+ * becomes "a cascade of small green BPMN symbols", the Miner's "small brown
+ * jagged rocks (50%) small brown BPMN symbols (50%)". Both are the same
+ * animation; only the glyph set and the colours differ, which is why they read
+ * as two versions of one thing rather than two effects.
+ *
+ * Fills its positioned parent. Optional `durationMs` fires `onDone` once (for
+ * the entry burst). Honours prefers-reduced-motion by skipping straight to
+ * onDone.
  */
 
 import { useEffect, useRef } from "react";
+import { drawGlyph, type GlyphSet } from "./glyphs";
 
 export function MatrixRain({
   durationMs,
@@ -17,15 +25,25 @@ export function MatrixRain({
   className = "",
   color = "#22FF22",
   headColor = "#D4FFD4",
+  glyphs = "katakana",
+  speedDivisor = 4,
 }: {
   durationMs?: number;
   onDone?: () => void;
+  /** The box each glyph is drawn in, and the column width. */
   fontSize?: number;
   className?: string;
-  /** Trailing-char colour (default Matrix green). The Miner uses an amber/brown. */
+  /** Trailing-glyph colour (default Matrix green). The Miner uses a brown. */
   color?: string;
-  /** Leading "head" char colour. */
+  /** Leading "head" glyph colour. */
   headColor?: string;
+  /** What falls: katakana, BPMN symbols, or the Miner's rocks-and-BPMN mix. */
+  glyphs?: GlyphSet;
+  /**
+   * Frames skipped between redraws, so a BIGGER number is a SLOWER cascade.
+   * 4 is the original Matrix rate; 8 is half of it.
+   */
+  speedDivisor?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -44,12 +62,6 @@ export function MatrixRain({
 
     const FADE_ALPHA = 0.06;
     const RESET_PROBABILITY = 0.025;
-    const SPEED_DIVISOR = 4;
-    const CHARS = (
-      "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン" +
-      "0123456789ABCDEF" +
-      "ﾊﾋﾌﾍﾎﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛ"
-    ).split("");
 
     let drops: number[] = [];
     const resize = () => {
@@ -69,8 +81,7 @@ export function MatrixRain({
       for (let i = 0; i < drops.length; i++) {
         const y = drops[i] * fontSize;
         if (y >= 0 && y < canvas.height + fontSize) {
-          ctx.fillStyle = drops[i] < 2 ? headColor : color;
-          ctx.fillText(CHARS[Math.floor(Math.random() * CHARS.length)], i * fontSize, y);
+          drawGlyph(ctx, glyphs, i * fontSize, y, fontSize, drops[i] < 2 ? headColor : color);
         }
         drops[i]++;
         if (y > canvas.height && Math.random() < RESET_PROBABILITY) drops[i] = 0;
@@ -80,7 +91,7 @@ export function MatrixRain({
     let raf = 0;
     let frame = 0;
     const loop = () => {
-      if (frame % SPEED_DIVISOR === 0) draw();
+      if (frame % speedDivisor === 0) draw();
       frame++;
       raf = window.requestAnimationFrame(loop);
     };

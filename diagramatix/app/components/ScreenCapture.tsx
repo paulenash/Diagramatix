@@ -100,7 +100,7 @@ export function ScreenCapture() {
   const pathname = usePathname();
   const email = session?.user?.email;
   const isSuper = !!email && SUPERUSER_EMAILS.has(email);
-  const { pos, handlers, didDrag } = useDraggable("diagramatix.camera.btnPos", () => ({ left: 64, bottom: 16 }));
+  const { pos, handlers, didDrag } = useDraggable("diagramatix.camera.btnPos", () => ({ left: 16, bottom: 16 }));
   const matrixRunning = useMatrixRunning();
 
   const [frozen, setFrozen] = useState<string | null>(null);

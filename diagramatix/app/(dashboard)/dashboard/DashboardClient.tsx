@@ -829,8 +829,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   }
 
   // Matrix screensaver config — idle seconds before the green katakana rain
-  // takes over. The on/off switch is the floating green "M" in the bottom-
-  // right corner; this dialog just lets the user set the timeout.
+  // takes over. It is armed and disarmed with Ctrl+Alt+M (SuperAdmin only) and
+  // has no button; this dialog just lets the user set the timeout.
   const MATRIX_IDLE_DEFAULT = 30;
   const [showMatrixConfig, setShowMatrixConfig] = useState(false);
   const [matrixIdleInput, setMatrixIdleInput] = useState<string>(() => {
@@ -1812,7 +1812,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     </div>
                     <button
                       onClick={() => { setFileMenuOpen(false); setShowMatrixConfig(true); }}
-                      title="Set how long the screen must be idle before the Matrix screensaver kicks in (when the green M in the bottom-right is on)."
+                      title="Set how long the screen must be idle before the Matrix screensaver kicks in. Arm it with Ctrl+Alt+M."
                       className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                     >
                       {"Matrix Screensaver\u2026"}
@@ -3031,9 +3031,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Matrix Screensaver</h2>
             <p className="text-xs text-gray-500 mb-4">
               Set how many seconds the page must be idle before the green
-              katakana rain kicks in. The screensaver only activates while the
-              floating green M (bottom-right) is on; any keyboard or mouse
-              activity dismisses it. Default is 30. Range 5–3600 seconds.
+              katakana rain kicks in. Arm and disarm the screensaver itself with
+              Ctrl+Alt+M — it has no button of its own. Any keyboard or mouse
+              activity dismisses the rain. Default is 30. Range 5–3600 seconds.
             </p>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Idle time (seconds)</label>

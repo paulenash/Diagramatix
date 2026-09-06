@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * The dramatic entry: types "Entering the DiagramMATRIX Simulator…", holds it on
- * screen for a 5s dramatic beat, then plays a short Matrix digital-rain burst and
- * hands off to the console. Skippable by click / any key (which cancels the
- * pause). The rain component itself handles reduced-motion.
+ * The dramatic entry: types "Entering the Diagramatix Simulator…", holds it on
+ * screen for a 5s dramatic beat, then plays a short cascade of green BPMN
+ * symbols and hands off to the console. Skippable by click / any key (which
+ * cancels the pause). The cascade component itself handles reduced-motion.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -36,11 +36,13 @@ export function SimulatorIntro({ onEnter }: { onEnter: () => void }) {
       onClick={enter}
       className="fixed inset-0 z-[60] bg-black overflow-hidden flex items-center justify-center cursor-pointer"
     >
-      {phase === "rain" && <MatrixRain durationMs={1800} onDone={enter} />}
+      {phase === "rain" && (
+        <MatrixRain durationMs={3600} onDone={enter} glyphs="bpmn" speedDivisor={8} fontSize={22} />
+      )}
       <div className="relative z-10 text-center px-6 pointer-events-none">
         {phase === "typing" ? (
           <MatrixTypewriter
-            text="Entering the DiagramMATRIX Simulator…"
+            text="Entering the Diagramatix Simulator…"
             speedMs={45}
             onDone={() => { pauseTimer.current = window.setTimeout(() => setPhase("rain"), 5000); }}
             className="text-lg sm:text-2xl drop-shadow-[0_0_10px_rgba(74,222,128,0.6)]"

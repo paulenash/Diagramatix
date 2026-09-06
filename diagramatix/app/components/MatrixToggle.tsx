@@ -1,18 +1,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useDraggable } from "./useDraggable";
 import { MATRIX_RUNNING_EVENT } from "./useMatrixRunning";
 
 /**
- * Global Matrix-rain screensaver. The little green "M" pinned to the
- * bottom-left of every page is the on/off switch:
+ * Global Matrix-rain screensaver, armed by a keystroke rather than a button.
+ *
+ * Paul, 2026-09-07: "Remove the Matrix Screen saver button and move the Camera
+ * and Video buttons default placement to the left and allow SuperAdmin to invoke
+ * the Matrix Screen Saver with ctrl-Shift-M if it does not conflict."
+ *
+ * IT DOES CONFLICT. Ctrl+Shift+M is the profile switcher in Chrome and Edge, and
+ * Responsive Design Mode in Firefox — both are bindings a browser takes before
+ * the page ever sees the event, so the shortcut would simply appear not to work
+ * in whichever browser was being used. Ctrl+Alt+M is unclaimed in all three and
+ * by Windows, so that is the key.
  *
  *   - OFF  → feature disabled, nothing happens.
  *   - ON   → after the idle timeout (default 30 s, configurable via the
  *            Dashboard System menu) the canvas overlay activates. Any
- *            keyboard/mouse activity dismisses the rain and re-arms the
- *            timer; clicking M again turns the whole feature off.
+ *            keyboard/mouse activity dismisses the rain and re-arms the timer.
+ *
+ * SuperAdmin only, on REAL identity rather than the acting view mode, so it
+ * stays reachable while filming the OrgAdmin or User experience.
  *
  * Both the on/off state and the idle timeout persist in localStorage and
  * sync across components via a `diagramatix.matrix.config-changed` event.
@@ -32,10 +42,9 @@ function readIdleSeconds(): number {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_IDLE_SECONDS;
 }
 
-export function MatrixToggle() {
+export function MatrixToggle({ superAdmin = false }: { superAdmin?: boolean }) {
   const [armed, setArmedState] = useState(false);
   const [running, setRunning] = useState(false);
-  const { pos, handlers, didDrag } = useDraggable("diagramatix.matrix.btnPos", () => ({ left: 16, bottom: 16 }));
   const [idleSeconds, setIdleSeconds] = useState(DEFAULT_IDLE_SECONDS);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -58,6 +67,29 @@ export function MatrixToggle() {
     (window as unknown as { __dgxMatrixRunning?: boolean }).__dgxMatrixRunning = running;
     window.dispatchEvent(new CustomEvent(MATRIX_RUNNING_EVENT, { detail: running }));
   }, [running]);
+
+  /**
+   * Ctrl+Alt+M. Announced with a brief on-screen line, because a feature with no
+   * button and no feedback is indistinguishable from a broken one — the only way
+   * to know it worked would be to sit still for thirty seconds.
+   */
+  const [flash, setFlash] = useState<string | null>(null);
+  useEffect(() => {
+    if (!superAdmin) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || !e.altKey || e.shiftKey || e.metaKey) return;
+      if (e.key.toLowerCase() !== "m") return;
+      e.preventDefault();
+      const next = !readArmed();
+      setArmedState(next);
+      localStorage.setItem(ARMED_KEY, next ? "1" : "0");
+      if (!next) setRunning(false);
+      setFlash(next ? `Matrix screensaver armed — ${readIdleSeconds()}s idle` : "Matrix screensaver off");
+      window.setTimeout(() => setFlash(null), 1800);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [superAdmin]);
 
   const setArmed = (next: boolean) => {
     setArmedState(next);
@@ -182,27 +214,14 @@ export function MatrixToggle() {
   return (
     <>
       {running && <canvas ref={canvasRef} className="fixed inset-0 z-[60] bg-black" />}
-      {!running && (
-      <button
-        data-no-capture
-        {...handlers}
-        onClick={() => { if (didDrag()) return; setArmed(!armed); }}
-        style={pos ? { left: pos.left, bottom: pos.bottom, touchAction: "none" } : { touchAction: "none" }}
-        className={`fixed ${pos ? "" : "bottom-4 left-4"} z-[70] w-10 h-10 flex items-center justify-center rounded-full border-2 font-mono font-bold text-lg transition-all bg-black cursor-grab active:cursor-grabbing ${
-          armed
-            ? "border-green-400 text-green-400 shadow-[0_0_15px_rgba(74,222,128,0.7)] hover:scale-110"
-            : "border-green-700/60 text-green-700/60 hover:border-green-400 hover:text-green-400 hover:scale-110"
-        }`}
-        title={
-          armed
-            ? `Matrix screensaver ON — fires after ${idleSeconds}s idle. Click to disable · drag to move.`
-            : "Matrix screensaver OFF. Click to enable · drag to move."
-        }
-        aria-label="Toggle Matrix screensaver"
-        aria-pressed={armed}
-      >
-        M
-      </button>
+      {flash && !running && (
+        <div
+          data-no-capture
+          role="status"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] rounded border border-green-500/60 bg-black/85 px-3 py-1.5 font-mono text-xs text-green-400 shadow-[0_0_15px_rgba(74,222,128,0.4)]"
+        >
+          {flash}
+        </div>
       )}
     </>
   );

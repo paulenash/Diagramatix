@@ -46,13 +46,13 @@ export default async function RootLayout({
   // Screencast Studio is gated on REAL SuperAdmin identity (not the view-aware
   // acting mode), so it stays available while a SuperAdmin films the OrgAdmin /
   // User experience via the dgx_sa_mode switch.
-  const screencastEnabled = isSuperuser(await auth());
+  const superAdmin = isSuperuser(await auth());
   return (
     <html lang="en">
       <body className={`${geist.variable} ${caveat.variable} antialiased`}>
           <SessionProvider>
             {children}
-            <GlobalOverlays screencastEnabled={screencastEnabled} />
+            <GlobalOverlays superAdmin={superAdmin} />
           </SessionProvider>
         </body>
     </html>
