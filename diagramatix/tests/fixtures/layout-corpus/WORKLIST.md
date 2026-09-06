@@ -9,7 +9,7 @@ worse; this says what the defects ARE so one can be picked up and finished.
 A diagram leaves this list when its count reaches zero — at which point its
 entry in `KNOWN` (tests/bpmn/layout-corpus.test.ts) is deleted.
 
-**2 diagram(s) with 3 defect(s)**, out of 29 in the corpus.
+**3 diagram(s) with 4 defect(s)**, out of 30 in the corpus.
 
 ## V04.01 V04.01 Workforce Planning  `V04.01.plan.json` — 2
 
@@ -19,3 +19,7 @@ entry in `KNOWN` (tests/bpmn/layout-corpus.test.ts) is deleted.
 ## V22.01 V22.01 Receive Notification  `V22.01.plan.json` — 1
 
 - shared attachment point pClaimant|bottom|0.500 — connectors conn-pClaimant-pCustomerPortal, conn-tSendAck-pClaimant
+
+## V22.01 Receive Notification (regenerated)  `V22.01b.plan.json` — 1
+
+- LABEL/BODY: label of "Duplicate notification closed — no" over "Notification Record"

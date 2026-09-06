@@ -61,6 +61,10 @@ const KNOWN: Record<string, number> = {
   "V04.01.plan.json": 2,
   // 3 -> 1 when R55.7 gave the exception path a row clear of the main line.
   "V22.01.plan.json": 1,
+  // The regenerated V22.01 (2026-09-06), kept alongside the older capture: it is
+  // the shape that put an End event under a gateway. Its one remaining defect is
+  // a branch LABEL over a data object — the K/L family, not this one.
+  "V22.01b.plan.json": 1,
 };
 
 describe("layout corpus — generated diagrams stay readable", () => {

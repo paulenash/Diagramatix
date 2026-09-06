@@ -622,7 +622,7 @@ export function layoutBpmnDiagram(
     if (process.env.DGX_TRACE_EL) {
       const id = process.env.DGX_TRACE_EL;
       const e = elements.find((x) => x.id === id);
-      if (e) console.log(`    TRACE ${id} after ${name}: x=${Math.round(e.x)} y=${Math.round(e.y)} parent=${e.parentId ?? "-"} host=${e.boundaryHostId ?? "-"}`);
+      if (e) console.log(`    TRACE ${id} after ${name}: x=${Math.round(e.x)} y=${Math.round(e.y)} ${Math.round(e.width)}x${Math.round(e.height)} parent=${e.parentId ?? "-"} host=${e.boundaryHostId ?? "-"}`);
       else console.log(`    TRACE ${id} after ${name}: not in elements yet`);
     }
   };
@@ -5887,6 +5887,51 @@ export function layoutBpmnDiagram(
       kind: "recovered-reference", elementId: ev.id, label: ev.label ?? "", field: "boundaryHost",
       detail: `drawn ${Math.round(Math.max(dx, dy))}px off "${host.label ?? host.id}" — put back on its ${use} edge`,
     });
+  }
+
+  // ── R8.38: an End event that lands on something sits back on its own line ──
+  //
+  // Paul, 2026-09-06 on V22.01: "End event on top of gateway."
+  //
+  // "Notification held incomplete" terminates the branch out of "Record
+  // Notification As Incomplete", two rows below — but it had been left on the
+  // MIDDLE row, in the same column as the decision "Duplicate of an existing
+  // claim?". That gateway is then centred on the vertical span of its own two
+  // branches (correctly — it is Paul's own rule that a gateway sits on its
+  // branches' mid-line), and the centring moved it straight onto the End event.
+  //
+  // The gateway is where it belongs. The End event is not: an End event
+  // terminates ONE flow, so it belongs on the line it terminates, and being
+  // anywhere else is what let something else be centred on top of it.
+  //
+  // A REPAIR, not a placement rule. It fires only where bodies already overlap,
+  // so the row analysis keeps every End event it positioned deliberately, and it
+  // declines the move if that would only trade one overlap for another.
+  {
+    const solid = elements.filter(e => e.type !== "pool" && e.type !== "lane");
+    const hits = (a: DiagramElement, b: DiagramElement) =>
+      a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+    const clashes = (e: DiagramElement, y: number) => solid.some(o =>
+      o.id !== e.id && o.parentId === e.parentId && !o.boundaryHostId
+      && o.type !== "data-object" && o.type !== "data-store" && o.type !== "text-annotation"
+      && hits({ ...e, y } as DiagramElement, o));
+
+    for (const e of elements) {
+      if (e.type !== "end-event" || e.boundaryHostId) continue;
+      if (!clashes(e, e.y)) continue;                       // nothing wrong with it
+      const ins = connectors.filter(c => c.type === "sequence" && c.targetId === e.id);
+      if (ins.length !== 1) continue;                       // several lines end here — no one row is its own
+      const src = elMap.get(ins[0].sourceId);
+      if (!src || src.parentId !== e.parentId) continue;
+      const wantY = src.y + src.height / 2 - e.height / 2;
+      if (Math.abs(wantY - e.y) < 0.5) continue;
+      if (clashes(e, wantY)) continue;                      // no better there — leave it visible where it is
+      e.y = wantY;
+      diagnose({
+        kind: "recovered-reference", elementId: e.id, label: e.label ?? "", field: "position",
+        detail: `drawn over another shape — moved onto the row of "${src.label ?? src.id}", the flow it ends`,
+      });
+    }
   }
 
   phase(`connectors built (${connectors.length})`);
