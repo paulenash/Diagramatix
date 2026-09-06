@@ -1442,6 +1442,7 @@ export function DiagramEditor({
   const [promptFacts, setPromptFacts] = useState<{
     promptRegeneratedAt: string | null; currentTemplateVersion: number | null;
     checkedPromptId: string | null; checkedPromptHasPlan: boolean;
+    promptModel: string | null; processCode: string | null;
   } | null>(null);
   useEffect(() => {
     if (!data.aiGeneration) { setPromptFacts(null); return; }
@@ -5915,6 +5916,7 @@ export function DiagramEditor({
             onNavigateToDiagram={handleDrillIntoSubprocess}
             aiGeneration={data.aiGeneration}
             aiFreshness={aiFreshness}
+            aiPromptModel={promptFacts?.processCode ? promptFacts.promptModel ?? "unknown" : undefined}
             aiModels={aiModels}
             currentAiModelId={currentAiModel?.id}
             onRegenerate={handleRegenerate}

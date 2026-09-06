@@ -812,6 +812,12 @@ model ValueChainPrompt {
   /// Did it parse back through parseValueChainMd when it was generated?
   roundTripsOk Boolean   @default(false)
   generatedAt  DateTime?
+  /// Which AI model wrote it. NULL means genuinely unknown, not "none": a prompt
+  /// imported from a .md was written elsewhere, and a prompt generated before
+  /// this column existed cannot be attributed after the fact. Both are stated as
+  /// unknown rather than guessed - the difference between Opus and Haiku is
+  /// roughly two thirds of the content, so an attribution has to be trustworthy.
+  model        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

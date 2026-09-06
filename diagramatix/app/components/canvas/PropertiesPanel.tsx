@@ -33,6 +33,7 @@ import { isUmlConnType } from "@/app/lib/diagram/types";
 import { umlAttributeTypeList } from "@/app/lib/diagram/umlTypes";
 import { getCachedCatalogue, findShapeByKey, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
 import { getAllowedRelationships, loadCompatibilityMatrix } from "@/app/lib/archimate/compatibility";
+import { aiModelLabel } from "@/app/lib/ai/models";
 
 // ArchiMate relationship metadata — maps the archi-* connector type to its
 // human name and ArchiMate relationship group (shown in the Properties panel).
@@ -155,6 +156,10 @@ interface Props {
   /** Whether this diagram still matches the prompt it came from — see
    *  `GET /api/diagrams/[id]/freshness`. Empty when it is current. */
   aiFreshness?: { level: "warn" | "info"; text: string }[];
+  /** Which model WROTE the repository prompt behind this diagram — the literal
+   *  string "unknown" when the prompt exists but was never attributed, and
+   *  undefined when the diagram did not come from the repository at all. */
+  aiPromptModel?: string;
   /** Cost-gated generate models the user may pick for a regeneration. */
   aiModels?: AllowedModel[];
   currentAiModelId?: string;
@@ -817,6 +822,7 @@ export function PropertiesPanel({
   onNavigateToDiagram,
   aiGeneration,
   aiFreshness,
+  aiPromptModel,
   aiModels = [],
   currentAiModelId,
   onRegenerate,
@@ -1140,6 +1146,22 @@ export function PropertiesPanel({
                       onChange={(e) => onToggleAiPromptAnnotation(e.target.checked)} />
                     Show original generation prompt
                   </label>
+                )}
+                {/* Two different models, and conflating them hides the one that
+                    matters. The prompt's author decides how much process the
+                    prompt describes at all; the diagram's decides how well that
+                    description was drawn. */}
+                {aiPromptModel && (
+                  <div className="text-[9px] text-gray-500 mt-0.5">
+                    Prompt written by{" "}
+                    <span className={aiPromptModel === "unknown" ? "text-amber-700" : "text-gray-700"}
+                      title={aiPromptModel === "unknown"
+                        ? "No model was recorded against the repository prompt — it was imported from a .md, which carries the text and nothing about what wrote it. Regenerate the prompt to attribute it."
+                        : aiPromptModel}>
+                      {aiPromptModel === "unknown" ? "an unrecorded model" : aiModelLabel(aiPromptModel)}
+                    </span>
+                    {aiGeneration.model && <> · drawn by <span className="text-gray-700">{aiModelLabel(aiGeneration.model)}</span></>}
+                  </div>
                 )}
                 <RegenerateControl
                   models={aiModels}

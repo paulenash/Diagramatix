@@ -46,6 +46,7 @@ export async function GET(_req: Request, { params }: Params) {
   const empty = {
     promptRegeneratedAt: null, currentTemplateVersion: latestTemplateVersion(type).version,
     processCode: null, checkedPromptId: null, checkedPromptHasPlan: false,
+    promptModel: null as string | null,
   };
   if (!gen) return NextResponse.json(empty);
 
@@ -58,13 +59,21 @@ export async function GET(_req: Request, { params }: Params) {
     : processCodeForDiagram(diagram.name);
 
   let promptRegeneratedAt: string | null = null;
+  /**
+   * Which model WROTE the prompt — a different question from which model drew
+   * the diagram, and the one that decides whether the prompt is worth keeping:
+   * Haiku was measured giving about a third of Opus's content. Null is a real
+   * answer, not a missing one — an imported chain can never know.
+   */
+  let promptModel: string | null = null;
   if (processCode) {
     const row = await prisma.valueChainPrompt.findFirst({
       where: { type, processCode },
-      select: { generatedAt: true },
+      select: { generatedAt: true, model: true },
       orderBy: { generatedAt: "desc" },
     });
     promptRegeneratedAt = row?.generatedAt?.toISOString() ?? null;
+    promptModel = row?.model ?? null;
   }
 
   /**
@@ -89,5 +98,6 @@ export async function GET(_req: Request, { params }: Params) {
     processCode: processCode || null,
     checkedPromptId,
     checkedPromptHasPlan,
+    promptModel,
   });
 }

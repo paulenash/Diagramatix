@@ -92,6 +92,9 @@ export async function GET(req: Request) {
         id: p.id, type: p.type, processCode: p.processCode, name: p.name,
         prompt: p.prompt, chars: p.prompt.length,
         roundTripsOk: p.roundTripsOk, generatedAt: p.generatedAt,
+        // null = unknown, which an imported chain always is. Reported as it is
+        // stored so the screen can say "unknown" rather than invent a default.
+        model: p.model,
         // Computed on read rather than stored: the check is deterministic and
         // costs microseconds, so it needs no column and cannot go stale against
         // a prompt someone edited by hand.
@@ -226,6 +229,11 @@ export async function POST(req: Request) {
           data: {
             chainId: chain.id, type: p.type, processCode: p.processCode, name: p.name,
             prompt: p.prompt, roundTripsOk: true, generatedAt: new Date(),
+            // Paul, 2026-09-06: "This may be unknown for an imported Value
+            // Chain?" It is - the .md carries the prompt text and nothing about
+            // what wrote it. Left null deliberately; stamping the current
+            // default here would be a guess presented as a record.
+            model: null,
           },
         });
         prompts++;
@@ -422,8 +430,9 @@ export async function POST(req: Request) {
             create: {
               chainId: chain.id, type: target.type, processCode: target.type === "bpmn" ? target.code : "",
               name, prompt: res.prompt, roundTripsOk: res.roundTrips, generatedAt: new Date(),
+              model,
             },
-            update: { name, prompt: res.prompt, roundTripsOk: res.roundTrips, generatedAt: new Date() },
+            update: { name, prompt: res.prompt, roundTripsOk: res.roundTrips, generatedAt: new Date(), model },
           });
           written++;
           send({

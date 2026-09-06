@@ -28,6 +28,7 @@ import {
   type MdPromptType,
 } from "@/app/lib/valueChain/promptTemplates";
 import { chainStaleness } from "@/app/lib/valueChain/staleness";
+import { aiModelLabel } from "@/app/lib/ai/models";
 import { tonesFor } from "@/app/lib/theme/featureColors";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
@@ -43,6 +44,9 @@ interface Prompt {
   /** What those two counts actually ARE — one readable line each. */
   unterminatedDetail?: string[];
   undrawableDetail?: string[];
+  /** Which AI model wrote it. null = genuinely unknown (imported, or pre-dating
+   *  the column) — stated as unknown rather than guessed. */
+  model?: string | null;
   truncated: string | null;
 }
 interface Chain {
@@ -783,6 +787,19 @@ function PromptRow({ label, prompt, open, setOpen, onRegenerate, busy, ticked, o
                 {prompt.unterminatedBranches} open branch{prompt.unterminatedBranches === 1 ? "" : "es"}
               </span>
             )}
+            {/* Which model wrote THIS prompt — and one BPMN prompt is one
+                diagram, so this is the per-diagram attribution. Haiku gives
+                roughly a third of the content Opus does, so "which model" is
+                the difference between a prompt worth keeping and one to
+                regenerate; an unattributed prompt says so rather than being
+                quietly assumed current. */}
+            <span
+              className={"text-[10px] " + (prompt.model ? "text-gray-500" : "text-amber-700")}
+              title={prompt.model
+                ? `This prompt was written by ${aiModelLabel(prompt.model)} (${prompt.model}).`
+                : "No model was recorded. Either this prompt was imported from a .md, which carries the text and nothing about what wrote it, or it predates the recording. Regenerate it to attribute it."}>
+              {prompt.model ? aiModelLabel(prompt.model) : "model unknown"}
+            </span>
             {!prompt.published && <span className="text-[10px] px-1 rounded bg-amber-100 text-amber-800">draft</span>}
           </>
         ) : (
