@@ -16,7 +16,7 @@ import {
 import { tonesFor } from "@/app/lib/theme/featureColors";
 import { useFeatureColors } from "@/app/lib/theme/useFeatureColors";
 
-const GRID_CHOICES = [40, 60, 80, 120, 200, 400];
+const GRID_CHOICES = [40, 60, 80, 120, 200, 400, 1000, 2000];
 const SPEEDS: { label: string; ms: number }[] = [
   { label: "Slow", ms: 240 }, { label: "Steady", ms: 90 }, { label: "Fast", ms: 30 }, { label: "Flat out", ms: 0 },
 ];
@@ -34,6 +34,7 @@ export function LifeClient() {
   const [speed, setSpeed] = useState(1);
   const [chosen, setChosen] = useState<string>("glider");
   const [showRules, setShowRules] = useState(true);
+  const [fit, setFit] = useState(true);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -121,6 +122,28 @@ export function LifeClient() {
 
   const box = boundingBox(cells);
   const current = patternById(chosen);
+
+  /**
+   * The square of grid the canvas shows.
+   *
+   * At 2000 × 2000 a centred glider is one cell in four million, and drawing the
+   * whole grid to a 720px canvas puts it below the resolution — a blank screen
+   * with the population counter insisting five cells are alive. So by default
+   * the view FOLLOWS the action: the live cells' bounding box with room around
+   * it, never smaller than 40 cells so a blinker does not fill the screen, and
+   * never larger than the grid.
+   *
+   * Turning it off shows the whole grid, which is what you want once a gun has
+   * filled it. The grid size still decides where things die either way — this
+   * only decides what is on screen.
+   */
+  const view = useMemo(() => {
+    if (!fit || !box) return { x: 0, y: 0, span: size };
+    const span = Math.min(size, Math.max(40, Math.ceil(Math.max(box.width, box.height) * 1.6)));
+    const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+    const clamp = (v: number) => Math.max(0, Math.min(size - span, Math.round(v - span / 2)));
+    return { x: clamp(cx), y: clamp(cy), span };
+  }, [fit, box?.x, box?.y, box?.width, box?.height, size]);
 
   return (
     <div className="min-h-screen dgx-dashboard-bg">
@@ -212,11 +235,23 @@ export function LifeClient() {
               </span>
             </div>
 
-            <LifeGrid cells={cells} size={size} onToggle={toggleCell} tone={tone} />
+            <LifeGrid cells={cells} size={size} onToggle={toggleCell} tone={tone} view={view} />
 
-            <p className="text-[10px] text-gray-500 mt-2">
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <label className="flex items-center gap-1 text-[11px] text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={fit} onChange={(e) => setFit(e.target.checked)}
+                  className="h-3 w-3 accent-violet-600" />
+                Follow the action
+              </label>
+              <span className="text-[10px] text-gray-500">
+                {view.span === size
+                  ? `showing the whole ${size} × ${size} grid`
+                  : `showing ${view.span} × ${view.span} of ${size} × ${size}, centred on the live cells`}
+              </span>
+            </div>
+            <p className="text-[10px] text-gray-500 mt-1">
               Click a cell to bring it to life or kill it. Anything outside the grid is dead —
-              the edges do not wrap, so a glider leaving the {size} × {size} window is gone.
+              the edges do not wrap, so a glider leaving the {size} × {size} grid is gone for good.
             </p>
           </section>
 
@@ -302,19 +337,29 @@ export function LifeClient() {
  * browser will do. The canvas draws only the LIVE cells, so the cost follows the
  * population, exactly as the engine does.
  */
-function LifeGrid({ cells, size, onToggle, tone }: {
+function LifeGrid({ cells, size, onToggle, tone, view }: {
   cells: Cells; size: number; onToggle: (x: number, y: number) => void;
   tone: { bg: string; text: string };
+  /** The square of grid the canvas shows. The whole grid, or a window onto it. */
+  view: { x: number; y: number; span: number };
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const PX = 720;                                     // drawing surface, square
+  /**
+   * The backing store, which is not the displayed size.
+   *
+   * At 2000 × 2000 in a 720px canvas a cell is a third of a pixel, so a glider
+   * is not merely small — it is below the resolution and vanishes into the
+   * downsample. A larger backing store lets a lone cell survive as something,
+   * and the browser scales the result down to the CSS width.
+   */
+  const PX = view.span > 400 ? 1600 : 720;
 
   useEffect(() => {
     const cv = ref.current;
     if (!cv) return;
     const ctx = cv.getContext("2d");
     if (!ctx) return;
-    const scale = PX / size;
+    const scale = PX / view.span;
     ctx.clearRect(0, 0, PX, PX);
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, PX, PX);
@@ -325,7 +370,7 @@ function LifeGrid({ cells, size, onToggle, tone }: {
       ctx.strokeStyle = "#eef2f7";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      for (let i = 0; i <= size; i++) {
+      for (let i = 0; i <= view.span; i++) {
         const p = Math.round(i * scale) + 0.5;
         ctx.moveTo(p, 0); ctx.lineTo(p, PX);
         ctx.moveTo(0, p); ctx.lineTo(PX, p);
@@ -335,21 +380,24 @@ function LifeGrid({ cells, size, onToggle, tone }: {
 
     ctx.fillStyle = tone.text;
     const pad = scale >= 6 ? 1 : 0;
+    const dot = Math.max(1, scale - pad * 2);
     for (const k of cells) {
       const x = cellX(k), y = cellY(k);
-      if (x < 0 || y < 0 || x >= size || y >= size) continue;   // off-grid is dead
-      ctx.fillRect(x * scale + pad, y * scale + pad, Math.max(1, scale - pad * 2), Math.max(1, scale - pad * 2));
+      if (x < 0 || y < 0 || x >= size || y >= size) continue;             // off-grid is dead
+      const vx = x - view.x, vy = y - view.y;
+      if (vx < 0 || vy < 0 || vx >= view.span || vy >= view.span) continue; // outside the window
+      ctx.fillRect(vx * scale + pad, vy * scale + pad, dot, dot);
     }
     ctx.strokeStyle = "#cbd5e1";
     ctx.strokeRect(0.5, 0.5, PX - 1, PX - 1);
-  }, [cells, size, tone.text]);
+  }, [cells, size, tone.text, view.x, view.y, view.span, PX]);
 
   const click = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const cv = ref.current;
     if (!cv) return;
     const r = cv.getBoundingClientRect();
-    const x = Math.floor(((e.clientX - r.left) / r.width) * size);
-    const y = Math.floor(((e.clientY - r.top) / r.height) * size);
+    const x = view.x + Math.floor(((e.clientX - r.left) / r.width) * view.span);
+    const y = view.y + Math.floor(((e.clientY - r.top) / r.height) * view.span);
     if (x >= 0 && y >= 0 && x < size && y < size) onToggle(x, y);
   };
 

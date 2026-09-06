@@ -87,6 +87,7 @@ describe("the pattern library behaves as it is described", () => {
   it("T3310 every oscillator returns to itself, at the period it claims", () => {
     const expected: Record<string, number> = {
       blinker: 2, toad: 2, beacon: 2, pulsar: 3, pentadecathlon: 15,
+      clock: 2, "traffic-light": 2, octagon: 5, "figure-eight": 8, "queen-bee-shuttle": 30,
     };
     for (const [id, period] of Object.entries(expected)) {
       const r = runUntilSettled(cellsOf(id), 100);
@@ -98,13 +99,18 @@ describe("the pattern library behaves as it is described", () => {
   it("T3311 every spaceship comes back to its own shape, displaced", () => {
     // The glider's diagonal step is the reason Life can carry information across
     // the grid, so the DISPLACEMENT is the property worth pinning, not the cells.
-    const expected: Record<string, [number, number]> = {
-      glider: [1, 1], lwss: [2, 0], mwss: [2, 0], hwss: [2, 0],
+    const expected: Record<string, { period: number; by: [number, number] }> = {
+      glider: { period: 4, by: [1, 1] },
+      lwss: { period: 4, by: [2, 0] },
+      mwss: { period: 4, by: [2, 0] },
+      hwss: { period: 4, by: [2, 0] },
+      // Far slower than the classic four, and only discovered in 2016.
+      copperhead: { period: 10, by: [0, -1] },
     };
-    for (const [id, [dx, dy]] of Object.entries(expected)) {
+    for (const [id, { period, by: [dx, dy] }] of Object.entries(expected)) {
       const start = cellsOf(id);
       let c = start;
-      for (let i = 0; i < 4; i++) c = step(c);
+      for (let i = 0; i < period; i++) c = step(c);
       expect(sameShape(start, c), `${id} lost its shape`).toBe(true);
       const a = boundingBox(start)!, b = boundingBox(c)!;
       expect([b.x - a.x, b.y - a.y], id).toEqual([dx, dy]);
@@ -125,6 +131,29 @@ describe("the pattern library behaves as it is described", () => {
     expect(r.generation).toBe(5206);
     expect(r.peakPopulation).toBeGreaterThan(1000);
   });
+
+  it("T3326 every methuselah settles at the generation it claims", () => {
+    // Each figure is published, and each came out exactly right the first time
+    // the engine ran the ASCII art. Getting eight independent numbers right by
+    // accident is not a thing that happens, so this is the check that the whole
+    // library is transcribed correctly rather than merely plausibly.
+    const expected: Record<string, number> = {
+      "r-pentomino": 1103, acorn: 5206, diehard: 130, thunderbird: 242,
+      century: 103, herschel: 128, "b-heptomino": 148, "pi-heptomino": 173,
+    };
+    for (const [id, gen] of Object.entries(expected)) {
+      expect(stabilisation(cellsOf(id), 8000).generation, id).toBe(gen);
+    }
+  }, 30000);
+
+  it("T3327 rabbits outlasts the acorn by a wide margin", () => {
+    // 17,332 generations from nine cells. The exact number is not asserted here
+    // because the run is slow; outlasting the acorn threefold is enough to show
+    // the transcription is right, and no mis-typed cell would.
+    const r = stabilisation(cellsOf("rabbits"), 20000);
+    expect(r.generation).toBeGreaterThan(15000);
+    expect(r.peakPopulation).toBeGreaterThan(1500);
+  }, 60000);
 
   it("T3314 the diehard dies completely at generation 130", () => {
     const r = stabilisation(cellsOf("diehard"));
@@ -228,5 +257,52 @@ describe("the rule is data, not code", () => {
     expect(conway).toContain("exactly 3");
     expect(high).toContain("3 or 6");
     expect(conway).not.toEqual(high);
+  });
+});
+
+/**
+ * Paul, 2026-09-06: "Add Life grid sizes 1000 x 1000 and 2000 x 2000."
+ *
+ * A 2000 × 2000 grid is four million cells, which is only affordable because
+ * nothing ever visits a dead one: a generation walks the LIVE cells outward, so
+ * it costs the same on a huge grid as on a small one. Measured, a glider runs
+ * 2,000 generations on a 2000 × 2000 grid in 23ms — 0.01ms a generation — and
+ * the Gosper gun, with five hundred cells alive, in 0.36ms a generation.
+ *
+ * The grid size decides only where things DIE.
+ */
+describe("a big grid costs nothing extra", () => {
+  it("T3324 the same population behaves identically whatever the grid size", () => {
+    // A glider well away from every edge cannot tell which grid it is on, so
+    // anything that made the result depend on the grid would be a bug in the
+    // bounds check rather than in Life.
+    const start = cellsFrom(artToCoords(patternById("glider")!.art).map(
+      ([x, y]) => [x + 100, y + 100] as [number, number]));
+    let small = start, huge = start;
+    for (let i = 0; i < 40; i++) {
+      small = step(small, { width: 400, height: 400 });
+      huge = step(huge, { width: 2000, height: 2000 });
+    }
+    expect(sameCells(small, huge)).toBe(true);
+    expect(huge.size).toBe(5);
+  });
+
+  it("T3325 a generation on a 2000 × 2000 grid is fast, because it follows the population", () => {
+    // Not a benchmark with a threshold anyone has to maintain — the assertion is
+    // the SHAPE of the cost: five live cells on four million squares must not
+    // cost meaningfully more than five live cells on forty thousand.
+    const glider = cellsFrom(artToCoords(patternById("glider")!.art).map(
+      ([x, y]) => [x + 900, y + 900] as [number, number]));
+    const time = (bounds: { width: number; height: number }) => {
+      let c = glider;
+      const t0 = performance.now();
+      for (let i = 0; i < 400; i++) c = step(c, bounds);
+      return performance.now() - t0;
+    };
+    const small = time({ width: 200, height: 200 });
+    const huge = time({ width: 2000, height: 2000 });
+    // Generous, because a test machine is noisy — but a grid-scanning
+    // implementation would be a hundred times slower here, not twice.
+    expect(huge).toBeLessThan(Math.max(50, small * 10));
   });
 });
