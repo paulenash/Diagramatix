@@ -173,7 +173,9 @@ export function ValueChainLibraryClient() {
           if (!line) continue;
           let m: Record<string, unknown>;
           try { m = JSON.parse(line); } catch { continue; }
-          if (m.t === "prompt") {
+          if (m.t === "plan") {
+            setNote(`Generating ${m.total} prompt(s) with ${aiModelLabel(String(m.model ?? ""))}…`);
+          } else if (m.t === "prompt") {
             const row: Row = {
               index: Number(m.index), name: String(m.name), type: m.type as MdPromptType,
               status: String(m.status), message: m.message as string | undefined,
@@ -181,6 +183,10 @@ export function ValueChainLibraryClient() {
               roundTrips: m.roundTrips as boolean | undefined,
             };
             setRows((r) => { const at = r.findIndex((x) => x.index === row.index); if (at === -1) return [...r, row]; const n = [...r]; n[at] = row; return n; });
+          } else if (m.t === "halted") {
+            // Raised to the error banner, not left as one row among many: the run
+            // stopped, and the reason is the same for everything not attempted.
+            setError(String(m.message ?? "The run stopped."));
           } else if (m.t === "done") {
             const refused = Number(m.refused ?? 0);
             setNote(`${m.written} prompt(s) written${m.failed ? `, ${m.failed} failed` : ""}${refused ? `, ${refused} REFUSED for asking a loop-back` : ""}.`);

@@ -14,6 +14,7 @@ import { aiApiKey } from "@/app/lib/ai/anthropicClient";
 import { AI_INVOCATION_POINTS, enterAiContext, recordDiagramGenerated } from "@/app/lib/ai/aiTelemetry";
 import { uniqueDiagramName } from "@/app/lib/valueChain/uniqueDiagramName";
 import { templateVersionAt, MD_PROMPT_TYPES, type MdPromptType } from "@/app/lib/valueChain/promptTemplates";
+import { isQuotaExhausted, quotaResumesAt } from "@/app/lib/ai/quotaExhausted";
 
 /**
  * SuperAdmin — "Create Project Diagrams from .md" batch runner.
@@ -205,7 +206,7 @@ export async function POST(req: Request) {
           existingProject = true;
           const had = await prisma.diagram.findMany({ where: { projectId }, select: { name: true } });
           for (const d of had) takenNames.add(d.name);
-          send({ t: "project", projectId, projectName: existing.name, total, existing: true });
+          send({ t: "project", projectId, projectName: existing.name, total, existing: true, model });
         } else {
           const project = await prisma.project.create({
             data: {
@@ -217,7 +218,7 @@ export async function POST(req: Request) {
             select: { id: true },
           });
           projectId = project.id;
-          send({ t: "project", projectId, projectName: projectName.trim(), total, existing: false });
+          send({ t: "project", projectId, projectName: projectName.trim(), total, existing: false, model });
         }
       } catch (e) {
         send({ t: "error", message: e instanceof Error ? e.message : "Could not open the project" });
@@ -341,6 +342,20 @@ export async function POST(req: Request) {
             t: "diagram", index, total, name: d.name, type: d.type,
             status: "error", message: describeError(e),
           });
+          // Same reasoning as the prompt runner: a spend cap means every
+          // remaining diagram will fail identically, and a generation costs far
+          // more than a prompt does, so grinding on is worse here.
+          if (isQuotaExhausted(e)) {
+            const back = quotaResumesAt(e);
+            send({
+              t: "halted", reason: "quota",
+              message: "The AI account has hit its usage limit"
+                + (back ? `, and regains access on ${back}` : "")
+                + `. Stopped after ${created} generated; ${total - index} not attempted.`,
+              created, remaining: total - index,
+            });
+            break;
+          }
         }
       }
 

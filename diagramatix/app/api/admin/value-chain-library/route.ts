@@ -12,6 +12,7 @@ import { checkPromptBranches } from "@/app/lib/valueChain/checkPromptBranches";
 import { checkPromptShapes } from "@/app/lib/valueChain/checkPromptShapes";
 import { selectRegenerationTargets } from "@/app/lib/valueChain/regenerationTargets";
 import { looksTruncated } from "@/app/lib/valueChain/checkPromptTruncated";
+import { isQuotaExhausted, quotaResumesAt } from "@/app/lib/ai/quotaExhausted";
 import { planLibraryImport } from "@/app/lib/valueChain/importPlan";
 import {
   type ImportedChain, parseLibraryFromMd, renderChainMd, renderLibraryMd, renumber,
@@ -412,7 +413,12 @@ export async function POST(req: Request) {
           briefs.set(t, buildMdPromptBriefing(t, row?.rules));
         }
 
-        send({ t: "plan", total: targets.length, chain: chain.code });
+        // WHICH MODEL. Paul changed the default to Kimi K3 after hitting an
+        // Anthropic spend cap and could not tell whether the change had taken:
+        // nothing on screen said what the run was using, so the only evidence
+        // was the error text, and a stale failed row reads exactly like a fresh
+        // one. A run should state its own model.
+        send({ t: "plan", total: targets.length, chain: chain.code, model });
         let written = 0, failed = 0, refused = 0;
         for (let i = 0; i < targets.length; i++) {
           const target = targets[i];
@@ -428,6 +434,27 @@ export async function POST(req: Request) {
           if (!res.ok) {
             failed++;
             send({ t: "prompt", index: i + 1, total: targets.length, name, type: target.type, status: "error", message: res.error });
+            // A spend cap is not THIS prompt failing, it is every REMAINING
+            // prompt failing. Carrying on made one doomed call per target and
+            // buried the reason in a wall of identical rows. Stop, say it once,
+            // and say where the run got to so it can be picked up from there.
+            if (isQuotaExhausted(res.error)) {
+              const back = quotaResumesAt(res.error);
+              const notAttempted = targets.length - i - 1;
+              send({
+                t: "halted",
+                reason: "quota",
+                message: "The AI account has hit its usage limit"
+                  + (back ? `, and regains access on ${back}` : "")
+                  + `. Stopped after ${written} written; ${notAttempted} not attempted.`,
+                written,
+                remaining: notAttempted,
+                nextTarget: targets[i + 1]
+                  ? (targets[i + 1].type === "bpmn" ? targets[i + 1].code : targets[i + 1].type)
+                  : null,
+              });
+              break;
+            }
             continue;
           }
           // The same guard the script applies: a loop-back asks for a shape the

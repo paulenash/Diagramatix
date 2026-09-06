@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { runMessageMatchesRow, type RunMessageLike } from "@/app/lib/valueChain/runRowMatch";
+import { aiModelLabel } from "@/app/lib/ai/models";
 
 type DiagKind = "value-chain" | "context" | "process-context" | "archimate" | "bpmn";
 interface ChainDiagram { name: string; type: DiagKind }
@@ -69,6 +70,7 @@ export function MdDiagramsClient() {
   const [projectName, setProjectName] = useState<string>("");
   const [parsing, setParsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [runModel, setRunModel] = useState<string | null>(null);
 
   /**
    * Where the diagrams land, and which of them are generated.
@@ -338,6 +340,10 @@ export function MdDiagramsClient() {
     const t = msg.t as string;
     if (t === "project") {
       setProjectId((msg.projectId as string) ?? null);
+      // WHICH MODEL this run is using. Without it the only evidence was the
+      // error text of a failed row, and a stale failed row reads exactly like a
+      // fresh one - which is how a model change looked like no change at all.
+      if (msg.model) setRunModel(String(msg.model));
     } else if (t === "diagram") {
       /**
        * Match on IDENTITY, not position.
@@ -374,6 +380,11 @@ export function MdDiagramsClient() {
         diagnostics: msg.diagnostics as Row["diagnostics"],
         savedName: msg.savedName as string | undefined,
       } : r));
+    } else if (t === "halted") {
+      // The run STOPPED. Raised to the banner rather than left as one row among
+      // many, because the reason applies to everything not attempted, not to the
+      // one diagram it happened to be on.
+      setError(String(msg.message ?? "The run stopped."));
     } else if (t === "done") {
       setSummary({ created: (msg.created as number) ?? 0, failed: (msg.failed as number) ?? 0 });
       // Only worth doing if something was actually created.
@@ -591,6 +602,7 @@ export function MdDiagramsClient() {
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-semibold text-gray-800">
               Progress — {doneCount}/{rows.length} done{errorCount > 0 ? `, ${errorCount} failed` : ""}
+              {runModel && <span className="ml-2 font-normal text-gray-500">· {aiModelLabel(runModel)}</span>}
             </h2>
             {projectId && (
               <button
