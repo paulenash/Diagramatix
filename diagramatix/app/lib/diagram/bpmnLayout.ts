@@ -747,8 +747,31 @@ export function layoutBpmnDiagram(
     };
     const out = new Map<string, string[]>();
     const inc = new Map<string, string[]>();
+    /**
+     * SEQUENCE FLOW ONLY. An association is not a route.
+     *
+     * V16.09 (Paul, 2026-09-06). This walk excluded message flows but not
+     * associations, and a data object is attached at BOTH ends: "Restoration
+     * Acceptance Criteria" hangs off a task before the loop and off one inside
+     * it. So the backward walk from the loop's end event stepped out through
+     * that data object into the lane in front of the loop, the forward walk
+     * stepped out through another into the lane behind it, and the intersection
+     * swallowed seven ordinary tasks — the sign-off and the incident update
+     * among them.
+     *
+     * A later pass noticed the loop's Start Event could not reach any of them
+     * and put them back, so the DIAGRAM came out right. But it reported eight
+     * problems against a plan that had made none, in wording that blamed the
+     * model ("declared inside …"). A warning that names an innocent party is
+     * worse than no warning: it gets read, acted on, and teaches the reader to
+     * discount the next one.
+     *
+     * Containment follows the flow. An association says "this task uses this
+     * document", which is true across any boundary and implies nothing about
+     * what lives inside what.
+     */
     for (const c of aiConnections) {
-      if (c.type === "message") continue;
+      if (c.type && c.type !== "sequence") continue;
       pushMap(out, c.sourceId, c.targetId);
       pushMap(inc, c.targetId, c.sourceId);
     }
@@ -761,13 +784,19 @@ export function layoutBpmnDiagram(
       if (startIds.length === 0 || endIds.length === 0) continue;
       const startSet = new Set(startIds);
       const endSet = new Set(endIds);
+      /**
+       * ...and never through the subprocess ITSELF. Passing through the EP node
+       * means you have left it, and an EP that swept itself up became its own
+       * parent — after which nothing placed it, or anything below it in the flow.
+       */
+      const fenced = (id: string) => id === ep.id;
       // Forward from starts, stopping AT ends (include the end, don't cross it).
       const fwd = new Set<string>();
       const fstack = [...startIds];
       while (fstack.length) {
         const n = fstack.pop()!;
         for (const t of out.get(n) ?? []) {
-          if (fwd.has(t)) continue;
+          if (fwd.has(t) || fenced(t)) continue;
           fwd.add(t);
           if (!endSet.has(t)) fstack.push(t);
         }
@@ -778,7 +807,7 @@ export function layoutBpmnDiagram(
       while (bstack.length) {
         const n = bstack.pop()!;
         for (const s of inc.get(n) ?? []) {
-          if (bwd.has(s)) continue;
+          if (bwd.has(s) || fenced(s)) continue;
           bwd.add(s);
           if (!startSet.has(s)) bstack.push(s);
         }
@@ -786,7 +815,7 @@ export function layoutBpmnDiagram(
       for (const id of fwd) {
         if (!bwd.has(id) || startSet.has(id) || endSet.has(id)) continue;
         const el = byId.get(id);
-        if (!el || NONFLOW.has(el.type) || el.parentSubprocess || el.boundaryHost) continue;
+        if (!el || el === ep || NONFLOW.has(el.type) || el.parentSubprocess || el.boundaryHost) continue;
         el.parentSubprocess = ep.id;
       }
     }
