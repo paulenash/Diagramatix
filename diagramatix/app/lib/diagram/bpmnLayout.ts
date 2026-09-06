@@ -615,6 +615,16 @@ export function layoutBpmnDiagram(
   const _t0 = Date.now();
   const phase = (name: string) => {
     layoutTrace(`[layoutBpmnDiagram] ${name} @ ${Date.now() - _t0}ms`);
+    // DGX_TRACE_EL=<id> prints one element position after every phase. Written
+    // to find why V16.06 EMIE ended up 504px from its host: placed correctly,
+    // then moved by container expansion, and the pass that moved it is only
+    // identifiable by watching the number change.
+    if (process.env.DGX_TRACE_EL) {
+      const id = process.env.DGX_TRACE_EL;
+      const e = elements.find((x) => x.id === id);
+      if (e) console.log(`    TRACE ${id} after ${name}: x=${Math.round(e.x)} y=${Math.round(e.y)} parent=${e.parentId ?? "-"} host=${e.boundaryHostId ?? "-"}`);
+      else console.log(`    TRACE ${id} after ${name}: not in elements yet`);
+    }
   };
   phase("start");
 
@@ -5771,6 +5781,112 @@ export function layoutBpmnDiagram(
       const owner = elMap.get(host.parentId);
       if (owner?.type === "pool" || owner?.type === "lane") expandContainerToFitChildren(owner.id, owner.type);
     }
+  }
+
+  // ── R8.14: a boundary event is put back on its host's rim ──
+  //
+  // Paul, 2026-09-06 on V16.06: EMIE "GRC submission rejected" is "misplaced far
+  // from its boundary". It ended up 504px below its host, inside a task in the
+  // NEXT LANE DOWN, which the readability check saw as one body drawn over
+  // another.
+  //
+  // Traced through the passes, it was placed correctly — on t13's edge — and
+  // then container expansion moved the event 504px without moving its host. A
+  // later pass re-derived its X from the host and left the Y, so it stayed
+  // exactly one lane too low with the right horizontal position, which is why it
+  // looked deliberate rather than dropped.
+  //
+  // The engine's recurring failure is a correct answer computed before later
+  // passes move the things it was about. Rather than chase every mover, the
+  // relationship is re-asserted once, at the end, exactly as R55.6 and R55.7 do.
+  //
+  // ONLY when the event has come off the rim entirely. An event still touching
+  // its host is where the earlier rules deliberately put it — R7.04's off-corner
+  // placement, R7.05's outward exit — and moving it would undo their work to fix
+  // nothing.
+  for (const ev of elements) {
+    if (!ev.boundaryHostId) continue;
+    const host = elMap.get(ev.boundaryHostId);
+    if (!host) continue;
+    const cx = ev.x + ev.width / 2, cy = ev.y + ev.height / 2;
+    const dx = Math.max(host.x - cx, 0, cx - (host.x + host.width));
+    const dy = Math.max(host.y - cy, 0, cy - (host.y + host.height));
+    if (dx <= 4 && dy <= 4) continue;                 // still on it — leave it alone
+
+    // The side that faces where the event's own flow goes, so the exception
+    // leaves in the direction it is drawn. Falling back to the bottom rim, which
+    // is where an unattached exception reads most naturally.
+    const out = connectors.find(c => c.type === "sequence" && c.sourceId === ev.id);
+    const tgt = out ? elMap.get(out.targetId) : undefined;
+    const hx = host.x + host.width / 2, hy = host.y + host.height / 2;
+    const tx = tgt ? tgt.x + tgt.width / 2 : hx;
+    const ty = tgt ? tgt.y + tgt.height / 2 : hy + 1;
+
+    /**
+     * Measured HOST to target, deliberately not from the event. The event is by
+     * definition in the wrong place here, so its own position says nothing about
+     * which way the exception should leave — asking a routine that reads it
+     * (pickBoundaryEventSide) put this one on the LEFT rim with its target off to
+     * the right, so the flow doubled back around the host it hangs off.
+     */
+    const vertical = Math.abs(ty - hy) >= Math.abs(tx - hx);
+    const byAxis = (v: boolean) => v ? (ty >= hy ? "bottom" : "top") : (tx >= hx ? "right" : "left");
+
+    /**
+     * ...and the nearer side is not always the usable one. On V16.06 the target
+     * is 178px right and 114px down, so "right" wins on distance — and the
+     * straight run out of that edge goes into "Issue impact assessment summary",
+     * the task immediately to the right. The router then took the event's flow
+     * down a whole lane and back up to get around it.
+     *
+     * So the second axis is taken when the first is walled in. Only a body counts
+     * as blocking; a diagram where both are blocked keeps the nearer side and
+     * lets the router do what it can.
+     */
+    const walled = (side: string) => {
+      const band = side === "right"
+        ? { x0: host.x + host.width, x1: Math.max(host.x + host.width, tx), y0: ev.y, y1: ev.y + ev.height }
+        : side === "left"
+          ? { x0: Math.min(host.x, tx), x1: host.x, y0: ev.y, y1: ev.y + ev.height }
+          : side === "bottom"
+            ? { x0: ev.x, x1: ev.x + ev.width, y0: host.y + host.height, y1: Math.max(host.y + host.height, ty) }
+            : { x0: ev.x, x1: ev.x + ev.width, y0: Math.min(host.y, ty), y1: host.y };
+      return elements.some(o =>
+        o.id !== ev.id && o.id !== host.id && o.id !== tgt?.id
+        && o.type !== "pool" && o.type !== "lane"
+        && o.x < band.x1 && o.x + o.width > band.x0
+        && o.y < band.y1 && o.y + o.height > band.y0);
+    };
+
+    const first = byAxis(vertical);
+    const second = byAxis(!vertical);
+    const use = (tgt && walled(first) && !walled(second)) ? second : first;
+
+    /**
+     * Along the side, sit toward the END the target is on — the same off-centre
+     * placement R7.04 gives an EMIE at first placement, and for the same reason.
+     * Centred, the exception drops straight down the host own centre line, which
+     * is where the flow INTO the host arrives; on V16.06 that crossed the
+     * incoming connector from "Record notifiable determination and deadline".
+     * Leaving toward where it goes reads better and clears the doorway.
+     */
+    const INSET = 6;
+    if (use === "top" || use === "bottom") {
+      ev.y = (use === "top" ? host.y : host.y + host.height) - ev.height / 2;
+      const end = tx >= hx ? host.x + host.width - ev.width - INSET : host.x + INSET;
+      ev.x = Math.min(Math.max(end, host.x), host.x + host.width - ev.width);
+    } else {
+      ev.x = (use === "left" ? host.x : host.x + host.width) - ev.width / 2;
+      const end = ty >= hy ? host.y + host.height - ev.height - INSET : host.y + INSET;
+      ev.y = Math.min(Math.max(end, host.y), host.y + host.height - ev.height);
+    }
+    // It belongs with its host, in the host's container — being parented
+    // elsewhere is how it came to be measured against another lane's rows.
+    ev.parentId = host.parentId;
+    diagnose({
+      kind: "recovered-reference", elementId: ev.id, label: ev.label ?? "", field: "boundaryHost",
+      detail: `drawn ${Math.round(Math.max(dx, dy))}px off "${host.label ?? host.id}" — put back on its ${use} edge`,
+    });
   }
 
   phase(`connectors built (${connectors.length})`);

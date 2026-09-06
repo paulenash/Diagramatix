@@ -9,7 +9,7 @@ worse; this says what the defects ARE so one can be picked up and finished.
 A diagram leaves this list when its count reaches zero — at which point its
 entry in `KNOWN` (tests/bpmn/layout-corpus.test.ts) is deleted.
 
-**2 diagram(s) with 3 defect(s)**, out of 28 in the corpus.
+**2 diagram(s) with 3 defect(s)**, out of 29 in the corpus.
 
 ## V04.01 V04.01 Workforce Planning  `V04.01.plan.json` — 2
 
