@@ -626,7 +626,42 @@ export function buildMdPromptBriefing(type: MdPromptType, stored: string | null 
  * two things `parseValueChainMd` matches on — are produced in exactly one place.
  * `T2893` runs the output of this back through the parser.
  */
-export function renderPromptBlock(type: MdPromptType, prompt: string): string {
+export interface PromptProvenance {
+  /** The AI model that wrote it. null when genuinely unknown. */
+  model?: string | null;
+  /** When it was written. null when genuinely unknown. */
+  generatedAt?: Date | string | null;
+}
+
+/**
+ * The provenance line: an HTML comment, so every markdown reader ignores it and
+ * the prompt text itself is untouched.
+ *
+ * WHY IT IS IN THE FILE AT ALL. A .md carries the prompt and nothing else, so an
+ * export-then-import used to throw away which model wrote each prompt and when —
+ * and the importer then stamped `generatedAt = now`, which is worse than losing
+ * it. A prompt written to an old template came back looking freshly current, and
+ * the staleness warnings that exist to catch exactly that went quiet. Round-
+ * tripping the library through a file must not launder its own history.
+ */
+export function renderProvenance(p: PromptProvenance): string {
+  const bits: string[] = [];
+  if (p.model) bits.push(`model=${p.model}`);
+  if (p.generatedAt) bits.push(`generated=${new Date(p.generatedAt).toISOString()}`);
+  return bits.length ? `<!-- diagramatix: ${bits.join("; ")} -->` : "";
+}
+
+/** Read one back. Absent or malformed reads as UNKNOWN, never as a default. */
+export function parseProvenance(comment: string | null | undefined): { model: string | null; generatedAt: string | null } {
+  if (!comment) return { model: null, generatedAt: null };
+  const model = /\bmodel=([^;\s]+)/.exec(comment)?.[1] ?? null;
+  const gen = /\bgenerated=([^;\s]+)/.exec(comment)?.[1] ?? null;
+  const at = gen ? new Date(gen) : null;
+  return { model, generatedAt: at && !Number.isNaN(at.getTime()) ? at.toISOString() : null };
+}
+
+export function renderPromptBlock(type: MdPromptType, prompt: string, prov?: PromptProvenance): string {
   const body = prompt.replace(/\r\n/g, "\n").replace(/\s+$/, "");
-  return `**${MD_PROMPT_LABEL[type]} diagram prompt.**\n\n\`\`\`text\n${body}\n\`\`\``;
+  const line = prov ? renderProvenance(prov) : "";
+  return `**${MD_PROMPT_LABEL[type]} diagram prompt.**${line ? `\n${line}` : ""}\n\n\`\`\`text\n${body}\n\`\`\``;
 }

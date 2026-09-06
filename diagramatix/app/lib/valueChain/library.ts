@@ -16,7 +16,7 @@
  */
 import { chainCodes, chainSection, chainTitle, chainNarrative, subprocessHeadings } from "./chainSource";
 import { findBlocks, blocksOfChain } from "./spliceBlocks";
-import { type MdPromptType, MD_PROMPT_LABEL, renderPromptBlock } from "./promptTemplates";
+import { type MdPromptType, MD_PROMPT_LABEL, renderPromptBlock, parseProvenance } from "./promptTemplates";
 
 /** label → type, matching `parseValueChainMd`'s `LABEL_TO_TYPE`. */
 const TYPE_OF_LABEL: Record<string, MdPromptType> = {
@@ -35,6 +35,13 @@ export interface ImportedPrompt {
   processCode: string;
   name: string;
   prompt: string;
+  /**
+   * Where it came from, carried through the .md so an export-then-import does
+   * not launder the library history. Both null when genuinely unknown - a file
+   * written before provenance existed, or one hand-authored.
+   */
+  model?: string | null;
+  generatedAt?: string | null;
 }
 
 export interface ImportedChain {
@@ -103,9 +110,13 @@ export function parseLibraryFromMd(md: string): ImportedChain[] {
           // heading, and its fallback when there is none.
           name: heading ? tidyHeading(heading) : `${code} ${title} — BPMN`,
           prompt: b.text,
+          ...parseProvenance(b.provenance),
         });
       } else {
-        prompts.push({ type, processCode: "", name: `${code} ${title} — ${MD_PROMPT_LABEL[type]}`, prompt: b.text });
+        prompts.push({
+          type, processCode: "", name: `${code} ${title} — ${MD_PROMPT_LABEL[type]}`, prompt: b.text,
+          ...parseProvenance(b.provenance),
+        });
       }
     }
 
@@ -142,12 +153,12 @@ export function renderChainMd(chain: ImportedChain, eol = "\n"): string {
   const chainLevel: MdPromptType[] = ["value-chain", "context", "process-context", "archimate"];
   for (const type of chainLevel) {
     const p = chain.prompts.find((x) => x.type === type && !x.processCode);
-    if (p) parts.push(renderPromptBlock(type, p.prompt), "");
+    if (p) parts.push(renderPromptBlock(type, p.prompt, p), "");
   }
   for (const proc of [...chain.processes].sort((a, z) => a.sortOrder - z.sortOrder)) {
     parts.push(`### ${proc.code} — ${proc.title}`, "");
     const p = chain.prompts.find((x) => x.type === "bpmn" && x.processCode === proc.code);
-    if (p) parts.push(renderPromptBlock("bpmn", p.prompt), "");
+    if (p) parts.push(renderPromptBlock("bpmn", p.prompt, p), "");
   }
   return parts.join("\n").replace(/\n{3,}/g, "\n\n").replace(/\n/g, eol);
 }

@@ -31,6 +31,8 @@ export interface PromptBlock {
   end: number;
   /** The prompt text itself, without the fence. */
   text: string;
+  /** The raw `diagramatix:` comment between the label and the fence, if any. */
+  provenance?: string | null;
 }
 
 /**
@@ -92,7 +94,12 @@ export function findBlocks(src: string): PromptBlock[] {
     // silently takes its key, so a splice would overwrite the wrong prompt.
     let under: string | null = null;
     for (const h of h3s) if (h.index < lm.index && h.index > chainAt) under = h.text; else if (h.index >= lm.index) break;
-    out.push({ label, chain, under: label === "BPMN" ? under : null, start: bodyStart, end: bodyEnd, text: fence[1] });
+    // The provenance comment, if the exporter wrote one. It sits between the
+    // label and the fence, so it is looked for in exactly that span - searching
+    // the whole document would pick up the previous block's line.
+    const between = after.slice(0, fence.index);
+    const prov = /<!--\s*diagramatix:([^>]*?)-->/.exec(between)?.[1]?.trim() ?? null;
+    out.push({ label, chain, under: label === "BPMN" ? under : null, start: bodyStart, end: bodyEnd, text: fence[1], provenance: prov });
   }
   return out;
 }

@@ -131,6 +131,9 @@ const toImported = (c: ChainRow): ImportedChain => ({
   processes: c.processes.map((p) => ({ code: p.code, title: p.title, sortOrder: p.sortOrder })),
   prompts: c.prompts.map((p) => ({
     type: p.type as MdPromptType, processCode: p.processCode, name: p.name, prompt: p.prompt,
+    // Provenance rides along in the .md so an export-then-import keeps it. A
+    // file is a copy of the library, not a laundering of it.
+    model: p.model, generatedAt: p.generatedAt ? p.generatedAt.toISOString() : null,
   })),
 });
 
@@ -228,12 +231,22 @@ export async function POST(req: Request) {
         await prisma.valueChainPrompt.create({
           data: {
             chainId: chain.id, type: p.type, processCode: p.processCode, name: p.name,
-            prompt: p.prompt, roundTripsOk: true, generatedAt: new Date(),
-            // Paul, 2026-09-06: "This may be unknown for an imported Value
-            // Chain?" It is - the .md carries the prompt text and nothing about
-            // what wrote it. Left null deliberately; stamping the current
-            // default here would be a guess presented as a record.
-            model: null,
+            prompt: p.prompt, roundTripsOk: true,
+            /**
+             * Provenance from the file where the file carries it, UNKNOWN where
+             * it does not - never invented.
+             *
+             * This used to stamp `generatedAt = new Date()` unconditionally,
+             * which was worse than losing the date: a prompt written to an old
+             * template came back looking freshly current, and every staleness
+             * warning that exists to catch that went quiet. A null date reads as
+             * stale, which errs towards regenerating - the safe direction.
+             *
+             * Paul, 2026-09-06: "This may be unknown for an imported Value
+             * Chain?" It is, for any file written elsewhere, and it says so.
+             */
+            generatedAt: p.generatedAt ? new Date(p.generatedAt) : null,
+            model: p.model ?? null,
           },
         });
         prompts++;
