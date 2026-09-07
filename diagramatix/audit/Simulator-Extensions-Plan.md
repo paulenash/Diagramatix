@@ -280,12 +280,14 @@ path. The machinery that writes SOPs to Word is already in the building.
 
 ## Phase 3 — Tell them when a difference is real
 
-**Status:** `Not started` · Changes the persisted metrics shape → docs pass required.
+**Status:** ✅ `Shipped` — including smaller item 06. **Correction to the plan:** this needed NO
+version bump. `metrics` is an existing Json column, and per UPDATE_EVERYTHING Step 0 a new key inside
+one is data, not structure. Feature-only release, Step 5 alone.
 
-- [ ] **Blocker first:** persist `repMeans` (+ `repCompleted`, `repCost`) on run metrics
-- [ ] `app/lib/simulation/significance.ts`
-- [ ] Verdict line + "Run N more replications" in `results/CompareView.tsx`
-- [ ] Smaller item **06** — warm-up chosen for the user
+- [x] **Blocker first:** persist `repMeans` (+ `repCompleted`, `repCost`) on run metrics
+- [x] `app/lib/simulation/significance.ts`
+- [x] Verdict line + "Run N more replications" in `results/CompareView.tsx`
+- [x] Smaller item **06** — warm-up chosen for the user
 
 **The blocker.** The run route persists `metrics = { stats, bottlenecks, nodeLabels, clockUnit,
 teamCapacities }` — `MonteCarloResult.reps` is computed and **dropped**. Significance needs the
@@ -300,6 +302,17 @@ them, clamped by `RUN_LIMITS` in `runner.ts`.
 
 > *Someone will otherwise present a 4% improvement that is entirely sampling noise, and be found out
 > by the first person who reruns it.*
+
+**As built.** One design point worth recording: the result carries BOTH a `verdict` (how much to
+trust the answer — `real`, `inside-noise`, `approximate`, `not-enough-data`) and `exceedsBand` (which
+way the answer points). Folding them together was the first cut, and it made every comparison
+against an older run read as noise, because the fallback path could never return `real`. The
+decision and the confidence in it are different questions and are now separate fields.
+
+The t critical values are a lookup table rather than an inverse-CDF: the range that matters is
+small (5–30 replications), and a table is inspectable and impossible to get subtly wrong. Between
+rows it takes the LARGER value, so the interval is never narrower than it should be — erring
+towards "cannot tell", never towards a false finding.
 
 **Smaller item 06 — auto warm-up.** `app/lib/simulation/warmup.ts`, Welch's moving-average method
 over a pilot replication's flow-time series. Needs completion *timestamps* alongside the existing

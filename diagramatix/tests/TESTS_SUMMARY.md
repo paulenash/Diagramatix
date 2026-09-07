@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 408 test files · 2,734 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3421  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-07  ·  **Document version:** 7.0  ·  **Suite:** 410 test files · 2,756 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3441  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3422**, the one after **T3423**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3442**, the one after **T3443**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3421`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3441`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2528,6 +2528,26 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3419 | `tests/simulation/rework.test.ts` | Automating a task keeps a residual time and drops its demand on the team. |
 | T3420 | `tests/simulation/rework.test.ts` | The automation residual scales with the task. |
 | T3421 | `tests/simulation/rework.test.ts` | The automation assumption travels with the proposal, including that building it is not free. |
+| T3422 | `tests/simulation/significance.test.ts` | A large difference against tight runs is reported as real, with a confidence interval. |
+| T3423 | `tests/simulation/significance.test.ts` | A small difference against noisy runs is reported as inside the noise, not as a finding. |
+| T3424 | `tests/simulation/significance.test.ts` | An inside-the-noise verdict says how many replications would settle it. |
+| T3425 | `tests/simulation/significance.test.ts` | A run with no stored per-replication vector is reported approximate, never certain. |
+| T3426 | `tests/simulation/significance.test.ts` | With no data at all it refuses to answer rather than guessing. |
+| T3427 | `tests/simulation/significance.test.ts` | Two perfectly steady runs: any difference is real, an identical one is not. |
+| T3428 | `tests/simulation/significance.test.ts` | Direction is described from the reader's point of view, not from the sign. |
+| T3429 | `tests/simulation/significance.test.ts` | The t table is conservative between rows, never narrower than it should be. |
+| T3430 | `tests/simulation/significance.test.ts` | mean and sample variance use n-1 and are zero-safe. |
+| T3431 | `tests/simulation/significance.test.ts` | Resolving a smaller difference needs more replications; impossible ones return nothing. |
+| T3432 | `tests/simulation/significance.test.ts` | An approximate comparison can still exceed the band, and is labelled approximate. |
+| T3433 | `tests/simulation/significance.test.ts` | A zero band means the replications agreed exactly, not that nothing is known. |
+| T3434 | `tests/simulation/significance.test.ts` | The real / inside-noise verdicts agree with exceedsBand. |
+| T3435 | `tests/simulation/warmup.test.ts` | A run that settles gets a warm-up covering the transient. |
+| T3436 | `tests/simulation/warmup.test.ts` | A run steady from the start needs no warm-up. |
+| T3437 | `tests/simulation/warmup.test.ts` | Too few cases declines to answer rather than inventing a number. |
+| T3438 | `tests/simulation/warmup.test.ts` | A run that never settles says so instead of suggesting a huge warm-up. |
+| T3439 | `tests/simulation/warmup.test.ts` | Without completion times it reports the case position and asks for a re-run. |
+| T3440 | `tests/simulation/warmup.test.ts` | The smoothed series is returned and never invents values outside the data's range. |
+| T3441 | `tests/simulation/client-bundle-hygiene.test.ts` | The import walker really follows relative imports, so a clean result means something. |
 
 > **Keep this section in sync.** Whenever an e2e spec is added, removed, or changes what it asserts, update this section. It is hand-maintained, not generated.
 

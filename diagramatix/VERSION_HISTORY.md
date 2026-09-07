@@ -15,6 +15,23 @@ a `schemaVersion` bump). Newest first.
 
 ---
 
+## 2.7.2485 — 2026-09-07 — Telling you when a difference is real
+
+- **Is the difference real?** Comparing two runs now says plainly whether the difference is larger
+  than the run-to-run noise — and when it is not, says so and offers to run the replications that
+  would settle it. Welch's test over the per-replication means, reported as a confidence interval
+  on the difference. Someone would otherwise present a 4% improvement that is entirely sampling
+  noise and be found out by the first person who reran it.
+- Runs now keep their **per-replication vectors**. They were computed and thrown away, so the
+  question could not be answered from a saved run at all. Older runs fall back to the p5–p95 band
+  and are labelled APPROXIMATE rather than passed off as certain.
+- **Suggested next steps** now uses that real test instead of the band comparison it shipped with.
+  It was always marked as a stand-in; this is the promised replacement, and nothing else changed.
+- **Warm-up is suggested rather than guessed** — Welch's moving average over the case flow times
+  finds where the start-up transient dies out. It declines to answer on a short or never-settling
+  run instead of inventing a number, and it is never imposed: a transient is sometimes the very
+  thing being studied.
+- Schema: no bump (feature-only — the new figures live inside the existing `metrics` JSON).
 ## 2.7.2482 — 2026-09-07 — What the change is worth, with a date on it
 
 - **Business case** — cost per case before and after, the saving, the annual figure, the one-off

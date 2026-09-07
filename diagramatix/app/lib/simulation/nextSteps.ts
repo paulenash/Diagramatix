@@ -19,9 +19,10 @@
  *     subset where a scenario's overrides are genuinely what ran, so that is the
  *     only subset used. Deriving more from `networkSnapshot` is possible later;
  *     guessing is not.
- *  2. "Inside the noise" is judged on the run-to-run band of the mean flow time
- *     (`flowTime` p5–p95), the only spread stored today. Phase 3 replaces
- *     {@link isInsideNoise} with a real significance test; nothing else changes.
+ *  2. "Inside the noise" is a real significance test (Welch's, over the stored
+ *     per-replication means) as of Phase 3. Runs recorded before those were
+ *     persisted fall back to the p5–p95 band and are reported as APPROXIMATE —
+ *     never as certainty.
  *
  * Pure — no DB, no React, no AI.
  */
@@ -30,6 +31,7 @@ import type { StudyRun } from "./studyRuns";
 import { latestRunPerScenario } from "./studyRuns";
 import type { OverrideSet } from "./overrides";
 import type { RunMetrics } from "./results";
+import { compareSamples } from "./significance";
 
 /** Levers this module can see. Team capacity and the two per-node time levers are
  *  enumerable from stored metrics alone (`teamCapacities`, `nodeLabels`); edge
@@ -59,6 +61,9 @@ export interface Outcome {
   meanHalfWidth: number;
   throughput: number;
   costPerCase: number;
+  /** Per-replication mean flow times, when the run recorded them — what the
+   *  significance test actually needs. Absent on older runs. */
+  repMeans?: number[];
   /** Team ids ranked by utilisation, busiest first. */
   bottlenecks: string[];
 }
@@ -161,6 +166,7 @@ export function outcomeOf(metrics: RunMetrics): Outcome {
     meanHalfWidth: Math.max(0, (ft.p95 - ft.p5) / 2),
     throughput: s.completed?.mean ?? 0,
     costPerCase: s.costPerCase?.mean ?? 0,
+    ...(metrics.repMeans && metrics.repMeans.length > 1 ? { repMeans: metrics.repMeans } : {}),
     bottlenecks: metrics.bottlenecks ?? [],
   };
 }
@@ -168,14 +174,20 @@ export function outcomeOf(metrics: RunMetrics): Outcome {
 /**
  * Is a difference between two outcomes indistinguishable from run-to-run noise?
  *
- * PHASE 3 REPLACES THIS. Today it compares the gap in mean flow time against the
- * wider of the two runs' p5–p95 half-widths — a crude but honest stand-in, since
- * the per-replication vector needed for a real test is not yet persisted. When
- * Phase 3 lands, this function becomes a Welch's t and nothing else here changes.
+ * PHASE 3: a real test. When both runs recorded their per-replication means this
+ * is Welch's over those samples; when either did not (an older run), it falls
+ * back to the p5–p95 band, which is approximate — and `compareSamples` labels it
+ * so, rather than letting an approximation pass as a verdict.
+ *
+ * This was the ONE stand-in the suggestions rested on. Everything that used it
+ * keeps working unchanged; the answers just became defensible.
  */
 export function isInsideNoise(a: Outcome, b: Outcome): boolean {
-  const band = Math.max(a.meanHalfWidth, b.meanHalfWidth);
-  return Math.abs(a.mean - b.mean) <= band;
+  return compareSamples(a.repMeans, b.repMeans, {
+    baseMeanFallback: a.mean,
+    compareMeanFallback: b.mean,
+    approxHalfWidth: Math.max(a.meanHalfWidth, b.meanHalfWidth),
+  }).exceedsBand === false;
 }
 
 /** Every lever visible in a run's metrics: one per team, per task, per source. */

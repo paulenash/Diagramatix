@@ -32,6 +32,8 @@ const CLIENT_REACHABLE = [
   { entry: path.join(LIB, "simulation", "nextSteps.ts"), importedBy: "StudyManager.tsx" },
   { entry: path.join(LIB, "simulation", "runTrend.ts"), importedBy: "RunTrend.tsx / RunHistory.tsx" },
   { entry: path.join(LIB, "simulation", "rework.ts"), importedBy: "SimDataPanel / StudyManager" },
+  { entry: path.join(LIB, "simulation", "significance.ts"), importedBy: "CompareView.tsx" },
+  { entry: path.join(LIB, "simulation", "warmup.ts"), importedBy: "the run dialog" },
 ];
 
 /** Relative import specifiers in a source file. Deliberately string-based: this
@@ -74,9 +76,10 @@ describe("client-reachable simulation modules are free of the database", () => {
   for (const { entry, importedBy } of CLIENT_REACHABLE) {
     it(`T3387 - ${rel(entry)} pulls in no DB import (bundled via ${importedBy})`, () => {
       const graph = graphFrom(entry);
-      // Self-cover: a walk that silently found nothing would pass while checking
-      // nothing at all.
-      expect(graph.length, "the import walk found nothing to check").toBeGreaterThan(2);
+      // A leaf module legitimately has a graph of one — itself. The walker is
+      // proven to actually walk by the dedicated test below, not by demanding
+      // every entry have dependencies.
+      expect(graph.map(rel), "the entry itself must be in its own graph").toContain(rel(entry));
 
       const offenders = graph
         .filter((f) => DB_IMPORTS.some((needle) => fs.readFileSync(f, "utf8").includes(needle)))
@@ -84,6 +87,17 @@ describe("client-reachable simulation modules are free of the database", () => {
       expect(offenders, `these reach the browser bundle via ${importedBy}`).toEqual([]);
     });
   }
+
+  it("T3441 - the walker really follows relative imports (so a clean result means something)", () => {
+    // Self-cover, done properly: assert a KNOWN multi-file chain is discovered.
+    // Without this, a walker that silently resolved nothing would report every
+    // module clean while checking none of them.
+    const graph = graphFrom(path.join(LIB, "simulation", "nextSteps.ts")).map(rel);
+    expect(graph).toContain("app/lib/simulation/nextSteps.ts");
+    expect(graph).toContain("app/lib/simulation/studyRuns.ts");
+    expect(graph).toContain("app/lib/simulation/significance.ts");
+    expect(graph.length).toBeGreaterThan(3);
+  });
 
   it("T3388 - the check can fail: loadStudyRuns.ts does import the DB, and is kept out of that graph", () => {
     const loader = path.join(LIB, "simulation", "loadStudyRuns.ts");

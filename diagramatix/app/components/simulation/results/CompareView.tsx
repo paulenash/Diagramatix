@@ -12,6 +12,7 @@
 import { useState } from "react";
 import { type RunMetrics, fmtDelta, fmtMoney } from "@/app/lib/simulation/results";
 import { FlowHistogram } from "./FlowHistogram";
+import { compareSamples, type SignificanceResult } from "@/app/lib/simulation/significance";
 import { useAiAllowed } from "@/app/lib/auth/useAiAllowed";
 
 export interface CompareEntry { key: string; name: string; isBaseline?: boolean; metrics: RunMetrics }
@@ -44,9 +45,13 @@ function verdict(base: RunMetrics, tobe: RunMetrics, name: string): string {
   return `${name}: ${parts.join(", ")}.`;
 }
 
-export function CompareView({ entries, assessFn }: {
+export function CompareView({ entries, assessFn, onRunMore }: {
   entries: CompareEntry[];
   assessFn?: () => Promise<{ assessment?: string; error?: string }>;
+  /** Offered when the difference is inside the noise: re-run both sides with
+   *  enough replications to settle it. Absent = the verdict is stated without
+   *  an offer to resolve it. */
+  onRunMore?: (replications: number) => void;
 }) {
   const aiAllowed = useAiAllowed();
   const [assessment, setAssessment] = useState<string | null>(null);
@@ -74,6 +79,23 @@ export function CompareView({ entries, assessFn }: {
 
   const verdicts = entries.filter((e) => e !== baseline).map((e) => verdict(baseM, e.metrics, e.name));
 
+  // Is the headline difference bigger than the run-to-run noise? Without this a
+  // 4% "improvement" that is pure sampling variation reads exactly like a real
+  // one — and is found out by the first person who reruns it.
+  const halfWidth = (m: RunMetrics) => Math.max(0, (m.stats.flowTime.p95 - m.stats.flowTime.p5) / 2);
+  const significance: { name: string; result: SignificanceResult }[] = entries
+    .filter((e) => e !== baseline)
+    .map((e) => ({
+      name: e.name,
+      result: compareSamples(baseM.repMeans, e.metrics.repMeans, {
+        label: "the difference in flow time",
+        lowerIsBetter: true,
+        baseMeanFallback: baseM.stats.flowTime.mean,
+        compareMeanFallback: e.metrics.stats.flowTime.mean,
+        approxHalfWidth: Math.max(halfWidth(baseM), halfWidth(e.metrics)),
+      }),
+    }));
+
   async function runAssessment() {
     if (!assessFn) return;
     setAssessing(true); setAssessErr(null);
@@ -90,6 +112,28 @@ export function CompareView({ entries, assessFn }: {
         <div className="mb-2 border border-green-500/40 rounded bg-green-400/5 px-2 py-1.5">
           <div className="text-green-400/60 uppercase tracking-widest text-[9px] mb-0.5">verdict vs {baseline.name}</div>
           {verdicts.map((v, i) => <div key={i} className="text-green-200 text-[11px]">{v}</div>)}
+          {significance.map(({ name, result }, i) => (
+            <div key={`sig-${i}`} className="mt-1 pt-1 border-t border-green-500/20 text-[10px] leading-relaxed">
+              <span className={
+                result.verdict === "real" ? "text-green-300"
+                : result.verdict === "inside-noise" ? "text-amber-300"
+                : "text-green-400/60"
+              }>
+                {result.verdict === "real" ? "✓ real" : result.verdict === "inside-noise" ? "⚠ inside the noise" : "≈ approximate"}
+              </span>
+              <span className="text-green-400/70"> — {result.statement}</span>
+              {result.verdict === "inside-noise" && result.replicationsNeeded && onRunMore && (
+                <button
+                  onClick={() => onRunMore(result.replicationsNeeded!)}
+                  className="ml-1 underline text-green-300 hover:text-green-200"
+                  title={`Re-run both sides with ${result.replicationsNeeded} replications`}
+                >
+                  Run {result.replicationsNeeded} replications
+                </button>
+              )}
+              {significance.length > 1 && <span className="text-green-400/40"> ({name})</span>}
+            </div>
+          ))}
         </div>
       )}
 

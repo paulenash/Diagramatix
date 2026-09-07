@@ -20,6 +20,20 @@ export interface RunMetrics {
   clockUnit: string;
   /** Team name → capacity, so the comparison can express "FTE freed". */
   teamCapacities?: Record<string, number>;
+  /**
+   * The PER-REPLICATION vector behind the aggregates — one number per run of the
+   * Monte-Carlo, at most `RUN_LIMITS.maxReplications` of them.
+   *
+   * Kept because a mean and a percentile band cannot answer "is this difference
+   * real?": that needs the individual observations. It is a handful of numbers
+   * beside a whole network snapshot, so the cost is nil.
+   *
+   * ABSENT on runs recorded before this was stored. Every reader must fall back
+   * and SAY the verdict is approximate, rather than treat absence as certainty.
+   */
+  repMeans?: number[];
+  repCompleted?: number[];
+  repCost?: number[];
 }
 
 /** A run row as returned by GET .../run (history, newest first). */
