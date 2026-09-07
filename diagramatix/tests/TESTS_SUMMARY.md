@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-09-04  ·  **Document version:** 7.0  ·  **Suite:** 389 test files · 2,559 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3339  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
+**As at:** 2026-09-04  ·  **Document version:** 7.0  ·  **Suite:** 389 test files · 2,559 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`  ·  **Highest ref:** T3356  ·  **Plus:** a Playwright browser e2e suite — see [Layer 11](#layer-11--end-to-end-playwright-browser-tests)
 
 ---
 
@@ -34,9 +34,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3340**, the one after **T3341**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T3357**, the one after **T3358**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T3339`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
+> **Highest ref allocated: `T3356`.** Update this line whenever you add tests, so the next continuation point is always obvious. It is CHECKED: `tests/config/tests-summary-coverage.test.ts` fails if it disagrees with the tree, and fails if any `Tnnnn` in the tree has no row in this document. Three different totals once coexisted in this file — 820, 436 and 131-vs-66 files — because nothing verified any of them. (T0639-T0640 = optional state + Activity→State table for logs with no state column; T0641-T0642 = governance aggregate from Control/Risk/Policy IDs on events + log-based control effectiveness; T0643-T0644 = IEEE XES import/export; T0645-T0646 = OCEL import/export; T0647-T0648 = Document Editor .docx export; T0649-T0650 = document-collection isolation, user-guide vs tech-design.) (T0617-T0619 = Excel-serial + sampleLog; T0620-T0623 = state-machine Layout red rules S3.01/02/04/05/06; T0624 = AI Explain-results prompt; T0625 = three choosable mining scenarios w/ declining compliance; T0626-T0635 = Risk & Control: element annotation, B38 coverage + B39 SoD checks, xlsx writer, adopt clone + RCM export, flat Activity×Risk×Control audit grid, GRC objects + traceability graph, control operating-effectiveness from mining conformance; T0636 = ready-made Order-to-Cash sample GRC library; T0637 = O2C mining example aligns with the library's control signatures; T0638 = Risk & Control Examples (3rd catalog) package + attach integrity.)
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -2299,6 +2299,23 @@ Real-browser journeys the Vitest suite can't reach — pointer drags on the SVG 
 | T3337 | `tests/ui/cascade-glyphs.test.ts` | The Simulator title carries the Diagramatix logo and the trademark. |
 | T3338 | `tests/ui/cascade-glyphs.test.ts` | The console background cascade is the same BPMN one as the entry. |
 | T3339 | `tests/ui/cascade-glyphs.test.ts` | A panel may shrink below its content, so task fields scroll inside it rather than escaping. |
+| T3340 | `tests/life/life3d.test.ts` | Three coordinates pack and unpack, negatives included. |
+| T3341 | `tests/life/life3d.test.ts` | A cube has 26 neighbours — 6 by face, 12 by edge, 8 by corner — counted the way the engine counts. |
+| T3342 | `tests/life/life3d.test.ts` | The face-only neighbourhood really is only the six faces; a corner-toucher does not count. |
+| T3343 | `tests/life/life3d.test.ts` | A bounded cube is a CULL, not a wrap. |
+| T3344 | `tests/life/life3d.test.ts` | A generation follows the population, not the volume — which is what makes 100³ affordable. |
+| T3345 | `tests/life/life3d.test.ts` | Every 3-D pattern is re-verified against its own claimed category, period and travel. |
+| T3346 | `tests/life/life3d.test.ts` | B6/S567 has a glider — Bays own test for whether a 3-D rule is a Life. |
+| T3347 | `tests/life/life3d.test.ts` | The glider is still flying after twenty periods, displaced exactly 20 each way. |
+| T3348 | `tests/life/life3d.test.ts` | The solid 2x2x2 cube never changes: every cube touches seven others, and 7 survives. |
+| T3349 | `tests/life/life3d.test.ts` | The same glider does NOT fly under Conway rule — a pattern belongs to its rule. |
+| T3350 | `tests/life/life3d.test.ts` | Born on three of twenty-six, a soup runs away; under B6/S567 it does not. |
+| T3351 | `tests/life/life3d.test.ts` | Bays spelling B6/S567 reads as he wrote it. |
+| T3352 | `tests/life/life3d.test.ts` | Counts above nine need a separator, and a count that cannot occur is refused. |
+| T3353 | `tests/life/life3d.test.ts` | Rubbish notation is refused. |
+| T3354 | `tests/life/life3d.test.ts` | A rule always formats unambiguously as a comma list. |
+| T3355 | `tests/life/life3d.test.ts` | Every 3-D rule in the library parses and carries a real note; Conway is kept for comparison. |
+| T3356 | `tests/life/life3d.test.ts` | The rules panel describes the ACTIVE rule and the right neighbourhood. |
 | T3040 | `tests/bpmn/v2505-rules.test.ts` | B48 fires when a data artifact's wrapped name lands on the task underneath. |
 | T3041 | `tests/bpmn/v2505-rules.test.ts` | B48 is silent once the artifact is lifted clear. |
 | T3042 | `tests/bpmn/v2505-rules.test.ts` | B48 does not fire for a SHORT name — measuring the 80px column instead of the text would move artifacts that are visibly fine. |
